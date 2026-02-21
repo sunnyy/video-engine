@@ -74,6 +74,8 @@ export default function AvatarLayer({ avatar, project }) {
     };
   }
 
+  const avatarFit = currentBeat.avatar_object_fit || "cover";
+
   return (
     <AbsoluteFill style={{ pointerEvents: "none", zIndex: 2 }}>
       <div style={containerStyle}>
@@ -83,7 +85,7 @@ export default function AvatarLayer({ avatar, project }) {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "cover",
+            objectFit: avatarFit,
           }}
         />
       </div>
