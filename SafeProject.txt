@@ -1,0 +1,59 @@
+SafeProject {
+  id
+  meta: {
+    orientation: "9:16" | "16:9"
+    mode: "talking_head" | "faceless"
+    fps: number
+    width: number
+    height: number
+  }
+
+  avatar: {
+    src: string | null
+    duration_sec: number
+    speed: number
+  } | null
+
+  music: {
+    src: string
+    volume: number
+  } | null
+
+  beats: SafeBeat[]
+}
+
+
+SafeBeat {
+  id: string
+  order: number
+  beat_type: string
+  visual_mode: "full" | "split" | "floating" | "dual"
+
+  duration_sec: number
+  start_sec: number
+  end_sec: number
+
+  spoken: string
+  visible: boolean
+
+  avatar_position: "top" | "bottom" | null
+
+  assets: {
+    main: AssetObject | null
+    secondary: AssetObject | null
+  }
+
+  caption: {
+    show: boolean
+    style: string
+    position: string
+    animation: string
+  }
+
+  transition: {
+    type: string
+    duration: number
+  }
+
+  components: []
+}
