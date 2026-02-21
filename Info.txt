@@ -1,0 +1,22 @@
+Project name: video-engine
+Database password: mNE7cXQMeAYwxi7t
+Project URL: https://dfwacscjpdesuvwamxfs.supabase.co
+Publishable API Key: sb_publishable_iGxNppQZj_0EsHPGU91oRQ_jPzOOwaf
+
+
+
+
+<pre
+    style={{
+        width: 400,
+        height: 400,
+        overflow: "auto",
+        background: "#111",
+        color: "#0f0",
+        padding: 12,
+        fontSize: 12,
+        display: "none"
+    }}
+>
+    {JSON.stringify(project, null, 2)}
+</pre>

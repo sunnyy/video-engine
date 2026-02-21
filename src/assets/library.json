@@ -1,0 +1,20 @@
+[
+  {
+    "id": "bg_gradient_dark",
+    "category": "background",
+    "tags": ["dark", "neutral"],
+    "orientation": "any",
+    "tone": "neutral",
+    "type": "image",
+    "src": "/assets/images/gradient-dark.jpg"
+  },
+  {
+    "id": "office_vertical",
+    "category": "office",
+    "tags": ["work", "startup"],
+    "orientation": "9:16",
+    "tone": "professional",
+    "type": "image",
+    "src": "/assets/images/office-vertical.jpg"
+  }
+]
