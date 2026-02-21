@@ -64,28 +64,56 @@ function resolveAsset(rawAsset, meta) {
 }
 
 export function normalizeBeat(raw = {}, index, meta) {
-  const visual_mode = resolveVisualMode(raw.visual_mode, meta.mode);
+  const visual_mode = resolveVisualMode(
+    raw.visual_mode,
+    meta.mode
+  );
 
   return {
-    id: raw.id || "beat_" + index + "_" + Math.random().toString(36).slice(2, 6),
+    id:
+      raw.id ||
+      "beat_" +
+        index +
+        "_" +
+        Math.random()
+          .toString(36)
+          .slice(2, 6),
 
     order: index,
     beat_type: raw.beat_type || "default",
     visual_mode,
+
+    // 🔥 PRESERVE content_type
+    content_type:
+      raw.content_type ||
+      (meta.mode === "talking_head"
+        ? "avatar"
+        : "asset"),
+
     duration_sec: resolveDuration(raw.duration_sec),
     start_sec: 0,
     end_sec: 0,
     spoken: resolveSpoken(raw.spoken),
     visible: resolveVisible(raw.visible),
-    avatar_position: normalizeAvatarPosition(raw.avatar_position, visual_mode),
+    avatar_position: normalizeAvatarPosition(
+      raw.avatar_position,
+      visual_mode
+    ),
 
     assets: {
       main: resolveAsset(raw.assets?.main, meta),
-      secondary: resolveAsset(raw.assets?.secondary, meta),
+      secondary: resolveAsset(
+        raw.assets?.secondary,
+        meta
+      ),
     },
 
     caption: normalizeCaption(raw.caption),
-    transition: normalizeTransition(raw.transition),
-    components: Array.isArray(raw.components) ? raw.components : [],
+    transition: normalizeTransition(
+      raw.transition
+    ),
+    components: Array.isArray(raw.components)
+      ? raw.components
+      : [],
   };
 }

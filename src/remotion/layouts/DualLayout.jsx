@@ -24,11 +24,7 @@ export default function DualLayout({ beat, project }) {
   };
 
   return (
-    <AbsoluteFill
-      style={{
-        flexDirection: isVertical ? "column" : "row",
-      }}
-    >
+    <AbsoluteFill style={{ flexDirection: isVertical ? "column" : "row", zIndex: 0 }}>
       <AbsoluteFill style={{ flex: 1, position: "relative" }}>
         {renderZone(main)}
       </AbsoluteFill>
@@ -37,11 +33,17 @@ export default function DualLayout({ beat, project }) {
         {renderZone(secondary)}
       </AbsoluteFill>
 
+      {/* Captions */}
       {beat.caption?.show && (
-        <Caption beat={beat} project={project} />
+        <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+          <Caption beat={beat} project={project} />
+        </div>
       )}
 
-      <ComponentsRenderer components={beat.components} />
+      {/* Components */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+        <ComponentsRenderer components={beat.components} />
+      </div>
     </AbsoluteFill>
   );
 }

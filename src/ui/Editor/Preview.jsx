@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Player } from "@remotion/player";
-import VideoComposition from "../../remotion/VideoComposition";
 import { useProjectStore } from "../../store/useProjectStore";
+import VideoComposition from "../../remotion/VideoComposition";
 
 export default function Preview() {
   const project = useProjectStore((s) => s.project);
@@ -11,38 +11,41 @@ export default function Preview() {
 
   if (!project) return null;
 
-  const activeBeat = project.beats.find(
-    (b) => b.id === activeBeatId
-  );
-
-  useEffect(() => {
-    if (!activeBeat || !playerRef.current) return;
-
-    const frame = Math.floor(
-      activeBeat.start_sec * project.meta.fps
+  if (!project.workflow?.beats_initialized) {
+    return (
+      <div className="flex h-full items-center justify-center text-gray-400">Complete previous steps to preview</div>
     );
+  }
+
+  const fps = project.meta.fps;
+  const durationFrames = Math.max(1, Math.floor(project.duration_sec * fps));
+
+  // 🔥 SEEK LOGIC
+  useEffect(() => {
+    if (!activeBeatId) return;
+    if (!playerRef.current) return;
+
+    const beat = project.beats.find((b) => b.id === activeBeatId);
+
+    if (!beat) return;
+
+    const frame = Math.floor(beat.start_sec * fps);
 
     playerRef.current.seekTo(frame);
-  }, [activeBeatId]);
+  }, [activeBeatId, project, fps]);
 
   return (
-    <div className="bg-white rounded-xl">
+    <div className="bg-white p-4 rounded-xl w-[50%] flex justify-center ">
       <Player
         ref={playerRef}
         component={VideoComposition}
-        durationInFrames={Math.floor(
-          project.duration_sec * project.meta.fps
-        )}
-        fps={project.meta.fps}
+        inputProps={{ project }}
+        durationInFrames={durationFrames}
         compositionWidth={project.meta.width}
         compositionHeight={project.meta.height}
+        fps={fps}
         controls
-         style={{
-          width: "100%",
-          borderRadius: 12,
-          overflow: "hidden",
-          maxHeight: "600px"
-        }}
+        style={{ maxHeight: 600 }}
       />
     </div>
   );

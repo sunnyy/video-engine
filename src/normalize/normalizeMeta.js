@@ -1,33 +1,21 @@
-import { DEFAULT_META, ORIENTATION_MAP } from "./constants";
-
-function resolveOrientation(raw) {
-  return ORIENTATION_MAP[raw] ? raw : DEFAULT_META.orientation;
-}
-
-function resolveMode(raw) {
-  return raw === "talking_head" || raw === "faceless"
-    ? raw
-    : DEFAULT_META.mode;
-}
-
-function resolveFPS(raw) {
-  return typeof raw === "number" && raw > 0
-    ? raw
-    : DEFAULT_META.fps;
-}
-
 export function normalizeMeta(raw = {}) {
-  const orientation = resolveOrientation(raw.orientation);
-  const mode = resolveMode(raw.mode);
-  const fps = resolveFPS(raw.fps);
+  const orientation = raw.orientation || "9:16";
+  const mode = raw.mode || "faceless";
+  const fps = raw.fps || 30;
 
-  const size = ORIENTATION_MAP[orientation];
+  let width = 1080;
+  let height = 1920;
+
+  if (orientation === "16:9") {
+    width = 1920;
+    height = 1080;
+  }
 
   return {
     orientation,
     mode,
     fps,
-    width: size.width,
-    height: size.height,
+    width,
+    height,
   };
 }

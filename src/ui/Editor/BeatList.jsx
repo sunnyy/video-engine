@@ -42,7 +42,7 @@ export default function BeatList() {
   };
 
   return (
-    <div className="w-[260px] overflow-y-auto border-r border-gray-200 bg-white p-4">
+    <div className="w-[260px] overflow-y-auto border-r border-gray-200 bg-white p-4 rounded-xl">
       <h4 className="mb-4 text-sm font-semibold text-gray-600 uppercase">
         Beats
       </h4>
@@ -99,7 +99,7 @@ function SortableBeat({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group flex items-center gap-3 rounded-lg border p-2 transition
+      className={`group flex items-center gap-3 rounded-lg border p-2 transition select-none
         ${
           isActive
             ? "border-indigo-600 bg-indigo-50"
@@ -130,7 +130,7 @@ function SortableBeat({
         className="flex flex-1 flex-col cursor-pointer"
       >
         <div className="flex items-center justify-between text-sm font-medium">
-          <span>Beat {index + 1}</span>
+          <span>{beat.spoken}</span>
           <span className="text-xs text-gray-500">
             {beat.duration_sec}s
           </span>
