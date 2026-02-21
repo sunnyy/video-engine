@@ -23,16 +23,16 @@ export default function AssetsSection({ beat, project }) {
         Assets
       </h4>
 
-      <div className="space-y-6">
+      <div className="flex gap-4 overflow-x-auto pb-2">
         <AssetSlot
-          label="Main Asset"
+          label="Main"
           asset={beat.assets.main}
           onClick={() => setOpenSlot("main")}
         />
 
         {beat.visual_mode === "dual" && (
           <AssetSlot
-            label="Secondary Asset"
+            label="Secondary"
             asset={beat.assets.secondary}
             onClick={() => setOpenSlot("secondary")}
           />
@@ -52,22 +52,21 @@ export default function AssetsSection({ beat, project }) {
 
 function AssetSlot({ label, asset, onClick }) {
   return (
-    <div>
-      <div className="mb-2 text-xs font-medium text-gray-500 uppercase">
+    <div className="flex-shrink-0 w-[120px]">
+      <div className="mb-2 text-[10px] font-medium text-gray-500 uppercase">
         {label}
       </div>
 
       <div
         onClick={onClick}
-        className="group relative flex h-44 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 hover:border-indigo-500"
+        className="group relative h-[160px] w-full cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-gray-50 hover:border-indigo-500"
       >
         {!asset && (
-          <span className="text-sm text-gray-400">
-            Click to select asset
-          </span>
+          <div className="flex h-full items-center justify-center text-xs text-gray-400 text-center px-2">
+            Select
+          </div>
         )}
 
-        {/* Background Preview */}
         {asset?.type === "background" && (
           <div
             className="h-full w-full"
@@ -79,7 +78,6 @@ function AssetSlot({ label, asset, onClick }) {
           />
         )}
 
-        {/* Image / Upload Preview */}
         {asset?.type !== "background" &&
           asset?.src && (
             <img
@@ -92,15 +90,15 @@ function AssetSlot({ label, asset, onClick }) {
           <>
             <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/40" />
 
-            <div className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
+            <div className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] text-white">
               {asset.type === "upload"
-                ? "Uploaded"
+                ? "Upload"
                 : asset.type === "background"
-                ? "Background"
+                ? "BG"
                 : "Library"}
             </div>
 
-            <div className="absolute right-2 top-2 rounded bg-white px-2 py-1 text-xs shadow">
+            <div className="absolute right-1 top-1 rounded bg-white px-1 py-0.5 text-[9px] shadow">
               Replace
             </div>
           </>

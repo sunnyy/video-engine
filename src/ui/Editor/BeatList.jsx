@@ -26,7 +26,7 @@ export default function BeatList() {
   };
 
   return (
-    <div className="w-[260px] overflow-y-auto border-r border-gray-200 bg-white p-4 rounded-xl">
+    <div className="w-[360px] overflow-y-auto border-r border-gray-200 bg-white px-2 py-2 rounded-xl">
       <h4 className="mb-4 text-sm font-semibold text-gray-600 uppercase">Beats</h4>
 
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -94,11 +94,13 @@ function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat }) 
         className="flex flex-1 flex-col cursor-pointer"
       >
         <div className="flex items-center justify-between text-sm font-medium">
-          <span>{beat.spoken}</span>
-          <span className="text-xs text-gray-500">{beat.duration_sec}s</span>
+          <span className="line-clamp-2 text-left">{beat.spoken}</span>
         </div>
 
-        <div className="text-xs text-gray-500">{beat.visual_mode}</div>
+        <div className="flex gap-2">
+          <span className="text-xs bg-gray-100 font-medium text-black px-2 py-[2px]">{beat.duration_sec}s</span>
+          <div className="text-xs bg-blue-100 font-medium text-black px-2 py-[2px]">{beat.visual_mode}</div>
+        </div>
       </div>
 
       {/* Delete */}
