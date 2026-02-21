@@ -7,6 +7,7 @@ function createRawBeat(order, mode) {
     beat_type: "default",
     visual_mode: mode === "talking_head" ? "split" : "full",
     duration_sec: 3,
+    seekToBeat: null,
     spoken: "",
     visible: true,
     assets: {

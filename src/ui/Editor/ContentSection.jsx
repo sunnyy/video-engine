@@ -16,7 +16,7 @@ export default function ContentSection({ beat }) {
         onChange={(e) =>
           updateBeat(beat.id, { spoken: e.target.value })
         }
-        className="w-full rounded-md border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="w-[90%] rounded-md border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
 
       <div className="mt-4 flex items-center gap-4">
@@ -32,7 +32,7 @@ export default function ContentSection({ beat }) {
           className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
 
-        <label className="flex items-center gap-2 text-sm text-gray-600">
+        {/* <label className="flex items-center gap-2 text-sm text-gray-600">
           <input
             type="checkbox"
             checked={beat.visible}
@@ -44,7 +44,7 @@ export default function ContentSection({ beat }) {
             className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
           />
           Visible
-        </label>
+        </label> */}
       </div>
     </div>
   );

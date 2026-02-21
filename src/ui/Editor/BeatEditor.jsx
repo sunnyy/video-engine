@@ -4,8 +4,10 @@ import { useProjectStore } from "../../store/useProjectStore";
 import LayoutSelector from "./LayoutSelector";
 import ContentSection from "./ContentSection";
 import AssetsSection from "./AssetsSection";
+import LayoutSettingsSection from "./LayoutSettingsSection";
 import CaptionsSection from "./CaptionsSection";
 import TransitionSection from "./TransitionSection";
+
 
 export default function BeatEditor() {
   const project = useProjectStore((s) => s.project);
@@ -31,6 +33,8 @@ export default function BeatEditor() {
         </h4>
         <LayoutSelector beat={activeBeat} />
       </div>
+
+      <LayoutSettingsSection beat={activeBeat} />
 
       <ContentSection beat={activeBeat} />
 

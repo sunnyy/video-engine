@@ -1,7 +1,7 @@
 import React from "react";
+import { Video } from "remotion";
 
 export default function AssetRenderer({ asset }) {
-
   if (!asset) {
     return (
       <div
@@ -14,6 +14,9 @@ export default function AssetRenderer({ asset }) {
       />
     );
   }
+
+  const objectFit =
+    asset.object_fit || "cover";
 
   // Background type
   if (asset.type === "background") {
@@ -50,16 +53,15 @@ export default function AssetRenderer({ asset }) {
 
     if (isVideo) {
       return (
-        <video
+        <Video
           src={asset.src}
+          muted
+          loop
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "cover",
+            objectFit: objectFit,
           }}
-          autoPlay
-          loop
-          muted
         />
       );
     }
@@ -70,13 +72,12 @@ export default function AssetRenderer({ asset }) {
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "cover",
+          objectFit: objectFit,
         }}
       />
     );
   }
 
-  // Final fallback
   return (
     <div
       style={{
