@@ -40,6 +40,18 @@ export const useProjectStore = create((set, get) => ({
     });
   },
 
+  updateProjectMeta: (updates) => {
+    const current = get().project;
+    if (!current) return;
+
+    const updated = {
+      ...current,
+      ...updates,
+    };
+
+    set({ project: updated });
+  },
+
   setActiveBeat: (beatId) => {
     set({ activeBeatId: beatId });
   },

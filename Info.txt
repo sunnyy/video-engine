@@ -3,7 +3,7 @@ Database password: mNE7cXQMeAYwxi7t
 Project URL: https://dfwacscjpdesuvwamxfs.supabase.co
 Publishable API Key: sb_publishable_iGxNppQZj_0EsHPGU91oRQ_jPzOOwaf
 
-
+First of all, keep your responses short, and straight to point, no explanations, no questions, no unnecessary talks until asked, and never give me code patches, always give me full code to replace, don't assume code, if you want to see the existing code, ask me I will give you code. Just go step by step.
 
 
 <pre
@@ -20,3 +20,50 @@ Publishable API Key: sb_publishable_iGxNppQZj_0EsHPGU91oRQ_jPzOOwaf
 >
     {JSON.stringify(project, null, 2)}
 </pre>
+
+
+
+No, the current flow is correct, we just have to display the script to be copied, so what we will do is, add an new panel on extreme left, that will have items:
+
+1. Script - Script in textarea, by default disabled, broken down lines as per beat, and edit icon, an copy icon, and if user tries to edit it, we show alert "Changing Script might need a new talking head video", if user proceeds, we restructure the beats, and rest assets for all beats.
+
+2. Beats (Selected by default)
+When Beats is selected BeatList + BeatEditor is visible
+
+3. Talking Head Video
+It will show a section to add Talking Head/Avatar Video
+
+4. Audio Track
+It will show a section for adding a audio/or mp4 that will serve as audio, a volume range selector, and a enable button (just in case they want to disable while user works on making an video)
+
+
+And regarding assets, right now we don't have storage connected, so we need to connect Supabase storage too. But before that, I want to discuss with you, about the flow of adding/uploading/attaching the assets, as if user attaches an asset to beat, so do we upload it? because if we upload and then user changes the asset, what to do with the previous one? And if we keep it just as temporary, and if user loses power or page, and come back, progress is lost.
+
+Also the assets should support both Image and Video.
+
+=============================================
+
+Regarding the Talking Head video, we should ask user first, about what type of video user wants to make, so I think we need to refactor the flow, User enters topic, we show in the script in a text area, so user can edit if needed, and select if this is going to be an Talking Head video or not.
+
+If he selects Talking Head video, then we show Talking Head video option in extreme left panel, and Split View and Floating Avarar Layout modes, Else we only show Beats and Audio track in left panel and Full View and Dual Asset for Faceless, since there is no avatar.
+
+Regarding the flow, I think we should ask the user first, if the user wants to make an Talking Head Video, then we generate script accordingly, and redirect user to Editor, then show popup to user
+
+==============================================
+
+New flow, need your suggestions: On Create Project, steps:
+
+1. Ask video_type: Talking Head || Faceless video
+2. Based on video_type: We generate script, if TH, slightly different prompt, else different
+3. We take user to Editor page, there we will have like a steps flow:
+4. Script ready 2. Upload Talking Head (currently active, if TH) we show read-only scrollable script, with a message and two buttons Message: Create a talking video with this script
+Buttons: Copy | Continue
+and an edit icon at top-right
+5. User can edit > copy > Continue || User can copy > continue || User can continue
+6. Ask user to upload Talking Head Video
+7. Redirect to Editor page, with Step 1. Script and Step 2. Talking Head video shows as completed, now Step 3. Beats (active), where user can make appropriate changes to contruct beat, fill in assets, transitions, change etc and then see preview
+8. Export Video
+
+
+
+Give me a detailed context of what our project is ( conceptual), what we have completed, and what we is remaining, and then I will open a new thread along with it, I will attach the project tree for new thread help.

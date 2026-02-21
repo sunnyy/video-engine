@@ -1,49 +1,54 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
-import AvatarLayer from "../elements/AvatarLayer";
 import AssetRenderer from "../elements/AssetRenderer";
 import Caption from "../elements/Caption";
 import ComponentsRenderer from "../elements/ComponentsRenderer";
 
 export default function FullLayout({ beat, project }) {
-  const { avatar } = project;
+  const isTalkingHead =
+    project.meta.mode === "talking_head";
+
+  const contentType =
+    beat.content_type ||
+    (isTalkingHead ? "avatar" : "asset");
+
+  const showAsset =
+    contentType === "asset" &&
+    beat.assets?.main;
 
   const showAvatar =
-    project.meta.mode === "talking_head" && avatar?.src;
-
-  const showAsset = beat.assets?.main;
+    contentType === "avatar";
 
   return (
-    <AbsoluteFill
-      style={{
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "#111",
-      }}
-    >
-      {/* Asset or Avatar fills full */}
-      {showAsset ? (
-        <AssetRenderer asset={beat.assets.main} />
-      ) : showAvatar ? (
-        <AvatarLayer avatar={avatar} />
-      ) : (
+    <AbsoluteFill style={{ position: "relative" }}>
+      {/* Background ONLY if asset mode */}
+      {showAsset && (
+        <AbsoluteFill style={{ zIndex: 1 }}>
+          <AssetRenderer asset={beat.assets.main} />
+        </AbsoluteFill>
+      )}
+
+      {/* Gradient only if asset missing AND not avatar mode */}
+      {!showAsset && !showAvatar && (
         <AbsoluteFill
           style={{
-            background:
-              "linear-gradient(135deg, #222, #111)",
+            background: "linear-gradient(135deg, #222, #111)",
+            zIndex: 1,
           }}
         />
       )}
 
-      {/* Caption */}
+      {/* Captions */}
       {beat.caption?.show && (
-        <Caption beat={beat} project={project} />
+        <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+          <Caption beat={beat} project={project} />
+        </div>
       )}
 
       {/* Components */}
-      <ComponentsRenderer
-        components={beat.components}
-      />
+      <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+        <ComponentsRenderer components={beat.components} />
+      </div>
     </AbsoluteFill>
   );
 }

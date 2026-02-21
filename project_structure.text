@@ -1,0 +1,89 @@
+- .env
+- .gitignore
+- App.js
+- index.html
+- Info.txt
+- package-lock.json
+- package.json
+- postcss.config.js
+- public
+  - assets
+    - images
+      - gradient-dark.jpg
+      - office-vertical.jpg
+    - videos
+  - vite.svg
+- README.md
+- SafeProject.txt
+- src
+  - App.css
+  - App.jsx
+  - assets
+    - library.json
+  - core
+    - assetMatcher.js
+    - calculateTimeline.js
+    - captionStyles.js
+    - createEmptyProject.js
+    - layoutRegistry.js
+    - transitionsRegistry.js
+  - index.css
+  - lib
+    - supabase.js
+  - main.jsx
+  - normalize
+    - constants.js
+    - normalizeAvatar.js
+    - normalizeBeat.js
+    - normalizeBeats.js
+    - normalizeMeta.js
+    - normalizeMusic.js
+    - normalizeProject.js
+  - pages
+    - AIGenerator.jsx
+    - Auth.jsx
+    - Dashboard.jsx
+    - Editor.jsx
+  - remotion
+    - BeatRenderer.jsx
+    - elements
+      - AssetRenderer.jsx
+      - AvatarLayer.jsx
+      - Caption.jsx
+      - ComponentsRenderer.jsx
+    - layouts
+      - DualLayout.jsx
+      - FloatingLayout.jsx
+      - FullLayout.jsx
+      - SplitLayout.jsx
+    - VideoComposition.jsx
+  - server
+    - index.js
+  - services
+    - ai
+      - generateStructuredShort.js
+    - assets
+      - getAssets.js
+    - auth
+      - authService.js
+    - projects
+      - projectService.js
+  - store
+    - useProjectStore.js
+  - ui
+    - Editor
+      - AssetPicker.jsx
+      - AssetsSection.jsx
+      - BeatEditor.jsx
+      - BeatList.jsx
+      - CaptionsSection.jsx
+      - ContentSection.jsx
+      - Header.jsx
+      - LayoutSelector.jsx
+      - Preview.jsx
+      - TransitionSection.jsx
+    - Workflow
+      - ScriptStep.jsx
+      - TalkingHeadStep.jsx
+- tailwind.config.js
+- vite.config.js

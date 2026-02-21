@@ -1,26 +1,43 @@
-import { normalizeMeta } from "./normalizeMeta";
-import { normalizeAvatar } from "./normalizeAvatar";
-import { normalizeMusic } from "./normalizeMusic";
-import { normalizeBeats } from "./normalizeBeats";
+import { normalizeMeta } from "../normalize/normalizeMeta";
+import { normalizeBeats } from "../normalize/normalizeBeats";
 import { calculateTimeline } from "../core/calculateTimeline";
 
-function generateProjectId() {
-  return "proj_" + Math.random().toString(36).slice(2, 10);
-}
-
-export function buildSafeProject(raw = {}) {
+export function buildSafeProject(raw) {
   const meta = normalizeMeta(raw.meta);
-  const avatar = normalizeAvatar(raw.avatar, meta.mode);
-  const music = normalizeMusic(raw.music);
-  const beats = normalizeBeats(raw.beats, meta.mode);
 
-  const normalized = {
-    id: raw.id || generateProjectId(),
+  const baseProject = {
+    id: raw.id || crypto.randomUUID(),
+
     meta,
-    avatar,
-    music,
-    beats,
+
+    script: raw.script || {
+      text: "",
+      structured_lines: [],
+    },
+
+    workflow: raw.workflow || {
+      script_completed: false,
+      avatar_completed: false,
+      beats_initialized: false,
+    },
+
+    avatar: raw.avatar || null,
+    music: raw.music || null,
+
+    beats: [],
+    duration_sec: 0,
   };
 
-  return calculateTimeline(normalized);
+  if (baseProject.workflow.beats_initialized && raw.beats) {
+    const normalizedBeats = normalizeBeats(raw.beats, meta);
+
+    const withTimeline = calculateTimeline({
+      ...baseProject,
+      beats: normalizedBeats,
+    });
+
+    return withTimeline;
+  }
+
+  return baseProject;
 }

@@ -1,16 +1,46 @@
-import React from "react";
-import "./App.css"
-import { useProjectStore } from "./store/useProjectStore";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { useEffect, useState } from "react";
+import { getSession } from "./services/auth/authService";
 
+import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
 import AIGenerator from "./pages/AIGenerator";
 import Editor from "./pages/Editor";
 
 export default function App() {
-  const project = useProjectStore((s) => s.project);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!project) {
-    return <AIGenerator />;
-  }
+  useEffect(() => {
+    getSession().then((sess) => {
+      setSession(sess);
+      setLoading(false);
+    });
+  }, []);
 
-  return <Editor />;
+  if (loading) return null;
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        {!session ? (
+          <>
+            <Route path="*" element={<Auth />} />
+          </>
+        ) : (
+          <>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/new" element={<AIGenerator />} />
+            <Route path="/editor/:id" element={<Editor />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </>
+        )}
+      </Routes>
+    </BrowserRouter>
+  );
 }
