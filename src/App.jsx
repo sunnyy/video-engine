@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getSession } from "./services/auth/authService";
-
+import "./App.css"
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import AIGenerator from "./pages/AIGenerator";

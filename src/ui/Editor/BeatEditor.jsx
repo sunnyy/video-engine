@@ -22,7 +22,7 @@ export default function BeatEditor() {
   if (!activeBeat) return null;
 
   return (
-    <div className="w-[30%] min-w-[320px] overflow-y-auto border-r border-gray-200 bg-white p-6 rounded-xl">
+    <div className="w-[30%] min-w-[320px] overflow-y-auto border-r border-gray-200 bg-white px-6 py-2 rounded-xl h-3/4">
       <h3 className="mb-6 text-lg font-semibold">
         Editing Beat #{activeBeat.order + 1}
       </h3>
