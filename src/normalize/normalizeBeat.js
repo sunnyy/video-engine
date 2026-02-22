@@ -1,4 +1,4 @@
-import { VALID_LAYOUTS, DEFAULT_BEAT, DEFAULT_CAPTION, DEFAULT_TRANSITION } from "./constants";
+import { VALID_LAYOUTS, DEFAULT_BEAT, DEFAULT_TRANSITION } from "./constants";
 import { matchAsset } from "../core/assetMatcher";
 
 function resolveVisualMode(raw, projectMode) {
@@ -18,15 +18,6 @@ function resolveSpoken(raw) {
   return typeof raw === "string" ? raw : DEFAULT_BEAT.spoken;
 }
 
-function normalizeCaption(raw = {}) {
-  return {
-    show: typeof raw.show === "boolean" ? raw.show : DEFAULT_CAPTION.show,
-    style: raw.style || DEFAULT_CAPTION.style,
-    position: raw.position || DEFAULT_CAPTION.position,
-    animation: raw.animation || DEFAULT_CAPTION.animation,
-  };
-}
-
 function normalizeTransition(raw = {}) {
   return {
     type: raw.type || DEFAULT_TRANSITION.type,
@@ -42,22 +33,10 @@ function normalizeAvatarPosition(raw, visualMode) {
 function resolveAsset(rawAsset, meta) {
   if (!rawAsset) return null;
 
-  // Preserve background
-  if (rawAsset.type === "background") {
+  if (rawAsset.type === "background" || rawAsset.type === "upload" || (rawAsset.type === "library" && rawAsset.src)) {
     return rawAsset;
   }
 
-  // Preserve upload
-  if (rawAsset.type === "upload") {
-    return rawAsset;
-  }
-
-  // Preserve library if already structured
-  if (rawAsset.type === "library" && rawAsset.src) {
-    return rawAsset;
-  }
-
-  // Fallback match
   return matchAsset({
     orientation: meta.orientation,
   });
@@ -83,7 +62,6 @@ export function normalizeBeat(raw = {}, index, meta) {
 
     avatar_position: normalizeAvatarPosition(raw.avatar_position, visual_mode),
 
-    // 🔥 PRESERVE avatar_object_fit
     avatar_object_fit: raw.avatar_object_fit || "cover",
 
     assets: {
@@ -102,7 +80,10 @@ export function normalizeBeat(raw = {}, index, meta) {
         : null,
     },
 
-    caption: normalizeCaption(raw.caption),
+    caption: {
+      show: typeof raw.caption?.show === "boolean" ? raw.caption.show : true,
+    },
+
     transition: normalizeTransition(raw.transition),
 
     components: Array.isArray(raw.components) ? raw.components : [],

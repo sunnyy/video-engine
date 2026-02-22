@@ -1,67 +1,74 @@
 import React from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 
-const STYLES = ["clean", "bold", "highlighted"];
-const ANIMATIONS = ["fade", "pop"];
+const STYLES = [
+  "clean",
+  "boxed",
+  "highlight",
+];
 
-export default function CaptionsSection({ beat }) {
-  const updateBeat = useProjectStore((s) => s.updateBeat);
+const ANIMATIONS = [
+  "fade",
+  "word_reveal",
+  "word_pop",
+];
+
+export default function CaptionsSection() {
+  const project = useProjectStore(
+    (s) => s.project
+  );
+  const updateProjectMeta =
+    useProjectStore(
+      (s) => s.updateProjectMeta
+    );
+
+  if (!project) return null;
+
+  const { captionPreset } = project;
 
   return (
-    <div>
+    <div className="w-1/2">
       <h4 className="mb-4 text-sm font-medium text-gray-600 uppercase tracking-wide">
-        Captions
+        Caption Style (Global)
       </h4>
 
-      <label className="mb-3 flex items-center gap-2 text-sm text-gray-600">
-        <input
-          type="checkbox"
-          checked={beat.caption.show}
-          onChange={(e) =>
-            updateBeat(beat.id, {
-              caption: {
-                ...beat.caption,
-                show: e.target.checked,
-              },
-            })
-          }
-          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-        />
-        Show Captions
-      </label>
-
-      <div className="flex gap-3">
+      <div className="flex gap-4">
         <select
-          value={beat.caption.style}
+          value={captionPreset.style}
           onChange={(e) =>
-            updateBeat(beat.id, {
-              caption: {
-                ...beat.caption,
+            updateProjectMeta({
+              captionPreset: {
+                ...captionPreset,
                 style: e.target.value,
               },
             })
           }
-          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
         >
           {STYLES.map((s) => (
-            <option key={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
 
         <select
-          value={beat.caption.animation}
+          value={captionPreset.animation}
           onChange={(e) =>
-            updateBeat(beat.id, {
-              caption: {
-                ...beat.caption,
-                animation: e.target.value,
+            updateProjectMeta({
+              captionPreset: {
+                ...captionPreset,
+                animation:
+                  e.target.value,
               },
             })
           }
-          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
         >
           {ANIMATIONS.map((a) => (
-            <option key={a}>{a}</option>
+            <option key={a} value={a}>
+              {a}
+            </option>
           ))}
         </select>
       </div>

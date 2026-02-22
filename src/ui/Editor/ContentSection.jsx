@@ -5,21 +5,20 @@ export default function ContentSection({ beat }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
 
   return (
-    <div className="mt-6">
-      <h4 className="mb-3 text-sm font-medium text-gray-600 uppercase tracking-wide">
-        Content
-      </h4>
+    <div className="w-full flex flex-wrap items-end">
+      <div className="flex flex-col w-[60%]">
+        <h4 className="w-full text-sm font-medium text-gray-600 uppercase tracking-wide">Content</h4>
 
-      <textarea
-        value={beat.spoken}
-        placeholder="Spoken text"
-        onChange={(e) =>
-          updateBeat(beat.id, { spoken: e.target.value })
-        }
-        className="w-[90%] rounded-md border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
+        <textarea
+          value={beat.spoken}
+          placeholder="Spoken text"
+          onChange={(e) => updateBeat(beat.id, { spoken: e.target.value })}
+          className="w-[90%] rounded-md border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
 
-      <div className="mt-4 flex items-center gap-4">
+      <div className="flex flex-col items-center ml-4">
+        <h4 className="mb-2 w-full text-sm font-medium text-gray-600 uppercase tracking-wide">Duration</h4>
         <input
           type="number"
           min={1}
@@ -29,7 +28,7 @@ export default function ContentSection({ beat }) {
               duration_sec: Number(e.target.value),
             })
           }
-          className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-16 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
 
         {/* <label className="flex items-center gap-2 text-sm text-gray-600">

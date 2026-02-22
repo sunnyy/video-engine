@@ -28,14 +28,11 @@ export default function LayoutSettingsSection({ beat }) {
     visual_mode === "dual";
 
   return (
-    <div className="mt-8">
-      <h4 className="mb-3 text-sm font-medium text-gray-600 uppercase tracking-wide">
-        Layout Settings
-      </h4>
+    <div className="flex gap-4">
 
       {showAvatarFit && (
         <div className="mb-4">
-          <label className="block mb-2 text-xs text-gray-500 uppercase">
+          <label className="block mb-2 text-sm text-gray-500 uppercase">
             Avatar Fit
           </label>
           <select
@@ -55,7 +52,7 @@ export default function LayoutSettingsSection({ beat }) {
 
       {showMainAssetFit && (
         <div className="mb-4">
-          <label className="block mb-2 text-xs text-gray-500 uppercase">
+          <label className="block mb-2 text-sm text-gray-500 uppercase">
             Main Asset Fit
           </label>
           <select
@@ -81,7 +78,7 @@ export default function LayoutSettingsSection({ beat }) {
 
       {showSecondaryAssetFit && (
         <div>
-          <label className="block mb-2 text-xs text-gray-500 uppercase">
+          <label className="block mb-2 text-sm text-gray-500 uppercase">
             Secondary Asset Fit
           </label>
           <select

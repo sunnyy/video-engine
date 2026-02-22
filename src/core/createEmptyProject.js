@@ -9,6 +9,11 @@ export function createEmptyProject({
       fps: 30,
     },
 
+    captionPreset: {
+      style: "clean",
+      animation: "fade",
+    },
+
     avatar:
       mode === "talking_head"
         ? {
@@ -23,7 +28,10 @@ export function createEmptyProject({
     beats: [
       {
         beat_type: "intro",
-        visual_mode: mode === "talking_head" ? "split" : "full",
+        visual_mode:
+          mode === "talking_head"
+            ? "split"
+            : "full",
         duration_sec: 3,
         spoken: "",
         visible: true,
@@ -33,9 +41,6 @@ export function createEmptyProject({
         },
         caption: {
           show: true,
-          style: "clean",
-          position: "bottom",
-          animation: "fade",
         },
         transition: {
           type: "cut",

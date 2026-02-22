@@ -26,7 +26,7 @@ export default function BeatList() {
   };
 
   return (
-    <div className="w-[360px] overflow-y-auto border-r border-gray-200 bg-white px-2 py-2 rounded-xl">
+    <div className="w-[420px] overflow-y-auto border-r border-gray-200 bg-white px-2 py-2 rounded-xl">
       <h4 className="mb-4 text-sm font-semibold text-gray-600 uppercase">Beats</h4>
 
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

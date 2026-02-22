@@ -45,7 +45,7 @@ export default function Editor() {
   return (
     <div className="flex h-screen flex-col bg-gray-100">
       <Header />
-      <div className="flex flex-1 items-start gap-10 mt-6">
+      <div className="flex flex-1 gap-6 mt-6 h-1/2">
         <BeatList />
         <BeatEditor />
         <Preview />

@@ -74,7 +74,7 @@ export default function Preview() {
   }, [project, fps]);
 
   return (
-    <div className="bg-white p-4 rounded-xl w-[50%] flex justify-center">
+    <div className="bg-white p-4 rounded-xl w-[40%] flex justify-center items-start">
       <Player
         ref={playerRef}
         component={VideoComposition}
@@ -84,7 +84,7 @@ export default function Preview() {
         compositionHeight={project.meta.height}
         fps={fps}
         controls
-        style={{ maxHeight: 600 }}
+        style={{ maxHeight: 700 }}
       />
     </div>
   );

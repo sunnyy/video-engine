@@ -1,24 +1,66 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
+import {
+  AbsoluteFill,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
+} from "remotion";
+import { captionStyles } from "../../core/captionStyleRegistry";
+import { captionAnimations } from "../../core/captionAnimationRegistry";
 
-export default function Caption({ beat }) {
+export default function Caption({ beat, project }) {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
-  const { spoken, caption } = beat;
-  if (!spoken) return null;
+  if (!beat?.spoken || !beat.caption?.show) return null;
 
-  const opacity =
-    caption.animation === "fade"
-      ? interpolate(frame, [0, 10], [0, 1], {
+  // frame is already local because of <Sequence>
+  const localFrame = frame;
+
+  const durationFrames = Math.floor(
+    beat.duration_sec * fps
+  );
+
+  const { style, animation } =
+    project.captionPreset;
+
+  const styleConfig =
+    captionStyles[style] ||
+    captionStyles.clean;
+
+  const animationRenderer =
+    captionAnimations[animation] ||
+    captionAnimations.fade;
+
+  const animatedText = animationRenderer({
+    text: beat.spoken,
+    localFrame,
+    durationFrames,
+    fps,
+  });
+
+  const fadeOpacity =
+    animation === "fade"
+      ? interpolate(localFrame, [0, 10], [0, 1], {
           extrapolateRight: "clamp",
         })
       : 1;
 
-  const positionStyles = {
-    bottom: { bottom: 120 },
-    top: { top: 120 },
-    center: { top: "50%", transform: "translateY(-50%)" },
-  };
+  let positionStyle = { bottom: 120 };
+
+  if (
+    beat.visual_mode === "split" ||
+    beat.visual_mode === "dual"
+  ) {
+    positionStyle = {
+      top: "50%",
+      transform: "translateY(-50%)",
+    };
+  }
+
+  if (beat.visual_mode === "floating") {
+    positionStyle = { top: 120 };
+  }
 
   return (
     <AbsoluteFill
@@ -31,18 +73,18 @@ export default function Caption({ beat }) {
       <div
         style={{
           position: "absolute",
-          left: 80,
-          right: 80,
+          left: 0,
+          right: 0,
+          margin: "auto",
+          width: "auto",
           textAlign: "center",
-          color: "#fff",
-          fontSize: 64,
-          fontWeight: 700,
           lineHeight: 1.2,
-          opacity,
-          ...positionStyles[caption.position],
+          opacity: fadeOpacity,
+          ...styleConfig,
+          ...positionStyle,
         }}
       >
-        {spoken}
+        {animatedText}
       </div>
     </AbsoluteFill>
   );
