@@ -59,7 +59,7 @@ function AssetSlot({ label, asset, onClick }) {
 
       <div
         onClick={onClick}
-        className="group relative h-[160px] w-full cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-gray-50 hover:border-indigo-500"
+        className="group relative h-[140px] w-full cursor-pointer overflow-hidden rounded-lg border border-solid border-gray-300 bg-gray-50 hover:border-indigo-500"
       >
         {!asset && (
           <div className="flex h-full items-center justify-center text-xs text-gray-400 text-center px-2">

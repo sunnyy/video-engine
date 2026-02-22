@@ -5,7 +5,7 @@ export default function TransitionSection({ beat }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
 
   return (
-    <div>
+    <div className="w-1/2">
       <h4 className="mb-4 text-sm font-medium text-gray-600 uppercase tracking-wide">
         Transition
       </h4>

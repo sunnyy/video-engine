@@ -64,6 +64,11 @@ and an edit icon at top-right
 7. Redirect to Editor page, with Step 1. Script and Step 2. Talking Head video shows as completed, now Step 3. Beats (active), where user can make appropriate changes to contruct beat, fill in assets, transitions, change etc and then see preview
 8. Export Video
 
-
+==============================================
 
 Give me a detailed context of what our project is ( conceptual), what we have completed, and what we is remaining, and then I will open a new thread along with it, I will attach the project tree for new thread help.
+
+1. We will have audio (effects) per beat, which we will set for each beat deterministic way
+2. User should be able to see Assets uploaded so far in the video, in a section
+3. Prevent User from accidentally delete the Beat, maybe we should introduce undo/redo functionality
+4. When we upload Avatar it should be attached to project, even if user changes Video type to Faceless and switches back, it should be there, currently once we refresh, avatar video is gone.

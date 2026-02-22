@@ -45,12 +45,12 @@ export const useProjectStore = create((set, get) => ({
     const current = get().project;
     if (!current) return;
 
-    const updated = {
+    const rebuilt = buildSafeProject({
       ...current,
       ...updates,
-    };
+    });
 
-    set({ project: updated });
+    set({ project: rebuilt });
   },
 
   setActiveBeat: (beatId) => {

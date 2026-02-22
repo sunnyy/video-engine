@@ -10,6 +10,11 @@ export function buildSafeProject(raw) {
 
     meta,
 
+    captionPreset: raw.captionPreset || {
+      style: "clean",
+      animation: "fade",
+    },
+
     script: raw.script || {
       text: "",
       structured_lines: [],
@@ -28,8 +33,12 @@ export function buildSafeProject(raw) {
     duration_sec: 0,
   };
 
-  if (baseProject.workflow.beats_initialized && raw.beats) {
-    const normalizedBeats = normalizeBeats(raw.beats, meta);
+  if (
+    baseProject.workflow.beats_initialized &&
+    raw.beats
+  ) {
+    const normalizedBeats =
+      normalizeBeats(raw.beats, meta);
 
     const withTimeline = calculateTimeline({
       ...baseProject,
