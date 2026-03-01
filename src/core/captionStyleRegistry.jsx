@@ -15,6 +15,8 @@ export const captionStyles = {
     background: "rgba(0,0,0,0.8)",
     padding: "16px 24px",
     borderRadius: 12,
+    width: "auto",
+    margin: "auto",
   },
 
   highlight: {
@@ -24,5 +26,7 @@ export const captionStyles = {
     background: "#FFD400",
     padding: "12px 20px",
     borderRadius: 8,
+    width: "auto",
+    margin: "auto",
   },
 };

@@ -33,10 +33,17 @@ function normalizeAvatarPosition(raw, visualMode) {
 function resolveAsset(rawAsset, meta) {
   if (!rawAsset) return null;
 
-  if (rawAsset.type === "background" || rawAsset.type === "upload" || (rawAsset.type === "library" && rawAsset.src)) {
+  // 🔥 If it already has a URL or src, trust it
+  if (rawAsset.url || rawAsset.src) {
     return rawAsset;
   }
 
+  // Background preset
+  if (rawAsset.type === "background") {
+    return rawAsset;
+  }
+
+  // Fallback only if truly empty
   return matchAsset({
     orientation: meta.orientation,
   });

@@ -1,0 +1,23 @@
+export function autoMatchAssets(beats, assetLibrary = []) {
+  if (!assetLibrary.length) return beats;
+
+  return beats.map((beat) => {
+    const text = beat.spoken.toLowerCase();
+
+    const match = assetLibrary.find((asset) =>
+      asset.tags.some((tag) =>
+        text.includes(tag.toLowerCase())
+      )
+    );
+
+    if (!match) return beat;
+
+    return {
+      ...beat,
+      assets: {
+        ...beat.assets,
+        main: match,
+      },
+    };
+  });
+}

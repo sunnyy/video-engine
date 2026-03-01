@@ -114,6 +114,7 @@ function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat }) 
 function Thumbnail({ asset }) {
   if (!asset) return null;
 
+  // Background
   if (asset.type === "background") {
     return (
       <div
@@ -123,9 +124,15 @@ function Thumbnail({ asset }) {
     );
   }
 
-  if (asset.src) {
-    return <img src={asset.src} draggable={false} className="h-full w-full object-cover" />;
+  // 🔥 Support both url + src
+  const source = asset.url || asset.src;
+  if (!source) return null;
+
+  const isVideo = source.endsWith(".mp4") || source.endsWith(".webm");
+
+  if (isVideo) {
+    return <video src={source} muted className="h-full w-full object-cover" />;
   }
 
-  return null;
+  return <img src={source} draggable={false} className="h-full w-full object-cover" />;
 }

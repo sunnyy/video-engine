@@ -1,125 +1,178 @@
 import React, { useEffect, useState, useRef } from "react";
 import { getAssets } from "../../services/assets/getAssets";
+import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
+import { deleteUserAsset } from "../../services/assets/deleteUserAsset";
+import { supabase } from "../../lib/supabase";
 
 const BACKGROUND_PRESETS = [
-  { id: "bg_white", type: "background", value: { color: "#ffffff" } },
+  { id: "bg_white", type: "background", value: { color: "#f6f6f6" } },
   { id: "bg_black", type: "background", value: { color: "#000000" } },
-  { id: "bg_gray", type: "background", value: { color: "#f3f4f6" } },
+  { id: "bg_gray", type: "background", value: { color: "#333333" } },
   {
     id: "bg_gradient_1",
     type: "background",
-    value: {
-      gradient: "linear-gradient(135deg, #667eea, #764ba2)",
-    },
+    value: { gradient: "linear-gradient(135deg, #667eea, #764ba2)" },
   },
   {
     id: "bg_gradient_2",
     type: "background",
-    value: {
-      gradient: "linear-gradient(135deg, #ff9a9e, #fad0c4)",
-    },
+    value: { gradient: "linear-gradient(135deg, #ff9a9e, #fad0c4)" },
   },
 ];
 
-export default function AssetPicker({
-  onSelect,
-  orientation,
-  onClose,
-}) {
-  const [tab, setTab] = useState("gallery");
+export default function AssetPicker({ onSelect, orientation, onClose }) {
+  const [tab, setTab] = useState("upload");
   const [search, setSearch] = useState("");
-  const [assets, setAssets] = useState([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
 
-  const observerRef = useRef();
+  const [myAssets, setMyAssets] = useState([]);
+  const [galleryAssets, setGalleryAssets] = useState([]);
+
+  const [loadingMy, setLoadingMy] = useState(false);
+  const [loadingGallery, setLoadingGallery] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
   const fileInputRef = useRef();
 
+  // 🔥 Load My Assets once
   useEffect(() => {
-    if (tab !== "gallery") return;
-    loadAssets(1, true);
-  }, [search, orientation, tab]);
+    loadMyAssets();
+  }, []);
 
-  const loadAssets = async (pageNumber, reset = false) => {
-    if (loading) return;
+  const loadMyAssets = async () => {
+    setLoadingMy(true);
+    const { data } = await supabase.from("user_assets").select("*").order("created_at", { ascending: false });
 
-    setLoading(true);
+    setMyAssets(
+      data?.map((a) => ({
+        id: a.id,
+        url: a.url,
+        type: a.type,
+        source: "user",
+        file_path: a.file_path,
+      })) || [],
+    );
+    setLoadingMy(false);
+  };
 
+  const loadGalleryAssets = async () => {
+    if (galleryAssets.length > 0) return;
+
+    setLoadingGallery(true);
     const result = await getAssets({
       search,
       orientation,
-      page: pageNumber,
-      limit: 18,
+      page: 1,
+      limit: 100,
     });
-
-    setAssets((prev) =>
-      reset ? result.data : [...prev, ...result.data]
-    );
-
-    setHasMore(result.hasMore);
-    setPage(pageNumber);
-    setLoading(false);
+    setGalleryAssets(result.data || []);
+    setLoadingGallery(false);
   };
 
-  useEffect(() => {
-    if (tab !== "gallery") return;
-    if (!hasMore || loading) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          loadAssets(page + 1);
-        }
-      },
-      { threshold: 1 }
-    );
-
-    if (observerRef.current) {
-      observer.observe(observerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore, loading, page, tab]);
-
-  const handleUpload = (e) => {
-    const file = e.target.files[0];
+  const handleUpload = async (e) => {
+    let file = e.target.files[0];
     if (!file) return;
 
-    const url = URL.createObjectURL(file);
+    setUploading(true);
 
-    onSelect({
-      id: crypto.randomUUID(),
-      type: "upload",
-      src: url,
-    });
+    try {
+      if (file.type.startsWith("video") && file.size > 45 * 1024 * 1024) {
+        const formData = new FormData();
+        formData.append("video", file);
 
-    onClose();
+        const response = await fetch("http://localhost:5000/api/compress", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Compression failed");
+        }
+
+        const compressedBlob = await response.blob();
+
+        file = new File([compressedBlob], `${crypto.randomUUID()}.mp4`, { type: "video/mp4" });
+      }
+
+      const asset = await uploadUserAsset(file);
+
+      const newAsset = {
+        id: asset.id,
+        url: asset.url,
+        type: asset.type,
+        source: "user",
+      };
+
+      setMyAssets((prev) => [newAsset, ...prev]);
+
+      onSelect(newAsset);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed");
+    }
+
+    setUploading(false);
   };
+
+  const handleDelete = async (asset) => {
+    setDeletingId(asset.id);
+    await deleteUserAsset(asset);
+    setMyAssets((prev) => prev.filter((a) => a.id !== asset.id));
+    setDeletingId(null);
+  };
+
+  const renderPreview = (asset) => {
+    const src = asset.thumbnail_url || asset.url;
+    if (!src) return null;
+
+    const isVideo = src.toLowerCase().endsWith(".mp4") || src.toLowerCase().endsWith(".webm");
+
+    if (isVideo) {
+      return (
+        <video
+          src={src}
+          muted
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-cover"
+          onLoadedData={(e) => {
+            e.currentTarget.currentTime = 0.1;
+          }}
+        />
+      );
+    }
+
+    return <img src={src} alt="" className="h-full w-full object-cover" />;
+  };
+
+  const activeAssets = tab === "my" ? myAssets : galleryAssets;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="flex h-[80vh] w-[900px] flex-col rounded-lg bg-white p-6">
+      <div className="flex h-[85vh] w-[1000px] flex-col rounded-lg bg-white p-6">
         <div className="mb-4 flex justify-between">
-          <h3 className="text-lg font-semibold">
-            Select Asset
-          </h3>
+          <h3 className="text-lg font-semibold">Select Asset</h3>
           <button onClick={onClose}>✕</button>
         </div>
 
         {/* Tabs */}
         <div className="mb-4 flex gap-6 border-b pb-2">
-          {["gallery", "upload", "background"].map((t) => (
+          {[
+            { key: "upload", label: "Upload" },
+            { key: "my", label: "My Assets" },
+            { key: "gallery", label: "Gallery" },
+            { key: "background", label: "Background" },
+          ].map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={
-                tab === t
-                  ? "font-semibold text-indigo-600"
-                  : "text-gray-500"
-              }
+              key={t.key}
+              onClick={() => {
+                setTab(t.key);
+                if (t.key === "gallery") loadGalleryAssets();
+              }}
+              className={tab === t.key ? "font-semibold text-indigo-600" : "text-gray-500"}
             >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {t.label}
             </button>
           ))}
         </div>
@@ -129,14 +182,15 @@ export default function AssetPicker({
           <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <button
               onClick={() => fileInputRef.current.click()}
+              disabled={uploading}
               className="rounded bg-indigo-600 px-6 py-3 text-white"
             >
-              Choose File
+              {uploading ? "Uploading..." : "Choose File"}
             </button>
 
             <input
               type="file"
-              accept="image/*,video/*"
+              accept="image/*,video/*,audio/*"
               ref={fileInputRef}
               onChange={handleUpload}
               className="hidden"
@@ -154,59 +208,49 @@ export default function AssetPicker({
                   onSelect(bg);
                   onClose();
                 }}
-                className="h-40 cursor-pointer rounded border"
-                style={
-                  bg.value.color
-                    ? { background: bg.value.color }
-                    : { background: bg.value.gradient }
-                }
+                className="aspect-video cursor-pointer rounded border"
+                style={bg.value.color ? { background: bg.value.color } : { background: bg.value.gradient }}
               />
             ))}
           </div>
         )}
 
-        {/* Gallery */}
-        {tab === "gallery" && (
-          <>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search assets..."
-              className="mb-4 w-full rounded border px-3 py-2"
-            />
-
-            <div className="grid flex-1 grid-cols-3 gap-4 overflow-y-auto">
-              {assets.map((asset) => (
+        {/* My + Gallery */}
+        {(tab === "my" || tab === "gallery") && (
+          <div className="grid grid-cols-3 gap-4 overflow-y-auto content-start">
+            {activeAssets.map((asset) => (
+              <div
+                key={asset.id}
+                className="relative cursor-pointer overflow-hidden rounded-xl border hover:border-indigo-500"
+              >
                 <div
-                  key={asset.id}
                   onClick={() => {
-                    onSelect({
-                      ...asset,
-                      type: "library",
-                    });
+                    onSelect(asset);
                     onClose();
                   }}
-                  className="cursor-pointer overflow-hidden rounded border hover:border-indigo-500"
+                  className="aspect-video"
                 >
-                  <img
-                    src={asset.src}
-                    className="h-40 w-full object-cover"
-                  />
-                  <div className="p-2 text-sm">
-                    {asset.category}
-                  </div>
+                  {renderPreview(asset)}
                 </div>
-              ))}
 
-              <div ref={observerRef} />
-            </div>
-
-            {loading && (
-              <div className="mt-2 text-center text-sm text-gray-500">
-                Loading...
+                {tab === "my" && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(asset);
+                    }}
+                    className="absolute top-1 right-1 bg-black/70 text-white text-xs px-2 py-1 rounded"
+                  >
+                    {deletingId === asset.id ? "Deleting..." : "Delete"}
+                  </button>
+                )}
               </div>
+            ))}
+
+            {(loadingMy || loadingGallery) && (
+              <div className="col-span-3 text-center text-sm text-gray-500">Loading...</div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -15,10 +15,9 @@ export default function AssetRenderer({ asset }) {
     );
   }
 
-  const objectFit =
-    asset.object_fit || "cover";
+  const objectFit = asset.object_fit || "cover";
 
-  // Background type
+  // Background
   if (asset.type === "background") {
     if (asset.value?.color) {
       return (
@@ -45,22 +44,24 @@ export default function AssetRenderer({ asset }) {
     }
   }
 
-  // Image / video type
-  if (asset.src) {
+  // 🔥 Normalize source (support old src + new url)
+  const source = asset.url || asset.src;
+
+  if (source) {
     const isVideo =
-      asset.src.endsWith(".mp4") ||
-      asset.src.endsWith(".webm");
+      source.endsWith(".mp4") ||
+      source.endsWith(".webm");
 
     if (isVideo) {
       return (
         <Video
-          src={asset.src}
+          src={source}
           muted
           loop
           style={{
             width: "100%",
             height: "100%",
-            objectFit: objectFit,
+            objectFit,
           }}
         />
       );
@@ -68,11 +69,11 @@ export default function AssetRenderer({ asset }) {
 
     return (
       <img
-        src={asset.src}
+        src={source}
         style={{
           width: "100%",
           height: "100%",
-          objectFit: objectFit,
+          objectFit,
         }}
       />
     );

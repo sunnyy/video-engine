@@ -25,29 +25,8 @@ export function createEmptyProject({
 
     music: null,
 
-    beats: [
-      {
-        beat_type: "intro",
-        visual_mode:
-          mode === "talking_head"
-            ? "split"
-            : "full",
-        duration_sec: 3,
-        spoken: "",
-        visible: true,
-        assets: {
-          main: null,
-          secondary: null,
-        },
-        caption: {
-          show: true,
-        },
-        transition: {
-          type: "cut",
-          duration: 0.3,
-        },
-        components: [],
-      },
-    ],
+    beats: [],
+
+    duration_sec: 0,
   };
 }
