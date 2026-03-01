@@ -5,16 +5,33 @@ import AssetPicker from "./AssetPicker";
 export default function AssetsSection({ beat, project }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
   const [openSlot, setOpenSlot] = useState(null);
+  const databaseId = useProjectStore((s) => s.databaseId);
 
   const handleSelect = (asset) => {
+    if (asset.type === "background") {
+      updateBeat(beat.id, {
+        assets: {
+          ...beat.assets,
+          [openSlot]: asset,
+        },
+      });
+    } else {
+      updateBeat(beat.id, {
+        assetAttach: asset,
+        zone: openSlot,
+      });
+    }
+
+    setOpenSlot(null);
+  };
+
+  const handleRemove = (slot) => {
     updateBeat(beat.id, {
       assets: {
         ...beat.assets,
-        [openSlot]: asset,
+        [slot]: null,
       },
     });
-
-    setOpenSlot(null);
   };
 
   return (
@@ -28,6 +45,7 @@ export default function AssetsSection({ beat, project }) {
           label="Main"
           asset={beat.assets.main}
           onClick={() => setOpenSlot("main")}
+          onRemove={() => handleRemove("main")}
         />
 
         {beat.visual_mode === "dual" && (
@@ -35,12 +53,14 @@ export default function AssetsSection({ beat, project }) {
             label="Secondary"
             asset={beat.assets.secondary}
             onClick={() => setOpenSlot("secondary")}
+            onRemove={() => handleRemove("secondary")}
           />
         )}
       </div>
 
       {openSlot && (
         <AssetPicker
+          projectId={databaseId}
           orientation={project.meta.orientation}
           onSelect={handleSelect}
           onClose={() => setOpenSlot(null)}
@@ -50,7 +70,7 @@ export default function AssetsSection({ beat, project }) {
   );
 }
 
-function AssetSlot({ label, asset, onClick }) {
+function AssetSlot({ label, asset, onClick, onRemove }) {
   return (
     <div className="flex-shrink-0 w-[120px]">
       <div className="mb-2 text-[10px] font-medium text-gray-500 uppercase">
@@ -78,29 +98,44 @@ function AssetSlot({ label, asset, onClick }) {
           />
         )}
 
-        {asset?.type !== "background" &&
-          asset?.src && (
-            <img
-              src={asset.src}
+        {asset?.type !== "background" && asset?.url && (
+          asset.url.endsWith(".mp4") ? (
+            <video
+              src={asset.url}
               className="h-full w-full object-cover"
+              muted
+              playsInline
             />
-          )}
+          ) : (
+            <img
+              src={asset.url}
+              className="h-full w-full object-cover"
+              alt=""
+            />
+          )
+        )}
 
         {asset && (
           <>
             <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/40" />
 
             <div className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] text-white">
-              {asset.type === "upload"
+              {asset.source === "project"
                 ? "Upload"
                 : asset.type === "background"
                 ? "BG"
                 : "Library"}
             </div>
 
-            <div className="absolute right-1 top-1 rounded bg-white px-1 py-0.5 text-[9px] shadow">
-              Replace
-            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              className="absolute right-1 top-1 rounded bg-red-600 px-1 py-0.5 text-[9px] text-white shadow"
+            >
+              ✕
+            </button>
           </>
         )}
       </div>

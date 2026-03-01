@@ -77,6 +77,7 @@ export default function Preview() {
     <div className="bg-white p-4 rounded-xl w-[40%] flex justify-center items-start">
       <Player
         ref={playerRef}
+        acknowledgeRemotionLicense
         component={VideoComposition}
         inputProps={{ project }}
         durationInFrames={durationFrames}

@@ -1,40 +1,33 @@
+import { buildBeatsFromScript } from "../../core/buildBeatsFromScript";
+
 export async function generateStructuredShort({
   topic,
   mode,
+  orientation,
+  durationCategory = "short",
 }) {
   const prompt = `
-You are a structured short-form video writer.
+You are a short-form video script writer.
 
 Return ONLY valid JSON.
 
 Format:
 {
-  "beats": [
-    {
-      "beat_type": "hook | problem | solution | payoff | cta",
-      "spoken": "short spoken line",
-      "visual_mode": "full | split | floating | dual",
-      "asset_tags": ["tag1", "tag2"]
-    }
-  ]
+  "script": "Full spoken script."
 }
 
 Rules:
-- 5 to 7 beats
-- Spoken must be short
-- No explanations
+- Clear hook
+- Clear ending
 - No markdown
 - JSON only
-- Mode: ${mode}
 - Topic: ${topic}
 `;
 
   const response = await fetch("http://localhost:5000/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt,
-    }),
+    body: JSON.stringify({ prompt }),
   });
 
   if (!response.ok) {
@@ -42,6 +35,16 @@ Rules:
   }
 
   const data = await response.json();
+  const script = data.script || "";
 
-  return data;
+  const beats = buildBeatsFromScript({
+    script,
+    videoType: mode,
+    durationCategory,
+  });
+
+  return {
+    script,
+    beats,
+  };
 }

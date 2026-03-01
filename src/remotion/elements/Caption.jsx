@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  AbsoluteFill,
-  useCurrentFrame,
-  useVideoConfig,
-  interpolate,
-} from "remotion";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import { captionStyles } from "../../core/captionStyleRegistry";
 import { captionAnimations } from "../../core/captionAnimationRegistry";
 
@@ -17,20 +12,13 @@ export default function Caption({ beat, project }) {
   // frame is already local because of <Sequence>
   const localFrame = frame;
 
-  const durationFrames = Math.floor(
-    beat.duration_sec * fps
-  );
+  const durationFrames = Math.floor(beat.duration_sec * fps);
 
-  const { style, animation } =
-    project.captionPreset;
+  const { style, animation } = project.captionPreset;
 
-  const styleConfig =
-    captionStyles[style] ||
-    captionStyles.clean;
+  const styleConfig = captionStyles[style] || captionStyles.clean;
 
-  const animationRenderer =
-    captionAnimations[animation] ||
-    captionAnimations.fade;
+  const animationRenderer = captionAnimations[animation] || captionAnimations.fade;
 
   const animatedText = animationRenderer({
     text: beat.spoken,
@@ -48,10 +36,7 @@ export default function Caption({ beat, project }) {
 
   let positionStyle = { bottom: 120 };
 
-  if (
-    beat.visual_mode === "split" ||
-    beat.visual_mode === "dual"
-  ) {
+  if (beat.visual_mode === "split" || beat.visual_mode === "dual") {
     positionStyle = {
       top: "50%",
       transform: "translateY(-50%)",
@@ -72,11 +57,7 @@ export default function Caption({ beat, project }) {
     >
       <div
         style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          margin: "auto",
-          width: "auto",
+          position: "static",
           textAlign: "center",
           lineHeight: 1.2,
           opacity: fadeOpacity,

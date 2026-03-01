@@ -1,6 +1,7 @@
 - .env
 - .gitignore
 - App.js
+- Flow.txt
 - index.html
 - Info.txt
 - package-lock.json
@@ -21,11 +22,20 @@
   - assets
     - library.json
   - core
+    - assetAutoMatcher
     - assetMatcher.js
+    - audioCueEngine.js
+    - buildBeatsFromScript.js
     - calculateTimeline.js
+    - captionAnimationRegistry.jsx
+    - captionPositionRegistry.jsx
+    - captionStyleRegistry.jsx
     - captionStyles.js
+    - captionTimingEngine.js
+    - compilerValidator.js
     - createEmptyProject.js
     - layoutRegistry.js
+    - pacingProfiles.js
     - transitionsRegistry.js
   - index.css
   - lib
@@ -58,12 +68,16 @@
       - SplitLayout.jsx
     - VideoComposition.jsx
   - server
+    - compressVideo.cjs
     - index.js
+    - temp
   - services
     - ai
       - generateStructuredShort.js
     - assets
+      - deleteUserAsset.js
       - getAssets.js
+      - uploadUserAsset.js
     - auth
       - authService.js
     - projects
@@ -80,10 +94,12 @@
       - ContentSection.jsx
       - Header.jsx
       - LayoutSelector.jsx
+      - LayoutSettingsSection.jsx
       - Preview.jsx
       - TransitionSection.jsx
     - Workflow
       - ScriptStep.jsx
       - TalkingHeadStep.jsx
 - tailwind.config.js
+- temp
 - vite.config.js

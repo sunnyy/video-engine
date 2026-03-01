@@ -3,7 +3,12 @@ Database password: mNE7cXQMeAYwxi7t
 Project URL: https://dfwacscjpdesuvwamxfs.supabase.co
 Publishable API Key: sb_publishable_iGxNppQZj_0EsHPGU91oRQ_jPzOOwaf
 
-First of all, keep your responses short, and straight to point, no explanations, no questions, no unnecessary talks until asked, and never give me code patches, always give me full code to replace, don't assume code, if you want to see the existing code, ask me I will give you code. Just go step by step.
+First of all, keep your responses short, and straight to point, no explanations, no questions, no unnecessary talks until asked, and never give me code patches, always give me full code to replace, don't assume code, if you want to see the existing code, ask me I will give you code. Just go step by step. Don't say these things:
+- Great, now you are thinking like so and so.
+- Great, now your system is becoming this from this
+- You could even do this better
+- Ask unnecessary questions
+
 
 
 <pre
@@ -72,3 +77,20 @@ Give me a detailed context of what our project is ( conceptual), what we have co
 2. User should be able to see Assets uploaded so far in the video, in a section
 3. Prevent User from accidentally delete the Beat, maybe we should introduce undo/redo functionality
 4. When we upload Avatar it should be attached to project, even if user changes Video type to Faceless and switches back, it should be there, currently once we refresh, avatar video is gone.
+5. Captions should be shown based on the duration, currently beats are swtiching before the last captions words appear. Have to make sure they are presented based on the beat's duration.
+6. I think we should let Caption position to be controlled, even though we set them by Layout which is fine as default, but let me know if this is too much to handle? Because in Full View > Asset with Object fit contain, captions can't be there in middle, and if fix them based on layout and avatar/asset's object fit, that will be too much and still not fully suitable in some conditons for end user.
+
+I don't know why is this becoming so complex, we are basically asking user to construct a beat based on layout, visual type (avatar/ asset image or video), it's object fit, transition, and we haven't yet introduced custom components yet
+
+
+Create a Coming Soon poster for an ultra luxury and royal Rajasthani based culture Fashion event, should display large logo attached, and main text "Runway of Realeza", and Slogan Where Royalty Meets Runway, and text Coming Soon. In middle it should have 3 models wearing Royal Sarees and heavy jewellery. Put Jaipur's Albert Hall slightly visible in top center in background basically using a darker gradient so it is slightly visible.
+
+
+Create a Coming Soon Poster 9:16 for an ultra luxury and royal Rajasthani based culture Fashion event, should display large logo attached as it is (don't change logo color), and main text "Runway of Realeza", and Slogan text "Where Royalty Meets Runway", and text "Season 1st" and below it "Coming Soon". In middle use the attached 5 female models with realistic face sitting on royal chairs. Middle model wearing a Rajasthani Safa and holding a sword like Rajputana kingdom. Put Jaipur's Albert Hall (use attached albert hall) slightly visible in top center in background basically using a gradient so it is slightly visible. Be creative, it should match the level of International brand, for example FTV. Add some small extra elements in corners like golden or silver lines, or graphics to make sure the poster doesn't look very simple. Overall color theme should be dark maroon or pinkish.
+
+Create a Coming Soon Poster 9:16 for an ultra luxury and royal Rajasthani based culture Fashion event, should display large logo attached as it is (don't change logo color), and main text "Runway of Realeza", and Slogan text "Where Royalty Meets Runway", and text "Season 1st" and below it "Coming Soon". In middle use the attached 5 female models with realistic face sitting on royal chairs. Put Jaipur's Albert Hall (use attached albert hall) slightly visible in top center in background basically using a gradient so it is slightly visible. Be creative, it should match the level of International brand, for example FTV. Add some small extra elements in corners like golden or silver lines, or graphics to make sure the poster doesn't look very simple. Overall color theme should be dark maroon or pinkish.
+
+Generate 9:16 Coming Soon Poster 9:16 at 4K resolution (3840x2160 or higher), 300 DPI, print-ready, sharp details, an ultra luxury and royal Rajasthani based culture Fashion event, should display large logo attached as it is (don't change logo color), and main text "Runway of Realeza", and text "Season 1st" and below it "Coming Soon". In middle use the attached 5 female models with realistic face sitting on royal chairs. Put Jaipur's Albert Hall (use attached albert hall) slightly visible in top center in background basically using a gradient so it is slightly visible. Be creative, it should match the level of International brand, for example FTV. Add some small extra elements in corners like golden or silver lines, or graphics to make sure the poster doesn't look very simple. Overall color theme should be dark maroon or pinkish.
+
+Use the uploaded photo as the face reference and keep the same identity, facial features, skin tone, hairstyle, and confident expression. Create a 9:16 ultra royal Holi festival poster for the luxury fashion brand “Runway of Realeza”. Use a deep rich maroon or wine textured royal background with subtle gold ornamental corner detailing. Place the uploaded official logo at the top center in its original silver metallic color without changing or recoloring it. Below the logo, write “Runway of Realeza” in elegant high-fashion serif typography in a soft silver tone. Add the slogan: “Where Royalty Celebrates in Color” in refined minimal typography. Apply only subtle Holi color accents lightly on cheeks or hands and soft floating gulal mist in blush pink, saffron, royal blue, and emerald — minimal and classy, not messy. Include small refined text reading “Alkesh Kumari – CEO & Founder” placed subtly near the bottom. Maintain symmetry, cinematic lighting, high-end luxury editorial look, ultra-detailed, premium magazine-quality finish. No cartoon effects, no neon tones, no face alteration.
+

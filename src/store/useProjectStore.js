@@ -1,13 +1,16 @@
 import { create } from "zustand";
 import { buildSafeProject } from "../normalize/normalizeProject";
 import { calculateTimeline } from "../core/calculateTimeline";
+import { getPacingProfile } from "../core/pacingProfiles";
+import { generateCaptionSegments } from "../core/captionTimingEngine";
+import { updateProject } from "../services/projects/projectService";
 
 function createRawBeat(order, mode) {
   return {
-    beat_type: "default",
+    id: crypto.randomUUID(),
+    beat_type: "content",
     visual_mode: mode === "talking_head" ? "split" : "full",
     duration_sec: 3,
-    seekToBeat: null,
     spoken: "",
     visible: true,
     assets: {
@@ -19,6 +22,7 @@ function createRawBeat(order, mode) {
       style: "clean",
       position: "bottom",
       animation: "fade",
+      segments: [],
     },
     transition: {
       type: "cut",
@@ -28,9 +32,30 @@ function createRawBeat(order, mode) {
   };
 }
 
+function recalcBeatTiming(beat, pacingProfile) {
+  const words = beat.spoken?.trim().split(/\s+/).filter(Boolean).length || 0;
+
+  const duration = Math.max(
+    pacingProfile.min_duration,
+    Math.min(pacingProfile.max_duration, words / pacingProfile.words_per_second || pacingProfile.min_duration),
+  );
+
+  return {
+    ...beat,
+    duration_sec: duration,
+    caption: {
+      ...beat.caption,
+      segments: generateCaptionSegments(beat.spoken || "", duration),
+    },
+  };
+}
+
 export const useProjectStore = create((set, get) => ({
   project: null,
   activeBeatId: null,
+  databaseId: null,
+
+  setDatabaseId: (id) => set({ databaseId: id }),
 
   setProject: (rawProject) => {
     const safeProject = buildSafeProject(rawProject);
@@ -57,18 +82,50 @@ export const useProjectStore = create((set, get) => ({
     set({ activeBeatId: beatId });
   },
 
-  updateBeat: (beatId, updates) => {
+  updateBeat: async (beatId, updates) => {
     const current = get().project;
-    if (!current) return;
+    const databaseId = get().databaseId;
 
-    const updatedBeats = current.beats.map((beat) => (beat.id === beatId ? { ...beat, ...updates } : beat));
+    if (!current || !databaseId) return;
 
-    const rebuilt = buildSafeProject({
+    const pacingProfile = getPacingProfile("normal");
+
+    const updatedBeats = current.beats.map((beat) => {
+      if (beat.id !== beatId) return beat;
+
+      let updated = { ...beat, ...updates };
+
+      if (updates.spoken !== undefined) {
+        updated = recalcBeatTiming(updated, pacingProfile);
+      }
+
+      if (updates.assetAttach) {
+        updated = {
+          ...updated,
+          assets: {
+            ...updated.assets,
+            [updates.zone || "main"]: {
+              id: updates.assetAttach.id,
+              source: updates.assetAttach.source,
+              url: updates.assetAttach.url,
+              type: updates.assetAttach.type,
+            },
+          },
+        };
+      }
+
+      return updated;
+    });
+
+    const updatedProject = calculateTimeline({
       ...current,
       beats: updatedBeats,
     });
 
-    set({ project: rebuilt });
+    set({ project: updatedProject });
+
+    // 🔥 Persist to DB
+    await updateProject(databaseId, updatedProject);
   },
 
   reorderBeats: (newBeats) => {
@@ -94,14 +151,14 @@ export const useProjectStore = create((set, get) => ({
 
     const newBeat = createRawBeat(current.beats.length, current.meta.mode);
 
-    const rebuilt = buildSafeProject({
+    const updatedProject = calculateTimeline({
       ...current,
       beats: [...current.beats, newBeat],
     });
 
     set({
-      project: rebuilt,
-      activeBeatId: rebuilt.beats[rebuilt.beats.length - 1].id,
+      project: updatedProject,
+      activeBeatId: newBeat.id,
     });
   },
 
@@ -110,17 +167,16 @@ export const useProjectStore = create((set, get) => ({
     if (!current) return;
 
     const filtered = current.beats.filter((b) => b.id !== beatId);
+    if (!filtered.length) return;
 
-    if (filtered.length === 0) return;
-
-    const rebuilt = buildSafeProject({
+    const updatedProject = calculateTimeline({
       ...current,
       beats: filtered,
     });
 
     set({
-      project: rebuilt,
-      activeBeatId: rebuilt.beats[0].id,
+      project: updatedProject,
+      activeBeatId: filtered[0].id,
     });
   },
 }));

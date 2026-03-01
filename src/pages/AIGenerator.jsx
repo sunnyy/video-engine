@@ -7,10 +7,11 @@ import { createProject } from "../services/projects/projectService";
 export default function AIGenerator() {
   const navigate = useNavigate();
 
-  const [name, setName] = useState("");
-  const [topic, setTopic] = useState("");
+  const [name, setName] = useState("T20 World Cup");
+  const [topic, setTopic] = useState("India unbeaten in t20 world cup so far");
   const [videoType, setVideoType] = useState("faceless");
   const [orientation, setOrientation] = useState("9:16");
+  const [durationCategory, setDurationCategory] = useState("short");
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
@@ -22,6 +23,8 @@ export default function AIGenerator() {
       const aiResult = await generateStructuredShort({
         topic,
         mode: videoType,
+        orientation,
+        durationCategory,
       });
 
       const safeProject = buildSafeProject({
@@ -29,16 +32,18 @@ export default function AIGenerator() {
           orientation,
           mode: videoType,
         },
+
         script: {
-          text: aiResult.beats
-            .map((b) => b.spoken)
-            .join("\n"),
+          text: aiResult.script,
           structured_lines: aiResult.beats,
         },
+
+        beats: aiResult.beats,
+
         workflow: {
-          script_completed: false,
+          script_completed: true,
           avatar_completed: false,
-          beats_initialized: false,
+          beats_initialized: true,
         },
       });
 
@@ -84,12 +89,8 @@ export default function AIGenerator() {
             onChange={(e) => setVideoType(e.target.value)}
             className="mt-1 w-full rounded border px-3 py-2"
           >
-            <option value="faceless">
-              Faceless
-            </option>
-            <option value="talking_head">
-              Talking Head
-            </option>
+            <option value="faceless">Faceless</option>
+            <option value="talking_head">Talking Head</option>
           </select>
         </div>
 
@@ -99,17 +100,26 @@ export default function AIGenerator() {
           </label>
           <select
             value={orientation}
-            onChange={(e) =>
-              setOrientation(e.target.value)
-            }
+            onChange={(e) => setOrientation(e.target.value)}
             className="mt-1 w-full rounded border px-3 py-2"
           >
-            <option value="9:16">
-              9:16 (Reels / Shorts)
-            </option>
-            <option value="16:9">
-              16:9 (YouTube)
-            </option>
+            <option value="9:16">9:16 (Vertical)</option>
+            <option value="16:9">16:9 (Horizontal)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm text-gray-600">
+            Duration
+          </label>
+          <select
+            value={durationCategory}
+            onChange={(e) => setDurationCategory(e.target.value)}
+            className="mt-1 w-full rounded border px-3 py-2"
+          >
+            <option value="short">30–40 sec</option>
+            <option value="medium">1–2 min</option>
+            <option value="long">3–5+ min</option>
           </select>
         </div>
 
@@ -130,7 +140,7 @@ export default function AIGenerator() {
           disabled={loading}
           className="w-full rounded bg-black py-3 text-white"
         >
-          {loading ? "Generating..." : "Generate Script"}
+          {loading ? "Generating..." : "Generate Video"}
         </button>
       </div>
     </div>

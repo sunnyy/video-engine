@@ -13,6 +13,7 @@ import Preview from "../ui/Editor/Preview";
 export default function Editor() {
   const { id } = useParams();
   const setProject = useProjectStore((s) => s.setProject);
+  const setDatabaseId = useProjectStore((s) => s.setDatabaseId);
   const project = useProjectStore((s) => s.project);
 
   const [loading, setLoading] = useState(true);
@@ -20,20 +21,21 @@ export default function Editor() {
   useEffect(() => {
     async function load() {
       const data = await getProjectById(id);
+
+      setDatabaseId(data.id); // 🔥 store real DB id
       setProject(data.safe_project_json);
+
       setLoading(false);
     }
     load();
-  }, [id, setProject]);
+  }, [id, setProject, setDatabaseId]);
 
   if (loading || !project) return null;
 
-  // Step 1: Script
   if (!project.workflow.script_completed) {
     return <ScriptStep />;
   }
 
-  // Step 2: Talking Head Upload
   if (
     project.meta.mode === "talking_head" &&
     !project.workflow.avatar_completed
@@ -41,7 +43,6 @@ export default function Editor() {
     return <TalkingHeadStep />;
   }
 
-  // Step 3: Beats Editor
   return (
     <div className="flex h-screen flex-col bg-gray-100">
       <Header />
