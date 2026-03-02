@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Video, useCurrentFrame } from "remotion";
+import { Video, useCurrentFrame } from "remotion";
 
 export default function AvatarLayer({ avatar, project }) {
   const frame = useCurrentFrame();
@@ -26,16 +26,13 @@ export default function AvatarLayer({ avatar, project }) {
     position: "absolute",
     width: "100%",
     height: "100%",
-    zIndex: 2,
-    opacity: 0, // hidden by default
+    opacity: 0,
   };
 
-  // FULL avatar mode
   if (visual_mode === "full" && content_type === "avatar") {
     containerStyle.opacity = 1;
   }
 
-  // SPLIT
   if (visual_mode === "split") {
     containerStyle.opacity = 1;
 
@@ -58,7 +55,6 @@ export default function AvatarLayer({ avatar, project }) {
     }
   }
 
-  // FLOATING
   if (visual_mode === "floating") {
     containerStyle = {
       position: "absolute",
@@ -69,7 +65,6 @@ export default function AvatarLayer({ avatar, project }) {
       bottom: 80,
       right: 80,
       boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
-      zIndex: 5,
       opacity: 1,
     };
   }
@@ -77,7 +72,7 @@ export default function AvatarLayer({ avatar, project }) {
   const avatarFit = currentBeat.avatar_object_fit || "cover";
 
   return (
-    <AbsoluteFill style={{ pointerEvents: "none", zIndex: 2 }}>
+    <div style={{ position: "absolute", inset: 0 }}>
       <div style={containerStyle}>
         <Video
           src={avatar.src}
@@ -89,6 +84,6 @@ export default function AvatarLayer({ avatar, project }) {
           }}
         />
       </div>
-    </AbsoluteFill>
+    </div>
   );
 }

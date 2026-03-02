@@ -22,13 +22,16 @@
   - assets
     - library.json
   - core
+    - assetAnimationRegistry.js
     - assetAutoMatcher
     - assetMatcher.js
     - audioCueEngine.js
+    - beatTransitionRegistry.js
     - buildBeatsFromScript.js
     - calculateTimeline.js
     - captionAnimationRegistry.jsx
     - captionPositionRegistry.jsx
+    - captionStyleRegistry.js
     - captionStyleRegistry.jsx
     - captionStyles.js
     - captionTimingEngine.js
@@ -88,14 +91,17 @@
     - Editor
       - AssetPicker.jsx
       - AssetsSection.jsx
+      - AvatarSection.jsx
       - BeatEditor.jsx
       - BeatList.jsx
       - CaptionsSection.jsx
       - ContentSection.jsx
+      - EditorPanel.jsx
       - Header.jsx
       - LayoutSelector.jsx
-      - LayoutSettingsSection.jsx
+      - MusicSection.jsx
       - Preview.jsx
+      - Sidebar.jsx
       - TransitionSection.jsx
     - Workflow
       - ScriptStep.jsx

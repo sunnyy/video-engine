@@ -28,6 +28,10 @@ export default function AvatarSection() {
   };
 
   const removeAvatar = () => {
+    if (avatar?.src) {
+      URL.revokeObjectURL(avatar.src);
+    }
+
     updateProjectMeta({
       avatar: {
         ...avatar,
@@ -51,7 +55,6 @@ export default function AvatarSection() {
         Talking Head Video
       </h3>
 
-      {/* Upload */}
       <input
         type="file"
         accept="video/*"
@@ -61,6 +64,20 @@ export default function AvatarSection() {
 
       {avatar.src && (
         <>
+          {/* Preview */}
+          <div className="mb-6">
+            <video
+              
+              src={avatar.src}
+              controls
+              className="w-full rounded-lg bg-black"
+              style={{
+                objectFit: avatar.object_fit || "cover",
+                maxHeight: 500,
+              }}
+            />
+          </div>
+
           {/* Object Fit */}
           <div className="mb-4">
             <h4 className="text-sm font-medium text-gray-600 uppercase mb-2">
@@ -83,7 +100,6 @@ export default function AvatarSection() {
             </select>
           </div>
 
-          {/* Remove */}
           <button
             onClick={removeAvatar}
             className="text-sm text-red-600"

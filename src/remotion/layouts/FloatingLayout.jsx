@@ -13,6 +13,7 @@ export default function FloatingLayout({ beat, project }) {
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "#111",
+        zIndex: 0, // allow avatar to appear above
       }}
     >
       {asset ? (
@@ -29,11 +30,9 @@ export default function FloatingLayout({ beat, project }) {
         />
       )}
 
-      {beat.caption?.show && (
-        <Caption beat={beat} project={project} />
-      )}
-
-      <ComponentsRenderer components={beat.components} />
+      <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+        <ComponentsRenderer components={beat.components} />
+      </div>
     </AbsoluteFill>
   );
 }

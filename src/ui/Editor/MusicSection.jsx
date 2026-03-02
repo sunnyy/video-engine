@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 
 export default function MusicSection() {
@@ -7,34 +7,46 @@ export default function MusicSection() {
     (s) => s.updateProjectMeta
   );
 
+  const fileRef = useRef(null);
+
   if (!project) return null;
 
-  const music = project.music || {
-    src: null,
-    volume: 0.8,
-  };
+  const music = project.music || null;
 
   const handleUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // revoke old url
+    if (music?.src) {
+      URL.revokeObjectURL(music.src);
+    }
+
     const url = URL.createObjectURL(file);
 
     updateProjectMeta({
       music: {
-        ...music,
         src: url,
+        volume: 0.8,
       },
     });
+
+    // reset input so same file can be re-selected
+    e.target.value = "";
   };
 
   const removeMusic = () => {
+    if (music?.src) {
+      URL.revokeObjectURL(music.src);
+    }
+
     updateProjectMeta({
-      music: {
-        ...music,
-        src: null,
-      },
+      music: null,
     });
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
   };
 
   return (
@@ -44,13 +56,14 @@ export default function MusicSection() {
       </h3>
 
       <input
+        ref={fileRef}
         type="file"
         accept="audio/*"
         onChange={handleUpload}
         className="mb-4"
       />
 
-      {music.src && (
+      {music?.src && (
         <>
           <div className="mb-2 text-xs text-gray-500">
             Volume
