@@ -30,7 +30,7 @@ export default function Editor() {
       setLoading(false);
     }
     load();
-  }, [id, setProject, setDatabaseId]);
+  }, [id]);
 
   if (loading || !project) return null;
 
@@ -38,7 +38,10 @@ export default function Editor() {
     return <ScriptStep />;
   }
 
-  if (project.meta.mode === "talking_head" && !project.workflow.avatar_completed) {
+  if (
+    project.meta.mode === "talking_head" &&
+    !project.workflow.avatar_completed
+  ) {
     return <TalkingHeadStep />;
   }
 
@@ -47,9 +50,12 @@ export default function Editor() {
       <Header />
 
       <div className="flex flex-1 gap-6 mt-6">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        
-        <EditorPanel activeTab={activeTab} />
+        <div className="flex-1 flex-col mr-10">
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+          <div className="flex-1 flex justify-center mt-4">
+            <EditorPanel activeTab={activeTab} />
+          </div>
+        </div>
         <Preview />
       </div>
     </div>
