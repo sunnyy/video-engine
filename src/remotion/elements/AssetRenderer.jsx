@@ -1,59 +1,128 @@
 import React from "react";
-import { Video } from "remotion";
+import {
+  AbsoluteFill,
+  Video,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
+  spring,
+  Easing,
+} from "remotion";
+import { assetAnimationRegistry } from "../../core/assetAnimationRegistry";
 
-export default function AssetRenderer({ asset }) {
-  if (!asset) {
-    return (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          background:
-            "linear-gradient(135deg, #1e1e1e, #3a3a3a)",
-        }}
-      />
-    );
-  }
+export default function AssetRenderer({ asset, beat, slot }) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  if (!asset) return null;
 
   const objectFit = asset.object_fit || "cover";
 
-  // Background
-  if (asset.type === "background") {
-    if (asset.value?.color) {
-      return (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            background: asset.value.color,
-          }}
-        />
-      );
-    }
+  const animationKey =
+    beat?.asset_settings?.[slot]?.animation || "none";
 
-    if (asset.value?.gradient) {
-      return (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            background: asset.value.gradient,
-          }}
-        />
-      );
+  const animation =
+    assetAnimationRegistry[animationKey]?.() ||
+    assetAnimationRegistry.none();
+
+  let style = {};
+
+  // 🔥 If animation is none → render static
+  if (animation.type !== "none") {
+    const duration = animation.duration || 20;
+
+    const progress = interpolate(frame, [0, duration], [0, 1], {
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    });
+
+    const springProgress = spring({
+      frame,
+      fps,
+      config: {
+        damping: 12,
+        stiffness: 120,
+        mass: 0.6,
+      },
+    });
+
+    switch (animation.type) {
+      case "fade":
+        style.opacity = progress;
+        break;
+
+      case "slideY":
+        style.transform = `translateY(${interpolate(
+          progress,
+          [0, 1],
+          [animation.from, 0]
+        )}px)`;
+        style.opacity = progress;
+        break;
+
+      case "slideX":
+        style.transform = `translateX(${interpolate(
+          progress,
+          [0, 1],
+          [animation.from, 0]
+        )}px)`;
+        style.opacity = progress;
+        break;
+
+      case "scale":
+        style.transform = `scale(${interpolate(
+          progress,
+          [0, 1],
+          [animation.from, 1]
+        )})`;
+        style.opacity = progress;
+        break;
+
+      case "springScale":
+        style.transform = `scale(${interpolate(
+          springProgress,
+          [0, 1],
+          [animation.from, 1]
+        )})`;
+        style.opacity = springProgress;
+        break;
+
+      case "blur":
+        style.filter = `blur(${interpolate(
+          progress,
+          [0, 1],
+          [animation.from, 0]
+        )}px)`;
+        style.opacity = progress;
+        break;
+
+      case "combo":
+        style.transform = `scale(${interpolate(
+          progress,
+          [0, 1],
+          [animation.scaleFrom, 1]
+        )})`;
+        style.filter = `blur(${interpolate(
+          progress,
+          [0, 1],
+          [animation.blurFrom, 0]
+        )}px)`;
+        style.opacity = progress;
+        break;
+
+      default:
+        break;
     }
   }
 
-  // 🔥 Normalize source (support old src + new url)
   const source = asset.url || asset.src;
+  const isVideo =
+    source?.toLowerCase().endsWith(".mp4") ||
+    source?.toLowerCase().endsWith(".webm");
 
-  if (source) {
-    const isVideo =
-      source.endsWith(".mp4") ||
-      source.endsWith(".webm");
-
-    if (isVideo) {
-      return (
+  return (
+    <AbsoluteFill style={{ overflow: "hidden", ...style }}>
+      {isVideo ? (
         <Video
           src={source}
           muted
@@ -64,29 +133,16 @@ export default function AssetRenderer({ asset }) {
             objectFit,
           }}
         />
-      );
-    }
-
-    return (
-      <img
-        src={source}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit,
-        }}
-      />
-    );
-  }
-
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        background:
-          "linear-gradient(135deg, #1e1e1e, #3a3a3a)",
-      }}
-    />
+      ) : (
+        <img
+          src={source}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit,
+          }}
+        />
+      )}
+    </AbsoluteFill>
   );
 }

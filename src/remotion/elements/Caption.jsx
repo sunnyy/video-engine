@@ -1,71 +1,83 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
-import { captionStyles } from "../../core/captionStyleRegistry";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import { captionStyleRegistry } from "../../core/captionStyleRegistry";
 import { captionAnimations } from "../../core/captionAnimationRegistry";
+import { captionPositions } from "../../core/captionPositionRegistry";
 
-export default function Caption({ beat, project }) {
+export default function Caption({ beat }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   if (!beat?.spoken || !beat.caption?.show) return null;
 
-  // frame is already local because of <Sequence>
-  const localFrame = frame;
+  const transitionOverlap = beat.transition?.duration || 0;
 
-  const durationFrames = Math.floor(beat.duration_sec * fps);
+  const durationFrames = Math.floor((beat.duration_sec * fps) * 0.85) - transitionOverlap;
 
-  const { style, animation } = project.captionPreset;
+  const { style, animation, position } = beat.caption;
 
-  const styleConfig = captionStyles[style] || captionStyles.clean;
+  const styleConfig = captionStyleRegistry[style]?.() || captionStyleRegistry.tiktokClean();
 
   const animationRenderer = captionAnimations[animation] || captionAnimations.fade;
 
-  const animatedText = animationRenderer({
-    text: beat.spoken,
-    localFrame,
-    durationFrames,
-    fps,
+  const positionConfig = captionPositions[position] || captionPositions.bottom;
+
+  const words = beat.spoken.split(" ");
+
+  // Build styled word objects
+  const baseWords = words.map((word, index) => {
+    const isLast = index === words.length - 1;
+
+    const highlightStyle = styleConfig.activeWord && isLast ? styleConfig.activeWord : {};
+
+    return {
+      text: word,
+      style: {
+        display: "inline-block",
+        marginRight: 8,
+        ...styleConfig.word,
+        ...highlightStyle,
+      },
+    };
   });
 
-  const fadeOpacity =
-    animation === "fade"
-      ? interpolate(localFrame, [0, 10], [0, 1], {
-          extrapolateRight: "clamp",
-        })
-      : 1;
+  // Render base JSX for non-word animations
+  const baseChildren = baseWords.map((w, i) => (
+    <span key={i} style={w.style}>
+      {w.text}
+    </span>
+  ));
 
-  let positionStyle = { bottom: 120 };
-
-  if (beat.visual_mode === "split" || beat.visual_mode === "dual") {
-    positionStyle = {
-      top: "50%",
-      transform: "translateY(-50%)",
-    };
-  }
-
-  if (beat.visual_mode === "floating") {
-    positionStyle = { top: 120 };
-  }
+  const animatedResult = animationRenderer({
+    words: baseWords,
+    localFrame: frame,
+    durationFrames,
+    fps,
+    children: baseChildren,
+  });
 
   return (
     <AbsoluteFill
       style={{
         pointerEvents: "none",
-        justifyContent: "center",
-        alignItems: "center",
+        ...positionConfig.container,
       }}
     >
       <div
         style={{
-          position: "static",
-          textAlign: "center",
           lineHeight: 1.2,
-          opacity: fadeOpacity,
-          ...styleConfig,
-          ...positionStyle,
+          textAlign: "center",
+          maxWidth: "85%",
+          ...styleConfig.container,
         }}
       >
-        {animatedText}
+        {Array.isArray(animatedResult)
+          ? animatedResult.map((w, i) => (
+              <span key={i} style={w.style}>
+                {w.text}
+              </span>
+            ))
+          : animatedResult}
       </div>
     </AbsoluteFill>
   );

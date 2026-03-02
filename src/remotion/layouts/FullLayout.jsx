@@ -21,14 +21,16 @@ export default function FullLayout({ beat, project }) {
 
   return (
     <AbsoluteFill style={{ position: "relative" }}>
-      {/* Background ONLY if asset mode */}
       {showAsset && (
         <AbsoluteFill style={{ zIndex: 1 }}>
-          <AssetRenderer asset={beat.assets.main} />
+          <AssetRenderer
+            asset={beat.assets.main}
+            beat={beat}
+            slot="main"
+          />
         </AbsoluteFill>
       )}
 
-      {/* Gradient only if asset missing AND not avatar mode */}
       {!showAsset && !showAvatar && (
         <AbsoluteFill
           style={{
@@ -38,14 +40,12 @@ export default function FullLayout({ beat, project }) {
         />
       )}
 
-      {/* Captions */}
       {beat.caption?.show && (
         <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
           <Caption beat={beat} project={project} />
         </div>
       )}
 
-      {/* Components */}
       <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
         <ComponentsRenderer components={beat.components} />
       </div>

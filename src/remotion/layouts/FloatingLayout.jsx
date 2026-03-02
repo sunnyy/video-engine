@@ -16,12 +16,15 @@ export default function FloatingLayout({ beat, project }) {
       }}
     >
       {asset ? (
-        <AssetRenderer asset={asset} />
+        <AssetRenderer
+          asset={asset}
+          beat={beat}
+          slot="main"
+        />
       ) : (
         <AbsoluteFill
           style={{
-            background:
-              "linear-gradient(135deg, #222, #111)",
+            background: "linear-gradient(135deg, #222, #111)",
           }}
         />
       )}
@@ -30,9 +33,7 @@ export default function FloatingLayout({ beat, project }) {
         <Caption beat={beat} project={project} />
       )}
 
-      <ComponentsRenderer
-        components={beat.components}
-      />
+      <ComponentsRenderer components={beat.components} />
     </AbsoluteFill>
   );
 }

@@ -11,8 +11,15 @@ export default function DualLayout({ beat, project }) {
   const main = beat.assets?.main;
   const secondary = beat.assets?.secondary;
 
-  const renderZone = (asset) => {
-    if (asset) return <AssetRenderer asset={asset} />;
+  const renderZone = (asset, slot) => {
+    if (asset)
+      return (
+        <AssetRenderer
+          asset={asset}
+          beat={beat}
+          slot={slot}
+        />
+      );
 
     return (
       <AbsoluteFill
@@ -24,23 +31,27 @@ export default function DualLayout({ beat, project }) {
   };
 
   return (
-    <AbsoluteFill style={{ flexDirection: isVertical ? "column" : "row", zIndex: 0 }}>
+    <AbsoluteFill
+      style={{
+        display: "flex",
+        flexDirection: isVertical ? "column" : "row",
+        zIndex: 0,
+      }}
+    >
       <AbsoluteFill style={{ flex: 1, position: "relative" }}>
-        {renderZone(main)}
+        {renderZone(main, "main")}
       </AbsoluteFill>
 
       <AbsoluteFill style={{ flex: 1, position: "relative" }}>
-        {renderZone(secondary)}
+        {renderZone(secondary, "secondary")}
       </AbsoluteFill>
 
-      {/* Captions */}
       {beat.caption?.show && (
         <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
           <Caption beat={beat} project={project} />
         </div>
       )}
 
-      {/* Components */}
       <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
         <ComponentsRenderer components={beat.components} />
       </div>

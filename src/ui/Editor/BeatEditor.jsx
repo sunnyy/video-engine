@@ -4,7 +4,6 @@ import { useProjectStore } from "../../store/useProjectStore";
 import LayoutSelector from "./LayoutSelector";
 import ContentSection from "./ContentSection";
 import AssetsSection from "./AssetsSection";
-import LayoutSettingsSection from "./LayoutSettingsSection";
 import CaptionsSection from "./CaptionsSection";
 import TransitionSection from "./TransitionSection";
 
@@ -25,7 +24,7 @@ export default function BeatEditor() {
       <ContentSection beat={activeBeat} />
 
       <div className="mb-2">
-        <h4 className="mb-3 text-sm font-medium text-gray-600 uppercase tracking-wide">Layout</h4>
+        <h4 className="mb-3 text-sm text-black font-semibold uppercase tracking-wide">Layout</h4>
         <LayoutSelector beat={activeBeat} />
       </div>
 
@@ -33,13 +32,10 @@ export default function BeatEditor() {
         <AssetsSection beat={activeBeat} project={project} />
       </div>
 
-      <LayoutSettingsSection beat={activeBeat} />
-
       <div className="flex gap-2">
         <CaptionsSection beat={activeBeat} />
-
-        <TransitionSection beat={activeBeat} />
       </div>
+      <TransitionSection beat={activeBeat} />
     </div>
   );
 }

@@ -5,10 +5,11 @@ import { getProjectById } from "../services/projects/projectService";
 
 import ScriptStep from "../ui/Workflow/ScriptStep";
 import TalkingHeadStep from "../ui/Workflow/TalkingHeadStep";
+
 import Header from "../ui/Editor/Header";
-import BeatList from "../ui/Editor/BeatList";
-import BeatEditor from "../ui/Editor/BeatEditor";
 import Preview from "../ui/Editor/Preview";
+import Sidebar from "../ui/Editor/Sidebar";
+import EditorPanel from "../ui/Editor/EditorPanel";
 
 export default function Editor() {
   const { id } = useParams();
@@ -17,12 +18,13 @@ export default function Editor() {
   const project = useProjectStore((s) => s.project);
 
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("beats");
 
   useEffect(() => {
     async function load() {
       const data = await getProjectById(id);
 
-      setDatabaseId(data.id); // 🔥 store real DB id
+      setDatabaseId(data.id);
       setProject(data.safe_project_json);
 
       setLoading(false);
@@ -36,19 +38,18 @@ export default function Editor() {
     return <ScriptStep />;
   }
 
-  if (
-    project.meta.mode === "talking_head" &&
-    !project.workflow.avatar_completed
-  ) {
+  if (project.meta.mode === "talking_head" && !project.workflow.avatar_completed) {
     return <TalkingHeadStep />;
   }
 
   return (
     <div className="flex h-screen flex-col bg-gray-100">
       <Header />
-      <div className="flex flex-1 gap-6 mt-6 h-1/2">
-        <BeatList />
-        <BeatEditor />
+
+      <div className="flex flex-1 gap-6 mt-6">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        
+        <EditorPanel activeTab={activeTab} />
         <Preview />
       </div>
     </div>
