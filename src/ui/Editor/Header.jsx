@@ -21,24 +21,20 @@ export default function Header() {
       },
     };
 
-    // Switching to talking head requires avatar step
-    if (mode === "talking_head") {
+    // Do NOT reset avatar when switching modes
+    // Only adjust visuals if needed
+
+    if (mode === "faceless") {
       updated = {
         ...updated,
-        avatar: null,
-        workflow: {
-          ...updated.workflow,
-          avatar_completed: false,
-        },
+        beats: updated.beats.map((beat) => ({
+          ...beat,
+          visual_mode:
+            beat.visual_mode === "split" || beat.visual_mode === "floating"
+              ? "full"
+              : beat.visual_mode,
+        })),
       };
-    }
-
-    // If switching to faceless, fix invalid layouts
-    if (mode === "faceless") {
-      updated.beats = updated.beats.map((beat) => ({
-        ...beat,
-        visual_mode: beat.visual_mode === "split" || beat.visual_mode === "floating" ? "full" : beat.visual_mode,
-      }));
     }
 
     const safe = buildSafeProject(updated);
@@ -65,7 +61,7 @@ export default function Header() {
 
     const url = URL.createObjectURL(file);
 
-    const updated = {
+    const updated = buildSafeProject({
       ...project,
       avatar: {
         src: url,
@@ -76,7 +72,7 @@ export default function Header() {
         ...project.workflow,
         avatar_completed: true,
       },
-    };
+    });
 
     setProject(updated);
   };
@@ -90,13 +86,21 @@ export default function Header() {
         <div className="flex border rounded overflow-hidden">
           <button
             onClick={() => handleModeChange("talking_head")}
-            className={`px-4 py-2 ${project.meta.mode === "talking_head" ? "bg-black text-white" : "bg-white"}`}
+            className={`px-4 py-2 ${
+              project.meta.mode === "talking_head"
+                ? "bg-black text-white"
+                : "bg-white"
+            }`}
           >
             Talking Head
           </button>
           <button
             onClick={() => handleModeChange("faceless")}
-            className={`px-4 py-2 ${project.meta.mode === "faceless" ? "bg-black text-white" : "bg-white"}`}
+            className={`px-4 py-2 ${
+              project.meta.mode === "faceless"
+                ? "bg-black text-white"
+                : "bg-white"
+            }`}
           >
             Faceless
           </button>
@@ -106,30 +110,49 @@ export default function Header() {
         <div className="flex border rounded overflow-hidden">
           <button
             onClick={() => handleOrientationChange("9:16")}
-            className={`px-3 py-2 ${project.meta.orientation === "9:16" ? "bg-black text-white" : "bg-white"}`}
+            className={`px-3 py-2 ${
+              project.meta.orientation === "9:16"
+                ? "bg-black text-white"
+                : "bg-white"
+            }`}
           >
             9:16
           </button>
           <button
             onClick={() => handleOrientationChange("16:9")}
-            className={`px-3 py-2 ${project.meta.orientation === "16:9" ? "bg-black text-white" : "bg-white"}`}
+            className={`px-3 py-2 ${
+              project.meta.orientation === "16:9"
+                ? "bg-black text-white"
+                : "bg-white"
+            }`}
           >
             16:9
           </button>
         </div>
 
         {/* Avatar Upload */}
-        {project.meta.mode === "talking_head" && (
+        {/* {project.meta.mode === "talking_head" && (
           <>
-            <button onClick={() => fileRef.current.click()} className="rounded bg-black px-4 py-2 text-white">
+            <button
+              onClick={() => fileRef.current.click()}
+              className="rounded bg-black px-4 py-2 text-white"
+            >
               Upload Talking Head Video
             </button>
 
-            <input type="file" accept="video/*" ref={fileRef} onChange={handleUpload} className="hidden" />
+            <input
+              type="file"
+              accept="video/*"
+              ref={fileRef}
+              onChange={handleUpload}
+              className="hidden"
+            />
           </>
-        )}
+        )} */}
 
-        <button className="bg-yellow-400 px-5 py-2 rounded font-semibold">Export</button>
+        <button className="bg-yellow-400 px-5 py-2 rounded font-semibold">
+          Export
+        </button>
       </div>
     </div>
   );

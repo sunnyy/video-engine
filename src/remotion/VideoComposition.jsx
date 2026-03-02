@@ -10,6 +10,8 @@ import {
 } from "remotion";
 import BeatRenderer from "./BeatRenderer";
 import AvatarLayer from "./elements/AvatarLayer";
+import Caption from "./elements/Caption";
+import ComponentsRenderer from "./elements/ComponentsRenderer";
 import { beatTransitionRegistry } from "../core/beatTransitionRegistry";
 
 export default function VideoComposition({ project }) {
@@ -21,6 +23,32 @@ export default function VideoComposition({ project }) {
   const { beats, meta, avatar, music } = project;
   const totalDurationFrames = Math.floor(project.duration_sec * fps);
 
+  const getBeatFrames = (beat, index) => {
+    const baseStart = Math.floor(beat.start_sec * fps);
+    const baseEnd = Math.floor(beat.end_sec * fps);
+
+    const transitionKey = beat.transition?.type || "none";
+    const transition =
+      beatTransitionRegistry[transitionKey]?.() ||
+      beatTransitionRegistry.none();
+
+    const overlap = transition.duration || 0;
+
+    const startFrame =
+      index === 0 ? baseStart : baseStart - overlap;
+
+    const endFrame = baseEnd;
+
+    return { startFrame, endFrame, overlap, transition };
+  };
+
+  const currentBeat = beats.find((beat, index) => {
+    const { startFrame, endFrame } =
+      getBeatFrames(beat, index);
+
+    return frame >= startFrame && frame < endFrame;
+  });
+
   return (
     <AbsoluteFill
       style={{
@@ -31,29 +59,25 @@ export default function VideoComposition({ project }) {
     >
       {/* Beats */}
       {beats.map((beat, index) => {
-        const baseStart = Math.floor(beat.start_sec * fps);
+        const { startFrame, overlap, transition } =
+          getBeatFrames(beat, index);
+
         const baseDuration = Math.max(
           1,
-          Math.floor((beat.end_sec - beat.start_sec) * fps)
+          Math.floor(
+            (beat.end_sec - beat.start_sec) * fps
+          )
         );
 
-        const transitionKey = beat.transition?.type || "none";
-        const transition =
-          beatTransitionRegistry[transitionKey]?.() ||
-          beatTransitionRegistry.none();
-
-        const overlap = transition.duration || 0;
-
-        const startFrame =
-          index === 0 ? baseStart : baseStart - overlap;
-
         const durationFrames = baseDuration + overlap;
-
         const localFrame = frame - startFrame;
 
         let style = {};
 
-        if (transition.type !== "none" && overlap > 0) {
+        if (
+          transition.type === "fade" &&
+          overlap > 0
+        ) {
           const progress = interpolate(
             localFrame,
             [0, overlap],
@@ -64,44 +88,7 @@ export default function VideoComposition({ project }) {
             }
           );
 
-          switch (transition.type) {
-            case "fade":
-              style.opacity = progress;
-              break;
-
-            case "slideX":
-              style.transform = `translateX(${interpolate(
-                progress,
-                [0, 1],
-                [
-                  transition.from > 0
-                    ? meta.width
-                    : -meta.width,
-                  0,
-                ]
-              )}px)`;
-              break;
-
-            case "scale":
-              style.transform = `scale(${interpolate(
-                progress,
-                [0, 1],
-                [transition.from, 1]
-              )})`;
-              break;
-
-            case "blur":
-              style.filter = `blur(${interpolate(
-                progress,
-                [0, 1],
-                [transition.from, 0]
-              )}px)`;
-              style.opacity = progress;
-              break;
-
-            default:
-              break;
-          }
+          style.opacity = progress;
         }
 
         return (
@@ -111,28 +98,56 @@ export default function VideoComposition({ project }) {
             durationInFrames={durationFrames}
           >
             <AbsoluteFill style={style}>
-              <BeatRenderer beat={beat} project={project} />
+              <BeatRenderer
+                beat={beat}
+                project={project}
+              />
             </AbsoluteFill>
           </Sequence>
         );
       })}
 
-      {/* Background Music */}
-      {music?.src && (
-        <Audio
-          src={music.src}
-          volume={music.volume ?? 0.8}
+      {/* Avatar */}
+      {meta.mode === "talking_head" &&
+        avatar?.src && (
+          <Sequence
+            from={0}
+            durationInFrames={
+              totalDurationFrames
+            }
+          >
+            <AvatarLayer
+              avatar={avatar}
+              project={project}
+            />
+          </Sequence>
+        )}
+
+      {/* Global Caption */}
+      {currentBeat?.caption?.show && (
+        <Caption
+          beat={currentBeat}
         />
       )}
 
-      {/* Avatar */}
-      {meta.mode === "talking_head" && avatar?.src && (
-        <Sequence
-          from={0}
-          durationInFrames={totalDurationFrames}
-        >
-          <AvatarLayer avatar={avatar} project={project} />
-        </Sequence>
+      {/* Global Components */}
+      {currentBeat?.components?.length >
+        0 && (
+        <ComponentsRenderer
+          components={
+            currentBeat.components
+          }
+        />
+      )}
+
+      {music?.src && (
+        <Audio
+          key={music.src}
+          src={music.src}
+          volume={
+            music.volume ?? 0.8
+          }
+        />
       )}
     </AbsoluteFill>
   );

@@ -157,7 +157,7 @@ export default function AssetPicker({ onSelect, orientation, onClose }) {
         </div>
 
         {/* Tabs */}
-        <div className="mb-4 flex gap-6 border-b pb-2">
+        <div className={`mb-4 flex gap-6 pb-2`}>
           {[
             { key: "upload", label: "Upload" },
             { key: "my", label: "My Assets" },
@@ -170,7 +170,7 @@ export default function AssetPicker({ onSelect, orientation, onClose }) {
                 setTab(t.key);
                 if (t.key === "gallery") loadGalleryAssets();
               }}
-              className={tab === t.key ? "font-semibold text-indigo-600" : "text-gray-500"}
+              className={`px-5 py-1 text-base rounded ${tab === t.key ? "font-semibold text-white bg-purple-700 border-purple-700" : " text-gray-700 border border-gray-400"}`}
             >
               {t.label}
             </button>

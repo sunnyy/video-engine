@@ -40,12 +40,6 @@ export default function FullLayout({ beat, project }) {
         />
       )}
 
-      {beat.caption?.show && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
-          <Caption beat={beat} project={project} />
-        </div>
-      )}
-
       <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
         <ComponentsRenderer components={beat.components} />
       </div>

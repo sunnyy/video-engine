@@ -5,7 +5,7 @@ import { captionStyleRegistry } from "../../core/captionStyleRegistry";
 const STYLES = ["tiktokClean", "reelsBold", "minimalGlass", "premiumBlock", "kineticPop", "cinematicSubtitle"];
 
 const ANIMATIONS = ["fade", "word_reveal", "word_pop"];
-const POSITIONS = ["bottom", "middle", "top"];
+const POSITIONS = ["top", "middle", "bottom"];
 
 export default function CaptionsSection({ beat }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
