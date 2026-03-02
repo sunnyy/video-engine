@@ -13,10 +13,7 @@ function createRawBeat(order, mode) {
     duration_sec: 3,
     spoken: "",
     visible: true,
-    assets: {
-      main: null,
-      secondary: null,
-    },
+    assets: { main: null, secondary: null },
     caption: {
       show: true,
       style: "clean",
@@ -24,10 +21,7 @@ function createRawBeat(order, mode) {
       animation: "fade",
       segments: [],
     },
-    transition: {
-      type: "cut",
-      duration: 0.3,
-    },
+    transition: { type: "cut", duration: 0.3 },
     components: [],
   };
 }
@@ -66,8 +60,9 @@ export const useProjectStore = create((set, get) => ({
     });
   },
 
-  updateProjectMeta: (updates) => {
+  updateProjectMeta: async (updates) => {
     const current = get().project;
+    const databaseId = get().databaseId;
     if (!current) return;
 
     const rebuilt = buildSafeProject({
@@ -76,17 +71,18 @@ export const useProjectStore = create((set, get) => ({
     });
 
     set({ project: rebuilt });
+
+    if (databaseId) {
+      await updateProject(databaseId, rebuilt);
+    }
   },
 
-  setActiveBeat: (beatId) => {
-    set({ activeBeatId: beatId });
-  },
+  setActiveBeat: (beatId) => set({ activeBeatId: beatId }),
 
   updateBeat: async (beatId, updates) => {
     const current = get().project;
     const databaseId = get().databaseId;
-
-    if (!current || !databaseId) return;
+    if (!current) return;
 
     const pacingProfile = getPacingProfile("normal");
 
@@ -99,21 +95,6 @@ export const useProjectStore = create((set, get) => ({
         updated = recalcBeatTiming(updated, pacingProfile);
       }
 
-      if (updates.assetAttach) {
-        updated = {
-          ...updated,
-          assets: {
-            ...updated.assets,
-            [updates.zone || "main"]: {
-              id: updates.assetAttach.id,
-              source: updates.assetAttach.source,
-              url: updates.assetAttach.url,
-              type: updates.assetAttach.type,
-            },
-          },
-        };
-      }
-
       return updated;
     });
 
@@ -124,25 +105,9 @@ export const useProjectStore = create((set, get) => ({
 
     set({ project: updatedProject });
 
-    // 🔥 Persist to DB
-    await updateProject(databaseId, updatedProject);
-  },
-
-  reorderBeats: (newBeats) => {
-    const current = get().project;
-    if (!current) return;
-
-    const reordered = newBeats.map((beat, index) => ({
-      ...beat,
-      order: index,
-    }));
-
-    const updatedProject = calculateTimeline({
-      ...current,
-      beats: reordered,
-    });
-
-    set({ project: updatedProject });
+    if (databaseId) {
+      await updateProject(databaseId, updatedProject);
+    }
   },
 
   addBeat: () => {

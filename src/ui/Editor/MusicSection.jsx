@@ -50,7 +50,7 @@ export default function MusicSection() {
   };
 
   return (
-    <div className="w-[50%] min-w-[320px] overflow-y-auto border-r border-gray-200 bg-white px-6 py-4 rounded-xl">
+    <div className="w-full min-w-[320px] overflow-y-auto border-r border-gray-200 bg-white px-6 py-4 rounded-xl">
       <h3 className="mb-6 text-lg font-semibold">
         Background Music
       </h3>

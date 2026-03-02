@@ -1,10 +1,15 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 import { buildSafeProject } from "../../normalize/normalizeProject";
+import validateProject from "../../core/validateProject";
 
 export default function Header() {
   const project = useProjectStore((s) => s.project);
   const setProject = useProjectStore((s) => s.setProject);
+
+  const [resolution, setResolution] = useState("1080p");
+  const [fps, setFps] = useState(30);
+  const [rendering, setRendering] = useState(false);
 
   const fileRef = useRef();
 
@@ -21,9 +26,6 @@ export default function Header() {
       },
     };
 
-    // Do NOT reset avatar when switching modes
-    // Only adjust visuals if needed
-
     if (mode === "faceless") {
       updated = {
         ...updated,
@@ -37,44 +39,60 @@ export default function Header() {
       };
     }
 
-    const safe = buildSafeProject(updated);
-    setProject(safe);
+    setProject(buildSafeProject(updated));
   };
 
   const handleOrientationChange = (orientation) => {
     if (orientation === project.meta.orientation) return;
 
-    const updated = buildSafeProject({
-      ...project,
-      meta: {
-        ...project.meta,
-        orientation,
-      },
-    });
-
-    setProject(updated);
+    setProject(
+      buildSafeProject({
+        ...project,
+        meta: {
+          ...project.meta,
+          orientation,
+        },
+      })
+    );
   };
 
-  const handleUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const handleExport = async () => {
+    const result = validateProject(project);
+    if (!result.valid) {
+      alert(result.errors.join("\n"));
+      return;
+    }
 
-    const url = URL.createObjectURL(file);
+    try {
+      setRendering(true);
 
-    const updated = buildSafeProject({
-      ...project,
-      avatar: {
-        src: url,
-        duration_sec: 60,
-        speed: 1,
-      },
-      workflow: {
-        ...project.workflow,
-        avatar_completed: true,
-      },
-    });
+      const res = await fetch("http://localhost:5000/api/render", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project,
+          resolution,
+          fps,
+        }),
+      });
 
-    setProject(updated);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert("Render failed: " + data.error);
+        setRendering(false);
+        return;
+      }
+
+      window.open(`http://localhost:5000/${data.file}`, "_blank");
+    } catch (err) {
+      alert("Render error");
+      console.error(err);
+    } finally {
+      setRendering(false);
+    }
   };
 
   return (
@@ -82,7 +100,6 @@ export default function Header() {
       <div className="font-bold text-lg">Video Engine</div>
 
       <div className="flex items-center gap-4">
-        {/* Mode Toggle */}
         <div className="flex border rounded overflow-hidden">
           <button
             onClick={() => handleModeChange("talking_head")}
@@ -106,7 +123,6 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Orientation Toggle */}
         <div className="flex border rounded overflow-hidden">
           <button
             onClick={() => handleOrientationChange("9:16")}
@@ -130,28 +146,32 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Avatar Upload */}
-        {/* {project.meta.mode === "talking_head" && (
-          <>
-            <button
-              onClick={() => fileRef.current.click()}
-              className="rounded bg-black px-4 py-2 text-white"
-            >
-              Upload Talking Head Video
-            </button>
+        <select
+          value={resolution}
+          onChange={(e) => setResolution(e.target.value)}
+          className="border px-3 py-2 rounded"
+        >
+          <option value="720p">720p</option>
+          <option value="1080p">1080p</option>
+          <option value="4k">4K</option>
+        </select>
 
-            <input
-              type="file"
-              accept="video/*"
-              ref={fileRef}
-              onChange={handleUpload}
-              className="hidden"
-            />
-          </>
-        )} */}
+        <select
+          value={fps}
+          onChange={(e) => setFps(Number(e.target.value))}
+          className="border px-3 py-2 rounded"
+        >
+          <option value={24}>24 FPS</option>
+          <option value={30}>30 FPS</option>
+          <option value={60}>60 FPS</option>
+        </select>
 
-        <button className="bg-yellow-400 px-5 py-2 rounded font-semibold">
-          Export
+        <button
+          onClick={handleExport}
+          disabled={rendering}
+          className="bg-yellow-400 px-5 py-2 rounded font-semibold disabled:opacity-50"
+        >
+          {rendering ? "Rendering..." : "Export"}
         </button>
       </div>
     </div>
