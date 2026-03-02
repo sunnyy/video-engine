@@ -2,7 +2,12 @@ import { VALID_LAYOUTS, DEFAULT_BEAT, DEFAULT_TRANSITION } from "./constants";
 import { matchAsset } from "../core/assetMatcher";
 
 function resolveVisualMode(raw, projectMode) {
+  if (projectMode !== "talking_head" && raw === "split") {
+    return "full";
+  }
+
   if (VALID_LAYOUTS.includes(raw)) return raw;
+
   return projectMode === "talking_head" ? "split" : "full";
 }
 
@@ -33,17 +38,10 @@ function normalizeAvatarPosition(raw, visualMode) {
 function resolveAsset(rawAsset, meta) {
   if (!rawAsset) return null;
 
-  // 🔥 If it already has a URL or src, trust it
-  if (rawAsset.url || rawAsset.src) {
-    return rawAsset;
-  }
+  if (rawAsset.url || rawAsset.src) return rawAsset;
 
-  // Background preset
-  if (rawAsset.type === "background") {
-    return rawAsset;
-  }
+  if (rawAsset.type === "background") return rawAsset;
 
-  // Fallback only if truly empty
   return matchAsset({
     orientation: meta.orientation,
   });
@@ -87,8 +85,21 @@ export function normalizeBeat(raw = {}, index, meta) {
         : null,
     },
 
+    // 🔥 PRESERVE ANIMATION SETTINGS
+    asset_settings: {
+      main: {
+        animation: raw.asset_settings?.main?.animation || "none",
+      },
+      secondary: {
+        animation: raw.asset_settings?.secondary?.animation || "none",
+      },
+    },
+
     caption: {
       show: typeof raw.caption?.show === "boolean" ? raw.caption.show : true,
+      style: raw.caption?.style || "tiktokClean",
+      animation: raw.caption?.animation || "fade",
+      position: raw.caption?.position || "bottom",
     },
 
     transition: normalizeTransition(raw.transition),

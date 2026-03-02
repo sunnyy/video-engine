@@ -1,13 +1,24 @@
 import React from "react";
-import { AbsoluteFill, Sequence } from "remotion";
+import {
+  AbsoluteFill,
+  Sequence,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
+  Easing,
+  Audio,
+} from "remotion";
 import BeatRenderer from "./BeatRenderer";
 import AvatarLayer from "./elements/AvatarLayer";
+import { beatTransitionRegistry } from "../core/beatTransitionRegistry";
 
 export default function VideoComposition({ project }) {
   if (!project) return null;
 
-  const { beats, meta, avatar } = project;
-  const fps = meta.fps;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const { beats, meta, avatar, music } = project;
   const totalDurationFrames = Math.floor(project.duration_sec * fps);
 
   return (
@@ -18,11 +29,80 @@ export default function VideoComposition({ project }) {
         height: meta.height,
       }}
     >
-      {/* Layouts FIRST */}
-      {beats.map((beat) => {
-        const startFrame = Math.floor(beat.start_sec * fps);
-        const rawDuration = (beat.end_sec - beat.start_sec) * fps;
-        const durationFrames = Math.max(1, Math.floor(rawDuration));
+      {/* Beats */}
+      {beats.map((beat, index) => {
+        const baseStart = Math.floor(beat.start_sec * fps);
+        const baseDuration = Math.max(
+          1,
+          Math.floor((beat.end_sec - beat.start_sec) * fps)
+        );
+
+        const transitionKey = beat.transition?.type || "none";
+        const transition =
+          beatTransitionRegistry[transitionKey]?.() ||
+          beatTransitionRegistry.none();
+
+        const overlap = transition.duration || 0;
+
+        const startFrame =
+          index === 0 ? baseStart : baseStart - overlap;
+
+        const durationFrames = baseDuration + overlap;
+
+        const localFrame = frame - startFrame;
+
+        let style = {};
+
+        if (transition.type !== "none" && overlap > 0) {
+          const progress = interpolate(
+            localFrame,
+            [0, overlap],
+            [0, 1],
+            {
+              extrapolateRight: "clamp",
+              easing: Easing.out(Easing.cubic),
+            }
+          );
+
+          switch (transition.type) {
+            case "fade":
+              style.opacity = progress;
+              break;
+
+            case "slideX":
+              style.transform = `translateX(${interpolate(
+                progress,
+                [0, 1],
+                [
+                  transition.from > 0
+                    ? meta.width
+                    : -meta.width,
+                  0,
+                ]
+              )}px)`;
+              break;
+
+            case "scale":
+              style.transform = `scale(${interpolate(
+                progress,
+                [0, 1],
+                [transition.from, 1]
+              )})`;
+              break;
+
+            case "blur":
+              style.filter = `blur(${interpolate(
+                progress,
+                [0, 1],
+                [transition.from, 0]
+              )}px)`;
+              style.opacity = progress;
+              break;
+
+            default:
+              break;
+          }
+        }
 
         return (
           <Sequence
@@ -30,14 +110,27 @@ export default function VideoComposition({ project }) {
             from={startFrame}
             durationInFrames={durationFrames}
           >
-            <BeatRenderer beat={beat} project={project} />
+            <AbsoluteFill style={style}>
+              <BeatRenderer beat={beat} project={project} />
+            </AbsoluteFill>
           </Sequence>
         );
       })}
 
-      {/* Avatar ABOVE layout backgrounds but BELOW captions */}
+      {/* Background Music */}
+      {music?.src && (
+        <Audio
+          src={music.src}
+          volume={music.volume ?? 0.8}
+        />
+      )}
+
+      {/* Avatar */}
       {meta.mode === "talking_head" && avatar?.src && (
-        <Sequence from={0} durationInFrames={totalDurationFrames}>
+        <Sequence
+          from={0}
+          durationInFrames={totalDurationFrames}
+        >
           <AvatarLayer avatar={avatar} project={project} />
         </Sequence>
       )}

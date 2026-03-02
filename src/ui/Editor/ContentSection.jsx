@@ -7,7 +7,7 @@ export default function ContentSection({ beat }) {
   return (
     <div className="w-full flex flex-wrap items-end">
       <div className="flex flex-col w-[60%]">
-        <h4 className="w-full text-sm font-medium text-gray-600 uppercase tracking-wide">Content</h4>
+        <h4 className="w-full text-sm text-black font-semibold uppercase tracking-wide">Content</h4>
 
         <textarea
           value={beat.spoken}
@@ -18,7 +18,7 @@ export default function ContentSection({ beat }) {
       </div>
 
       <div className="flex flex-col items-center ml-4">
-        <h4 className="mb-2 w-full text-sm font-medium text-gray-600 uppercase tracking-wide">Duration</h4>
+        <h4 className="mb-2 w-full text-sm text-black font-semibold uppercase tracking-wide">Duration</h4>
         <input
           type="number"
           min={1}

@@ -1,57 +1,77 @@
-import React from "react";
-import { spring } from "remotion";
+import { spring, interpolate, Easing } from "remotion";
 
 export const captionAnimations = {
-  fade: ({ text }) => text,
+  fade: ({ children, localFrame }) => {
+    const opacity = interpolate(
+      localFrame,
+      [0, 12],
+      [0, 1],
+      {
+        extrapolateRight: "clamp",
+        easing: Easing.out(Easing.cubic),
+      }
+    );
+
+    return (
+      <div style={{ opacity }}>
+        {children}
+      </div>
+    );
+  },
 
   word_reveal: ({
-    text,
+    words,
     localFrame,
     durationFrames,
   }) => {
-    const words = text.split(" ");
-    const wordsToShow = Math.floor(
-      (localFrame / durationFrames) * words.length
+    const totalWords = words.length || 1;
+
+    const progress =
+      localFrame / durationFrames;
+
+    const wordsToShow = Math.min(
+      totalWords,
+      Math.floor(progress * totalWords)
     );
-    return words.slice(0, wordsToShow).join(" ");
+
+    return words.slice(0, wordsToShow);
   },
 
   word_pop: ({
-    text,
+    words,
     localFrame,
     durationFrames,
     fps,
   }) => {
-    const words = text.split(" ");
+    const totalWords = words.length || 1;
     const wordDuration =
-      durationFrames / words.length;
+      durationFrames / totalWords;
 
-    return words.map((word, index) => {
+    return words.map((wordObj, index) => {
       const start = index * wordDuration;
+
       const progress = spring({
         frame: localFrame - start,
         fps,
         config: {
-          damping: 12,
-          stiffness: 200,
+          damping: 10,
+          stiffness: 180,
+          mass: 0.5,
         },
       });
 
       const scale =
-        progress < 0 ? 0.8 : progress;
+        localFrame < start
+          ? 0.8
+          : progress;
 
-      return (
-        <span
-          key={index}
-          style={{
-            display: "inline-block",
-            marginRight: 8,
-            transform: `scale(${scale})`,
-          }}
-        >
-          {word}
-        </span>
-      );
+      return {
+        ...wordObj,
+        style: {
+          ...wordObj.style,
+          transform: `scale(${scale})`,
+        },
+      };
     });
   },
 };

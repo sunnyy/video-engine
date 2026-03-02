@@ -27,18 +27,18 @@ export function buildSafeProject(raw) {
     },
 
     avatar: raw.avatar || null,
-    music: raw.music || null,
+
+    music: raw.music || {
+      src: null,
+      volume: 0.8,
+    },
 
     beats: [],
     duration_sec: 0,
   };
 
-  if (
-    baseProject.workflow.beats_initialized &&
-    raw.beats
-  ) {
-    const normalizedBeats =
-      normalizeBeats(raw.beats, meta);
+  if (baseProject.workflow.beats_initialized && raw.beats) {
+    const normalizedBeats = normalizeBeats(raw.beats, meta);
 
     const withTimeline = calculateTimeline({
       ...baseProject,

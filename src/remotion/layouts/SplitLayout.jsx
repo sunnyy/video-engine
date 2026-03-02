@@ -13,14 +13,19 @@ export default function SplitLayout({ beat, project }) {
 
   const renderAssetZone = () => {
     if (asset) {
-      return <AssetRenderer asset={asset} />;
+      return (
+        <AssetRenderer
+          asset={asset}
+          beat={beat}
+          slot="main"
+        />
+      );
     }
 
     return (
       <AbsoluteFill
         style={{
-          background:
-            "linear-gradient(135deg, #222, #111)",
+          background: "linear-gradient(135deg, #222, #111)",
         }}
       />
     );
@@ -29,25 +34,15 @@ export default function SplitLayout({ beat, project }) {
   return (
     <AbsoluteFill
       style={{
+        display: "flex",
         flexDirection: isVertical ? "column" : "row",
       }}
     >
-      {/* Avatar zone is empty because avatar is global */}
-      <AbsoluteFill
-        style={{
-          flex: 1,
-          position: "relative",
-        }}
-      >
+      <AbsoluteFill style={{ flex: 1, position: "relative" }}>
         {avatarOnTop ? null : renderAssetZone()}
       </AbsoluteFill>
 
-      <AbsoluteFill
-        style={{
-          flex: 1,
-          position: "relative",
-        }}
-      >
+      <AbsoluteFill style={{ flex: 1, position: "relative" }}>
         {avatarOnTop ? renderAssetZone() : null}
       </AbsoluteFill>
 
@@ -55,9 +50,7 @@ export default function SplitLayout({ beat, project }) {
         <Caption beat={beat} project={project} />
       )}
 
-      <ComponentsRenderer
-        components={beat.components}
-      />
+      <ComponentsRenderer components={beat.components} />
     </AbsoluteFill>
   );
 }
