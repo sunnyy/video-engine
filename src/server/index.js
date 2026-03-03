@@ -10,13 +10,11 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 
 import { bundle } from "@remotion/bundler";
-import {
-  renderFrames,
-  stitchFramesToVideo,
-  getCompositions,
-} from "@remotion/renderer";
+import { renderFrames, stitchFramesToVideo, getCompositions } from "@remotion/renderer";
 
 import { v4 as uuidv4 } from "uuid";
+
+import compressVideo from "./compressVideo.cjs";
 
 dotenv.config();
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -64,32 +62,24 @@ const upload = multer({ dest: TEMP_DIR });
 
 app.post("/api/compress", upload.single("video"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
     const inputPath = req.file.path;
     const outputPath = path.join(TEMP_DIR, `compressed-${Date.now()}.mp4`);
 
-    await new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
-        .videoCodec("libx264")
-        .outputOptions([
-          "-preset veryfast",
-          "-crf 26",
-          "-vf scale=1280:-2",
-          "-movflags +faststart",
-        ])
-        .audioCodec("aac")
-        .audioBitrate("128k")
-        .on("end", resolve)
-        .on("error", reject)
-        .save(outputPath);
-    });
+    await compressVideo(inputPath, outputPath);
 
-    res.download(outputPath, () => {
-      fs.unlinkSync(inputPath);
-      fs.unlinkSync(outputPath);
-    });
-  } catch {
+    const buffer = fs.readFileSync(outputPath);
+
+    fs.unlinkSync(inputPath);
+    fs.unlinkSync(outputPath);
+
+    res.setHeader("Content-Type", "video/mp4");
+    res.send(buffer);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Compression failed" });
   }
 });
@@ -111,11 +101,10 @@ app.post("/api/render", async (req, res) => {
   try {
     let { project } = req.body;
 
+    //console.log("project:", project);
+
     // Remove blob URLs
-    const clean = (url) =>
-      typeof url === "string" && url.startsWith("blob:")
-        ? null
-        : url;
+    const clean = (url) => (typeof url === "string" && url.startsWith("blob:") ? null : url);
 
     if (project?.music?.src) project.music.src = clean(project.music.src);
     if (project?.avatar?.src) project.avatar.src = clean(project.avatar.src);
@@ -141,10 +130,7 @@ app.post("/api/render", async (req, res) => {
     const comp = comps.find((c) => c.id === "VideoComposition");
     if (!comp) throw new Error("VideoComposition not found");
 
-    const outputPath = path.join(
-      TEMP_DIR,
-      `render-${Date.now()}.mp4`
-    );
+    const outputPath = path.join(TEMP_DIR, `render-${Date.now()}.mp4`);
 
     const framesDir = path.join(TEMP_DIR, `frames-${jobId}`);
     if (!fs.existsSync(framesDir)) {
@@ -162,9 +148,7 @@ app.post("/api/render", async (req, res) => {
       concurrency: 1,
       onFrameUpdate: () => {
         rendered++;
-        renderJobs[jobId].progress = Math.round(
-          (rendered / comp.durationInFrames) * 100
-        );
+        renderJobs[jobId].progress = Math.round((rendered / comp.durationInFrames) * 100);
       },
     });
 
