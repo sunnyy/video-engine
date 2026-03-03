@@ -1,11 +1,10 @@
 import React, { useRef } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
+import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
 
 export default function MusicSection() {
   const project = useProjectStore((s) => s.project);
-  const updateProjectMeta = useProjectStore(
-    (s) => s.updateProjectMeta
-  );
+  const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
   const fileRef = useRef(null);
 
@@ -13,33 +12,23 @@ export default function MusicSection() {
 
   const music = project.music || null;
 
-  const handleUpload = (e) => {
+  const handleUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // revoke old url
-    if (music?.src) {
-      URL.revokeObjectURL(music.src);
-    }
-
-    const url = URL.createObjectURL(file);
+    const uploaded = await uploadUserAsset(file);
 
     updateProjectMeta({
       music: {
-        src: url,
+        src: uploaded.url,
         volume: 0.8,
       },
     });
 
-    // reset input so same file can be re-selected
     e.target.value = "";
   };
 
   const removeMusic = () => {
-    if (music?.src) {
-      URL.revokeObjectURL(music.src);
-    }
-
     updateProjectMeta({
       music: null,
     });

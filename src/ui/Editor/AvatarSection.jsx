@@ -1,5 +1,6 @@
 import React from "react";
 import { useProjectStore } from "../../store/useProjectStore";
+import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
 
 export default function AvatarSection() {
   const project = useProjectStore((s) => s.project);
@@ -9,24 +10,40 @@ export default function AvatarSection() {
 
   const avatar = project.avatar;
 
-  const handleUpload = (e) => {
+  const handleUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const url = URL.createObjectURL(file);
+    // 1️⃣ Compress on backend
+    const formData = new FormData();
+    formData.append("video", file);
+
+    const compressedRes = await fetch("http://localhost:5000/api/compress", {
+      method: "POST",
+      body: formData,
+    });
+
+    const blob = await compressedRes.blob();
+
+    const compressedFile = new File([blob], "compressed.mp4", {
+      type: "video/mp4",
+    });
+
+    // 2️⃣ Upload compressed file to Supabase
+    const uploaded = await uploadUserAsset(compressedFile);
 
     updateProjectMeta({
       avatar: {
-        src: url,
+        src: uploaded.url,
         object_fit: avatar?.object_fit || "cover",
       },
     });
+
+    e.target.value = "";
   };
 
   const removeAvatar = () => {
-    updateProjectMeta({
-      avatar: null,
-    });
+    updateProjectMeta({ avatar: null });
   };
 
   const updateFit = (fit) => {
@@ -58,18 +75,14 @@ export default function AvatarSection() {
             />
           </div>
 
-          <div className="mb-4">
-            <h4 className="text-sm font-medium text-gray-600 uppercase mb-2">Object Fit</h4>
-
-            <select
-              value={avatar.object_fit || "cover"}
-              onChange={(e) => updateFit(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="cover">Cover</option>
-              <option value="contain">Contain</option>
-            </select>
-          </div>
+          <select
+            value={avatar.object_fit || "cover"}
+            onChange={(e) => updateFit(e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="cover">Cover</option>
+            <option value="contain">Contain</option>
+          </select>
 
           <button onClick={removeAvatar} className="text-sm text-red-600">
             Remove Avatar
