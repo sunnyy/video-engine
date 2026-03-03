@@ -27,25 +27,69 @@ export default function validateProject(project) {
 
     const beatDuration = beat.end_sec - beat.start_sec;
 
-    if (beat.transition?.duration && beat.transition.duration > beatDuration) {
-      errors.push(`Beat ${index + 1}: Transition longer than beat duration`);
+    if (
+      beat.transition?.duration &&
+      beat.transition.duration > beatDuration
+    ) {
+      errors.push(
+        `Beat ${index + 1}: Transition longer than beat duration`
+      );
     }
 
-    const contentType =
-      beat.content_type ||
-      (meta?.mode === "talking_head" ? "avatar" : "asset");
+    const layout = beat.visual_mode || "full";
+    const contentType = beat.content_type || "asset";
 
-    if (contentType === "asset") {
-      if (!beat.assets?.main?.src) {
-        errors.push(`Beat ${index + 1}: Missing main asset`);
+    const hasMain = !!beat.assets?.main?.url;
+    const hasSecondary = !!beat.assets?.secondary?.url;
+    const hasAvatar = !!avatar?.src;
+
+    // 🔹 FULL LAYOUT
+    if (layout === "full") {
+      if (contentType === "avatar") {
+        if (!hasAvatar) {
+          errors.push(`Beat ${index + 1}: Avatar missing`);
+        }
+      } else {
+        if (!hasMain) {
+          errors.push(`Beat ${index + 1}: Main asset missing`);
+        }
+      }
+    }
+
+    // 🔹 SPLIT LAYOUT
+    if (layout === "split") {
+      if (!hasMain) {
+        errors.push(`Beat ${index + 1}: Split requires main asset`);
+      }
+
+      if (meta.mode === "talking_head" && !hasAvatar) {
+        errors.push(`Beat ${index + 1}: Split requires avatar`);
+      }
+    }
+
+    // 🔹 DUAL LAYOUT
+    if (layout === "dual") {
+      if (!hasMain || !hasSecondary) {
+        errors.push(
+          `Beat ${index + 1}: Dual layout requires two assets`
+        );
+      }
+    }
+
+    // 🔹 FLOATING LAYOUT
+    if (layout === "floating") {
+      if (!hasMain) {
+        errors.push(`Beat ${index + 1}: Floating requires main asset`);
+      }
+
+      if (meta.mode === "talking_head" && !hasAvatar) {
+        errors.push(`Beat ${index + 1}: Floating requires avatar`);
       }
     }
   });
 
-  if (meta?.mode === "talking_head") {
-    if (!avatar?.src) {
-      errors.push("Talking head mode requires avatar");
-    }
+  if (meta?.mode === "talking_head" && !avatar?.src) {
+    errors.push("Talking head mode requires avatar");
   }
 
   if (music?.src && typeof music.volume !== "number") {

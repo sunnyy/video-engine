@@ -40,6 +40,7 @@
     - layoutRegistry.js
     - pacingProfiles.js
     - transitionsRegistry.js
+    - validateProject.js
   - index.css
   - lib
     - supabase.js
@@ -69,11 +70,14 @@
       - FloatingLayout.jsx
       - FullLayout.jsx
       - SplitLayout.jsx
+    - Root.jsx
     - VideoComposition.jsx
   - server
     - compressVideo.cjs
     - index.js
     - temp
+      - frames-4edd95e3-ab67-48ac-aee0-e7c2f493ae26
+      - render-1772555316362.mp4
   - services
     - ai
       - generateStructuredShort.js

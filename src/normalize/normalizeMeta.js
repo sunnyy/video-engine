@@ -1,7 +1,7 @@
 export function normalizeMeta(raw = {}) {
   const orientation = raw.orientation || "9:16";
   const mode = raw.mode || "faceless";
-  const fps = raw.fps || 30;
+  const fps = raw.fps || 25;
 
   let width = 1080;
   let height = 1920;

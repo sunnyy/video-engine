@@ -39,14 +39,14 @@ export default function CaptionsSection({ beat }) {
 
   const previewText = beat.spoken || "Your caption here";
 
-  useEffect(() => {
-    if (activeRef.current && containerRef.current) {
-      activeRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [caption.style]);
+  // useEffect(() => {
+  //   if (activeRef.current && containerRef.current) {
+  //     activeRef.current.scrollIntoView({
+  //       behavior: "smooth",
+  //       block: "center",
+  //     });
+  //   }
+  // }, [caption.style]);
 
   const updateCaption = (key, value) => {
     updateBeat(beat.id, {

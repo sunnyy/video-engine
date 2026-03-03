@@ -10,10 +10,15 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 
 import { bundle } from "@remotion/bundler";
-import { renderMedia } from "@remotion/renderer";
+import {
+  renderFrames,
+  stitchFramesToVideo,
+  getCompositions,
+} from "@remotion/renderer";
+
+import { v4 as uuidv4 } from "uuid";
 
 dotenv.config();
-
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const app = express();
@@ -31,7 +36,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-/* AI ROUTE */
+/* ---------------- AI ROUTE ---------------- */
 
 app.post("/api/generate", async (req, res) => {
   try {
@@ -46,16 +51,14 @@ app.post("/api/generate", async (req, res) => {
       temperature: 0.7,
     });
 
-    const text = completion.choices[0].message.content;
-    const parsed = JSON.parse(text);
-
+    const parsed = JSON.parse(completion.choices[0].message.content);
     res.json(parsed);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: "AI generation failed" });
   }
 });
 
-/* COMPRESSION ROUTE */
+/* ---------------- COMPRESSION ROUTE ---------------- */
 
 const upload = multer({ dest: TEMP_DIR });
 
@@ -91,62 +94,109 @@ app.post("/api/compress", upload.single("video"), async (req, res) => {
   }
 });
 
-/* REMOTION RENDER ROUTE */
+/* ---------------- RENDER ---------------- */
 
 let bundleLocation = null;
+let renderJobs = {};
 
 async function ensureBundle() {
   if (bundleLocation) return bundleLocation;
-
   bundleLocation = await bundle({
-    entryPoint: path.resolve("src/main.jsx"),
+    entryPoint: path.resolve("src/remotion/Root.jsx"),
   });
-
   return bundleLocation;
 }
 
 app.post("/api/render", async (req, res) => {
   try {
-    const { project, fps = 30, resolution = "1080p" } = req.body;
+    let { project } = req.body;
+
+    // Remove blob URLs
+    const clean = (url) =>
+      typeof url === "string" && url.startsWith("blob:")
+        ? null
+        : url;
+
+    if (project?.music?.src) project.music.src = clean(project.music.src);
+    if (project?.avatar?.src) project.avatar.src = clean(project.avatar.src);
+
+    if (project?.beats) {
+      project.beats = project.beats.map((b) => {
+        if (b?.asset?.src) b.asset.src = clean(b.asset.src);
+        return b;
+      });
+    }
+
+    const jobId = uuidv4();
+    renderJobs[jobId] = { progress: 0, done: false, url: null };
+
+    res.json({ success: true, jobId });
 
     const serveUrl = await ensureBundle();
 
-    const base =
-      resolution === "720p"
-        ? 720
-        : resolution === "4k"
-        ? 2160
-        : 1080;
-
-    const isVertical = project.meta.orientation === "9:16";
-
-    const width = isVertical ? base : Math.round(base * (16 / 9));
-    const height = isVertical ? Math.round(base * (16 / 9)) : base;
-
-    const fileName = `render-${Date.now()}.mp4`;
-    const outputPath = path.join(TEMP_DIR, fileName);
-
-    await renderMedia({
-      composition: "VideoComposition",
-      serveUrl,
-      codec: "h264",
-      outputLocation: outputPath,
+    const comps = await getCompositions(serveUrl, {
       inputProps: { project },
-      fps,
-      width,
-      height,
     });
 
-    res.json({
-      success: true,
-      url: `http://localhost:5000/renders/${fileName}`,
+    const comp = comps.find((c) => c.id === "VideoComposition");
+    if (!comp) throw new Error("VideoComposition not found");
+
+    const outputPath = path.join(
+      TEMP_DIR,
+      `render-${Date.now()}.mp4`
+    );
+
+    const framesDir = path.join(TEMP_DIR, `frames-${jobId}`);
+    if (!fs.existsSync(framesDir)) {
+      fs.mkdirSync(framesDir);
+    }
+
+    let rendered = 0;
+
+    const { assetsInfo } = await renderFrames({
+      composition: comp,
+      serveUrl,
+      inputProps: { project },
+      outputDir: framesDir,
+      imageFormat: "jpeg",
+      concurrency: 1,
+      onFrameUpdate: () => {
+        rendered++;
+        renderJobs[jobId].progress = Math.round(
+          (rendered / comp.durationInFrames) * 100
+        );
+      },
     });
+
+    await stitchFramesToVideo({
+      composition: comp,
+      serveUrl,
+      inputProps: { project },
+      codec: "h264",
+      assetsInfo,
+      outputLocation: outputPath,
+      fps: comp.fps,
+      width: comp.width,
+      height: comp.height,
+    });
+
+    fs.rmSync(framesDir, { recursive: true, force: true });
+
+    renderJobs[jobId] = {
+      progress: 100,
+      done: true,
+      url: `http://localhost:5000/renders/${path.basename(outputPath)}`,
+    };
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error(err);
   }
 });
 
-/* SERVER START */
+app.get("/api/render-status/:jobId", (req, res) => {
+  const job = renderJobs[req.params.jobId];
+  if (!job) return res.status(404).json({ error: "Job not found" });
+  res.json(job);
+});
 
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");

@@ -6,7 +6,7 @@ export function createEmptyProject({
     meta: {
       orientation,
       mode,
-      fps: 30,
+      fps: 25,
     },
 
     captionPreset: {
