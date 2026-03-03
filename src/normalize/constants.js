@@ -1,7 +1,7 @@
 export const DEFAULT_META = {
   orientation: "9:16",
   mode: "faceless",
-  fps: 30,
+  fps: 25,
 };
 
 export const ORIENTATION_MAP = {

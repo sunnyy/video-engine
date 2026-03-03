@@ -8,8 +8,8 @@ export default function Header() {
   const setProject = useProjectStore((s) => s.setProject);
 
   const [resolution, setResolution] = useState("1080p");
-  const [fps, setFps] = useState(30);
-  const [rendering, setRendering] = useState(false);
+  const [progress, setProgress] = useState(null);
+  const [downloadUrl, setDownloadUrl] = useState(null);
 
   const fileRef = useRef();
 
@@ -63,35 +63,37 @@ export default function Header() {
       return;
     }
 
-    try {
-      setRendering(true);
+    setProgress(0);
+    setDownloadUrl(null);
 
+    try {
       const res = await fetch("http://localhost:5000/api/render", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          project,
-          resolution,
-          fps,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project, resolution }),
       });
 
       const data = await res.json();
+      const jobId = data.jobId;
 
-      if (!data.success) {
-        alert("Render failed: " + data.error);
-        setRendering(false);
-        return;
-      }
+      const interval = setInterval(async () => {
+        const statusRes = await fetch(
+          `http://localhost:5000/api/render-status/${jobId}`
+        );
+        const status = await statusRes.json();
 
-      window.open(`http://localhost:5000/${data.file}`, "_blank");
+        setProgress(status.progress);
+
+        if (status.done) {
+          clearInterval(interval);
+          setProgress(null);
+          setDownloadUrl(status.url);
+        }
+      }, 500);
     } catch (err) {
-      alert("Render error");
       console.error(err);
-    } finally {
-      setRendering(false);
+      setProgress(null);
+      alert("Render failed");
     }
   };
 
@@ -153,26 +155,25 @@ export default function Header() {
         >
           <option value="720p">720p</option>
           <option value="1080p">1080p</option>
-          <option value="4k">4K</option>
-        </select>
-
-        <select
-          value={fps}
-          onChange={(e) => setFps(Number(e.target.value))}
-          className="border px-3 py-2 rounded"
-        >
-          <option value={24}>24 FPS</option>
-          <option value={30}>30 FPS</option>
-          <option value={60}>60 FPS</option>
         </select>
 
         <button
           onClick={handleExport}
-          disabled={rendering}
-          className="bg-yellow-400 px-5 py-2 rounded font-semibold disabled:opacity-50"
+          disabled={progress !== null}
+          className="bg-yellow-400 px-5 py-2 rounded text-black font-semibold disabled:opacity-50"
         >
-          {rendering ? "Rendering..." : "Export"}
+          {progress !== null ? `Rendering ${progress}%` : "Export"}
         </button>
+
+        {downloadUrl && (
+          <a
+            href={downloadUrl}
+            download
+            className="bg-green-500 text-white px-5 py-2 rounded font-semibold"
+          >
+            Download
+          </a>
+        )}
       </div>
     </div>
   );
