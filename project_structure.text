@@ -1,6 +1,7 @@
 - .env
 - .gitignore
 - App.js
+- ENGINE_SPEC_V1.md
 - Flow.txt
 - index.html
 - Info.txt
@@ -13,6 +14,12 @@
       - gradient-dark.jpg
       - office-vertical.jpg
     - videos
+  - sfx
+    - click.mp3
+    - impact.mp3
+    - soft_hit.mp3
+    - tick.mp3
+    - whoosh.mp3
   - vite.svg
 - README.md
 - SafeProject.txt
@@ -21,24 +28,35 @@
   - App.jsx
   - assets
     - library.json
+    - stockAssets.js
   - core
     - assetAnimationRegistry.js
-    - assetAutoMatcher
+    - assetAutoMatcher.js
     - assetMatcher.js
     - audioCueEngine.js
+    - beatIntent
+      - beatIntentClassifier.js
     - beatTransitionRegistry.js
+    - beatVariationEngine.js
     - buildBeatsFromScript.js
     - calculateTimeline.js
     - captionAnimationRegistry.jsx
+    - captionEmphasisEngine.js
     - captionPositionRegistry.jsx
     - captionStyleRegistry.js
-    - captionStyleRegistry.jsx
     - captionStyles.js
     - captionTimingEngine.js
     - compilerValidator.js
+    - componentAutoGenerator.js
+    - componentMotionRegistry.js
+    - componentRegistry.js
     - createEmptyProject.js
+    - debugProject.js
+    - getAvailableLayouts.js
+    - getLayoutSafeAreas.js
     - layoutRegistry.js
     - pacingProfiles.js
+    - testProject.js
     - transitionsRegistry.js
     - validateProject.js
   - index.css
@@ -62,34 +80,43 @@
     - BeatRenderer.jsx
     - elements
       - AssetRenderer.jsx
+      - AudioCueRenderer.jsx
       - AvatarLayer.jsx
       - Caption.jsx
       - ComponentsRenderer.jsx
     - layouts
-      - DualLayout.jsx
-      - FloatingLayout.jsx
-      - FullLayout.jsx
-      - SplitLayout.jsx
+      - CenterAvatar.jsx
+      - FloatingAvatar.jsx
+      - FullZone.jsx
+      - HeadlineFocus.jsx
+      - ListLayout.jsx
+      - PictureInPicture.jsx
+      - QuoteCard.jsx
+      - SideAvatar.jsx
+      - SplitZone.jsx
+      - StatLayout.jsx
     - Root.jsx
     - VideoComposition.jsx
   - server
+    - compressAudio.cjs
     - compressVideo.cjs
     - index.js
     - temp
-      - frames-4edd95e3-ab67-48ac-aee0-e7c2f493ae26
-      - render-1772555316362.mp4
+      - render-1773074276742.mp4
   - services
     - ai
       - generateStructuredShort.js
     - assets
       - deleteUserAsset.js
       - getAssets.js
+      - getGalleryAssets.js
       - uploadUserAsset.js
     - auth
       - authService.js
     - projects
       - projectService.js
   - store
+    - useAssetsStore.js
     - useProjectStore.js
   - ui
     - Editor
@@ -99,6 +126,7 @@
       - BeatEditor.jsx
       - BeatList.jsx
       - CaptionsSection.jsx
+      - ComponentPicker.jsx
       - ContentSection.jsx
       - EditorPanel.jsx
       - Header.jsx
@@ -111,5 +139,4 @@
       - ScriptStep.jsx
       - TalkingHeadStep.jsx
 - tailwind.config.js
-- temp
 - vite.config.js

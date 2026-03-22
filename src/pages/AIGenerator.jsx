@@ -5,21 +5,25 @@ import { buildSafeProject } from "../normalize/normalizeProject";
 import { createProject } from "../services/projects/projectService";
 
 export default function AIGenerator() {
+
   const navigate = useNavigate();
 
   const [name, setName] = useState("T20 World Cup");
   const [topic, setTopic] = useState("India unbeaten in t20 world cup so far");
   const [videoType, setVideoType] = useState("faceless");
+  const [niche, setNiche] = useState("general");
   const [orientation, setOrientation] = useState("9:16");
   const [durationCategory, setDurationCategory] = useState("short");
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
+
     if (!name || !topic) return;
 
     setLoading(true);
 
     try {
+
       const aiResult = await generateStructuredShort({
         topic,
         mode: videoType,
@@ -28,14 +32,15 @@ export default function AIGenerator() {
       });
 
       const safeProject = buildSafeProject({
+
         meta: {
           orientation,
           mode: videoType,
+          niche
         },
 
         script: {
-          text: aiResult.script,
-          structured_lines: aiResult.beats,
+          text: aiResult.script
         },
 
         beats: aiResult.beats,
@@ -45,6 +50,7 @@ export default function AIGenerator() {
           avatar_completed: false,
           beats_initialized: true,
         },
+
       });
 
       const saved = await createProject({
@@ -54,25 +60,25 @@ export default function AIGenerator() {
       });
 
       navigate(`/editor/${saved.id}`);
+
     } catch (err) {
+
       console.error(err);
       alert("Failed to generate");
+
     }
 
     setLoading(false);
+
   };
 
   return (
     <div className="flex h-screen items-center justify-center bg-gray-50">
       <div className="w-[500px] space-y-6 rounded bg-white p-8 shadow">
-        <h2 className="text-xl font-semibold">
-          Create New Project
-        </h2>
+        <h2 className="text-xl font-semibold">Create New Project</h2>
 
         <div>
-          <label className="text-sm text-gray-600">
-            Project Name
-          </label>
+          <label className="text-sm text-gray-600">Project Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -81,9 +87,7 @@ export default function AIGenerator() {
         </div>
 
         <div>
-          <label className="text-sm text-gray-600">
-            Video Type
-          </label>
+          <label className="text-sm text-gray-600">Video Type</label>
           <select
             value={videoType}
             onChange={(e) => setVideoType(e.target.value)}
@@ -95,9 +99,24 @@ export default function AIGenerator() {
         </div>
 
         <div>
-          <label className="text-sm text-gray-600">
-            Orientation
-          </label>
+          <label className="text-sm text-gray-600">Niche</label>
+
+          <select
+            value={niche}
+            onChange={(e) => setNiche(e.target.value)}
+            className="mt-1 w-full rounded border px-3 py-2"
+          >
+            <option value="general">General</option>
+            <option value="news">News</option>
+            <option value="explainer">Explainer</option>
+            <option value="education">Education</option>
+            <option value="reaction">Reaction</option>
+            <option value="sports">Sports</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm text-gray-600">Orientation</label>
           <select
             value={orientation}
             onChange={(e) => setOrientation(e.target.value)}
@@ -109,9 +128,7 @@ export default function AIGenerator() {
         </div>
 
         <div>
-          <label className="text-sm text-gray-600">
-            Duration
-          </label>
+          <label className="text-sm text-gray-600">Duration</label>
           <select
             value={durationCategory}
             onChange={(e) => setDurationCategory(e.target.value)}
@@ -124,9 +141,7 @@ export default function AIGenerator() {
         </div>
 
         <div>
-          <label className="text-sm text-gray-600">
-            Topic
-          </label>
+          <label className="text-sm text-gray-600">Topic</label>
           <textarea
             value={topic}
             onChange={(e) => setTopic(e.target.value)}

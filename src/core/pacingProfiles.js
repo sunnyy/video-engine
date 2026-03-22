@@ -1,4 +1,5 @@
 export const PACING_PROFILES = {
+
   aggressive_short: {
     words_per_second: 3.2,
     min_duration: 2,
@@ -16,8 +17,11 @@ export const PACING_PROFILES = {
     min_duration: 3,
     max_duration: 14,
   },
+
 };
 
 export function getPacingProfile(profileName) {
+
   return PACING_PROFILES[profileName] || PACING_PROFILES.normal;
+
 }

@@ -1,6 +1,7 @@
 import { supabase } from "../../lib/supabase";
 
-export async function uploadUserAsset(file) {
+export async function uploadUserAsset(file, forcedType = null, onProgress = null) {
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -11,26 +12,64 @@ export async function uploadUserAsset(file) {
   const fileName = `${crypto.randomUUID()}.${fileExt}`;
   const filePath = `${user.id}/${fileName}`;
 
-  // 1️⃣ Upload to storage
-  const { error: uploadError } = await supabase.storage.from("user-assets").upload(filePath, file, {
-    contentType: "video/mp4",
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+
+  const uploadUrl =
+    `${supabase.storageUrl}/object/user-assets/${filePath}`;
+
+  await new Promise((resolve, reject) => {
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.open("POST", uploadUrl);
+
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.setRequestHeader("Content-Type", file.type);
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+
+      const percent = Math.round(
+        (event.loaded / event.total) * 100
+      );
+
+      if (onProgress) onProgress(percent);
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error("Upload failed"));
+      }
+    };
+
+    xhr.onerror = reject;
+
+    xhr.send(file);
+
   });
 
-  if (uploadError) throw uploadError;
-
-  // 2️⃣ Get public URL
-  const { data: publicUrlData } = supabase.storage.from("user-assets").getPublicUrl(filePath);
+  const { data: publicUrlData } =
+    supabase.storage
+      .from("user-assets")
+      .getPublicUrl(filePath);
 
   const publicUrl = publicUrlData.publicUrl;
 
-  // 3️⃣ Insert into user_assets table
+  const assetType =
+    forcedType ||
+    (file.type.startsWith("video") ? "video" : "image");
+
   const { data, error } = await supabase
     .from("user_assets")
     .insert({
       user_id: user.id,
       url: publicUrl,
       file_path: filePath,
-      type: file.type.startsWith("video") ? "video" : "image",
+      type: assetType
     })
     .select()
     .single();
@@ -38,4 +77,5 @@ export async function uploadUserAsset(file) {
   if (error) throw error;
 
   return data;
+
 }

@@ -1,63 +1,48 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { buildSafeProject } from "../../normalize/normalizeProject";
 import validateProject from "../../core/validateProject";
 
 export default function Header() {
+
   const project = useProjectStore((s) => s.project);
-  const setProject = useProjectStore((s) => s.setProject);
+  const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
   const [resolution, setResolution] = useState("1080p");
   const [progress, setProgress] = useState(null);
   const [downloadUrl, setDownloadUrl] = useState(null);
 
-  const fileRef = useRef();
-
   if (!project) return null;
 
-  const handleModeChange = (mode) => {
+  const handleModeChange = async (mode) => {
+
     if (mode === project.meta.mode) return;
 
-    let updated = {
-      ...project,
+    await updateProjectMeta({
       meta: {
         ...project.meta,
-        mode,
-      },
-    };
+        mode
+      }
+    });
 
-    if (mode === "faceless") {
-      updated = {
-        ...updated,
-        beats: updated.beats.map((beat) => ({
-          ...beat,
-          visual_mode:
-            beat.visual_mode === "split" || beat.visual_mode === "floating"
-              ? "full"
-              : beat.visual_mode,
-        })),
-      };
-    }
-
-    setProject(buildSafeProject(updated));
   };
 
-  const handleOrientationChange = (orientation) => {
+  const handleOrientationChange = async (orientation) => {
+
     if (orientation === project.meta.orientation) return;
 
-    setProject(
-      buildSafeProject({
-        ...project,
-        meta: {
-          ...project.meta,
-          orientation,
-        },
-      })
-    );
+    await updateProjectMeta({
+      meta: {
+        ...project.meta,
+        orientation
+      }
+    });
+
   };
 
   const handleExport = async () => {
+
     const result = validateProject(project);
+
     if (!result.valid) {
       alert(result.errors.join("\n"));
       return;
@@ -67,42 +52,67 @@ export default function Header() {
     setDownloadUrl(null);
 
     try {
+
       const res = await fetch("http://localhost:5000/api/render", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project, resolution }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          project,
+          resolution
+        })
       });
 
       const data = await res.json();
       const jobId = data.jobId;
 
       const interval = setInterval(async () => {
+
         const statusRes = await fetch(
           `http://localhost:5000/api/render-status/${jobId}`
         );
+
         const status = await statusRes.json();
 
         setProgress(status.progress);
 
         if (status.done) {
+
           clearInterval(interval);
+
           setProgress(null);
+
           setDownloadUrl(status.url);
+
         }
+
       }, 500);
+
     } catch (err) {
+
       console.error(err);
+
       setProgress(null);
+
       alert("Render failed");
+
     }
+
   };
 
   return (
+
     <div className="flex items-center justify-between border-b px-6 py-3 bg-white">
-      <div className="font-bold text-lg">Video Engine</div>
+
+      <div className="font-bold text-lg">
+        Video Engine
+      </div>
 
       <div className="flex items-center gap-4">
+
         <div className="flex border rounded overflow-hidden">
+
           <button
             onClick={() => handleModeChange("talking_head")}
             className={`px-4 py-2 ${
@@ -113,6 +123,7 @@ export default function Header() {
           >
             Talking Head
           </button>
+
           <button
             onClick={() => handleModeChange("faceless")}
             className={`px-4 py-2 ${
@@ -123,9 +134,11 @@ export default function Header() {
           >
             Faceless
           </button>
+
         </div>
 
         <div className="flex border rounded overflow-hidden">
+
           <button
             onClick={() => handleOrientationChange("9:16")}
             className={`px-3 py-2 ${
@@ -136,6 +149,7 @@ export default function Header() {
           >
             9:16
           </button>
+
           <button
             onClick={() => handleOrientationChange("16:9")}
             className={`px-3 py-2 ${
@@ -146,6 +160,7 @@ export default function Header() {
           >
             16:9
           </button>
+
         </div>
 
         <select
@@ -162,10 +177,13 @@ export default function Header() {
           disabled={progress !== null}
           className="bg-yellow-400 px-5 py-2 rounded text-black font-semibold disabled:opacity-50"
         >
-          {progress !== null ? `Rendering ${progress}%` : "Export"}
+          {progress !== null
+            ? `Rendering ${progress}%`
+            : "Export"}
         </button>
 
         {downloadUrl && (
+
           <a
             href={downloadUrl}
             download
@@ -173,8 +191,13 @@ export default function Header() {
           >
             Download
           </a>
+
         )}
+
       </div>
+
     </div>
+
   );
+
 }

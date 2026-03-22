@@ -9,34 +9,16 @@ export default function Preview() {
   const setActiveBeat = useProjectStore((s) => s.setActiveBeat);
 
   const playerRef = useRef(null);
-  const isSeekingRef = useRef(false);
 
   if (!project) return null;
 
-  if (!project.workflow?.beats_initialized) {
-    return (
-      <div className="flex h-full items-center justify-center text-gray-400">Complete previous steps to preview</div>
-    );
-  }
-
   const fps = project.meta.fps;
-  const durationFrames = Math.max(1, Math.floor(project.duration_sec * fps));
 
-  // Seek only when user explicitly selects beat
-  useEffect(() => {
-    if (!isSeekingRef.current) return;
-    if (!playerRef.current) return;
+  const durationFrames = Math.max(
+    1,
+    Math.floor(project.duration_sec * fps)
+  );
 
-    const beat = project.beats.find((b) => b.id === activeBeatId);
-    if (!beat) return;
-
-    const frame = Math.floor(beat.start_sec * fps);
-    playerRef.current.seekTo(frame);
-
-    isSeekingRef.current = false;
-  }, [activeBeatId]);
-
-  // Sync highlight while playing (no seek)
   useEffect(() => {
     const interval = setInterval(() => {
       if (!playerRef.current) return;
@@ -74,7 +56,7 @@ export default function Preview() {
   }, [project, fps]);
 
   return (
-    <div className="bg-white p-4 rounded-xl w-[40%] flex justify-center items-start">
+    <div className="bg-white p-4 rounded-xl w-[35%] flex justify-center items-start">
       <Player
         ref={playerRef}
         acknowledgeRemotionLicense

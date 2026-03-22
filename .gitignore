@@ -30,8 +30,7 @@ dist-ssr
 .DS_Store
 
 SafeProject.txt
-Info.txt
 Flow.txt
 project_structure.text
 
-server/temp
+src/server/temp

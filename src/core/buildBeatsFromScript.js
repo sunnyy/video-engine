@@ -1,17 +1,19 @@
 import { getPacingProfile } from "./pacingProfiles";
-import { generateCaptionSegments } from "./captionTimingEngine";
+import { generateCaptionText } from "./captionTimingEngine";
 import { autoMatchAssets } from "./assetAutoMatcher";
 import { injectAudioCues } from "./audioCueEngine";
 import { validateBeats } from "./compilerValidator";
+import { layoutRegistry } from "./layoutRegistry";
+import { classifyBeatIntent } from "./beatIntent/beatIntentClassifier";
+import { autoGenerateComponents } from "./componentAutoGenerator";
+import { applyBeatVariation } from "./beatVariationEngine";
+import { applyCaptionEmphasis } from "./captionEmphasisEngine";
 
 function splitScriptIntoChunks(script, chunkCount) {
-  if (!script) return Array(chunkCount).fill("");
+  if (!script) return [];
 
   const sentences = script.split(/(?<=[.?!])\s+/).filter(Boolean);
-
-  if (sentences.length === 0) {
-    return Array(chunkCount).fill(script);
-  }
+  if (!sentences.length) return [script];
 
   const chunks = Array.from({ length: chunkCount }, () => []);
 
@@ -20,7 +22,7 @@ function splitScriptIntoChunks(script, chunkCount) {
     chunks[bucket].push(sentence);
   });
 
-  return chunks.map((arr) => arr.join(" ").trim());
+  return chunks.map((arr) => arr.join(" ").trim()).filter(Boolean);
 }
 
 function calculateDynamicDuration(spoken, pacingProfile) {
@@ -33,41 +35,80 @@ function calculateDynamicDuration(spoken, pacingProfile) {
   );
 }
 
-function pickLayout(index, totalBeats, videoType) {
-  if (index === 0) return "full";
-  if (index === totalBeats - 1) return "full";
+function getLayoutForIntent(intent, videoType, orientation) {
 
-  if (videoType === "talking_head") {
-    return index % 3 === 0 ? "floating" : "split";
+  const intentLayoutMap = {
+    hook: "HeadlineFocus",
+    question: "QuoteCard",
+    stat: "StatLayout",
+    list: "ListLayout",
+    quote: "QuoteCard",
+    fact: "FullZone",
+  };
+
+  const candidate = intentLayoutMap[intent] || "FullZone";
+  const layout = layoutRegistry[candidate];
+
+  if (!layout) return "FullZone";
+
+  if (videoType === "faceless" && layout.supportsAvatar) {
+    return "HeadlineFocus";
   }
 
-  return index % 2 === 0 ? "split" : "dual";
-}
-
-function enforceNoMoreThanTwoSame(beats) {
-  let count = 1;
-
-  for (let i = 1; i < beats.length; i++) {
-    if (beats[i].visual_mode === beats[i - 1].visual_mode) {
-      count++;
-      if (count > 2) {
-        beats[i].visual_mode = "split";
-        count = 1;
-      }
-    } else {
-      count = 1;
-    }
+  if (orientation === "vertical" && !layout.orientations.includes("vertical")) {
+    return "HeadlineFocus";
   }
 
-  return beats;
+  if (orientation === "horizontal" && !layout.orientations.includes("horizontal")) {
+    return "HeadlineFocus";
+  }
+
+  return candidate;
 }
 
-export function buildBeatsFromScript({
+function chooseCaptionAnimation(intent) {
+
+  switch (intent) {
+    case "hook":
+      return "pop";
+    case "stat":
+      return "word_pop";
+    case "question":
+      return "wave";
+    case "list":
+      return "slide";
+    case "quote":
+      return "fade";
+    default:
+      return "fade";
+  }
+}
+
+function chooseTransition(index) {
+
+  const transitions = [
+    "fade",
+    "slideLeft",
+    "slideRight",
+    "slideUp",
+    "slideDown",
+    "scale",
+    "blurFade"
+  ];
+
+  if (index === 0) return "cut";
+
+  return transitions[index % transitions.length];
+}
+
+export async function buildBeatsFromScript({
   script = "",
   videoType = "faceless",
+  orientation = "vertical",
   durationCategory = "short",
 }) {
-  if (!script) return [];
+
+  if (!script || !script.trim()) return [];
 
   const pacingMap = {
     short: "aggressive_short",
@@ -82,73 +123,74 @@ export function buildBeatsFromScript({
   const words = script.trim().split(/\s+/).filter(Boolean);
   const wordCount = words.length;
 
-  let beatCount = 6;
+  let beatCount = Math.ceil(wordCount / 12);
 
-  if (wordCount > 150) beatCount = 8;
-  if (wordCount > 300) beatCount = 12;
+  if (beatCount < 8) beatCount = 8;
+  if (beatCount > 18) beatCount = 18;
 
   const spokenChunks = splitScriptIntoChunks(script, beatCount);
 
   let currentStart = 0;
 
   let beats = spokenChunks.map((spoken, index) => {
-    const duration = calculateDynamicDuration(
-      spoken,
-      pacingProfile
-    );
+
+    const duration = calculateDynamicDuration(spoken, pacingProfile);
 
     const start_sec = currentStart;
     const end_sec = start_sec + duration;
+
     currentStart = end_sec;
 
-    const layout = pickLayout(
-      index,
-      beatCount,
-      videoType
-    );
+    const intent = classifyBeatIntent(spoken);
+
+    const layout = getLayoutForIntent(intent, videoType, orientation);
 
     return {
+
       id: crypto.randomUUID(),
       order: index,
+      layout,
 
-      beat_type: index === 0
-        ? "hook"
-        : index === beatCount - 1
-        ? "closing"
-        : "content",
-
-      visual_mode: layout,
-
-      duration_sec: duration,
-      start_sec,
-      end_sec,
-
-      spoken,
-      visible: true,
-
-      assets: {
-        main: null,
-        secondary: null,
+      zones: {
+        z1: {
+          type: videoType === "talking_head" ? "avatar" : "asset",
+          src: null,
+          objectFit: "cover",
+        },
       },
 
+      heading: intent === "hook" ? spoken : null,
+      text: intent === "list" ? spoken : null,
+
+      components: {},
+
       caption: {
-        show: true,
-        style_multiplier: index === 0 ? 1.3 : 1,
-        segments: generateCaptionSegments(spoken, duration),
+        text: generateCaptionText(spoken),
+        style: "tiktokClean",
+        animation: chooseCaptionAnimation(intent),
+        position: "bottom",
       },
 
       transition: {
-        type: index === 0 ? "cut" : "fade",
-        duration: 0.3,
+        type: chooseTransition(index),
+        duration: 0.35,
       },
 
-      components: [],
+      spoken,
+      duration_sec: duration,
+      start_sec,
+      end_sec,
     };
+
   });
 
-  beats = enforceNoMoreThanTwoSame(beats);
+  beats = await autoMatchAssets(beats, orientation);
 
-  beats = autoMatchAssets(beats);
+  beats = autoGenerateComponents(beats);
+
+  beats = applyBeatVariation(beats);
+
+  beats = applyCaptionEmphasis(beats);
 
   beats = injectAudioCues(beats, {
     audio_rules: {

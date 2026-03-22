@@ -2,127 +2,175 @@ import React from "react";
 import {
   AbsoluteFill,
   Video,
+  Img,
   useCurrentFrame,
   useVideoConfig,
   interpolate,
   spring,
-  Easing,
+  Easing
 } from "remotion";
+
 import { assetAnimationRegistry } from "../../core/assetAnimationRegistry";
 
-export default function AssetRenderer({ asset, beat, slot }) {
+export default function AssetRenderer({ zone, beat, slot }) {
+
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  if (!asset) return null;
+  if (!zone) return null;
 
-  const objectFit = asset.object_fit || "cover";
+  /* ---------- BACKGROUND SUPPORT ---------- */
+
+  if (zone.type === "background") {
+    return (
+      <AbsoluteFill
+        style={{
+          background: zone.gradient
+            ? zone.gradient
+            : zone.color || "#000"
+        }}
+      />
+    );
+  }
+
+  if (!zone.src) return null;
+
+  /* ---------- NORMAL ASSET RENDER ---------- */
+
+  const objectFit = zone.objectFit || "cover";
 
   const animationKey =
-    beat?.asset_settings?.[slot]?.animation || "none";
+    beat?.asset_settings?.[slot]?.animation ||
+    zone?.animation ||
+    "pushSlow";
 
   const animation =
     assetAnimationRegistry[animationKey]?.() ||
     assetAnimationRegistry.none();
 
+  const beatStartFrame = Math.floor((beat.start_sec || 0) * fps);
+
+  const assetDelayFrames = Math.floor(0.6 * fps);
+
+  const localFrame = Math.max(0, frame - beatStartFrame - assetDelayFrames);
+
+  const beatFrames = Math.floor((beat.duration_sec || 3) * fps);
+
   let style = {};
 
-  // 🔥 If animation is none → render static
   if (animation.type !== "none") {
+
     const duration = animation.duration || 20;
 
-    const progress = interpolate(frame, [0, duration], [0, 1], {
-      extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
-    });
+    const progress = interpolate(
+      localFrame,
+      [0, duration],
+      [0, 1],
+      {
+        extrapolateRight: "clamp",
+        easing: Easing.out(Easing.cubic)
+      }
+    );
 
     const springProgress = spring({
-      frame,
+      frame: localFrame,
       fps,
       config: {
         damping: 12,
         stiffness: 120,
-        mass: 0.6,
-      },
+        mass: 0.6
+      }
     });
 
     switch (animation.type) {
+
       case "fade":
         style.opacity = progress;
         break;
 
       case "slideY":
-        style.transform = `translateY(${interpolate(
-          progress,
-          [0, 1],
-          [animation.from, 0]
-        )}px)`;
+        style.transform = `translateY(${interpolate(progress,[0,1],[animation.from || 200,0])}px)`;
         style.opacity = progress;
         break;
 
       case "slideX":
-        style.transform = `translateX(${interpolate(
-          progress,
-          [0, 1],
-          [animation.from, 0]
-        )}px)`;
+        style.transform = `translateX(${interpolate(progress,[0,1],[animation.from || 300,0])}px)`;
         style.opacity = progress;
         break;
 
       case "scale":
-        style.transform = `scale(${interpolate(
-          progress,
-          [0, 1],
-          [animation.from, 1]
-        )})`;
+        style.transform = `scale(${interpolate(progress,[0,1],[animation.from || 0.7,1])})`;
         style.opacity = progress;
         break;
 
       case "springScale":
-        style.transform = `scale(${interpolate(
-          springProgress,
-          [0, 1],
-          [animation.from, 1]
-        )})`;
+        style.transform = `scale(${interpolate(springProgress,[0,1],[animation.from || 1.4,1])})`;
         style.opacity = springProgress;
         break;
 
       case "blur":
-        style.filter = `blur(${interpolate(
-          progress,
-          [0, 1],
-          [animation.from, 0]
-        )}px)`;
+        style.filter = `blur(${interpolate(progress,[0,1],[animation.from || 40,0])}px)`;
         style.opacity = progress;
         break;
 
       case "combo":
-        style.transform = `scale(${interpolate(
-          progress,
-          [0, 1],
-          [animation.scaleFrom, 1]
-        )})`;
-        style.filter = `blur(${interpolate(
-          progress,
-          [0, 1],
-          [animation.blurFrom, 0]
-        )}px)`;
+        style.transform = `scale(${interpolate(progress,[0,1],[animation.scaleFrom || 1.2,1])})`;
+        style.filter = `blur(${interpolate(progress,[0,1],[animation.blurFrom || 20,0])}px)`;
         style.opacity = progress;
+        break;
+
+      case "zoomSlow":
+        style.transform = `scale(${interpolate(localFrame,[0,beatFrames],[1,1.15])})`;
+        break;
+
+      case "kenburns":
+        style.transform = `
+          scale(${interpolate(localFrame,[0,beatFrames],[1.05,1.2])})
+          translateX(${interpolate(localFrame,[0,beatFrames],[0,-60])}px)
+          translateY(${interpolate(localFrame,[0,beatFrames],[0,-40])}px)
+        `;
+        break;
+
+      case "pushSlow":
+        style.transform = `scale(${interpolate(
+          localFrame,
+          [0, beatFrames],
+          [animation.scaleStart || 1.05, animation.scaleEnd || 1.25]
+        )})`;
+        break;
+
+      case "drift":
+        style.transform = `
+          scale(${interpolate(localFrame,[0,beatFrames],[animation.scaleStart || 1.1,animation.scaleEnd || 1.2])})
+          translateX(${interpolate(localFrame,[0,beatFrames],[animation.xStart || 0,animation.xEnd || 0])}px)
+          translateY(${interpolate(localFrame,[0,beatFrames],[animation.yStart || 0,animation.yEnd || 0])}px)
+        `;
         break;
 
       default:
         break;
+
     }
+
   }
 
-  const source = asset.url || asset.src;
+  const source = zone.src;
+
   const isVideo =
     source?.toLowerCase().endsWith(".mp4") ||
     source?.toLowerCase().endsWith(".webm");
 
   return (
-    <AbsoluteFill style={{ overflow: "hidden", ...style }}>
+
+    <AbsoluteFill
+      style={{
+        overflow: "hidden",
+        ...style
+      }}
+    >
+
       {isVideo ? (
+
         <Video
           src={source}
           muted
@@ -130,19 +178,25 @@ export default function AssetRenderer({ asset, beat, slot }) {
           style={{
             width: "100%",
             height: "100%",
-            objectFit,
+            objectFit
           }}
         />
+
       ) : (
-        <img
+
+        <Img
           src={source}
           style={{
             width: "100%",
             height: "100%",
-            objectFit,
+            objectFit
           }}
         />
+
       )}
+
     </AbsoluteFill>
+
   );
+
 }

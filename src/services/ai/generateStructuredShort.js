@@ -37,9 +37,10 @@ Rules:
   const data = await response.json();
   const script = data.script || "";
 
-  const beats = buildBeatsFromScript({
+  const beats = await buildBeatsFromScript({
     script,
     videoType: mode,
+    orientation,
     durationCategory,
   });
 

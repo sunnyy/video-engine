@@ -1,9 +1,7 @@
-// src/core/calculateTimeline.js
-
 function calculateBeatTiming(beats) {
   let currentTime = 0;
 
-  return beats.map((beat) => {
+  return beats.map((beat, index) => {
     const start_sec = currentTime;
     const end_sec = start_sec + beat.duration_sec;
 
@@ -11,6 +9,7 @@ function calculateBeatTiming(beats) {
 
     return {
       ...beat,
+      order: index,
       start_sec,
       end_sec,
     };

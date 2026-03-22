@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
 
 export default function AvatarSection() {
   const project = useProjectStore((s) => s.project);
   const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
+
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   if (!project) return null;
 
@@ -14,7 +17,9 @@ export default function AvatarSection() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 1️⃣ Compress on backend
+    setUploading(true);
+    setProgress(0);
+
     const formData = new FormData();
     formData.append("video", file);
 
@@ -29,8 +34,13 @@ export default function AvatarSection() {
       type: "video/mp4",
     });
 
-    // 2️⃣ Upload compressed file to Supabase
-    const uploaded = await uploadUserAsset(compressedFile);
+    const uploaded = await uploadUserAsset(
+      compressedFile,
+      "avatar",
+      (percent) => {
+        setProgress(percent);
+      }
+    );
 
     updateProjectMeta({
       avatar: {
@@ -39,6 +49,7 @@ export default function AvatarSection() {
       },
     });
 
+    setUploading(false);
     e.target.value = "";
   };
 
@@ -59,7 +70,16 @@ export default function AvatarSection() {
     <div className="w-full min-w-[320px] overflow-y-auto border-r border-gray-200 bg-white px-6 py-4 rounded-xl">
       <h3 className="mb-6 text-lg font-semibold">Talking Head Video</h3>
 
-      <input type="file" accept="video/*" onChange={handleUpload} className="mb-6" />
+      <input type="file" accept="video/*" onChange={handleUpload} className="mb-3" />
+
+      {uploading && (
+        <div className="w-full bg-gray-200 h-2 rounded mb-6">
+          <div
+            className="h-2 bg-indigo-600 rounded transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
 
       {avatar?.src && (
         <>
@@ -78,7 +98,7 @@ export default function AvatarSection() {
           <select
             value={avatar.object_fit || "cover"}
             onChange={(e) => updateFit(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm mb-3"
           >
             <option value="cover">Cover</option>
             <option value="contain">Contain</option>

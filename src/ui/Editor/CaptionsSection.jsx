@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { useProjectStore } from "../../store/useProjectStore";
+import { layoutRegistry } from "../../core/layoutRegistry";
 import { captionStyleRegistry } from "../../core/captionStyleRegistry";
 
 const STYLES = [
@@ -19,34 +20,28 @@ const STYLES = [
   "highContrastFlash",
 ];
 
-const ANIMATIONS = ["fade", "word_reveal", "word_pop"];
+const ANIMATIONS = ["fade", "word_reveal", "word_pop", "pop", "wave", "slide"];
+
 const POSITIONS = ["top", "middle", "bottom"];
 
 export default function CaptionsSection({ beat }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
+  const project = useProjectStore((s) => s.project);
+  const setProject = useProjectStore((s) => s.setProject);
 
-  const containerRef = useRef(null);
-  const activeRef = useRef(null);
+  const layout = layoutRegistry[beat.layout];
+  const structure = layout?.structure || {};
 
-  if (!beat) return null;
+  if (!structure.caption) return null;
 
   const caption = beat.caption || {
     show: true,
-    style: "clean",
+    style: "tiktokClean",
     animation: "fade",
     position: "bottom",
   };
 
-  const previewText = beat.spoken || "Your caption here";
-
-  // useEffect(() => {
-  //   if (activeRef.current && containerRef.current) {
-  //     activeRef.current.scrollIntoView({
-  //       behavior: "smooth",
-  //       block: "center",
-  //     });
-  //   }
-  // }, [caption.style]);
+  const previewText = beat.spoken || "Your caption preview text";
 
   const updateCaption = (key, value) => {
     updateBeat(beat.id, {
@@ -57,31 +52,48 @@ export default function CaptionsSection({ beat }) {
     });
   };
 
+  // FIXED: apply only STYLE
+  const applyStyleToAllBeats = () => {
+    const updatedBeats = project.beats.map((b) => ({
+      ...b,
+      caption: {
+        ...b.caption,
+        style: caption.style,
+      },
+    }));
+
+    setProject({
+      ...project,
+      beats: updatedBeats,
+    });
+  };
+
   const renderPreviewStyle = (styleKey) => {
     const styleConfig =
       captionStyleRegistry[styleKey]?.() ||
-      captionStyleRegistry.clean();
+      captionStyleRegistry.tiktokClean();
 
-    const words = previewText.split(" ").slice(0, 11);
+    const words = previewText.split(" ").slice(0, 10);
+
     const isActive = caption.style === styleKey;
 
     return (
       <div
         key={styleKey}
-        ref={isActive ? activeRef : null}
         onClick={() => updateCaption("style", styleKey)}
-        className={`cursor-pointer rounded-lg border transition mb-5 ${
-          isActive ? "border-indigo-500 ring-2 ring-indigo-300" : "border-gray-200"
+        className={`cursor-pointer rounded-lg border transition mb-4 ${
+          isActive
+            ? "border-indigo-500 ring-2 ring-indigo-300"
+            : "border-gray-200"
         }`}
       >
         <div
           style={{
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 600,
             color: "#666",
             textTransform: "uppercase",
-            marginBottom: 10,
-            letterSpacing: 1,
+            marginBottom: 8,
           }}
         >
           {styleKey}
@@ -90,35 +102,24 @@ export default function CaptionsSection({ beat }) {
         <div
           style={{
             textAlign: "center",
-            lineHeight: 1.2,
             background: "#333",
             padding: "10px",
-            border: "1px solid #ddd",
             ...styleConfig.container,
           }}
         >
-          {words.map((word, index) => {
-            const isLast = index === words.length - 1;
-            const highlightStyle =
-              styleConfig.activeWord && isLast
-                ? styleConfig.activeWord
-                : {};
-
-            return (
-              <span
-                key={index}
-                style={{
-                  display: "inline-block",
-                  marginRight: 8,
-                  ...styleConfig.word,
-                  ...highlightStyle,
-                  fontSize: 18,
-                }}
-              >
-                {word}
-              </span>
-            );
-          })}
+          {words.map((word, index) => (
+            <span
+              key={index}
+              style={{
+                display: "inline-block",
+                marginRight: 6,
+                ...styleConfig.word,
+                fontSize: 14,
+              }}
+            >
+              {word}
+            </span>
+          ))}
         </div>
       </div>
     );
@@ -126,8 +127,8 @@ export default function CaptionsSection({ beat }) {
 
   return (
     <div className="flex-1 w-full">
-      <div className="flex items-center gap-3">
-        <h4 className="text-sm font-semibold uppercase">
+      <div className="flex items-center gap-3 mb-4">
+        <h4 className="text-sm font-semibold uppercase m-0">
           Caption Settings
         </h4>
 
@@ -135,9 +136,7 @@ export default function CaptionsSection({ beat }) {
           <input
             type="checkbox"
             checked={caption.show}
-            onChange={(e) =>
-              updateCaption("show", e.target.checked)
-            }
+            onChange={(e) => updateCaption("show", e.target.checked)}
           />
           Show Caption
         </label>
@@ -145,12 +144,19 @@ export default function CaptionsSection({ beat }) {
 
       <div className="flex gap-4">
         <div className="w-[70%]">
-          <h4 className="text-sm font-semibold uppercase mb-2">
-            Style
-          </h4>
+          <div className="flex mb-2 items-center">
+            <h4 className="text-sm font-semibold uppercase">Style</h4>
+
+            <button
+              onClick={applyStyleToAllBeats}
+              className="text-xs px-2 py-1 border rounded ml-4"
+            >
+              Apply Style to All Beats
+            </button>
+          </div>
+
           <div
-            ref={containerRef}
-            className="flex flex-col max-h-[200px] overflow-y-auto p-4"
+            className="flex flex-col max-h-[140px] overflow-y-auto p-3"
             style={{
               border: "1px solid #ddd",
               borderRadius: 5,
@@ -165,6 +171,7 @@ export default function CaptionsSection({ beat }) {
             <h4 className="text-sm font-semibold uppercase mb-1">
               Animation
             </h4>
+
             <select
               value={caption.animation}
               onChange={(e) =>
@@ -184,8 +191,9 @@ export default function CaptionsSection({ beat }) {
             <h4 className="text-sm font-semibold uppercase mb-1">
               Position
             </h4>
+
             <select
-              value={caption.position}
+              value={caption.position || "bottom"}
               onChange={(e) =>
                 updateCaption("position", e.target.value)
               }

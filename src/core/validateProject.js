@@ -1,21 +1,31 @@
 export default function validateProject(project) {
+
   const errors = [];
 
   if (!project) {
     return { valid: false, errors: ["Project missing"] };
   }
 
-  const { beats, meta, avatar, music, duration_sec } = project;
+  const { beats, meta, avatar, music } = project;
 
-  if (!beats || beats.length === 0) {
+  if (!beats || !Array.isArray(beats) || beats.length === 0) {
     errors.push("No beats in project");
   }
 
-  if (!duration_sec || duration_sec <= 0) {
-    errors.push("Invalid total duration");
+  if (!meta) {
+    errors.push("Project meta missing");
   }
 
   beats?.forEach((beat, index) => {
+
+    if (!beat.layout) {
+      errors.push(`Beat ${index + 1}: Missing layout`);
+    }
+
+    if (!beat.zones) {
+      errors.push(`Beat ${index + 1}: Missing zones`);
+    }
+
     if (beat.start_sec == null || beat.end_sec == null) {
       errors.push(`Beat ${index + 1}: Missing timing`);
       return;
@@ -36,56 +46,24 @@ export default function validateProject(project) {
       );
     }
 
-    const layout = beat.visual_mode || "full";
-    const contentType = beat.content_type || "asset";
+    const zones = Object.values(beat.zones || {});
 
-    const hasMain = !!beat.assets?.main?.url;
-    const hasSecondary = !!beat.assets?.secondary?.url;
-    const hasAvatar = !!avatar?.src;
-
-    // 🔹 FULL LAYOUT
-    if (layout === "full") {
-      if (contentType === "avatar") {
-        if (!hasAvatar) {
-          errors.push(`Beat ${index + 1}: Avatar missing`);
-        }
-      } else {
-        if (!hasMain) {
-          errors.push(`Beat ${index + 1}: Main asset missing`);
-        }
-      }
+    if (!zones.length) {
+      errors.push(`Beat ${index + 1}: No zones defined`);
     }
 
-    // 🔹 SPLIT LAYOUT
-    if (layout === "split") {
-      if (!hasMain) {
-        errors.push(`Beat ${index + 1}: Split requires main asset`);
+    zones.forEach((zone, zIndex) => {
+
+      if (!zone.type) {
+        errors.push(`Beat ${index + 1} Zone ${zIndex + 1}: Missing type`);
       }
 
-      if (meta.mode === "talking_head" && !hasAvatar) {
-        errors.push(`Beat ${index + 1}: Split requires avatar`);
-      }
-    }
-
-    // 🔹 DUAL LAYOUT
-    if (layout === "dual") {
-      if (!hasMain || !hasSecondary) {
-        errors.push(
-          `Beat ${index + 1}: Dual layout requires two assets`
-        );
-      }
-    }
-
-    // 🔹 FLOATING LAYOUT
-    if (layout === "floating") {
-      if (!hasMain) {
-        errors.push(`Beat ${index + 1}: Floating requires main asset`);
+      if (zone.type === "asset" && !zone.src) {
+        errors.push(`Beat ${index + 1} Zone ${zIndex + 1}: Asset missing src`);
       }
 
-      if (meta.mode === "talking_head" && !hasAvatar) {
-        errors.push(`Beat ${index + 1}: Floating requires avatar`);
-      }
-    }
+    });
+
   });
 
   if (meta?.mode === "talking_head" && !avatar?.src) {
@@ -100,4 +78,5 @@ export default function validateProject(project) {
     valid: errors.length === 0,
     errors,
   };
+
 }

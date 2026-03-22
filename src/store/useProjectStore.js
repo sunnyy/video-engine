@@ -2,27 +2,42 @@ import { create } from "zustand";
 import { buildSafeProject } from "../normalize/normalizeProject";
 import { calculateTimeline } from "../core/calculateTimeline";
 import { getPacingProfile } from "../core/pacingProfiles";
-import { generateCaptionSegments } from "../core/captionTimingEngine";
 import { updateProject } from "../services/projects/projectService";
 
 function createRawBeat(order, mode) {
   return {
     id: crypto.randomUUID(),
-    beat_type: "content",
-    visual_mode: mode === "talking_head" ? "split" : "full",
-    duration_sec: 3,
-    spoken: "",
-    visible: true,
-    assets: { main: null, secondary: null },
-    caption: {
-      show: true,
-      style: "clean",
-      position: "bottom",
-      animation: "fade",
-      segments: [],
+    order,
+    layout: "FullZone",
+
+    zones: {
+      z1: {
+        type: mode === "talking_head" ? "avatar" : "asset",
+        src: null,
+        objectFit: "cover",
+      },
     },
-    transition: { type: "cut", duration: 0.3 },
-    components: [],
+
+    heading: null,
+    text: null,
+    components: {},
+
+    caption: {
+      text: "",
+      style: "tiktokClean",
+      animation: "fade",
+      position: "bottom",
+    },
+
+    transition: {
+      type: "cut",
+      duration: 0.3,
+    },
+
+    spoken: "",
+    duration_sec: 3,
+    start_sec: 0,
+    end_sec: 0,
   };
 }
 
@@ -39,7 +54,7 @@ function recalcBeatTiming(beat, pacingProfile) {
     duration_sec: duration,
     caption: {
       ...beat.caption,
-      segments: generateCaptionSegments(beat.spoken || "", duration),
+      text: beat.spoken || "",
     },
   };
 }
@@ -56,24 +71,52 @@ export const useProjectStore = create((set, get) => ({
 
     set({
       project: safeProject,
-      activeBeatId: safeProject.beats[0]?.id || null,
+      activeBeatId: safeProject.beats?.[0]?.id || null,
     });
   },
 
   updateProjectMeta: async (updates) => {
     const current = get().project;
     const databaseId = get().databaseId;
+
     if (!current) return;
 
-    const rebuilt = buildSafeProject({
+    let newMeta = current.meta;
+
+    if (updates.meta) {
+      newMeta = {
+        ...current.meta,
+        ...updates.meta,
+      };
+    }
+
+    const rebuilt = {
       ...current,
       ...updates,
-    });
+      meta: newMeta,
+    };
 
-    set({ project: rebuilt });
+    if (updates.meta?.mode) {
+      const mode = updates.meta.mode;
+
+      rebuilt.beats = current.beats.map((beat) => ({
+        ...beat,
+        zones: {
+          ...beat.zones,
+          z1: {
+            ...beat.zones.z1,
+            type: mode === "talking_head" ? "avatar" : "asset",
+          },
+        },
+      }));
+    }
+
+    const safeProject = buildSafeProject(rebuilt);
+
+    set({ project: safeProject });
 
     if (databaseId) {
-      await updateProject(databaseId, rebuilt);
+      await updateProject(databaseId, safeProject);
     }
   },
 
@@ -82,6 +125,7 @@ export const useProjectStore = create((set, get) => ({
   updateBeat: async (beatId, updates) => {
     const current = get().project;
     const databaseId = get().databaseId;
+
     if (!current) return;
 
     const pacingProfile = getPacingProfile("normal");
@@ -127,11 +171,44 @@ export const useProjectStore = create((set, get) => ({
     });
   },
 
+  duplicateBeat: async (beatId) => {
+    const current = get().project;
+    const databaseId = get().databaseId;
+
+    if (!current) return;
+
+    const index = current.beats.findIndex((b) => b.id === beatId);
+    if (index === -1) return;
+
+    const original = current.beats[index];
+
+    const cloned = JSON.parse(JSON.stringify(original));
+    cloned.id = crypto.randomUUID();
+
+    const newBeats = [...current.beats];
+    newBeats.splice(index + 1, 0, cloned);
+
+    const updatedProject = calculateTimeline({
+      ...current,
+      beats: newBeats,
+    });
+
+    set({
+      project: updatedProject,
+      activeBeatId: cloned.id,
+    });
+
+    if (databaseId) {
+      await updateProject(databaseId, updatedProject);
+    }
+  },
+
   deleteBeat: (beatId) => {
     const current = get().project;
     if (!current) return;
 
     const filtered = current.beats.filter((b) => b.id !== beatId);
+
     if (!filtered.length) return;
 
     const updatedProject = calculateTimeline({

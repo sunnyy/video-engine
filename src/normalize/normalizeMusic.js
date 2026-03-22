@@ -1,9 +1,29 @@
 export function normalizeMusic(raw) {
-  if (!raw?.src) return null;
+
+  if (!raw) return null;
 
   return {
-    src: raw.src,
-    volume:
-      typeof raw.volume === "number" ? raw.volume : 1,
+
+    tts: raw.tts?.src
+      ? {
+          src: raw.tts.src,
+          volume:
+            typeof raw.tts.volume === "number"
+              ? raw.tts.volume
+              : 1,
+        }
+      : null,
+
+    music: raw.music?.src
+      ? {
+          src: raw.music.src,
+          volume:
+            typeof raw.music.volume === "number"
+              ? raw.music.volume
+              : 0.8,
+        }
+      : null,
+
   };
+
 }

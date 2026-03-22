@@ -1,41 +1,43 @@
 export const beatTransitionRegistry = {
-  none: () => ({
-    type: "none",
+
+  cut: () => ({
+    type: "cut",
     duration: 0,
   }),
 
-  crossfade: () => ({
+  fade: () => ({
     type: "fade",
-    duration: 20,
+    duration: 12,
   }),
 
   slideLeft: () => ({
-    type: "slideX",
-    from: 100,
-    duration: 20,
+    type: "slideLeft",
+    duration: 14,
   }),
 
   slideRight: () => ({
-    type: "slideX",
-    from: -100,
-    duration: 20,
+    type: "slideRight",
+    duration: 14,
   }),
 
-  zoomIn: () => ({
-    type: "scale",
-    from: 0.5,
-    duration: 10,
+  slideUp: () => ({
+    type: "slideUp",
+    duration: 14,
   }),
 
-  zoomOut: () => ({
+  slideDown: () => ({
+    type: "slideDown",
+    duration: 14,
+  }),
+
+  scale: () => ({
     type: "scale",
-    from: 4.1,
-    duration: 10,
+    duration: 12,
   }),
 
   blurFade: () => ({
-    type: "blur",
-    from: 20,
-    duration: 20,
-  }),
+    type: "blurFade",
+    duration: 16,
+  })
+
 };

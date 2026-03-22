@@ -10,6 +10,7 @@ export default function BeatList() {
   const setActiveBeat = useProjectStore((s) => s.setActiveBeat);
   const reorderBeats = useProjectStore((s) => s.reorderBeats);
   const deleteBeat = useProjectStore((s) => s.deleteBeat);
+  const duplicateBeat = useProjectStore((s) => s.duplicateBeat);
 
   if (!project) return null;
 
@@ -26,8 +27,8 @@ export default function BeatList() {
   };
 
   return (
-    <div className="w-[25%] overflow-y-auto border-r border-gray-200 bg-white px-2 py-2 rounded-xl">
-      <h4 className="mb-4 text-sm font-semibold text-gray-600 uppercase">Beats</h4>
+    <div className="w-[30%] overflow-y-auto bg-white px-2 py-4 rounded-xl">
+      <h3 className="m-0 text-lg font-semibold mb-4">Beats</h3>
 
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={project.beats.map((b) => b.id)} strategy={verticalListSortingStrategy}>
@@ -40,6 +41,7 @@ export default function BeatList() {
                 activeBeatId={activeBeatId}
                 setActiveBeat={setActiveBeat}
                 deleteBeat={deleteBeat}
+                duplicateBeat={duplicateBeat}
               />
             ))}
           </div>
@@ -49,7 +51,7 @@ export default function BeatList() {
   );
 }
 
-function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat }) {
+function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat, duplicateBeat }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: beat.id });
 
   const style = {
@@ -59,6 +61,14 @@ function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat }) 
 
   const isActive = beat.id === activeBeatId;
 
+  const zone = beat.zones?.z1 || null;
+
+  const handleDelete = () => {
+    const confirmed = window.confirm("Delete this beat?");
+    if (!confirmed) return;
+    deleteBeat(beat.id);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -67,24 +77,21 @@ function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat }) 
         ${isActive ? "border-indigo-600 bg-indigo-50" : "border-gray-200 hover:border-gray-300"}
       `}
     >
-      {/* Drag Handle */}
       <div {...attributes} {...listeners} className="cursor-grab text-gray-400 active:cursor-grabbing">
         ☰
       </div>
 
-      {/* Thumbnail */}
       <div
         onClick={() => {
           const { seekToBeat } = useProjectStore.getState();
           if (seekToBeat) seekToBeat(beat.id);
           setActiveBeat(beat.id);
         }}
-        className="h-14 w-14 overflow-hidden rounded-md border bg-gray-100 cursor-pointer"
+        className="h-[60px] w-[50px] min-w-[50px] overflow-hidden rounded-md border bg-gray-100 cursor-pointer"
       >
-        <Thumbnail asset={beat.assets.main} />
+        <Thumbnail asset={zone} />
       </div>
 
-      {/* Info */}
       <div
         onClick={() => {
           const { seekToBeat } = useProjectStore.getState();
@@ -98,15 +105,30 @@ function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat }) 
         </div>
 
         <div className="flex gap-2">
-          <span className="text-xs bg-gray-100 font-medium text-black px-2 py-[2px]">{beat.duration_sec}s</span>
-          <div className="text-xs bg-blue-100 font-medium text-black px-2 py-[2px]">{beat.visual_mode}</div>
+          <span className="text-xs bg-gray-100 font-medium text-black px-2 py-[2px]">
+            {beat.duration_sec}s
+          </span>
+          <div className="text-xs bg-blue-100 font-medium text-black px-2 py-[2px]">
+            {beat.layout}
+          </div>
         </div>
       </div>
 
-      {/* Delete */}
-      <button onClick={() => deleteBeat(beat.id)} className="text-xs text-gray-400 hover:text-red-500">
-        ✕
-      </button>
+      <div className="flex flex-col gap-1">
+        <button
+          onClick={() => duplicateBeat(beat.id)}
+          className="text-xs text-gray-400 hover:text-blue-500"
+        >
+          ⧉
+        </button>
+
+        <button
+          onClick={handleDelete}
+          className="text-xs text-gray-400 hover:text-red-500"
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
@@ -114,18 +136,16 @@ function SortableBeat({ beat, index, activeBeatId, setActiveBeat, deleteBeat }) 
 function Thumbnail({ asset }) {
   if (!asset) return null;
 
-  // Background
   if (asset.type === "background") {
     return (
       <div
         className="h-full w-full"
-        style={asset.value?.color ? { background: asset.value.color } : { background: asset.value?.gradient }}
+        style={asset.color ? { background: asset.color } : { background: asset.gradient }}
       />
     );
   }
 
-  // 🔥 Support both url + src
-  const source = asset.url || asset.src;
+  const source = asset.src || asset.url;
   if (!source) return null;
 
   const isVideo = source.endsWith(".mp4") || source.endsWith(".webm");

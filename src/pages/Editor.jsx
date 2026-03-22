@@ -38,10 +38,7 @@ export default function Editor() {
     return <ScriptStep />;
   }
 
-  if (
-    project.meta.mode === "talking_head" &&
-    !project.workflow.avatar_completed
-  ) {
+  if (project.meta.mode === "talking_head" && !project.workflow.avatar_completed) {
     return <TalkingHeadStep />;
   }
 
@@ -49,13 +46,9 @@ export default function Editor() {
     <div className="flex h-screen flex-col bg-gray-100">
       <Header />
 
-      <div className="flex flex-1 gap-6 mt-6">
-        <div className="flex-1 flex-col mr-10">
-          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-          <div className="flex-1 flex justify-center mt-4">
-            <EditorPanel activeTab={activeTab} />
-          </div>
-        </div>
+      <div className="flex flex-1 gap-4 mt-4 mx-4">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <EditorPanel activeTab={activeTab} />
         <Preview />
       </div>
     </div>

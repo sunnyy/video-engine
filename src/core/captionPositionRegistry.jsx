@@ -1,22 +1,40 @@
 export const captionPositions = {
+
   bottom: {
     container: {
       justifyContent: "flex-end",
       alignItems: "center",
-      paddingBottom: 80,
     },
   },
+
   middle: {
     container: {
       justifyContent: "center",
       alignItems: "center",
     },
   },
+
   top: {
     container: {
       justifyContent: "flex-start",
       alignItems: "center",
-      paddingTop: 80,
     },
   },
+
+  left: {
+    container: {
+      justifyContent: "center",
+      alignItems: "flex-start",
+      paddingLeft: 80,
+    },
+  },
+
+  right: {
+    container: {
+      justifyContent: "center",
+      alignItems: "flex-end",
+      paddingRight: 80,
+    },
+  },
+
 };

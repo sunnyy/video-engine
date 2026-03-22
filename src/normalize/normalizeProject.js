@@ -1,52 +1,57 @@
-import { normalizeMeta } from "../normalize/normalizeMeta";
-import { normalizeBeats } from "../normalize/normalizeBeats";
+import { normalizeMeta } from "./normalizeMeta";
+import { normalizeBeats } from "./normalizeBeats";
 import { calculateTimeline } from "../core/calculateTimeline";
+import { normalizeMusic } from "./normalizeMusic";
 
-export function buildSafeProject(raw) {
-  const meta = normalizeMeta(raw.meta);
+export function buildSafeProject(raw = {}) {
+
+  const meta = normalizeMeta(raw.meta ?? {});
 
   const baseProject = {
+
     id: raw.id || crypto.randomUUID(),
 
     meta,
 
     captionPreset: raw.captionPreset || {
-      style: "clean",
-      animation: "fade",
+      style: "tiktokClean"
     },
 
-    script: raw.script || {
-      text: "",
-      structured_lines: [],
+    script: {
+      text: raw?.script?.text || ""
     },
 
     workflow: raw.workflow || {
       script_completed: false,
       avatar_completed: false,
-      beats_initialized: false,
+      beats_initialized: false
     },
 
     avatar: raw.avatar || null,
 
-    music: raw.music || {
-      src: null,
-      volume: 0.8,
+    audio: normalizeMusic(raw.audio) || {
+      tts: null,
+      music: null
     },
 
     beats: [],
-    duration_sec: 0,
+    duration_sec: 0
+
   };
 
-  if (baseProject.workflow.beats_initialized && raw.beats) {
+  if (raw.beats && raw.beats.length) {
+
     const normalizedBeats = normalizeBeats(raw.beats, meta);
 
     const withTimeline = calculateTimeline({
       ...baseProject,
-      beats: normalizedBeats,
+      beats: normalizedBeats
     });
 
     return withTimeline;
+
   }
 
   return baseProject;
+
 }

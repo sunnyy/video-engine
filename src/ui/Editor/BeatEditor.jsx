@@ -1,5 +1,6 @@
 import React from "react";
 import { useProjectStore } from "../../store/useProjectStore";
+import { layoutRegistry } from "../../core/layoutRegistry";
 
 import LayoutSelector from "./LayoutSelector";
 import ContentSection from "./ContentSection";
@@ -14,30 +15,34 @@ export default function BeatEditor() {
   if (!project || !activeBeatId) return null;
 
   const activeBeat = project.beats.find((b) => b.id === activeBeatId);
-
   if (!activeBeat) return null;
 
+  const layout = layoutRegistry[activeBeat.layout];
+  const structure = layout?.structure || {};
+
   return (
-    <div className="flex-1 w-[75%] min-w-[320px] overflow-y-auto border-r border-gray-200 bg-white px-6 py-2 rounded-xl ml-4">
-      <h3 className="mb-0 text-lg font-semibold">Editing Beat #{activeBeat.order + 1}</h3>
+    <div className="flex-1 w-[75%] min-w-[320px] overflow-y-auto border-r border-gray-200 bg-white px-6 py-4 rounded-xl ml-4">
+      <h3 className="m-0 text-lg font-semibold">Editing Beat #{activeBeat.order + 1}</h3>
 
-      <ContentSection beat={activeBeat} />
-
-      <div className="mb-2">
-        <h4 className="mb-3 text-sm text-black font-semibold uppercase tracking-wide">Layout</h4>
+      <div className="mt-4 mb-6">
         <LayoutSelector beat={activeBeat} />
       </div>
-      
-      <div className="mb-2">
+
+      <div className="mb-4">
         <AssetsSection beat={activeBeat} project={project} />
       </div>
 
-      <TransitionSection beat={activeBeat} />
-
-      <div className="flex gap-2">
-        <CaptionsSection beat={activeBeat} />
+      <div className="mb-4">
+        <ContentSection beat={activeBeat} />
       </div>
-      
+
+      {structure.caption && (
+        <div className="mb-4">
+          <CaptionsSection beat={activeBeat} />
+        </div>
+      )}
+
+      <TransitionSection beat={activeBeat} />
     </div>
   );
 }

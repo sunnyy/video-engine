@@ -4,15 +4,18 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+
 import { captionStyleRegistry } from "../../core/captionStyleRegistry";
 import { captionAnimations } from "../../core/captionAnimationRegistry";
 import { captionPositions } from "../../core/captionPositionRegistry";
+import { getLayoutSafeAreas } from "../../core/getLayoutSafeAreas";
 
-export default function Caption({ beat }) {
+export default function Caption({ caption, beat, project }) {
+
   const globalFrame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  if (!beat?.spoken || !beat.caption?.show) return null;
+  if (!caption?.show || !caption?.text) return null;
 
   const startFrame = Math.floor(beat.start_sec * fps);
   const endFrame = Math.floor(beat.end_sec * fps);
@@ -28,43 +31,51 @@ export default function Caption({ beat }) {
     Math.floor((beat.duration_sec * fps) * 0.85) -
     transitionOverlap;
 
-  const { style, animation, position } = beat.caption;
+  const styleKey = caption.style;
+  const animationKey = caption.animation;
+  const positionKey = caption.position || "bottom";
+
+  const brandColor =
+    project?.meta?.brand_color || "#00F2EA";
 
   const styleConfig =
-    captionStyleRegistry[style]?.() ||
-    captionStyleRegistry.tiktokClean();
+    captionStyleRegistry[styleKey]?.(brandColor) ||
+    captionStyleRegistry.tiktokClean(brandColor);
 
   const animationRenderer =
-    captionAnimations[animation] ||
+    captionAnimations[animationKey] ||
     captionAnimations.fade;
 
   const positionConfig =
-    captionPositions[position] ||
+    captionPositions[positionKey] ||
     captionPositions.bottom;
 
-  const words = beat.spoken.split(" ");
+  const safeAreas = getLayoutSafeAreas(beat.layout);
+  const captionSafe = safeAreas?.caption || {};
 
-  const baseWords = words.map((word, index) => {
-    const isLast = index === words.length - 1;
+  const words = caption.text.split(" ").map((word) => {
 
-    const highlightStyle =
-      styleConfig.activeWord && isLast
-        ? styleConfig.activeWord
-        : {};
+    const isEmphasis = word.includes("<em>");
+
+    const cleanWord = word
+      .replace("<em>", "")
+      .replace("</em>", "");
 
     return {
-      text: word,
+      text: cleanWord,
       style: {
         display: "inline-block",
         marginRight: 6,
-        ...styleConfig.word,
-        ...highlightStyle,
-      },
+        ...(isEmphasis
+          ? styleConfig.activeWord
+          : styleConfig.word),
+      }
     };
+
   });
 
   const animatedResult = animationRenderer({
-    words: baseWords,
+    words,
     localFrame,
     durationFrames,
     fps,
@@ -75,6 +86,10 @@ export default function Caption({ beat }) {
       style={{
         pointerEvents: "none",
         zIndex: 100,
+        paddingLeft: captionSafe.left || 0,
+        paddingRight: captionSafe.right || 0,
+        paddingBottom: captionSafe.bottom || 0,
+        paddingTop: captionSafe.top || 0,
         ...positionConfig.container,
       }}
     >
@@ -83,6 +98,7 @@ export default function Caption({ beat }) {
           lineHeight: 1.2,
           textAlign: "center",
           maxWidth: "85%",
+          margin: "0 auto",
           ...styleConfig.container,
         }}
       >

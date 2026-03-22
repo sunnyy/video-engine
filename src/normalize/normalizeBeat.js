@@ -1,109 +1,57 @@
-import { VALID_LAYOUTS, DEFAULT_BEAT, DEFAULT_TRANSITION } from "./constants";
-import { matchAsset } from "../core/assetMatcher";
+export function normalizeBeat(raw = {}, index = 0, meta = {}) {
 
-function resolveVisualMode(raw, projectMode) {
-  if (projectMode !== "talking_head" && raw === "split") {
-    return "full";
-  }
+  const mode = meta?.mode || "faceless";
 
-  if (VALID_LAYOUTS.includes(raw)) return raw;
+  const zones =
+    raw.zones || {
+      z1: {
+        type: mode === "talking_head" ? "avatar" : "asset",
+        src: null,
+        objectFit: "cover"
+      }
+    };
 
-  return projectMode === "talking_head" ? "split" : "full";
-}
-
-function resolveDuration(raw) {
-  return typeof raw === "number" && raw > 0 ? raw : DEFAULT_BEAT.duration_sec;
-}
-
-function resolveVisible(raw) {
-  return typeof raw === "boolean" ? raw : DEFAULT_BEAT.visible;
-}
-
-function resolveSpoken(raw) {
-  return typeof raw === "string" ? raw : DEFAULT_BEAT.spoken;
-}
-
-function normalizeTransition(raw = {}) {
-  return {
-    type: raw.type || DEFAULT_TRANSITION.type,
-    duration: typeof raw.duration === "number" ? raw.duration : DEFAULT_TRANSITION.duration,
-  };
-}
-
-function normalizeAvatarPosition(raw, visualMode) {
-  if (visualMode !== "split") return null;
-  return raw === "bottom" ? "bottom" : "top";
-}
-
-function resolveAsset(rawAsset, meta) {
-  if (!rawAsset) return null;
-
-  if (rawAsset.url || rawAsset.src) return rawAsset;
-
-  if (rawAsset.type === "background") return rawAsset;
-
-  return matchAsset({
-    orientation: meta.orientation,
-  });
-}
-
-export function normalizeBeat(raw = {}, index, meta) {
-  const visual_mode = resolveVisualMode(raw.visual_mode, meta.mode);
+  const captionRaw = raw.caption || {};
 
   return {
-    id: raw.id || "beat_" + index + "_" + Math.random().toString(36).slice(2, 6),
+
+    id: raw.id || crypto.randomUUID(),
 
     order: index,
-    beat_type: raw.beat_type || "default",
-    visual_mode,
 
-    content_type: raw.content_type || (meta.mode === "talking_head" ? "avatar" : "asset"),
+    layout: raw.layout || "FullZone",
 
-    duration_sec: resolveDuration(raw.duration_sec),
-    start_sec: 0,
-    end_sec: 0,
-    spoken: resolveSpoken(raw.spoken),
-    visible: resolveVisible(raw.visible),
+    zones,
 
-    avatar_position: normalizeAvatarPosition(raw.avatar_position, visual_mode),
+    heading: raw.heading || null,
 
-    avatar_object_fit: raw.avatar_object_fit || "cover",
+    text: raw.text || null,
 
-    assets: {
-      main: raw.assets?.main
-        ? {
-            ...resolveAsset(raw.assets.main, meta),
-            object_fit: raw.assets.main.object_fit || "cover",
-          }
-        : null,
+    spoken: raw.spoken || "",
 
-      secondary: raw.assets?.secondary
-        ? {
-            ...resolveAsset(raw.assets.secondary, meta),
-            object_fit: raw.assets.secondary.object_fit || "cover",
-          }
-        : null,
-    },
+    components: raw.components || {},
 
-    // 🔥 PRESERVE ANIMATION SETTINGS
-    asset_settings: {
-      main: {
-        animation: raw.asset_settings?.main?.animation || "none",
-      },
-      secondary: {
-        animation: raw.asset_settings?.secondary?.animation || "none",
-      },
-    },
+    audio_cues: raw.audio_cues || [],
 
     caption: {
-      show: typeof raw.caption?.show === "boolean" ? raw.caption.show : true,
-      style: raw.caption?.style || "tiktokClean",
-      animation: raw.caption?.animation || "fade",
-      position: raw.caption?.position || "bottom",
+      show: captionRaw.show !== undefined ? captionRaw.show : true,
+      text: captionRaw.text || "",
+      style: captionRaw.style || "tiktokClean",
+      animation: captionRaw.animation || "fade",
+      position: captionRaw.position || "bottom"
     },
 
-    transition: normalizeTransition(raw.transition),
+    transition: raw.transition || {
+      type: "cut",
+      duration: 0.3
+    },
 
-    components: Array.isArray(raw.components) ? raw.components : [],
+    duration_sec: raw.duration_sec || 3,
+
+    start_sec: raw.start_sec || 0,
+
+    end_sec: raw.end_sec || 0
+
   };
+
 }

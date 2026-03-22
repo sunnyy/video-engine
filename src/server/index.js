@@ -15,6 +15,7 @@ import { renderFrames, stitchFramesToVideo, getCompositions } from "@remotion/re
 import { v4 as uuidv4 } from "uuid";
 
 import compressVideo from "./compressVideo.cjs";
+import compressAudio from "./compressAudio.cjs";
 
 dotenv.config();
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -56,7 +57,7 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
-/* ---------------- COMPRESSION ROUTE ---------------- */
+/* ---------------- COMPRESSION VIDEO ---------------- */
 
 const upload = multer({ dest: TEMP_DIR });
 
@@ -81,6 +82,35 @@ app.post("/api/compress", upload.single("video"), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Compression failed" });
+  }
+});
+
+/* ---------------- COMPRESSION AUDIO ---------------- */
+
+app.post("/api/compress-audio", upload.single("audio"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const inputPath = req.file.path;
+    const outputPath = path.join(
+      TEMP_DIR,
+      `compressed-audio-${Date.now()}.m4a`
+    );
+
+    await compressAudio(inputPath, outputPath);
+
+    const buffer = fs.readFileSync(outputPath);
+
+    fs.unlinkSync(inputPath);
+    fs.unlinkSync(outputPath);
+
+    res.setHeader("Content-Type", "audio/mp4");
+    res.send(buffer);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Audio compression failed" });
   }
 });
 
