@@ -8,14 +8,16 @@ export function getLayoutSafeAreas(layoutName) {
     return {
       heading: {},
       caption: {},
-      components: {}
+      blocks: {}
     };
   }
 
-  return layout.safeAreas || {
-    heading: {},
-    caption: {},
-    components: {}
+  const safe = layout.safeAreas || {};
+
+  return {
+    heading: safe.heading || {},
+    caption: safe.caption || {},
+    blocks: safe.blocks || {}
   };
 
 }

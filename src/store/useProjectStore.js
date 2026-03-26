@@ -18,9 +18,14 @@ function createRawBeat(order, mode) {
       },
     },
 
+    asset_settings: {},
+
     heading: null,
     text: null,
+
     components: {},
+
+    overlays: [],
 
     caption: {
       text: "",
@@ -203,8 +208,30 @@ export const useProjectStore = create((set, get) => ({
     }
   },
 
-  deleteBeat: (beatId) => {
+  reorderBeats: async (newBeats) => {
     const current = get().project;
+    const databaseId = get().databaseId;
+
+    if (!current) return;
+
+    const updatedProject = calculateTimeline({
+      ...current,
+      beats: newBeats,
+    });
+
+    set({
+      project: updatedProject,
+    });
+
+    if (databaseId) {
+      await updateProject(databaseId, updatedProject);
+    }
+  },
+
+  deleteBeat: async (beatId) => {
+    const current = get().project;
+    const databaseId = get().databaseId;
+
     if (!current) return;
 
     const filtered = current.beats.filter((b) => b.id !== beatId);
@@ -220,5 +247,9 @@ export const useProjectStore = create((set, get) => ({
       project: updatedProject,
       activeBeatId: filtered[0].id,
     });
+
+    if (databaseId) {
+      await updateProject(databaseId, updatedProject);
+    }
   },
 }));

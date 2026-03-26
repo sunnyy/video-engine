@@ -19,41 +19,22 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
   if (!zone) return null;
 
-  /* ---------- BACKGROUND SUPPORT ---------- */
-
-  if (zone.type === "background") {
-    return (
-      <AbsoluteFill
-        style={{
-          background: zone.gradient
-            ? zone.gradient
-            : zone.color || "#000"
-        }}
-      />
-    );
-  }
-
-  if (!zone.src) return null;
-
-  /* ---------- NORMAL ASSET RENDER ---------- */
+  const source = zone.src || null;
+  if (!source) return null;
 
   const objectFit = zone.objectFit || "cover";
 
   const animationKey =
-    beat?.asset_settings?.[slot]?.animation ||
     zone?.animation ||
-    "pushSlow";
+    beat?.asset_settings?.[slot]?.animation ||
+    "none";
 
   const animation =
-    assetAnimationRegistry[animationKey]?.() ||
-    assetAnimationRegistry.none();
+    assetAnimationRegistry[animationKey]
+      ? assetAnimationRegistry[animationKey]()
+      : assetAnimationRegistry.none();
 
-  const beatStartFrame = Math.floor((beat.start_sec || 0) * fps);
-
-  const assetDelayFrames = Math.floor(0.6 * fps);
-
-  const localFrame = Math.max(0, frame - beatStartFrame - assetDelayFrames);
-
+  const localFrame = frame;
   const beatFrames = Math.floor((beat.duration_sec || 3) * fps);
 
   let style = {};
@@ -67,6 +48,7 @@ export default function AssetRenderer({ zone, beat, slot }) {
       [0, duration],
       [0, 1],
       {
+        extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
         easing: Easing.out(Easing.cubic)
       }
@@ -90,33 +72,27 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
       case "slideY":
         style.transform = `translateY(${interpolate(progress,[0,1],[animation.from || 200,0])}px)`;
-        style.opacity = progress;
         break;
 
       case "slideX":
         style.transform = `translateX(${interpolate(progress,[0,1],[animation.from || 300,0])}px)`;
-        style.opacity = progress;
         break;
 
       case "scale":
         style.transform = `scale(${interpolate(progress,[0,1],[animation.from || 0.7,1])})`;
-        style.opacity = progress;
         break;
 
       case "springScale":
         style.transform = `scale(${interpolate(springProgress,[0,1],[animation.from || 1.4,1])})`;
-        style.opacity = springProgress;
         break;
 
       case "blur":
         style.filter = `blur(${interpolate(progress,[0,1],[animation.from || 40,0])}px)`;
-        style.opacity = progress;
         break;
 
       case "combo":
         style.transform = `scale(${interpolate(progress,[0,1],[animation.scaleFrom || 1.2,1])})`;
         style.filter = `blur(${interpolate(progress,[0,1],[animation.blurFrom || 20,0])}px)`;
-        style.opacity = progress;
         break;
 
       case "zoomSlow":
@@ -154,8 +130,6 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
   }
 
-  const source = zone.src;
-
   const isVideo =
     source?.toLowerCase().endsWith(".mp4") ||
     source?.toLowerCase().endsWith(".webm");
@@ -164,36 +138,48 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
     <AbsoluteFill
       style={{
-        overflow: "hidden",
-        ...style
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden"
       }}
     >
 
-      {isVideo ? (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          ...style
+        }}
+      >
 
-        <Video
-          src={source}
-          muted
-          loop
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit
-          }}
-        />
+        {isVideo ? (
 
-      ) : (
+          <Video
+            src={source}
+            muted
+            loop
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit
+            }}
+          />
 
-        <Img
-          src={source}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit
-          }}
-        />
+        ) : (
 
-      )}
+          <Img
+            src={source}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit
+            }}
+          />
+
+        )}
+
+      </div>
 
     </AbsoluteFill>
 

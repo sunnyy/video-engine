@@ -34,6 +34,8 @@ export function buildSafeProject(raw = {}) {
       music: null
     },
 
+    overlays: raw.overlays || [],
+
     beats: [],
     duration_sec: 0
 

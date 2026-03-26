@@ -1,13 +1,11 @@
 import React from "react";
-import { AbsoluteFill } from "remotion";
 import { layoutRegistry } from "../core/layoutRegistry";
-import AssetRenderer from "./elements/AssetRenderer";
 import AudioCueRenderer from "./elements/AudioCueRenderer";
+import OverlayRenderer from "./elements/OverlayRenderer";
 
 export default function BeatRenderer({ beat, project }) {
 
   const layoutName = beat?.layout || "FullZone";
-
   const layout = layoutRegistry[layoutName];
 
   if (!layout) return null;
@@ -16,36 +14,21 @@ export default function BeatRenderer({ beat, project }) {
 
   const zones = beat.zones || {};
   const components = beat.components || {};
-  const heading = beat.heading || null;
-  const caption = beat.caption || null;
-
-  const backgroundZone =
-    Object.values(zones).find((z) => z?.type === "background") || null;
+  const overlays = beat.overlays || {};
 
   return (
     <>
-      {backgroundZone && (
-        <AbsoluteFill>
-          <AssetRenderer
-            zone={backgroundZone}
-            beat={beat}
-            slot="background"
-          />
-        </AbsoluteFill>
-      )}
-
       <LayoutComponent
         beat={beat}
         project={project}
         zones={zones}
-        heading={heading}
         components={components}
-        caption={caption}
         layoutMeta={layout}
       />
+
+      <OverlayRenderer overlays={overlays} />
 
       <AudioCueRenderer beat={beat} />
     </>
   );
-
 }

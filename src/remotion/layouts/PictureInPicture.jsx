@@ -1,11 +1,9 @@
 import React from "react";
-import AssetRenderer from "../elements/AssetRenderer";
-import AvatarLayer from "../elements/AvatarLayer";
-import ComponentsRenderer from "../elements/ComponentsRenderer";
+import LayoutZoneRenderer from "./LayoutZoneRenderer";
+import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 
 export default function PictureInPicture({
   zones,
-  heading,
   components,
   beat,
   project,
@@ -15,7 +13,7 @@ export default function PictureInPicture({
   const background = zones?.z1;
   const pip = zones?.z2;
 
-  const headingSafe = layoutMeta?.safeAreas?.heading || {};
+  const layoutPadding = beat?.layoutPadding || 0;
 
   return (
     <div
@@ -23,66 +21,55 @@ export default function PictureInPicture({
         width: "100%",
         height: "100%",
         position: "relative",
-        overflow: "hidden"
+        overflow: "hidden",
+        padding: layoutPadding
       }}
     >
 
-      {background?.type === "asset" && (
-        <AssetRenderer zone={background} beat={beat} slot="z1" />
-      )}
+      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
 
-      {pip?.type === "asset" && (
-        <div
-          style={{
-            position: "absolute",
-            right: 40,
-            bottom: 40,
-            width: 360,
-            height: 480,
-            zIndex: 5
-          }}
-        >
-          <AssetRenderer zone={pip} beat={beat} slot="z2" />
-        </div>
-      )}
+      {/* Background zone */}
 
-      {pip?.type === "avatar" && (
-        <div
-          style={{
-            position: "absolute",
-            right: 40,
-            bottom: 40,
-            width: 360,
-            height: 480,
-            zIndex: 5
-          }}
-        >
-          <AvatarLayer zone={pip} />
-        </div>
-      )}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0
+        }}
+      >
+        <LayoutZoneRenderer
+          zone={background}
+          slot="z1"
+          beat={beat}
+          project={project}
+          components={components}
+          layoutMeta={layoutMeta}
+        />
+      </div>
 
-      {heading && (
-        <div
-          style={{
-            position: "absolute",
-            top: headingSafe.top || 80,
-            left: headingSafe.left || 80,
-            right: headingSafe.right || 80,
-            fontSize: 64,
-            fontWeight: 700,
-            color: "white",
-            zIndex: 5
-          }}
-        >
-          {heading}
-        </div>
-      )}
+      {/* PIP zone */}
 
-      <ComponentsRenderer
-        components={components}
-        beat={beat}
-        project={project}
-      />
+      <div
+        style={{
+          position: "absolute",
+          right: 40,
+          bottom: 40,
+          width: "32%",
+          aspectRatio: "9/16",
+          borderRadius: 20,
+          overflow: "hidden",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+          zIndex: 20
+        }}
+      >
+        <LayoutZoneRenderer
+          zone={pip}
+          slot="z2"
+          beat={beat}
+          project={project}
+          components={components}
+          layoutMeta={layoutMeta}
+        />
+      </div>
 
     </div>
   );

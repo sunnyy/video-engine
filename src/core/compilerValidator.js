@@ -24,11 +24,19 @@ export function validateBeats(beats) {
 
       layout: beat.layout || "FullZone",
 
+      layoutBackground: beat.layoutBackground || {
+        type: "color",
+        value: "#000000",
+        objectFit: "cover"
+      },
+
       zones: beat.zones || {
         z1: {
-          type: "asset",
+          role: "asset",
           src: null,
-          objectFit: "cover"
+          objectFit: "cover",
+          padding: {},
+          background: null
         }
       },
 

@@ -11,6 +11,7 @@ function extractTags(text = "") {
 function chooseAnimation(index) {
   const cinematic = [
     "pushSlow",
+    "blurIn",
     "driftLeft",
     "driftRight",
     "driftUp",

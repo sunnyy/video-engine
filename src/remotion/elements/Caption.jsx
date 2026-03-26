@@ -9,6 +9,7 @@ import { captionStyleRegistry } from "../../core/captionStyleRegistry";
 import { captionAnimations } from "../../core/captionAnimationRegistry";
 import { captionPositions } from "../../core/captionPositionRegistry";
 import { getLayoutSafeAreas } from "../../core/getLayoutSafeAreas";
+import { layoutRegistry } from "../../core/layoutRegistry";
 
 export default function Caption({ caption, beat, project }) {
 
@@ -16,6 +17,22 @@ export default function Caption({ caption, beat, project }) {
   const { fps } = useVideoConfig();
 
   if (!caption?.show || !caption?.text) return null;
+
+  const layout = layoutRegistry[beat.layout];
+
+  const captionStrategy = layout?.captionStrategy || "always";
+
+  if (captionStrategy === "never") return null;
+
+  if (captionStrategy === "auto") {
+
+    const hasContentComponents =
+      beat.components &&
+      Object.keys(beat.components).length > 0;
+
+    if (hasContentComponents) return null;
+
+  }
 
   const startFrame = Math.floor(beat.start_sec * fps);
   const endFrame = Math.floor(beat.end_sec * fps);

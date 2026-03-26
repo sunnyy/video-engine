@@ -13,6 +13,7 @@ import {
 import BeatRenderer from "./BeatRenderer";
 import Caption from "./elements/Caption";
 import AudioCueRenderer from "./elements/AudioCueRenderer";
+import OverlayRenderer from "./elements/OverlayRenderer";
 import { beatTransitionRegistry } from "../core/beatTransitionRegistry";
 
 export default function VideoComposition({ project }) {
@@ -22,7 +23,9 @@ export default function VideoComposition({ project }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const { beats, meta, audio, avatar } = project;
+  const { beats, meta, audio, avatar, overlays } = project;
+
+  const videoOverlays = overlays || [];
 
   const currentBeat = beats.find((beat) => {
 
@@ -199,6 +202,14 @@ export default function VideoComposition({ project }) {
         );
 
       })}
+
+      {/* VIDEO LEVEL OVERLAYS */}
+
+      {videoOverlays.length > 0 && (
+        <AbsoluteFill style={{ zIndex: 110 }}>
+          <OverlayRenderer overlays={videoOverlays} />
+        </AbsoluteFill>
+      )}
 
       {currentBeat?.caption && (
         <Caption

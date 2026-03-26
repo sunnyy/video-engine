@@ -1,58 +1,44 @@
 import React from "react";
-import AssetRenderer from "../elements/AssetRenderer";
-import ComponentsRenderer from "../elements/ComponentsRenderer";
+import LayoutZoneRenderer from "./LayoutZoneRenderer";
+import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 
 export default function FullZone({
   zones,
-  heading,
   components,
   beat,
   project,
   layoutMeta
 }) {
 
-  const zone = zones?.z1;
+  const layoutPadding = beat?.layoutPadding || 0;
 
-  const headingSafe = layoutMeta?.safeAreas?.heading || {};
+  if (!zones) return null;
 
   return (
-
     <div
       style={{
         width: "100%",
         height: "100%",
-        position: "relative"
+        position: "relative",
+        overflow: "hidden",
+        padding: layoutPadding
       }}
     >
 
-      {zone && (
-        <AssetRenderer zone={zone} beat={beat} slot="z1" />
-      )}
+      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
 
-      {heading && (
-        <div
-          style={{
-            position: "absolute",
-            top: headingSafe.top || 80,
-            left: headingSafe.left || 80,
-            right: headingSafe.right || 80,
-            fontSize: 60,
-            fontWeight: 700,
-            color: "white"
-          }}
-        >
-          {heading}
-        </div>
-      )}
-
-      <ComponentsRenderer
-        components={components}
-        beat={beat}
-        project={project}
-      />
+      {Object.entries(zones).map(([slot, zone]) => (
+        <LayoutZoneRenderer
+          key={slot}
+          zone={zone}
+          slot={slot}
+          beat={beat}
+          project={project}
+          components={components}
+          layoutMeta={layoutMeta}
+        />
+      ))}
 
     </div>
-
   );
-
 }

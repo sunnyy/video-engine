@@ -3,11 +3,10 @@ import { generateCaptionText } from "./captionTimingEngine";
 import { autoMatchAssets } from "./assetAutoMatcher";
 import { injectAudioCues } from "./audioCueEngine";
 import { validateBeats } from "./compilerValidator";
-import { layoutRegistry } from "./layoutRegistry";
 import { classifyBeatIntent } from "./beatIntent/beatIntentClassifier";
-import { autoGenerateComponents } from "./componentAutoGenerator";
 import { applyBeatVariation } from "./beatVariationEngine";
 import { applyCaptionEmphasis } from "./captionEmphasisEngine";
+import { resolveLayout } from "./layoutResolver";
 
 function splitScriptIntoChunks(script, chunkCount) {
   if (!script) return [];
@@ -35,39 +34,7 @@ function calculateDynamicDuration(spoken, pacingProfile) {
   );
 }
 
-function getLayoutForIntent(intent, videoType, orientation) {
-
-  const intentLayoutMap = {
-    hook: "HeadlineFocus",
-    question: "QuoteCard",
-    stat: "StatLayout",
-    list: "ListLayout",
-    quote: "QuoteCard",
-    fact: "FullZone",
-  };
-
-  const candidate = intentLayoutMap[intent] || "FullZone";
-  const layout = layoutRegistry[candidate];
-
-  if (!layout) return "FullZone";
-
-  if (videoType === "faceless" && layout.supportsAvatar) {
-    return "HeadlineFocus";
-  }
-
-  if (orientation === "vertical" && !layout.orientations.includes("vertical")) {
-    return "HeadlineFocus";
-  }
-
-  if (orientation === "horizontal" && !layout.orientations.includes("horizontal")) {
-    return "HeadlineFocus";
-  }
-
-  return candidate;
-}
-
 function chooseCaptionAnimation(intent) {
-
   switch (intent) {
     case "hook":
       return "pop";
@@ -85,7 +52,6 @@ function chooseCaptionAnimation(intent) {
 }
 
 function chooseTransition(index) {
-
   const transitions = [
     "fade",
     "slideLeft",
@@ -93,7 +59,7 @@ function chooseTransition(index) {
     "slideUp",
     "slideDown",
     "scale",
-    "blurFade"
+    "blurFade",
   ];
 
   if (index === 0) return "cut";
@@ -106,8 +72,8 @@ export async function buildBeatsFromScript({
   videoType = "faceless",
   orientation = "vertical",
   durationCategory = "short",
+  project = null,
 }) {
-
   if (!script || !script.trim()) return [];
 
   const pacingMap = {
@@ -131,9 +97,9 @@ export async function buildBeatsFromScript({
   const spokenChunks = splitScriptIntoChunks(script, beatCount);
 
   let currentStart = 0;
+  let previousLayout = null;
 
   let beats = spokenChunks.map((spoken, index) => {
-
     const duration = calculateDynamicDuration(spoken, pacingProfile);
 
     const start_sec = currentStart;
@@ -143,19 +109,32 @@ export async function buildBeatsFromScript({
 
     const intent = classifyBeatIntent(spoken);
 
-    const layout = getLayoutForIntent(intent, videoType, orientation);
+    const layout = resolveLayout({
+      intent,
+      previousLayout,
+      project,
+    });
+
+    previousLayout = layout;
 
     return {
-
       id: crypto.randomUUID(),
       order: index,
       layout,
 
+      layoutBackground: {
+        type: "color",
+        value: "#000000",
+        objectFit: "cover"
+      },
+
       zones: {
         z1: {
-          type: videoType === "talking_head" ? "avatar" : "asset",
+          role: videoType === "talking_head" ? "avatar" : "asset",
           src: null,
           objectFit: "cover",
+          padding: {},
+          background: null
         },
       },
 
@@ -181,12 +160,9 @@ export async function buildBeatsFromScript({
       start_sec,
       end_sec,
     };
-
   });
 
   beats = await autoMatchAssets(beats, orientation);
-
-  beats = autoGenerateComponents(beats);
 
   beats = applyBeatVariation(beats);
 

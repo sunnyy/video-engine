@@ -1,11 +1,9 @@
 import React from "react";
-import AssetRenderer from "../elements/AssetRenderer";
-import AvatarLayer from "../elements/AvatarLayer";
-import ComponentsRenderer from "../elements/ComponentsRenderer";
+import LayoutZoneRenderer from "./LayoutZoneRenderer";
+import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 
 export default function SideAvatar({
   zones,
-  heading,
   components,
   beat,
   project,
@@ -15,63 +13,61 @@ export default function SideAvatar({
   const background = zones?.z1;
   const avatar = zones?.z2;
 
-  const headingSafe = layoutMeta?.safeAreas?.heading || {};
+  const layoutPadding = beat?.layoutPadding || 0;
 
   return (
-
     <div
       style={{
         width: "100%",
         height: "100%",
         position: "relative",
-        overflow: "hidden"
+        overflow: "hidden",
+        padding: layoutPadding
       }}
     >
 
-      {background?.type === "asset" && (
-        <AssetRenderer zone={background} beat={beat} slot="z1" />
-      )}
+      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
 
-      {avatar?.type === "avatar" && (
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            bottom: 0,
-            width: 420,
-            height: "100%",
-            zIndex: 5
-          }}
-        >
-          <AvatarLayer zone={avatar} />
-        </div>
-      )}
+      {/* Background zone */}
 
-      {heading && (
-        <div
-          style={{
-            position: "absolute",
-            top: headingSafe.top || 120,
-            left: headingSafe.left || 460,
-            right: headingSafe.right || 80,
-            fontSize: 60,
-            fontWeight: 800,
-            color: "white",
-            zIndex: 5
-          }}
-        >
-          {heading}
-        </div>
-      )}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0
+        }}
+      >
+        <LayoutZoneRenderer
+          zone={background}
+          slot="z1"
+          beat={beat}
+          project={project}
+          components={components}
+          layoutMeta={layoutMeta}
+        />
+      </div>
 
-      <ComponentsRenderer
-        components={components}
-        beat={beat}
-        project={project}
-      />
+      {/* Avatar zone */}
+
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          bottom: 0,
+          width: 420,
+          height: "100%",
+          zIndex: 10
+        }}
+      >
+        <LayoutZoneRenderer
+          zone={avatar}
+          slot="z2"
+          beat={beat}
+          project={project}
+          components={components}
+          layoutMeta={layoutMeta}
+        />
+      </div>
 
     </div>
-
   );
-
 }

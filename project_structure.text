@@ -3,6 +3,13 @@
 - App.js
 - ENGINE_SPEC_V1.md
 - Flow.txt
+- images
+  - img_0.jpg
+  - img_1.jpg
+  - img_2.jpg
+  - img_3.jpg
+  - img_4.jpg
+  - img_5.jpg
 - index.html
 - Info.txt
 - package-lock.json
@@ -36,8 +43,10 @@
     - audioCueEngine.js
     - beatIntent
       - beatIntentClassifier.js
+      - beatIntentTypes.js
     - beatTransitionRegistry.js
     - beatVariationEngine.js
+    - blockRegistry.js
     - buildBeatsFromScript.js
     - calculateTimeline.js
     - captionAnimationRegistry.jsx
@@ -47,14 +56,12 @@
     - captionStyles.js
     - captionTimingEngine.js
     - compilerValidator.js
-    - componentAutoGenerator.js
-    - componentMotionRegistry.js
-    - componentRegistry.js
     - createEmptyProject.js
     - debugProject.js
     - getAvailableLayouts.js
     - getLayoutSafeAreas.js
     - layoutRegistry.js
+    - layoutResolver.js
     - pacingProfiles.js
     - testProject.js
     - transitionsRegistry.js
@@ -78,17 +85,49 @@
     - Editor.jsx
   - remotion
     - BeatRenderer.jsx
+    - blocks
+      - BeforeAfterBlock.jsx
+      - ComparisonBlock.jsx
+      - HookBlock.jsx
+      - ListRevealBlock.jsx
+      - NumberTickerBlock.jsx
+      - QuoteBlock.jsx
+      - SlideshowBlock.jsx
+      - StatBlock.jsx
+      - variants
+        - hook
+          - bigWord.jsx
+          - kinetic.jsx
+          - popScale.jsx
+        - listReveal
+          - bullet.jsx
+          - cards.jsx
+          - grid.jsx
+          - highlightReveal.jsx
+          - stacked.jsx
+          - timeline.jsx
+        - slideshow
+          - carousel3D.jsx
+          - kenBurns.jsx
+          - stackCards.jsx
+          - zoomFade.jsx
+        - ticker
+          - countUp.jsx
+          - odometer.jsx
+          - pulse.jsx
     - elements
       - AssetRenderer.jsx
       - AudioCueRenderer.jsx
       - AvatarLayer.jsx
       - Caption.jsx
-      - ComponentsRenderer.jsx
+      - OverlayRenderer.jsx
     - layouts
       - CenterAvatar.jsx
       - FloatingAvatar.jsx
       - FullZone.jsx
       - HeadlineFocus.jsx
+      - LayoutBackgroundRenderer.jsx
+      - LayoutZoneRenderer.jsx
       - ListLayout.jsx
       - PictureInPicture.jsx
       - QuoteCard.jsx
@@ -113,28 +152,59 @@
       - uploadUserAsset.js
     - auth
       - authService.js
+    - image-search
+      - index.js
     - projects
       - projectService.js
+    - puppeteer
+      - index.js
   - store
     - useAssetsStore.js
     - useProjectStore.js
   - ui
     - Editor
-      - AssetPicker.jsx
-      - AssetsSection.jsx
       - AvatarSection.jsx
       - BeatEditor.jsx
       - BeatList.jsx
+      - BlockPicker.jsx
+      - blocks
+        - blockEditors.js
+        - editors
+          - BeforeAfterEditor.jsx
+          - BlockTimingEditor.jsx
+          - ComparisonEditor.jsx
+          - HookEditor.jsx
+          - ListRevealEditor.jsx
+          - NumberTickerEditor.jsx
+          - QuoteEditor.jsx
+          - SlideshowEditor.jsx
+          - StatEditor.jsx
       - CaptionsSection.jsx
-      - ComponentPicker.jsx
       - ContentSection.jsx
       - EditorPanel.jsx
       - Header.jsx
       - LayoutSelector.jsx
       - MusicSection.jsx
+      - OverlaySection.jsx
       - Preview.jsx
       - Sidebar.jsx
       - TransitionSection.jsx
+      - VideoOverlaySection.jsx
+      - zonePicker
+        - tabs
+          - BlocksTab.jsx
+          - ColorsTab.jsx
+          - GalleryTab.jsx
+          - MyAssetsTab.jsx
+        - ZonePickerModal.jsx
+      - zones
+        - tabs
+          - BackgroundTab.jsx
+          - ContentTab.jsx
+          - StylingTab.jsx
+        - ZoneCard.jsx
+        - ZonePreview.jsx
+      - ZonesSection.jsx
     - Workflow
       - ScriptStep.jsx
       - TalkingHeadStep.jsx

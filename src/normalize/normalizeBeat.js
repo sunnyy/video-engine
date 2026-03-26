@@ -5,13 +5,21 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
   const zones =
     raw.zones || {
       z1: {
-        type: mode === "talking_head" ? "avatar" : "asset",
+        role: mode === "talking_head" ? "avatar" : "asset",
         src: null,
-        objectFit: "cover"
+        objectFit: "cover",
+        padding: {},
+        background: null
       }
     };
 
   const captionRaw = raw.caption || {};
+
+  const layoutBackground = raw.layoutBackground || {
+    type: "color",
+    value: "#000000",
+    objectFit: "cover"
+  };
 
   return {
 
@@ -21,7 +29,13 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
 
     layout: raw.layout || "FullZone",
 
+    layoutBackground,
+
+    layoutPadding: raw.layoutPadding || 0,
+
     zones,
+
+    asset_settings: raw.asset_settings || {},
 
     heading: raw.heading || null,
 
@@ -30,6 +44,8 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     spoken: raw.spoken || "",
 
     components: raw.components || {},
+
+    overlays: raw.overlays || [],
 
     audio_cues: raw.audio_cues || [],
 

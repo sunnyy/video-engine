@@ -2,6 +2,7 @@ import React from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 
 export default function Sidebar({ activeTab, setActiveTab }) {
+
   const project = useProjectStore((s) => s.project);
 
   if (!project) return null;
@@ -10,10 +11,13 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
   return (
     <div className="w-[100px] border-r border-gray-200 bg-white p-4 flex flex-col gap-3 rounded-xl">
+
       <button
         onClick={() => setActiveTab("beats")}
         className={`text-center text-base px-3 py-2 rounded ${
-          activeTab === "beats" ? "bg-indigo-100 text-indigo-600" : "hover:bg-gray-100"
+          activeTab === "beats"
+            ? "bg-indigo-100 text-indigo-600"
+            : "hover:bg-gray-100"
         }`}
       >
         Beats
@@ -23,7 +27,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         <button
           onClick={() => setActiveTab("avatar")}
           className={`text-center text-base px-3 py-2 rounded ${
-            activeTab === "avatar" ? "bg-indigo-100 text-indigo-600" : "hover:bg-gray-100"
+            activeTab === "avatar"
+              ? "bg-indigo-100 text-indigo-600"
+              : "hover:bg-gray-100"
           }`}
         >
           Video
@@ -33,11 +39,25 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       <button
         onClick={() => setActiveTab("audio")}
         className={`text-center text-base px-3 py-2 rounded ${
-          activeTab === "audio" ? "bg-indigo-100 text-indigo-600" : "hover:bg-gray-100"
+          activeTab === "audio"
+            ? "bg-indigo-100 text-indigo-600"
+            : "hover:bg-gray-100"
         }`}
       >
         Audio
       </button>
+
+      <button
+        onClick={() => setActiveTab("videoOverlays")}
+        className={`text-center text-base px-3 py-2 rounded ${
+          activeTab === "videoOverlays"
+            ? "bg-indigo-100 text-indigo-600"
+            : "hover:bg-gray-100"
+        }`}
+      >
+        Overlays
+      </button>
+
     </div>
   );
 }
