@@ -39,6 +39,20 @@ function scoreAsset(asset, tags) {
   return score;
 }
 
+function findAssetZone(zones = {}) {
+  for (const key of Object.keys(zones)) {
+    const z = zones[key];
+
+    if (z.role === "block") continue;
+
+    if (!z.src || z.src === null) {
+      return key;
+    }
+  }
+
+  return null;
+}
+
 export async function autoMatchAssets(beats, orientation) {
   const { data: assets, error } = await supabase
     .from("assets_library")
@@ -84,8 +98,9 @@ export async function autoMatchAssets(beats, orientation) {
 
     usedAssets.add(bestAsset.url);
 
-    const firstZone = Object.keys(beat.zones || {})[0];
-    if (!firstZone) return beat;
+    const assetZone = findAssetZone(beat.zones);
+
+    if (!assetZone) return beat;
 
     const animation = chooseAnimation(index);
 
@@ -93,15 +108,16 @@ export async function autoMatchAssets(beats, orientation) {
       ...beat,
       zones: {
         ...beat.zones,
-        [firstZone]: {
-          type: "asset",
+        [assetZone]: {
+          ...beat.zones[assetZone],
+          role: "asset",
           src: bestAsset.url,
           objectFit: "cover",
         },
       },
       asset_settings: {
         ...(beat.asset_settings || {}),
-        [firstZone]: {
+        [assetZone]: {
           animation,
         },
       },

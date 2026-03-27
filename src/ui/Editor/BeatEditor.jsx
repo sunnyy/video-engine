@@ -7,7 +7,6 @@ import ZonesSection from "./ZonesSection";
 import CaptionsSection from "./CaptionsSection";
 import TransitionSection from "./TransitionSection";
 import OverlaySection from "./OverlaySection";
-import ContentSection from "./ContentSection";
 
 export default function BeatEditor() {
   const project = useProjectStore((s) => s.project);
@@ -29,26 +28,20 @@ export default function BeatEditor() {
 
       {/* Layout */}
 
-      <div className="mt-4 mb-6">
+      <div className="mt-4 mb-10">
         <LayoutSelector beat={activeBeat} />
       </div>
 
       {/* Assets */}
 
-      <div className="mb-4">
+      <div className="mb-10">
         <ZonesSection beat={activeBeat} project={project} />
-      </div>
-
-      {/* ContentSection */}
-
-      <div className="mb-4 mt-20">
-        <ContentSection beat={activeBeat} />
       </div>
 
       {/* Captions */}
 
       {structure.caption && (
-        <div className="mb-4">
+        <div className="mb-10">
           <CaptionsSection beat={activeBeat} />
         </div>
       )}

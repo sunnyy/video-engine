@@ -17,12 +17,8 @@ export default function AssetRenderer({ zone, beat, slot }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  if (!zone) return null;
-
-  const source = zone.src || null;
-  if (!source) return null;
-
-  const objectFit = zone.objectFit || "cover";
+  const source = zone?.src || null;
+  const objectFit = zone?.objectFit || "cover";
 
   const animationKey =
     zone?.animation ||
@@ -35,7 +31,7 @@ export default function AssetRenderer({ zone, beat, slot }) {
       : assetAnimationRegistry.none();
 
   const localFrame = frame;
-  const beatFrames = Math.floor((beat.duration_sec || 3) * fps);
+  const beatFrames = Math.floor((beat?.duration_sec || 3) * fps);
 
   let style = {};
 
@@ -130,9 +126,13 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
   }
 
+  if (!source) {
+    return null;
+  }
+
   const isVideo =
-    source?.toLowerCase().endsWith(".mp4") ||
-    source?.toLowerCase().endsWith(".webm");
+    source.toLowerCase().endsWith(".mp4") ||
+    source.toLowerCase().endsWith(".webm");
 
   return (
 

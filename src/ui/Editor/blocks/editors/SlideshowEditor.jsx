@@ -40,13 +40,13 @@ export default function SlideshowEditor({
         Images
       </div>
 
-      <div className="flex d-flex flex-wrap gap-2">
+      <div className="flex d-flex flex-wrap gap-3">
 
         {images.map((img,i)=>(
 
           <div
             key={i}
-            className="relative border rounded overflow-hidden w-[80px] h-[80px] cursor-pointer"
+            className="relative border rounded overflow-hidden w-[70px] h-[70px] cursor-pointer"
             onClick={()=>setPickerIndex(i)}
           >
 
@@ -56,7 +56,7 @@ export default function SlideshowEditor({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="flex items-center justify-center text-[10px] w-[80px] h-[80px] bg-gray-100">
+              <div className="flex items-center justify-center text-[10px] w-[70px] h-[70px] bg-gray-100">
                 Select
               </div>
             )}
@@ -77,7 +77,7 @@ export default function SlideshowEditor({
 
         <button
           onClick={addImage}
-          className="border rounded w-[80px] h-[80px] flex items-center justify-center text-[11px]"
+          className="border rounded w-[70px] h-[70px] flex items-center justify-center text-[11px]"
         >
           + Add
         </button>

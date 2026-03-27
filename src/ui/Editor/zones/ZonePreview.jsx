@@ -106,7 +106,7 @@ export default function ZonePreview({ zone, mode = "content" }) {
 
   return (
 
-    <div className="relative w-full h-[140px] border rounded overflow-hidden bg-gray-100">
+    <div className="relative w-full h-[140px] border rounded overflow-hidden bg-gray-200">
 
       {mode === "background" && renderBackground()}
 

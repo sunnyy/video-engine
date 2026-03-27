@@ -56,13 +56,13 @@ export default function OverlaySection({ beat }) {
   };
 
   return (
-    <div className="border rounded-lg p-3 bg-gray-50">
+    <div className="space-y-4">
 
       <div className="flex items-center justify-between mb-3">
 
-        <div className="font-semibold text-sm">
+        <h4 className="mb-4 text-base bg-gray-100 px-2 py-1 font-semibold uppercase">
           Overlays
-        </div>
+        </h4>
 
         <button
           onClick={addOverlay}

@@ -20,7 +20,7 @@ export default function ZoneCard({
 
   return (
 
-    <div className="w-[260px]">
+    <div className="w-[240px]">
 
       <div className="text-[10px] mb-2 uppercase text-gray-500">
         {slot}
@@ -30,10 +30,10 @@ export default function ZoneCard({
 
         <button
           onClick={()=>setTab("content")}
-          className={`px-2 py-1 text-[11px] rounded ${
+          className={`px-2 py-1 text-[12px] rounded ${
             tab==="content"
               ? "bg-black text-white"
-              : "bg-gray-200"
+              : "bg-white"
           }`}
         >
           Content
@@ -41,10 +41,10 @@ export default function ZoneCard({
 
         <button
           onClick={()=>setTab("background")}
-          className={`px-2 py-1 text-[11px] rounded ${
+          className={`px-2 py-1 text-[12px] rounded ${
             tab==="background"
               ? "bg-black text-white"
-              : "bg-gray-200"
+              : "bg-white"
           }`}
         >
           Background
@@ -52,10 +52,10 @@ export default function ZoneCard({
 
         <button
           onClick={()=>setTab("style")}
-          className={`px-2 py-1 text-[11px] rounded ${
+          className={`px-2 py-1 text-[12px] rounded ${
             tab==="style"
               ? "bg-black text-white"
-              : "bg-gray-200"
+              : "bg-white"
           }`}
         >
           Styling

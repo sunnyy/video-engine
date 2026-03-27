@@ -10,11 +10,12 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Inter, sans-serif",
       margin: "0 10px",
-      fontSize: 64,
+      fontSize: 44,
       fontWeight: 800,
       color: "#ffffff",
       letterSpacing: "-0.5px",
       lineHeight: 1.2,
+      textAlign: "justify"
     },
     activeWord: {
       color: brandColor,
@@ -26,7 +27,7 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Oswald, sans-serif",
       margin: "0 10px",
-      fontSize: 70,
+      fontSize: 50,
       fontWeight: 900,
       color: "#ffffff",
       letterSpacing: "-1px",
@@ -49,7 +50,7 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Poppins, sans-serif",
       margin: "0 10px",
-      fontSize: 60,
+      fontSize: 40,
       fontWeight: 600,
       color: "white",
       letterSpacing: "-0.3px",
@@ -68,7 +69,7 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Montserrat, sans-serif",
       margin: "0 10px",
-      fontSize: 68,
+      fontSize: 48,
       fontWeight: 800,
       color: "#ffffff",
       letterSpacing: "-0.5px",
@@ -85,7 +86,7 @@ export const captionStyleRegistry = {
     container: {},
     word: {
       fontFamily: "Rubik, sans-serif",
-      fontSize: 72,
+      fontSize: 42,
       fontWeight: 900,
       color: "#ffffff",
       letterSpacing: "-1px",
@@ -107,7 +108,7 @@ export const captionStyleRegistry = {
     },
     word: {
       fontFamily: "Playfair Display, serif",
-      fontSize: 46,
+      fontSize: 36,
       margin: "0 10px",
       fontWeight: 600,
       color: "#ffffff",
@@ -124,7 +125,7 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Anton, sans-serif",
       margin: "0 10px",
-      fontSize: 68,
+      fontSize: 48,
       fontWeight: 400,
       color: "#ffffff",
       letterSpacing: "1px",
@@ -141,7 +142,7 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Playfair Display, serif",
       margin: "0 10px",
-      fontSize: 66,
+      fontSize: 46,
       fontWeight: 700,
       background: "linear-gradient(90deg,#C6A75E,#F5E6B3,#C6A75E)",
       WebkitBackgroundClip: "text",
@@ -160,7 +161,7 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Anton, sans-serif",
       margin: "0 10px",
-      fontSize: 82,
+      fontSize: 52,
       fontWeight: 400,
       color: "#ffffff",
       letterSpacing: "-2px",
@@ -183,7 +184,7 @@ export const captionStyleRegistry = {
     word: {
       fontFamily: "Poppins, sans-serif",
       margin: "0 10px",
-      fontSize: 62,
+      fontSize: 42,
       fontWeight: 600,
       color: "#ffffff",
       letterSpacing: "-0.3px",

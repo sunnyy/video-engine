@@ -354,7 +354,7 @@ export default function ZonesSection({ beat, project }) {
 
     <div>
 
-      <h4 className="mb-4 text-sm font-semibold uppercase">
+      <h4 className="mb-4 text-base bg-gray-100 px-2 py-1 font-semibold uppercase">
         Zones
       </h4>
 

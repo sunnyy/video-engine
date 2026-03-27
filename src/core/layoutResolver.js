@@ -19,11 +19,11 @@ export function resolveLayout({
   switch (intent) {
 
     case "hook":
-      pool = ["HeadlineFocus", "QuoteCard", "FullZone"];
+      pool = ["FullZone", "CenterAvatar"];
       break;
 
     case "list":
-      pool = ["ListLayout", "SplitZone", "PictureInPicture"];
+      pool = ["TwoTopOneBottom", "OneTopTwoBottom"];
       break;
 
     case "comparison":
@@ -31,23 +31,24 @@ export function resolveLayout({
       break;
 
     case "stat":
-      pool = ["StatLayout", "HeadlineFocus"];
+      pool = ["FullZone", "ThreeZone"];
       break;
 
     case "quote":
-      pool = ["QuoteCard"];
+      pool = ["CenterAvatar", "FullZone"];
       break;
 
     case "question":
-      pool = ["HeadlineFocus", "SplitZone"];
+      pool = ["FullZone", "SplitZone"];
       break;
 
     case "cta":
-      pool = ["HeadlineFocus", "FullZone"];
+      pool = ["FullZone"];
       break;
 
     default:
-      pool = ["FullZone", "SplitZone", "HeadlineFocus"];
+      pool = ["FullZone", "SplitZone", "ThreeZone"];
+
   }
 
   const validLayouts = pool.filter((name) => {
@@ -64,4 +65,5 @@ export function resolveLayout({
   if (filtered.length) return randomPick(filtered);
 
   return randomPick(validLayouts);
+
 }

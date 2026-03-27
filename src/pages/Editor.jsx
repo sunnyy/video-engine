@@ -43,7 +43,7 @@ export default function Editor() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gray-100">
+    <div className="flex flex-col bg-[#ECF1F8]">
       <Header />
 
       <div className="flex flex-1 gap-4 mt-4 mx-4">

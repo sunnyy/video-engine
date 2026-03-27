@@ -1,11 +1,10 @@
 export function applyBeatVariation(beats) {
 
   const layoutGroups = {
-    hero: ["HeadlineFocus", "FullZone"],
+    hero: ["FullZone", "CenterAvatar"],
     split: ["SplitZone", "PictureInPicture"],
-    stat: ["StatLayout"],
-    quote: ["QuoteCard"],
-    list: ["ListLayout"]
+    grid: ["ThreeZone", "FourGrid"],
+    stack: ["TwoTopOneBottom", "OneTopTwoBottom"]
   };
 
   const captionAnimations = [
@@ -31,9 +30,7 @@ export function applyBeatVariation(beats) {
     if (layout === lastLayout || currentGroup === lastGroup) {
 
       const groups = Object.keys(layoutGroups);
-
       const nextGroup = groups[(i + 1) % groups.length];
-
       const options = layoutGroups[nextGroup];
 
       if (options?.length) {

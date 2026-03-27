@@ -56,18 +56,18 @@ export default function ContentTab({
           <select
             value={content.asset?.objectFit || "cover"}
             onChange={(e)=>updateContentProp(slot,"objectFit",e.target.value)}
-            className="w-full text-[11px] border rounded"
+            className="w-full text-[12px] p-1 border rounded"
           >
             <option value="cover">cover</option>
             <option value="contain">contain</option>
           </select>
 
-          <div className="mt-2 text-[11px]">Animation</div>
+          <div className="mt-2 text-[12px]">Animation</div>
 
           <select
             value={content.asset?.animation || "none"}
             onChange={(e)=>updateContentProp(slot,"animation",e.target.value)}
-            className="w-full text-[11px] border rounded"
+            className="w-full text-[12px] p-1 border rounded"
           >
             <option value="none">none</option>
             {animations.map(a=>(

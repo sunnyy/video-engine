@@ -124,16 +124,16 @@
     - layouts
       - CenterAvatar.jsx
       - FloatingAvatar.jsx
+      - FourGrid.jsx
       - FullZone.jsx
-      - HeadlineFocus.jsx
       - LayoutBackgroundRenderer.jsx
       - LayoutZoneRenderer.jsx
-      - ListLayout.jsx
+      - OneTopTwoBottom.jsx
       - PictureInPicture.jsx
-      - QuoteCard.jsx
       - SideAvatar.jsx
       - SplitZone.jsx
-      - StatLayout.jsx
+      - ThreeZone.jsx
+      - TwoTopOneBottom.jsx
     - Root.jsx
     - VideoComposition.jsx
   - server

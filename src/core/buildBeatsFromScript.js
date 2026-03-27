@@ -6,32 +6,15 @@ import { validateBeats } from "./compilerValidator";
 import { classifyBeatIntent } from "./beatIntent/beatIntentClassifier";
 import { applyBeatVariation } from "./beatVariationEngine";
 import { applyCaptionEmphasis } from "./captionEmphasisEngine";
-import { resolveLayout } from "./layoutResolver";
-
-function splitScriptIntoChunks(script, chunkCount) {
-  if (!script) return [];
-
-  const sentences = script.split(/(?<=[.?!])\s+/).filter(Boolean);
-  if (!sentences.length) return [script];
-
-  const chunks = Array.from({ length: chunkCount }, () => []);
-
-  sentences.forEach((sentence, index) => {
-    const bucket = index % chunkCount;
-    chunks[bucket].push(sentence);
-  });
-
-  return chunks.map((arr) => arr.join(" ").trim()).filter(Boolean);
-}
+import { planBeatVisual } from "./visualPlanner";
+import { applyVisualDirection } from "./visualDirector";
 
 function calculateDynamicDuration(spoken, pacingProfile) {
   const words = spoken.trim().split(/\s+/).filter(Boolean).length;
+
   const duration = words / pacingProfile.words_per_second;
 
-  return Math.max(
-    pacingProfile.min_duration,
-    Math.min(pacingProfile.max_duration, duration)
-  );
+  return Math.max(1.1, Math.min(2.6, duration));
 }
 
 function chooseCaptionAnimation(intent) {
@@ -52,15 +35,7 @@ function chooseCaptionAnimation(intent) {
 }
 
 function chooseTransition(index) {
-  const transitions = [
-    "fade",
-    "slideLeft",
-    "slideRight",
-    "slideUp",
-    "slideDown",
-    "scale",
-    "blurFade",
-  ];
+  const transitions = ["fade", "slideLeft", "slideRight", "slideUp", "slideDown", "scale", "blurFade"];
 
   if (index === 0) return "cut";
 
@@ -69,37 +44,41 @@ function chooseTransition(index) {
 
 export async function buildBeatsFromScript({
   script = "",
+  structuredBeats = null,
   videoType = "faceless",
   orientation = "vertical",
   durationCategory = "short",
-  project = null,
 }) {
-  if (!script || !script.trim()) return [];
-
   const pacingMap = {
     short: "aggressive_short",
     medium: "normal",
     long: "calm_longform",
   };
 
-  const pacingProfile = getPacingProfile(
-    pacingMap[durationCategory] || "normal"
-  );
+  const pacingProfile = getPacingProfile(pacingMap[durationCategory] || "normal");
 
-  const words = script.trim().split(/\s+/).filter(Boolean);
-  const wordCount = words.length;
+  let sourceBeats = [];
 
-  let beatCount = Math.ceil(wordCount / 12);
+  if (structuredBeats && structuredBeats.length) {
+    sourceBeats = structuredBeats;
+  } else {
+    const sentences = script
+      .split(/(?<=[.?!])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  if (beatCount < 8) beatCount = 8;
-  if (beatCount > 18) beatCount = 18;
-
-  const spokenChunks = splitScriptIntoChunks(script, beatCount);
+    sourceBeats = sentences.map((s) => ({
+      spoken: s,
+      intent: classifyBeatIntent(s),
+    }));
+  }
 
   let currentStart = 0;
-  let previousLayout = null;
 
-  let beats = spokenChunks.map((spoken, index) => {
+  let beats = sourceBeats.map((item, index) => {
+    const spoken = item.spoken;
+    const intent = item.intent || classifyBeatIntent(spoken);
+
     const duration = calculateDynamicDuration(spoken, pacingProfile);
 
     const start_sec = currentStart;
@@ -107,41 +86,29 @@ export async function buildBeatsFromScript({
 
     currentStart = end_sec;
 
-    const intent = classifyBeatIntent(spoken);
-
-    const layout = resolveLayout({
+    const visual = planBeatVisual({
       intent,
-      previousLayout,
-      project,
+      videoType,
     });
-
-    previousLayout = layout;
 
     return {
       id: crypto.randomUUID(),
       order: index,
-      layout,
+
+      layout: visual.layout,
 
       layoutBackground: {
         type: "color",
         value: "#000000",
-        objectFit: "cover"
+        objectFit: "cover",
       },
 
-      zones: {
-        z1: {
-          role: videoType === "talking_head" ? "avatar" : "asset",
-          src: null,
-          objectFit: "cover",
-          padding: {},
-          background: null
-        },
-      },
+      zones: visual.zones,
+
+      blocks: visual.blocks || [],
 
       heading: intent === "hook" ? spoken : null,
       text: intent === "list" ? spoken : null,
-
-      components: {},
 
       caption: {
         text: generateCaptionText(spoken),
@@ -161,6 +128,8 @@ export async function buildBeatsFromScript({
       end_sec,
     };
   });
+
+  beats = applyVisualDirection(beats);
 
   beats = await autoMatchAssets(beats, orientation);
 
