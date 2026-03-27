@@ -18,24 +18,25 @@ export default function PictureInPicture({
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-        padding: layoutPadding
+        width:"100%",
+        height:"100%",
+        position:"relative",
+        overflow:"hidden"
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
-
-      {/* Background zone */}
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       <div
         style={{
-          position: "absolute",
-          inset: 0
+          position:"absolute",
+          inset:layoutPadding
         }}
       >
+
         <LayoutZoneRenderer
           zone={background}
           slot="z1"
@@ -44,23 +45,26 @@ export default function PictureInPicture({
           components={components}
           layoutMeta={layoutMeta}
         />
-      </div>
 
-      {/* PIP zone */}
+      </div>
 
       <div
         style={{
-          position: "absolute",
-          right: 40,
-          bottom: 40,
-          width: "32%",
-          aspectRatio: "9/16",
-          borderRadius: 20,
-          overflow: "hidden",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
-          zIndex: 20
+          position:"absolute",
+          right:40 + layoutPadding,
+          bottom:40 + layoutPadding,
+          width:"32%",
+          aspectRatio:"9/16",
+          borderRadius:20,
+          overflow:"hidden",
+          boxShadow:"0 20px 50px rgba(0,0,0,0.6)",
+          zIndex:20,
+          borderColor: "white",
+          borderWidth: "10px",
+          borderStyle: "solid",
         }}
       >
+
         <LayoutZoneRenderer
           zone={pip}
           slot="z2"
@@ -69,6 +73,7 @@ export default function PictureInPicture({
           components={components}
           layoutMeta={layoutMeta}
         />
+
       </div>
 
     </div>

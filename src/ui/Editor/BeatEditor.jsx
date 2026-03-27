@@ -1,11 +1,10 @@
 import React from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { layoutRegistry } from "../../core/layoutRegistry";
+import { layoutRegistry } from "../../core/layoutRegistry.js";
 
 import LayoutSelector from "./LayoutSelector";
 import ZonesSection from "./ZonesSection";
 import CaptionsSection from "./CaptionsSection";
-import TransitionSection from "./TransitionSection";
 import OverlaySection from "./OverlaySection";
 
 export default function BeatEditor() {
@@ -32,12 +31,6 @@ export default function BeatEditor() {
         <LayoutSelector beat={activeBeat} />
       </div>
 
-      {/* Assets */}
-
-      <div className="mb-10">
-        <ZonesSection beat={activeBeat} project={project} />
-      </div>
-
       {/* Captions */}
 
       {structure.caption && (
@@ -46,15 +39,17 @@ export default function BeatEditor() {
         </div>
       )}
 
+      {/* Assets */}
+
+      <div className="mb-10">
+        <ZonesSection beat={activeBeat} project={project} />
+      </div>
+
       {/* Overlays */}
 
       <div className="mb-4">
         <OverlaySection beat={activeBeat} />
       </div>
-
-      {/* Transitions */}
-
-      <TransitionSection beat={activeBeat} />
     </div>
   );
 }

@@ -29,10 +29,11 @@ dist-ssr
 .env.production
 .DS_Store
 
-SafeProject.txt
-Flow.txt
-project_structure.text
 Info.txt
+Flow.txt
+Tasks.txt
+SafeProject.txt
+project_structure.text
 ENGINE_SPEC_V1.md
 
 src/server/temp

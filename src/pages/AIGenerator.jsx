@@ -8,8 +8,8 @@ export default function AIGenerator() {
 
   const navigate = useNavigate();
 
-  const [name, setName] = useState("T20 World Cup");
-  const [topic, setTopic] = useState("India unbeaten in t20 world cup so far");
+  const [name, setName] = useState("dhurandhar 2 movie success");
+  const [topic, setTopic] = useState("dhurandhar 2 movie success");
   const [videoType, setVideoType] = useState("faceless");
   const [niche, setNiche] = useState("general");
   const [orientation, setOrientation] = useState("9:16");

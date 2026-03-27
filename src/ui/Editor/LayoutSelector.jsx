@@ -1,15 +1,26 @@
 import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { layoutRegistry } from "../../core/layoutRegistry";
+import { layoutRegistry } from "../../core/layoutRegistry.js";
 import ZonePicker from "./zonePicker/ZonePickerModal";
 import LayoutPreview from "./LayoutPreview";
 
+const transitionOptions = [
+  "none",
+  "crossfade",
+  "slideLeft",
+  "slideRight",
+  "zoomIn",
+  "zoomOut",
+  "blurFade",
+];
+
 export default function LayoutSelector({ beat }) {
+
   const project = useProjectStore((s) => s.project);
   const updateBeat = useProjectStore((s) => s.updateBeat);
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [tab, setTab] = useState("content");
+  const [tab, setTab] = useState("structure");
 
   if (!project) return null;
 
@@ -19,13 +30,14 @@ export default function LayoutSelector({ beat }) {
     project.meta?.orientation === "9:16"
       ? "vertical"
       : project.meta?.orientation === "16:9"
-        ? "horizontal"
-        : project.meta?.width > project.meta?.height
-          ? "horizontal"
-          : "vertical";
+      ? "horizontal"
+      : project.meta?.width > project.meta?.height
+      ? "horizontal"
+      : "vertical";
 
   const layouts = Object.entries(layoutRegistry)
     .filter(([name, layout]) => {
+
       if (layout.orientations && !layout.orientations.includes(orientation)) return false;
 
       if (mode === "faceless") {
@@ -34,10 +46,12 @@ export default function LayoutSelector({ beat }) {
       }
 
       return true;
+
     })
     .map(([name]) => name);
 
   const handleSelect = (layout) => {
+
     const layoutDef = layoutRegistry[layout];
 
     const zones = {};
@@ -54,20 +68,24 @@ export default function LayoutSelector({ beat }) {
       layout,
       zones,
     });
+
   };
 
   const setLayoutBackground = (asset) => {
+
     let background;
 
     if (asset.kind === "color") {
+
       background = {
         type: "color",
         value: asset.color,
         objectFit: "cover",
       };
-    } else {
-      const src = asset.asset?.src || asset.url;
 
+    } else {
+
+      const src = asset.asset?.src || asset.url;
       const isVideo = src?.endsWith(".mp4") || src?.endsWith(".webm");
 
       background = {
@@ -75,12 +93,15 @@ export default function LayoutSelector({ beat }) {
         value: src,
         objectFit: "cover",
       };
+
     }
 
     updateBeat(beat.id, { layoutBackground: background });
+
   };
 
   const removeLayoutBackground = () => {
+
     updateBeat(beat.id, {
       layoutBackground: {
         type: "color",
@@ -88,15 +109,19 @@ export default function LayoutSelector({ beat }) {
         objectFit: "cover",
       },
     });
+
   };
 
   const setLayoutPadding = (value) => {
+
     updateBeat(beat.id, {
       layoutPadding: Number(value),
     });
+
   };
 
   const setObjectFit = (fit) => {
+
     const bg = beat.layoutBackground;
     if (!bg) return;
 
@@ -106,12 +131,24 @@ export default function LayoutSelector({ beat }) {
         objectFit: fit,
       },
     });
+
+  };
+
+  const setTransition = (type) => {
+
+    updateBeat(beat.id, {
+      transition: {
+        type,
+      },
+    });
+
   };
 
   const bg = beat.layoutBackground;
   const padding = beat.layoutPadding || 0;
 
   const renderPreview = () => {
+
     if (!bg) return null;
 
     if (bg.type === "color" || bg.type === "gradient") {
@@ -149,81 +186,129 @@ export default function LayoutSelector({ beat }) {
         />
       );
     }
+
   };
 
   return (
+
     <div className="space-y-4">
-      <h4 className="mb-4 text-base bg-gray-100 px-2 py-1 font-semibold uppercase">Layout</h4>
+
+      <h4 className="mb-4 text-base bg-gray-100 px-2 py-1 font-semibold uppercase">
+        Layout
+      </h4>
 
       <div className="flex gap-2">
+
         <button
-          onClick={() => setTab("content")}
-          className={`px-3 py-1 rounded text-[12px] ${tab === "content" ? "bg-black text-white" : "bg-white"}`}
+          onClick={() => setTab("structure")}
+          className={`px-3 py-1 rounded text-[12px] ${
+            tab === "structure" ? "bg-black text-white" : "bg-white"
+          }`}
         >
           Structure
         </button>
 
         <button
           onClick={() => setTab("background")}
-          className={`px-3 py-1 rounded text-[12px] ${tab === "background" ? "bg-black text-white" : "bg-white"}`}
+          className={`px-3 py-1 rounded text-[12px] ${
+            tab === "background" ? "bg-black text-white" : "bg-white"
+          }`}
         >
           Background
         </button>
 
         <button
           onClick={() => setTab("styling")}
-          className={`px-3 py-1 rounded text-[12px] ${tab === "styling" ? "bg-black text-white" : "bg-white"}`}
+          className={`px-3 py-1 rounded text-[12px] ${
+            tab === "styling" ? "bg-black text-white" : "bg-white"
+          }`}
         >
           Styling
         </button>
+
+        <button
+          onClick={() => setTab("transition")}
+          className={`px-3 py-1 rounded text-[12px] ${
+            tab === "transition" ? "bg-black text-white" : "bg-white"
+          }`}
+        >
+          Transition
+        </button>
+
       </div>
 
-      {tab === "content" && (
-        <div className="flex d-flex  gap-3">
+      {tab === "structure" && (
+
+        <div className="flex gap-3">
+
           {layouts.map((layout) => (
+
             <div
               key={layout}
               onClick={() => handleSelect(layout)}
               className={`cursor-pointer p-[3px] rounded border ${
-                beat.layout === layout ? "border-black ring-2 ring-black" : "border-gray-200"
+                beat.layout === layout
+                  ? "border-black ring-2 ring-black"
+                  : "border-gray-200"
               }`}
             >
+
               <LayoutPreview layout={layout} />
 
-              {/* <div className="text-[11px] mt-1 text-center">{layout}</div> */}
             </div>
+
           ))}
+
         </div>
+
       )}
 
       {tab === "background" && (
+
         <div>
+
           <div
             className="relative w-[140px] h-[90px] border rounded cursor-pointer overflow-hidden"
             onClick={() => setPickerOpen(true)}
           >
+
             {renderPreview()}
 
             {!bg && (
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">Select</div>
+              <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">
+                Select
+              </div>
             )}
+
           </div>
 
           <div className="mt-2 flex gap-2">
-            <button onClick={() => setPickerOpen(true)} className="text-xs border px-2 py-1 rounded">
+
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="text-xs border px-2 py-1 rounded"
+            >
               Change
             </button>
 
-            <button onClick={removeLayoutBackground} className="text-xs border px-2 py-1 rounded">
+            <button
+              onClick={removeLayoutBackground}
+              className="text-xs border px-2 py-1 rounded"
+            >
               Reset
             </button>
+
           </div>
 
           {bg && (bg.type === "image" || bg.type === "video") && (
+
             <div className="flex gap-2 mt-2">
+
               <button
                 onClick={() => setObjectFit("cover")}
-                className={`text-xs px-2 py-1 border rounded ${bg.objectFit === "cover" ? "bg-black text-white" : ""}`}
+                className={`text-xs px-2 py-1 border rounded ${
+                  bg.objectFit === "cover" ? "bg-black text-white" : ""
+                }`}
               >
                 Cover
               </button>
@@ -236,13 +321,19 @@ export default function LayoutSelector({ beat }) {
               >
                 Contain
               </button>
+
             </div>
+
           )}
+
         </div>
+
       )}
 
       {tab === "styling" && (
+
         <div>
+
           <div className="text-xs mb-1">Padding</div>
 
           <input
@@ -252,10 +343,37 @@ export default function LayoutSelector({ beat }) {
             onChange={(e) => setLayoutPadding(e.target.value)}
             className="w-[120px] border px-2 py-1 rounded text-sm"
           />
+
         </div>
+
+      )}
+
+      {tab === "transition" && (
+
+        <div className="w-[200px]">
+
+          <select
+            value={beat.transition?.type || "none"}
+            onChange={(e) => setTransition(e.target.value)}
+            className="w-full border px-2 py-1 rounded text-sm"
+          >
+
+            {transitionOptions.map((opt) => (
+
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+
+            ))}
+
+          </select>
+
+        </div>
+
       )}
 
       {pickerOpen && (
+
         <ZonePicker
           mode="background"
           orientation={project.meta.orientation}
@@ -265,7 +383,11 @@ export default function LayoutSelector({ beat }) {
           }}
           onClose={() => setPickerOpen(false)}
         />
+
       )}
+
     </div>
+
   );
+
 }

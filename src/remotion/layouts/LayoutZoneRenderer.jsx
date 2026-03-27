@@ -63,32 +63,18 @@ export default function LayoutZoneRenderer({
         />
       )}
 
-      {background.kind === "asset" && background.asset?.type === "image" && (
-        <img
-          src={background.asset.src}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: background.asset.objectFit || "cover"
+      {background.kind === "asset" && (
+        <AssetRenderer
+          zone={{
+            src: background.asset?.src,
+            objectFit: background.asset?.objectFit,
+            enterTransition: background.asset?.enterTransition,
+            exitTransition: background.asset?.exitTransition,
+            motion: background.asset?.motion,
+            type: background.asset?.type
           }}
-        />
-      )}
-
-      {background.kind === "asset" && background.asset?.type === "video" && (
-        <video
-          src={background.asset.src}
-          autoPlay
-          muted
-          loop
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: background.asset.objectFit || "cover"
-          }}
+          beat={beat}
+          slot={`${slot}_bg`}
         />
       )}
 
@@ -115,7 +101,9 @@ export default function LayoutZoneRenderer({
             zone={{
               src: content.asset?.src,
               objectFit: content.asset?.objectFit,
-              animation: content.asset?.animation,
+              enterTransition: content.asset?.enterTransition,
+              exitTransition: content.asset?.exitTransition,
+              motion: content.asset?.motion,
               type: content.asset?.type
             }}
             beat={beat}

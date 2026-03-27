@@ -54,12 +54,32 @@ export default function validateProject(project) {
 
     zones.forEach((zone, zIndex) => {
 
-      if (!zone.type) {
-        errors.push(`Beat ${index + 1} Zone ${zIndex + 1}: Missing type`);
+      const contentKind = zone?.content?.kind;
+
+      if (!contentKind) {
+        errors.push(`Beat ${index + 1} Zone ${zIndex + 1}: Missing content kind`);
+        return;
       }
 
-      if (zone.type === "asset" && !zone.src) {
-        errors.push(`Beat ${index + 1} Zone ${zIndex + 1}: Asset missing src`);
+      if (contentKind === "asset") {
+
+        const src =
+          zone?.content?.asset?.src ||
+          zone?.content?.asset?.url ||
+          zone?.content?.src;
+
+        if (!src) {
+          errors.push(
+            `Beat ${index + 1} Zone ${zIndex + 1}: Asset missing src`
+          );
+        }
+
+      }
+
+      if (contentKind === "block" && !zone?.content?.block) {
+        errors.push(
+          `Beat ${index + 1} Zone ${zIndex + 1}: Block missing definition`
+        );
       }
 
     });

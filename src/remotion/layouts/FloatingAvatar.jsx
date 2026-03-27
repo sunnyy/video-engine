@@ -18,24 +18,25 @@ export default function FloatingAvatar({
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-        padding: layoutPadding
+        width:"100%",
+        height:"100%",
+        position:"relative",
+        overflow:"hidden"
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
-
-      {/* Background zone */}
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       <div
         style={{
-          position: "absolute",
-          inset: 0
+          position:"absolute",
+          inset:layoutPadding
         }}
       >
+
         <LayoutZoneRenderer
           zone={background}
           slot="z1"
@@ -44,20 +45,20 @@ export default function FloatingAvatar({
           components={components}
           layoutMeta={layoutMeta}
         />
-      </div>
 
-      {/* Floating avatar */}
+      </div>
 
       <div
         style={{
-          position: "absolute",
-          right: 40,
-          bottom: 40,
-          width: 420,
-          height: 640,
-          zIndex: 10
+          position:"absolute",
+          right:40 + layoutPadding,
+          bottom:40 + layoutPadding,
+          width:420,
+          height:640,
+          zIndex:10
         }}
       >
+
         <LayoutZoneRenderer
           zone={avatar}
           slot="z2"
@@ -66,8 +67,10 @@ export default function FloatingAvatar({
           components={components}
           layoutMeta={layoutMeta}
         />
+
       </div>
 
     </div>
   );
+
 }

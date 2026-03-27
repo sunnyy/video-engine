@@ -23,20 +23,22 @@ export default function FourGrid({
         width:"100%",
         height:"100%",
         position:"relative",
-        overflow:"hidden",
-        padding:layoutPadding
+        overflow:"hidden"
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       <div
         style={{
+          position:"absolute",
+          inset:layoutPadding,
           display:"grid",
           gridTemplateColumns:"1fr 1fr",
-          gridTemplateRows:"1fr 1fr",
-          width:"100%",
-          height:"100%"
+          gridTemplateRows:"1fr 1fr"
         }}
       >
 

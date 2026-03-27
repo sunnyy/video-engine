@@ -9,7 +9,7 @@ import { captionStyleRegistry } from "../../core/captionStyleRegistry";
 import { captionAnimations } from "../../core/captionAnimationRegistry";
 import { captionPositions } from "../../core/captionPositionRegistry";
 import { getLayoutSafeAreas } from "../../core/getLayoutSafeAreas";
-import { layoutRegistry } from "../../core/layoutRegistry";
+import { layoutRegistry } from "../../core/layoutRegistry.js";
 
 export default function Caption({ caption, beat, project }) {
 

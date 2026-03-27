@@ -21,27 +21,29 @@ export default function SplitZone({
 
     <div
       style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-        padding: layoutPadding
+        width:"100%",
+        height:"100%",
+        position:"relative",
+        overflow:"hidden"
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       {isVertical ? (
 
         <>
-          {/* TOP */}
+
           <div
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "50%"
+              position:"absolute",
+              left:layoutPadding,
+              right:layoutPadding,
+              top:layoutPadding,
+              height:`calc(50% - ${layoutPadding}px)`
             }}
           >
             <LayoutZoneRenderer
@@ -54,14 +56,13 @@ export default function SplitZone({
             />
           </div>
 
-          {/* BOTTOM */}
           <div
             style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              width: "100%",
-              height: "50%"
+              position:"absolute",
+              left:layoutPadding,
+              right:layoutPadding,
+              bottom:layoutPadding,
+              height:`calc(50% - ${layoutPadding}px)`
             }}
           >
             <LayoutZoneRenderer
@@ -73,19 +74,20 @@ export default function SplitZone({
               layoutMeta={layoutMeta}
             />
           </div>
+
         </>
 
       ) : (
 
         <>
-          {/* LEFT */}
+
           <div
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "50%",
-              height: "100%"
+              position:"absolute",
+              top:layoutPadding,
+              bottom:layoutPadding,
+              left:layoutPadding,
+              width:`calc(50% - ${layoutPadding}px)`
             }}
           >
             <LayoutZoneRenderer
@@ -98,14 +100,13 @@ export default function SplitZone({
             />
           </div>
 
-          {/* RIGHT */}
           <div
             style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              width: "50%",
-              height: "100%"
+              position:"absolute",
+              top:layoutPadding,
+              bottom:layoutPadding,
+              right:layoutPadding,
+              width:`calc(50% - ${layoutPadding}px)`
             }}
           >
             <LayoutZoneRenderer
@@ -117,6 +118,7 @@ export default function SplitZone({
               layoutMeta={layoutMeta}
             />
           </div>
+
         </>
 
       )}

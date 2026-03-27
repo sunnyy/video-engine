@@ -10,7 +10,8 @@ import {
   Easing
 } from "remotion";
 
-import { assetAnimationRegistry } from "../../core/assetAnimationRegistry";
+import { assetTransitions } from "../../core/assetTransitions";
+import { assetMotions } from "../../core/assetMotions";
 
 export default function AssetRenderer({ zone, beat, slot }) {
 
@@ -20,28 +21,46 @@ export default function AssetRenderer({ zone, beat, slot }) {
   const source = zone?.src || null;
   const objectFit = zone?.objectFit || "cover";
 
-  const animationKey =
-    zone?.animation ||
-    beat?.asset_settings?.[slot]?.animation ||
+  const beatFrames = Math.floor((beat?.duration_sec || 2) * fps);
+  const localFrame = frame;
+
+  const enterKey =
+    zone?.enterTransition ||
+    beat?.asset_settings?.[slot]?.enterTransition ||
+    "fadeIn";
+
+  const exitKey =
+    zone?.exitTransition ||
+    beat?.asset_settings?.[slot]?.exitTransition ||
     "none";
 
-  const animation =
-    assetAnimationRegistry[animationKey]
-      ? assetAnimationRegistry[animationKey]()
-      : assetAnimationRegistry.none();
+  const motionKey =
+    zone?.motion ||
+    beat?.asset_settings?.[slot]?.motion ||
+    "none";
 
-  const localFrame = frame;
-  const beatFrames = Math.floor((beat?.duration_sec || 3) * fps);
+  const enter = assetTransitions[enterKey]
+    ? assetTransitions[enterKey]()
+    : assetTransitions.none();
+
+  const exit = assetTransitions[exitKey]
+    ? assetTransitions[exitKey]()
+    : assetTransitions.none();
+
+  const motion = assetMotions[motionKey]
+    ? assetMotions[motionKey]()
+    : assetMotions.none();
 
   let style = {};
+  let transformParts = [];
 
-  if (animation.type !== "none") {
+  /* ---------- ENTER ---------- */
 
-    const duration = animation.duration || 20;
+  if (enter.type !== "none") {
 
     const progress = interpolate(
       localFrame,
-      [0, duration],
+      [0, enter.duration || 16],
       [0, 1],
       {
         extrapolateLeft: "clamp",
@@ -60,63 +79,42 @@ export default function AssetRenderer({ zone, beat, slot }) {
       }
     });
 
-    switch (animation.type) {
+    switch (enter.type) {
 
-      case "fade":
+      case "fadeIn":
         style.opacity = progress;
         break;
 
       case "slideY":
-        style.transform = `translateY(${interpolate(progress,[0,1],[animation.from || 200,0])}px)`;
+        transformParts.push(
+          `translateY(${interpolate(progress,[0,1],[enter.from || 200,0])}px)`
+        );
         break;
 
       case "slideX":
-        style.transform = `translateX(${interpolate(progress,[0,1],[animation.from || 300,0])}px)`;
+        transformParts.push(
+          `translateX(${interpolate(progress,[0,1],[enter.from || 300,0])}px)`
+        );
         break;
 
       case "scale":
-        style.transform = `scale(${interpolate(progress,[0,1],[animation.from || 0.7,1])})`;
+        transformParts.push(
+          `scale(${interpolate(progress,[0,1],[enter.from || 0.7,1])})`
+        );
         break;
 
       case "springScale":
-        style.transform = `scale(${interpolate(springProgress,[0,1],[animation.from || 1.4,1])})`;
+        transformParts.push(
+          `scale(${interpolate(springProgress,[0,1],[enter.from || 1.4,1])})`
+        );
         break;
 
       case "blur":
-        style.filter = `blur(${interpolate(progress,[0,1],[animation.from || 40,0])}px)`;
+        style.filter = `blur(${interpolate(progress,[0,1],[enter.from || 40,0])}px)`;
         break;
 
-      case "combo":
-        style.transform = `scale(${interpolate(progress,[0,1],[animation.scaleFrom || 1.2,1])})`;
-        style.filter = `blur(${interpolate(progress,[0,1],[animation.blurFrom || 20,0])}px)`;
-        break;
-
-      case "zoomSlow":
-        style.transform = `scale(${interpolate(localFrame,[0,beatFrames],[1,1.15])})`;
-        break;
-
-      case "kenburns":
-        style.transform = `
-          scale(${interpolate(localFrame,[0,beatFrames],[1.05,1.2])})
-          translateX(${interpolate(localFrame,[0,beatFrames],[0,-60])}px)
-          translateY(${interpolate(localFrame,[0,beatFrames],[0,-40])}px)
-        `;
-        break;
-
-      case "pushSlow":
-        style.transform = `scale(${interpolate(
-          localFrame,
-          [0, beatFrames],
-          [animation.scaleStart || 1.05, animation.scaleEnd || 1.25]
-        )})`;
-        break;
-
-      case "drift":
-        style.transform = `
-          scale(${interpolate(localFrame,[0,beatFrames],[animation.scaleStart || 1.1,animation.scaleEnd || 1.2])})
-          translateX(${interpolate(localFrame,[0,beatFrames],[animation.xStart || 0,animation.xEnd || 0])}px)
-          translateY(${interpolate(localFrame,[0,beatFrames],[animation.yStart || 0,animation.yEnd || 0])}px)
-        `;
+      case "wipe":
+        style.clipPath = `inset(0 ${interpolate(progress,[0,1],[100,0])}% 0 0)`;
         break;
 
       default:
@@ -126,9 +124,125 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
   }
 
-  if (!source) {
-    return null;
+  /* ---------- MOTION ---------- */
+
+  if (motion.type !== "none") {
+
+    switch (motion.type) {
+
+      case "scaleDrift":
+        transformParts.push(
+          `scale(${interpolate(
+            localFrame,
+            [0, beatFrames],
+            [motion.scaleStart || 1.05, motion.scaleEnd || 1.2]
+          )})`
+        );
+        break;
+
+      case "drift":
+        transformParts.push(
+          `scale(${interpolate(
+            localFrame,
+            [0, beatFrames],
+            [motion.scaleStart || 1.1, motion.scaleEnd || 1.2]
+          )})`
+        );
+
+        transformParts.push(
+          `translateX(${interpolate(
+            localFrame,
+            [0, beatFrames],
+            [motion.xStart || 0, motion.xEnd || 0]
+          )}px)`
+        );
+
+        transformParts.push(
+          `translateY(${interpolate(
+            localFrame,
+            [0, beatFrames],
+            [motion.yStart || 0, motion.yEnd || 0]
+          )}px)`
+        );
+        break;
+
+      case "kenburns":
+        transformParts.push(
+          `scale(${interpolate(localFrame,[0,beatFrames],[1.05,1.2])})`
+        );
+
+        transformParts.push(
+          `translateX(${interpolate(localFrame,[0,beatFrames],[0,-60])}px)`
+        );
+
+        transformParts.push(
+          `translateY(${interpolate(localFrame,[0,beatFrames],[0,-40])}px)`
+        );
+        break;
+
+      default:
+        break;
+
+    }
+
   }
+
+  /* ---------- EXIT ---------- */
+
+  if (exit.type !== "none") {
+
+    const exitStart = beatFrames - (exit.duration || 16);
+
+    const progress = interpolate(
+      localFrame,
+      [exitStart, beatFrames],
+      [0, 1],
+      {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp"
+      }
+    );
+
+    switch (exit.type) {
+
+      case "fadeOut":
+        style.opacity = interpolate(progress,[0,1],[1,0]);
+        break;
+
+      case "slideY":
+        transformParts.push(
+          `translateY(${interpolate(progress,[0,1],[0,exit.to || 200])}px)`
+        );
+        break;
+
+      case "slideX":
+        transformParts.push(
+          `translateX(${interpolate(progress,[0,1],[0,exit.to || 300])}px)`
+        );
+        break;
+
+      case "scale":
+        transformParts.push(
+          `scale(${interpolate(progress,[0,1],[1,exit.to || 0.7])})`
+        );
+        break;
+
+      case "blur":
+        style.filter = `blur(${interpolate(progress,[0,1],[0,exit.to || 40])}px)`;
+        break;
+
+      default:
+        break;
+
+    }
+
+  }
+
+  if (transformParts.length) {
+    style.transform = transformParts.join(" ");
+  }
+
+  if (!source) return null;
 
   const isVideo =
     source.toLowerCase().endsWith(".mp4") ||

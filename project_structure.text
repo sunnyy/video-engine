@@ -66,6 +66,9 @@
     - testProject.js
     - transitionsRegistry.js
     - validateProject.js
+    - visualDirector.js
+    - visualGrammar.js
+    - visualPlanner.js
   - index.css
   - lib
     - supabase.js
@@ -142,6 +145,7 @@
     - index.js
     - temp
       - render-1773074276742.mp4
+      - render-1774606450659.mp4
   - services
     - ai
       - generateStructuredShort.js
@@ -180,15 +184,14 @@
           - SlideshowEditor.jsx
           - StatEditor.jsx
       - CaptionsSection.jsx
-      - ContentSection.jsx
       - EditorPanel.jsx
       - Header.jsx
+      - LayoutPreview.jsx
       - LayoutSelector.jsx
       - MusicSection.jsx
       - OverlaySection.jsx
       - Preview.jsx
       - Sidebar.jsx
-      - TransitionSection.jsx
       - VideoOverlaySection.jsx
       - zonePicker
         - tabs
@@ -209,4 +212,5 @@
       - ScriptStep.jsx
       - TalkingHeadStep.jsx
 - tailwind.config.js
+- Tasks.txt
 - vite.config.js

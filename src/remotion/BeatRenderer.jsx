@@ -1,5 +1,5 @@
 import React from "react";
-import { layoutRegistry } from "../core/layoutRegistry";
+import { layoutRegistry } from "../core/layoutRegistry.js";
 import AudioCueRenderer from "./elements/AudioCueRenderer";
 import OverlayRenderer from "./elements/OverlayRenderer";
 

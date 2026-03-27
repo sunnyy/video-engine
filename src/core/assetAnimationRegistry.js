@@ -1,103 +1,114 @@
 export const assetAnimationRegistry = {
 
-  none: () => ({
-    type: "none",
-    duration: 0,
-  }),
+  /* ---------------- ENTRY ANIMATIONS ---------------- */
 
-  fade: () => ({
+  fadeIn: () => ({
+    layer: "entry",
     type: "fade",
-    duration: 18,
+    duration: 14,
   }),
 
-  slideUp: () => ({
+  slideUpIn: () => ({
+    layer: "entry",
     type: "slideY",
     from: 220,
-    duration: 18,
+    duration: 16,
   }),
 
-  slideDown: () => ({
+  slideDownIn: () => ({
+    layer: "entry",
     type: "slideY",
     from: -220,
-    duration: 18,
+    duration: 16,
   }),
 
-  slideLeft: () => ({
+  slideLeftIn: () => ({
+    layer: "entry",
     type: "slideX",
     from: 320,
-    duration: 18,
+    duration: 16,
   }),
 
-  slideRight: () => ({
+  slideRightIn: () => ({
+    layer: "entry",
     type: "slideX",
     from: -320,
+    duration: 16,
+  }),
+
+  scaleIn: () => ({
+    layer: "entry",
+    type: "scale",
+    from: 0.7,
     duration: 18,
   }),
 
-  zoomIn: () => ({
-    type: "scale",
-    from: 0.6,
-    duration: 20,
-  }),
-
-  zoomOut: () => ({
-    type: "scale",
-    from: 1.4,
-    duration: 20,
-  }),
-
-  punch: () => ({
+  punchIn: () => ({
+    layer: "entry",
     type: "springScale",
-    from: 1.6,
-    duration: 26,
+    from: 1.5,
+    duration: 22,
   }),
 
-  blurIn: () => ({
+  blurReveal: () => ({
+    layer: "entry",
     type: "blur",
     from: 40,
-    duration: 20,
+    duration: 18,
   }),
 
   cinematicReveal: () => ({
+    layer: "entry",
     type: "combo",
     scaleFrom: 1.25,
     blurFrom: 30,
-    duration: 26,
+    duration: 24,
   }),
 
-  dramaticZoom: () => ({
-    type: "scale",
-    from: 0.4,
-    duration: 16
+  wipeReveal: () => ({
+    layer: "entry",
+    type: "wipe",
+    direction: "left",
+    duration: 20,
   }),
 
-  verticalReveal: () => ({
-    type: "slideY",
-    from: 300,
-    duration: 20
+  /* ---------------- CONTINUOUS MOTION ---------------- */
+
+  none: () => ({
+    layer: "motion",
+    type: "none",
   }),
 
-  horizontalReveal: () => ({
-    type: "slideX",
-    from: 300,
-    duration: 20
+  slowZoom: () => ({
+    layer: "motion",
+    type: "scaleDrift",
+    scaleStart: 1.05,
+    scaleEnd: 1.2,
   }),
 
-  /* ---- HIGH IMPACT CAMERA MOTION ---- */
+  cinematicPush: () => ({
+    layer: "motion",
+    type: "scaleDrift",
+    scaleStart: 1.12,
+    scaleEnd: 1.35,
+  }),
 
   pushSlow: () => ({
-    type: "pushSlow",
+    layer: "motion",
+    type: "scaleDrift",
     scaleStart: 1.05,
     scaleEnd: 1.25,
   }),
 
   pullSlow: () => ({
-    type: "pushSlow",
+    layer: "motion",
+    type: "scaleDrift",
     scaleStart: 1.25,
     scaleEnd: 1.05,
   }),
 
   driftLeft: () => ({
+    layer: "motion",
     type: "drift",
     xStart: 0,
     xEnd: -120,
@@ -106,6 +117,7 @@ export const assetAnimationRegistry = {
   }),
 
   driftRight: () => ({
+    layer: "motion",
     type: "drift",
     xStart: 0,
     xEnd: 120,
@@ -114,6 +126,7 @@ export const assetAnimationRegistry = {
   }),
 
   driftUp: () => ({
+    layer: "motion",
     type: "drift",
     yStart: 0,
     yEnd: -100,
@@ -122,6 +135,7 @@ export const assetAnimationRegistry = {
   }),
 
   driftDown: () => ({
+    layer: "motion",
     type: "drift",
     yStart: 0,
     yEnd: 100,
@@ -129,18 +143,13 @@ export const assetAnimationRegistry = {
     scaleEnd: 1.18,
   }),
 
-  kenburnsPro: () => ({
+  kenburns: () => ({
+    layer: "motion",
     type: "kenburns",
     scaleStart: 1.1,
     scaleEnd: 1.35,
     panX: -80,
     panY: -40
-  }),
-
-  cinematicPush: () => ({
-    type: "pushSlow",
-    scaleStart: 1.15,
-    scaleEnd: 1.4
   }),
 
 };

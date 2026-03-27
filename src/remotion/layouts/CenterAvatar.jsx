@@ -18,24 +18,25 @@ export default function CenterAvatar({
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-        padding: layoutPadding
+        width:"100%",
+        height:"100%",
+        position:"relative",
+        overflow:"hidden"
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
-
-      {/* Background zone */}
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       <div
         style={{
-          position: "absolute",
-          inset: 0
+          position:"absolute",
+          inset:layoutPadding
         }}
       >
+
         <LayoutZoneRenderer
           zone={background}
           slot="z1"
@@ -44,21 +45,21 @@ export default function CenterAvatar({
           components={components}
           layoutMeta={layoutMeta}
         />
-      </div>
 
-      {/* Avatar zone */}
+      </div>
 
       <div
         style={{
-          position: "absolute",
-          left: "50%",
-          bottom: 0,
-          transform: "translateX(-50%)",
-          width: 520,
-          height: "100%",
-          zIndex: 10
+          position:"absolute",
+          left:"50%",
+          bottom:layoutPadding,
+          transform:"translateX(-50%)",
+          width:520,
+          height:`calc(100% - ${layoutPadding * 2}px)`,
+          zIndex:10
         }}
       >
+
         <LayoutZoneRenderer
           zone={avatar}
           slot="z2"
@@ -67,8 +68,10 @@ export default function CenterAvatar({
           components={components}
           layoutMeta={layoutMeta}
         />
+
       </div>
 
     </div>
   );
+
 }

@@ -25,7 +25,10 @@ export default function FullZone({
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       {Object.entries(zones).map(([slot, zone]) => (
         <LayoutZoneRenderer

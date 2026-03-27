@@ -21,6 +21,15 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     objectFit: "cover"
   };
 
+  let duration = raw.duration_sec;
+
+  if (typeof duration !== "number" || isNaN(duration)) {
+    duration = 1.5;
+  }
+
+  const start = raw.start_sec ?? 0;
+  const end = start + duration;
+
   return {
 
     id: raw.id || crypto.randomUUID(),
@@ -62,11 +71,11 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
       duration: 0.3
     },
 
-    duration_sec: raw.duration_sec || 3,
+    duration_sec: duration,
 
-    start_sec: raw.start_sec || 0,
+    start_sec: start,
 
-    end_sec: raw.end_sec || 0
+    end_sec: end
 
   };
 

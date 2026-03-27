@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { layoutRegistry } from "../../core/layoutRegistry";
+import { layoutRegistry } from "../../core/layoutRegistry.js";
 import blockRegistry from "../../core/blockRegistry";
 import ZonePickerModal from "./zonePicker/ZonePickerModal";
 import ZoneCard from "./zones/ZoneCard";

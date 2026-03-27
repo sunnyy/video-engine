@@ -1,5 +1,5 @@
 import { getAvailableLayouts } from "./getAvailableLayouts";
-import { layoutRegistry } from "./layoutRegistry";
+import { layoutRegistry } from "./layoutRegistry.js";
 
 function randomPick(arr) {
   if (!arr || arr.length === 0) return null;

@@ -1,12 +1,12 @@
 import React from "react";
-import { Audio, Sequence, useVideoConfig } from "remotion";
+import { Audio, Sequence, useVideoConfig, staticFile } from "remotion";
 
 const SOUND_LIBRARY = {
-  impact: "/sfx/impact.mp3",
-  whoosh: "/sfx/whoosh.mp3",
-  tick: "/sfx/tick.mp3",
-  click: "/sfx/click.mp3",
-  soft_hit: "/sfx/soft_hit.mp3"
+  impact: staticFile("sfx/impact.mp3"),
+  whoosh: staticFile("sfx/whoosh.mp3"),
+  tick: staticFile("sfx/tick.mp3"),
+  click: staticFile("sfx/click.mp3"),
+  soft_hit: staticFile("sfx/soft_hit.mp3")
 };
 
 export default function AudioCueRenderer({ beat }) {

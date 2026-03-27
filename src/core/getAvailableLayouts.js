@@ -1,4 +1,4 @@
-import { layoutRegistry } from "./layoutRegistry";
+import { layoutRegistry } from "./layoutRegistry.js";
 
 export function getAvailableLayouts(project) {
 

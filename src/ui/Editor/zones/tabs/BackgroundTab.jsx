@@ -1,5 +1,7 @@
 import React from "react";
 import ZonePreview from "../ZonePreview";
+import { assetTransitions } from "../../../../core/assetTransitions";
+import { assetMotions } from "../../../../core/assetMotions";
 
 export default function BackgroundTab({
   slot,
@@ -10,6 +12,9 @@ export default function BackgroundTab({
 }) {
 
   const bg = zone?.background || {};
+
+  const transitions = Object.keys(assetTransitions || {});
+  const motions = Object.keys(assetMotions || {});
 
   return (
 
@@ -53,17 +58,40 @@ export default function BackgroundTab({
             <option value="contain">contain</option>
           </select>
 
-          <div className="mt-2 text-[11px]">Transition</div>
+          <div className="mt-2 text-[11px]">Enter</div>
 
           <select
-            value={bg.asset?.transition || "none"}
-            onChange={(e)=>updateBackgroundProp(slot,"transition",e.target.value)}
+            value={bg.asset?.enterTransition || "fadeIn"}
+            onChange={(e)=>updateBackgroundProp(slot,"enterTransition",e.target.value)}
             className="w-full text-[11px] border rounded"
           >
-            <option value="none">none</option>
-            <option value="fade">fade</option>
-            <option value="zoom">zoom</option>
-            <option value="slide">slide</option>
+            {transitions.map(t=>(
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+
+          <div className="mt-2 text-[11px]">Exit</div>
+
+          <select
+            value={bg.asset?.exitTransition || "none"}
+            onChange={(e)=>updateBackgroundProp(slot,"exitTransition",e.target.value)}
+            className="w-full text-[11px] border rounded"
+          >
+            {transitions.map(t=>(
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+
+          <div className="mt-2 text-[11px]">Motion</div>
+
+          <select
+            value={bg.asset?.motion || "none"}
+            onChange={(e)=>updateBackgroundProp(slot,"motion",e.target.value)}
+            className="w-full text-[11px] border rounded"
+          >
+            {motions.map(m=>(
+              <option key={m} value={m}>{m}</option>
+            ))}
           </select>
 
         </>

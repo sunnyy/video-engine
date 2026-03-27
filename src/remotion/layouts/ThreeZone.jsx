@@ -23,19 +23,21 @@ export default function ThreeZone({
         width:"100%",
         height:"100%",
         position:"relative",
-        overflow:"hidden",
-        padding:layoutPadding
+        overflow:"hidden"
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       <div
         style={{
+          position:"absolute",
+          inset:layoutPadding,
           display:"flex",
-          flexDirection:"column",
-          width:"100%",
-          height:"100%"
+          flexDirection:"column"
         }}
       >
 

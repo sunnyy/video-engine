@@ -18,24 +18,25 @@ export default function SideAvatar({
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-        padding: layoutPadding
+        width:"100%",
+        height:"100%",
+        position:"relative",
+        overflow:"hidden"
       }}
     >
 
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} />
-
-      {/* Background zone */}
+      <LayoutBackgroundRenderer
+        background={beat?.layoutBackground}
+        beat={beat}
+      />
 
       <div
         style={{
-          position: "absolute",
-          inset: 0
+          position:"absolute",
+          inset:layoutPadding
         }}
       >
+
         <LayoutZoneRenderer
           zone={background}
           slot="z1"
@@ -44,20 +45,20 @@ export default function SideAvatar({
           components={components}
           layoutMeta={layoutMeta}
         />
-      </div>
 
-      {/* Avatar zone */}
+      </div>
 
       <div
         style={{
-          position: "absolute",
-          left: 0,
-          bottom: 0,
-          width: 420,
-          height: "100%",
-          zIndex: 10
+          position:"absolute",
+          left:layoutPadding,
+          bottom:layoutPadding,
+          width:420,
+          height:`calc(100% - ${layoutPadding * 2}px)`,
+          zIndex:10
         }}
       >
+
         <LayoutZoneRenderer
           zone={avatar}
           slot="z2"
@@ -66,6 +67,7 @@ export default function SideAvatar({
           components={components}
           layoutMeta={layoutMeta}
         />
+
       </div>
 
     </div>
