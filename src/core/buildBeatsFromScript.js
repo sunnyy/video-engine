@@ -8,12 +8,14 @@ import { applyBeatVariation } from "./beatVariationEngine";
 import { applyCaptionEmphasis } from "./captionEmphasisEngine";
 import { planBeatVisual } from "./visualPlanner";
 import { applyVisualDirection } from "./visualDirector";
+import { layoutDefaultsRegistry } from "./layoutDefaultsRegistry";
 
 function words(text) {
   return text.trim().split(/\s+/).filter(Boolean);
 }
 
 function splitIntoDurationBeats(text, pacingProfile) {
+
   const w = words(text);
   const beats = [];
 
@@ -23,6 +25,7 @@ function splitIntoDurationBeats(text, pacingProfile) {
   let i = 0;
 
   while (i < w.length) {
+
     const sliceSize =
       Math.min(
         maxWords,
@@ -31,12 +34,15 @@ function splitIntoDurationBeats(text, pacingProfile) {
 
     beats.push(w.slice(i, i + sliceSize).join(" "));
     i += sliceSize;
+
   }
 
   return beats;
+
 }
 
 function calculateDuration(spoken, pacingProfile) {
+
   const w = words(spoken).length;
 
   let duration = w / pacingProfile.words_per_second;
@@ -45,38 +51,58 @@ function calculateDuration(spoken, pacingProfile) {
   if (duration > 2) duration = 2;
 
   return Number(duration.toFixed(2));
+
 }
 
 function chooseCaptionAnimation(intent) {
+
   switch (intent) {
+
     case "hook":
       return "pop";
+
     case "stat":
       return "word_pop";
+
     case "question":
       return "wave";
+
     case "list":
       return "slide";
+
     case "quote":
       return "fade";
+
     default:
       return "fade";
+
   }
+
 }
 
-function chooseTransition(index) {
-  const transitions = [
-    "cut",
-    "zoomCut",
-    "blurFade",
-    "slideWhip",
-    "scaleJump",
-    "flash"
-  ];
+function chooseTransition(layout, index) {
+
+  const layoutTransitionMap = {
+
+    FullZone: ["cut","zoomCut","scaleJump"],
+    SplitZone: ["slideWhip","zoomCut","cut"],
+    ThreeZone: ["blurFade","cut","zoomCut"],
+    TwoTopOneBottom: ["slideWhip","scaleJump","cut"],
+    OneTopTwoBottom: ["zoomCut","blurFade","cut"],
+    FourGrid: ["cut","flash","zoomCut"],
+    PictureInPicture: ["scaleJump","blurFade","cut"],
+    CenterAvatar: ["cut","zoomCut","cut"],
+    FloatingAvatar: ["cut","scaleJump","zoomCut"],
+    SideAvatar: ["slideWhip","cut","zoomCut"]
+
+  };
+
+  const pattern = layoutTransitionMap[layout] || ["cut"];
 
   if (index === 0) return "cut";
 
-  return transitions[index % transitions.length];
+  return pattern[index % pattern.length];
+
 }
 
 export async function buildBeatsFromScript({
@@ -93,7 +119,8 @@ export async function buildBeatsFromScript({
     long: "calm_longform",
   };
 
-  const pacingProfile = getPacingProfile(pacingMap[durationCategory] || "normal");
+  const pacingProfile =
+    getPacingProfile(pacingMap[durationCategory] || "normal");
 
   let sourceBeats = [];
 
@@ -144,16 +171,34 @@ export async function buildBeatsFromScript({
       videoType,
     });
 
+    const layoutDefaults =
+      layoutDefaultsRegistry[visual.layout] || {};
+
+    const captionPosition =
+      layoutDefaults.captionPosition || "bottom";
+
+    const layoutBackgroundDefaults =
+      layoutDefaults.layoutBackground || {};
+
     return {
+
       id: crypto.randomUUID(),
       order: index,
 
       layout: visual.layout,
 
+      layoutPadding: visual.layoutPadding,
+
       layoutBackground: {
         type: "color",
         value: "#000000",
         objectFit: "cover",
+        enterTransition:
+          layoutBackgroundDefaults.enterTransition || "fadeIn",
+        exitTransition:
+          layoutBackgroundDefaults.exitTransition || "none",
+        motion:
+          layoutBackgroundDefaults.motion || "none",
       },
 
       zones: visual.zones,
@@ -167,11 +212,11 @@ export async function buildBeatsFromScript({
         text: generateCaptionText(spoken),
         style: "tiktokClean",
         animation: chooseCaptionAnimation(intent),
-        position: "bottom",
+        position: captionPosition,
       },
 
       transition: {
-        type: chooseTransition(index),
+        type: chooseTransition(visual.layout, index),
         duration: 0.25,
       },
 
@@ -179,6 +224,7 @@ export async function buildBeatsFromScript({
       duration_sec: duration,
       start_sec,
       end_sec,
+
     };
 
   });
@@ -201,4 +247,5 @@ export async function buildBeatsFromScript({
   beats = validateBeats(beats);
 
   return beats;
+
 }

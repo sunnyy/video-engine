@@ -94,10 +94,7 @@ app.post("/api/compress-audio", upload.single("audio"), async (req, res) => {
     }
 
     const inputPath = req.file.path;
-    const outputPath = path.join(
-      TEMP_DIR,
-      `compressed-audio-${Date.now()}.m4a`
-    );
+    const outputPath = path.join(TEMP_DIR, `compressed-audio-${Date.now()}.m4a`);
 
     await compressAudio(inputPath, outputPath);
 
@@ -120,10 +117,10 @@ let bundleLocation = null;
 let renderJobs = {};
 
 async function ensureBundle() {
-  if (bundleLocation) return bundleLocation;
-  bundleLocation = await bundle({
+  const bundleLocation = await bundle({
     entryPoint: path.resolve("src/remotion/Root.jsx"),
   });
+
   return bundleLocation;
 }
 

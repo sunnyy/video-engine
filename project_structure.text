@@ -2,6 +2,7 @@
 - .gitignore
 - App.js
 - ENGINE_SPEC_V1.md
+- Features.txt
 - Flow.txt
 - images
   - img_0.jpg
@@ -40,6 +41,8 @@
     - assetAnimationRegistry.js
     - assetAutoMatcher.js
     - assetMatcher.js
+    - assetMotions.js
+    - assetTransitions.js
     - audioCueEngine.js
     - beatIntent
       - beatIntentClassifier.js
@@ -60,6 +63,7 @@
     - debugProject.js
     - getAvailableLayouts.js
     - getLayoutSafeAreas.js
+    - layoutDefaultsRegistry.js
     - layoutRegistry.js
     - layoutResolver.js
     - pacingProfiles.js
@@ -146,6 +150,9 @@
     - temp
       - render-1773074276742.mp4
       - render-1774606450659.mp4
+      - render-1774625194400.mp4
+      - render-1774625947340.mp4
+      - render-1774626503236.mp4
   - services
     - ai
       - generateStructuredShort.js
@@ -211,6 +218,7 @@
     - Workflow
       - ScriptStep.jsx
       - TalkingHeadStep.jsx
+- Strategy.txt
 - tailwind.config.js
 - Tasks.txt
 - vite.config.js

@@ -10,8 +10,8 @@ import {
   Easing
 } from "remotion";
 
-import { assetTransitions } from "../../core/assetTransitions";
-import { assetMotions } from "../../core/assetMotions";
+import { transitionsRegistry } from "../../core/transitionsRegistry";
+import { motionsRegistry } from "../../core/motionsRegistry";
 
 export default function AssetRenderer({ zone, beat, slot }) {
 
@@ -22,7 +22,6 @@ export default function AssetRenderer({ zone, beat, slot }) {
   const objectFit = zone?.objectFit || "cover";
 
   const beatFrames = Math.floor((beat?.duration_sec || 2) * fps);
-  const localFrame = frame;
 
   const enterKey =
     zone?.enterTransition ||
@@ -39,24 +38,31 @@ export default function AssetRenderer({ zone, beat, slot }) {
     beat?.asset_settings?.[slot]?.motion ||
     "none";
 
-  const enter = assetTransitions[enterKey]
-    ? assetTransitions[enterKey]()
-    : assetTransitions.none();
+  const enterDelay = zone?.enterDelay || 0;
 
-  const exit = assetTransitions[exitKey]
-    ? assetTransitions[exitKey]()
-    : assetTransitions.none();
+  const enter =
+    transitionsRegistry.enter[enterKey]
+      ? transitionsRegistry.enter[enterKey]()
+      : transitionsRegistry.enter.none();
 
-  const motion = assetMotions[motionKey]
-    ? assetMotions[motionKey]()
-    : assetMotions.none();
+  const exit =
+    transitionsRegistry.exit[exitKey]
+      ? transitionsRegistry.exit[exitKey]()
+      : transitionsRegistry.exit.none();
+
+  const motion =
+    motionsRegistry[motionKey]
+      ? motionsRegistry[motionKey]()
+      : motionsRegistry.none();
 
   let style = {};
   let transformParts = [];
 
-  /* ---------- ENTER ---------- */
+  const localFrame = Math.max(frame - enterDelay, 0);
 
-  if (enter.type !== "none") {
+  /* ENTER */
+
+  if (enter.layer === "entry") {
 
     const progress = interpolate(
       localFrame,
@@ -81,7 +87,7 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
     switch (enter.type) {
 
-      case "fadeIn":
+      case "fade":
         style.opacity = progress;
         break;
 
@@ -124,60 +130,140 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
   }
 
-  /* ---------- MOTION ---------- */
+  /* MOTION */
 
   if (motion.type !== "none") {
 
     switch (motion.type) {
 
       case "scaleDrift":
+
         transformParts.push(
           `scale(${interpolate(
-            localFrame,
+            frame,
             [0, beatFrames],
             [motion.scaleStart || 1.05, motion.scaleEnd || 1.2]
           )})`
         );
+
         break;
 
       case "drift":
+
         transformParts.push(
           `scale(${interpolate(
-            localFrame,
+            frame,
             [0, beatFrames],
             [motion.scaleStart || 1.1, motion.scaleEnd || 1.2]
           )})`
         );
 
         transformParts.push(
-          `translateX(${interpolate(
-            localFrame,
-            [0, beatFrames],
-            [motion.xStart || 0, motion.xEnd || 0]
-          )}px)`
+          `translateX(${interpolate(frame,[0,beatFrames],[motion.xStart || 0,motion.xEnd || 0])}px)`
         );
 
         transformParts.push(
-          `translateY(${interpolate(
-            localFrame,
-            [0, beatFrames],
-            [motion.yStart || 0, motion.yEnd || 0]
-          )}px)`
+          `translateY(${interpolate(frame,[0,beatFrames],[motion.yStart || 0,motion.yEnd || 0])}px)`
         );
+
         break;
 
       case "kenburns":
+
         transformParts.push(
-          `scale(${interpolate(localFrame,[0,beatFrames],[1.05,1.2])})`
+          `scale(${interpolate(frame,[0,beatFrames],[1.05,1.2])})`
         );
 
         transformParts.push(
-          `translateX(${interpolate(localFrame,[0,beatFrames],[0,-60])}px)`
+          `translateX(${interpolate(frame,[0,beatFrames],[0,-60])}px)`
         );
 
         transformParts.push(
-          `translateY(${interpolate(localFrame,[0,beatFrames],[0,-40])}px)`
+          `translateY(${interpolate(frame,[0,beatFrames],[0,-40])}px)`
         );
+
+        break;
+
+      case "parallax":
+
+        transformParts.push(
+          `translateX(${interpolate(frame,[0,beatFrames],[motion.xStart || 0,motion.xEnd || 0])}px)`
+        );
+
+        break;
+
+      case "float":
+
+        transformParts.push(
+          `translateY(${Math.sin(frame * (motion.speed || 0.5)) * (motion.amplitude || 10)}px)`
+        );
+
+        break;
+
+      case "breathing":
+
+        transformParts.push(
+          `scale(${interpolate(Math.sin(frame * (motion.speed || 0.5)),[-1,1],[motion.scaleStart || 1,motion.scaleEnd || 1.05])})`
+        );
+
+        break;
+
+      case "orbit":
+
+        transformParts.push(
+          `translateX(${Math.sin(frame * (motion.speed || 0.4)) * (motion.radius || 40)}px)`
+        );
+
+        transformParts.push(
+          `translateY(${Math.cos(frame * (motion.speed || 0.4)) * (motion.radius || 20)}px)`
+        );
+
+        break;
+
+      case "arcPan":
+
+        transformParts.push(
+          `translateX(${interpolate(frame,[0,beatFrames],[motion.xStart || -80,motion.xEnd || 80])}px)`
+        );
+
+        transformParts.push(
+          `translateY(${interpolate(frame,[0,beatFrames],[motion.yStart || 40,motion.yEnd || -40])}px)`
+        );
+
+        break;
+
+      case "droneRise":
+
+        transformParts.push(
+          `translateY(${interpolate(frame,[0,beatFrames],[motion.yStart || 120,motion.yEnd || -40])}px)`
+        );
+
+        transformParts.push(
+          `scale(${interpolate(frame,[0,beatFrames],[motion.scaleStart || 1.05,motion.scaleEnd || 1.2])})`
+        );
+
+        break;
+
+      case "microZoom":
+
+        transformParts.push(
+          `scale(${interpolate(frame,[0,beatFrames],[motion.scaleStart || 1,motion.scaleEnd || 1.12])})`
+        );
+
+        break;
+
+      case "bounce":
+
+        const bounce = spring({
+          frame,
+          fps,
+          config: { damping: 8, stiffness: 120 }
+        });
+
+        transformParts.push(
+          `scale(${interpolate(bounce,[0,1],[motion.scaleStart || 1.3,motion.scaleEnd || 1])})`
+        );
+
         break;
 
       default:
@@ -187,14 +273,14 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
   }
 
-  /* ---------- EXIT ---------- */
+  /* EXIT */
 
-  if (exit.type !== "none") {
+  if (exit.layer === "exit") {
 
     const exitStart = beatFrames - (exit.duration || 16);
 
     const progress = interpolate(
-      localFrame,
+      frame,
       [exitStart, beatFrames],
       [0, 1],
       {
@@ -205,7 +291,7 @@ export default function AssetRenderer({ zone, beat, slot }) {
 
     switch (exit.type) {
 
-      case "fadeOut":
+      case "fade":
         style.opacity = interpolate(progress,[0,1],[1,0]);
         break;
 

@@ -16,6 +16,7 @@ export default function LayoutZoneRenderer({
   if (!zone) return null;
 
   const padding = zone.style?.padding || {};
+
   const safe = getLayoutSafeAreas(beat.layout);
   const blockSafe = safe?.blocks || {};
 
@@ -25,10 +26,10 @@ export default function LayoutZoneRenderer({
 
   const contentBox = {
     position: "absolute",
-    top: padding.top || 0,
-    right: padding.right || 0,
-    bottom: padding.bottom || 0,
-    left: padding.left || 0,
+    top: padding.top ?? 0,
+    right: padding.right ?? 0,
+    bottom: padding.bottom ?? 0,
+    left: padding.left ?? 0,
     overflow: "visible"
   };
 
@@ -42,6 +43,7 @@ export default function LayoutZoneRenderer({
   }
 
   return (
+
     <div
       style={{
         position: "relative",
@@ -67,14 +69,14 @@ export default function LayoutZoneRenderer({
         <AssetRenderer
           zone={{
             src: background.asset?.src,
-            objectFit: background.asset?.objectFit,
-            enterTransition: background.asset?.enterTransition,
-            exitTransition: background.asset?.exitTransition,
-            motion: background.asset?.motion,
+            objectFit: background.asset?.objectFit || "cover",
+            enterTransition: background.asset?.enterTransition || "fadeIn",
+            exitTransition: background.asset?.exitTransition || "none",
+            motion: background.asset?.motion || "none",
             type: background.asset?.type
           }}
           beat={beat}
-          slot={`${slot}_bg`}
+          slot={`${slot}_background`}
         />
       )}
 
@@ -100,10 +102,10 @@ export default function LayoutZoneRenderer({
           <AssetRenderer
             zone={{
               src: content.asset?.src,
-              objectFit: content.asset?.objectFit,
-              enterTransition: content.asset?.enterTransition,
-              exitTransition: content.asset?.exitTransition,
-              motion: content.asset?.motion,
+              objectFit: content.asset?.objectFit || "cover",
+              enterTransition: content.asset?.enterTransition || "fadeIn",
+              exitTransition: content.asset?.exitTransition || "none",
+              motion: content.asset?.motion || "none",
               type: content.asset?.type
             }}
             beat={beat}
@@ -115,10 +117,10 @@ export default function LayoutZoneRenderer({
           <div
             style={{
               position: "absolute",
-              top: blockSafe.top || 0,
-              left: blockSafe.left || 0,
-              right: blockSafe.right || 0,
-              bottom: blockSafe.bottom || 0
+              top: blockSafe.top ?? 0,
+              left: blockSafe.left ?? 0,
+              right: blockSafe.right ?? 0,
+              bottom: blockSafe.bottom ?? 0
             }}
           >
             <BlockRenderer
@@ -134,5 +136,7 @@ export default function LayoutZoneRenderer({
       </div>
 
     </div>
+
   );
+
 }

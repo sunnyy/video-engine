@@ -1,7 +1,7 @@
 import React from "react";
 import ZonePreview from "../ZonePreview";
-import { assetTransitions } from "../../../../core/assetTransitions";
-import { assetMotions } from "../../../../core/assetMotions";
+import { transitionsRegistry } from "../../../../core/transitionsRegistry";
+import { motionsRegistry } from "../../../../core/motionsRegistry";
 
 export default function BackgroundTab({
   slot,
@@ -13,8 +13,9 @@ export default function BackgroundTab({
 
   const bg = zone?.background || {};
 
-  const transitions = Object.keys(assetTransitions || {});
-  const motions = Object.keys(assetMotions || {});
+  const enterTransitions = Object.keys(transitionsRegistry.enter || {});
+  const exitTransitions = Object.keys(transitionsRegistry.exit || {});
+  const motions = Object.keys(motionsRegistry || {});
 
   return (
 
@@ -65,7 +66,7 @@ export default function BackgroundTab({
             onChange={(e)=>updateBackgroundProp(slot,"enterTransition",e.target.value)}
             className="w-full text-[11px] border rounded"
           >
-            {transitions.map(t=>(
+            {enterTransitions.map(t=>(
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -77,7 +78,7 @@ export default function BackgroundTab({
             onChange={(e)=>updateBackgroundProp(slot,"exitTransition",e.target.value)}
             className="w-full text-[11px] border rounded"
           >
-            {transitions.map(t=>(
+            {exitTransitions.map(t=>(
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -96,6 +97,14 @@ export default function BackgroundTab({
 
         </>
 
+      )}
+
+      {/* BACKGROUND VISIBILITY WARNING */}
+
+      {!bg.kind && (
+        <div className="mt-3 text-[10px] text-red-500">
+          No background selected. Zone may appear black.
+        </div>
       )}
 
     </div>

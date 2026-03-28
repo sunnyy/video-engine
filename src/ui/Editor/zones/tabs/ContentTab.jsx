@@ -1,7 +1,7 @@
 import React from "react";
 import { getBlockVariants } from "../../../../core/blockRegistry";
-import { assetTransitions } from "../../../../core/assetTransitions";
-import { assetMotions } from "../../../../core/assetMotions";
+import { transitionsRegistry } from "../../../../core/transitionsRegistry";
+import { motionsRegistry } from "../../../../core/motionsRegistry";
 import ZonePreview from "../ZonePreview";
 import blockEditors from "../../blocks/blockEditors";
 import BlockTimingEditor from "../../blocks/editors/BlockTimingEditor";
@@ -15,18 +15,21 @@ export default function ContentTab({
   updateContentProp,
   clearContent,
 }) {
+
   const content = zone?.content || {};
   const block = content?.block || {};
 
   const variants = block?.type ? getBlockVariants(block.type) : [];
 
-  const transitions = Object.keys(assetTransitions || {});
-  const motions = Object.keys(assetMotions || {});
+  const enterTransitions = Object.keys(transitionsRegistry.enter || {});
+  const exitTransitions = Object.keys(transitionsRegistry.exit || {});
+  const motions = Object.keys(motionsRegistry || {});
 
   const BlockEditor = block?.type ? blockEditors[block.type] : null;
 
   return (
     <div>
+
       <div className="relative mb-2">
         <div onClick={() => openPicker(slot, "content")} className="cursor-pointer">
           <ZonePreview zone={zone} mode="content" />
@@ -44,8 +47,11 @@ export default function ContentTab({
 
       {content.kind === "asset" && (
         <>
+
           <div className="flex-1 flex gap-2">
+
             <div className="flex-1 flex-col">
+
               <div className="mt-2 text-[12px]">Object Fit</div>
 
               <select
@@ -56,9 +62,11 @@ export default function ContentTab({
                 <option value="cover">cover</option>
                 <option value="contain">contain</option>
               </select>
+
             </div>
 
             <div className="flex-1 flex-col">
+
               <div className="mt-2 text-[12px]">Motion</div>
 
               <select
@@ -67,49 +75,56 @@ export default function ContentTab({
                 className="w-full text-[12px] p-1 border rounded"
               >
                 {motions.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
+                  <option key={m} value={m}>{m}</option>
                 ))}
               </select>
+
             </div>
+
           </div>
 
           <div className="flex-1 flex gap-2">
+
             <div className="flex-1 flex-col">
+
               <div className="mt-2 text-[12px]">Enter</div>
+
               <select
                 value={content.asset?.enterTransition || "fadeIn"}
                 onChange={(e) => updateContentProp(slot, "enterTransition", e.target.value)}
                 className="w-full text-[12px] p-1 border rounded"
               >
-                {transitions.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
+                {enterTransitions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
+
             </div>
+
             <div className="flex-1 flex-col">
+
               <div className="mt-2 text-[12px]">Exit</div>
+
               <select
                 value={content.asset?.exitTransition || "none"}
                 onChange={(e) => updateContentProp(slot, "exitTransition", e.target.value)}
                 className="w-full text-[12px] p-1 border rounded"
               >
-                {transitions.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
+                {exitTransitions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
+
             </div>
+
           </div>
+
         </>
       )}
 
       {content.kind === "block" && block?.type && (
         <>
+
           <div className="mt-3 text-[11px]">Variant</div>
 
           <select
@@ -118,17 +133,23 @@ export default function ContentTab({
             className="w-full text-[11px] border rounded"
           >
             {variants.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
+              <option key={v} value={v}>{v}</option>
             ))}
           </select>
 
-          {BlockEditor && <BlockEditor slot={slot} block={block} updateBlockProp={updateBlockProp} />}
+          {BlockEditor && (
+            <BlockEditor
+              slot={slot}
+              block={block}
+              updateBlockProp={updateBlockProp}
+            />
+          )}
 
           <BlockTimingEditor block={block} />
+
         </>
       )}
+
     </div>
   );
 }
