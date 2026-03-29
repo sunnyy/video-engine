@@ -3,6 +3,7 @@ import {
   AbsoluteFill,
   useCurrentFrame,
   useVideoConfig,
+  interpolate
 } from "remotion";
 
 import { captionStyleRegistry } from "../../core/captionStyleRegistry";
@@ -44,6 +45,8 @@ export default function Caption({ caption, beat, project }) {
 
   const transitionOverlap = beat.transition?.duration || 0;
 
+  const beatFrames = Math.floor(beat.duration_sec * fps);
+
   const durationFrames =
     Math.floor((beat.duration_sec * fps) * 0.85) -
     transitionOverlap;
@@ -69,6 +72,21 @@ export default function Caption({ caption, beat, project }) {
 
   const safeAreas = getLayoutSafeAreas(beat.layout);
   const captionSafe = safeAreas?.caption || {};
+
+  /* MOTION HOLD */
+
+  const holdStart = beatFrames * 0.55;
+  const holdEnd = beatFrames * 0.75;
+
+  const holdScale = interpolate(
+    localFrame,
+    [holdStart, holdEnd],
+    [1.05, 1],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp"
+    }
+  );
 
   const words = caption.text.split(" ").map((word) => {
 
@@ -116,6 +134,7 @@ export default function Caption({ caption, beat, project }) {
           textAlign: "center",
           maxWidth: "85%",
           margin: "0 auto",
+          transform: `scale(${holdScale})`,
           ...styleConfig.container,
         }}
       >

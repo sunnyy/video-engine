@@ -6,6 +6,8 @@ export async function generateStructuredShort({
   mode,
   orientation,
   durationCategory = "short",
+  assetSource = "stock",
+  uploadedAssets = []
 }) {
 
   const grammar = JSON.stringify(VISUAL_GRAMMAR, null, 2);
@@ -67,11 +69,15 @@ Topic: ${topic}
     videoType: mode,
     orientation,
     durationCategory,
+    assetSource,
+    uploadedAssets
   });
 
   return {
     script,
     beats,
+    assetSource,
+    uploadedAssets
   };
 
 }

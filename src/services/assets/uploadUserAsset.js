@@ -29,6 +29,7 @@ export async function uploadUserAsset(file, forcedType = null, onProgress = null
     xhr.setRequestHeader("Content-Type", file.type);
 
     xhr.upload.onprogress = (event) => {
+
       if (!event.lengthComputable) return;
 
       const percent = Math.round(
@@ -36,14 +37,17 @@ export async function uploadUserAsset(file, forcedType = null, onProgress = null
       );
 
       if (onProgress) onProgress(percent);
+
     };
 
     xhr.onload = () => {
+
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
       } else {
         reject(new Error("Upload failed"));
       }
+
     };
 
     xhr.onerror = reject;
@@ -52,12 +56,8 @@ export async function uploadUserAsset(file, forcedType = null, onProgress = null
 
   });
 
-  const { data: publicUrlData } =
-    supabase.storage
-      .from("user-assets")
-      .getPublicUrl(filePath);
-
-  const publicUrl = publicUrlData.publicUrl;
+  const publicUrl =
+    `${supabase.storageUrl}/object/public/user-assets/${filePath}`;
 
   const assetType =
     forcedType ||

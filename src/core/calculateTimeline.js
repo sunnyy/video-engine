@@ -1,16 +1,19 @@
 function normalizeDuration(duration) {
+
   const MIN = 1.2;
   const MAX = 4.5;
 
-  let d = duration;
+  let d = duration ?? MIN;
 
   if (d < MIN) d = MIN;
   if (d > MAX) d = MAX;
 
   return Math.round(d * 10) / 10;
+
 }
 
 function calculateBeatTiming(beats) {
+
   let currentTime = 0;
 
   return beats.map((beat, index) => {
@@ -31,14 +34,20 @@ function calculateBeatTiming(beats) {
     };
 
   });
+
 }
 
 function calculateTotalDuration(beats) {
-  if (!beats.length) return 0;
+
+  if (!beats?.length) return 0;
+
   return beats[beats.length - 1].end_sec;
+
 }
 
 export function calculateTimeline(project) {
+
+  if (!project?.beats) return project;
 
   const timedBeats = calculateBeatTiming(project.beats);
   const totalDuration = calculateTotalDuration(timedBeats);

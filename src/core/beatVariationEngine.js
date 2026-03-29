@@ -19,6 +19,8 @@ export function applyBeatVariation(beats) {
   let lastLayout = null;
   let lastGroup = null;
 
+  let currentStart = 0;
+
   return beats.map((beat, i) => {
 
     let layout = beat.layout;
@@ -46,9 +48,28 @@ export function applyBeatVariation(beats) {
     const animation =
       captionAnimations[i % captionAnimations.length];
 
+    /* ---------- duration variation ---------- */
+
+    let duration = beat.duration_sec;
+
+    const variance = (Math.random() * 0.8) - 0.4;
+
+    duration = duration + variance;
+
+    if (duration < 1.4) duration = 1.4;
+    if (duration > 3.2) duration = 3.2;
+
+    const start = currentStart;
+    const end = start + duration;
+
+    currentStart = end;
+
     return {
       ...beat,
       layout,
+      duration_sec: Number(duration.toFixed(2)),
+      start_sec: start,
+      end_sec: end,
       caption: {
         ...beat.caption,
         animation

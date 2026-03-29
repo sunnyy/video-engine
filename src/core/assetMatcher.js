@@ -10,9 +10,14 @@ const FALLBACK_ASSET = {
   src: null,
 };
 
+function normalizeOrientation(o) {
+  if (o === "9:16") return "vertical";
+  if (o === "16:9") return "horizontal";
+  return o || "any";
+}
+
 function matchByOrientation(asset, orientation) {
-  if (orientation === "9:16") orientation = "vertical";
-  if (orientation === "16:9") orientation = "horizontal";
+  orientation = normalizeOrientation(orientation);
 
   return (
     asset.orientation === "any" ||
@@ -20,12 +25,46 @@ function matchByOrientation(asset, orientation) {
   );
 }
 
-function matchByTags(asset, tags = []) {
-  if (!tags.length) return true;
+function scoreTags(asset, tags = []) {
+  if (!tags.length) return 0;
 
   const assetTags = asset.tags || [];
+  let score = 0;
 
-  return tags.some((tag) => assetTags.includes(tag));
+  tags.forEach((tag) => {
+    if (assetTags.includes(tag)) score += 3;
+  });
+
+  return score;
+}
+
+function scoreText(asset, tags = []) {
+
+  const title = (asset.title || "").toLowerCase();
+  const description = (asset.description || "").toLowerCase();
+
+  let score = 0;
+
+  tags.forEach((tag) => {
+    if (title.includes(tag)) score += 2;
+    if (description.includes(tag)) score += 1;
+  });
+
+  return score;
+
+}
+
+function scoreAsset(asset, tags) {
+
+  let score = 0;
+
+  score += scoreTags(asset, tags);
+  score += scoreText(asset, tags);
+
+  if (asset.type === "video") score += 0.5;
+
+  return score;
+
 }
 
 export async function matchAsset({
@@ -47,22 +86,37 @@ export async function matchAsset({
     return FALLBACK_ASSET;
   }
 
-  const candidates = data.filter(
-    (asset) =>
-      matchByOrientation(asset, orientation) &&
-      matchByTags(asset, tags)
+  const normalizedOrientation = normalizeOrientation(orientation);
+
+  const candidates = data.filter((asset) =>
+    matchByOrientation(asset, normalizedOrientation)
   );
 
   if (!candidates.length) return FALLBACK_ASSET;
 
-  const asset = candidates[0];
+  let best = null;
+  let bestScore = -1;
+
+  for (const asset of candidates) {
+
+    const score = scoreAsset(asset, tags);
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = asset;
+    }
+
+  }
+
+  if (!best) return FALLBACK_ASSET;
 
   return {
-    id: asset.id,
-    type: asset.type,
-    src: asset.url,
-    thumbnail: asset.thumbnail_url,
-    category: asset.category,
-    tags: asset.tags || [],
+    id: best.id,
+    type: best.type,
+    src: best.url,
+    thumbnail: best.thumbnail_url,
+    category: best.category,
+    tags: best.tags || [],
   };
+
 }

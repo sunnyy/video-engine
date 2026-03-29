@@ -56,17 +56,20 @@ export default function OverlaySection({ beat }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
 
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between">
 
-        <h4 className="mb-4 text-base bg-gray-100 px-2 py-1 font-semibold uppercase">
+        <div
+          className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#9494a8]"
+          style={{ fontFamily: "'Syne', sans-serif" }}
+        >
           Overlays
-        </h4>
+        </div>
 
         <button
           onClick={addOverlay}
-          className="text-xs px-3 py-1 rounded bg-black text-white"
+          className="text-[11px] px-3 py-[4px] rounded-[6px] bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] text-[#e8e8f0] hover:border-[#7c5cfc] transition"
         >
           + Add Overlay
         </button>
@@ -74,7 +77,7 @@ export default function OverlaySection({ beat }) {
       </div>
 
       {overlays.length === 0 && (
-        <div className="text-xs text-gray-500">
+        <div className="text-[11px] text-[#55556a]">
           No overlays added
         </div>
       )}
@@ -82,7 +85,7 @@ export default function OverlaySection({ beat }) {
       {overlays.map((o) => (
         <div
           key={o.id}
-          className="border rounded p-3 mb-3 bg-white text-xs"
+          className="border border-[rgba(255,255,255,0.06)] rounded-[8px] p-3 bg-[#16161f] text-[11px]"
         >
 
           <div className="flex justify-between items-center mb-2">
@@ -92,7 +95,7 @@ export default function OverlaySection({ beat }) {
               onChange={(e) =>
                 updateOverlay(o.id, { type: e.target.value })
               }
-              className="border rounded px-2 py-1"
+              className="bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[3px] text-[#e8e8f0]"
             >
               <option value="text">Text</option>
               <option value="badge">Badge</option>
@@ -105,7 +108,7 @@ export default function OverlaySection({ beat }) {
 
             <button
               onClick={() => removeOverlay(o.id)}
-              className="text-red-500"
+              className="text-[#f87171] text-[11px]"
             >
               Delete
             </button>
@@ -114,13 +117,13 @@ export default function OverlaySection({ beat }) {
 
           {(o.type === "text" || o.type === "badge" || o.type === "highlight" || o.type === "cta") && (
             <div className="mb-2">
-              <label className="block mb-1">Text</label>
+              <label className="block mb-1 text-[#55556a]">Text</label>
               <input
                 value={o.text || ""}
                 onChange={(e) =>
                   updateOverlay(o.id, { text: e.target.value })
                 }
-                className="w-full border rounded px-2 py-1"
+                className="w-full bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[#e8e8f0]"
               />
             </div>
           )}
@@ -128,19 +131,19 @@ export default function OverlaySection({ beat }) {
           <div className="grid grid-cols-3 gap-2 mb-2">
 
             <div>
-              <label className="block mb-1">Size</label>
+              <label className="block mb-1 text-[#55556a]">Size</label>
               <input
                 type="number"
                 value={o.size || 60}
                 onChange={(e) =>
                   updateOverlay(o.id, { size: Number(e.target.value) })
                 }
-                className="w-full border rounded px-2 py-1"
+                className="w-full bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[#e8e8f0]"
               />
             </div>
 
             <div>
-              <label className="block mb-1">Top</label>
+              <label className="block mb-1 text-[#55556a]">Top</label>
               <input
                 value={o.position?.top || ""}
                 onChange={(e) =>
@@ -148,12 +151,12 @@ export default function OverlaySection({ beat }) {
                     position: { ...o.position, top: e.target.value }
                   })
                 }
-                className="w-full border rounded px-2 py-1"
+                className="w-full bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[#e8e8f0]"
               />
             </div>
 
             <div>
-              <label className="block mb-1">Left</label>
+              <label className="block mb-1 text-[#55556a]">Left</label>
               <input
                 value={o.position?.left || ""}
                 onChange={(e) =>
@@ -161,7 +164,7 @@ export default function OverlaySection({ beat }) {
                     position: { ...o.position, left: e.target.value }
                   })
                 }
-                className="w-full border rounded px-2 py-1"
+                className="w-full bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[#e8e8f0]"
               />
             </div>
 
@@ -171,26 +174,26 @@ export default function OverlaySection({ beat }) {
             <div className="grid grid-cols-2 gap-2 mb-2">
 
               <div>
-                <label className="block mb-1">Width</label>
+                <label className="block mb-1 text-[#55556a]">Width</label>
                 <input
                   type="number"
                   value={o.width || 300}
                   onChange={(e) =>
                     updateOverlay(o.id, { width: Number(e.target.value) })
                   }
-                  className="w-full border rounded px-2 py-1"
+                  className="w-full bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[#e8e8f0]"
                 />
               </div>
 
               <div>
-                <label className="block mb-1">Height</label>
+                <label className="block mb-1 text-[#55556a]">Height</label>
                 <input
                   type="number"
                   value={o.height || 120}
                   onChange={(e) =>
                     updateOverlay(o.id, { height: Number(e.target.value) })
                   }
-                  className="w-full border rounded px-2 py-1"
+                  className="w-full bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[#e8e8f0]"
                 />
               </div>
 
@@ -200,25 +203,25 @@ export default function OverlaySection({ beat }) {
           <div className="grid grid-cols-2 gap-2">
 
             <div>
-              <label className="block mb-1">Color</label>
+              <label className="block mb-1 text-[#55556a]">Color</label>
               <input
                 type="color"
                 value={o.color || "#ffffff"}
                 onChange={(e) =>
                   updateOverlay(o.id, { color: e.target.value })
                 }
-                className="w-full border rounded px-2 py-1"
+                className="w-full h-[28px] bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px]"
               />
             </div>
 
             <div>
-              <label className="block mb-1">Motion</label>
+              <label className="block mb-1 text-[#55556a]">Motion</label>
               <select
                 value={o.motion || "pop"}
                 onChange={(e) =>
                   updateOverlay(o.id, { motion: e.target.value })
                 }
-                className="w-full border rounded px-2 py-1"
+                className="w-full bg-[#1c1c28] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[#e8e8f0]"
               >
                 <option value="pop">Pop</option>
                 <option value="fade">Fade</option>

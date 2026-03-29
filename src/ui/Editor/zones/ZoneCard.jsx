@@ -16,46 +16,49 @@ export default function ZoneCard({
   clearBackground
 }) {
 
-  const [tab,setTab] = useState("content");
+  const [tab, setTab] = useState("content");
 
   return (
 
     <div className="w-[240px]">
 
-      <div className="text-[10px] mb-2 uppercase text-gray-500">
+      <div
+        className="text-[10px] mb-2 uppercase tracking-[0.08em] text-[#55556a]"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
         {slot}
       </div>
 
       <div className="flex gap-2 mb-3">
 
         <button
-          onClick={()=>setTab("content")}
-          className={`px-2 py-1 text-[12px] rounded ${
-            tab==="content"
-              ? "bg-black text-white"
-              : "bg-white"
+          onClick={() => setTab("content")}
+          className={`px-3 py-[5px] text-[11px] rounded-[6px] border transition ${
+            tab === "content"
+              ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+              : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
           }`}
         >
           Content
         </button>
 
         <button
-          onClick={()=>setTab("background")}
-          className={`px-2 py-1 text-[12px] rounded ${
-            tab==="background"
-              ? "bg-black text-white"
-              : "bg-white"
+          onClick={() => setTab("background")}
+          className={`px-3 py-[5px] text-[11px] rounded-[6px] border transition ${
+            tab === "background"
+              ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+              : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
           }`}
         >
           Background
         </button>
 
         <button
-          onClick={()=>setTab("style")}
-          className={`px-2 py-1 text-[12px] rounded ${
-            tab==="style"
-              ? "bg-black text-white"
-              : "bg-white"
+          onClick={() => setTab("style")}
+          className={`px-3 py-[5px] text-[11px] rounded-[6px] border transition ${
+            tab === "style"
+              ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+              : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
           }`}
         >
           Styling
@@ -63,7 +66,7 @@ export default function ZoneCard({
 
       </div>
 
-      {tab==="content" && (
+      {tab === "content" && (
 
         <ContentTab
           slot={slot}
@@ -77,7 +80,7 @@ export default function ZoneCard({
 
       )}
 
-      {tab==="background" && (
+      {tab === "background" && (
 
         <BackgroundTab
           slot={slot}
@@ -89,7 +92,7 @@ export default function ZoneCard({
 
       )}
 
-      {tab==="style" && (
+      {tab === "style" && (
 
         <StylingTab
           slot={slot}

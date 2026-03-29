@@ -191,18 +191,18 @@ export default function LayoutSelector({ beat }) {
 
   return (
 
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
 
-      <h4 className="mb-4 text-base bg-gray-100 px-2 py-1 font-semibold uppercase">
-        Layout
-      </h4>
+      {/* Tabs */}
 
       <div className="flex gap-2">
 
         <button
           onClick={() => setTab("structure")}
-          className={`px-3 py-1 rounded text-[12px] ${
-            tab === "structure" ? "bg-black text-white" : "bg-white"
+          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+            tab === "structure"
+              ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+              : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
           }`}
         >
           Structure
@@ -210,8 +210,10 @@ export default function LayoutSelector({ beat }) {
 
         <button
           onClick={() => setTab("background")}
-          className={`px-3 py-1 rounded text-[12px] ${
-            tab === "background" ? "bg-black text-white" : "bg-white"
+          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+            tab === "background"
+              ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+              : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
           }`}
         >
           Background
@@ -219,8 +221,10 @@ export default function LayoutSelector({ beat }) {
 
         <button
           onClick={() => setTab("styling")}
-          className={`px-3 py-1 rounded text-[12px] ${
-            tab === "styling" ? "bg-black text-white" : "bg-white"
+          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+            tab === "styling"
+              ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+              : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
           }`}
         >
           Styling
@@ -228,8 +232,10 @@ export default function LayoutSelector({ beat }) {
 
         <button
           onClick={() => setTab("transition")}
-          className={`px-3 py-1 rounded text-[12px] ${
-            tab === "transition" ? "bg-black text-white" : "bg-white"
+          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+            tab === "transition"
+              ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+              : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
           }`}
         >
           Transition
@@ -239,17 +245,17 @@ export default function LayoutSelector({ beat }) {
 
       {tab === "structure" && (
 
-        <div className="flex gap-3">
+        <div className="grid grid-cols-8 gap-3">
 
           {layouts.map((layout) => (
 
             <div
               key={layout}
               onClick={() => handleSelect(layout)}
-              className={`cursor-pointer p-[3px] rounded border ${
+              className={`cursor-pointer rounded-[8px] border p-[4px] transition ${
                 beat.layout === layout
-                  ? "border-black ring-2 ring-black"
-                  : "border-gray-200"
+                  ? "border-[#f5c518] ring-1 ring-[#f5c518]"
+                  : "border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)]"
               }`}
             >
 
@@ -268,14 +274,14 @@ export default function LayoutSelector({ beat }) {
         <div>
 
           <div
-            className="relative w-[140px] h-[90px] border rounded cursor-pointer overflow-hidden"
+            className="relative w-[140px] h-[90px] border border-[rgba(255,255,255,0.06)] rounded-[6px] cursor-pointer overflow-hidden bg-[#16161f]"
             onClick={() => setPickerOpen(true)}
           >
 
             {renderPreview()}
 
             {!bg && (
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">
+              <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#55556a]">
                 Select
               </div>
             )}
@@ -286,14 +292,14 @@ export default function LayoutSelector({ beat }) {
 
             <button
               onClick={() => setPickerOpen(true)}
-              className="text-xs border px-2 py-1 rounded"
+              className="text-[11px] px-2 py-[3px] border border-[rgba(255,255,255,0.06)] rounded-[6px] bg-[#16161f] text-[#9494a8]"
             >
               Change
             </button>
 
             <button
               onClick={removeLayoutBackground}
-              className="text-xs border px-2 py-1 rounded"
+              className="text-[11px] px-2 py-[3px] border border-[rgba(255,255,255,0.06)] rounded-[6px] bg-[#16161f] text-[#9494a8]"
             >
               Reset
             </button>
@@ -306,8 +312,10 @@ export default function LayoutSelector({ beat }) {
 
               <button
                 onClick={() => setObjectFit("cover")}
-                className={`text-xs px-2 py-1 border rounded ${
-                  bg.objectFit === "cover" ? "bg-black text-white" : ""
+                className={`text-[11px] px-2 py-[3px] border rounded-[6px] ${
+                  bg.objectFit === "cover"
+                    ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+                    : "border-[rgba(255,255,255,0.06)] text-[#9494a8]"
                 }`}
               >
                 Cover
@@ -315,8 +323,10 @@ export default function LayoutSelector({ beat }) {
 
               <button
                 onClick={() => setObjectFit("contain")}
-                className={`text-xs px-2 py-1 border rounded ${
-                  bg.objectFit === "contain" ? "bg-black text-white" : ""
+                className={`text-[11px] px-2 py-[3px] border rounded-[6px] ${
+                  bg.objectFit === "contain"
+                    ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+                    : "border-[rgba(255,255,255,0.06)] text-[#9494a8]"
                 }`}
               >
                 Contain
@@ -334,15 +344,22 @@ export default function LayoutSelector({ beat }) {
 
         <div>
 
-          <div className="text-xs mb-1">Padding</div>
+          <div className="text-[11px] text-[#55556a] mb-1">
+            Padding
+          </div>
 
           <input
-            type="number"
-            value={padding}
+            type="range"
             min={0}
+            max={60}
+            value={padding}
             onChange={(e) => setLayoutPadding(e.target.value)}
-            className="w-[120px] border px-2 py-1 rounded text-sm"
+            className="w-[200px]"
           />
+
+          <div className="text-[11px] text-[#9494a8] mt-1">
+            {padding}px
+          </div>
 
         </div>
 
@@ -355,7 +372,7 @@ export default function LayoutSelector({ beat }) {
           <select
             value={beat.transition?.type || "none"}
             onChange={(e) => setTransition(e.target.value)}
-            className="w-full border px-2 py-1 rounded text-sm"
+            className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.06)] rounded-[6px] px-2 py-[4px] text-[12px] text-[#e8e8f0]"
           >
 
             {transitionOptions.map((opt) => (

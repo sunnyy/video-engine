@@ -3,6 +3,7 @@ import { useProjectStore } from "../../store/useProjectStore";
 import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
 
 export default function MusicSection() {
+
   const project = useProjectStore((s) => s.project);
   const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
@@ -24,6 +25,7 @@ export default function MusicSection() {
   const audio = project.audio || { tts: null, music: null };
 
   const uploadAudio = async (file, type) => {
+
     if (!file) return;
 
     setUploading((p) => ({ ...p, [type]: true }));
@@ -70,9 +72,11 @@ export default function MusicSection() {
     });
 
     setUploading((p) => ({ ...p, [type]: false }));
+
   };
 
   const removeAudio = (type) => {
+
     const updatedAudio = {
       ...audio,
       [type]: null,
@@ -82,42 +86,60 @@ export default function MusicSection() {
 
     if (type === "music" && musicRef.current) musicRef.current.value = "";
     if (type === "tts" && ttsRef.current) ttsRef.current.value = "";
+
   };
 
   const renderProgress = (type) => {
+
     if (!uploading[type]) return null;
 
     return (
-      <div className="w-full bg-gray-200 h-2 rounded mb-3">
+      <div className="w-full h-[4px] bg-[#1c1c28] rounded overflow-hidden mb-3">
         <div
-          className="h-2 bg-indigo-600 rounded transition-all"
+          className="h-full bg-[#7c5cfc] transition-all"
           style={{ width: `${progress[type]}%` }}
         />
       </div>
     );
+
   };
 
   return (
-    <div className="w-[50%] overflow-y-auto border-r border-gray-200 bg-white px-6 py-4 rounded-xl">
-      <h3 className="mb-6 text-lg font-semibold">Video Audio</h3>
+
+    <div className="w-[50%] overflow-y-auto border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] px-6 py-5">
+
+      <h3
+        className="mb-6 text-[15px] font-bold text-[#e8e8f0]"
+        style={{ fontFamily: "'Syne', sans-serif" }}
+      >
+        Video Audio
+      </h3>
 
       {/* TTS */}
-      <div className="mb-8">
-        <h4 className="text-sm font-semibold mb-2">Voice / TTS</h4>
+
+      <div className="mb-10">
+
+        <h4 className="text-[12px] uppercase tracking-[0.08em] text-[#9494a8] mb-2">
+          Voice / TTS
+        </h4>
 
         <input
           ref={ttsRef}
           type="file"
           accept="audio/*"
           onChange={(e) => uploadAudio(e.target.files?.[0], "tts")}
-          className="mb-2"
+          className="text-[12px] text-[#9494a8] mb-2"
         />
 
         {renderProgress("tts")}
 
         {audio?.tts?.src && (
+
           <>
-            <div className="text-xs text-gray-500 mb-1">Volume</div>
+
+            <div className="text-[11px] text-[#55556a] mb-1">
+              Volume
+            </div>
 
             <input
               type="range"
@@ -141,31 +163,42 @@ export default function MusicSection() {
 
             <button
               onClick={() => removeAudio("tts")}
-              className="text-sm text-red-600"
+              className="text-[12px] text-[#f87171]"
             >
               Remove Voice
             </button>
+
           </>
+
         )}
+
       </div>
 
       {/* MUSIC */}
+
       <div>
-        <h4 className="text-sm font-semibold mb-2">Background Music</h4>
+
+        <h4 className="text-[12px] uppercase tracking-[0.08em] text-[#9494a8] mb-2">
+          Background Music
+        </h4>
 
         <input
           ref={musicRef}
           type="file"
           accept="audio/*"
           onChange={(e) => uploadAudio(e.target.files?.[0], "music")}
-          className="mb-2"
+          className="text-[12px] text-[#9494a8] mb-2"
         />
 
         {renderProgress("music")}
 
         {audio?.music?.src && (
+
           <>
-            <div className="text-xs text-gray-500 mb-1">Volume</div>
+
+            <div className="text-[11px] text-[#55556a] mb-1">
+              Volume
+            </div>
 
             <input
               type="range"
@@ -189,13 +222,19 @@ export default function MusicSection() {
 
             <button
               onClick={() => removeAudio("music")}
-              className="text-sm text-red-600"
+              className="text-[12px] text-[#f87171]"
             >
               Remove Music
             </button>
+
           </>
+
         )}
+
       </div>
+
     </div>
+
   );
+
 }

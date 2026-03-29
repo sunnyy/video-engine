@@ -12,7 +12,9 @@ import Sidebar from "../ui/Editor/Sidebar";
 import EditorPanel from "../ui/Editor/EditorPanel";
 
 export default function Editor() {
+
   const { id } = useParams();
+
   const setProject = useProjectStore((s) => s.setProject);
   const setDatabaseId = useProjectStore((s) => s.setDatabaseId);
   const project = useProjectStore((s) => s.project);
@@ -21,15 +23,20 @@ export default function Editor() {
   const [activeTab, setActiveTab] = useState("beats");
 
   useEffect(() => {
+
     async function load() {
+
       const data = await getProjectById(id);
 
       setDatabaseId(data.id);
       setProject(data.safe_project_json);
 
       setLoading(false);
+
     }
+
     load();
+
   }, [id]);
 
   if (loading || !project) return null;
@@ -43,14 +50,28 @@ export default function Editor() {
   }
 
   return (
-    <div className="flex flex-col bg-[#ECF1F8]">
+
+    <div className="flex flex-col min-h-screen bg-red-300 text-[#e8e8f0]">
+
       <Header />
 
-      <div className="flex flex-1 gap-4 mt-4 mx-4">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        <EditorPanel activeTab={activeTab} />
+      <div className="flex flex-1">
+
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />
+
+        <EditorPanel
+          activeTab={activeTab}
+        />
+
         <Preview />
+
       </div>
+
     </div>
+
   );
+
 }

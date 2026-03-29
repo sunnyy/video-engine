@@ -354,9 +354,12 @@ export default function ZonesSection({ beat, project }) {
 
     <div>
 
-      <h4 className="mb-4 text-base bg-gray-100 px-2 py-1 font-semibold uppercase">
+      <div
+        className="mb-4 text-[11px] font-bold tracking-[0.1em] uppercase text-[#9494a8]"
+        style={{ fontFamily: "'Syne', sans-serif" }}
+      >
         Zones
-      </h4>
+      </div>
 
       <div className="flex gap-6 flex-wrap">
 

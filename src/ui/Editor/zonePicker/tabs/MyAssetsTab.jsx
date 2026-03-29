@@ -68,7 +68,7 @@ export default function MyAssetsTab({
 
           <div
             key={asset.id}
-            className="relative cursor-pointer overflow-hidden rounded-xl border hover:border-indigo-500 min-h-[200px]"
+            className="relative bg-gray-100 cursor-pointer overflow-hidden rounded-xl border hover:border-indigo-500 min-h-[200px]"
           >
 
             <div

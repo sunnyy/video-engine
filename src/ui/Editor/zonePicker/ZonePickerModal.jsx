@@ -92,7 +92,7 @@ export default function ZonePickerModal({
     return (
       <img
         src={src}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-contain"
       />
     );
 

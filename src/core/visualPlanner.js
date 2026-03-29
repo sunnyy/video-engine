@@ -1,82 +1,58 @@
+import { layoutRegistry } from "./layoutRegistry";
 import { layoutDefaultsRegistry } from "./layoutDefaultsRegistry";
 
-let lastLayouts = [];
+function pickLayout({ visual_type, videoType }) {
 
-function pickLayout(intent) {
-
-  const intentLayouts = {
-
-    hook: ["FullZone"],
-    stat: ["FullZone","ThreeZone"],
+  const map = {
+    stat: ["ThreeZone","SplitZone","FullZone"],
     list: ["TwoTopOneBottom","OneTopTwoBottom"],
     comparison: ["SplitZone"],
-    quote: ["FullZone","ThreeZone"]
-
+    quote: ["ThreeZone","FullZone"],
+    statement: ["FullZone","ThreeZone"],
+    question: ["FullZone"]
   };
 
-  const candidates = intentLayouts[intent] || ["FullZone"];
+  let candidates = map[visual_type] || ["FullZone"];
 
-  for (let i = 0; i < candidates.length; i++) {
+  candidates = candidates.filter((l) => {
 
-    if (!lastLayouts.includes(candidates[i])) {
-      return candidates[i];
-    }
+    const def = layoutRegistry[l];
+    if (!def) return false;
 
-  }
+    if (videoType === "faceless" && def.supportsAvatar === true)
+      return false;
+
+    return true;
+
+  });
+
+  if (!candidates.length) candidates = ["FullZone"];
 
   return candidates[Math.floor(Math.random() * candidates.length)];
 
 }
 
-function registerLayout(layout) {
+function buildZones(layout) {
 
-  lastLayouts.push(layout);
+  const def = layoutRegistry[layout];
+  const zones = {};
 
-  if (lastLayouts.length > 3) {
-    lastLayouts.shift();
-  }
+  def.zones.forEach((z) => {
 
-}
-
-function balanceMotion(layout, zones) {
-
-  const motionPairs = {
-
-    SplitZone: { z1: "driftLeft", z2: "driftRight" },
-
-    TwoTopOneBottom: {
-      z1: "driftLeft",
-      z2: "driftRight",
-      z3: "slowZoom"
-    },
-
-    ThreeZone: {
-      z1: "driftLeft",
-      z2: "slowZoom",
-      z3: "driftRight"
-    },
-
-    FourGrid: {
-      z1: "driftLeft",
-      z2: "driftRight",
-      z3: "driftLeft",
-      z4: "driftRight"
-    }
-
-  };
-
-  const pattern = motionPairs[layout];
-  if (!pattern) return zones;
-
-  Object.keys(pattern).forEach((z) => {
-
-    if (!zones[z]) return;
-
-    if (zones[z].content && zones[z].content.kind === "asset") {
-
-      zones[z].content.asset.motion = pattern[z];
-
-    }
+    zones[z] = {
+      role: "asset",
+      content: {
+        kind: "asset",
+        asset: {
+          src: null,
+          type: "image",
+          objectFit: "cover",
+          motion: "kenburns"
+        }
+      },
+      background: {},
+      style: { padding: {} }
+    };
 
   });
 
@@ -84,139 +60,55 @@ function balanceMotion(layout, zones) {
 
 }
 
-function applyEntryStagger(layout, zones) {
+function chooseBlockZone(layout) {
 
-  const staggerPatterns = {
+  if (layout === "SplitZone") return "z2";
+  if (layout === "ThreeZone") return "z2";
+  if (layout === "TwoTopOneBottom") return "z3";
+  if (layout === "OneTopTwoBottom") return "z1";
+  if (layout === "PictureInPicture") return "z2";
 
-    SplitZone: { z1: 0, z2: 6 },
-
-    TwoTopOneBottom: { z1: 0, z2: 4, z3: 8 },
-
-    ThreeZone: { z1: 0, z2: 4, z3: 8 },
-
-    FourGrid: { z1: 0, z2: 4, z3: 8, z4: 12 }
-
-  };
-
-  const pattern = staggerPatterns[layout];
-  if (!pattern) return zones;
-
-  Object.keys(pattern).forEach((z) => {
-
-    if (!zones[z]) return;
-
-    if (zones[z].content && zones[z].content.kind === "asset") {
-
-      zones[z].content.asset.enterDelay = pattern[z];
-
-    }
-
-  });
-
-  return zones;
+  return "z1";
 
 }
 
-export function planBeatVisual({ intent, videoType }) {
+export function planBeatVisual({
+  videoType,
+  spoken = "",
+  visual_type = "statement",
+  block_candidate = null
+}) {
 
-  const layout = pickLayout(intent);
-  registerLayout(layout);
+  const layout = pickLayout({
+    visual_type,
+    videoType
+  });
 
-  let block = null;
-
-  switch (intent) {
-
-    case "hook":
-      block = "HookBlock";
-      break;
-
-    case "stat":
-      block = "StatBlock";
-      break;
-
-    case "list":
-      block = "ListRevealBlock";
-      break;
-
-    case "comparison":
-      block = "ComparisonBlock";
-      break;
-
-    case "quote":
-      block = "QuoteBlock";
-      break;
-
-    default:
-      block = null;
-
-  }
-
-  const layoutPaddingDefaults = {
-
-    FullZone: 50,
-    SplitZone: 50,
-    ThreeZone: 50,
-    TwoTopOneBottom: 80,
-    OneTopTwoBottom: 80,
-    FourGrid: 80,
-    PictureInPicture: 100,
-    CenterAvatar: 100,
-    FloatingAvatar: 100,
-    SideAvatar: 100
-
-  };
-
-  let zones = {};
-
-  if (layout === "SplitZone") {
-
-    zones = {
-      z1: { role: videoType === "talking_head" ? "avatar" : "asset", padding:{} },
-      z2: { role: "block", padding:{} }
-    };
-
-  }
-
-  else if (layout === "TwoTopOneBottom") {
-
-    zones = {
-      z1: { role: videoType === "talking_head" ? "avatar" : "asset", padding:{} },
-      z2: { role: videoType === "talking_head" ? "avatar" : "asset", padding:{} },
-      z3: { role: "block", padding:{} }
-    };
-
-  }
-
-  else if (layout === "ThreeZone") {
-
-    zones = {
-      z1: { role: "asset", padding:{} },
-      z2: { role: "block", padding:{} },
-      z3: { role: "asset", padding:{} }
-    };
-
-  }
-
-  else {
-
-    zones = {
-      z1: {
-        role: block
-          ? "block"
-          : (videoType === "talking_head" ? "avatar" : "asset"),
-        padding:{}
-      }
-    };
-
-  }
-
+  const zones = buildZones(layout);
   const blocks = [];
 
-  if (block) {
+  /* ONLY use AI-suggested blocks */
+
+  if (block_candidate) {
+
+    const zone = chooseBlockZone(layout);
+
+    zones[zone] = {
+      role: "block",
+      content: {
+        kind: "block",
+        block: {
+          type: block_candidate
+        }
+      },
+      background: {},
+      style: { padding: {} }
+    };
 
     blocks.push({
-      type: block,
-      zone: Object.keys(zones).find(z => zones[z].role === "block") || "z1",
+      id: crypto.randomUUID(),
+      type: block_candidate,
+      zone,
       props: {}
     });
 
@@ -226,40 +118,18 @@ export function planBeatVisual({ intent, videoType }) {
 
   if (defaults?.zones) {
 
-    Object.keys(zones).forEach((zoneKey) => {
+    Object.keys(zones).forEach((z) => {
 
-      const zoneDefaults = defaults.zones[zoneKey];
-      if (!zoneDefaults) return;
+      const d = defaults.zones[z];
+      if (!d) return;
 
-      if (zones[zoneKey].role === "asset") {
+      if (zones[z].role === "asset") {
 
-        zones[zoneKey].content = {
-          kind: "asset",
-          asset: {
-            src: null,
-            type: "image",
-            objectFit: "cover",
-            enterTransition: zoneDefaults.assetEnter || "fadeIn",
-            exitTransition: zoneDefaults.assetExit || "none",
-            motion: zoneDefaults.assetMotion || "slowZoom",
-            enterDelay: 0
-          }
-        };
-
-      }
-
-      if (zoneDefaults.backgroundEnter || zoneDefaults.backgroundMotion) {
-
-        zones[zoneKey].background = {
-          kind: "asset",
-          asset: {
-            src: null,
-            type: "image",
-            objectFit: "cover",
-            enterTransition: zoneDefaults.backgroundEnter || "fadeIn",
-            exitTransition: zoneDefaults.backgroundExit || "none",
-            motion: zoneDefaults.backgroundMotion || "none"
-          }
+        zones[z].content.asset = {
+          ...zones[z].content.asset,
+          enterTransition: d.assetEnter || "fadeIn",
+          exitTransition: d.assetExit || "none",
+          motion: d.assetMotion || "kenburns"
         };
 
       }
@@ -268,17 +138,11 @@ export function planBeatVisual({ intent, videoType }) {
 
   }
 
-  zones = balanceMotion(layout, zones);
-
-  zones = applyEntryStagger(layout, zones);
-
   return {
-
     layout,
-    layoutPadding: layoutPaddingDefaults[layout] || 50,
+    layoutPadding: 0,
     zones,
     blocks
-
   };
 
 }

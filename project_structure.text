@@ -38,17 +38,22 @@
     - library.json
     - stockAssets.js
   - core
-    - assetAnimationRegistry.js
+    - ai
+      - aiOutputValidator.js
+      - beatRoleAnalyzer.js
+      - blockPropExtractor.js
+      - visualTypeAnalyzer.js
     - assetAutoMatcher.js
     - assetMatcher.js
-    - assetMotions.js
-    - assetTransitions.js
+    - assetStrategyEngine.js
     - audioCueEngine.js
+    - backgroundPatternRegistry.js
     - beatIntent
       - beatIntentClassifier.js
       - beatIntentTypes.js
-    - beatTransitionRegistry.js
     - beatVariationEngine.js
+    - blockContentExtractors.js
+    - blockEligibilityEngine.js
     - blockRegistry.js
     - buildBeatsFromScript.js
     - calculateTimeline.js
@@ -63,10 +68,13 @@
     - debugProject.js
     - getAvailableLayouts.js
     - getLayoutSafeAreas.js
+    - layoutCapabilityRegistry.js
     - layoutDefaultsRegistry.js
     - layoutRegistry.js
     - layoutResolver.js
+    - motionsRegistry.js
     - pacingProfiles.js
+    - scriptVisualReasoner.js
     - testProject.js
     - transitionsRegistry.js
     - validateProject.js

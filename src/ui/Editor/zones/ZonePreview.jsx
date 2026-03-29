@@ -93,7 +93,7 @@ export default function ZonePreview({ zone, mode = "content" }) {
     if (content.kind === "block") {
 
       return (
-        <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold bg-gray-100">
+        <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold bg-[#1c1c28] text-[#e8e8f0]">
           {content.block?.type || "Block"}
         </div>
       );
@@ -106,7 +106,7 @@ export default function ZonePreview({ zone, mode = "content" }) {
 
   return (
 
-    <div className="relative w-full h-[140px] border rounded overflow-hidden bg-gray-200">
+    <div className="relative w-full h-[140px] border border-gray-100 rounded-[8px] overflow-hidden bg-gray-500">
 
       {mode === "background" && renderBackground()}
 

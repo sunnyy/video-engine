@@ -42,6 +42,10 @@ export default function LayoutZoneRenderer({
     variant = block?.variant || "default";
   }
 
+  const assetMissing =
+    content.kind === "asset" &&
+    (!content.asset || !content.asset.src);
+
   return (
 
     <div
@@ -98,7 +102,7 @@ export default function LayoutZoneRenderer({
           />
         )}
 
-        {content.kind === "asset" && (
+        {content.kind === "asset" && content.asset?.src && (
           <AssetRenderer
             zone={{
               src: content.asset?.src,
@@ -111,6 +115,28 @@ export default function LayoutZoneRenderer({
             beat={beat}
             slot={slot}
           />
+        )}
+
+        {/* MISSING ASSET PLACEHOLDER */}
+
+        {assetMissing && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              border: "2px dashed rgba(255,255,255,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              color: "white",
+              background: "rgba(0,0,0,0.35)",
+              textAlign: "center",
+              padding: 10
+            }}
+          >
+            ⚠ Asset Required
+          </div>
         )}
 
         {BlockRenderer && (

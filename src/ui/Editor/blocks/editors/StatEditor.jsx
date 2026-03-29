@@ -19,7 +19,7 @@ export default function StatEditor({
         <input
           value={block.props?.value || ""}
           onChange={(e)=>updateBlockProp(slot,"value",e.target.value)}
-          className="w-full border rounded text-[11px]"
+          className="w-full border rounded text-[13px] p-1 bg-gray-600 text-gray-300"
         />
 
       </div>
@@ -33,7 +33,7 @@ export default function StatEditor({
         <input
           value={block.props?.label || ""}
           onChange={(e)=>updateBlockProp(slot,"label",e.target.value)}
-          className="w-full border rounded text-[11px]"
+          className="w-full border rounded text-[13px] p-1 bg-gray-600 text-gray-300"
         />
 
       </div>

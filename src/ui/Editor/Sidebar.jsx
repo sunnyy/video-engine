@@ -9,55 +9,42 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
   const isTalkingHead = project.meta.mode === "talking_head";
 
-  return (
-    <div className="w-[100px] border-r border-gray-200 bg-white p-4 flex flex-col gap-3 rounded-xl">
+  const Item = ({ id, label }) => {
 
+    const active = activeTab === id;
+
+    return (
       <button
-        onClick={() => setActiveTab("beats")}
-        className={`text-center text-base px-3 py-2 rounded ${
-          activeTab === "beats"
-            ? "bg-indigo-100 text-indigo-600"
-            : "hover:bg-gray-100"
+        onClick={() => setActiveTab(id)}
+        className={`w-full text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-[6px] rounded-[6px] border transition ${
+          active
+            ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
+            : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8] hover:border-[rgba(255,255,255,0.2)]"
         }`}
+        style={{ fontFamily: "'Syne', sans-serif" }}
       >
-        Beats
+        {label}
       </button>
+    );
+
+  };
+
+  return (
+
+    <div className="w-[110px] border-r border-[rgba(255,255,255,0.06)] bg-[#111118] p-4 flex flex-col gap-3">
+
+      <Item id="beats" label="Beats" />
 
       {isTalkingHead && (
-        <button
-          onClick={() => setActiveTab("avatar")}
-          className={`text-center text-base px-3 py-2 rounded ${
-            activeTab === "avatar"
-              ? "bg-indigo-100 text-indigo-600"
-              : "hover:bg-gray-100"
-          }`}
-        >
-          Video
-        </button>
+        <Item id="avatar" label="Video" />
       )}
 
-      <button
-        onClick={() => setActiveTab("audio")}
-        className={`text-center text-base px-3 py-2 rounded ${
-          activeTab === "audio"
-            ? "bg-indigo-100 text-indigo-600"
-            : "hover:bg-gray-100"
-        }`}
-      >
-        Audio
-      </button>
+      <Item id="audio" label="Audio" />
 
-      <button
-        onClick={() => setActiveTab("videoOverlays")}
-        className={`text-center text-base px-3 py-2 rounded ${
-          activeTab === "videoOverlays"
-            ? "bg-indigo-100 text-indigo-600"
-            : "hover:bg-gray-100"
-        }`}
-      >
-        Overlays
-      </button>
+      <Item id="videoOverlays" label="Overlays" />
 
     </div>
+
   );
+
 }

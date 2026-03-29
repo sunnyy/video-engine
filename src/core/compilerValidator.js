@@ -1,3 +1,5 @@
+import { layoutRegistry } from "./layoutRegistry";
+
 export function validateBeats(beats) {
 
   if (!Array.isArray(beats)) return [];
@@ -16,13 +18,61 @@ export function validateBeats(beats) {
 
     currentTime = end_sec;
 
+    const layout = beat.layout || "FullZone";
+
+    const layoutDef = layoutRegistry[layout];
+
+    const zones = {};
+
+    if (layoutDef) {
+
+      layoutDef.zones.forEach((z) => {
+
+        zones[z] =
+          beat.zones && beat.zones[z]
+            ? beat.zones[z]
+            : {
+                role: "asset",
+                padding: {},
+                content: {
+                  kind: "asset",
+                  asset: {
+                    src: null,
+                    type: "image",
+                    objectFit: "cover",
+                    motion: "kenburns"
+                  }
+                }
+              };
+
+      });
+
+    } else {
+
+      zones.z1 =
+        beat.zones?.z1 || {
+          role: "asset",
+          padding: {},
+          content: {
+            kind: "asset",
+            asset: {
+              src: null,
+              type: "image",
+              objectFit: "cover",
+              motion: "kenburns"
+            }
+          }
+        };
+
+    }
+
     const cleanBeat = {
 
       id: beat.id || `beat_${index}`,
 
       order: index,
 
-      layout: beat.layout || "FullZone",
+      layout,
 
       layoutBackground: beat.layoutBackground || {
         type: "color",
@@ -30,15 +80,9 @@ export function validateBeats(beats) {
         objectFit: "cover"
       },
 
-      zones: beat.zones || {
-        z1: {
-          role: "asset",
-          src: null,
-          objectFit: "cover",
-          padding: {},
-          background: null
-        }
-      },
+      zones,
+
+      blocks: beat.blocks || [],
 
       heading: beat.heading || null,
 

@@ -8,21 +8,20 @@ import {
 
 import { transitionsRegistry } from "../../core/transitionsRegistry";
 import { motionsRegistry } from "../../core/motionsRegistry";
+import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
 
 export default function LayoutBackgroundRenderer({ background, beat }) {
 
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  if (!background) return null;
+  const type = background?.type || "pattern";
+  const value = background?.value;
+  const fit = background?.objectFit || "cover";
 
-  const type = background.type || "color";
-  const value = background.value;
-  const fit = background.objectFit || "cover";
-
-  const enterKey = background.enterTransition || "fadeIn";
-  const exitKey = background.exitTransition || "none";
-  const motionKey = background.motion || "none";
+  const enterKey = background?.enterTransition || "fadeIn";
+  const exitKey = background?.exitTransition || "none";
+  const motionKey = background?.motion || "none";
 
   const enter =
     transitionsRegistry.enter[enterKey]
@@ -94,15 +93,12 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
     switch (motion.type) {
 
       case "scaleDrift":
-
         transformParts.push(
           `scale(${interpolate(frame,[0,beatFrames],[motion.scaleStart || 1.05,motion.scaleEnd || 1.2])})`
         );
-
         break;
 
       case "drift":
-
         transformParts.push(
           `scale(${interpolate(frame,[0,beatFrames],[motion.scaleStart || 1.1,motion.scaleEnd || 1.2])})`
         );
@@ -114,11 +110,9 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
         transformParts.push(
           `translateY(${interpolate(frame,[0,beatFrames],[motion.yStart || 0,motion.yEnd || 0])}px)`
         );
-
         break;
 
       case "kenburns":
-
         transformParts.push(
           `scale(${interpolate(frame,[0,beatFrames],[1.05,1.2])})`
         );
@@ -130,35 +124,27 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
         transformParts.push(
           `translateY(${interpolate(frame,[0,beatFrames],[0,-40])}px)`
         );
-
         break;
 
       case "parallax":
-
         transformParts.push(
           `translateX(${interpolate(frame,[0,beatFrames],[motion.xStart || 0,motion.xEnd || 0])}px)`
         );
-
         break;
 
       case "float":
-
         transformParts.push(
           `translateY(${Math.sin(frame * (motion.speed || 0.5)) * (motion.amplitude || 10)}px)`
         );
-
         break;
 
       case "breathing":
-
         transformParts.push(
           `scale(${interpolate(Math.sin(frame * (motion.speed || 0.5)),[-1,1],[motion.scaleStart || 1,motion.scaleEnd || 1.05])})`
         );
-
         break;
 
       case "orbit":
-
         transformParts.push(
           `translateX(${Math.sin(frame * (motion.speed || 0.4)) * (motion.radius || 40)}px)`
         );
@@ -166,11 +152,9 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
         transformParts.push(
           `translateY(${Math.cos(frame * (motion.speed || 0.4)) * (motion.radius || 20)}px)`
         );
-
         break;
 
       case "arcPan":
-
         transformParts.push(
           `translateX(${interpolate(frame,[0,beatFrames],[motion.xStart || -80,motion.xEnd || 80])}px)`
         );
@@ -178,11 +162,9 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
         transformParts.push(
           `translateY(${interpolate(frame,[0,beatFrames],[motion.yStart || 40,motion.yEnd || -40])}px)`
         );
-
         break;
 
       case "droneRise":
-
         transformParts.push(
           `translateY(${interpolate(frame,[0,beatFrames],[motion.yStart || 120,motion.yEnd || -40])}px)`
         );
@@ -190,19 +172,15 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
         transformParts.push(
           `scale(${interpolate(frame,[0,beatFrames],[motion.scaleStart || 1.05,motion.scaleEnd || 1.2])})`
         );
-
         break;
 
       case "microZoom":
-
         transformParts.push(
           `scale(${interpolate(frame,[0,beatFrames],[motion.scaleStart || 1,motion.scaleEnd || 1.12])})`
         );
-
         break;
 
       case "bounce":
-
         const bounce = spring({
           frame,
           fps,
@@ -212,7 +190,6 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
         transformParts.push(
           `scale(${interpolate(bounce,[0,1],[motion.scaleStart || 1.3,motion.scaleEnd || 1])})`
         );
-
         break;
 
     }
@@ -278,13 +255,19 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
     ...style
   };
 
+  /* COLOR / GRADIENT */
+
   if (type === "color" || type === "gradient") {
     return <div style={{ ...baseStyle, background: value }} />;
   }
 
+  /* IMAGE */
+
   if (type === "image") {
     return <img src={value} style={baseStyle} />;
   }
+
+  /* VIDEO */
 
   if (type === "video") {
     return (
@@ -298,5 +281,19 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
     );
   }
 
-  return null;
+  /* PATTERN FALLBACK */
+
+  const pattern =
+    backgroundPatternRegistry[value]?.() ||
+    backgroundPatternRegistry.softGradient();
+
+  return (
+    <div
+      style={{
+        ...baseStyle,
+        ...pattern
+      }}
+    />
+  );
+
 }

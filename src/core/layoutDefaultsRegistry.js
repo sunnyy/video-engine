@@ -4,6 +4,8 @@ export const layoutDefaultsRegistry = {
 
     captionPosition: "bottom",
 
+    motionIntensity: 1,
+
     layoutBackground: {
       enterTransition: "fadeIn",
       exitTransition: "none",
@@ -30,6 +32,8 @@ export const layoutDefaultsRegistry = {
 
     captionPosition: "middle",
 
+    motionIntensity: 1.2,
+
     layoutBackground: {
       enterTransition: "fadeIn",
       exitTransition: "none",
@@ -41,7 +45,7 @@ export const layoutDefaultsRegistry = {
       z1: {
         assetEnter: "slideLeftIn",
         assetExit: "none",
-        assetMotion: "driftLeft",
+        assetMotion: "pushSlow",
 
         backgroundEnter: "fadeIn",
         backgroundExit: "none",
@@ -51,7 +55,7 @@ export const layoutDefaultsRegistry = {
       z2: {
         assetEnter: "slideRightIn",
         assetExit: "none",
-        assetMotion: "driftRight",
+        assetMotion: "kenburns",
 
         backgroundEnter: "fadeIn",
         backgroundExit: "none",
@@ -66,6 +70,8 @@ export const layoutDefaultsRegistry = {
 
     captionPosition: "bottom",
 
+    motionIntensity: 1.1,
+
     layoutBackground: {
       enterTransition: "fadeIn",
       exitTransition: "none",
@@ -76,7 +82,7 @@ export const layoutDefaultsRegistry = {
 
       z1: {
         assetEnter: "slideUpIn",
-        assetMotion: "driftLeft"
+        assetMotion: "kenburns"
       },
 
       z2: {
@@ -86,7 +92,7 @@ export const layoutDefaultsRegistry = {
 
       z3: {
         assetEnter: "slideDownIn",
-        assetMotion: "driftRight"
+        assetMotion: "pushSlow"
       }
 
     }
@@ -96,6 +102,8 @@ export const layoutDefaultsRegistry = {
   TwoTopOneBottom: {
 
     captionPosition: "middle",
+
+    motionIntensity: 1.2,
 
     layoutBackground: {
       enterTransition: "fadeIn",
@@ -107,12 +115,12 @@ export const layoutDefaultsRegistry = {
 
       z1: {
         assetEnter: "slideLeftIn",
-        assetMotion: "driftLeft"
+        assetMotion: "cinematicPush"
       },
 
       z2: {
         assetEnter: "slideRightIn",
-        assetMotion: "driftRight"
+        assetMotion: "cinematicPush"
       },
 
       z3: {
@@ -128,6 +136,8 @@ export const layoutDefaultsRegistry = {
 
     captionPosition: "bottom",
 
+    motionIntensity: 1.2,
+
     layoutBackground: {
       enterTransition: "fadeIn",
       exitTransition: "none",
@@ -143,12 +153,12 @@ export const layoutDefaultsRegistry = {
 
       z2: {
         assetEnter: "slideLeftIn",
-        assetMotion: "driftLeft"
+        assetMotion: "kenburns"
       },
 
       z3: {
         assetEnter: "slideRightIn",
-        assetMotion: "driftRight"
+        assetMotion: "cinematicPush"
       }
 
     }
@@ -159,6 +169,8 @@ export const layoutDefaultsRegistry = {
 
     captionPosition: "bottom",
 
+    motionIntensity: 1.3,
+
     layoutBackground: {
       enterTransition: "fadeIn",
       exitTransition: "none",
@@ -167,10 +179,10 @@ export const layoutDefaultsRegistry = {
 
     zones: {
 
-      z1: { assetEnter: "scaleIn", assetMotion: "driftLeft" },
-      z2: { assetEnter: "slideLeftIn", assetMotion: "driftRight" },
-      z3: { assetEnter: "slideRightIn", assetMotion: "driftLeft" },
-      z4: { assetEnter: "scaleIn", assetMotion: "driftRight" }
+      z1: { assetEnter: "scaleIn", assetMotion: "pushSlow" },
+      z2: { assetEnter: "slideLeftIn", assetMotion: "kenburns" },
+      z3: { assetEnter: "slideRightIn", assetMotion: "cinematicPush" },
+      z4: { assetEnter: "scaleIn", assetMotion: "pushSlow" }
 
     }
 
@@ -179,6 +191,8 @@ export const layoutDefaultsRegistry = {
   PictureInPicture: {
 
     captionPosition: "middle",
+
+    motionIntensity: 1.1,
 
     layoutBackground: {
       enterTransition: "blurIn",
@@ -206,6 +220,8 @@ export const layoutDefaultsRegistry = {
 
     captionPosition: "middle",
 
+    motionIntensity: 0.8,
+
     layoutBackground: {
       enterTransition: "fadeIn",
       exitTransition: "none",
@@ -232,6 +248,8 @@ export const layoutDefaultsRegistry = {
 
     captionPosition: "middle",
 
+    motionIntensity: 0.9,
+
     layoutBackground: {
       enterTransition: "fadeIn",
       exitTransition: "none",
@@ -257,6 +275,8 @@ export const layoutDefaultsRegistry = {
   SideAvatar: {
 
     captionPosition: "middle",
+
+    motionIntensity: 0.9,
 
     layoutBackground: {
       enterTransition: "fadeIn",

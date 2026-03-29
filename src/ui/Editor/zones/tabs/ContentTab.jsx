@@ -57,7 +57,7 @@ export default function ContentTab({
               <select
                 value={content.asset?.objectFit || "cover"}
                 onChange={(e) => updateContentProp(slot, "objectFit", e.target.value)}
-                className="w-full text-[12px] p-1 border rounded"
+                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
               >
                 <option value="cover">cover</option>
                 <option value="contain">contain</option>
@@ -72,7 +72,7 @@ export default function ContentTab({
               <select
                 value={content.asset?.motion || "none"}
                 onChange={(e) => updateContentProp(slot, "motion", e.target.value)}
-                className="w-full text-[12px] p-1 border rounded"
+                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
               >
                 {motions.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -92,7 +92,7 @@ export default function ContentTab({
               <select
                 value={content.asset?.enterTransition || "fadeIn"}
                 onChange={(e) => updateContentProp(slot, "enterTransition", e.target.value)}
-                className="w-full text-[12px] p-1 border rounded"
+                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
               >
                 {enterTransitions.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -108,7 +108,7 @@ export default function ContentTab({
               <select
                 value={content.asset?.exitTransition || "none"}
                 onChange={(e) => updateContentProp(slot, "exitTransition", e.target.value)}
-                className="w-full text-[12px] p-1 border rounded"
+                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
               >
                 {exitTransitions.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -130,7 +130,7 @@ export default function ContentTab({
           <select
             value={block.variant}
             onChange={(e) => setVariant(slot, e.target.value)}
-            className="w-full text-[11px] border rounded"
+            className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
           >
             {variants.map((v) => (
               <option key={v} value={v}>{v}</option>

@@ -103,22 +103,32 @@ export default function Header() {
 
   return (
 
-    <div className="flex items-center justify-between border-b px-6 py-3 bg-white">
+    <div className="flex items-center justify-between px-6 py-3 border-b border-[rgba(255,255,255,0.06)] bg-[#111118]">
 
-      <div className="font-bold text-lg">
-        Video Engine
+      {/* Logo */}
+      <div className="flex items-center gap-2">
+        <div className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] bg-[#f5c518] text-[#0b0b10] font-bold text-[12px]">
+          VE
+        </div>
+        <span
+          className="text-[14px] font-bold text-[#e8e8f0]"
+          style={{ fontFamily: "'Syne', sans-serif" }}
+        >
+          VideoEngine
+        </span>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
 
-        <div className="flex border rounded overflow-hidden">
+        {/* Mode */}
+        <div className="flex bg-[#1c1c28] rounded-[6px] p-[2px]">
 
           <button
             onClick={() => handleModeChange("talking_head")}
-            className={`px-4 py-2 ${
+            className={`px-3 py-[4px] text-[12px] rounded-[4px] transition ${
               project.meta.mode === "talking_head"
-                ? "bg-black text-white"
-                : "bg-white"
+                ? "bg-[#111118] text-[#e8e8f0]"
+                : "text-[#9494a8]"
             }`}
           >
             Talking Head
@@ -126,10 +136,10 @@ export default function Header() {
 
           <button
             onClick={() => handleModeChange("faceless")}
-            className={`px-4 py-2 ${
+            className={`px-3 py-[4px] text-[12px] rounded-[4px] transition ${
               project.meta.mode === "faceless"
-                ? "bg-black text-white"
-                : "bg-white"
+                ? "bg-[#111118] text-[#e8e8f0]"
+                : "text-[#9494a8]"
             }`}
           >
             Faceless
@@ -137,14 +147,15 @@ export default function Header() {
 
         </div>
 
-        <div className="flex border rounded overflow-hidden">
+        {/* Orientation */}
+        <div className="flex bg-[#1c1c28] rounded-[6px] p-[2px]">
 
           <button
             onClick={() => handleOrientationChange("9:16")}
-            className={`px-3 py-2 ${
+            className={`px-3 py-[4px] text-[11px] font-mono rounded-[4px] transition ${
               project.meta.orientation === "9:16"
-                ? "bg-black text-white"
-                : "bg-white"
+                ? "bg-[#f5c518] text-[#0b0b10]"
+                : "text-[#55556a]"
             }`}
           >
             9:16
@@ -152,10 +163,10 @@ export default function Header() {
 
           <button
             onClick={() => handleOrientationChange("16:9")}
-            className={`px-3 py-2 ${
+            className={`px-3 py-[4px] text-[11px] font-mono rounded-[4px] transition ${
               project.meta.orientation === "16:9"
-                ? "bg-black text-white"
-                : "bg-white"
+                ? "bg-[#f5c518] text-[#0b0b10]"
+                : "text-[#55556a]"
             }`}
           >
             16:9
@@ -163,23 +174,23 @@ export default function Header() {
 
         </div>
 
+        {/* Resolution */}
         <select
           value={resolution}
           onChange={(e) => setResolution(e.target.value)}
-          className="border px-3 py-2 rounded"
+          className="bg-[#16161f] border border-[rgba(255,255,255,0.06)] text-[#e8e8f0] text-[12px] px-3 py-[5px] rounded-[6px]"
         >
           <option value="720p">720p</option>
           <option value="1080p">1080p</option>
         </select>
 
+        {/* Export */}
         <button
           onClick={handleExport}
           disabled={progress !== null}
-          className="bg-yellow-400 px-5 py-2 rounded text-black font-semibold disabled:opacity-50"
+          className="flex items-center gap-2 bg-[#f5c518] text-[#0b0b10] font-bold text-[12px] px-4 py-[6px] rounded-[6px] hover:shadow-[0_0_16px_rgba(245,197,24,0.3)] transition disabled:opacity-50"
         >
-          {progress !== null
-            ? `Rendering ${progress}%`
-            : "Export"}
+          {progress !== null ? `Rendering ${progress}%` : "Export"}
         </button>
 
         {downloadUrl && (
@@ -187,7 +198,7 @@ export default function Header() {
           <a
             href={downloadUrl}
             download
-            className="bg-green-500 text-white px-5 py-2 rounded font-semibold"
+            className="bg-[#2dd4bf] text-[#0b0b10] font-semibold text-[12px] px-4 py-[6px] rounded-[6px]"
           >
             Download
           </a>

@@ -20,10 +20,9 @@ export default function EditorPanel({ activeTab }) {
   }
 
   return (
-    <div className="flex-1 flex w-full">
+    <div className="flex-1 flex w-full bg-[#0b0b10]">
       <BeatList />
       <BeatEditor />
     </div>
   );
-
 }

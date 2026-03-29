@@ -10,7 +10,6 @@ const blocks = [
       text: "3 mistakes founders make",
     },
   },
-
   {
     type: "Slideshow",
     variant: "default",
@@ -19,7 +18,6 @@ const blocks = [
       images: ["/images/img_0.jpg", "/images/img_1.jpg", "/images/img_2.jpg"],
     },
   },
-
   {
     type: "ListReveal",
     variant: "highlightReveal",
@@ -28,7 +26,6 @@ const blocks = [
       items: ["First point", "Second point", "Third point"],
     },
   },
-
   {
     type: "Stat",
     variant: "bigNumber",
@@ -38,7 +35,6 @@ const blocks = [
       label: "Engagement Increase",
     },
   },
-
   {
     type: "Quote",
     variant: "highlight",
@@ -48,7 +44,6 @@ const blocks = [
       author: "Naval Ravikant",
     },
   },
-
   {
     type: "BeforeAfter",
     variant: "default",
@@ -58,7 +53,6 @@ const blocks = [
       after: "/images/img_4.jpg",
     },
   },
-
   {
     type: "Comparison",
     variant: "cards",
@@ -76,7 +70,6 @@ const blocks = [
       },
     },
   },
-
   {
     type: "NumberTicker",
     variant: "countUp",
@@ -108,12 +101,30 @@ export default function BlockPicker({ beat, zoneKey }) {
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-2 gap-2">
+
       {blocks.map((b) => (
-        <button key={b.type} onClick={() => addBlock(b)} className="px-3 py-1 text-xs bg-black text-white rounded">
+        <button
+          key={b.type}
+          onClick={() => addBlock(b)}
+          className="
+            flex items-center justify-center
+            h-[34px]
+            text-[11px] font-medium
+            rounded-[6px]
+            border border-[rgba(255,255,255,0.08)]
+            bg-[#16161f]
+            text-[#9494a8]
+            hover:text-[#e8e8f0]
+            hover:bg-[#1c1c28]
+            hover:border-[rgba(255,255,255,0.15)]
+            transition
+          "
+        >
           {b.label}
         </button>
       ))}
+
     </div>
   );
 }
