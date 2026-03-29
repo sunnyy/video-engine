@@ -1,5 +1,6 @@
 import { layoutRegistry } from "./layoutRegistry";
 import { layoutDefaultsRegistry } from "./layoutDefaultsRegistry";
+import { buildVisualIdentity } from "./visualIdentityEngine";
 
 function pickLayout({ visual_type, videoType }) {
 
@@ -72,12 +73,41 @@ function chooseBlockZone(layout) {
 
 }
 
+function buildChoreography(layout) {
+
+  if (layout === "ThreeZone" || layout === "TwoTopOneBottom" || layout === "OneTopTwoBottom") {
+    return {
+      mode: "cascade",
+      stagger_ms: 120,
+      anchor_zone: "z1"
+    };
+  }
+
+  if (layout === "SplitZone" || layout === "PictureInPicture") {
+    return {
+      mode: "cascade",
+      stagger_ms: 90,
+      anchor_zone: "z1"
+    };
+  }
+
+  return {
+    mode: "simultaneous",
+    stagger_ms: 0,
+    anchor_zone: "z1"
+  };
+
+}
+
 export function planBeatVisual({
+  project,
   videoType,
   spoken = "",
   visual_type = "statement",
   block_candidate = null
 }) {
+
+  const visualIdentity = buildVisualIdentity(project);
 
   const layout = pickLayout({
     visual_type,
@@ -86,8 +116,6 @@ export function planBeatVisual({
 
   const zones = buildZones(layout);
   const blocks = [];
-
-  /* ONLY use AI-suggested blocks */
 
   if (block_candidate) {
 
@@ -101,7 +129,10 @@ export function planBeatVisual({
           type: block_candidate
         }
       },
-      background: {},
+      background: {
+        kind: "color",
+        color: visualIdentity.colorStory.surface
+      },
       style: { padding: {} }
     };
 
@@ -132,6 +163,11 @@ export function planBeatVisual({
           motion: d.assetMotion || "kenburns"
         };
 
+        zones[z].background = {
+          kind: "color",
+          color: visualIdentity.colorStory.surface
+        };
+
       }
 
     });
@@ -141,6 +177,11 @@ export function planBeatVisual({
   return {
     layout,
     layoutPadding: 0,
+    layoutBackground: {
+      type: "color",
+      value: visualIdentity.colorStory.dominant
+    },
+    choreography: buildChoreography(layout),
     zones,
     blocks
   };

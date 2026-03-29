@@ -26,20 +26,17 @@ function Section({ label, color, children }) {
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#16161f] transition cursor-pointer"
         style={{ background: "none", border: "none" }}
       >
-        <div
-          className="w-[4px] h-[16px] rounded-sm flex-shrink-0"
-          style={{ background: color }}
-        />
+        <div className="w-[5px] h-[20px] rounded-sm flex-shrink-0" style={{ background: color }} />
 
         <span
-          className="flex-1 text-left text-[11px] font-bold tracking-[0.1em] uppercase text-[#9494a8]"
+          className="flex-1 text-left text-[15px] font-bold tracking-[0.1em] uppercase text-[#bbb]"
           style={{ fontFamily: "'Syne', sans-serif" }}
         >
           {label}
         </span>
 
         <span
-          className="text-[#55556a] text-xs transition-transform duration-200"
+          className="text-[#55556a] text-2xl transition-transform duration-200"
           style={{
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
             display: "inline-block",
@@ -69,10 +66,8 @@ export default function BeatEditor() {
 
   return (
     <div className="flex-1 w-[75%] min-w-[320px] overflow-y-auto border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] px-6 py-5 ml-4">
-
       {/* Beat Header */}
       <div className="flex items-center gap-3 mb-6">
-
         <span
           className="px-2 py-[4px] text-[10px] rounded-[4px] border border-[rgba(255,255,255,0.1)] bg-[#16161f] text-[#55556a]"
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -80,10 +75,7 @@ export default function BeatEditor() {
           BEAT #{activeBeat.order + 1}
         </span>
 
-        <h3
-          className="m-0 text-[16px] font-bold text-[#e8e8f0]"
-          style={{ fontFamily: "'Syne', sans-serif" }}
-        >
+        <h3 className="m-0 text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>
           Editing Beat #{activeBeat.order + 1}
         </h3>
       </div>
@@ -93,6 +85,11 @@ export default function BeatEditor() {
         <LayoutSelector beat={activeBeat} />
       </Section>
 
+      {/* Zones */}
+      <Section color="#f97316" label="Zones">
+        <ZonesSection beat={activeBeat} project={project} />
+      </Section>
+
       {/* Caption */}
       {structure.caption && (
         <Section color="#3b9eff" label="Caption">
@@ -100,16 +97,10 @@ export default function BeatEditor() {
         </Section>
       )}
 
-      {/* Zones */}
-      <Section color="#f97316" label="Zones">
-        <ZonesSection beat={activeBeat} project={project} />
-      </Section>
-
       {/* Overlays */}
       <Section color="#2dd4bf" label="Overlays">
         <OverlaySection beat={activeBeat} />
       </Section>
-
     </div>
   );
 }

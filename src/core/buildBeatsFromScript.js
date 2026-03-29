@@ -287,7 +287,7 @@ export async function buildBeatsFromScript({
 
       caption: {
         text: generateCaptionText(spoken),
-        style: "tiktokClean",
+        style: "wordBlaze",
         animation: chooseCaptionAnimation(intent),
         position: layoutDefaults.captionPosition || "bottom",
       },

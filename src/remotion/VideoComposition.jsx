@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   AbsoluteFill,
   Sequence,
@@ -15,14 +15,49 @@ import Caption from "./elements/Caption";
 import AudioCueRenderer from "./elements/AudioCueRenderer";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { transitionsRegistry } from "../core/transitionsRegistry";
+import { buildVisualIdentity } from "../core/visualIdentityEngine";
+
+/* FONT LOADER */
+
+function loadCaptionFonts() {
+
+  const fonts = [
+    "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap",
+    "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap",
+    "https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&display=swap",
+    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&display=swap"
+  ];
+
+  fonts.forEach((url) => {
+
+    if (document.querySelector(`link[href="${url}"]`)) return;
+
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = url;
+    document.head.appendChild(link);
+
+  });
+
+}
 
 export default function VideoComposition({ project }) {
+
   if (!project) return null;
+
+  useEffect(() => {
+    loadCaptionFonts();
+  }, []);
 
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const { beats, meta, audio, avatar, overlays } = project;
+
+  const visualIdentity = buildVisualIdentity(project);
 
   const videoOverlays = overlays || [];
 
@@ -52,7 +87,7 @@ export default function VideoComposition({ project }) {
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: "#000",
+        backgroundColor: visualIdentity.colorStory.dominant,
         width: meta.width,
         height: meta.height
       }}
@@ -142,42 +177,6 @@ export default function VideoComposition({ project }) {
               );
               break;
 
-            case "dipBlack":
-              style.opacity = progress;
-              style.background = "#000";
-              break;
-
-            case "dipWhite":
-              style.opacity = progress;
-              style.background = "#fff";
-              break;
-
-            case "blurFade":
-              style.filter = `blur(${interpolate(progress,[0,1],[30,0])}px)`;
-              style.opacity = progress;
-              break;
-
-            case "whipPan":
-              transformParts.push(
-                `translateX(${interpolate(progress,[0,1],[meta.width*1.5,0])}px)`
-              );
-              style.filter = `blur(${interpolate(progress,[0,1],[40,0])}px)`;
-              break;
-
-            case "spin":
-              transformParts.push(
-                `rotate(${interpolate(progress,[0,1],[90,0])}deg)`
-              );
-              transformParts.push(
-                `scale(${interpolate(progress,[0,1],[0.8,1])})`
-              );
-              break;
-
-            case "flash":
-              style.opacity = progress;
-              style.filter = `brightness(${interpolate(progress,[0,1],[3,1])})`;
-              break;
-
             default:
               break;
 
@@ -211,7 +210,7 @@ export default function VideoComposition({ project }) {
       )}
 
       {currentBeat?.caption && (
-        <Caption caption={currentBeat.caption} beat={currentBeat} />
+        <Caption caption={currentBeat.caption} beat={currentBeat} project={project} />
       )}
 
       {audio?.tts?.src && (
@@ -232,4 +231,5 @@ export default function VideoComposition({ project }) {
 
     </AbsoluteFill>
   );
+
 }

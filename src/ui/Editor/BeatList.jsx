@@ -63,14 +63,14 @@ export default function BeatList() {
       {/* Header */}
       <div className="flex items-center justify-between px-2 mb-3">
         <h3
-          className="m-0 text-[11px] font-bold tracking-[0.1em] uppercase text-[#55556a]"
+          className="m-0 text-[15px] font-bold tracking-[0.1em] uppercase text-[#bbb]"
           style={{ fontFamily: "'Syne', sans-serif" }}
         >
           Timeline
         </h3>
 
         <span
-          className="text-[10px] px-2 py-[2px] rounded-[4px] border border-[rgba(255,255,255,0.06)] bg-[#1c1c28] text-[#55556a]"
+          className="text-[12px] px-2 py-[2px] rounded-[4px] border border-[rgba(255,255,255,0.06)] bg-[#1c1c28] text-[#bbb]"
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
         >
           {project.beats.length} beats

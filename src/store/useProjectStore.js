@@ -29,7 +29,7 @@ function createRawBeat(order, mode) {
 
     caption: {
       text: "",
-      style: "tiktokClean",
+      style: "wordBlaze",
       animation: "fade",
       position: "bottom",
     },

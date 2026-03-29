@@ -2,8 +2,8 @@ export function buildAssetPlan(beats = [], assets = []) {
 
   if (!assets.length) return beats;
 
+  const usedInVideo = new Set();
   let assetIndex = 0;
-  const usedRecently = [];
 
   function nextAsset() {
 
@@ -14,21 +14,15 @@ export function buildAssetPlan(beats = [], assets = []) {
       const asset = assets[assetIndex % assets.length];
       assetIndex++;
 
-      if (!usedRecently.includes(asset.url)) {
-
-        usedRecently.push(asset.url);
-
-        if (usedRecently.length > 5) {
-          usedRecently.shift();
-        }
-
+      if (!usedInVideo.has(asset.url)) {
+        usedInVideo.add(asset.url);
         return asset;
       }
 
       attempts++;
-
     }
 
+    // fallback if all assets used
     return assets[assetIndex % assets.length];
 
   }

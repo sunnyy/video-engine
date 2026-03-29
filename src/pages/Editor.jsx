@@ -51,7 +51,7 @@ export default function Editor() {
 
   return (
 
-    <div className="flex flex-col min-h-screen bg-red-300 text-[#e8e8f0]">
+    <div className="flex flex-col min-h-screen bg-gray-400 text-[#e8e8f0]">
 
       <Header />
 

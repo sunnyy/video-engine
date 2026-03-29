@@ -3,6 +3,8 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remo
 import { layoutRegistry } from "../core/layoutRegistry.js";
 import AudioCueRenderer from "./elements/AudioCueRenderer";
 import OverlayRenderer from "./elements/OverlayRenderer";
+import GrainOverlay from "./effects/GrainOverlay";
+import VignetteLayer from "./effects/VignetteLayer";
 
 export default function BeatRenderer({ beat, project }) {
 
@@ -67,6 +69,10 @@ export default function BeatRenderer({ beat, project }) {
       <OverlayRenderer overlays={overlays} />
 
       <AudioCueRenderer beat={beat} />
+
+      <GrainOverlay intensity={0.25} />
+
+      <VignetteLayer strength={0.35} />
 
     </AbsoluteFill>
 

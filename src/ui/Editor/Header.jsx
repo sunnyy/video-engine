@@ -107,11 +107,12 @@ export default function Header() {
 
       {/* Logo */}
       <div className="flex items-center gap-2">
-        <div className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] bg-[#f5c518] text-[#0b0b10] font-bold text-[12px]">
+        <div className="w-[32px] h-[24px] flex items-center justify-center rounded-[6px] bg-[#f5c518] text-[#0b0b10] font-bold text-[16px]"
+        style={{ fontFamily: "'Syne', sans-serif" }}>
           VE
         </div>
         <span
-          className="text-[14px] font-bold text-[#e8e8f0]"
+          className="text-[18px] font-bold text-[#e8e8f0]"
           style={{ fontFamily: "'Syne', sans-serif" }}
         >
           VideoEngine
@@ -125,7 +126,7 @@ export default function Header() {
 
           <button
             onClick={() => handleModeChange("talking_head")}
-            className={`px-3 py-[4px] text-[12px] rounded-[4px] transition ${
+            className={`px-3 py-[4px] text-[14px] rounded-[4px] border-0 transition ${
               project.meta.mode === "talking_head"
                 ? "bg-[#111118] text-[#e8e8f0]"
                 : "text-[#9494a8]"
@@ -136,7 +137,7 @@ export default function Header() {
 
           <button
             onClick={() => handleModeChange("faceless")}
-            className={`px-3 py-[4px] text-[12px] rounded-[4px] transition ${
+            className={`px-3 py-[4px] text-[14px] rounded-[4px] border-0 transition ${
               project.meta.mode === "faceless"
                 ? "bg-[#111118] text-[#e8e8f0]"
                 : "text-[#9494a8]"
@@ -152,7 +153,7 @@ export default function Header() {
 
           <button
             onClick={() => handleOrientationChange("9:16")}
-            className={`px-3 py-[4px] text-[11px] font-mono rounded-[4px] transition ${
+            className={`px-3 py-[4px] text-[14px] font-mono rounded-[4px] transition ${
               project.meta.orientation === "9:16"
                 ? "bg-[#f5c518] text-[#0b0b10]"
                 : "text-[#55556a]"
@@ -163,7 +164,7 @@ export default function Header() {
 
           <button
             onClick={() => handleOrientationChange("16:9")}
-            className={`px-3 py-[4px] text-[11px] font-mono rounded-[4px] transition ${
+            className={`px-3 py-[4px] text-[14px] font-mono rounded-[4px] transition ${
               project.meta.orientation === "16:9"
                 ? "bg-[#f5c518] text-[#0b0b10]"
                 : "text-[#55556a]"
@@ -178,7 +179,7 @@ export default function Header() {
         <select
           value={resolution}
           onChange={(e) => setResolution(e.target.value)}
-          className="bg-[#16161f] border border-[rgba(255,255,255,0.06)] text-[#e8e8f0] text-[12px] px-3 py-[5px] rounded-[6px]"
+          className="bg-[#16161f] border border-[rgba(255,255,255,0.06)] text-[#e8e8f0] text-[14px] px-3 py-[5px] rounded-[6px]"
         >
           <option value="720p">720p</option>
           <option value="1080p">1080p</option>
@@ -188,7 +189,7 @@ export default function Header() {
         <button
           onClick={handleExport}
           disabled={progress !== null}
-          className="flex items-center gap-2 bg-[#f5c518] text-[#0b0b10] font-bold text-[12px] px-4 py-[6px] rounded-[6px] hover:shadow-[0_0_16px_rgba(245,197,24,0.3)] transition disabled:opacity-50"
+          className="flex items-center gap-2 bg-[#f5c518] text-[#0b0b10] font-bold text-[14px] px-4 py-[6px] rounded-[6px] hover:shadow-[0_0_16px_rgba(245,197,24,0.3)] transition disabled:opacity-50"
         >
           {progress !== null ? `Rendering ${progress}%` : "Export"}
         </button>
@@ -198,7 +199,7 @@ export default function Header() {
           <a
             href={downloadUrl}
             download
-            className="bg-[#2dd4bf] text-[#0b0b10] font-semibold text-[12px] px-4 py-[6px] rounded-[6px]"
+            className="bg-[#2dd4bf] text-[#0b0b10] font-semibold text-[14px] px-4 py-[6px] rounded-[6px]"
           >
             Download
           </a>

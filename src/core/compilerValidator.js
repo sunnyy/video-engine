@@ -95,13 +95,13 @@ export function validateBeats(beats) {
       caption: beat.caption
         ? {
             text: beat.caption.text || "",
-            style: beat.caption.style || "tiktokClean",
+            style: beat.caption.style || "wordBlaze",
             animation: beat.caption.animation || "fade",
             position: beat.caption.position || "bottom"
           }
         : {
             text: "",
-            style: "tiktokClean",
+            style: "wordBlaze",
             animation: "fade",
             position: "bottom"
           },

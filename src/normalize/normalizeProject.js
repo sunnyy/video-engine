@@ -14,7 +14,7 @@ export function buildSafeProject(raw = {}) {
     meta,
 
     captionPreset: raw.captionPreset || {
-      style: "tiktokClean"
+      style: "wordBlaze"
     },
 
     script: {

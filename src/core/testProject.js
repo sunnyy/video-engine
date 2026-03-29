@@ -30,7 +30,7 @@ export const testProject = {
 
       caption: {
         show: true,
-        style: "tiktokClean",
+        style: "wordBlaze",
         animation: "fade",
         position: "bottom",
         segments: []
@@ -74,7 +74,7 @@ export const testProject = {
 
       caption: {
         show: true,
-        style: "tiktokClean",
+        style: "wordBlaze",
         animation: "fade",
         position: "bottom",
         segments: []

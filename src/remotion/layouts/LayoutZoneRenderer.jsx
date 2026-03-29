@@ -1,4 +1,5 @@
 import React from "react";
+import { useCurrentFrame, useVideoConfig } from "remotion";
 import AssetRenderer from "../elements/AssetRenderer";
 import AvatarLayer from "../elements/AvatarLayer";
 import blockRegistry from "../../core/blockRegistry";
@@ -14,6 +15,9 @@ export default function LayoutZoneRenderer({
 }) {
 
   if (!zone) return null;
+
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   const padding = zone.style?.padding || {};
 
@@ -42,6 +46,39 @@ export default function LayoutZoneRenderer({
     variant = block?.variant || "default";
   }
 
+  /* VISUAL FOCUS HIERARCHY */
+
+  const focus = zone.focus || "secondary";
+
+  let focusStyle = {};
+
+  if (focus === "primary") {
+    focusStyle = {
+      zIndex: 5,
+      transform: "scale(1.02)"
+    };
+  }
+
+  if (focus === "secondary") {
+    focusStyle = {
+      zIndex: 3
+    };
+  }
+
+  if (focus === "background") {
+    focusStyle = {
+      zIndex: 1,
+      opacity: 0.85
+    };
+  }
+
+  /* CHOREOGRAPHY */
+
+  const zoneIndex = parseInt(slot.replace("z", ""), 10) - 1 || 0;
+  const stagger = beat?.choreography?.stagger_ms || 0;
+  const delayFrames = Math.floor((stagger * zoneIndex) / 1000 * fps);
+  const visible = frame >= delayFrames;
+
   const assetMissing =
     content.kind === "asset" &&
     (!content.asset || !content.asset.src);
@@ -53,11 +90,11 @@ export default function LayoutZoneRenderer({
         position: "relative",
         width: "100%",
         height: "100%",
-        overflow: "hidden"
+        overflow: "hidden",
+        opacity: visible ? 1 : 0,
+        ...focusStyle
       }}
     >
-
-      {/* BACKGROUND */}
 
       {background.kind === "color" && (
         <div
@@ -83,8 +120,6 @@ export default function LayoutZoneRenderer({
           slot={`${slot}_background`}
         />
       )}
-
-      {/* CONTENT */}
 
       <div style={contentBox}>
 
@@ -116,8 +151,6 @@ export default function LayoutZoneRenderer({
             slot={slot}
           />
         )}
-
-        {/* MISSING ASSET PLACEHOLDER */}
 
         {assetMissing && (
           <div

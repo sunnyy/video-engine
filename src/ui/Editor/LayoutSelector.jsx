@@ -199,7 +199,7 @@ export default function LayoutSelector({ beat }) {
 
         <button
           onClick={() => setTab("structure")}
-          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+          className={`px-3 py-[4px] text-[13px] rounded-[6px] border transition ${
             tab === "structure"
               ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
               : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
@@ -210,7 +210,7 @@ export default function LayoutSelector({ beat }) {
 
         <button
           onClick={() => setTab("background")}
-          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+          className={`px-3 py-[4px] text-[13px] rounded-[6px] border transition ${
             tab === "background"
               ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
               : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
@@ -221,7 +221,7 @@ export default function LayoutSelector({ beat }) {
 
         <button
           onClick={() => setTab("styling")}
-          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+          className={`px-3 py-[4px] text-[13px] rounded-[6px] border transition ${
             tab === "styling"
               ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
               : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"
@@ -232,7 +232,7 @@ export default function LayoutSelector({ beat }) {
 
         <button
           onClick={() => setTab("transition")}
-          className={`px-3 py-[4px] text-[11px] rounded-[6px] border transition ${
+          className={`px-3 py-[4px] text-[13px] rounded-[6px] border transition ${
             tab === "transition"
               ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
               : "bg-[#16161f] border-[rgba(255,255,255,0.06)] text-[#9494a8]"

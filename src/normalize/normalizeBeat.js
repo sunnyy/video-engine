@@ -61,7 +61,7 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     caption: {
       show: captionRaw.show !== undefined ? captionRaw.show : true,
       text: captionRaw.text || "",
-      style: captionRaw.style || "tiktokClean",
+      style: captionRaw.style || "wordBlaze",
       animation: captionRaw.animation || "fade",
       position: captionRaw.position || "bottom"
     },
