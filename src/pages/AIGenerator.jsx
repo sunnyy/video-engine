@@ -5,47 +5,119 @@ import { buildSafeProject } from "../normalize/normalizeProject";
 import { createProject } from "../services/projects/projectService";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 
+/* ── Options ──────────────────────────────────────────────── */
+
+const VIDEO_TYPES = [
+  { value: "viral",         label: "Viral / Hook"       },
+  { value: "entertainment", label: "Entertainment"       },
+  { value: "news",          label: "News"                },
+  { value: "explainer",     label: "Explainer"           },
+  { value: "opinion",       label: "Opinion / Hot Take"  },
+  { value: "story",         label: "Story / Narrative"   },
+];
+
+const LANGUAGES = [
+  { value: "english",    label: "English"    },
+  { value: "hindi",      label: "Hindi"      },
+  { value: "hinglish",   label: "Hinglish"   },
+  { value: "tamil",      label: "Tamil"      },
+  { value: "telugu",     label: "Telugu"     },
+  { value: "arabic",     label: "Arabic"     },
+  { value: "portuguese", label: "Portuguese" },
+];
+
+const MODES = [
+  { value: "faceless",     label: "Faceless"      },
+  { value: "talking_head", label: "Talking Head"  },
+];
+
+const ASSET_SOURCES = [
+  { value: "stock",    label: "Stock Library"          },
+  { value: "user",     label: "Upload My Assets"        },
+  { value: "internet", label: "Auto-Find from Internet" },
+];
+
+const DURATIONS = [
+  { value: "short",  label: "Short  (15–30 sec)"  },
+  { value: "medium", label: "Medium (30–60 sec)"  },
+  { value: "long",   label: "Long   (60+ sec)"    },
+];
+
+const ORIENTATIONS = [
+  { value: "9:16",  label: "9:16  — Vertical (TikTok / Reels)" },
+  { value: "16:9",  label: "16:9  — Horizontal (YouTube)"      },
+];
+
+/* ── Small form helpers ───────────────────────────────────── */
+
+function Label({ children }) {
+  return (
+    <label className="block text-[14px] font-semibold uppercase tracking-wider text-[#55556a] mb-[5px]"
+      style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+      {children}
+    </label>
+  );
+}
+
+function Select({ value, onChange, options }) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none transition-colors"
+    >
+      {options.map(o => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
+
+/* ── Main component ───────────────────────────────────────── */
+
 export default function AIGenerator() {
   const navigate = useNavigate();
 
-  const [name, setName] = useState("dhurandhar 2 movie success");
-  const [topic, setTopic] = useState("dhurandhar 2 movie success");
-  const [videoType, setVideoType] = useState("faceless");
-  const [niche, setNiche] = useState("general");
-  const [orientation, setOrientation] = useState("9:16");
+  /* form state */
+  const [name,             setName]             = useState("");
+  const [topic,            setTopic]            = useState("");
+  const [context,          setContext]          = useState("");  // optional facts
+  const [videoType,        setVideoType]        = useState("viral");
+  const [mode,             setMode]             = useState("faceless");
+  const [language,         setLanguage]         = useState("english");
+  const [orientation,      setOrientation]      = useState("9:16");
   const [durationCategory, setDurationCategory] = useState("short");
-  const [assetSource, setAssetSource] = useState("stock");
+  const [assetSource,      setAssetSource]      = useState("stock");
 
+  /* asset upload state */
   const [uploadFiles, setUploadFiles] = useState([]);
-  const [previews, setPreviews] = useState([]);
+  const [previews,    setPreviews]    = useState([]);
 
-  const [loading, setLoading] = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
 
+  /* ── File handling ── */
   function handleFiles(e) {
     const files = Array.from(e.target.files);
-
-    const newPreviews = files.map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-    }));
-
-    setUploadFiles((prev) => [...prev, ...files]);
-    setPreviews((prev) => [...prev, ...newPreviews]);
+    const newPreviews = files.map(file => ({ file, url: URL.createObjectURL(file) }));
+    setUploadFiles(prev => [...prev, ...files]);
+    setPreviews(prev => [...prev, ...newPreviews]);
   }
 
   function removeFile(index) {
-    setUploadFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
+    setUploadFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev    => prev.filter((_, i) => i !== index));
   }
 
+  /* ── Generate ── */
   const handleGenerate = async () => {
-    if (!name || !topic) return;
-
+    if (!topic.trim()) { setError("Please enter a topic."); return; }
+    setError("");
     setLoading(true);
 
     try {
+      /* Upload assets if needed */
       let uploadedAssets = [];
-
       if (assetSource === "user" && uploadFiles.length > 0) {
         for (const file of uploadFiles) {
           const uploaded = await uploadUserAsset(file);
@@ -53,117 +125,176 @@ export default function AIGenerator() {
         }
       }
 
+      /* Generate */
       const aiResult = await generateStructuredShort({
         topic,
-        mode: videoType,
+        context,           // optional facts / RAG output
+        videoType,         // content type: viral, news, explainer, etc.
+        mode,              // faceless | talking_head
+        language,          // english, hindi, hinglish, etc.
         orientation,
         durationCategory,
         assetSource,
         uploadedAssets,
       });
 
+      /* Build safe project */
       const safeProject = buildSafeProject({
         meta: {
           orientation,
-          mode: videoType,
-          niche,
+          mode,
+          videoType,
+          language,
           assetSource,
           uploadedAssets,
         },
-
         script: {
-          text: aiResult.script,
+          text:         aiResult.script,
+          emotionalArc: aiResult.meta?.emotionalArc,
         },
-
         beats: aiResult.beats,
-
         workflow: {
-          script_completed: true,
-          avatar_completed: false,
+          script_completed:  true,
+          avatar_completed:  false,
           beats_initialized: true,
         },
       });
 
+      /* Save and navigate */
       const saved = await createProject({
-        name,
+        name: name || topic.slice(0, 60),
         rawAI: aiResult,
         safeProject,
       });
 
       navigate(`/editor/${saved.id}`);
+
     } catch (err) {
       console.error(err);
-      alert("Failed to generate");
+      setError(err.message || "Generation failed. Please try again.");
     }
 
     setLoading(false);
   };
 
+  /* ── UI ── */
   return (
-    <div className="flex items-center justify-center bg-gray-50">
-      <div className="w-[500px] space-y-6 rounded bg-white p-8 shadow">
-        <h2 className="text-xl font-semibold">Create New Project</h2>
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "#08080d" }}
+    >
+      <div
+        className="w-full max-w-[520px] rounded-[20px] border border-[rgba(255,255,255,0.07)] p-8 flex flex-col gap-5"
+        style={{ background: "#111118" }}
+      >
 
+        {/* Header */}
         <div>
-          <label className="text-sm text-gray-600">Project Name</label>
+          <h2
+            className="text-[22px] font-bold text-[#e8e8f0] mb-1"
+            style={{ fontFamily: "'Syne', sans-serif" }}
+          >
+            Create New Video
+          </h2>
+          <p className="text-[15px] text-[#55556a]">
+            AI writes the script · Engine assembles the video
+          </p>
+        </div>
+
+        {/* Project name */}
+        <div>
+          <Label>Project Name</Label>
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
+            onChange={e => setName(e.target.value)}
+            placeholder="e.g. Dhurandhar 2 Review"
+            className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none transition-colors"
           />
         </div>
 
+        {/* Topic */}
         <div>
-          <label className="text-sm text-gray-600">Video Type</label>
-          <select
-            value={videoType}
-            onChange={(e) => setVideoType(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
-          >
-            <option value="faceless">Faceless</option>
-            <option value="talking_head">Talking Head</option>
-          </select>
+          <Label>Topic</Label>
+          <textarea
+            value={topic}
+            onChange={e => setTopic(e.target.value)}
+            placeholder="What is this video about? Be specific."
+            rows={3}
+            className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none transition-colors"
+          />
         </div>
 
+        {/* Context / facts (optional) */}
         <div>
-          <label className="text-sm text-gray-600">Asset Source</label>
-          <select
-            value={assetSource}
-            onChange={(e) => setAssetSource(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
-          >
-            <option value="stock">Stock Library</option>
-            <option value="user">Upload My Assets</option>
-            <option value="internet">Auto-Find from Internet</option>
-          </select>
+          <Label>Context / Facts  <span className="text-[#55556a] normal-case tracking-normal font-normal">(optional)</span></Label>
+          <textarea
+            value={context}
+            onChange={e => setContext(e.target.value)}
+            placeholder="Paste any facts, stats, or notes you want AI to use. Leave empty to let AI decide."
+            rows={2}
+            className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none transition-colors"
+          />
         </div>
 
+        {/* Two-col row: Video Type + Language */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Video Type</Label>
+            <Select value={videoType} onChange={setVideoType} options={VIDEO_TYPES} />
+          </div>
+          <div>
+            <Label>Language</Label>
+            <Select value={language} onChange={setLanguage} options={LANGUAGES} />
+          </div>
+        </div>
+
+        {/* Two-col row: Mode + Orientation */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Mode</Label>
+            <Select value={mode} onChange={setMode} options={MODES} />
+          </div>
+          <div>
+            <Label>Duration</Label>
+            <Select value={durationCategory} onChange={setDurationCategory} options={DURATIONS} />
+          </div>
+        </div>
+
+        {/* Orientation + Asset Source */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Orientation</Label>
+            <Select value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
+          </div>
+          <div>
+            <Label>Assets</Label>
+            <Select value={assetSource} onChange={setAssetSource} options={ASSET_SOURCES} />
+          </div>
+        </div>
+
+        {/* Asset upload */}
         {assetSource === "user" && (
-          <>
-            <div>
-              <label className="text-sm text-gray-600">Upload Assets</label>
-              <input
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                onChange={handleFiles}
-                className="mt-1 w-full"
-              />
-            </div>
-
+          <div>
+            <Label>Upload Assets</Label>
+            <input
+              type="file"
+              multiple
+              accept="image/*,video/*"
+              onChange={handleFiles}
+              className="w-full text-[14px] text-[#9494a8]"
+            />
             {previews.length > 0 && (
-              <div className="flex-1 flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 mt-3">
                 {previews.map((p, i) => (
-                  <div key={i} className="relative w-[70px] h-[100px] rounded overflow-hidden border">
+                  <div key={i} className="relative w-[60px] h-[80px] rounded-[6px] overflow-hidden border border-[rgba(255,255,255,0.08)]">
                     {p.file.type.startsWith("video") ? (
                       <video src={p.url} className="w-full h-full object-cover" />
                     ) : (
                       <img src={p.url} className="w-full h-full object-cover" />
                     )}
-
                     <button
                       onClick={() => removeFile(i)}
-                      className="absolute top-1 right-1 bg-black text-white text-xs w-5 h-5 rounded-full flex items-center justify-center"
+                      className="absolute top-[2px] right-[2px] bg-black/70 text-white text-[10px] w-[16px] h-[16px] rounded-full flex items-center justify-center"
                     >
                       ×
                     </button>
@@ -171,68 +302,31 @@ export default function AIGenerator() {
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
 
-        <div>
-          <label className="text-sm text-gray-600">Niche</label>
+        {/* Error */}
+        {error && (
+          <div className="text-[14px] text-[#f87171] bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] rounded-[8px] px-3 py-2">
+            {error}
+          </div>
+        )}
 
-          <select
-            value={niche}
-            onChange={(e) => setNiche(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
-          >
-            <option value="general">General</option>
-            <option value="news">News</option>
-            <option value="explainer">Explainer</option>
-            <option value="education">Education</option>
-            <option value="reaction">Reaction</option>
-            <option value="sports">Sports</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="text-sm text-gray-600">Orientation</label>
-          <select
-            value={orientation}
-            onChange={(e) => setOrientation(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
-          >
-            <option value="9:16">9:16 (Vertical)</option>
-            <option value="16:9">16:9 (Horizontal)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="text-sm text-gray-600">Duration</label>
-          <select
-            value={durationCategory}
-            onChange={(e) => setDurationCategory(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
-          >
-            <option value="short">30–40 sec</option>
-            <option value="medium">1–2 min</option>
-            <option value="long">3–5+ min</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="text-sm text-gray-600">Topic</label>
-          <textarea
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
-            rows={4}
-          />
-        </div>
-
+        {/* Generate button */}
         <button
           onClick={handleGenerate}
-          disabled={loading}
-          className="w-full rounded bg-black py-3 text-white"
+          disabled={loading || !topic.trim()}
+          className="w-full rounded-[10px] py-[13px] text-[14px] font-bold transition-all"
+          style={{
+            fontFamily: "'Syne', sans-serif",
+            background: loading || !topic.trim() ? "#1c1c28" : "#f0e040",
+            color:      loading || !topic.trim() ? "#55556a" : "#08080d",
+            cursor:     loading || !topic.trim() ? "not-allowed" : "pointer",
+          }}
         >
-          {loading ? "Generating..." : "Generate Video"}
+          {loading ? "Generating…" : "Generate Video"}
         </button>
+
       </div>
     </div>
   );

@@ -58,12 +58,11 @@
     - blockRegistry.js
     - buildBeatsFromScript.js
     - calculateTimeline.js
-    - captionAnimationRegistry.jsx
     - captionEmphasisEngine.js
     - captionPositionRegistry.jsx
-    - captionStyleRegistry.js
-    - captionStyles.js
+    - captionStyleRegistry.jsx
     - captionTimingEngine.js
+    - colorUtils.js
     - compilerValidator.js
     - createEmptyProject.js
     - debugProject.js
@@ -81,6 +80,7 @@
     - validateProject.js
     - visualDirector.js
     - visualGrammar.js
+    - visualIdentityEngine.js
     - visualPlanner.js
   - index.css
   - lib
@@ -103,34 +103,17 @@
     - BeatRenderer.jsx
     - blocks
       - BeforeAfterBlock.jsx
-      - ComparisonBlock.jsx
-      - HookBlock.jsx
-      - ListRevealBlock.jsx
-      - NumberTickerBlock.jsx
-      - QuoteBlock.jsx
+      - HookImpactBlock.jsx
+      - ListCountdownBlock.jsx
+      - MythVsFactBlock.jsx
+      - ProblemSolutionBlock.jsx
+      - ProcessStepsBlock.jsx
+      - QuoteHighlightBlock.jsx
       - SlideshowBlock.jsx
-      - StatBlock.jsx
-      - variants
-        - hook
-          - bigWord.jsx
-          - kinetic.jsx
-          - popScale.jsx
-        - listReveal
-          - bullet.jsx
-          - cards.jsx
-          - grid.jsx
-          - highlightReveal.jsx
-          - stacked.jsx
-          - timeline.jsx
-        - slideshow
-          - carousel3D.jsx
-          - kenBurns.jsx
-          - stackCards.jsx
-          - zoomFade.jsx
-        - ticker
-          - countUp.jsx
-          - odometer.jsx
-          - pulse.jsx
+      - StatExplosionBlock.jsx
+    - effects
+      - GrainOverlay.jsx
+      - VignetteLayer.jsx
     - elements
       - AssetRenderer.jsx
       - AudioCueRenderer.jsx
@@ -182,23 +165,26 @@
     - useAssetsStore.js
     - useProjectStore.js
   - ui
+    - components
+      - CaptionStylePreview.jsx
     - Editor
       - AvatarSection.jsx
       - BeatEditor.jsx
       - BeatList.jsx
       - BlockPicker.jsx
       - blocks
-        - blockEditors.js
+        - blockEditors.jsx
         - editors
           - BeforeAfterEditor.jsx
-          - BlockTimingEditor.jsx
-          - ComparisonEditor.jsx
-          - HookEditor.jsx
-          - ListRevealEditor.jsx
-          - NumberTickerEditor.jsx
-          - QuoteEditor.jsx
+          - editorComponents.jsx
+          - HookImpactEditor.jsx
+          - ListCountdownEditor.jsx
+          - MythVsFactEditor.jsx
+          - ProblemSolutionEditor.jsx
+          - ProcessStepsEditor.jsx
+          - QuoteHighlightEditor.jsx
           - SlideshowEditor.jsx
-          - StatEditor.jsx
+          - StatExplosionEditor.jsx
       - CaptionsSection.jsx
       - EditorPanel.jsx
       - Header.jsx

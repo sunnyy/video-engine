@@ -54,20 +54,21 @@ export default function LayoutSelector({ beat }) {
 
     const layoutDef = layoutRegistry[layout];
 
-    const zones = {};
+    // Keep all existing zone content — only fill zones that don't exist yet
+    const existingZones = beat.zones || {};
+    const zones = { ...existingZones };
 
     (layoutDef.zones || []).forEach((z) => {
-      zones[z] = {
-        content: { kind: null },
-        background: { kind: null },
-        style: {},
-      };
+      if (!zones[z]) {
+        zones[z] = {
+          content:    {},
+          background: {},
+          style:      {},
+        };
+      }
     });
 
-    updateBeat(beat.id, {
-      layout,
-      zones,
-    });
+    updateBeat(beat.id, { layout, zones });
 
   };
 

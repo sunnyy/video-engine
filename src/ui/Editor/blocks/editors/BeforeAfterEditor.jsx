@@ -1,98 +1,42 @@
-import React, { useState } from "react";
-import ZonePickerModal from "../../zonePicker/ZonePickerModal";
+import React from "react";
+import { BEFORE_AFTER_DEFAULTS } from "../../../../remotion/blocks/BeforeAfterBlock";
+import { Field, TextInput, ColorPicker } from "./editorComponents";
 
-export default function BeforeAfterEditor({
-  slot,
-  block,
-  updateBlockProp
-}) {
-
-  const [picker,setPicker] = useState(null);
-
-  const before = block.props?.before || "";
-  const after = block.props?.after || "";
-
-  const selectImage = (key,asset) => {
-
-    updateBlockProp(slot,key,asset.url);
-    setPicker(null);
-
-  };
-
-  const removeImage = (key) => {
-
-    updateBlockProp(slot,key,"");
-
-  };
-
-  const Box = ({label,value,type}) => (
-
-    <div className="space-y-1">
-
-      <div className="text-[11px]">{label}</div>
-
-      <div
-        onClick={()=>setPicker(type)}
-        className="relative border rounded overflow-hidden h-[80px] cursor-pointer"
-      >
-
-        {value ? (
-          <img
-            src={value}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="flex items-center justify-center text-[10px] h-full">
-            Select
-          </div>
-        )}
-
-        {value && (
-          <button
-            onClick={(e)=>{
-              e.stopPropagation();
-              removeImage(type);
-            }}
-            className="absolute top-1 right-1 text-[10px] bg-white border rounded px-1"
-          >
-            X
-          </button>
-        )}
-
-      </div>
-
-    </div>
-
-  );
+export default function BeforeAfterEditor({ slot, block, updateBlockProp }) {
+  const props = { ...BEFORE_AFTER_DEFAULTS, ...(block?.props || {}) };
+  const set = (k, v) => updateBlockProp(slot, k, v);
 
   return (
+    <div className="flex flex-col gap-4 mt-3">
 
-    <div className="mt-2 grid grid-cols-2 gap-3">
+      <Field label="Before label">
+        <TextInput value={props.beforeLabel} onChange={v => set("beforeLabel", v)} />
+      </Field>
 
-      <Box
-        label="Before"
-        value={before}
-        type="before"
-      />
+      <Field label="Before value">
+        <TextInput value={props.beforeValue} onChange={v => set("beforeValue", v)} />
+      </Field>
 
-      <Box
-        label="After"
-        value={after}
-        type="after"
-      />
+      <Field label="Before description">
+        <TextInput value={props.beforeDesc} onChange={v => set("beforeDesc", v)} />
+      </Field>
 
-      {picker && (
+      <Field label="After label">
+        <TextInput value={props.afterLabel} onChange={v => set("afterLabel", v)} />
+      </Field>
 
-        <ZonePickerModal
-          allowedTabs={["assets","gallery"]}
-          onClose={()=>setPicker(null)}
-          onSelect={(asset)=>selectImage(picker,asset)}
-        />
+      <Field label="After value">
+        <TextInput value={props.afterValue} onChange={v => set("afterValue", v)} />
+      </Field>
 
-      )}
+      <Field label="After description">
+        <TextInput value={props.afterDesc} onChange={v => set("afterDesc", v)} />
+      </Field>
+
+      <Field label="Accent">
+        <ColorPicker value={props.accent} onChange={v => set("accent", v)} />
+      </Field>
 
     </div>
-
   );
-
 }

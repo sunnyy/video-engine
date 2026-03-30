@@ -1,41 +1,75 @@
-import React from "react";
+/**
+ * ColorsTab.jsx
+ * src/ui/Editor/zones/zonePicker/tabs/ColorsTab.jsx
+ *
+ * Loads backgrounds from backgroundPatternRegistry.
+ * Grouped by category with tab switcher.
+ * Same registry used by automated video generation.
+ */
+import React, { useState } from "react";
+import backgroundPatternRegistry, { backgroundCategories } from "../../../../core/backgroundPatternRegistry";
 
-const BACKGROUND_PRESETS = [
-  { id:"bg_white", kind:"color", color:"#f6f6f6" },
-  { id:"bg_black", kind:"color", color:"#000000" },
-  { id:"bg_gray", kind:"color", color:"#333333" },
-  { id:"bg_gradient_1", kind:"color", color:"linear-gradient(135deg, #667eea, #764ba2)" },
-  { id:"bg_gradient_2", kind:"color", color:"linear-gradient(135deg, #ff9a9e, #fad0c4)" }
-];
+const CATEGORY_LABELS = {
+  dark:     "Dark",
+  light:    "Light",
+  gradient: "Gradients",
+  vibrant:  "Vibrant",
+  neon:     "Neon",
+  mesh:     "Mesh",
+  pattern:  "Patterns",
+};
 
 export default function ColorsTab({ onSelect, onClose }) {
+  const [activeCategory, setActiveCategory] = useState("dark");
+
+  const keys = backgroundCategories[activeCategory] || [];
 
   return (
+    <div className="flex flex-col h-full gap-3">
 
-    <div className="grid flex-1 grid-cols-3 gap-4 overflow-y-auto">
+      {/* Category tabs */}
+      <div className="flex flex-wrap gap-[3px]">
+        {Object.keys(backgroundCategories).map(cat => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`px-3 py-[5px] rounded-[6px] text-[11px] font-medium transition-all capitalize
+              ${activeCategory === cat
+                ? "bg-[#7c5cfc] text-white"
+                : "bg-[#1c1c28] text-[#9494a8] hover:text-[#e8e8f0] border border-[rgba(255,255,255,0.06)]"
+              }`}
+          >
+            {CATEGORY_LABELS[cat]}
+          </button>
+        ))}
+      </div>
 
-      {BACKGROUND_PRESETS.map((bg)=>(
+      {/* Grid */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="grid grid-cols-6 gap-2">
+          {keys.map(key => {
+            const styleObj = backgroundPatternRegistry[key]?.() || {};
+            const cssStyle = {
+              background:     styleObj.background,
+              backgroundSize: styleObj.backgroundSize || "auto",
+            };
 
-        <div
-          key={bg.id}
-          onClick={()=>{
-
-            onSelect({
-              kind:"color",
-              color:bg.color
-            });
-
-            onClose();
-
-          }}
-          className="aspect-video cursor-pointer rounded border"
-          style={{ background:bg.color }}
-        />
-
-      ))}
+            return (
+              <div
+                key={key}
+                onClick={() => {
+                  onSelect({ kind: "color", color: styleObj.background, backgroundSize: styleObj.backgroundSize });
+                  onClose();
+                }}
+                className="cursor-pointer rounded-[8px] border border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-all hover:scale-[1.03] overflow-hidden"
+                style={{ height: "180px", ...cssStyle }}
+                title={key}
+              />
+            );
+          })}
+        </div>
+      </div>
 
     </div>
-
   );
-
 }

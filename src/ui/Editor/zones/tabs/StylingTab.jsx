@@ -1,55 +1,83 @@
+/**
+ * StylingTab.jsx
+ * src/ui/Editor/zones/tabs/StylingTab.jsx
+ *
+ * Simple styling controls for asset presentation inside a zone:
+ * - Padding (one slider, all 4 sides equal)
+ * - Border Radius
+ * - Box Shadow blur intensity
+ */
 import React from "react";
 
-export default function StylingTab({
-  slot,
-  zone,
-  setPadding
-}) {
+function SliderRow({ label, value, onChange, min = 0, max = 60, step = 1, unit = "px" }) {
+  return (
+    <div className="flex flex-col gap-[5px]">
+      <div className="flex justify-between items-center">
+        <span
+          className="text-[10px] font-bold tracking-widest uppercase text-[#55556a]"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {label}
+        </span>
+        <span className="text-[11px] font-mono text-[#9494a8]">
+          {value}{unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full accent-[#7c5cfc] h-[3px] cursor-pointer"
+      />
+    </div>
+  );
+}
 
-  const padding = zone?.style?.padding || {};
+export default function StylingTab({ slot, zone, setPadding, setZoneStyle }) {
+  const padding      = zone?.style?.padding      || {};
+  const borderRadius = zone?.style?.borderRadius ?? 0;
+  const shadowBlur   = zone?.style?.shadowBlur   ?? 0;
+
+  // Single value controls all 4 sides equally
+  const paddingValue = padding.top ?? 0;
+
+  const handlePadding = (val) => {
+    setPadding(slot, "top",    val);
+    setPadding(slot, "right",  val);
+    setPadding(slot, "bottom", val);
+    setPadding(slot, "left",   val);
+  };
 
   return (
+    <div className="flex flex-col gap-5 mt-1">
 
-    <div>
+      <SliderRow
+        label="Padding"
+        value={paddingValue}
+        onChange={handlePadding}
+        min={0}
+        max={60}
+      />
 
-      <div className="text-[10px] mb-1 text-gray-500">
-        Padding
-      </div>
+      <SliderRow
+        label="Corner Radius"
+        value={borderRadius}
+        onChange={v => setZoneStyle && setZoneStyle(slot, "borderRadius", v)}
+        min={0}
+        max={80}
+      />
 
-      <div className="grid grid-cols-2 gap-1">
-
-        <input
-          type="number"
-          value={padding.top || 0}
-          onChange={(e)=>setPadding(slot,"top",e.target.value)}
-          className="border rounded text-[11px]"
-        />
-
-        <input
-          type="number"
-          value={padding.right || 0}
-          onChange={(e)=>setPadding(slot,"right",e.target.value)}
-          className="border rounded text-[11px]"
-        />
-
-        <input
-          type="number"
-          value={padding.bottom || 0}
-          onChange={(e)=>setPadding(slot,"bottom",e.target.value)}
-          className="border rounded text-[11px]"
-        />
-
-        <input
-          type="number"
-          value={padding.left || 0}
-          onChange={(e)=>setPadding(slot,"left",e.target.value)}
-          className="border rounded text-[11px]"
-        />
-
-      </div>
+      <SliderRow
+        label="Shadow"
+        value={shadowBlur}
+        onChange={v => setZoneStyle && setZoneStyle(slot, "shadowBlur", v)}
+        min={0}
+        max={60}
+      />
 
     </div>
-
   );
-
 }

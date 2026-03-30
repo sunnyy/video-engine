@@ -7,11 +7,22 @@ export const layoutCapabilityRegistry = {
       }
     },
     allowedBlocks: [
-      "Hook",
-      "Stat",
-      "Quote",
-      "NumberTicker",
-      "ListReveal"
+      "HookImpact",
+      "StatExplosion",
+      "QuoteHighlight",
+      "ListCountdown",
+      "ProcessSteps",
+      "ProgressBars",
+      "MythVsFact",
+      "BeforeAfter",
+      "ProblemSolution",
+      "SplitScreen",
+      "KineticTypography",
+      "CTAButton",
+      "CountdownTimer",
+      "ChapterTitle",
+      "Testimonial",
+      "BadgePack"
     ]
   },
 
@@ -25,9 +36,13 @@ export const layoutCapabilityRegistry = {
       }
     },
     allowedBlocks: [
-      "Stat",
-      "Comparison",
-      "Quote"
+      "StatExplosion",
+      "QuoteHighlight",
+      "BeforeAfter",
+      "MythVsFact",
+      "SplitScreen",
+      "ProgressBars",
+      "Testimonial"
     ]
   },
 
@@ -38,9 +53,12 @@ export const layoutCapabilityRegistry = {
       z3: { roles: ["asset"] }
     },
     allowedBlocks: [
-      "Stat",
-      "Quote",
-      "NumberTicker"
+      "StatExplosion",
+      "QuoteHighlight",
+      "ProgressBars",
+      "ListCountdown",
+      "ProcessSteps",
+      "MythVsFact"
     ]
   },
 
@@ -51,9 +69,12 @@ export const layoutCapabilityRegistry = {
       z3: { roles: ["block","asset"] }
     },
     allowedBlocks: [
-      "ListReveal",
-      "Stat",
-      "Quote"
+      "ListCountdown",
+      "ProcessSteps",
+      "StatExplosion",
+      "QuoteHighlight",
+      "ProgressBars",
+      "CTAButton"
     ]
   },
 
@@ -64,9 +85,12 @@ export const layoutCapabilityRegistry = {
       z3: { roles: ["asset"] }
     },
     allowedBlocks: [
-      "ListReveal",
-      "Stat",
-      "Quote"
+      "ListCountdown",
+      "ProcessSteps",
+      "StatExplosion",
+      "QuoteHighlight",
+      "ProgressBars",
+      "HookImpact"
     ]
   },
 
@@ -86,8 +110,11 @@ export const layoutCapabilityRegistry = {
       z2: { roles: ["block","asset"] }
     },
     allowedBlocks: [
-      "Stat",
-      "Quote"
+      "StatExplosion",
+      "QuoteHighlight",
+      "ProgressBars",
+      "Testimonial",
+      "CTAButton"
     ]
   }
 

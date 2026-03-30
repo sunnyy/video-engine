@@ -1,106 +1,40 @@
-import React, { useState } from "react";
-import ZonePickerModal from "../../zonePicker/ZonePickerModal";
+import React from "react";
+import { SLIDESHOW_DEFAULTS } from "../../../../remotion/blocks/SlideshowBlock";
+import { Field, ListEditor, ColorPicker } from "./editorComponents";
 
-export default function SlideshowEditor({
-  slot,
-  block,
-  updateBlockProp
-}) {
+export default function SlideshowEditor({ slot, block, updateBlockProp }) {
+  const props = { ...SLIDESHOW_DEFAULTS, ...(block?.props || {}) };
 
-  const images = block.props?.images || [];
-  const [pickerIndex,setPickerIndex] = useState(null);
+  const set = (k, v) => updateBlockProp(slot, k, v);
 
-  const updateImage = (index,value) => {
+  const titles = props.slides?.map(s => s.title) || [];
 
-    const arr = [...images];
-    arr[index] = value;
-
-    updateBlockProp(slot,"images",arr);
-
-  };
-
-  const addImage = () => {
-
-    updateBlockProp(slot,"images",[...images,""]);
-
-  };
-
-  const removeImage = (index) => {
-
-    const arr = images.filter((_,i)=>i!==index);
-    updateBlockProp(slot,"images",arr);
-
+  const updateSlides = (list) => {
+    const slides = list.map((title, i) => ({
+      title,
+      sub: props.slides?.[i]?.sub || "",
+    }));
+    set("slides", slides);
   };
 
   return (
+    <div className="flex flex-col gap-4 mt-3">
 
-    <div className="mt-2 space-y-2">
-
-      <div className="text-[11px]">
-        Images
-      </div>
-
-      <div className="flex d-flex flex-wrap gap-3">
-
-        {images.map((img,i)=>(
-
-          <div
-            key={i}
-            className="relative border rounded overflow-hidden w-[70px] h-[70px] cursor-pointer"
-            onClick={()=>setPickerIndex(i)}
-          >
-
-            {img ? (
-              <img
-                src={img}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex items-center justify-center text-[10px] w-[70px] h-[70px] bg-gray-100">
-                Select
-              </div>
-            )}
-
-            <button
-              onClick={(e)=>{
-                e.stopPropagation();
-                removeImage(i);
-              }}
-              className="absolute top-1 right-1 text-[10px] bg-white border rounded px-1"
-            >
-              X
-            </button>
-
-          </div>
-
-        ))}
-
-        <button
-          onClick={addImage}
-          className="border rounded w-[70px] h-[70px] flex items-center justify-center text-[11px]"
-        >
-          + Add
-        </button>
-
-      </div>
-
-      {pickerIndex!==null && (
-
-        <ZonePickerModal
-          allowedTabs={["assets","gallery"]}
-          onClose={()=>setPickerIndex(null)}
-          onSelect={(asset)=>{
-
-            updateImage(pickerIndex,asset.url);
-            setPickerIndex(null);
-
-          }}
+      <Field label="Slides">
+        <ListEditor
+          items={titles}
+          onChange={updateSlides}
+          placeholder="Slide title..."
         />
+      </Field>
 
-      )}
+      <Field label="Accent colour">
+        <ColorPicker
+          value={props.accent}
+          onChange={v => set("accent", v)}
+        />
+      </Field>
 
     </div>
-
   );
-
 }

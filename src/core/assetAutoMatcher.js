@@ -1,161 +1,123 @@
-import { supabase } from "../lib/supabase";
+/**
+ * assetAutoMatcher.js
+ * src/core/assetAutoMatcher.js
+ *
+ * Fetches assets from Pixabay based on topic, then distributes
+ * them across beat zones using dedup logic from assetStrategyEngine.
+ *
+ * No longer reads from Supabase assets_library.
+ * User-uploaded assets still take priority when assetSource === "user".
+ */
+
 import { layoutRegistry } from "./layoutRegistry";
 import { layoutDefaultsRegistry } from "./layoutDefaultsRegistry";
 import { buildAssetPlan } from "./assetStrategyEngine";
+import { fetchAssets } from "../services/image-search";
 
-function chooseMotion(index) {
-
-  const motions = [
-    "pushSlow",
-    "kenburns",
-    "cinematicPush"
-  ];
-
-  return motions[index % motions.length];
-
-}
+/* ─────────────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────────────── */
 
 function getLayoutZones(layout) {
-
-  const def = layoutRegistry[layout];
-
-  if (!def) return ["z1"];
-
-  return def.zones;
-
+  return layoutRegistry[layout]?.zones || ["z1"];
 }
 
 function findAssetZones(layout, zones) {
-
-  const layoutZones = getLayoutZones(layout);
-
-  const result = [];
-
-  layoutZones.forEach((z) => {
-
+  return getLayoutZones(layout).filter((z) => {
     const zone = zones[z];
-
-    if (!zone) {
-      result.push(z);
-      return;
-    }
-
-    if (zone.role === "asset") {
-      result.push(z);
-    }
-
+    return !zone || zone.role === "asset";
   });
-
-  return result;
-
 }
 
 function detectObjectFit(asset, layout) {
-
   if (!asset?.width || !asset?.height) return "cover";
-
   const ratio = asset.width / asset.height;
-
   const isHorizontal = ratio > 1.2;
-
-  if (layout === "FullZone" && isHorizontal) {
-    return "contain";
-  }
-
-  return "cover";
-
+  return layout === "FullZone" && isHorizontal ? "contain" : "cover";
 }
+
+function chooseMotion(beatIndex, zoneIndex) {
+  const motions = ["kenburns", "pushSlow", "cinematicPush", "slowZoom", "pullSlow"];
+  return motions[(beatIndex + zoneIndex) % motions.length];
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MAIN EXPORT
+───────────────────────────────────────────────────────────── */
 
 export async function autoMatchAssets(
   beats,
   orientation,
-  {
-    assetSource = "stock",
-    uploadedAssets = []
-  } = {}
+  { assetSource = "stock", uploadedAssets = [], topic = "", language = "english" } = {},
 ) {
-
   let assets = [];
 
+  /* ── User uploaded assets take full priority ── */
   if (assetSource === "user" && uploadedAssets.length) {
-
-    assets = uploadedAssets.map(a => ({
+    assets = uploadedAssets.map((a) => ({
       url: a.url,
       type: a.type || "image",
       width: a.width,
-      height: a.height
+      height: a.height,
     }));
-
   } else {
+    /* ── Fetch from Pixabay based on topic ── */
 
-    const { data } = await supabase
-      .from("assets_library")
-      .select("*");
+    // Count total asset zones needed across all beats
+    const totalZonesNeeded = beats.reduce((sum, beat) => {
+      return sum + findAssetZones(beat.layout, beat.zones).length;
+    }, 0);
 
-    assets = data || [];
+    // Fetch 1.5× what we need to allow for dedup variety
+    const fetchCount = Math.min(Math.ceil(totalZonesNeeded * 1.5), 40);
+    
+    assets = await fetchAssets({
+      query: topic || "lifestyle people",
+      language,
+      orientation,
+      count: fetchCount,
+    });
 
+    // If Pixabay returns nothing, return beats unchanged
+    if (!assets.length) {
+      console.warn("[assetAutoMatcher] No assets fetched — beats will have empty zones");
+      return beats;
+    }
   }
 
-  if (!assets.length) return beats;
-
+  /* ── Distribute assets across beats using strategy engine ── */
   beats = buildAssetPlan(beats, assets);
 
+  /* ── Apply zone-level settings (objectFit, motion, transitions) ── */
   return beats.map((beat, beatIndex) => {
-
     const zones = { ...beat.zones };
-
-    const assetZones =
-      findAssetZones(beat.layout, zones);
-
-    const layoutDefaults =
-      layoutDefaultsRegistry[beat.layout] || {};
+    const assetZones = findAssetZones(beat.layout, zones);
+    const layoutDefs = layoutDefaultsRegistry[beat.layout] || {};
 
     assetZones.forEach((zoneKey, zoneIndex) => {
+      const currentSrc = zones[zoneKey]?.content?.asset?.src;
+      const asset = assets.find((a) => a.url === currentSrc) || assets[(beatIndex + zoneIndex) % assets.length];
 
-      const assetSrc =
-        zones?.[zoneKey]?.content?.asset?.src;
-
-      const asset =
-        assets.find(a => a.url === assetSrc) ||
-        assets[(beatIndex + zoneIndex) % assets.length];
-
-      const zoneDefaults =
-        layoutDefaults?.zones?.[zoneKey] || {};
-
-      const objectFit =
-        detectObjectFit(asset, beat.layout);
+      const zoneDefs = layoutDefs?.zones?.[zoneKey] || {};
+      const objectFit = detectObjectFit(asset, beat.layout);
 
       zones[zoneKey] = {
-
         ...zones[zoneKey],
-
         role: "asset",
-
         content: {
           kind: "asset",
           asset: {
             src: asset.url,
             type: asset.type || "image",
             objectFit,
-            motion:
-              zoneDefaults.assetMotion ||
-              chooseMotion(beatIndex + zoneIndex),
-            enterTransition:
-              zoneDefaults.assetEnter || "fadeIn",
-            exitTransition:
-              zoneDefaults.assetExit || "none"
-          }
-        }
-
+            motion: zoneDefs.assetMotion || chooseMotion(beatIndex, zoneIndex),
+            enterTransition: zoneDefs.assetEnter || "fadeIn",
+            exitTransition: zoneDefs.assetExit || "none",
+          },
+        },
       };
-
     });
 
-    return {
-      ...beat,
-      zones
-    };
-
+    return { ...beat, zones };
   });
-
 }

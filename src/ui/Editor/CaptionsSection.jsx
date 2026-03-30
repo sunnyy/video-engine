@@ -238,7 +238,7 @@ export default function CaptionsSection({ beat }) {
             <textarea
               value={caption.text || beat.spoken || ""}
               onChange={(e) => updateCaption("text", e.target.value)}
-              className="bg-[#16161f] border border-[rgba(255,255,255,0.06)] rounded-[8px] p-3 text-[13px] text-[#e8e8f0] resize-none focus:border-[#7c5cfc] focus:outline-none transition-colors"
+              className="bg-[#16161f] border border-[rgba(255,255,255,0.06)] rounded-[8px] p-3 text-[24px] text-[#e8e8f0] resize-none focus:border-[#7c5cfc] focus:outline-none transition-colors"
               rows={3}
               placeholder="Caption text (defaults to spoken text)"
             />

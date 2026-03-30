@@ -9,7 +9,7 @@ export default function BlocksTab({ onSelect, onClose }) {
 
     const block = {
       type,
-      variant: blockRegistry[type].variants[0],
+      variant: "default",
       props: { ...defaults }
     };
 
@@ -34,12 +34,8 @@ export default function BlocksTab({ onSelect, onClose }) {
           className="cursor-pointer rounded-xl border p-6 text-center hover:border-indigo-500"
         >
 
-          <div className="text-lg font-semibold">
+          <div className="text-sm font-semibold">
             {type}
-          </div>
-
-          <div className="text-xs text-gray-500 mt-2">
-            {blockRegistry[type].variants.length} variants
           </div>
 
         </div>

@@ -221,7 +221,7 @@ export default function ZonePickerModal({
     >
 
       <div
-        className="bg-white w-[1000px] h-[85vh] rounded-lg p-6 flex flex-col"
+        className="bg-[#1c1c28] w-[1000px] h-[85vh] rounded-lg p-6 flex flex-col"
         onClick={(e)=>e.stopPropagation()}
       >
 

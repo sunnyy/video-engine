@@ -1,154 +1,161 @@
+/**
+ * ContentTab.jsx
+ * src/ui/Editor/zones/tabs/ContentTab.jsx
+ *
+ * Two-column grid for dropdowns.
+ * Full-width sliders below for Padding, Radius, Shadow.
+ */
 import React from "react";
-import { getBlockVariants } from "../../../../core/blockRegistry";
 import { transitionsRegistry } from "../../../../core/transitionsRegistry";
-import { motionsRegistry } from "../../../../core/motionsRegistry";
-import ZonePreview from "../ZonePreview";
-import blockEditors from "../../blocks/blockEditors";
-import BlockTimingEditor from "../../blocks/editors/BlockTimingEditor";
+import { motionsRegistry }     from "../../../../core/motionsRegistry";
+
+function FieldLabel({ children }) {
+  return (
+    <div
+      className="text-[10px] font-bold tracking-widest uppercase text-[#7070a0] mb-[4px]"
+      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Sel({ value, onChange, options }) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full bg-[#12121c] border border-[rgba(255,255,255,0.08)] rounded-[6px] px-2 py-[5px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer"
+    >
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+}
+
+function Slider({ label, value, onChange, min = 0, max = 60, unit = "px" }) {
+  return (
+    <div className="flex flex-col gap-[3px]">
+      <div className="flex justify-between items-center">
+        <FieldLabel>{label}</FieldLabel>
+        <span className="text-[10px] font-mono text-[#7070a0]">{value}{unit}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full accent-[#7c5cfc] cursor-pointer"
+        style={{ height: 2 }}
+      />
+    </div>
+  );
+}
 
 export default function ContentTab({
-  slot,
-  zone,
-  openPicker,
-  setVariant,
-  updateBlockProp,
-  updateContentProp,
-  clearContent,
+  slot, zone, openPicker, updateContentProp,
+  setPadding, setZoneStyle, clearContent,
 }) {
+  const content  = zone?.content || {};
+  const style    = zone?.style   || {};
 
-  const content = zone?.content || {};
-  const block = content?.block || {};
-
-  const variants = block?.type ? getBlockVariants(block.type) : [];
-
-  const enterTransitions = Object.keys(transitionsRegistry.enter || {});
-  const exitTransitions = Object.keys(transitionsRegistry.exit || {});
+  const enters  = Object.keys(transitionsRegistry.enter || {});
+  const exits   = Object.keys(transitionsRegistry.exit  || {});
   const motions = Object.keys(motionsRegistry || {});
 
-  const BlockEditor = block?.type ? blockEditors[block.type] : null;
+  const radiusVal  = style.borderRadius ?? 0;
+  const shadowVal  = style.shadowBlur   ?? 0;
 
+  const allPadding = (v) => {
+    setPadding(slot, "top",    v);
+    setPadding(slot, "right",  v);
+    setPadding(slot, "bottom", v);
+    setPadding(slot, "left",   v);
+  };
+
+  /* ── Empty ── */
+  if (!content.kind) return (
+    <div
+      className="flex flex-col items-center justify-center gap-2 cursor-pointer py-6 opacity-50"
+      onClick={() => openPicker(slot, "content")}
+    >
+      <div className="text-[28px] leading-none text-[#9494a8]">+</div>
+      <span className="text-[11px] text-[#9494a8]">Add content</span>
+    </div>
+  );
+
+  /* ── Block ── */
+  if (content.kind === "block") return (
+    <div className="flex flex-col items-center justify-center gap-1 py-6">
+      <div className="bg-[rgba(124,92,252,0.15)] text-[#a78fff] text-[12px] font-semibold px-3 py-[3px] rounded-[5px]">
+        {content.block?.type}
+      </div>
+      <span className="text-[10px] text-[#7070a0]">Edit below ↓</span>
+    </div>
+  );
+
+  /* ── Color ── */
+  if (content.kind === "color") return (
+    <div className="flex flex-col items-center justify-center gap-2 py-6">
+      <div
+        className="w-8 h-8 rounded-full border border-[rgba(255,255,255,0.12)]"
+        style={{ background: content.color }}
+      />
+      <span className="text-[10px] font-mono text-[#7070a0]">{content.color}</span>
+    </div>
+  );
+
+  /* ── Asset ── */
   return (
-    <div>
+    <div className="flex flex-col gap-3">
 
-      <div className="relative mb-2">
-        <div onClick={() => openPicker(slot, "content")} className="cursor-pointer">
-          <ZonePreview zone={zone} mode="content" />
+      {/* 2-column dropdowns */}
+      <div className="grid grid-cols-2 gap-x-2 gap-y-3">
+
+        <div>
+          <FieldLabel>Fit</FieldLabel>
+          <Sel
+            value={content.asset?.objectFit || "cover"}
+            onChange={v => updateContentProp(slot, "objectFit", v)}
+            options={["cover", "contain"]}
+          />
         </div>
 
-        {content.kind && (
-          <button
-            onClick={() => clearContent(slot)}
-            className="absolute top-1 right-1 bg-white border rounded px-1 text-[10px]"
-          >
-            X
-          </button>
-        )}
+        <div>
+          <FieldLabel>Motion</FieldLabel>
+          <Sel
+            value={content.asset?.motion || "none"}
+            onChange={v => updateContentProp(slot, "motion", v)}
+            options={motions}
+          />
+        </div>
+
+        <div>
+          <FieldLabel>Enter</FieldLabel>
+          <Sel
+            value={content.asset?.enterTransition || "fadeIn"}
+            onChange={v => updateContentProp(slot, "enterTransition", v)}
+            options={enters}
+          />
+        </div>
+
+        <div>
+          <FieldLabel>Exit</FieldLabel>
+          <Sel
+            value={content.asset?.exitTransition || "none"}
+            onChange={v => updateContentProp(slot, "exitTransition", v)}
+            options={exits}
+          />
+        </div>
+
       </div>
 
-      {content.kind === "asset" && (
-        <>
+      {/* Divider */}
+      <div className="h-[1px] bg-[rgba(255,255,255,0.06)]" />
 
-          <div className="flex-1 flex gap-2">
-
-            <div className="flex-1 flex-col">
-
-              <div className="mt-2 text-[12px]">Object Fit</div>
-
-              <select
-                value={content.asset?.objectFit || "cover"}
-                onChange={(e) => updateContentProp(slot, "objectFit", e.target.value)}
-                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
-              >
-                <option value="cover">cover</option>
-                <option value="contain">contain</option>
-              </select>
-
-            </div>
-
-            <div className="flex-1 flex-col">
-
-              <div className="mt-2 text-[12px]">Motion</div>
-
-              <select
-                value={content.asset?.motion || "none"}
-                onChange={(e) => updateContentProp(slot, "motion", e.target.value)}
-                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
-              >
-                {motions.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-
-            </div>
-
-          </div>
-
-          <div className="flex-1 flex gap-2">
-
-            <div className="flex-1 flex-col">
-
-              <div className="mt-2 text-[12px]">Enter</div>
-
-              <select
-                value={content.asset?.enterTransition || "fadeIn"}
-                onChange={(e) => updateContentProp(slot, "enterTransition", e.target.value)}
-                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
-              >
-                {enterTransitions.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-
-            </div>
-
-            <div className="flex-1 flex-col">
-
-              <div className="mt-2 text-[12px]">Exit</div>
-
-              <select
-                value={content.asset?.exitTransition || "none"}
-                onChange={(e) => updateContentProp(slot, "exitTransition", e.target.value)}
-                className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
-              >
-                {exitTransitions.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-
-            </div>
-
-          </div>
-
-        </>
-      )}
-
-      {content.kind === "block" && block?.type && (
-        <>
-
-          <div className="mt-3 text-[11px]">Variant</div>
-
-          <select
-            value={block.variant}
-            onChange={(e) => setVariant(slot, e.target.value)}
-            className="w-full text-[13px] p-1 border rounded bg-gray-600 text-gray-300"
-          >
-            {variants.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-
-          {BlockEditor && (
-            <BlockEditor
-              slot={slot}
-              block={block}
-              updateBlockProp={updateBlockProp}
-            />
-          )}
-
-          <BlockTimingEditor block={block} />
-
-        </>
-      )}
+      {/* Full-width sliders */}
+      <div className="flex flex-col gap-3">
+        <Slider label="Scale"   value={Math.round((zone?.style?.scale ?? 1) * 100)} onChange={v => setZoneStyle && setZoneStyle(slot, "scale", v / 100)} min={50} max={100} unit="%" />
+        <Slider label="Radius"  value={radiusVal}  onChange={v => setZoneStyle && setZoneStyle(slot, "borderRadius", v)} max={80} />
+        <Slider label="Shadow"  value={shadowVal}  onChange={v => setZoneStyle && setZoneStyle(slot, "shadowBlur",   v)} max={60} />
+      </div>
 
     </div>
   );

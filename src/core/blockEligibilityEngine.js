@@ -4,17 +4,16 @@ import { layoutCapabilityRegistry } from "./layoutCapabilityRegistry";
 function detectCandidateBlocks(intent, spoken = "") {
 
   const text = (spoken || "").toLowerCase();
-
   const candidates = [];
 
-  if (intent === "hook") candidates.push("Hook");
+  if (intent === "hook") candidates.push("HookImpact");
 
   if (
     intent === "stat" ||
     text.includes("%") ||
     text.match(/\d+/)
   ) {
-    candidates.push("Stat","NumberTicker");
+    candidates.push("StatExplosion","ProgressBars");
   }
 
   if (
@@ -24,7 +23,7 @@ function detectCandidateBlocks(intent, spoken = "") {
     text.includes("third") ||
     text.includes("top")
   ) {
-    candidates.push("ListReveal");
+    candidates.push("ListCountdown","ProcessSteps");
   }
 
   if (
@@ -33,7 +32,7 @@ function detectCandidateBlocks(intent, spoken = "") {
     text.includes("versus") ||
     text.includes("compared")
   ) {
-    candidates.push("Comparison");
+    candidates.push("MythVsFact","BeforeAfter","SplitScreen","ProblemSolution");
   }
 
   if (
@@ -41,7 +40,14 @@ function detectCandidateBlocks(intent, spoken = "") {
     text.includes('"') ||
     text.includes("said")
   ) {
-    candidates.push("Quote");
+    candidates.push("QuoteHighlight","Testimonial");
+  }
+
+  if (
+    intent === "chapter" ||
+    text.includes("chapter")
+  ) {
+    candidates.push("ChapterTitle");
   }
 
   return candidates;
@@ -56,7 +62,6 @@ export function resolveBlockForBeat({
 }) {
 
   const layoutCaps = layoutCapabilityRegistry[layout];
-
   if (!layoutCaps) return null;
 
   const allowedBlocks = layoutCaps.allowedBlocks || [];
@@ -72,7 +77,6 @@ export function resolveBlockForBeat({
   const blockType = valid[0];
 
   const blockDef = blockRegistry[blockType];
-
   if (!blockDef) return null;
 
   if (duration < (blockDef.minDuration || 2)) return null;

@@ -1,132 +1,364 @@
+/**
+ * backgroundPatternRegistry.js
+ * src/core/backgroundPatternRegistry.js
+ *
+ * Single source of truth for all zone backgrounds.
+ * Used by:
+ *   - ZonePickerModal > ColorsTab (user picks manually)
+ *   - visualPlanner.js / visualDirector.js (automated selection)
+ *
+ * Each entry is a function returning a CSS style object.
+ * Keys are used for automated selection — keep them semantic.
+ *
+ * Categories: dark | light | gradient | neon | pattern | cinematic
+ */
+
 export const backgroundPatternRegistry = {
 
-  /* ---------------- PATTERNS ---------------- */
+  /* ─── PURE DARK ─────────────────────────────────────────── */
 
-  none: () => ({
-    background: "#000000"
+  pureBlack: () => ({
+    background: "#000000",
   }),
 
-  stripesDiagonal: (c1 = "#111", c2 = "#222") => ({
-    background: `repeating-linear-gradient(
-      45deg,
-      ${c1} 0px,
-      ${c1} 12px,
-      ${c2} 12px,
-      ${c2} 24px
-    )`
+  deepBlack: () => ({
+    background: "#080810",
   }),
 
-  stripesHorizontal: (c1 = "#111", c2 = "#222") => ({
-    background: `repeating-linear-gradient(
-      0deg,
-      ${c1} 0px,
-      ${c1} 10px,
-      ${c2} 10px,
-      ${c2} 20px
-    )`
+  inkBlack: () => ({
+    background: "#0b0b14",
   }),
 
-  dots: (c = "#333") => ({
-    background: `radial-gradient(circle, ${c} 2px, transparent 2px)`,
-    backgroundSize: "22px 22px"
+  charcoal: () => ({
+    background: "#111118",
   }),
 
-  grid: (c = "#333") => ({
-    background: `
-      linear-gradient(${c} 1px, transparent 1px),
-      linear-gradient(90deg, ${c} 1px, transparent 1px)
-    `,
-    backgroundSize: "40px 40px"
+  graphite: () => ({
+    background: "#1a1a24",
   }),
 
-  crossGrid: (c = "#333") => ({
-    background: `
-      linear-gradient(${c} 1px, transparent 1px),
-      linear-gradient(90deg, ${c} 1px, transparent 1px),
-      linear-gradient(45deg, ${c} 1px, transparent 1px),
-      linear-gradient(-45deg, ${c} 1px, transparent 1px)
-    `,
-    backgroundSize: "40px 40px"
+  deepNavy: () => ({
+    background: "#0a0e1a",
   }),
 
-  /* ---------------- GRADIENT LIBRARY ---------------- */
+  midnightBlue: () => ({
+    background: "#080d1f",
+  }),
+
+  deepTeal: () => ({
+    background: "#060f12",
+  }),
+
+  deepForest: () => ({
+    background: "#070e08",
+  }),
+
+  deepPlum: () => ({
+    background: "#0e0714",
+  }),
+
+  deepBurgundy: () => ({
+    background: "#120508",
+  }),
+
+  /* ─── PURE LIGHT ─────────────────────────────────────────── */
+
+  pureWhite: () => ({
+    background: "#ffffff",
+  }),
+
+  softWhite: () => ({
+    background: "#f5f5f0",
+  }),
+
+  warmCream: () => ({
+    background: "#f7f3ea",
+  }),
+
+  coolGray: () => ({
+    background: "#f0f0f5",
+  }),
+
+  warmSand: () => ({
+    background: "#e9dfc8",
+  }),
+
+  softBlush: () => ({
+    background: "#f4d8d8",
+  }),
+
+  mintLight: () => ({
+    background: "#d9f0e3",
+  }),
+
+  skyLight: () => ({
+    background: "#dcebfa",
+  }),
+
+  lavenderLight: () => ({
+    background: "#ddd6f3",
+  }),
+
+  /* ─── DARK GRADIENTS ─────────────────────────────────────── */
 
   gradientDark: () => ({
-    background: `linear-gradient(135deg,#111,#000)`
+    background: "linear-gradient(135deg, #111118 0%, #000000 100%)",
   }),
 
   gradientPurpleNight: () => ({
-    background: `linear-gradient(135deg,#1a0b2e,#000)`
+    background: "linear-gradient(135deg, #1a0b2e 0%, #0a0512 100%)",
   }),
 
   gradientBlueDepth: () => ({
-    background: `linear-gradient(135deg,#0f2027,#203a43,#2c5364)`
+    background: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)",
   }),
 
-  gradientSunset: () => ({
-    background: `linear-gradient(135deg,#ff7e5f,#feb47b)`
+  gradientRoyalDark: () => ({
+    background: "linear-gradient(135deg, #17142a 0%, #312e81 100%)",
   }),
 
-  gradientOrangeGlow: () => ({
-    background: `linear-gradient(135deg,#ff5f6d,#ffc371)`
+  gradientEmeraldNight: () => ({
+    background: "linear-gradient(135deg, #0b1f1a 0%, #1f4d3a 100%)",
   }),
 
-  gradientNeonPink: () => ({
-    background: `linear-gradient(135deg,#ff00cc,#333399)`
+  gradientBurgundyDark: () => ({
+    background: "linear-gradient(135deg, #1a0f14 0%, #4a1f2d 100%)",
   }),
 
-  gradientAqua: () => ({
-    background: `linear-gradient(135deg,#13547a,#80d0c7)`
-  }),
-
-  gradientEmerald: () => ({
-    background: `linear-gradient(135deg,#134e5e,#71b280)`
-  }),
-
-  gradientRedEnergy: () => ({
-    background: `linear-gradient(135deg,#cb2d3e,#ef473a)`
+  gradientSteelDark: () => ({
+    background: "linear-gradient(135deg, #1f2937 0%, #374151 100%)",
   }),
 
   gradientCyber: () => ({
-    background: `linear-gradient(135deg,#0f0c29,#302b63,#24243e)`
-  }),
-
-  gradientSoftLight: () => ({
-    background: `linear-gradient(135deg,#f5f7fa,#c3cfe2)`
-  }),
-
-  gradientWarmLight: () => ({
-    background: `linear-gradient(135deg,#f6d365,#fda085)`
-  }),
-
-  gradientOcean: () => ({
-    background: `linear-gradient(135deg,#2E3192,#1BFFFF)`
+    background: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
   }),
 
   gradientNightSky: () => ({
-    background: `linear-gradient(135deg,#141E30,#243B55)`
+    background: "linear-gradient(135deg, #141e30 0%, #243b55 100%)",
+  }),
+
+  gradientRedDark: () => ({
+    background: "linear-gradient(135deg, #1a0505 0%, #3d0a0a 100%)",
+  }),
+
+  /* ─── VIBRANT GRADIENTS ──────────────────────────────────── */
+
+  gradientSunset: () => ({
+    background: "linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)",
+  }),
+
+  gradientOrangeGlow: () => ({
+    background: "linear-gradient(135deg, #ff5f6d 0%, #ffc371 100%)",
+  }),
+
+  gradientNeonPink: () => ({
+    background: "linear-gradient(135deg, #ff00cc 0%, #333399 100%)",
+  }),
+
+  gradientAqua: () => ({
+    background: "linear-gradient(135deg, #13547a 0%, #80d0c7 100%)",
+  }),
+
+  gradientEmerald: () => ({
+    background: "linear-gradient(135deg, #134e5e 0%, #71b280 100%)",
+  }),
+
+  gradientOcean: () => ({
+    background: "linear-gradient(135deg, #2e3192 0%, #1bffff 100%)",
   }),
 
   gradientLavender: () => ({
-    background: `linear-gradient(135deg,#654ea3,#eaafc8)`
+    background: "linear-gradient(135deg, #654ea3 0%, #eaafc8 100%)",
   }),
 
-  /* ---------------- RADIAL / MESH ---------------- */
-
-  radialBurst: (c1 = "#111", c2 = "#000") => ({
-    background: `radial-gradient(circle at center, ${c1}, ${c2})`
+  gradientRose: () => ({
+    background: "linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)",
   }),
 
-  softGradient: (c1 = "#1a1a1a", c2 = "#000") => ({
-    background: `linear-gradient(135deg, ${c1}, ${c2})`
+  gradientGold: () => ({
+    background: "linear-gradient(135deg, #4a3510 0%, #c9a84c 50%, #ffd700 100%)",
   }),
 
-  meshGradient: (c1 = "#222", c2 = "#000", c3 = "#333") => ({
+  gradientForest: () => ({
+    background: "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)",
+  }),
+
+  gradientWarmLight: () => ({
+    background: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)",
+  }),
+
+  /* ─── NEON / GLOW ────────────────────────────────────────── */
+
+  neonPurple: () => ({
+    background: "radial-gradient(ellipse at center, #2d0a5e 0%, #0a0514 70%)",
+  }),
+
+  neonBlue: () => ({
+    background: "radial-gradient(ellipse at center, #001a4d 0%, #000510 70%)",
+  }),
+
+  neonGreen: () => ({
+    background: "radial-gradient(ellipse at center, #003320 0%, #000a05 70%)",
+  }),
+
+  neonRed: () => ({
+    background: "radial-gradient(ellipse at center, #4d0000 0%, #0a0000 70%)",
+  }),
+
+  neonCyan: () => ({
+    background: "radial-gradient(ellipse at center, #003333 0%, #000a0a 70%)",
+  }),
+
+  /* ─── MESH / RADIAL ──────────────────────────────────────── */
+
+  meshPurpleBlue: () => ({
     background: `
-      radial-gradient(circle at 20% 20%, ${c1}, transparent 40%),
-      radial-gradient(circle at 80% 30%, ${c2}, transparent 40%),
-      radial-gradient(circle at 50% 80%, ${c3}, transparent 40%)
-    `
+      radial-gradient(ellipse at 20% 20%, #2d1b69 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, #1a0a40 0%, transparent 50%),
+      #0a0514
+    `,
+  }),
+
+  meshTealPurple: () => ({
+    background: `
+      radial-gradient(ellipse at 30% 70%, #0f3d3d 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 30%, #2d0a5e 0%, transparent 50%),
+      #080810
+    `,
+  }),
+
+  meshOrangeRed: () => ({
+    background: `
+      radial-gradient(ellipse at 20% 80%, #4d1a00 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, #3d0a0a 0%, transparent 50%),
+      #0a0000
+    `,
+  }),
+
+  radialBurst: () => ({
+    background: "radial-gradient(circle at center, #1a1a2e 0%, #000000 70%)",
+  }),
+
+  radialWarm: () => ({
+    background: "radial-gradient(circle at center, #2e1a0a 0%, #000000 70%)",
+  }),
+
+  /* ─── PATTERNS ───────────────────────────────────────────── */
+
+  darkGrid: () => ({
+    background: `
+      linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px),
+      #0b0b14
+    `,
+    backgroundSize: "32px 32px, 32px 32px",
+  }),
+
+  darkDots: () => ({
+    background: "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px), #0b0b14",
+    backgroundSize: "20px 20px",
+  }),
+
+  darkDiagonal: () => ({
+    background: `
+      repeating-linear-gradient(
+        45deg,
+        #111118 0px, #111118 18px,
+        #16161f 18px, #16161f 20px
+      )
+    `,
+  }),
+
+  lightGrid: () => ({
+    background: `
+      linear-gradient(rgba(0,0,0,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px),
+      #f5f3ee
+    `,
+    backgroundSize: "28px 28px, 28px 28px",
+  }),
+
+  lightDots: () => ({
+    background: "radial-gradient(circle, rgba(0,0,0,0.15) 1px, transparent 1px), #f5f3ee",
+    backgroundSize: "18px 18px",
+  }),
+
+  diagonalStripe: () => ({
+    background: `
+      repeating-linear-gradient(
+        135deg,
+        #f7e6a6 0px, #f7e6a6 12px,
+        #f2d16b 12px, #f2d16b 24px
+      )
+    `,
+  }),
+
+  softStripe: () => ({
+    background: `
+      repeating-linear-gradient(
+        90deg,
+        #f8edeb 0px, #f8edeb 16px,
+        #fcd5ce 16px, #fcd5ce 32px
+      )
+    `,
+  }),
+
+  neonGrid: () => ({
+    background: `
+      linear-gradient(rgba(124,92,252,0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,92,252,0.15) 1px, transparent 1px),
+      #080810
+    `,
+    backgroundSize: "40px 40px, 40px 40px",
   }),
 
 };
+
+/* ─── Category map for automated selection ───────────────── */
+export const backgroundCategories = {
+  dark:      ["pureBlack","deepBlack","inkBlack","charcoal","graphite","deepNavy","midnightBlue","deepTeal","deepForest","deepPlum","deepBurgundy"],
+  light:     ["pureWhite","softWhite","warmCream","coolGray","warmSand","softBlush","mintLight","skyLight","lavenderLight"],
+  gradient:  ["gradientDark","gradientPurpleNight","gradientBlueDepth","gradientRoyalDark","gradientEmeraldNight","gradientBurgundyDark","gradientSteelDark","gradientCyber","gradientNightSky","gradientRedDark"],
+  vibrant:   ["gradientSunset","gradientOrangeGlow","gradientNeonPink","gradientAqua","gradientEmerald","gradientOcean","gradientLavender","gradientRose","gradientGold","gradientForest","gradientWarmLight"],
+  neon:      ["neonPurple","neonBlue","neonGreen","neonRed","neonCyan"],
+  mesh:      ["meshPurpleBlue","meshTealPurple","meshOrangeRed","radialBurst","radialWarm"],
+  pattern:   ["darkGrid","darkDots","darkDiagonal","lightGrid","lightDots","diagonalStripe","softStripe","neonGrid"],
+};
+
+/* ─── Intent → background suggestions ───────────────────── */
+export const backgroundByIntent = {
+  shock:       ["gradientRedDark","deepBurgundy","neonRed","gradientCyber"],
+  curiosity:   ["gradientPurpleNight","gradientRoyalDark","neonPurple","meshPurpleBlue"],
+  proof:       ["charcoal","graphite","gradientSteelDark","darkGrid"],
+  reveal:      ["gradientCyber","gradientBlueDepth","neonBlue","meshTealPurple"],
+  urgency:     ["gradientRedDark","gradientOrangeGlow","neonRed","deepBurgundy"],
+  empathy:     ["gradientLavender","gradientRose","lavenderLight","softBlush"],
+  explanation: ["charcoal","deepNavy","gradientSteelDark","darkDots"],
+  contrast:    ["gradientSunset","gradientGold","gradientOcean","gradientEmerald"],
+  punchline:   ["gradientOrangeGlow","gradientNeonPink","gradientSunset","neonCyan"],
+  irony:       ["gradientNeonPink","neonGreen","diagonalStripe","darkDiagonal"],
+};
+
+/**
+ * Get a random background from a category.
+ * @param {string} category
+ * @returns {object} CSS style object
+ */
+export function getRandomBackground(category = "dark") {
+  const keys = backgroundCategories[category] || backgroundCategories.dark;
+  const key  = keys[Math.floor(Math.random() * keys.length)];
+  return backgroundPatternRegistry[key]?.() || backgroundPatternRegistry.inkBlack();
+}
+
+/**
+ * Get a background suggestion for a beat intent.
+ * @param {string} intent
+ * @returns {object} CSS style object
+ */
+export function getBackgroundForIntent(intent) {
+  const keys = backgroundByIntent[intent] || backgroundCategories.dark;
+  const key  = keys[Math.floor(Math.random() * keys.length)];
+  return backgroundPatternRegistry[key]?.() || backgroundPatternRegistry.inkBlack();
+}
+
+export default backgroundPatternRegistry;
