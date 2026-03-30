@@ -9,6 +9,11 @@ import ThreeZone from "../remotion/layouts/ThreeZone.jsx";
 import TwoTopOneBottom from "../remotion/layouts/TwoTopOneBottom.jsx";
 import OneTopTwoBottom from "../remotion/layouts/OneTopTwoBottom.jsx";
 import FourGrid from "../remotion/layouts/FourGrid.jsx";
+import SixGrid from "../remotion/layouts/SixGrid.jsx";
+import BigTopSmallBottom from "../remotion/layouts/BigTopSmallBottom.jsx";
+import SmallTopBigBottom from "../remotion/layouts/SmallTopBigBottom.jsx";
+import LeftHeavy from "../remotion/layouts/LeftHeavy.jsx";
+import RightHeavy from "../remotion/layouts/RightHeavy.jsx";
 
 export const layoutRegistry = {
 
@@ -280,6 +285,81 @@ export const layoutRegistry = {
       blocks: true,
       caption: true
     }
-  }
+  },
+
+  SixGrid: {
+    component: SixGrid,
+    zones: ["z1","z2","z3","z4","z5","z6"],
+    supportsAvatar: false,
+    orientations: ["vertical","horizontal"],
+    capability: { assetSlots:6, avatarSlots:0, prefersAvatar:false },
+    safeAreas: {
+      heading: { top:80, left:80, right:80 },
+      blocks:  { top:140, left:80, right:80, bottom:260 },
+      caption: { bottom:160, left:80, right:80 }
+    },
+    captionPosition: "bottom",
+    structure: { heading:true, blocks:true, caption:true }
+  },
+
+  BigTopSmallBottom: {
+    component: BigTopSmallBottom,
+    zones: ["z1","z2","z3"],
+    supportsAvatar: false,
+    orientations: ["vertical","horizontal"],
+    capability: { assetSlots:3, avatarSlots:0, prefersAvatar:false },
+    safeAreas: {
+      heading: { top:80, left:80, right:80 },
+      blocks:  { top:140, left:80, right:80, bottom:260 },
+      caption: { bottom:160, left:80, right:80 }
+    },
+    captionPosition: "bottom",
+    structure: { heading:true, blocks:true, caption:true }
+  },
+
+  SmallTopBigBottom: {
+    component: SmallTopBigBottom,
+    zones: ["z1","z2","z3"],
+    supportsAvatar: false,
+    orientations: ["vertical","horizontal"],
+    capability: { assetSlots:3, avatarSlots:0, prefersAvatar:false },
+    safeAreas: {
+      heading: { top:80, left:80, right:80 },
+      blocks:  { top:140, left:80, right:80, bottom:260 },
+      caption: { bottom:160, left:80, right:80 }
+    },
+    captionPosition: "bottom",
+    structure: { heading:true, blocks:true, caption:true }
+  },
+
+  LeftHeavy: {
+    component: LeftHeavy,
+    zones: ["z1","z2"],
+    supportsAvatar: false,
+    orientations: ["vertical","horizontal"],
+    capability: { assetSlots:2, avatarSlots:0, prefersAvatar:false },
+    safeAreas: {
+      heading: { top:80, left:80, right:80 },
+      blocks:  { top:140, left:80, right:80, bottom:260 },
+      caption: { bottom:160, left:80, right:80 }
+    },
+    captionPosition: "bottom",
+    structure: { heading:true, blocks:true, caption:true }
+  },
+
+  RightHeavy: {
+    component: RightHeavy,
+    zones: ["z1","z2"],
+    supportsAvatar: false,
+    orientations: ["vertical","horizontal"],
+    capability: { assetSlots:2, avatarSlots:0, prefersAvatar:false },
+    safeAreas: {
+      heading: { top:80, left:80, right:80 },
+      blocks:  { top:140, left:80, right:80, bottom:260 },
+      caption: { bottom:160, left:80, right:80 }
+    },
+    captionPosition: "bottom",
+    structure: { heading:true, blocks:true, caption:true }
+  },
 
 };

@@ -2,105 +2,112 @@ import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 import { layoutRegistry } from "../../core/layoutRegistry.js";
 
-import LayoutSelector from "./LayoutSelector";
-import ZonesSection from "./ZonesSection";
+import LayoutSelector  from "./LayoutSelector";
+import ZonesSection    from "./ZonesSection";
 import CaptionsSection from "./CaptionsSection";
-import OverlaySection from "./OverlaySection";
+import OverlaySection  from "./OverlaySection";
 
 if (typeof document !== "undefined" && !document.getElementById("editor-fonts")) {
   const link = document.createElement("link");
-  link.id = "editor-fonts";
-  link.rel = "stylesheet";
-  link.href =
-    "https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
+  link.id   = "editor-fonts";
+  link.rel  = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
   document.head.appendChild(link);
 }
 
-function Section({ label, color, children }) {
-  const [open, setOpen] = useState(true);
-
-  return (
-    <div className="mb-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[#111118] overflow-hidden">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#16161f] transition cursor-pointer"
-        style={{ background: "none", border: "none" }}
-      >
-        <div className="w-[5px] h-[20px] rounded-sm flex-shrink-0" style={{ background: color }} />
-
-        <span
-          className="flex-1 text-left text-[15px] font-bold tracking-[0.1em] uppercase text-[#bbb]"
-          style={{ fontFamily: "'Syne', sans-serif" }}
-        >
-          {label}
-        </span>
-
-        <span
-          className="text-[#55556a] text-2xl transition-transform duration-200"
-          style={{
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            display: "inline-block",
-          }}
-        >
-          ▾
-        </span>
-      </button>
-
-      {open && <div className="px-4 pb-4 pt-2">{children}</div>}
-    </div>
-  );
-}
+const TABS = [
+  { key: "layout",   label: "Layout",   color: "#7c5cfc" },
+  { key: "zones",    label: "Zones",    color: "#f97316" },
+  { key: "caption",  label: "Caption",  color: "#3b9eff" },
+  { key: "overlays", label: "Overlays", color: "#2dd4bf" },
+  { key: "sfx",      label: "SFX",      color: "#f0e040" },
+];
 
 export default function BeatEditor() {
-  const project = useProjectStore((s) => s.project);
+  const project      = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
+  const [tab, setTab] = useState("layout");
 
   if (!project || !activeBeatId) return null;
 
   const activeBeat = project.beats.find((b) => b.id === activeBeatId);
   if (!activeBeat) return null;
 
-  const layout = layoutRegistry[activeBeat.layout];
+  const layout    = layoutRegistry[activeBeat.layout];
   const structure = layout?.structure || {};
-  const zones = activeBeat.zones || {};
 
   return (
-    <div className="flex-1 w-[75%] min-w-[320px] overflow-y-auto border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] px-6 py-5 ml-4">
-      {/* Beat Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <span
-          className="px-2 py-[4px] text-[10px] rounded-[4px] border border-[rgba(255,255,255,0.1)] bg-[#16161f] text-[#55556a]"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-        >
-          BEAT #{activeBeat.order + 1}
-        </span>
+    <div className="flex-1 w-[75%] min-w-[320px] flex flex-col border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] ml-4 overflow-hidden">
 
-        <h3 className="m-0 text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>
-          Editing Beat #{activeBeat.order + 1}
-        </h3>
+      {/* ── Tab bar ── */}
+      <div
+        className="flex items-center gap-[2px] px-4 pt-4 pb-0 shrink-0"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        {TABS.map(({ key, label, color }) => {
+          /* Hide Caption tab if layout doesn't support it */
+          if (key === "caption" && !structure.caption) return null;
+
+          const isActive = tab === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className="relative px-4 py-[9px] text-[18px] font-bold transition-all"
+              style={{
+                fontFamily: "'Syne', sans-serif",
+                background:  "none",
+                border:      "none",
+                cursor:      "pointer",
+                color:       isActive ? "#ffffff" : "#66666a",
+                borderBottom: isActive ? `4px solid ${color}` : "2px solid transparent",
+                marginBottom: -1,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+
+        {/* Beat badge pushed to right */}
+        <div className="ml-auto mb-2">
+          <span
+            className="px-2 py-[3px] text-[14px] rounded-[4px] border border-[rgba(255,255,255,0.08)] bg-[#16161f] text-[#55556a]"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            BEAT #{activeBeat.order + 1}
+          </span>
+        </div>
       </div>
 
-      {/* Layout */}
-      <Section color="#7c5cfc" label="Layout">
-        <LayoutSelector beat={activeBeat} />
-      </Section>
+      {/* ── Tab content — scrollable ── */}
+      <div className="flex-1 overflow-y-auto px-5 py-5">
 
-      {/* Zones */}
-      <Section color="#f97316" label="Zones">
-        <ZonesSection beat={activeBeat} project={project} />
-      </Section>
+        {tab === "layout" && (
+          <LayoutSelector beat={activeBeat} />
+        )}
 
-      {/* Caption */}
-      {structure.caption && (
-        <Section color="#3b9eff" label="Caption">
+        {tab === "zones" && (
+          <ZonesSection beat={activeBeat} project={project} />
+        )}
+
+        {tab === "caption" && structure.caption && (
           <CaptionsSection beat={activeBeat} />
-        </Section>
-      )}
+        )}
 
-      {/* Overlays */}
-      <Section color="#2dd4bf" label="Overlays">
-        <OverlaySection beat={activeBeat} />
-      </Section>
+        {tab === "overlays" && (
+          <OverlaySection beat={activeBeat} />
+        )}
+
+        {tab === "sfx" && (
+          <div className="flex flex-col items-center justify-center h-40 gap-2 opacity-40">
+            <span className="text-[28px]">🎵</span>
+            <span className="text-[13px] text-[#9494a8]">Sound effects coming soon</span>
+          </div>
+        )}
+
+      </div>
+
     </div>
   );
 }

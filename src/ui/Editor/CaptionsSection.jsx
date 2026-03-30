@@ -5,14 +5,8 @@ import { captionStyleRegistry, captionStyleKeys } from "../../core/captionStyleR
 
 const PREVIEW_TEXT = "This changes everything";
 const FPS = 30;
-const LOOP_FRAMES = 270; // 9 seconds at 30fps — enough to see the full animation
+const LOOP_FRAMES = 270;
 
-/* ─────────────────────────────────────────────────────────────
-   CaptionPreview
-   Runs its own rAF loop so each card animates independently.
-   Uses a canvas-free approach: just a div with the rendered JSX,
-   scaled down to fit the card.
-───────────────────────────────────────────────────────────── */
 function CaptionPreview({ styleKey, brandColor }) {
   const [frame, setFrame] = useState(0);
   const rafRef = useRef(null);
@@ -41,11 +35,13 @@ function CaptionPreview({ styleKey, brandColor }) {
   return (
     <div
       style={{
-        transform: "scale(0.28)",
+        width: 700,
+        transform: "scale(0.40)",
         transformOrigin: "center center",
         whiteSpace: "nowrap",
         pointerEvents: "none",
         userSelect: "none",
+        flexShrink: 0,
       }}
     >
       {rendered}
@@ -53,48 +49,34 @@ function CaptionPreview({ styleKey, brandColor }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────
-   POSITION BUTTONS
-───────────────────────────────────────────────────────────── */
 const POSITIONS = [
-  { key: "top",    label: "Top"    },
-  { key: "middle", label: "Mid"    },
+  { key: "top", label: "Top" },
+  { key: "middle", label: "Middle" },
   { key: "bottom", label: "Bottom" },
 ];
 
-/* ─────────────────────────────────────────────────────────────
-   MAIN COMPONENT
-───────────────────────────────────────────────────────────── */
 export default function CaptionsSection({ beat }) {
-
   const updateBeat = useProjectStore((s) => s.updateBeat);
-  const project    = useProjectStore((s) => s.project);
+  const project = useProjectStore((s) => s.project);
   const setProject = useProjectStore((s) => s.setProject);
 
-  const [tab, setTab] = useState("style");
-
-  /* guard: only show when layout supports captions */
   const layout = layoutRegistry[beat.layout];
   if (!layout?.structure?.caption) return null;
 
   const caption = beat.caption || {
-    show:     true,
-    text:     beat.spoken || "",
-    style:    captionStyleKeys[0],
+    show: true,
+    text: beat.spoken || "",
+    style: captionStyleKeys[0],
     position: "bottom",
   };
 
-  const brandColor = project?.meta?.brand_color
-    ?? project?.visualIdentity?.colorStory?.accent
-    ?? "#00F2EA";
+  const brandColor = project?.meta?.brand_color ?? project?.visualIdentity?.colorStory?.accent ?? "#00F2EA";
 
-  const updateCaption = (key, value) => {
-    updateBeat(beat.id, {
-      caption: { ...caption, [key]: value },
-    });
+  const update = (key, value) => {
+    updateBeat(beat.id, { caption: { ...caption, [key]: value } });
   };
 
-  const applyStyleToAllBeats = () => {
+  const applyToAll = () => {
     const beats = project.beats.map((b) => ({
       ...b,
       caption: { ...b.caption, style: caption.style },
@@ -102,175 +84,139 @@ export default function CaptionsSection({ beat }) {
     setProject({ ...project, beats });
   };
 
-  /* ── TAB NAV ── */
-  const tabs = [
-    { key: "style",    label: "Style"    },
-    { key: "content",  label: "Content"  },
-    { key: "position", label: "Position" },
-  ];
-
   return (
-    <div className="flex flex-col gap-3">
-
-      {/* Tab bar */}
-      <div className="flex gap-[3px] bg-[#16161f] border border-[#ffffff08] rounded-[10px] p-[3px]">
-        {tabs.map(({ key, label }) => (
+    <div className="flex flex-col gap-5">
+      {/* Show / Text */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-[#e8e8f0]">Show Caption</span>
           <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex-1 py-[6px] rounded-[7px] text-[11px] font-medium transition-all
-              ${tab === key
-                ? "bg-[#1c1c28] text-[#e8e8f0] shadow-sm"
-                : "text-[#55556a] hover:text-[#9494a8]"
-              }`}
+            onClick={() => update("show", !caption.show)}
+            className="w-[36px] h-[20px] rounded-full relative transition-all shrink-0"
+            style={{
+              background: caption.show ? "#7c5cfc" : "#1c1c28",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
           >
-            {label}
+            <span
+              style={{
+                position: "absolute",
+                top: 2,
+                left: caption.show ? 17 : 2,
+                width: 14,
+                height: 14,
+                background: "#fff",
+                borderRadius: "50%",
+                transition: "left 0.15s",
+              }}
+            />
           </button>
-        ))}
+        </div>
+
+        <div className="flex flex-col gap-[6px]">
+          <span
+            className="text-[14px] font-bold tracking-widest uppercase text-[#55556a]"
+            style={{ fontFamily: "'JetBrains Mono',monospace" }}
+          >
+            Text
+          </span>
+          <textarea
+            value={caption.text || beat.spoken || ""}
+            onChange={(e) => update("text", e.target.value)}
+            rows={3}
+            placeholder="Defaults to spoken text"
+            className="bg-[#111118] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-2 text-[20px] text-[#e8e8f0] resize-none focus:border-[#7c5cfc] focus:outline-none transition-colors leading-relaxed"
+          />
+        </div>
       </div>
 
-      {/* ── STYLE TAB ── */}
-      {tab === "style" && (
-        <div className="flex flex-col gap-3">
+      {/* ── Position ── */}
+      <div className="flex flex-col gap-2">
+        <span
+          className="text-[11px] font-bold tracking-widest uppercase text-[#55556a]"
+          style={{ fontFamily: "'JetBrains Mono',monospace" }}
+        >
+          Position
+        </span>
+        <div className="flex gap-[3px] bg-[#0e0e15] border border-[rgba(255,255,255,0.04)] rounded-[8px] p-[3px]">
+          {POSITIONS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => update("position", key)}
+              className={`flex-1 py-[8px] rounded-[6px] text-[14px]  text-[#e8e8f0] font-semibold transition-all bg-[#1c1c28] border-0
+                ${caption.position === key ? "border-2 border-blue-500" : "border-gray-500  hover:text-[#7070a0]"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          {/* Apply to all */}
-          <button
-            onClick={applyStyleToAllBeats}
-            className="text-[11px] font-medium py-[7px] rounded-[8px] border border-[#ffffff10] text-[#9494a8] hover:text-[#e8e8f0] hover:border-[#ffffff20] hover:bg-[#16161f] transition-all"
+      {/* ── Style grid — scrollable, shows ~3-4 at a time ── */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between mb-1">
+          <span
+            className="text-[11px] font-bold tracking-widest uppercase text-[#55556a]"
+            style={{ fontFamily: "'JetBrains Mono',monospace" }}
           >
-            Apply to All Beats
+            Caption Style
+          </span>
+          <button
+            onClick={applyToAll}
+            className="text-[11px] text-[#7c5cfc] hover:text-[#9d7fff] transition-colors bg-transparent border-0 cursor-pointer"
+          >
+            Apply to all
           </button>
+        </div>
 
-          {/* Style grid */}
-          <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1">
-            {captionStyleKeys.map((key) => {
-              const isSelected = caption.style === key;
-              const entry = captionStyleRegistry[key];
-              return (
+        <div className="flex flex-col gap-4 overflow-y-auto pr-[2px]" style={{ maxHeight: 420 }}>
+          {captionStyleKeys.map((key) => {
+            const isSelected = caption.style === key;
+            const entry = captionStyleRegistry[key];
+            return (
+              <div
+                key={key}
+                onClick={() => update("style", key)}
+                className="cursor-pointer rounded-[10px] overflow-hidden flex flex-col shrink-0"
+                style={{
+                  border: isSelected ? "1.5px solid #7c5cfc" : "1px solid rgba(255,255,255,0.07)",
+                  background: "#111118",
+                  boxShadow: isSelected ? "0 0 0 1px #7c5cfc40, 0 0 16px rgba(124,92,252,0.15)" : "none",
+                }}
+              >
                 <div
-                  key={key}
-                  onClick={() => updateCaption("style", key)}
-                  className="cursor-pointer rounded-[10px] overflow-hidden flex flex-col"
                   style={{
-                    border: isSelected
-                      ? "1.5px solid #7c5cfc"
-                      : "1px solid rgba(255,255,255,0.2)",
-                    background: "#0e0e15",
-                    boxShadow: isSelected
-                      ? "0 0 0 1px #7c5cfc, 0 0 16px rgba(124,92,252,0.2)"
-                      : "none",
-                  }}
-                >
-                  {/* Preview area */}
-                  <div
-                    style={{
-                      minHeight: 90,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                      background: key === "editorialSerif"
+                    height: 100,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    background:
+                      key === "editorialSerif"
                         ? "linear-gradient(160deg,#f5f3ee,#e8e4db)"
                         : "linear-gradient(160deg,#0d0d18,#050510)",
-                      position: "relative",
-                    }}
-                  >
-                    <CaptionPreview styleKey={key} brandColor={brandColor} />
-                  </div>
-
-                  {/* Label */}
-                  <div
-                    className="px-2 py-[5px] border-t border-[rgba(255,255,255,0.05)]"
-                    style={{
-                      fontFamily: "inherit",
-                      fontSize: 10,
-                      fontWeight: 600,
-                      letterSpacing: "0.06em",
-                      color: isSelected ? "#a78fff" : "rgba(148,148,168,0.7)",
-                      textAlign: "center",
-                    }}
-                  >
-                    {entry?.label ?? key}
-                  </div>
+                  }}
+                >
+                  <CaptionPreview styleKey={key} brandColor={brandColor} />
                 </div>
-              );
-            })}
-          </div>
+                <div
+                  style={{
+                    padding: "5px 8px",
+                    borderTop: "1px solid rgba(255,255,255,0.05)",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textAlign: "center",
+                    color: isSelected ? "#a78fff" : "rgba(148,148,168,0.6)",
+                  }}
+                >
+                  {entry?.label ?? key}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      )}
-
-      {/* ── CONTENT TAB ── */}
-      {tab === "content" && (
-        <div className="flex flex-col gap-3">
-
-          {/* Show / hide toggle */}
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-[#9494a8]">Show Caption</span>
-            <button
-              onClick={() => updateCaption("show", !caption.show)}
-              className="w-[30px] h-[16px] rounded-full relative transition-all"
-              style={{
-                background: caption.show ? "#7c5cfc" : "#1c1c28",
-                border: "1px solid rgba(255,255,255,0.1)",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: 1,
-                  left: caption.show ? 14 : 2,
-                  width: 12,
-                  height: 12,
-                  background: "#fff",
-                  borderRadius: "50%",
-                  transition: "left 0.15s",
-                  boxShadow: "0 1px 3px rgba(0,0,0,.3)",
-                }}
-              />
-            </button>
-          </div>
-
-          {/* Text override */}
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-widest text-[#55556a] font-bold">
-              Caption Text
-            </span>
-            <textarea
-              value={caption.text || beat.spoken || ""}
-              onChange={(e) => updateCaption("text", e.target.value)}
-              className="bg-[#16161f] border border-[rgba(255,255,255,0.06)] rounded-[8px] p-3 text-[24px] text-[#e8e8f0] resize-none focus:border-[#7c5cfc] focus:outline-none transition-colors"
-              rows={3}
-              placeholder="Caption text (defaults to spoken text)"
-            />
-          </div>
-
-        </div>
-      )}
-
-      {/* ── POSITION TAB ── */}
-      {tab === "position" && (
-        <div className="flex flex-col gap-3">
-          <span className="text-[10px] uppercase tracking-widest text-[#55556a] font-bold">
-            Vertical Position
-          </span>
-          <div className="flex gap-2 bg-[#16161f] border border-[#ffffff08] rounded-[8px] p-[3px]">
-            {POSITIONS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => updateCaption("position", key)}
-                className={`flex-1 text-[11px] font-medium py-[6px] rounded-[6px] capitalize transition-all
-                  ${caption.position === key
-                    ? "bg-[#1c1c28] text-[#e8e8f0] shadow-sm"
-                    : "text-[#55556a] hover:text-[#9494a8]"
-                  }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
+      </div>
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { motionsRegistry }     from "../../../../core/motionsRegistry";
 function FieldLabel({ children }) {
   return (
     <div
-      className="text-[10px] font-bold tracking-widest uppercase text-[#7070a0] mb-[4px]"
+      className="text-[14px] font-bold tracking-widest uppercase text-[#7070a0] mb-[4px]"
       style={{ fontFamily: "'JetBrains Mono', monospace" }}
     >
       {children}
