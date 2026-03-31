@@ -268,7 +268,7 @@ export default function ZonePickerModal({
                 if (t.key==="gallery") loadGalleryAssets();
 
               }}
-              className={`px-4 py-1 rounded ${
+              className={`px-4 py-1 rounded text-base ${
                 tab===t.key
                   ? "bg-purple-700 text-white"
                   : "border"

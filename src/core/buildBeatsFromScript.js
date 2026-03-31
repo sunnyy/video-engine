@@ -2,23 +2,24 @@
  * buildBeatsFromScript.js
  * src/core/buildBeatsFromScript.js
  *
- * Two separate concepts now correctly named:
- *   mode      = "faceless" | "talking_head"   — how the video is shot
- *   videoType = "viral" | "news" | ...        — content / storytelling type
+ * The director brain. Assembles every creative decision per beat:
+ * layout, zones, backgrounds, asset styling, blocks, overlays,
+ * captions, SFX, transitions — all intent + energy aware.
  */
 
-import { generateCaptionText }    from "./captionTimingEngine";
-import { autoMatchAssets }         from "./assetAutoMatcher";
-import { injectAudioCues }         from "./audioCueEngine";
-import { validateBeats }           from "./compilerValidator";
-import { classifyBeatIntent }      from "./beatIntent/beatIntentClassifier";
-import { applyBeatVariation }      from "./beatVariationEngine";
-import { applyCaptionEmphasis }    from "./captionEmphasisEngine";
-import { planBeatVisual }          from "./visualPlanner";
-import { applyVisualDirection }    from "./visualDirector";
-import { layoutDefaultsRegistry }  from "./layoutDefaultsRegistry";
-import { layoutRegistry }          from "./layoutRegistry";
-import blockRegistry               from "./blockRegistry";
+import { generateCaptionText }   from "./captionTimingEngine";
+import { autoMatchAssets }        from "./assetAutoMatcher";
+import { validateBeats }          from "./compilerValidator";
+import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
+import { applyBeatVariation }     from "./beatVariationEngine";
+import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
+import { planBeatVisual }         from "./visualPlanner";
+import { layoutRegistry }         from "./layoutRegistry";
+import blockRegistry              from "./blockRegistry";
+import { pickBeatSFX }            from "./sfxRegistry";
+import { OVERLAY_SFX_DEFAULTS }   from "./sfxRegistry";
+import { autoAssignOverlays }     from "./overlayPlacementEngine";
+import { pickAutoMusic }          from "./musicRegistry";
 
 import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
 import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
@@ -28,7 +29,6 @@ import { validateAIOutputs }  from "./ai/aiOutputValidator";
 /* ─────────────────────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────────────────────── */
-
 function words(text) {
   return text.trim().split(/\s+/).filter(Boolean);
 }
@@ -47,114 +47,82 @@ function splitIntoDurationBeats(text) {
 
 /* ─────────────────────────────────────────────────────────────
    DURATION
-   Uses both intent and energy (0–1) from rich beats.
 ───────────────────────────────────────────────────────────── */
 function calculateDuration(spoken, intent, energy = 0.5) {
-  const wc = words(spoken).length;
+  const wc  = words(spoken).length;
   let base  = 1.6 + wc * 0.12;
 
-  switch (intent) {
-    case "shock":       base += 0.8; break;
-    case "curiosity":   base += 0.5; break;
-    case "proof":       base += 0.5; break;
-    case "reveal":      base += 0.7; break;
-    case "punchline":   base += 0.6; break;
-    case "empathy":     base += 0.4; break;
-    case "explanation": base += 0.4; break;
-    case "urgency":     base -= 0.2; break;
-    // legacy intents
-    case "hook":        base += 0.6; break;
-    case "stat":        base += 0.4; break;
-    case "list":        base += 0.3; break;
-  }
-
-  // High energy = faster pacing
+  const intentAdj = {
+    shock: 0.8, curiosity: 0.5, proof: 0.5, reveal: 0.7,
+    punchline: 0.6, empathy: 0.4, explanation: 0.4, urgency: -0.2,
+    hook: 0.6, stat: 0.4, list: 0.3,
+  };
+  base += intentAdj[intent] || 0;
   base -= (energy - 0.5) * 0.4;
 
   const variance = Math.random() * 0.4 - 0.2;
-  let duration = base + variance;
-  if (duration < 1.4) duration = 1.4;
-  if (duration > 4.0) duration = 4.0;
-
-  return Number(duration.toFixed(2));
+  return Number(Math.min(4.0, Math.max(1.4, base + variance)).toFixed(2));
 }
 
 /* ─────────────────────────────────────────────────────────────
-   CAPTION STYLE
-   Maps new emotional intents → caption style keys.
+   CAPTION
 ───────────────────────────────────────────────────────────── */
 function chooseCaptionStyle(intent, energy = 0.5) {
   if (energy >= 0.85) return "brutalSlam";
-  switch (intent) {
-    case "shock":       return "wordBlaze";
-    case "curiosity":   return "wordHighlight";
-    case "proof":       return "premiumBlock";
-    case "reveal":      return "glitchStamp";
-    case "urgency":     return "brutalSlam";
-    case "empathy":     return "editorialSerif";
-    case "punchline":   return "markerHighlight";
-    case "contrast":    return "splitColour";
-    case "irony":       return "wordHighlight";
-    // legacy
-    case "hook":        return "wordBlaze";
-    case "stat":        return "premiumBlock";
-    case "quote":       return "editorialSerif";
-    default:            return "tiktokClean";
-  }
+  const map = {
+    shock: "wordBlaze", curiosity: "wordHighlight", proof: "premiumBlock",
+    reveal: "glitchStamp", urgency: "brutalSlam", empathy: "editorialSerif",
+    punchline: "markerPen", contrast: "wordHighlight", irony: "wordHighlight",
+    hook: "wordBlaze", stat: "premiumBlock", quote: "editorialSerif",
+  };
+  return map[intent] || "tiktokClean";
 }
 
-/* ─────────────────────────────────────────────────────────────
-   CAPTION ANIMATION
-───────────────────────────────────────────────────────────── */
 function chooseCaptionAnimation(intent, energy = 0.5) {
   if (energy >= 0.8) return "word_pop";
-  switch (intent) {
-    case "shock":       return "word_pop";
-    case "curiosity":   return "wave";
-    case "proof":       return "word_reveal";
-    case "reveal":      return "pop";
-    case "urgency":     return "word_pop";
-    case "contrast":    return "slide";
-    case "punchline":   return "pop";
-    case "empathy":     return "fade";
-    case "explanation": return "word_reveal";
-    case "irony":       return "wave";
-    // legacy
-    case "hook":        return "pop";
-    case "stat":        return "word_pop";
-    case "question":    return "wave";
-    case "list":        return "slide";
-    case "quote":       return "fade";
-    default:            return "fade";
-  }
+  const map = {
+    shock: "word_pop", curiosity: "wave", proof: "word_reveal",
+    reveal: "pop", urgency: "word_pop", contrast: "slide",
+    punchline: "pop", empathy: "fade", explanation: "word_reveal",
+    irony: "wave", hook: "pop", stat: "word_pop", quote: "fade",
+  };
+  return map[intent] || "fade";
+}
+
+function chooseCaptionPosition(index, total, energy) {
+  // First beat → bottom (above CTA area)
+  // Last beat  → bottom
+  // High energy → middle for drama
+  if (index === 0 || index === total - 1) return "bottom";
+  if (energy >= 0.8) return "middle";
+  return "bottom";
 }
 
 /* ─────────────────────────────────────────────────────────────
    TRANSITION
-   Energy-aware, layout-aware.
 ───────────────────────────────────────────────────────────── */
 function chooseTransition(layout, index, energy = 0.5) {
   if (index === 0) return { type: "cut", duration: 0.25 };
+  if (index === -1) return { type: "blurFade", duration: 0.3 }; // last beat
 
   const high = energy >= 0.75;
-
   const map = {
-    FullZone:        high ? "zoomCut"   : "blurFade",
-    SplitZone:       high ? "slideWhip" : "cut",
-    ThreeZone:       high ? "zoomCut"   : "blurFade",
-    TwoTopOneBottom: high ? "slideWhip" : "scaleJump",
-    OneTopTwoBottom: high ? "zoomCut"   : "blurFade",
+    FullZone:         high ? "zoomCut"   : "blurFade",
+    SplitZone:        high ? "slideWhip" : "cut",
+    ThreeZone:        high ? "zoomCut"   : "blurFade",
+    SmallTopBigBottom:high ? "slideWhip" : "blurFade",
+    BigTopSmallBottom:high ? "zoomCut"   : "blurFade",
+    LeftHeavy:        high ? "slideWhip" : "cut",
+    RightHeavy:       high ? "slideWhip" : "cut",
+    TwoTopOneBottom:  high ? "slideWhip" : "scaleJump",
+    OneTopTwoBottom:  high ? "zoomCut"   : "blurFade",
     FourGrid:               "cut",
     PictureInPicture: high ? "slideWhip" : "blurFade",
     SideAvatar:             "cut",
-    CenterAvatar:    high ? "zoomCut"   : "blurFade",
+    CenterAvatar:     high ? "zoomCut"   : "blurFade",
     FloatingAvatar:         "cut",
   };
-
-  return {
-    type:     map[layout] || "cut",
-    duration: high ? 0.2 : 0.3,
-  };
+  return { type: map[layout] || "cut", duration: high ? 0.2 : 0.3 };
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -163,17 +131,13 @@ function chooseTransition(layout, index, energy = 0.5) {
 function enforceLayoutZones(layout, zones) {
   const def = layoutRegistry[layout];
   if (!def) return zones;
-
   const fixed = {};
   def.zones.forEach(z => {
     fixed[z] = zones[z] || {
       role: "asset",
-      content: {
-        kind: "asset",
-        asset: { src: null, type: "image", objectFit: "cover" },
-      },
+      content: { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
       background: {},
-      style: { padding: {} },
+      style: {},
     };
   });
   return fixed;
@@ -185,31 +149,23 @@ function enforceLayoutZones(layout, zones) {
 function injectBlockContent(beats) {
   return beats.map(beat => {
     if (!beat.blocks?.length) return beat;
-
-    const zones       = { ...beat.zones };
+    const zones = { ...beat.zones };
     const validBlocks = [];
 
     beat.blocks.forEach(block => {
       const def   = blockRegistry[block.type];
       if (!def)   return;
-
       const props = beat.block_props;
-      if (!props || Object.keys(props).length === 0) return;
+      if (!props || !Object.keys(props).length) return;
 
       zones[block.zone] = {
+        ...zones[block.zone],
         role: "block",
         content: {
           kind: "block",
-          block: {
-            type:    block.type,
-            variant: def.variants?.[0] || null,
-            props,
-          },
+          block: { type: block.type, variant: block.variant || def.variants?.[0], props },
         },
-        background: {},
-        style: { padding: {} },
       };
-
       validBlocks.push(block);
     });
 
@@ -223,64 +179,60 @@ function injectBlockContent(beats) {
 export async function buildBeatsFromScript({
   script           = "",
   structuredBeats  = null,
-  mode             = "faceless",      // "faceless" | "talking_head"
-  videoType        = "viral",         // "viral" | "news" | "explainer" | etc.
+  mode             = "faceless",
+  videoType        = "viral",
   orientation      = "9:16",
   durationCategory = "short",
   assetSource      = "stock",
   uploadedAssets   = [],
   language         = "english",
   topic            = "",
+  brandColor       = null,
+  brandName        = null,
+  audience         = "general",
+  tone             = "bold",
 }) {
 
-  /* ── Detect rich beats (from new generateStructuredShort) ── */
+  /* ── Detect rich beats ── */
   const isRich = Array.isArray(structuredBeats) &&
     structuredBeats.length > 0 &&
-    typeof structuredBeats[0].energy === "number" &&
-    structuredBeats[0].visual_hint !== undefined;
+    typeof structuredBeats[0].energy === "number";
 
   let sourceBeats = [];
 
   if (isRich) {
-    /* New path — rich beats, skip all AI re-passes */
     sourceBeats = structuredBeats;
-
   } else if (Array.isArray(structuredBeats) && structuredBeats.length) {
-    /* Legacy path — minimal beats, run AI passes */
     sourceBeats = structuredBeats;
     sourceBeats = await analyzeBeatRoles(sourceBeats);
     sourceBeats = await analyzeVisualTypes(sourceBeats);
     sourceBeats = await extractBlockProps(sourceBeats);
     sourceBeats = validateAIOutputs(sourceBeats);
-
   } else {
-    /* Plain text fallback */
-    const sentences = script
-      .split(/(?<=[.?!])\s+/)
-      .map(s => s.trim())
-      .filter(Boolean);
-
+    const sentences = script.split(/(?<=[.?!])\s+/).map(s => s.trim()).filter(Boolean);
     sentences.forEach(sentence => {
       splitIntoDurationBeats(sentence).forEach(p => {
         sourceBeats.push({
-          spoken:         p,
-          intent:         classifyBeatIntent(p),
-          energy:         0.5,
-          visual_hint:    "none",
-          emphasis_words: [],
+          spoken: p, intent: classifyBeatIntent(p),
+          energy: 0.5, visual_hint: "none", emphasis_words: [],
         });
       });
     });
-
     sourceBeats = await analyzeBeatRoles(sourceBeats);
     sourceBeats = await analyzeVisualTypes(sourceBeats);
     sourceBeats = await extractBlockProps(sourceBeats);
     sourceBeats = validateAIOutputs(sourceBeats);
   }
 
-  /* ── Build beat objects ── */
+  const total = sourceBeats.length;
   let currentStart = 0;
 
+  /* Track previous layouts for variety enforcement */
+  let previousLayout        = null;
+  let previousPreviousLayout = null;
+  let lastMotion            = null;
+
+  /* ── Build beat objects ── */
   let beats = sourceBeats.map((item, index) => {
     const spoken      = String(item.spoken || "").trim();
     const intent      = item.intent      || classifyBeatIntent(spoken);
@@ -292,51 +244,83 @@ export async function buildBeatsFromScript({
     const end_sec   = start_sec + duration;
     currentStart    = end_sec;
 
+    /* ── Visual planning with layout variety + motion coherence ── */
     const visual = planBeatVisual({
+      mode,
       intent,
       energy,
       visual_hint,
-      mode,        // ← correct: mode drives avatar layout filtering
-      videoType,   // ← correct: content type for future use
-      spoken,
-      duration,
-      visual_type:     item.visual_type,
-      block_candidate: item.block_candidate,
-      visual_weight:   item.visual_weight,
+      block_candidate: item.block_candidate || null,
+      previousLayout,
+      previousPreviousLayout,
+      lastMotion,
+      brandColor,
     });
 
-    const zones          = enforceLayoutZones(visual.layout, visual.zones || {});
-    const layoutDefaults = layoutDefaultsRegistry[visual.layout] || {};
+    /* Update tracking */
+    previousPreviousLayout = previousLayout;
+    previousLayout         = visual.layout;
+
+    // Track last motion from z1
+    const z1Motion = visual.zones?.z1?.content?.asset?.motion;
+    if (z1Motion) lastMotion = z1Motion;
+
+    /* ── Caption ── */
+    const captionPosition = chooseCaptionPosition(index, total, energy);
+    const isLast          = index === total - 1;
+
+    /* ── Overlays — auto-assigned, conflict-aware ── */
+    const overlays = autoAssignOverlays({
+      intent,
+      energy,
+      layout:          visual.layout,
+      captionPosition,
+      brandColor,
+    });
+
+    /* ── Apply overlay SFX defaults ── */
+    overlays.forEach(ov => {
+      if (!ov.sfx && OVERLAY_SFX_DEFAULTS[ov.type]) {
+        ov.sfx = OVERLAY_SFX_DEFAULTS[ov.type];
+      }
+    });
+
+    /* ── Beat SFX ── */
+    const sfxCue = pickBeatSFX(intent, energy, 1.0);
+
+    /* ── Zones ── */
+    const zones = enforceLayoutZones(visual.layout, visual.zones || {});
 
     return {
       id:    crypto.randomUUID(),
       order: index,
 
-      layout:        visual.layout,
-      layoutPadding: visual.layoutPadding || 0,
-
-      layoutBackground: {
-        type:            visual.layoutBackground?.type  || "color",
-        value:           visual.layoutBackground?.value || "#000000",
-        objectFit:       "cover",
-        enterTransition: layoutDefaults.layoutBackground?.enterTransition || "fadeIn",
-        exitTransition:  layoutDefaults.layoutBackground?.exitTransition  || "none",
-        motion:          layoutDefaults.layoutBackground?.motion          || "none",
-      },
+      layout:           visual.layout,
+      layoutPadding:    visual.layoutPadding || 0,
+      layoutBackground: visual.layoutBackground,
 
       zones,
       blocks:      visual.blocks     || [],
       block_props: item.block_props  || null,
 
       caption: {
+        show:           true,
         text:           generateCaptionText(spoken),
         style:          chooseCaptionStyle(intent, energy),
         animation:      chooseCaptionAnimation(intent, energy),
-        position:       layoutDefaults.captionPosition || "bottom",
+        position:       captionPosition,
         emphasis_words: item.emphasis_words || [],
       },
 
-      transition: chooseTransition(visual.layout, index, energy),
+      overlays,
+
+      audio_cues: sfxCue ? [sfxCue] : [],
+
+      transition: chooseTransition(
+        visual.layout,
+        isLast ? -1 : index,
+        energy
+      ),
 
       spoken,
       intent,
@@ -350,9 +334,8 @@ export async function buildBeatsFromScript({
     };
   });
 
-  /* ── Post-processing pipeline ── */
+  /* ── Post-processing ── */
   beats = injectBlockContent(beats);
-  beats = applyVisualDirection(beats, { mode });
 
   beats = await autoMatchAssets(beats, orientation, {
     assetSource,
@@ -363,9 +346,6 @@ export async function buildBeatsFromScript({
 
   beats = applyBeatVariation(beats);
   beats = applyCaptionEmphasis(beats);
-  beats = injectAudioCues(beats, {
-    audio_rules: { hook_sfx: true, layout_whoosh: true },
-  });
   beats = validateBeats(beats);
 
   return beats;

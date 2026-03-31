@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import { layoutRegistry } from "../core/layoutRegistry.js";
-import AudioCueRenderer from "./elements/AudioCueRenderer";
+import SFXRenderer from "./elements/SFXRenderer.jsx";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import GrainOverlay from "./effects/GrainOverlay";
 import VignetteLayer from "./effects/VignetteLayer";
@@ -68,7 +68,7 @@ export default function BeatRenderer({ beat, project }) {
 
       <OverlayRenderer overlays={overlays} />
 
-      <AudioCueRenderer beat={beat} />
+      <SFXRenderer beat={beat} />
 
       <GrainOverlay intensity={0.25} />
 

@@ -1,13 +1,12 @@
 /**
  * ColorsTab.jsx
  * src/ui/Editor/zones/zonePicker/tabs/ColorsTab.jsx
- *
- * Loads backgrounds from backgroundPatternRegistry.
- * Grouped by category with tab switcher.
- * Same registry used by automated video generation.
  */
 import React, { useState } from "react";
-import backgroundPatternRegistry, { backgroundCategories } from "../../../../core/backgroundPatternRegistry";
+import {
+  backgroundPatternRegistry,
+  backgroundCategories,
+} from "../../../../core/backgroundPatternRegistry";
 
 const CATEGORY_LABELS = {
   dark:     "Dark",
@@ -39,30 +38,36 @@ export default function ColorsTab({ onSelect, onClose }) {
                 : "bg-[#1c1c28] text-[#9494a8] hover:text-[#e8e8f0] border border-[rgba(255,255,255,0.06)]"
               }`}
           >
-            {CATEGORY_LABELS[cat]}
+            {CATEGORY_LABELS[cat] || cat}
           </button>
         ))}
       </div>
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {keys.map(key => {
-            const styleObj = backgroundPatternRegistry[key]?.() || {};
-            const cssStyle = {
-              background:     styleObj.background,
-              backgroundSize: styleObj.backgroundSize || "auto",
-            };
+            const entry = backgroundPatternRegistry[key];
+            if (!entry) return null;
+            const { style } = entry;
 
             return (
               <div
                 key={key}
                 onClick={() => {
-                  onSelect({ kind: "color", color: styleObj.background, backgroundSize: styleObj.backgroundSize });
+                  onSelect({
+                    kind:           "color",
+                    color:          style.background,
+                    backgroundSize: style.backgroundSize || "auto",
+                  });
                   onClose();
                 }}
                 className="cursor-pointer rounded-[8px] border border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-all hover:scale-[1.03] overflow-hidden"
-                style={{ height: "180px", ...cssStyle }}
+                style={{
+                  aspectRatio:    "9/16",
+                  background:     style.background,
+                  backgroundSize: style.backgroundSize || "auto",
+                }}
                 title={key}
               />
             );

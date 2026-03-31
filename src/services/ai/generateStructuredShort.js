@@ -45,6 +45,28 @@ VISUAL_HINT (optional hint to engine — pick one if obvious):
 `;
 
 /* ─────────────────────────────────────────────────────────────
+   AUDIENCE CONFIGS
+───────────────────────────────────────────────────────────── */
+const AUDIENCE_CONFIGS = {
+  general:       "Speak to a broad audience. Assume no prior knowledge. Keep it universally relatable.",
+  teens:         "Speak to Gen Z. Use current references, casual language, fast pace. No corporate tone.",
+  professionals: "Speak to working adults. Respect their intelligence. Data and outcomes matter.",
+  creators:      "Speak to content creators and builders. Behind-the-scenes insights, tools, growth.",
+  parents:       "Speak to parents. Warm, practical, relatable struggles and wins.",
+};
+
+/* ─────────────────────────────────────────────────────────────
+   TONE OVERRIDES
+───────────────────────────────────────────────────────────── */
+const TONE_OVERRIDES = {
+  bold:          "Be direct, punchy, confident. No hedging. Every sentence should hit hard.",
+  conversational:"Sound like a real person talking. Use contractions, pauses, natural rhythm.",
+  educational:   "Teach clearly. One idea at a time. Make complex things simple.",
+  funny:         "Use irony, unexpected comparisons, comic timing. Land the joke without forcing it.",
+  emotional:     "Make the viewer feel something. Use personal language. Vulnerability is strength.",
+};
+
+/* ─────────────────────────────────────────────────────────────
    VIDEO TYPE CONFIGS
 ───────────────────────────────────────────────────────────── */
 const VIDEO_TYPE_CONFIGS = {
@@ -108,10 +130,14 @@ function getLanguageInstruction(language) {
 /* ─────────────────────────────────────────────────────────────
    BUILD THE PROMPT
 ───────────────────────────────────────────────────────────── */
-function buildPrompt({ topic, videoType, language, durationCategory, context }) {
+function buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone, brandName }) {
   const typeConfig = VIDEO_TYPE_CONFIGS[videoType] || VIDEO_TYPE_CONFIGS.viral;
   const beatCount  = BEAT_COUNTS[durationCategory] || BEAT_COUNTS.short;
   const langInstr  = getLanguageInstruction(language);
+
+  const audienceInstr = AUDIENCE_CONFIGS[audience] || AUDIENCE_CONFIGS.general;
+  const toneOverride  = TONE_OVERRIDES[tone]       || "";
+  const brandLine     = brandName ? `BRAND / CHANNEL: ${brandName} — you may reference this naturally in the last beat if it fits.` : "";
 
   return `
 You are a viral short-form video scriptwriter and creative director.
@@ -119,9 +145,12 @@ You are a viral short-form video scriptwriter and creative director.
 LANGUAGE: ${langInstr}
 
 VIDEO TYPE: ${videoType}
-TONE: ${typeConfig.tone}
+TONE: ${typeConfig.tone}. ${toneOverride}
 STRUCTURE: ${typeConfig.structure}
 AVOID: ${typeConfig.avoid}
+
+AUDIENCE: ${audienceInstr}
+${brandLine}
 
 TOPIC: ${topic}
 ${context ? `\nCONTEXT / FACTS TO USE:\n${context}` : ""}
@@ -237,7 +266,11 @@ export async function generateStructuredShort({
   uploadedAssets  = [],
   language        = "english",
   videoType       = "viral",
-  context         = "",        // optional: facts from RAG or user input
+  context         = "",
+  brandColor      = null,
+  brandName       = null,
+  audience        = "general",
+  tone            = "bold",
 }) {
 
   const prompt = buildPrompt({
@@ -246,6 +279,9 @@ export async function generateStructuredShort({
     language,
     durationCategory,
     context,
+    audience,
+    tone,
+    brandName,
   });
 
   /* ── API call ── */
@@ -276,6 +312,10 @@ export async function generateStructuredShort({
     uploadedAssets,
     language,
     topic,
+    brandColor,
+    brandName,
+    audience,
+    tone,
   });
 
   const script = parsedScript.beats.map(b => b.spoken).join(" ");
@@ -287,6 +327,10 @@ export async function generateStructuredShort({
       videoType:    parsedScript.videoType,
       language:     parsedScript.language,
       emotionalArc: parsedScript.emotionalArc,
+      brandColor,
+      brandName,
+      audience,
+      tone,
     },
     assetSource,
     uploadedAssets,

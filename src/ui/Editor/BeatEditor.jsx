@@ -2,29 +2,31 @@ import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 import { layoutRegistry } from "../../core/layoutRegistry.js";
 
-import LayoutSelector  from "./LayoutSelector";
-import ZonesSection    from "./ZonesSection";
+import LayoutSelector from "./LayoutSelector";
+import ZonesSection from "./ZonesSection";
 import CaptionsSection from "./CaptionsSection";
-import OverlaySection  from "./OverlaySection";
+import OverlaySection from "./OverlaySection";
+import SFXSection from "./SFXSection";
 
 if (typeof document !== "undefined" && !document.getElementById("editor-fonts")) {
   const link = document.createElement("link");
-  link.id   = "editor-fonts";
-  link.rel  = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
+  link.id = "editor-fonts";
+  link.rel = "stylesheet";
+  link.href =
+    "https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
   document.head.appendChild(link);
 }
 
 const TABS = [
-  { key: "layout",   label: "Layout",   color: "#7c5cfc" },
-  { key: "zones",    label: "Zones",    color: "#f97316" },
-  { key: "caption",  label: "Caption",  color: "#3b9eff" },
+  { key: "layout", label: "Layout", color: "#7c5cfc" },
+  { key: "zones", label: "Zones", color: "#f97316" },
+  { key: "caption", label: "Caption", color: "#3b9eff" },
   { key: "overlays", label: "Overlays", color: "#2dd4bf" },
-  { key: "sfx",      label: "SFX",      color: "#f0e040" },
+  { key: "sfx", label: "SFX", color: "#f0e040" },
 ];
 
 export default function BeatEditor() {
-  const project      = useProjectStore((s) => s.project);
+  const project = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
   const [tab, setTab] = useState("layout");
 
@@ -33,12 +35,11 @@ export default function BeatEditor() {
   const activeBeat = project.beats.find((b) => b.id === activeBeatId);
   if (!activeBeat) return null;
 
-  const layout    = layoutRegistry[activeBeat.layout];
+  const layout = layoutRegistry[activeBeat.layout];
   const structure = layout?.structure || {};
 
   return (
     <div className="flex-1 w-[75%] min-w-[320px] flex flex-col border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] ml-4 overflow-hidden">
-
       {/* ── Tab bar ── */}
       <div
         className="flex items-center gap-[2px] px-4 pt-4 pb-0 shrink-0"
@@ -56,10 +57,10 @@ export default function BeatEditor() {
               className="relative px-4 py-[9px] text-[18px] font-bold transition-all"
               style={{
                 fontFamily: "'Syne', sans-serif",
-                background:  "none",
-                border:      "none",
-                cursor:      "pointer",
-                color:       isActive ? "#ffffff" : "#66666a",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: isActive ? "#ffffff" : "#66666a",
                 borderBottom: isActive ? `4px solid ${color}` : "2px solid transparent",
                 marginBottom: -1,
               }}
@@ -82,32 +83,16 @@ export default function BeatEditor() {
 
       {/* ── Tab content — scrollable ── */}
       <div className="flex-1 overflow-y-auto px-5 py-5">
+        {tab === "layout" && <LayoutSelector beat={activeBeat} />}
 
-        {tab === "layout" && (
-          <LayoutSelector beat={activeBeat} />
-        )}
+        {tab === "zones" && <ZonesSection beat={activeBeat} project={project} />}
 
-        {tab === "zones" && (
-          <ZonesSection beat={activeBeat} project={project} />
-        )}
+        {tab === "caption" && structure.caption && <CaptionsSection beat={activeBeat} />}
 
-        {tab === "caption" && structure.caption && (
-          <CaptionsSection beat={activeBeat} />
-        )}
+        {tab === "overlays" && <OverlaySection beat={activeBeat} />}
 
-        {tab === "overlays" && (
-          <OverlaySection beat={activeBeat} />
-        )}
-
-        {tab === "sfx" && (
-          <div className="flex flex-col items-center justify-center h-40 gap-2 opacity-40">
-            <span className="text-[28px]">🎵</span>
-            <span className="text-[13px] text-[#9494a8]">Sound effects coming soon</span>
-          </div>
-        )}
-
+        {tab === "sfx" && <SFXSection beat={activeBeat} />}
       </div>
-
     </div>
   );
 }

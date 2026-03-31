@@ -37,6 +37,22 @@ const ASSET_SOURCES = [
   { value: "internet", label: "Auto-Find from Internet" },
 ];
 
+const AUDIENCES = [
+  { value: "general",       label: "General Audience"   },
+  { value: "teens",         label: "Teens / Gen Z"       },
+  { value: "professionals", label: "Professionals"       },
+  { value: "creators",      label: "Creators / Builders" },
+  { value: "parents",       label: "Parents / Families"  },
+];
+
+const TONES = [
+  { value: "bold",          label: "Bold / Aggressive"   },
+  { value: "conversational",label: "Conversational"       },
+  { value: "educational",   label: "Educational"          },
+  { value: "funny",         label: "Funny / Witty"        },
+  { value: "emotional",     label: "Emotional / Empathy"  },
+];
+
 const DURATIONS = [
   { value: "short",  label: "Short  (15–30 sec)"  },
   { value: "medium", label: "Medium (30–60 sec)"  },
@@ -93,6 +109,11 @@ export default function AIGenerator() {
   const [uploadFiles, setUploadFiles] = useState([]);
   const [previews,    setPreviews]    = useState([]);
 
+  const [brandColor, setBrandColor] = useState("");
+  const [brandName,  setBrandName]  = useState("");
+  const [audience,   setAudience]   = useState("general");
+  const [tone,       setTone]       = useState("bold");
+
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
 
@@ -128,14 +149,18 @@ export default function AIGenerator() {
       /* Generate */
       const aiResult = await generateStructuredShort({
         topic,
-        context,           // optional facts / RAG output
-        videoType,         // content type: viral, news, explainer, etc.
-        mode,              // faceless | talking_head
-        language,          // english, hindi, hinglish, etc.
+        context,
+        videoType,
+        mode,
+        language,
         orientation,
         durationCategory,
         assetSource,
         uploadedAssets,
+        brandColor:  brandColor.trim() || null,
+        brandName:   brandName.trim()  || null,
+        audience,
+        tone,
       });
 
       /* Build safe project */
@@ -147,6 +172,10 @@ export default function AIGenerator() {
           language,
           assetSource,
           uploadedAssets,
+          brand_color: brandColor.trim() || null,
+          brand_name:  brandName.trim()  || null,
+          audience,
+          tone,
         },
         script: {
           text:         aiResult.script,
@@ -196,9 +225,6 @@ export default function AIGenerator() {
           >
             Create New Video
           </h2>
-          <p className="text-[15px] text-[#55556a]">
-            AI writes the script · Engine assembles the video
-          </p>
         </div>
 
         {/* Project name */}
@@ -236,6 +262,18 @@ export default function AIGenerator() {
           />
         </div>
 
+        {/* Two-col row: Audience + Tone */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Audience</Label>
+            <Select value={audience} onChange={setAudience} options={AUDIENCES} />
+          </div>
+          <div>
+            <Label>Tone</Label>
+            <Select value={tone} onChange={setTone} options={TONES} />
+          </div>
+        </div>
+
         {/* Two-col row: Video Type + Language */}
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -257,6 +295,36 @@ export default function AIGenerator() {
           <div>
             <Label>Duration</Label>
             <Select value={durationCategory} onChange={setDurationCategory} options={DURATIONS} />
+          </div>
+        </div>
+
+        {/* Brand — optional */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Brand Color <span className="text-[#55556a] normal-case tracking-normal font-normal">(optional)</span></Label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={brandColor || "#7c5cfc"}
+                onChange={e => setBrandColor(e.target.value)}
+                className="w-[40px] h-[36px] rounded-[6px] border border-[rgba(255,255,255,0.07)] cursor-pointer bg-[#16161f] p-[2px]"
+              />
+              <input
+                value={brandColor}
+                onChange={e => setBrandColor(e.target.value)}
+                placeholder="#ffffff"
+                className="flex-1 bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none transition-colors font-mono"
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Brand Name <span className="text-[#55556a] normal-case tracking-normal font-normal">(optional)</span></Label>
+            <input
+              value={brandName}
+              onChange={e => setBrandName(e.target.value)}
+              placeholder="e.g. @yourchannel"
+              className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none transition-colors"
+            />
           </div>
         </div>
 

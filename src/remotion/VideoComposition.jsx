@@ -12,9 +12,9 @@ import {
 
 import BeatRenderer from "./BeatRenderer";
 import Caption from "./elements/Caption";
-import AudioCueRenderer from "./elements/AudioCueRenderer";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { transitionsRegistry } from "../core/transitionsRegistry";
+import { MUSIC_LIBRARY } from "../core/musicRegistry";
 import { buildVisualIdentity } from "../core/visualIdentityEngine";
 
 /* FONT LOADER */
@@ -196,7 +196,6 @@ export default function VideoComposition({ project }) {
           >
             <AbsoluteFill style={{ ...style, zIndex: 2 }}>
               <BeatRenderer beat={beat} project={project} />
-              <AudioCueRenderer beat={beat} />
             </AbsoluteFill>
           </Sequence>
         );
@@ -221,13 +220,15 @@ export default function VideoComposition({ project }) {
         />
       )}
 
-      {audio?.music?.src && (
-        <Audio
-          key={audio.music.src}
-          src={audio.music.src}
-          volume={musicVolume}
-        />
-      )}
+      {audio?.music && (() => {
+        const musicKey = audio.music.musicKey;
+        const src = musicKey && MUSIC_LIBRARY[musicKey]
+          ? MUSIC_LIBRARY[musicKey].file   // staticFile() — correct for Remotion render
+          : audio.music.src;               // uploaded file URL fallback
+        return src ? (
+          <Audio key={src} src={src} volume={musicVolume} />
+        ) : null;
+      })()}
 
     </AbsoluteFill>
   );

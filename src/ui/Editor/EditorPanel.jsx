@@ -1,14 +1,14 @@
 import React from "react";
 import BeatList from "./BeatList";
 import BeatEditor from "./BeatEditor";
-import MusicSection from "./MusicSection";
+import AudioSection from "./AudioSection";
 import AvatarSection from "./AvatarSection";
 import VideoOverlaySection from "./VideoOverlaySection";
 
 export default function EditorPanel({ activeTab }) {
 
   if (activeTab === "audio") {
-    return <MusicSection />;
+    return <AudioSection />;
   }
 
   if (activeTab === "avatar") {

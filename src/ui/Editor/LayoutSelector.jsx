@@ -10,7 +10,7 @@ import { useProjectStore }  from "../../store/useProjectStore";
 import { layoutRegistry }   from "../../core/layoutRegistry.js";
 import ZonePicker           from "./zonePicker/ZonePickerModal";
 import LayoutPreview        from "./LayoutPreview";
-import backgroundPatternRegistry, { backgroundCategories } from "../../core/backgroundPatternRegistry";
+import { backgroundPatternRegistry, backgroundCategories } from "../../core/backgroundPatternRegistry";
 
 const TRANSITION_OPTIONS = [
   "cut","crossfade","slideLeft","slideRight",
