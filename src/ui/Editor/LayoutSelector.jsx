@@ -60,7 +60,10 @@ export default function LayoutSelector({ beat }) {
     .map(([name]) => name);
 
   /* ── Add new layouts not yet in registry (preview only) ── */
-  const extraLayouts = ["SixGrid","BigTopSmallBottom","SmallTopBigBottom","LeftHeavy","RightHeavy"];
+  // LeftHeavy/RightHeavy only for 16:9
+  const extraLayouts = orientation === "horizontal"
+    ? ["SixGrid","BigTopSmallBottom","SmallTopBigBottom","LeftHeavy","RightHeavy"]
+    : ["SixGrid","BigTopSmallBottom","SmallTopBigBottom"];
   const allLayouts   = [...new Set([...layouts, ...extraLayouts])];
 
   /* ── Handlers ── */
@@ -139,21 +142,41 @@ export default function LayoutSelector({ beat }) {
             </div>
           </div>
 
-          {/* Padding */}
-          <Slider label="Padding" value={padding}
-            onChange={v => updateBeat(beat.id, { layoutPadding: v })}
-            max={60} />
+          {/* Padding + Duration + Transition in one row */}
+          <div className="grid grid-cols-3 gap-3">
 
-          {/* Transition */}
-          <div>
-            <FieldLabel>Transition</FieldLabel>
-            <select
-              value={beat.transition?.type || "cut"}
-              onChange={e => updateBeat(beat.id, { transition: { type: e.target.value } })}
-              className="w-full bg-[#12121c] border border-[rgba(255,255,255,0.08)] rounded-[6px] px-2 py-[7px] text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer"
-            >
-              {TRANSITION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
+            <div>
+              <FieldLabel>Padding</FieldLabel>
+              <div className="flex flex-col gap-[3px]">
+                <input type="range" min={0} max={60} value={padding}
+                  onChange={e => updateBeat(beat.id, { layoutPadding: Number(e.target.value) })}
+                  className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 2 }} />
+                <span className="text-[11px] font-mono text-[#7070a0]">{padding}px</span>
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel>Duration</FieldLabel>
+              <div className="flex flex-col gap-[3px]">
+                <input type="range" min={1} max={12} step={0.1}
+                  value={beat.duration_sec ?? 3.0}
+                  onChange={e => updateBeat(beat.id, { duration_sec: Math.round(Number(e.target.value) * 10) / 10 })}
+                  className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 2 }} />
+                <span className="text-[11px] font-mono text-[#7070a0]">{(beat.duration_sec ?? 3.0).toFixed(1)}s</span>
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel>Transition</FieldLabel>
+              <select
+                value={beat.transition?.type || "cut"}
+                onChange={e => updateBeat(beat.id, { transition: { type: e.target.value } })}
+                className="w-full bg-[#12121c] border border-[rgba(255,255,255,0.08)] rounded-[6px] px-2 py-[5px] text-[11px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer"
+              >
+                {TRANSITION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+
           </div>
 
         </div>

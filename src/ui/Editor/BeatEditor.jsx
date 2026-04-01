@@ -39,7 +39,7 @@ export default function BeatEditor() {
   const structure = layout?.structure || {};
 
   return (
-    <div className="flex-1 w-[75%] min-w-[320px] flex flex-col border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] ml-4 overflow-hidden">
+    <div className="flex-1 w-[70%] min-w-[320px] flex flex-col border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] ml-4 overflow-hidden">
       {/* ── Tab bar ── */}
       <div
         className="flex items-center gap-[2px] px-4 pt-4 pb-0 shrink-0"

@@ -181,6 +181,7 @@ export default function AIGenerator() {
           text:         aiResult.script,
           emotionalArc: aiResult.meta?.emotionalArc,
         },
+        audio: aiResult.audio || { tts: null, music: null },
         beats: aiResult.beats,
         workflow: {
           script_completed:  true,
@@ -225,6 +226,9 @@ export default function AIGenerator() {
           >
             Create New Video
           </h2>
+          <p className="text-[15px] text-[#55556a]">
+            AI writes the script · Engine assembles the video
+          </p>
         </div>
 
         {/* Project name */}

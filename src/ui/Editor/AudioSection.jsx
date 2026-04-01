@@ -289,10 +289,7 @@ export default function AudioSection() {
     updateProjectMeta({ audio: { ...audio, [type]: { ...audio[type], volume } } });
 
   return (
-    <div className="w-[50%] overflow-y-auto border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] px-6 py-6">
-      <h3 className="mb-6 text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>
-        Video Audio
-      </h3>
+    <div className="w-[100%] overflow-y-auto border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] px-6 py-6">
 
       <div className="flex flex-col gap-8">
 

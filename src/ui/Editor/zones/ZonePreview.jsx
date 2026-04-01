@@ -98,8 +98,16 @@ export default function ZonePreview({ zone, mode = "content" }) {
 
     if (content.kind === "block") {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#1c1c28]">
-          <span className="text-[10px] font-semibold text-[#a78fff]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1"
+          style={{ background: "linear-gradient(160deg, #1a0b2e 0%, #0f0720 60%, #1c1c28 100%)" }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: "rgba(124,92,252,0.2)",
+            border: "1px solid rgba(124,92,252,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14,
+          }}>⬡</div>
+          <span className="text-[9px] font-bold text-[#a78fff] text-center px-1 leading-tight">
             {content.block?.type || "Block"}
           </span>
         </div>

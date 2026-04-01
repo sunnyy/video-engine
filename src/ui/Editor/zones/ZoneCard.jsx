@@ -118,6 +118,20 @@ export default function ZoneCard({
       {/* ── Block editor — full width below ── */}
       {isContent && content.kind === "block" && block?.type && (
         <div className="border-t border-[rgba(255,255,255,0.07)] px-3 py-3">
+
+          {/* Fix #21 — Scale slider for block zones */}
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[11px] font-bold tracking-widest uppercase text-[#7070a0] shrink-0"
+              style={{ fontFamily:"'JetBrains Mono',monospace" }}>Scale</span>
+            <input type="range" min={50} max={100}
+              value={Math.round((zone?.style?.scale ?? 1) * 100)}
+              onChange={e => setZoneStyle && setZoneStyle(slot, "scale", Number(e.target.value) / 100)}
+              className="flex-1 accent-[#7c5cfc] cursor-pointer" style={{ height: 2 }} />
+            <span className="text-[11px] font-mono text-[#7070a0] w-[36px] text-right">
+              {Math.round((zone?.style?.scale ?? 1) * 100)}%
+            </span>
+          </div>
+
           {variants.length > 0 && (
             <div className="flex items-center gap-2 mb-2">
               <span

@@ -9,6 +9,7 @@
  */
 
 import { buildBeatsFromScript } from "../../core/buildBeatsFromScript";
+import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/musicRegistry";
 
 /* ─────────────────────────────────────────────────────────────
    INTENT DEFINITIONS
@@ -320,6 +321,8 @@ export async function generateStructuredShort({
 
   const script = parsedScript.beats.map(b => b.spoken).join(" ");
 
+  const autoMusicKey = pickAutoMusic(videoType, tone);
+
   return {
     script,
     beats,
@@ -331,6 +334,14 @@ export async function generateStructuredShort({
       brandName,
       audience,
       tone,
+    },
+    audio: {
+      tts:   null,
+      music: autoMusicKey ? {
+        musicKey: autoMusicKey,
+        src:      MUSIC_PREVIEW_URLS[autoMusicKey],
+        volume:   0.12,
+      } : null,
     },
     assetSource,
     uploadedAssets,

@@ -7,8 +7,6 @@
  */
 
 import { layoutRegistry }          from "./layoutRegistry";
-import { layoutDefaultsRegistry }  from "./layoutDefaultsRegistry";
-import { buildVisualIdentity }      from "./visualIdentityEngine";
 import { pickZoneBackground }       from "./zoneContrastEngine";
 import { getBackgroundForIntent }   from "./backgroundPatternRegistry";
 import blockRegistry                from "./blockRegistry";
@@ -24,7 +22,7 @@ const FACELESS_LAYOUTS = {
   list:       ["TwoTopOneBottom","OneTopTwoBottom","ThreeZone","SplitZone","FullZone"],
   scene:      ["FullZone","BigTopSmallBottom","ThreeZone","SplitZone"],
   product:    ["SplitZone","SmallTopBigBottom","LeftHeavy","FullZone"],
-  none:       ["FullZone","SplitZone","ThreeZone","BigTopSmallBottom","SmallTopBigBottom"],
+  none:       ["FullZone","SplitZone","ThreeZone","BigTopSmallBottom","SmallTopBigBottom","SplitZone"],
 };
 
 const TALKING_HEAD_LAYOUTS = {
@@ -103,11 +101,13 @@ function pickEnter(energy, zoneIndex) {
 function pickLayout({ visual_hint, energy, mode, previousLayout, previousPreviousLayout }) {
   const pool     = mode === "talking_head" ? TALKING_HEAD_LAYOUTS : FACELESS_LAYOUTS;
   const fallback = mode === "talking_head"
-    ? ["SideAvatar", "CenterAvatar", "FloatingAvatar"]
+    ? ["SideAvatar", "FloatingAvatar", "CenterAvatar"]
     : ["FullZone", "SplitZone", "ThreeZone"];
 
+  const avatarLayouts = ["SideAvatar","CenterAvatar","FloatingAvatar","PictureInPicture"];
   let candidates = (pool[visual_hint] || pool.none || fallback)
-    .filter(l => Boolean(layoutRegistry[l]));
+    .filter(l => Boolean(layoutRegistry[l]))
+    .filter(l => mode === "talking_head" ? true : !avatarLayouts.includes(l));
 
   if (!candidates.length) candidates = fallback.filter(l => Boolean(layoutRegistry[l]));
 

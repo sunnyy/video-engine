@@ -58,7 +58,7 @@ export default function BeatList() {
   };
 
   return (
-    <div className="w-[30%] overflow-y-auto bg-[#111118] border-r border-[rgba(255,255,255,0.06)] px-2 py-4 flex flex-col">
+    <div className="w-[30%] h-full overflow-y-auto bg-[#111118] border-r border-[rgba(255,255,255,0.06)] px-2 py-4 flex flex-col">
 
       {/* Header */}
       <div className="flex items-center justify-between px-2 mb-3">

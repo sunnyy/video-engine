@@ -96,10 +96,19 @@ export default function ZonesSection({ beat, project }) {
       return;
     }
     if (data.kind === "asset") {
+      // Preserve existing motion/transitions — only update src and type
+      const existing = zones?.[slot]?.content?.asset || {};
       updateZone(slot, {
         content: {
           kind: "asset",
-          asset: { type: data.asset.type, src: data.asset.src, objectFit: "cover", animation: "none" },
+          asset: {
+            src:             data.asset.src,
+            type:            data.asset.type,
+            objectFit:       existing.objectFit       || "cover",
+            motion:          existing.motion          || "kenburns",
+            enterTransition: existing.enterTransition || "fadeIn",
+            exitTransition:  existing.exitTransition  || "none",
+          },
         },
       });
     }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 import {
   OVERLAY_TYPES, OVERLAY_TYPE_KEYS, ANCHOR_LABELS,
@@ -47,11 +47,67 @@ function TextInput({ value, onChange, placeholder }) {
   );
 }
 
-/* 3×3 anchor grid — compact */
+/* ── Animated overlay preview ── */
+function OverlayPreview({ type }) {
+  const PREVIEWS = {
+    HeadlineText: (
+      <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:22, fontWeight:900, color:"#fff", letterSpacing:"-0.5px", textTransform:"uppercase", lineHeight:1, textShadow:"0 1px 8px rgba(0,0,0,0.6)" }}>
+        THIS CHANGES<br/><span style={{color:"#f0e040"}}>EVERYTHING</span>
+      </div>
+    ),
+    Badge: (
+      <div style={{ display:"flex", alignItems:"center", gap:5, background:"#ff4d6d", padding:"4px 12px", borderRadius:100, fontFamily:"monospace", fontSize:11, fontWeight:800, color:"#fff", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+        <div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>LIVE
+      </div>
+    ),
+    StatCallout: (
+      <div style={{ background:"rgba(0,0,0,0.6)", borderLeft:"3px solid #f0e040", padding:"6px 10px", borderRadius:"0 6px 6px 0" }}>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#f0e040",lineHeight:1}}>↑ 94%</div>
+        <div style={{fontFamily:"monospace",fontSize:9,color:"rgba(255,255,255,0.6)",letterSpacing:"0.1em",textTransform:"uppercase"}}>ENGAGEMENT</div>
+      </div>
+    ),
+    HighlightBox: (
+      <div style={{ background:"rgba(245,243,238,0.95)", padding:"6px 10px", borderRadius:6, maxWidth:160 }}>
+        <div style={{fontFamily:"'Outfit',sans-serif",fontSize:11,fontWeight:700,color:"#111",lineHeight:1.3}}>Did you know this changes everything?</div>
+      </div>
+    ),
+    LiveDot: (
+      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+        <div style={{width:8,height:8,borderRadius:"50%",background:"#ff4d6d",boxShadow:"0 0 0 4px rgba(255,77,109,0.2)"}}/>
+        <div style={{fontFamily:"monospace",fontSize:12,fontWeight:800,color:"#ff4d6d",letterSpacing:"0.12em"}}>LIVE</div>
+      </div>
+    ),
+    EmojiFloat: (
+      <div style={{ display:"flex", gap:6, fontSize:22 }}>❤️🔥💯</div>
+    ),
+    ArrowPointer: (
+      <svg width={32} height={32} viewBox="0 0 48 48">
+        <path d="M8 24 L32 24 M24 12 L36 24 L24 36" stroke="#f0e040" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" fill="none" style={{transform:"rotate(90deg)",transformOrigin:"center"}}/>
+      </svg>
+    ),
+  };
+
+  return (
+    <div style={{
+      height: 64,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "linear-gradient(160deg,#0d0d18,#050510)",
+      borderRadius: "8px 8px 0 0",
+      overflow: "hidden",
+      padding: "8px",
+    }}>
+      {PREVIEWS[type] || <span style={{color:"#55556a",fontSize:11}}>{type}</span>}
+    </div>
+  );
+}
+
+/* ── Anchor grid ── */
 const GRID_ANCHORS = [
-  ["top-left",    "top-center",    "top-right"   ],
-  ["mid-left",    null,            "mid-right"   ],
-  ["bottom-left", "bottom-center", "bottom-right"],
+  ["top-left","top-center","top-right"],
+  ["mid-left", null,       "mid-right"],
+  ["bottom-left","bottom-center","bottom-right"],
 ];
 
 function AnchorGrid({ value, onChange, availableAnchors }) {
@@ -60,22 +116,18 @@ function AnchorGrid({ value, onChange, availableAnchors }) {
       {GRID_ANCHORS.map((row, ri) => (
         <div key={ri} className="flex gap-[3px]">
           {row.map((anchor, ci) => {
-            if (!anchor) return <div key={ci} style={{ flex: 1, aspectRatio: "1" }} />;
+            if (!anchor) return <div key={ci} style={{ flex:1, aspectRatio:"1" }} />;
             const isActive    = value === anchor;
             const isAvailable = !availableAnchors || availableAnchors.includes(anchor);
             return (
               <button key={anchor} onClick={() => isAvailable && onChange(anchor)}
                 title={ANCHOR_LABELS[anchor]} disabled={!isAvailable}
-                style={{ flex: 1, aspectRatio: "1" }}
+                style={{ flex:1, aspectRatio:"1" }}
                 className={`rounded-[4px] border transition-all flex items-center justify-center
-                  ${isActive
-                    ? "bg-[#7c5cfc] border-[#7c5cfc]"
-                    : isAvailable
-                      ? "bg-[#1c1c28] border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] cursor-pointer"
-                      : "bg-[#0e0e15] border-[rgba(255,255,255,0.03)] opacity-25 cursor-not-allowed"
-                  }`}>
-                <div className={`rounded-full ${isActive ? "bg-white" : "bg-[#55556a]"}`}
-                  style={{ width: 5, height: 5 }} />
+                  ${isActive ? "bg-[#7c5cfc] border-[#7c5cfc]"
+                    : isAvailable ? "bg-[#1c1c28] border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] cursor-pointer"
+                    : "bg-[#0e0e15] border-[rgba(255,255,255,0.03)] opacity-25 cursor-not-allowed"}`}>
+                <div className={`rounded-full ${isActive ? "bg-white" : "bg-[#55556a]"}`} style={{width:5,height:5}} />
               </button>
             );
           })}
@@ -88,7 +140,7 @@ function AnchorGrid({ value, onChange, availableAnchors }) {
   );
 }
 
-/* Type-specific content editors */
+/* ── Content editors ── */
 function ContentEditor({ overlay, update }) {
   const t = overlay.type;
 
@@ -158,10 +210,8 @@ function ContentEditor({ overlay, update }) {
 
   if (t === "EmojiFloat") return (
     <div><Label>Emojis (comma separated)</Label>
-      <TextInput
-        value={(overlay.emojis || ["❤️","🔥","💯"]).join(", ")}
-        onChange={v => update("emojis", v.split(",").map(s => s.trim()).filter(Boolean))}
-      />
+      <TextInput value={(overlay.emojis || ["❤️","🔥","💯"]).join(", ")}
+        onChange={v => update("emojis", v.split(",").map(s => s.trim()).filter(Boolean))} />
     </div>
   );
 
@@ -177,14 +227,16 @@ function ContentEditor({ overlay, update }) {
             className="w-full h-[38px] rounded-[6px] cursor-pointer border border-[rgba(255,255,255,0.08)]" />
         </div>
       </div>
-      <div><Label>Label</Label><TextInput value={overlay.label} onChange={v => update("label", v)} placeholder="Optional" /></div>
+      <div><Label>Label</Label>
+        <TextInput value={overlay.label} onChange={v => update("label", v)} placeholder="Optional" />
+      </div>
     </div>
   );
 
   return null;
 }
 
-/* Single overlay card — compact horizontal layout */
+/* ── Overlay card ── */
 function OverlayCard({ overlay, beat, onUpdate, onRemove }) {
   const [open, setOpen] = useState(true);
   const scale = overlay.scale ?? 1;
@@ -199,102 +251,48 @@ function OverlayCard({ overlay, beat, onUpdate, onRemove }) {
 
   return (
     <div className="rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[#111118] overflow-hidden">
-
-      {/* Header — always visible */}
       <div className="flex items-center gap-2 px-3 py-[10px]"
         style={{ borderBottom: open ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
         <button onClick={() => setOpen(o => !o)}
           className="flex-1 flex items-center gap-2 bg-transparent border-0 cursor-pointer text-left">
-          <span className="text-[14px] font-bold text-[#e8e8f0]">
-            {OVERLAY_TYPES[overlay.type]?.label || overlay.type}
-          </span>
-          <span className="text-[13px] text-[#55556a]">
-            {ANCHOR_LABELS[overlay.anchor] || overlay.anchor}
-          </span>
+          <span className="text-[14px] font-bold text-[#e8e8f0]">{OVERLAY_TYPES[overlay.type]?.label || overlay.type}</span>
+          <span className="text-[13px] text-[#55556a]">{ANCHOR_LABELS[overlay.anchor] || overlay.anchor}</span>
           <span className="ml-auto text-[#55556a]">{open ? "▾" : "▸"}</span>
         </button>
         <button onClick={onRemove}
-          className="text-[13px] text-[#f87171] hover:text-[#ff6b6b] bg-transparent border-0 cursor-pointer px-1">
-          ✕
-        </button>
+          className="text-[13px] text-[#f87171] hover:text-[#ff6b6b] bg-transparent border-0 cursor-pointer px-1">✕</button>
       </div>
 
       {open && (
         <div className="flex gap-0">
-
-          {/* LEFT — anchor grid + sliders */}
-          <div className="flex flex-col gap-3 p-3 shrink-0"
-            style={{ width: 160, borderRight: "1px solid rgba(255,255,255,0.06)" }}>
-            <AnchorGrid
-              value={overlay.anchor}
-              onChange={v => onUpdate("anchor", v)}
-              availableAnchors={safeAnchors}
-            />
-            <Slider label="Scale"
-              value={Math.round(scale * 100)}
-              onChange={v => onUpdate("scale", v / 100)}
-              min={40} max={150} unit="%" />
-            <Slider label="Delay"
-              value={Math.round(delay * 10)}
-              onChange={v => onUpdate("delay", v / 10)}
-              min={0} max={30} step={1} unit="×0.1s" />
+          <div className="flex flex-col gap-3 p-3 shrink-0" style={{ width:160, borderRight:"1px solid rgba(255,255,255,0.06)" }}>
+            <AnchorGrid value={overlay.anchor} onChange={v => onUpdate("anchor", v)} availableAnchors={safeAnchors} />
+            <Slider label="Scale" value={Math.round(scale*100)} onChange={v => onUpdate("scale", v/100)} min={40} max={150} unit="%" />
+            <Slider label="Delay" value={Math.round(delay*10)} onChange={v => onUpdate("delay", v/10)} min={0} max={30} step={1} unit="×0.1s" />
             <div>
               <Label>Motion</Label>
               <Sel value={overlay.motion || "pop"} onChange={v => onUpdate("motion", v)}
                 options={[["pop","Pop"],["slam","Slam"],["slideUp","Slide Up"],["slideLeft","Slide Left"],["fade","Fade"]]} />
             </div>
-
-            {/* SFX toggle */}
-            <div className="flex flex-col gap-2 pt-2 border-t border-[rgba(255,255,255,0.05)]">
-              <div className="flex items-center justify-between">
-                <Label>Sound</Label>
-                <button
-                  onClick={() => {
-                    if (overlay.sfx) {
-                      onUpdate("sfx", null);
-                    } else {
-                              onUpdate("sfx", def
-                        ? { key: def.key, url: def.url, label: def.label, volume: def.volume }
-                        : { key: "pop_soft", url: SFX_LIBRARY.pop_soft.url, label: "Pop Soft", volume: 0.4 }
-                      );
-                    }
-                  }}
-                  className={`text-[11px] px-2 py-[3px] rounded-[5px] border transition-all cursor-pointer font-semibold
-                    ${overlay.sfx
-                      ? "bg-[#7c5cfc20] border-[#7c5cfc] text-[#a78fff]"
-                      : "border-[rgba(255,255,255,0.06)] bg-[#1c1c28] text-[#55556a] hover:text-[#e8e8f0]"
-                    }`}>
-                  {overlay.sfx ? "On" : "Off"}
-                </button>
-              </div>
-              {overlay.sfx && (
-                <select
-                  value={overlay.sfx.key || "pop_soft"}
-                  onChange={e => {
-                    const sfx = SFX_LIBRARY[e.target.value];
-                    if (sfx) onUpdate("sfx", { key: e.target.value, url: sfx.url, label: sfx.label, volume: overlay.sfx?.volume ?? 0.4 });
-                  }}
-                  className="w-full bg-[#12121c] border border-[rgba(255,255,255,0.08)] rounded-[6px] px-2 py-[5px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer">
-                  {SFX_KEYS.map(k => (
-                    <option key={k} value={k}>{SFX_LIBRARY[k].label}</option>
-                  ))}
-                </select>
-              )}
+            <div className="flex flex-col gap-1 pt-2 border-t border-[rgba(255,255,255,0.05)]">
+              <Label>Sound</Label>
+              <select value={overlay.sfx || "none"} onChange={e => onUpdate("sfx", e.target.value)}
+                className="w-full bg-[#12121c] border border-[rgba(255,255,255,0.08)] rounded-[6px] px-2 py-[5px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer">
+                <option value="none">None</option>
+                {SFX_KEYS.map(k => <option key={k} value={k}>{SFX_LIBRARY[k].label}</option>)}
+              </select>
             </div>
           </div>
-
-          {/* RIGHT — content fields */}
           <div className="flex-1 p-3">
-            <ContentEditor overlay={overlay} update={(k, v) => onUpdate(k, v)} />
+            <ContentEditor overlay={overlay} update={(k,v) => onUpdate(k,v)} />
           </div>
-
         </div>
       )}
     </div>
   );
 }
 
-/* Main section */
+/* ── Main section ── */
 export default function OverlaySection({ beat }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
   const [adding, setAdding] = useState(false);
@@ -305,7 +303,11 @@ export default function OverlaySection({ beat }) {
   const addOverlay = (type) => {
     const ov = createOverlay(type);
     if (!ov) return;
-    const safe = getSafeAnchors(beat.layout, type, overlays);
+    const safe = getSafePlacementAnchors({
+      layout: beat.layout, overlayType: type,
+      captionPosition: beat.caption?.position || "bottom",
+      existingOverlays: overlays,
+    });
     if (safe.length > 0) ov.anchor = safe[0];
     updateBeat(beat.id, { overlays: [...overlays, ov] });
     setAdding(false);
@@ -325,27 +327,22 @@ export default function OverlaySection({ beat }) {
           style={{ fontFamily:"'JetBrains Mono',monospace" }}>Overlays</span>
         <button onClick={() => setAdding(a => !a)}
           className={`text-[13px] px-3 py-[6px] rounded-[7px] border transition-all font-semibold
-            ${adding
-              ? "bg-[#7c5cfc] border-[#7c5cfc] text-white"
-              : "bg-[#1c1c28] border-[rgba(255,255,255,0.08)] text-[#e8e8f0] hover:border-[#7c5cfc]"
-            }`}>
+            ${adding ? "bg-[#7c5cfc] border-[#7c5cfc] text-white"
+              : "bg-[#1c1c28] border-[rgba(255,255,255,0.08)] text-[#e8e8f0] hover:border-[#7c5cfc]"}`}>
           {adding ? "Cancel" : "+ Add"}
         </button>
       </div>
 
-      {/* Type picker */}
+      {/* Type picker with previews — #9 */}
       {adding && (
-        <div className="grid grid-cols-4 gap-2 p-3 rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[#111118]">
+        <div className="grid grid-cols-3 gap-2 p-3 rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[#111118]">
           {OVERLAY_TYPE_KEYS.map(type => (
             <button key={type} onClick={() => addOverlay(type)}
-              className="flex flex-col items-center gap-1 py-3 px-1 rounded-[8px] border border-[rgba(255,255,255,0.06)] bg-[#1c1c28] hover:border-[#7c5cfc] hover:bg-[#1a1a30] transition-all cursor-pointer">
-              <span className="text-[16px] font-bold text-[#7c5cfc]"
-                style={{ fontFamily:"'JetBrains Mono',monospace" }}>
-                {OVERLAY_TYPES[type].icon}
-              </span>
-              <span className="text-[11px] text-[#9494a8] font-medium text-center leading-tight">
-                {OVERLAY_TYPES[type].label}
-              </span>
+              className="flex flex-col rounded-[8px] border border-[rgba(255,255,255,0.06)] bg-[#0e0e15] hover:border-[#7c5cfc] transition-all cursor-pointer overflow-hidden text-left">
+              <OverlayPreview type={type} />
+              <div className="px-2 py-[6px] border-t border-[rgba(255,255,255,0.05)]">
+                <div className="text-[12px] font-semibold text-[#e8e8f0]">{OVERLAY_TYPES[type].label}</div>
+              </div>
             </button>
           ))}
         </div>
@@ -361,7 +358,7 @@ export default function OverlaySection({ beat }) {
       <div className="flex flex-col gap-2">
         {overlays.map(overlay => (
           <OverlayCard key={overlay.id} overlay={overlay} beat={beat}
-            onUpdate={(k, v) => updateOverlay(overlay.id, k, v)}
+            onUpdate={(k,v) => updateOverlay(overlay.id, k, v)}
             onRemove={() => removeOverlay(overlay.id)} />
         ))}
       </div>

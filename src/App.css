@@ -8,3 +8,8 @@ body {
   margin: 0;
   padding: 0;
 }
+
+* {
+  scrollbar-width: auto;
+  scrollbar-color: black rgb(28 28 46 / var(--tw-bg-opacity));
+}

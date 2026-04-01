@@ -1,122 +1,73 @@
+/**
+ * motionsRegistry.js
+ * src/core/motionsRegistry.js
+ *
+ * Only motions that keep the asset within its zone bounds.
+ * Removed: drift, arcPan, orbitSlow, parallaxLeft, parallaxRight, float, breathing, bounce
+ * These caused assets to visually leave their zone container.
+ */
 export const motionsRegistry = {
 
-  none: () => ({
-    type: "none"
-  }),
+  none: () => ({ type: "none" }),
 
-  /* ---------- ZOOM / PUSH ---------- */
+  /* ── ZOOM / PUSH — safe, scale from center ── */
 
   slowZoom: () => ({
     type: "scaleDrift",
     scaleStart: 1.05,
-    scaleEnd: 1.2
+    scaleEnd: 1.18,
   }),
 
   cinematicPush: () => ({
     type: "scaleDrift",
-    scaleStart: 1.12,
-    scaleEnd: 1.35
+    scaleStart: 1.1,
+    scaleEnd: 1.28,
   }),
 
   pushSlow: () => ({
     type: "scaleDrift",
     scaleStart: 1.05,
-    scaleEnd: 1.25
+    scaleEnd: 1.22,
   }),
 
   pullSlow: () => ({
     type: "scaleDrift",
-    scaleStart: 1.25,
-    scaleEnd: 1.05
+    scaleStart: 1.22,
+    scaleEnd: 1.05,
   }),
 
-  /* ---------- KEN BURNS ---------- */
+  microZoom: () => ({
+    type: "microZoom",
+    scaleStart: 1.0,
+    scaleEnd: 1.1,
+  }),
+
+  /* ── KEN BURNS — scale + gentle pan, stays in bounds ── */
 
   kenburns: () => ({
     type: "kenburns",
     scaleStart: 1.1,
-    scaleEnd: 1.35,
-    panX: -80,
-    panY: -40
+    scaleEnd: 1.28,
+    panX: -40,   // reduced from -80 to stay in bounds
+    panY: -20,   // reduced from -40
   }),
 
   kenburnsReverse: () => ({
     type: "kenburnsReverse",
-    scaleStart: 1.35,
+    scaleStart: 1.28,
     scaleEnd: 1.1,
-    panX: 80,
-    panY: 40
+    panX: 40,
+    panY: 20,
   }),
 
-  /* ---------- PARALLAX ---------- */
-
-  parallaxLeft: () => ({
-    type: "parallax",
-    xStart: 0,
-    xEnd: -200,
-    depth: 0.6
-  }),
-
-  parallaxRight: () => ({
-    type: "parallax",
-    xStart: 0,
-    xEnd: 200,
-    depth: 0.6
-  }),
-
-  /* ---------- FLOATING ---------- */
-
-  float: () => ({
-    type: "float",
-    amplitude: 12,
-    speed: 0.5
-  }),
-
-  breathing: () => ({
-    type: "breathing",
-    scaleStart: 1,
-    scaleEnd: 1.05,
-    speed: 0.6
-  }),
-
-  /* ---------- ORBIT / ARC ---------- */
-
-  orbitSlow: () => ({
-    type: "orbit",
-    radius: 40,
-    speed: 0.4
-  }),
-
-  arcPan: () => ({
-    type: "arcPan",
-    xStart: -80,
-    xEnd: 80,
-    yStart: 40,
-    yEnd: -40
-  }),
-
-  /* ---------- DRONE / CAMERA ---------- */
+  /* ── DRONE RISE — vertical only, stays in bounds ── */
 
   droneRise: () => ({
     type: "droneRise",
-    yStart: 120,
-    yEnd: -40,
+    yStart: 60,    // reduced from 120 to stay in bounds
+    yEnd: -20,     // reduced from -40
     scaleStart: 1.05,
-    scaleEnd: 1.2
+    scaleEnd: 1.18,
   }),
-
-  /* ---------- IMPACT ---------- */
-
-  microZoom: () => ({
-    type: "microZoom",
-    scaleStart: 1,
-    scaleEnd: 1.12
-  }),
-
-  bounce: () => ({
-    type: "bounce",
-    scaleStart: 1.3,
-    scaleEnd: 1
-  })
 
 };
