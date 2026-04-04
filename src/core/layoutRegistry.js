@@ -1,365 +1,61 @@
-import FullZone from "../remotion/layouts/FullZone.jsx";
-import SplitZone from "../remotion/layouts/SplitZone.jsx";
-import FloatingAvatar from "../remotion/layouts/FloatingAvatar.jsx";
-import SideAvatar from "../remotion/layouts/SideAvatar.jsx";
-import CenterAvatar from "../remotion/layouts/CenterAvatar.jsx";
-import PictureInPicture from "../remotion/layouts/PictureInPicture.jsx";
+/**
+ * layoutRegistry.js
+ * src/core/layoutRegistry.js
+ *
+ * Layouts are now JSON definitions from layoutDefinitions.js.
+ * No JSX component imports per layout.
+ * LayoutRenderer.jsx is the single universal renderer.
+ */
 
-import ThreeZone from "../remotion/layouts/ThreeZone.jsx";
-import TwoTopOneBottom from "../remotion/layouts/TwoTopOneBottom.jsx";
-import OneTopTwoBottom from "../remotion/layouts/OneTopTwoBottom.jsx";
-import FourGrid from "../remotion/layouts/FourGrid.jsx";
-import SixGrid from "../remotion/layouts/SixGrid.jsx";
-import BigTopSmallBottom from "../remotion/layouts/BigTopSmallBottom.jsx";
-import SmallTopBigBottom from "../remotion/layouts/SmallTopBigBottom.jsx";
-import LeftHeavy from "../remotion/layouts/LeftHeavy.jsx";
-import RightHeavy from "../remotion/layouts/RightHeavy.jsx";
+import { layoutDefinitions } from "./layoutDefinitions.js";
 
-export const layoutRegistry = {
+/**
+ * layoutRegistry
+ * Each entry exposes the layout definition for AI selection and rendering.
+ * `def` is the full JSON zone definition from layoutDefinitions.
+ */
+export const layoutRegistry = Object.fromEntries(
+  Object.entries(layoutDefinitions).map(([id, def]) => [
+    id,
+    {
+      id,
+      label:       def.label,
+      def,                        // full zone definition
+      intent:      def.intent,    // array: ["hook","stat",...]
+      energy:      def.energy,    // array: ["low","medium","high"]
+      orientation: def.orientation, // array: ["9:16","16:9"]
+      assetCount:  def.assetCount,
+      textCount:   def.textCount,
 
-  FullZone: {
-    component: FullZone,
-    zones: ["z1"],
-    supportsAvatar: true,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 1,
-      avatarSlots: 1,
-      prefersAvatar: false
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
+      // Legacy compat fields — kept so nothing else breaks during migration
+      zones:          def.zones.map(z => z.id),
+      supportsAvatar: def.zones.some(z => z.content?.kind === "avatar"),
+      captionPosition: "bottom",
+      structure: { heading: true, blocks: true, caption: true },
     }
-  },
+  ])
+);
 
-  SplitZone: {
-    component: SplitZone,
-    zones: ["z1","z2"],
-    supportsAvatar: true,
-    orientations: ["vertical","horizontal"],
+/**
+ * getLayoutDef(layoutId)
+ * Returns the raw zone definition for a layout id.
+ */
+export function getLayoutDef(layoutId) {
+  return layoutRegistry[layoutId]?.def || null;
+}
 
-    capability: {
-      assetSlots: 2,
-      avatarSlots: 1,
-      prefersAvatar: false
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-    captionStrategy: "auto",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  ThreeZone: {
-    component: ThreeZone,
-    zones: ["z1","z2","z3"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 3,
-      avatarSlots: 0,
-      prefersAvatar: false
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  TwoTopOneBottom: {
-    component: TwoTopOneBottom,
-    zones: ["z1","z2","z3"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 3,
-      avatarSlots: 0,
-      prefersAvatar: false
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  OneTopTwoBottom: {
-    component: OneTopTwoBottom,
-    zones: ["z1","z2","z3"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 3,
-      avatarSlots: 0,
-      prefersAvatar: false
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  FourGrid: {
-    component: FourGrid,
-    zones: ["z1","z2","z3","z4"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 4,
-      avatarSlots: 0,
-      prefersAvatar: false
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  FloatingAvatar: {
-    component: FloatingAvatar,
-    zones: ["z1","z2"],
-    supportsAvatar: true,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 1,
-      avatarSlots: 1,
-      prefersAvatar: true
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  SideAvatar: {
-    component: SideAvatar,
-    zones: ["z1","z2"],
-    supportsAvatar: true,
-    orientations: ["horizontal"],
-
-    capability: {
-      assetSlots: 1,
-      avatarSlots: 1,
-      prefersAvatar: true
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  CenterAvatar: {
-    component: CenterAvatar,
-    zones: ["z1","z2"],
-    supportsAvatar: true,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 1,
-      avatarSlots: 1,
-      prefersAvatar: true
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  PictureInPicture: {
-    component: PictureInPicture,
-    zones: ["z1","z2"],
-    supportsAvatar: true,
-    orientations: ["vertical","horizontal"],
-
-    capability: {
-      assetSlots: 2,
-      avatarSlots: 1
-    },
-
-    safeAreas: {
-      heading: { top: 80, left: 80, right: 80 },
-      blocks: { top: 140, left: 80, right: 80, bottom: 260 },
-      caption: { bottom: 160, left: 80, right: 80 }
-    },
-
-    captionPosition: "bottom",
-
-    structure: {
-      heading: true,
-      blocks: true,
-      caption: true
-    }
-  },
-
-  SixGrid: {
-    component: SixGrid,
-    zones: ["z1","z2","z3","z4","z5","z6"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-    capability: { assetSlots:6, avatarSlots:0, prefersAvatar:false },
-    safeAreas: {
-      heading: { top:80, left:80, right:80 },
-      blocks:  { top:140, left:80, right:80, bottom:260 },
-      caption: { bottom:160, left:80, right:80 }
-    },
-    captionPosition: "bottom",
-    structure: { heading:true, blocks:true, caption:true }
-  },
-
-  BigTopSmallBottom: {
-    component: BigTopSmallBottom,
-    zones: ["z1","z2","z3"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-    capability: { assetSlots:3, avatarSlots:0, prefersAvatar:false },
-    safeAreas: {
-      heading: { top:80, left:80, right:80 },
-      blocks:  { top:140, left:80, right:80, bottom:260 },
-      caption: { bottom:160, left:80, right:80 }
-    },
-    captionPosition: "bottom",
-    structure: { heading:true, blocks:true, caption:true }
-  },
-
-  SmallTopBigBottom: {
-    component: SmallTopBigBottom,
-    zones: ["z1","z2","z3"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-    capability: { assetSlots:3, avatarSlots:0, prefersAvatar:false },
-    safeAreas: {
-      heading: { top:80, left:80, right:80 },
-      blocks:  { top:140, left:80, right:80, bottom:260 },
-      caption: { bottom:160, left:80, right:80 }
-    },
-    captionPosition: "bottom",
-    structure: { heading:true, blocks:true, caption:true }
-  },
-
-  LeftHeavy: {
-    component: LeftHeavy,
-    zones: ["z1","z2"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-    capability: { assetSlots:2, avatarSlots:0, prefersAvatar:false },
-    safeAreas: {
-      heading: { top:80, left:80, right:80 },
-      blocks:  { top:140, left:80, right:80, bottom:260 },
-      caption: { bottom:160, left:80, right:80 }
-    },
-    captionPosition: "bottom",
-    structure: { heading:true, blocks:true, caption:true }
-  },
-
-  RightHeavy: {
-    component: RightHeavy,
-    zones: ["z1","z2"],
-    supportsAvatar: false,
-    orientations: ["vertical","horizontal"],
-    capability: { assetSlots:2, avatarSlots:0, prefersAvatar:false },
-    safeAreas: {
-      heading: { top:80, left:80, right:80 },
-      blocks:  { top:140, left:80, right:80, bottom:260 },
-      caption: { bottom:160, left:80, right:80 }
-    },
-    captionPosition: "bottom",
-    structure: { heading:true, blocks:true, caption:true }
-  },
-
-};
+/**
+ * findLayouts({ intent, energy, orientation, assetCount, textCount })
+ * Returns all layouts matching the given criteria.
+ * All filters are optional — omitting one means "any".
+ */
+export function findLayouts({ intent, energy, orientation, assetCount, textCount } = {}) {
+  return Object.values(layoutRegistry).filter(layout => {
+    if (intent      && !layout.intent.includes(intent))           return false;
+    if (energy      && !layout.energy.includes(energy))           return false;
+    if (orientation && !layout.orientation.includes(orientation)) return false;
+    if (assetCount  !== undefined && layout.assetCount !== assetCount) return false;
+    if (textCount   !== undefined && layout.textCount  !== textCount)  return false;
+    return true;
+  });
+}

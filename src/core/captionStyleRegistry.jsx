@@ -9,10 +9,22 @@ function splitWords(text) {
   return text.trim().split(/\s+/).filter(Boolean);
 }
 
-/** Which word index is active at this frame */
-function activeIndex(frame, fps, total, intervalMs = 370) {
+/** Which word index is active at this frame.
+ *  If beatDurationMs is provided, intervalMs is calculated from beat duration / word count
+ *  so all words complete exactly within the beat. */
+function activeIndex(frame, fps, total, intervalMs = 370, overrideIntervalMs = null) {
+  // overrideIntervalMs is already ms-per-word, use directly
+  const resolvedInterval = overrideIntervalMs || intervalMs;
   const ms = (frame / fps) * 1000;
-  return Math.min(Math.floor(ms / intervalMs), total - 1);
+  return Math.min(Math.floor(ms / resolvedInterval), total - 1);
+}
+
+/** Calculate ms-per-word from beat duration and word count.
+ *  No clamping — let the beat duration fully control the pace. */
+function beatInterval(beatDurationSec, wordCount) {
+  if (!beatDurationSec || !wordCount) return null;
+  // Spread words evenly across 90% of beat duration (leave 10% buffer at end)
+  return (beatDurationSec * 1000 * 0.9) / wordCount;
 }
 
 /** Spring from a per-word staggered offset */
@@ -29,9 +41,9 @@ function wordSpring(frame, fps, wordIndex, staggerFrames = 8, cfg = {}) {
    Inactive = ghost, active = brand colour + wide glow
    Exactly mirrors the HTML demo
 ───────────────────────────────────────────────────────────── */
-function WordBlaze({ text, frame, fps, brandColor }) {
+function WordBlaze({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 370);
+  const active = activeIndex(frame, fps, words.length, 370, beatInterval(beatDuration, words.length));
 
   return (
     <div style={{ textAlign: "center", lineHeight: 1.1 }}>
@@ -46,8 +58,9 @@ function WordBlaze({ text, frame, fps, brandColor }) {
               fontFamily: "'Bebas Neue', sans-serif",
               fontSize: 84,
               letterSpacing: 2,
+              lineHeight: 0.9,
               margin: "0 8px",
-              color: isActive ? brandColor : isDone ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.22)",
+              color: isActive ? brandColor : isDone ? "rgba(255,255,255,1)" : "rgba(255,255,255,1)",
               textShadow: isActive ? `0 0 30px ${brandColor}, 0 0 60px ${brandColor}60` : "none",
               transform: isActive ? "scale(1.12)" : "scale(1)",
               transition: "color 0.08s, transform 0.08s, text-shadow 0.08s",
@@ -66,12 +79,13 @@ function WordBlaze({ text, frame, fps, brandColor }) {
    Full sentence visible; active word gets a clip-path colour fill
    sweeping left→right using a layered span technique
 ───────────────────────────────────────────────────────────── */
-function KaraokeFill({ text, frame, fps, brandColor }) {
+function KaraokeFill({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 420);
+  const resolvedIntervalMs = beatInterval(beatDuration, words.length) || 420;
+  const active = activeIndex(frame, fps, words.length, 420, beatInterval(beatDuration, words.length));
 
   // How far through the active word's duration are we? (0→1)
-  const intervalFrames = (420 / 1000) * fps;
+  const intervalFrames = (resolvedIntervalMs / 1000) * fps;
   const wordStartFrame = active * intervalFrames;
   const fillProgress = Math.min((frame - wordStartFrame) / (intervalFrames * 0.7), 1);
 
@@ -122,7 +136,7 @@ function KaraokeFill({ text, frame, fps, brandColor }) {
    3. STACK REVEAL
    Lines flip in from below using 3D rotateX perspective
 ───────────────────────────────────────────────────────────── */
-function StackReveal({ text, frame, fps }) {
+function StackReveal({ text, frame, fps, brandColor, beatDuration }) {
   // Split into lines of ~2–3 words
   const words = splitWords(text);
   const chunkSize = Math.ceil(words.length / 3);
@@ -181,11 +195,11 @@ function StackReveal({ text, frame, fps }) {
    Words appear one-by-one; active word gets a yellow background
    that sweeps in like a real marker stroke
 ───────────────────────────────────────────────────────────── */
-function MarkerPen({ text, frame, fps, brandColor }) {
+function MarkerPen({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 390);
+  const active = activeIndex(frame, fps, words.length, 390, beatInterval(beatDuration, words.length));
 
-  const intervalFrames = (390 / 1000) * fps;
+  const intervalFrames = ((beatInterval(beatDuration, words.length) || 390) / 1000) * fps;
   const wordStartFrame = active * intervalFrames;
   const sweepProgress = Math.min((frame - wordStartFrame) / (intervalFrames * 0.5), 1);
 
@@ -240,11 +254,11 @@ function MarkerPen({ text, frame, fps, brandColor }) {
    Active word crashes in from large+blur with chromatic split
    then snaps clean. Inactive words are ghost.
 ───────────────────────────────────────────────────────────── */
-function GlitchStamp({ text, frame, fps, brandColor }) {
+function GlitchStamp({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 400);
+  const active = activeIndex(frame, fps, words.length, 400, beatInterval(beatDuration, words.length));
 
-  const intervalFrames = (400 / 1000) * fps;
+  const intervalFrames = ((beatInterval(beatDuration, words.length) || 400) / 1000) * fps;
 
   return (
     <div style={{ textAlign: "center", lineHeight: 1.1 }}>
@@ -335,9 +349,9 @@ function GlitchStamp({ text, frame, fps, brandColor }) {
    6. EDITORIAL SERIF
    Light bg, Playfair Display italic, active word lifts + italics
 ───────────────────────────────────────────────────────────── */
-function EditorialSerif({ text, frame, fps, brandColor }) {
+function EditorialSerif({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 450);
+  const active = activeIndex(frame, fps, words.length, 450, beatInterval(beatDuration, words.length));
 
   return (
     <div
@@ -389,7 +403,7 @@ function EditorialSerif({ text, frame, fps, brandColor }) {
    7. NEON TICKER
    Characters appear one-by-one with a blinking cursor, teal glow
 ───────────────────────────────────────────────────────────── */
-function NeonTicker({ text, frame, fps }) {
+function NeonTicker({ text, frame, fps, brandColor, beatDuration }) {
   // 1 char every ~1.5 frames at 30fps ≈ 38ms per char
   const charsPerFrame = fps / 20; // ~1.5 chars per frame
   const visibleChars = Math.floor(frame * charsPerFrame);
@@ -432,9 +446,9 @@ function NeonTicker({ text, frame, fps }) {
    8. PILL DROP
    Each word is a spring-dropped pill; active pill fills purple
 ───────────────────────────────────────────────────────────── */
-function PillDrop({ text, frame, fps, brandColor }) {
+function PillDrop({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 500);
+  const active = activeIndex(frame, fps, words.length, 500, beatInterval(beatDuration, words.length));
 
   return (
     <div
@@ -489,11 +503,11 @@ function PillDrop({ text, frame, fps, brandColor }) {
    Massive Barlow Condensed with stroke; active word slams
    in from scale 1.35 + blur, snaps to red
 ───────────────────────────────────────────────────────────── */
-function BrutalSlam({ text, frame, fps, brandColor }) {
+function BrutalSlam({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 350);
+  const active = activeIndex(frame, fps, words.length, 350, beatInterval(beatDuration, words.length));
 
-  const intervalFrames = (350 / 1000) * fps;
+  const intervalFrames = ((beatInterval(beatDuration, words.length) || 350) / 1000) * fps;
 
   return (
     <div style={{ textAlign: "center", lineHeight: 1 }}>
@@ -543,10 +557,10 @@ function BrutalSlam({ text, frame, fps, brandColor }) {
    Words wipe in left→right one at a time; active word
    gets a bright shimmer that animates continuously
 ───────────────────────────────────────────────────────────── */
-function LuxuryGold({ text, frame, fps }) {
+function LuxuryGold({ text, frame, fps, brandColor, beatDuration }) {
   const words = splitWords(text);
-  const active = activeIndex(frame, fps, words.length, 480);
-  const intervalFrames = (480 / 1000) * fps;
+  const active = activeIndex(frame, fps, words.length, 480, beatInterval(beatDuration, words.length));
+  const intervalFrames = ((beatInterval(beatDuration, words.length) || 480) / 1000) * fps;
 
   return (
     <div

@@ -1,3 +1,7 @@
+/**
+ * visualGrammar.js
+ * src/core/visualGrammar.js
+ */
 export const VISUAL_GRAMMAR = {
 
   blocks: [
@@ -12,16 +16,12 @@ export const VISUAL_GRAMMAR = {
   ],
 
   layouts: [
-    "FullZone",
-    "SplitZone",
-    "ThreeZone",
-    "TwoTopOneBottom",
-    "OneTopTwoBottom",
-    "FourGrid",
-    "SideAvatar",
-    "CenterAvatar",
-    "FloatingAvatar",
-    "PictureInPicture"
+    "FullBleed",
+    "HeadlineOverAsset",
+    "SplitAssets",
+    "ThreeStack",
+    "HeadlineReveal",
+    "FourCollage",
   ],
 
   intents: [
@@ -32,40 +32,27 @@ export const VISUAL_GRAMMAR = {
     "question",
     "reveal",
     "explanation",
-    "comparison"
+    "comparison",
+    "proof",
+    "showcase",
+    "cta",
   ],
 
   storytellingPatterns: [
 
     {
       name: "viral_hook",
-      beats: [
-        "hook",
-        "reveal",
-        "stat",
-        "explanation"
-      ]
+      beats: ["hook", "reveal", "stat", "explanation"]
     },
 
     {
       name: "top_list",
-      beats: [
-        "hook",
-        "list",
-        "list",
-        "list",
-        "reveal"
-      ]
+      beats: ["hook", "list", "list", "list", "reveal"]
     },
 
     {
       name: "comparison",
-      beats: [
-        "hook",
-        "comparison",
-        "reveal",
-        "explanation"
-      ]
+      beats: ["hook", "comparison", "reveal", "explanation"]
     }
 
   ]

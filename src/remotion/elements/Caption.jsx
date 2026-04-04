@@ -42,11 +42,18 @@ export default function Caption({ caption, beat, project }) {
   const captionSafe = safeAreas?.caption || {};
 
   /* ── render caption style ── */
+  // Beat duration in seconds — used for caption word timing
+  const beatDuration = beat.end_sec - beat.start_sec || beat.duration_sec || 3;
+
+  // Only use beat-aware timing if duration is reasonable (>1s)
+  const safeBeatDuration = beatDuration >= 1 ? beatDuration : null;
+
   const rendered = styleEntry.render({
-    text:       caption.text,
-    frame:      localFrame,
+    text:        caption.text,
+    frame:       localFrame,
     fps,
     brandColor,
+    beatDuration: safeBeatDuration,
   });
 
   return (

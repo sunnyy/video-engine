@@ -2,38 +2,30 @@
  * assetAutoMatcher.js
  * src/core/assetAutoMatcher.js
  *
- * Fetches assets from Pixabay based on topic, then distributes
- * them across beat zones using dedup logic from assetStrategyEngine.
- *
- * No longer reads from Supabase assets_library.
- * User-uploaded assets still take priority when assetSource === "user".
+ * Generates images via Fal.ai (per asset zone, per beat context).
+ * Only fills zones where type === "asset" in the layout definition.
+ * Never fills text zones.
  */
 
-import { layoutRegistry } from "./layoutRegistry";
-import { layoutDefaultsRegistry } from "./layoutDefaultsRegistry";
-import { buildAssetPlan } from "./assetStrategyEngine";
-import { fetchAssets } from "../services/image-search";
+import { getLayoutDef } from "./layoutRegistry";
+import { generateImages } from "../server/assets/falService";
 
-/* ─────────────────────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────────────────────── */
-
-function getLayoutZones(layout) {
-  return layoutRegistry[layout]?.zones || ["z1"];
+/* ── Get asset-type zones from layout definition ── */
+function getAssetZoneIds(layoutId) {
+  const def = getLayoutDef(layoutId);
+  if (!def) return ["z1"];
+  return def.zones.filter(z => z.type === "asset").map(z => z.id);
 }
 
-function findAssetZones(layout, zones) {
-  return getLayoutZones(layout).filter((z) => {
-    const zone = zones[z];
-    return !zone || zone.role === "asset";
+/* ── Find which asset zones still need a src filled ── */
+function findAssetZones(layoutId, zones) {
+  return getAssetZoneIds(layoutId).filter(zId => {
+    const zone = zones?.[zId];
+    if (!zone) return true; // missing — needs asset
+    if (zone.content?.kind === "block") return false; // block zone — skip
+    if (zone.content?.asset?.src) return false; // already has asset — skip
+    return true;
   });
-}
-
-function detectObjectFit(asset, layout) {
-  if (!asset?.width || !asset?.height) return "cover";
-  const ratio = asset.width / asset.height;
-  const isHorizontal = ratio > 1.2;
-  return layout === "FullZone" && isHorizontal ? "contain" : "cover";
 }
 
 function chooseMotion(beatIndex, zoneIndex) {
@@ -41,83 +33,99 @@ function chooseMotion(beatIndex, zoneIndex) {
   return motions[(beatIndex + zoneIndex) % motions.length];
 }
 
-/* ─────────────────────────────────────────────────────────────
-   MAIN EXPORT
-───────────────────────────────────────────────────────────── */
-
+/* ── Main export ── */
 export async function autoMatchAssets(
   beats,
   orientation,
-  { assetSource = "stock", uploadedAssets = [], topic = "", language = "english" } = {},
+  { assetSource = "ai", uploadedAssets = [], topic = "", language = "english" } = {},
 ) {
-  let assets = [];
 
-  /* ── User uploaded assets take full priority ── */
+  /* ── User uploaded assets — full priority ── */
   if (assetSource === "user" && uploadedAssets.length) {
-    assets = uploadedAssets.map((a) => ({
-      url: a.url,
+    const assets = uploadedAssets.map(a => ({
+      url:  a.url,
       type: a.type || "image",
-      width: a.width,
-      height: a.height,
     }));
-  } else {
-    /* ── Fetch from Pixabay based on topic ── */
 
-    // Count total asset zones needed across all beats
-    const totalZonesNeeded = beats.reduce((sum, beat) => {
-      return sum + findAssetZones(beat.layout, beat.zones).length;
-    }, 0);
+    return beats.map((beat, beatIndex) => {
+      const zones      = { ...beat.zones };
+      const assetZones = findAssetZones(beat.layout, zones);
 
-    // Fetch 1.5× what we need to allow for dedup variety
-    const fetchCount = Math.min(Math.ceil(totalZonesNeeded * 1.5), 40);
-    
-    assets = await fetchAssets({
-      query: topic || "lifestyle people",
-      language,
-      orientation,
-      count: fetchCount,
+      assetZones.forEach((zoneId, zoneIndex) => {
+        const asset = assets[(beatIndex + zoneIndex) % assets.length];
+        zones[zoneId] = {
+          ...zones[zoneId],
+          content: {
+            kind: "asset",
+            asset: {
+              src:             asset.url,
+              type:            asset.type,
+              objectFit:       "cover",
+              motion:          chooseMotion(beatIndex, zoneIndex),
+              enterTransition: "none",
+              exitTransition:  "none",
+            },
+          },
+        };
+      });
+
+      return { ...beat, zones };
     });
-
-    // If Pixabay returns nothing, return beats unchanged
-    if (!assets.length) {
-      console.warn("[assetAutoMatcher] No assets fetched — beats will have empty zones");
-      return beats;
-    }
   }
 
-  /* ── Distribute assets across beats using strategy engine ── */
-  beats = buildAssetPlan(beats, assets);
+  /* ── AI image generation — one prompt per asset zone per beat ── */
+  const zoneJobs = [];
 
-  /* ── Apply zone-level settings (objectFit, motion, transitions) ── */
-  return beats.map((beat, beatIndex) => {
-    const zones = { ...beat.zones };
-    const assetZones = findAssetZones(beat.layout, zones);
-    const layoutDefs = layoutDefaultsRegistry[beat.layout] || {};
+  beats.forEach((beat, beatIndex) => {
+    const assetZones = findAssetZones(beat.layout, beat.zones);
+    assetZones.forEach(zoneId => {
+      zoneJobs.push({
+        beatIndex,
+        zoneId,
+        spoken:      beat.spoken      || topic,
+        intent:      beat.intent      || "explanation",
+        visual_hint: beat.visual_hint || "none",
+        topic,
+      });
+    });
+  });
 
-    assetZones.forEach((zoneKey, zoneIndex) => {
-      const currentSrc = zones[zoneKey]?.content?.asset?.src;
-      const asset = assets.find((a) => a.url === currentSrc) || assets[(beatIndex + zoneIndex) % assets.length];
+  if (!zoneJobs.length) return beats;
 
-      const zoneDefs = layoutDefs?.zones?.[zoneKey] || {};
-      const objectFit = detectObjectFit(asset, beat.layout);
+  console.log(`[assetAutoMatcher] Generating ${zoneJobs.length} images via Fal.ai...`);
 
-      zones[zoneKey] = {
-        ...zones[zoneKey],
-        role: "asset",
+  const images = await generateImages({
+    prompts:     zoneJobs,
+    orientation,
+    concurrency: 3,
+  });
+
+  const updatedBeats = beats.map(b => ({ ...b, zones: { ...b.zones } }));
+  let imageIndex = 0;
+
+  beats.forEach((beat, beatIndex) => {
+    const assetZones = findAssetZones(beat.layout, beat.zones);
+
+    assetZones.forEach((zoneId, zoneIndex) => {
+      const image = images[imageIndex++];
+      if (!image) return;
+
+      updatedBeats[beatIndex].zones[zoneId] = {
+        ...updatedBeats[beatIndex].zones[zoneId],
         content: {
           kind: "asset",
           asset: {
-            src: asset.url,
-            type: asset.type || "image",
-            objectFit,
-            motion: zoneDefs.assetMotion || chooseMotion(beatIndex, zoneIndex),
-            enterTransition: zoneDefs.assetEnter || "fadeIn",
-            exitTransition: zoneDefs.assetExit || "none",
+            src:             image.url,
+            type:            "image",
+            objectFit:       "cover",
+            motion:          chooseMotion(beatIndex, zoneIndex),
+            enterTransition: "none",
+            exitTransition:  "none",
           },
         },
       };
     });
-
-    return { ...beat, zones };
   });
+
+  return updatedBeats;
 }

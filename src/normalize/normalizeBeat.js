@@ -36,7 +36,7 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     id: raw.id || crypto.randomUUID(),
     order: index,
 
-    layout: raw.layout || "FullZone",
+    layout: raw.layout || "FullBleed",
     layoutBackground,
     layoutPadding: raw.layoutPadding || 0,
 

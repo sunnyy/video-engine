@@ -38,7 +38,10 @@ export default function BrandingSection() {
 
   const update = (key, value) => {
     updateProjectMeta({
-      brand: { ...brand, [key]: value },
+      meta: {
+        ...project.meta,
+        brand: { ...brand, [key]: value },
+      },
     });
   };
 

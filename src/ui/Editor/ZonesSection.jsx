@@ -1,24 +1,32 @@
+/**
+ * ZonesSection.jsx
+ * src/ui/Editor/ZonesSection.jsx
+ */
 import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { layoutRegistry } from "../../core/layoutRegistry.js";
-import blockRegistry from "../../core/blockRegistry";
+import { getLayoutDef } from "../../core/layoutRegistry.js";
 import ZonePickerModal from "./zonePicker/ZonePickerModal";
-import ZoneCard from "./zones/ZoneCard";
+import ZoneEditor from "./ZoneEditor";
 
-export default function ZonesSection({ beat, project }) {
+export default function ZonesSection({ beat, project, selectedZoneId, selectedZoneIds, onSelectZone }) {
+  const updateBeat       = useProjectStore((s) => s.updateBeat);
+  const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
 
-  const updateBeat = useProjectStore((s) => s.updateBeat);
-  const [picker, setPicker] = useState(null);
+  const [picker, setPicker]           = useState(null);
+  const [addingZone, setAddingZone]   = useState(false);
+  const [newZoneType, setNewZoneType] = useState("asset");
 
-  const layout    = layoutRegistry[beat.layout];
-  const zones     = beat.zones  || {};
-  const zoneSlots = layout?.zones || [];
+  const layoutDef = getLayoutDef(beat.layout);
+  const zones     = beat.zones || {};
+  const zoneDefs  = layoutDef?.zones || [];
 
-  if (!layout) return null;
+  const isMultiSelect    = selectedZoneIds ? selectedZoneIds.size > 1 : false;
+  const selectedZoneDef  = zoneDefs.find(z => z.id === selectedZoneId) || null;
+  const selectedZoneData = zones[selectedZoneId] || {};
+  const selectedZoneType = selectedZoneDef?.type || selectedZoneData.type || "asset";
 
   const openPicker = (slot, type) => setPicker({ slot, type });
 
-  /* ── Asset normalisation ── */
   const normalizeAsset = (data) => {
     if (!data) return data;
     if (data.kind) return data;
@@ -30,91 +38,77 @@ export default function ZonesSection({ beat, project }) {
     return data;
   };
 
-  /* ── Duration sync ── */
-  const getRequiredDuration = (block) => {
-    if (!block?.type) return 0;
-    const min = blockRegistry[block.type]?.minDuration || 2;
-    if (block.type === "ListReveal") {
-      return Math.max(min, (block.props?.items?.length || 0) * 0.6);
-    }
-    if (block.type === "Slideshow") {
-      return Math.max(min, (block.props?.images?.length || 0) * 1.2);
-    }
-    return min;
-  };
-
-  const syncBeatDuration = (zonesData) => {
-    let max = 0;
-    Object.values(zonesData).forEach((z) => {
-      const req = getRequiredDuration(z?.content?.block);
-      if (req > max) max = req;
-    });
-    if (max > (beat.duration_sec || 0)) {
-      updateBeat(beat.id, { duration_sec: max });
-    }
-  };
-
-  /* ── Core zone updater ── */
   const updateZone = (slot, newData) => {
+    const newZones = { ...zones, [slot]: { ...(zones[slot] || {}), ...newData } };
+    updateBeat(beat.id, { zones: newZones });
+  };
+
+  const updateZoneSilent = (slot, newData) => {
+    const newZones = { ...zones, [slot]: { ...(zones[slot] || {}), ...newData } };
+    updateBeatSilent(beat.id, { zones: newZones });
+  };
+
+  const addZone = () => {
+    const id     = `custom_${Date.now()}`;
+    const isText = newZoneType === "text";
     const newZones = {
       ...zones,
-      [slot]: { ...(zones?.[slot] || {}), ...newData },
+      [id]: {
+        type: newZoneType,
+        x: 10, y: 10, width: 80, height: 20,
+        zIndex: 10, start: 0, end: null,
+        enterAnimation: "fadeIn", exitAnimation: "none",
+        content: isText
+          ? { kind: "text", text: "New text" }
+          : { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
+        style: isText ? { fontSize: 32, fontWeight: 700, color: "#ffffff", textAlign: "center" } : {},
+        background: {},
+      },
     };
     updateBeat(beat.id, { zones: newZones });
-    syncBeatDuration(newZones);
+    setAddingZone(false);
+    onSelectZone(id, false);
   };
 
-  /* ── Content ── */
-  const updateContentProp = (slot, key, value) => {
-    const zone    = zones?.[slot] || {};
-    const content = zone.content  || {};
-    const asset   = content.asset || {};
-    const block   = content.block || {};
+  const deleteZone = (slot) => {
+    const newZones = { ...zones };
+    delete newZones[slot];
+    updateBeat(beat.id, { zones: newZones });
+    if (selectedZoneId === slot) onSelectZone(null);
+  };
 
+  const updateTextContent = (slot, text) => {
+    const zone = zones[slot] || {};
+    updateZone(slot, { content: { ...zone.content, kind: "text", text } });
+  };
+
+  const updateTextStyle = (slot, key, value) =>
+    updateZone(slot, { style: { ...(zones[slot]?.style || {}), [key]: value } });
+
+  const updateContentProp = (slot, key, value) => {
+    const zone    = zones[slot] || {};
+    const content = zone.content || {};
     if (content.kind === "asset") {
-      updateZone(slot, { content: { ...content, asset: { ...asset, [key]: value } } });
-      return;
-    }
-    if (content.kind === "block") {
-      updateZone(slot, {
-        content: {
-          ...content,
-          block: { ...block, props: { ...(block.props || {}), [key]: value } },
-        },
-      });
+      updateZone(slot, { content: { ...content, asset: { ...(content.asset || {}), [key]: value } } });
     }
   };
 
   const setContent = (slot, data) => {
     data = normalizeAsset(data);
-    if (data.kind === "block") {
-      updateZone(slot, { content: { kind: "block", block: data.block } });
-      return;
-    }
-    if (data.kind === "color") {
-      updateZone(slot, { content: { kind: "color", color: data.color } });
-      return;
-    }
+    if (data.kind === "block") { updateZone(slot, { content: { kind: "block", block: data.block } }); return; }
+    if (data.kind === "color") { updateZone(slot, { content: { kind: "color", color: data.color } }); return; }
     if (data.kind === "asset") {
-      // Preserve existing motion/transitions — only update src and type
-      const existing = zones?.[slot]?.content?.asset || {};
-      updateZone(slot, {
-        content: {
-          kind: "asset",
-          asset: {
-            src:             data.asset.src,
-            type:            data.asset.type,
-            objectFit:       existing.objectFit       || "cover",
-            motion:          existing.motion          || "kenburns",
-            enterTransition: existing.enterTransition || "fadeIn",
-            exitTransition:  existing.exitTransition  || "none",
-          },
-        },
-      });
+      const existing = zones[slot]?.content?.asset || {};
+      updateZone(slot, { content: { kind: "asset", asset: {
+        src: data.asset.src, type: data.asset.type,
+        objectFit:       existing.objectFit       || "cover",
+        motion:          existing.motion          || "kenburns",
+        enterTransition: existing.enterTransition || "none",
+        exitTransition:  existing.exitTransition  || "none",
+      }}});
     }
   };
 
-  /* ── Background ── */
   const setBackground = (slot, data) => {
     data = normalizeAsset(data);
     if (data.kind === "color") {
@@ -122,66 +116,23 @@ export default function ZonesSection({ beat, project }) {
       return;
     }
     if (data.kind === "asset") {
-      updateZone(slot, {
-        background: {
-          kind: "asset",
-          asset: { type: data.asset.type, src: data.asset.src, objectFit: "cover", transition: "none" },
-        },
-      });
+      updateZone(slot, { background: { kind: "asset", asset: { type: data.asset.type, src: data.asset.src, objectFit: "cover" } } });
     }
   };
 
   const updateBackgroundProp = (slot, key, value) => {
-    const zone  = zones?.[slot] || {};
-    const bg    = zone.background || {};
-    const asset = bg.asset || {};
-    updateZone(slot, { background: { ...bg, asset: { ...asset, [key]: value } } });
+    const bg = zones[slot]?.background || {};
+    updateZoneSilent(slot, { background: { ...bg, asset: { ...(bg.asset || {}), [key]: value } } });
   };
 
-  /* ── Block ── */
-  const setVariant = (slot, variant) => {
-    const zone    = zones?.[slot] || {};
-    const content = zone.content  || {};
-    updateZone(slot, {
-      content: { ...content, block: { ...(content.block || {}), variant } },
-    });
-  };
+  const setZoneStyle       = (slot, key, value) => updateZone(slot,       { style: { ...(zones[slot]?.style || {}), [key]: value } });
+  const setZoneStyleSilent = (slot, key, value) => updateZoneSilent(slot, { style: { ...(zones[slot]?.style || {}), [key]: value } });
+  const setZoneLayout       = (slot, key, value) => updateZone(slot,       { [key]: value });
+  const setZoneLayoutSilent = (slot, key, value) => updateZoneSilent(slot, { [key]: value });
 
-  const updateBlockProp = (slot, key, value) => {
-    const zone    = zones?.[slot] || {};
-    const content = zone.content  || {};
-    const block   = content.block || {};
-    updateZone(slot, {
-      content: {
-        ...content,
-        block: { ...block, props: { ...(block.props || {}), [key]: value } },
-      },
-    });
-  };
+  const clearContent    = (slot) => updateZone(slot, { content: {} });
+  const clearBackground = (slot) => updateZone(slot, { background: {} });
 
-  /* ── Styling ── */
-  const setPadding = (slot, side, value) => {
-    const zone    = zones?.[slot] || {};
-    const style   = zone.style    || {};
-    const padding = style.padding || {};
-    updateZone(slot, {
-      style: { ...style, padding: { ...padding, [side]: Number(value) } },
-    });
-  };
-
-  /**
-   * setZoneStyle — updates any top-level style key:
-   *   borderRadius, border, shadow, opacity
-   */
-  const setZoneStyle = (slot, key, value) => {
-    const zone  = zones?.[slot] || {};
-    const style = zone.style    || {};
-    updateZone(slot, {
-      style: { ...style, [key]: value },
-    });
-  };
-
-  /* ── Picker ── */
   const handleSelect = (asset) => {
     if (!picker) return;
     if (picker.type === "content")    setContent(picker.slot, asset);
@@ -189,47 +140,83 @@ export default function ZonesSection({ beat, project }) {
     setPicker(null);
   };
 
-  /* ── Clear ── */
-  const clearContent = (slot) => {
-    const zone = zones?.[slot] || {};
-    updateZone(slot, { ...zone, content: {} });
-  };
-
-  const clearBackground = (slot) => {
-    const zone = zones?.[slot] || {};
-    updateZone(slot, { ...zone, background: {} });
-  };
+  const headerLabel = isMultiSelect
+    ? `${selectedZoneIds.size} zones selected`
+    : selectedZoneId ? `Zone: ${selectedZoneId}` : "Zones";
 
   return (
-    <div>
-      <div
-        className="mb-4 text-[11px] font-bold tracking-[0.1em] uppercase text-[#9494a8]"
-        style={{ fontFamily: "'Syne', sans-serif" }}
-      >
-        Zones
+    <div className="flex flex-col h-full">
+
+      <div className="flex items-center justify-between mb-3 shrink-0">
+        <div className="text-[11px] font-bold tracking-widest uppercase text-[#9494a8]"
+          style={{ fontFamily: "'Syne', sans-serif" }}>
+          {headerLabel}
+        </div>
+        <button onClick={() => setAddingZone(v => !v)}
+          className="px-2 py-[3px] rounded-[5px] text-[10px] font-bold text-[#7c5cfc] border border-[rgba(124,92,252,0.3)] hover:bg-[rgba(124,92,252,0.1)] bg-transparent cursor-pointer">
+          + Add Zone
+        </button>
       </div>
 
-      <div className="flex flex-col gap-3">
-        {zoneSlots.map((slot) => {
-          const zone = zones?.[slot] || {};
-          return (
-            <ZoneCard
-              key={slot}
-              slot={slot}
-              zone={zone}
-              openPicker={openPicker}
-              setVariant={setVariant}
-              updateBlockProp={updateBlockProp}
-              updateContentProp={updateContentProp}
-              setPadding={setPadding}
-              setZoneStyle={setZoneStyle}
-              updateBackgroundProp={updateBackgroundProp}
-              clearContent={clearContent}
-              clearBackground={clearBackground}
-            />
-          );
-        })}
-      </div>
+      {addingZone && (
+        <div className="mb-3 p-2 rounded-[8px] border border-[rgba(124,92,252,0.2)] bg-[rgba(124,92,252,0.05)] flex items-center gap-2 shrink-0">
+          {["asset", "text"].map(t => (
+            <button key={t} onClick={() => setNewZoneType(t)}
+              className={`px-2 py-[3px] rounded-[4px] text-[10px] font-bold capitalize border cursor-pointer
+                ${newZoneType === t ? "bg-[#7c5cfc] text-white border-[#7c5cfc]" : "bg-transparent text-[#7070a0] border-[rgba(255,255,255,0.1)]"}`}>
+              {t}
+            </button>
+          ))}
+          <button onClick={addZone}
+            className="ml-auto px-2 py-[3px] rounded-[4px] text-[10px] font-bold bg-[#7c5cfc] text-white border-0 cursor-pointer">
+            Add
+          </button>
+        </div>
+      )}
+
+      {/* Nothing selected */}
+      {!selectedZoneId && !isMultiSelect && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-40">
+          <span className="text-[32px]">👆</span>
+          <span className="text-[12px] text-[#9494a8] text-center">Click a zone on the canvas<br/>to edit it</span>
+        </div>
+      )}
+
+      {/* Multi-select — show nothing, just the count in header */}
+      {isMultiSelect && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 opacity-60">
+          <span className="text-[28px]">⊞</span>
+          <span className="text-[12px] text-[#9494a8] text-center">
+            {selectedZoneIds.size} zones selected<br/>
+            <span className="text-[10px] opacity-60">Drag · Arrow keys · Rotate</span>
+          </span>
+        </div>
+      )}
+
+      {/* Single zone editor */}
+      {selectedZoneId && !isMultiSelect && (
+        <div className="flex-1 overflow-y-auto">
+          <ZoneEditor
+            beatId={beat.id}
+            slot={selectedZoneId}
+            zone={selectedZoneData}
+            zoneDef={selectedZoneDef}
+            zoneType={selectedZoneType}
+            openPicker={openPicker}
+            updateTextContent={updateTextContent}
+            updateTextStyle={updateTextStyle}
+            updateContentProp={updateContentProp}
+            updateBackgroundProp={updateBackgroundProp}
+            setZoneStyle={setZoneStyle}
+            setZoneStyleSilent={setZoneStyleSilent}
+            setZoneLayout={setZoneLayout}
+            setZoneLayoutSilent={setZoneLayoutSilent}
+            clearContent={clearContent}
+            clearBackground={clearBackground}
+            onDelete={() => deleteZone(selectedZoneId)}
+          />
+        </div>
+      )}
 
       {picker && (
         <ZonePickerModal
@@ -239,6 +226,7 @@ export default function ZonesSection({ beat, project }) {
           onClose={() => setPicker(null)}
         />
       )}
+
     </div>
   );
 }

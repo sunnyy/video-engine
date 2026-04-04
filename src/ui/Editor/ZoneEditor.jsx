@@ -1,0 +1,336 @@
+/**
+ * ZoneEditor.jsx
+ * src/ui/Editor/ZoneEditor.jsx
+ */
+import React, { useEffect } from "react";
+import { transitionsRegistry } from "../../../src/core/transitionsRegistry";
+import { motionsRegistry }     from "../../../src/core/motionsRegistry";
+import { useProjectStore }     from "../../../src/store/useProjectStore";
+
+const FONT_FAMILIES = [
+  { label: "Default",          value: "inherit" },
+  { label: "Bebas Neue",       value: "'Bebas Neue', sans-serif" },
+  { label: "Syne",             value: "'Syne', sans-serif" },
+  { label: "Outfit",           value: "'Outfit', sans-serif" },
+  { label: "Playfair Display", value: "'Playfair Display', serif" },
+  { label: "JetBrains Mono",   value: "'JetBrains Mono', monospace" },
+  { label: "Unbounded",        value: "'Unbounded', sans-serif" },
+  { label: "Barlow Condensed", value: "'Barlow Condensed', sans-serif" },
+];
+
+function Label({ children }) {
+  return (
+    <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#7070a0] mb-[5px]"
+      style={{ fontFamily: "'JetBrains Mono', monospace" }}>{children}</div>
+  );
+}
+
+function Sel({ label, value, onChange, options }) {
+  return (
+    <div>
+      {label && <Label>{label}</Label>}
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[8px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer appearance-none"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237070a0' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}>
+        {options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/* Slider with undo batching — silent on drag, commit on mouseUp */
+function Slider({ label, value, onChangeSilent, onCommit, min = 0, max = 100, step = 1, unit = "" }) {
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-[5px]">
+        <Label>{label}</Label>
+        <span className="text-[11px] font-mono text-[#55556a]">{value}{unit}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChangeSilent(Number(e.target.value))}
+        onMouseUp={onCommit}
+        onTouchEnd={onCommit}
+        className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 3 }}
+      />
+    </div>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <div className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#3a3a55] mb-3 mt-1"
+      style={{ fontFamily: "'JetBrains Mono', monospace" }}>{children}</div>
+  );
+}
+
+function Divider() {
+  return <div className="h-[1px] bg-[rgba(255,255,255,0.05)] my-4" />;
+}
+
+export default function ZoneEditor({
+  beatId,
+  slot, zone, zoneDef, zoneType,
+  openPicker,
+  updateTextContent, updateTextStyle,
+  updateContentProp, updateBackgroundProp,
+  setZoneStyle, setZoneLayout,
+  setZoneStyleSilent, setZoneLayoutSilent,
+  clearContent, clearBackground,
+  onDelete,
+}) {
+  const commitBeat = useProjectStore(s => s.commitBeat);
+
+  const safeZone = zone || {};
+  const content  = safeZone.content    || {};
+  const style    = safeZone.style      || {};
+  const bg       = safeZone.background || {};
+
+  const isText = zoneType === "text";
+
+  const enters  = Object.keys(transitionsRegistry.enter || {});
+  const exits   = Object.keys(transitionsRegistry.exit  || {});
+  const motions = Object.keys(motionsRegistry || {});
+
+  const start   = safeZone.start          ?? zoneDef?.start          ?? 0;
+  const end     = safeZone.end            !== undefined ? safeZone.end : (zoneDef?.end ?? null);
+  const enter   = safeZone.enterAnimation ?? zoneDef?.enterAnimation ?? "fadeIn";
+  const exit    = safeZone.exitAnimation  ?? zoneDef?.exitAnimation  ?? "none";
+  const radius  = style.borderRadius ?? 0;
+  const shadow  = style.shadowBlur   ?? 0;
+  const padding = style.contentPadding ?? 0;
+
+  const commit = () => commitBeat(beatId);
+
+  // Helpers — silent versions for sliders
+  const setStyleSilent  = (key, val) => setZoneStyleSilent(slot, key, val);
+  const setLayoutSilent = (key, val) => setZoneLayoutSilent(slot, key, val);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.code !== "Delete") return;
+      if (["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName)) return;
+      e.preventDefault();
+      onDelete();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDelete]);
+
+  return (
+    <div className="pb-6">
+
+      {/* ── TEXT ── */}
+      {isText && (
+        <>
+          <SectionTitle>Text</SectionTitle>
+          <textarea
+            value={content.text || ""}
+            onChange={e => updateTextContent(slot, e.target.value)}
+            rows={3}
+            placeholder="Enter text..."
+            className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-2 text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none placeholder-[#55556a] mb-3"
+          />
+
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <Sel label="Font" value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyle(slot,"fontFamily",v)} options={FONT_FAMILIES} />
+            <Sel label="Align" value={style.textAlign ?? "center"} onChange={v => updateTextStyle(slot,"textAlign",v)}
+              options={[{label:"Left",value:"left"},{label:"Center",value:"center"},{label:"Right",value:"right"}]} />
+            <Sel label="Weight" value={String(style.fontWeight ?? 700)} onChange={v => updateTextStyle(slot,"fontWeight",Number(v))}
+              options={[{label:"Regular",value:"400"},{label:"Medium",value:"500"},{label:"Semi",value:"600"},{label:"Bold",value:"700"},{label:"Extra",value:"800"},{label:"Black",value:"900"}]} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <Slider label="Font Size" value={style.fontSize ?? 32}
+              onChangeSilent={v => setStyleSilent("fontSize", v)}
+              onCommit={commit} min={10} max={120} unit="px" />
+            <Slider label="Opacity" value={Math.round((style.opacity ?? 1)*100)}
+              onChangeSilent={v => setStyleSilent("opacity", v/100)}
+              onCommit={commit} min={0} max={100} unit="%" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <Slider label="Border Radius" value={radius}
+              onChangeSilent={v => setStyleSilent("borderRadius", v)}
+              onCommit={commit} min={0} max={80} unit="px" />
+            <Slider label="Padding" value={padding}
+              onChangeSilent={v => setStyleSilent("contentPadding", v)}
+              onCommit={commit} min={0} max={60} unit="px" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Text Color</Label>
+              <div className="flex items-center gap-2 bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[7px]">
+                <input type="color" value={style.color ?? "#ffffff"} onChange={e => updateTextStyle(slot,"color",e.target.value)}
+                  className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0" />
+                <span className="text-[11px] font-mono text-[#7070a0] truncate">{style.color ?? "#ffffff"}</span>
+              </div>
+            </div>
+            <div>
+              <Label>BG Color</Label>
+              <div className="flex items-center gap-2 bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[7px]">
+                <input type="color"
+                  value={!style.background || style.background === "transparent" ? "#000000" : style.background}
+                  onChange={e => updateTextStyle(slot,"background",e.target.value)}
+                  className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0" />
+                <button onClick={() => updateTextStyle(slot,"background","transparent")}
+                  className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer ml-auto">clear</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── ASSET ── */}
+      {!isText && (
+        <>
+          <SectionTitle>Asset</SectionTitle>
+          <div className="flex gap-4 mb-4">
+
+            {/* Preview */}
+            <div className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
+              style={{ width: 100, height: 130 }}
+              onClick={() => openPicker(slot, "content")}>
+              {content.asset?.src ? (
+                <img src={content.asset.src} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-[#0e0e1a] flex flex-col items-center justify-center gap-1 opacity-50">
+                  <span className="text-[22px]">＋</span>
+                  <span className="text-[9px] text-[#9494a8] text-center px-1">Add Asset</span>
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
+                <span className="text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                  {content.asset?.src ? "Change" : "Add"}
+                </span>
+              </div>
+              {content.asset?.src && (
+                <button onClick={e => { e.stopPropagation(); clearContent(slot); }}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#ff4444] text-white text-[10px] flex items-center justify-center border-0 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity font-bold">
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Right controls */}
+            <div className="flex-1 flex flex-col gap-3">
+              <div className="grid grid-cols-3 gap-2">
+                <Sel label="Object Fit" value={content.asset?.objectFit || "cover"} onChange={v => updateContentProp(slot,"objectFit",v)} options={["cover","contain"]} />
+                <Slider label="Rounded Border" value={radius}
+                  onChangeSilent={v => setStyleSilent("borderRadius", v)}
+                  onCommit={commit} min={0} max={80} unit="px" />
+                <Slider label="Shadow" value={shadow}
+                  onChangeSilent={v => setStyleSilent("shadowBlur", v)}
+                  onCommit={commit} min={0} max={60} unit="px" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Sel label="Enter" value={content.asset?.enterTransition || "none"} onChange={v => updateContentProp(slot,"enterTransition",v)} options={enters} />
+                <Sel label="Exit"  value={content.asset?.exitTransition  || "none"} onChange={v => updateContentProp(slot,"exitTransition",v)}  options={exits} />
+                <Sel label="Motion" value={content.asset?.motion || "none"} onChange={v => updateContentProp(slot,"motion",v)} options={motions} />
+              </div>
+
+              {/* Padding — only when BG is set */}
+              {bg.kind && (
+                <Slider label="Content Padding" value={padding}
+                  onChangeSilent={v => setStyleSilent("contentPadding", v)}
+                  onCommit={commit} min={0} max={60} unit="px" />
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      <Divider />
+
+      {/* ── BACKGROUND ── */}
+      <SectionTitle>Background</SectionTitle>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="relative shrink-0 rounded-[8px] overflow-hidden cursor-pointer group border border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
+          style={{ width: 56, height: 40 }}
+          onClick={() => openPicker(slot, "background")}>
+          {bg.kind === "color" && <div className="absolute inset-0" style={{ background: bg.color }} />}
+          {bg.kind === "asset" && bg.asset?.src && <img src={bg.asset.src} className="absolute inset-0 w-full h-full object-cover" />}
+          {!bg.kind && <div className="absolute inset-0 bg-[#0e0e1a] flex items-center justify-center text-[#55556a] text-[18px]">＋</div>}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <button onClick={() => openPicker(slot, "background")}
+            className="text-[11px] font-bold text-[#7c5cfc] bg-transparent border-0 cursor-pointer text-left hover:text-[#a78fff] transition-colors">
+            {bg.kind ? "Change" : "Add Background"}
+          </button>
+          {bg.kind && (
+            <button onClick={() => clearBackground(slot)}
+              className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer text-left transition-colors">
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Padding — shown for all zone types when BG is set */}
+      {bg.kind && (
+        <div className={`grid gap-3 mb-3 ${bg.kind === "asset" ? "grid-cols-3" : "grid-cols-1"}`}>
+          {bg.kind === "asset" && (
+            <>
+              <Slider label="Opacity" value={Math.round((bg.asset?.opacity ?? 1)*100)}
+                onChangeSilent={v => updateBackgroundProp(slot,"opacity",v/100)}
+                onCommit={commit} min={10} max={100} unit="%" />
+              <Slider label="Blur" value={bg.asset?.blur ?? 0}
+                onChangeSilent={v => updateBackgroundProp(slot,"blur",v)}
+                onCommit={commit} min={0} max={20} unit="px" />
+            </>
+          )}
+          <Slider label="Content Padding" value={padding}
+            onChangeSilent={v => setStyleSilent("contentPadding", v)}
+            onCommit={commit} min={0} max={60} unit="px" />
+        </div>
+      )}
+
+      <Divider />
+
+      {/* ── TIMING ── */}
+      <SectionTitle>Timing</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 mb-2">
+        <Slider label="Start" value={Number(start.toFixed(1))}
+          onChangeSilent={v => setLayoutSilent("start", v)}
+          onCommit={commit} min={0} max={30} step={0.1} unit="s" />
+        <div>
+          <div className="flex justify-between items-center mb-[5px]">
+            <Label>End</Label>
+            <span className="text-[11px] font-mono text-[#55556a]">{end === null ? "auto" : `${Number(end).toFixed(1)}s`}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="range" min={0} max={30} step={0.1}
+              value={end === null ? 30 : end}
+              onChange={e => { const v = Number(e.target.value); setLayoutSilent("end", v >= 30 ? null : v); }}
+              onMouseUp={commit} onTouchEnd={commit}
+              className="flex-1 accent-[#7c5cfc] cursor-pointer" style={{ height: 3 }} />
+            {end !== null && (
+              <button onClick={() => setZoneLayout(slot,"end",null)}
+                className="text-[9px] text-[#7c5cfc] border-0 bg-transparent cursor-pointer shrink-0">auto</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Divider />
+
+      {/* ── ANIMATIONS ── */}
+      <SectionTitle>Animations</SectionTitle>
+      <div className="grid grid-cols-2 gap-3">
+        <Sel label="Enter Animation" value={enter} onChange={v => setZoneLayout(slot,"enterAnimation",v)} options={enters} />
+        <Sel label="Exit Animation"  value={exit}  onChange={v => setZoneLayout(slot,"exitAnimation",v)}  options={exits}  />
+      </div>
+
+      <Divider />
+
+      {/* ── DELETE ── */}
+      <button onClick={onDelete}
+        className="w-full py-[8px] rounded-[8px] text-[12px] font-bold text-[#ff6060] border border-[rgba(255,60,60,0.15)] hover:bg-[rgba(255,60,60,0.08)] bg-transparent cursor-pointer transition-colors">
+        Delete Zone <span className="opacity-30 text-[10px] ml-1">Del</span>
+      </button>
+
+    </div>
+  );
+}

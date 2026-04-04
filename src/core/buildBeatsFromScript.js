@@ -10,14 +10,14 @@ import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
 import { applyBeatVariation }     from "./beatVariationEngine";
 import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
 import { planBeatVisual }         from "./visualPlanner";
-import { layoutRegistry }         from "./layoutRegistry";
+import { getLayoutDef }           from "./layoutRegistry";
 import blockRegistry              from "./blockRegistry";
 import { pickBeatSFX, OVERLAY_SFX_DEFAULTS } from "./sfxRegistry";
 import { autoAssignOverlays }     from "./overlayPlacementEngine";
 
 import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
-import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
 import { extractBlockProps }  from "./ai/blockPropExtractor";
+import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
 import { validateAIOutputs }  from "./ai/aiOutputValidator";
 
 /* ── Helpers ── */
@@ -37,10 +37,10 @@ function splitIntoDurationBeats(text) {
   return beats;
 }
 
-/* ── Duration — max 8s, respects word count + intent ── */
+/* ── Duration ── */
 function calculateDuration(spoken, intent, energy = 0.5) {
   const wc  = words(spoken).length;
-  let base  = 1.6 + wc * 0.14; // slightly more generous per word
+  let base  = 1.6 + wc * 0.14;
 
   const intentAdj = {
     shock: 0.8, curiosity: 0.5, proof: 0.6, reveal: 0.8,
@@ -84,41 +84,51 @@ function chooseCaptionPosition(index, total, energy) {
 }
 
 /* ── Transition ── */
-function chooseTransition(layout, index, energy = 0.5, isLast = false) {
-  if (index === 0)  return { type: "cut",      duration: 0.25 };
-  if (isLast)       return { type: "blurFade",  duration: 0.3  };
-
+function chooseTransition(layoutId, index, energy = 0.5, isLast = false) {
+  if (index === 0) return { type: "cut",     duration: 0.25 };
+  if (isLast)      return { type: "blurFade", duration: 0.3  };
   const high = energy >= 0.75;
-  const map = {
-    FullZone:         high ? "zoomCut"   : "blurFade",
-    SplitZone:        high ? "slideWhip" : "cut",
-    ThreeZone:        high ? "zoomCut"   : "blurFade",
-    SmallTopBigBottom:high ? "slideWhip" : "blurFade",
-    BigTopSmallBottom:high ? "zoomCut"   : "blurFade",
-    TwoTopOneBottom:  high ? "slideWhip" : "scaleJump",
-    OneTopTwoBottom:  high ? "zoomCut"   : "blurFade",
-    FourGrid:               "cut",
-    PictureInPicture: high ? "slideWhip" : "blurFade",
-    SideAvatar:             "cut",
-    CenterAvatar:     high ? "zoomCut"   : "blurFade",
-    FloatingAvatar:         "cut",
-  };
-  return { type: map[layout] || "cut", duration: high ? 0.2 : 0.3 };
+  return { type: high ? "zoomCut" : "blurFade", duration: high ? 0.2 : 0.3 };
 }
 
-/* ── Enforce layout zones ── */
-function enforceLayoutZones(layout, zones) {
-  const def = layoutRegistry[layout];
-  if (!def) return zones;
+/* ── Enforce layout zones — respects new zone type schema ── */
+function enforceLayoutZones(layoutId, existingZones = {}) {
+  const def = getLayoutDef(layoutId);
+  if (!def) return existingZones;
+
   const fixed = {};
-  def.zones.forEach(z => {
-    fixed[z] = zones[z] || {
-      role: "asset",
-      content: { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
-      background: {},
-      style: {},
-    };
+
+  def.zones.forEach(zoneDef => {
+    const existing = existingZones[zoneDef.id];
+
+    if (existing) {
+      // Keep existing content but ensure zone id is present
+      fixed[zoneDef.id] = existing;
+      return;
+    }
+
+    // Create empty zone matching type from layout definition
+    if (zoneDef.type === "text") {
+      fixed[zoneDef.id] = {
+        content: { kind: "text", text: "" },
+        style: { ...zoneDef.style },
+      };
+    } else if (zoneDef.type === "asset") {
+      fixed[zoneDef.id] = {
+        content: {
+          kind: "asset",
+          asset: { src: null, type: "image", objectFit: "cover" },
+        },
+        style: {},
+      };
+    } else {
+      fixed[zoneDef.id] = {
+        content: {},
+        style: {},
+      };
+    }
   });
+
   return fixed;
 }
 
@@ -130,14 +140,15 @@ function injectBlockContent(beats) {
     const validBlocks = [];
 
     beat.blocks.forEach(block => {
-      const def   = blockRegistry[block.type];
-      if (!def)   return;
-      const props = beat.block_props;
-      if (!props || !Object.keys(props).length) return;
+      const def = blockRegistry[block.type];
+      if (!def) return;
+
+      const props = (beat.block_props && Object.keys(beat.block_props).length)
+        ? beat.block_props
+        : (def.defaultProps || {});
 
       zones[block.zone] = {
         ...zones[block.zone],
-        role: "block",
         content: {
           kind: "block",
           block: { type: block.type, variant: block.variant || def.variants?.[0], props },
@@ -147,6 +158,41 @@ function injectBlockContent(beats) {
     });
 
     return { ...beat, zones, blocks: validBlocks };
+  });
+}
+
+/* ── Fill text zones from spoken content ── */
+function fillTextZones(beats) {
+  return beats.map(beat => {
+    const def = getLayoutDef(beat.layout);
+    if (!def) return beat;
+
+    const textZones = def.zones
+      .filter(z => z.type === "text")
+      .sort((a, b) => a.order - b.order);
+
+    if (!textZones.length) return beat;
+
+    const zones = { ...beat.zones };
+
+    // text-order-1 gets the main spoken text
+    // additional text zones left empty for now (AI fill in future)
+    textZones.forEach((zoneDef, i) => {
+      const existing = zones[zoneDef.id];
+      const hasText = existing?.content?.text;
+      if (!hasText) {
+        zones[zoneDef.id] = {
+          ...existing,
+          content: {
+            kind: "text",
+            text: i === 0 ? beat.spoken : "",
+          },
+          style: { ...(existing?.style || {}), ...zoneDef.style },
+        };
+      }
+    });
+
+    return { ...beat, zones };
   });
 }
 
@@ -204,7 +250,7 @@ export async function buildBeatsFromScript({
   let previousLayout         = null;
   let previousPreviousLayout = null;
   let lastMotion             = null;
-  let lastSFXKey             = null; // ← dedup consecutive SFX
+  let lastSFXKey             = null;
 
   /* ── Build beats ── */
   let beats = sourceBeats.map((item, index) => {
@@ -221,10 +267,10 @@ export async function buildBeatsFromScript({
 
     /* Visual plan */
     const visual = planBeatVisual({
-      mode, intent, energy, visual_hint,
+      mode, intent, energy, visual_hint, orientation,
       block_candidate: item.block_candidate || null,
       previousLayout, previousPreviousLayout, lastMotion,
-      brandColor,
+      brandColor, beatIndex: index,
     });
 
     previousPreviousLayout = previousLayout;
@@ -232,10 +278,8 @@ export async function buildBeatsFromScript({
     const z1Motion = visual.zones?.z1?.content?.asset?.motion;
     if (z1Motion) lastMotion = z1Motion;
 
-    /* Caption */
     const captionPosition = chooseCaptionPosition(index, total, energy);
 
-    /* Overlays — auto-assigned with conflict awareness */
     const overlays = autoAssignOverlays({
       intent, energy,
       layout:          visual.layout,
@@ -243,22 +287,19 @@ export async function buildBeatsFromScript({
       brandColor,
     });
 
-    /* Apply overlay SFX defaults */
     overlays.forEach(ov => {
       if (!ov.sfx && OVERLAY_SFX_DEFAULTS[ov.type]) {
         ov.sfx = OVERLAY_SFX_DEFAULTS[ov.type];
       }
     });
 
-    /* Beat SFX — deduplicate consecutive beats */
-    let sfxCue = pickBeatSFX(intent, energy, 0.4); // default 40% volume
+    let sfxCue = pickBeatSFX(intent, energy, 0.4);
     if (sfxCue?.key === lastSFXKey) {
       const retry = pickBeatSFX(intent, energy, 0.4);
       if (retry?.key !== lastSFXKey) sfxCue = retry;
     }
     if (sfxCue) lastSFXKey = sfxCue.key;
 
-    /* Zones */
     const zones = enforceLayoutZones(visual.layout, visual.zones || {});
 
     return {
@@ -295,6 +336,50 @@ export async function buildBeatsFromScript({
 
   /* ── Post-processing ── */
   beats = injectBlockContent(beats);
+  beats = fillTextZones(beats);
+
+  /* ── Extract block props ── */
+  const beatsWithBlocks = beats.filter(b => b.blocks?.length > 0);
+  if (beatsWithBlocks.length > 0) {
+    try {
+      const tagged = beats.map(b => ({
+        ...b,
+        block_candidate: b.blocks?.[0]?.type || null,
+      }));
+
+      const extracted = await extractBlockProps(tagged);
+
+      const propsById = {};
+      extracted.forEach(b => {
+        if (b.block_props && Object.keys(b.block_props).length > 0) {
+          propsById[b.id] = b.block_props;
+        }
+      });
+
+      beats = beats.map(b => {
+        const props = propsById[b.id];
+        if (!props || !b.blocks?.length) return b;
+
+        const zones = { ...b.zones };
+        b.blocks.forEach(block => {
+          const zone = zones[block.zone];
+          if (zone?.content?.kind === "block") {
+            zones[block.zone] = {
+              ...zone,
+              content: {
+                ...zone.content,
+                block: { ...zone.content.block, props },
+              },
+            };
+          }
+        });
+        return { ...b, zones, block_props: props };
+      });
+    } catch (err) {
+      console.error("[buildBeats] blockPropExtractor failed:", err.message);
+    }
+  }
+
   beats = await autoMatchAssets(beats, orientation, { assetSource, uploadedAssets, topic, language });
   beats = applyBeatVariation(beats);
   beats = applyCaptionEmphasis(beats);

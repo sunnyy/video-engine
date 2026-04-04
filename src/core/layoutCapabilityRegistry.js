@@ -1,121 +1,63 @@
+/**
+ * layoutCapabilityRegistry.js
+ * src/core/layoutCapabilityRegistry.js
+ *
+ * Defines what content types each zone in each layout supports.
+ * Zone type (text/asset) is now authoritative from layoutDefinitions.
+ * This registry is used for editor UI capability hints only.
+ */
 export const layoutCapabilityRegistry = {
 
-  FullZone: {
+  FullBleed: {
     zones: {
-      z1: {
-        roles: ["asset","block"]
-      }
-    },
-    allowedBlocks: [
-      "HookImpact",
-      "StatExplosion",
-      "QuoteHighlight",
-      "ListCountdown",
-      "ProcessSteps",
-      "ProgressBars",
-      "MythVsFact",
-      "BeforeAfter",
-      "ProblemSolution",
-      "SplitScreen",
-      "KineticTypography",
-      "CTAButton",
-      "CountdownTimer",
-      "ChapterTitle",
-      "Testimonial",
-      "BadgePack"
-    ]
-  },
-
-  SplitZone: {
-    zones: {
-      z1: {
-        roles: ["asset"]
-      },
-      z2: {
-        roles: ["block","asset"]
-      }
-    },
-    allowedBlocks: [
-      "StatExplosion",
-      "QuoteHighlight",
-      "BeforeAfter",
-      "MythVsFact",
-      "SplitScreen",
-      "ProgressBars",
-      "Testimonial"
-    ]
-  },
-
-  ThreeZone: {
-    zones: {
-      z1: { roles: ["asset"] },
-      z2: { roles: ["block","asset"] },
-      z3: { roles: ["asset"] }
-    },
-    allowedBlocks: [
-      "StatExplosion",
-      "QuoteHighlight",
-      "ProgressBars",
-      "ListCountdown",
-      "ProcessSteps",
-      "MythVsFact"
-    ]
-  },
-
-  TwoTopOneBottom: {
-    zones: {
-      z1: { roles: ["asset"] },
-      z2: { roles: ["asset"] },
-      z3: { roles: ["block","asset"] }
-    },
-    allowedBlocks: [
-      "ListCountdown",
-      "ProcessSteps",
-      "StatExplosion",
-      "QuoteHighlight",
-      "ProgressBars",
-      "CTAButton"
-    ]
-  },
-
-  OneTopTwoBottom: {
-    zones: {
-      z1: { roles: ["block","asset"] },
-      z2: { roles: ["asset"] },
-      z3: { roles: ["asset"] }
-    },
-    allowedBlocks: [
-      "ListCountdown",
-      "ProcessSteps",
-      "StatExplosion",
-      "QuoteHighlight",
-      "ProgressBars",
-      "HookImpact"
-    ]
-  },
-
-  FourGrid: {
-    zones: {
-      z1: { roles: ["asset"] },
-      z2: { roles: ["asset"] },
-      z3: { roles: ["asset"] },
-      z4: { roles: ["asset"] }
+      z1: { roles: ["asset"] }
     },
     allowedBlocks: []
   },
 
-  PictureInPicture: {
+  HeadlineOverAsset: {
     zones: {
       z1: { roles: ["asset"] },
-      z2: { roles: ["block","asset"] }
+      z2: { roles: ["text"]  }
     },
-    allowedBlocks: [
-      "StatExplosion",
-      "QuoteHighlight",
-      "ProgressBars",
-      "Testimonial",
-      "CTAButton"
-    ]
-  }
+    allowedBlocks: []
+  },
+
+  SplitAssets: {
+    zones: {
+      z1: { roles: ["asset"] },
+      z2: { roles: ["asset"] }
+    },
+    allowedBlocks: []
+  },
+
+  ThreeStack: {
+    zones: {
+      z1: { roles: ["asset"] },
+      z2: { roles: ["asset"] },
+      z3: { roles: ["asset"] }
+    },
+    allowedBlocks: []
+  },
+
+  HeadlineReveal: {
+    zones: {
+      z1: { roles: ["text"]  },
+      z2: { roles: ["asset"] },
+      z3: { roles: ["text"]  }
+    },
+    allowedBlocks: []
+  },
+
+  FourCollage: {
+    zones: {
+      z1: { roles: ["text"]  },
+      z2: { roles: ["asset"] },
+      z3: { roles: ["asset"] },
+      z4: { roles: ["asset"] },
+      z5: { roles: ["asset"] }
+    },
+    allowedBlocks: []
+  },
 
 };

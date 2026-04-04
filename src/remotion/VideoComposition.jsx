@@ -14,7 +14,6 @@ import BeatRenderer from "./BeatRenderer";
 import Caption from "./elements/Caption";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { transitionsRegistry } from "../core/transitionsRegistry";
-import { MUSIC_LIBRARY } from "../core/musicRegistry";
 import { buildVisualIdentity } from "../core/visualIdentityEngine";
 
 /* FONT LOADER */
@@ -220,15 +219,13 @@ export default function VideoComposition({ project }) {
         />
       )}
 
-      {audio?.music && (() => {
-        const musicKey = audio.music.musicKey;
-        const src = musicKey && MUSIC_LIBRARY[musicKey]
-          ? MUSIC_LIBRARY[musicKey].file   // staticFile() — correct for Remotion render
-          : audio.music.src;               // uploaded file URL fallback
-        return src ? (
-          <Audio key={src} src={src} volume={musicVolume} />
-        ) : null;
-      })()}
+      {audio?.music?.src && (
+        <Audio
+          key={audio.music.src}
+          src={audio.music.src}
+          volume={musicVolume}
+        />
+      )}
 
     </AbsoluteFill>
   );

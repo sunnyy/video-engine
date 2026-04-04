@@ -29,17 +29,7 @@ export const MUSIC_LIBRARY = {
     tone:      ["bold", "funny", "conversational"],
     intent:    ["shock", "curiosity", "punchline"],
   },
-  loksii: {
-    label:     "Loksii",
-    file:      staticFile("music/loksii.mp3"),
-    energy:    "low",
-    mood:      "chill",
-    bpm:       85,
-    vibe:      ["chill", "ambient", "calm"],
-    videoType: ["explainer", "story", "opinion"],
-    tone:      ["conversational", "emotional", "educational"],
-    intent:    ["empathy", "explanation", "story"],
-  },
+
   mood_mode: {
     label:     "Mood Mode",
     file:      staticFile("music/mood_mode.mp3"),
@@ -80,7 +70,6 @@ export const MUSIC_KEYS = Object.keys(MUSIC_LIBRARY);
 export const MUSIC_PREVIEW_URLS = {
   eliveta_1:    "/music/eliveta491190.mp3",
   eliveta_2:    "/music/eliveta491224.mp3",
-  loksii:       "/music/loksii.mp3",
   mood_mode:    "/music/mood_mode.mp3",
   nastelbom:    "/music/nastelbom.mp3",
   the_mountain: "/music/the_mountain.mp3",

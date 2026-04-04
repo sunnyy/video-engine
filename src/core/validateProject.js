@@ -1,3 +1,5 @@
+import { layoutRegistry } from "./layoutRegistry.js";
+
 export default function validateProject(project) {
 
   const errors = [];
@@ -46,40 +48,31 @@ export default function validateProject(project) {
       );
     }
 
-    const zones = Object.values(beat.zones || {});
+    // Only validate zones that belong to the current layout
+    const layoutDef    = layoutRegistry[beat.layout];
+    const layoutZones  = layoutDef?.zones || Object.keys(beat.zones || {});
+    const zonesToCheck = layoutZones.map(key => ({ key, zone: beat.zones?.[key] }));
 
-    if (!zones.length) {
+    if (!zonesToCheck.length) {
       errors.push(`Beat ${index + 1}: No zones defined`);
     }
 
-    zones.forEach((zone, zIndex) => {
+    zonesToCheck.forEach(({ key, zone }, zIndex) => {
 
       const contentKind = zone?.content?.kind;
 
-      if (!contentKind) {
-        errors.push(`Beat ${index + 1} Zone ${zIndex + 1}: Missing content kind`);
-        return;
-      }
+      // Skip zones with no content — renderer handles empty zones gracefully
+      if (!contentKind) return;
 
       if (contentKind === "asset") {
-
-        const src =
-          zone?.content?.asset?.src ||
-          zone?.content?.asset?.url ||
-          zone?.content?.src;
-
+        const src = zone?.content?.asset?.src || zone?.content?.asset?.url || zone?.content?.src;
         if (!src) {
-          errors.push(
-            `Beat ${index + 1} Zone ${zIndex + 1}: Asset missing src`
-          );
+          errors.push(`Beat ${index + 1} Zone ${key}: Asset missing src`);
         }
-
       }
 
       if (contentKind === "block" && !zone?.content?.block) {
-        errors.push(
-          `Beat ${index + 1} Zone ${zIndex + 1}: Block missing definition`
-        );
+        errors.push(`Beat ${index + 1} Zone ${key}: Block missing definition`);
       }
 
     });

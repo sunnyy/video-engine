@@ -10,8 +10,7 @@ import AvatarSection from "./AvatarSection";
 import VideoOverlaySection from "./VideoOverlaySection";
 import BrandingSection from "./BrandingSection";
 
-
-export default function EditorPanel({ activeTab }) {
+export default function EditorPanel({ activeTab, selectedZoneId, onSelectZone }) {
 
   if (activeTab === "audio") {
     return (
@@ -49,7 +48,7 @@ export default function EditorPanel({ activeTab }) {
     <div className="flex-1 flex flex-col h-full min-h-0 bg-[#0b0b10]">
       <div className="flex-1 flex min-h-0">
         <BeatList />
-        <BeatEditor />
+        <BeatEditor selectedZoneId={selectedZoneId} onSelectZone={onSelectZone} />
       </div>
     </div>
   );
