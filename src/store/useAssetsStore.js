@@ -52,6 +52,7 @@ export const useAssetsStore = create((set, get) => ({
   },
 
   loadGalleryAssets: async (orientation = "9:16") => {
+    return false;
 
     const o = normalizeOrientation(orientation);
 

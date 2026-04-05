@@ -119,8 +119,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   }, [togglePlayPause, undo, redo]);
 
   return (
-    <div className="bg-[#111118] border-l border-[rgba(255,255,255,0.06)] flex flex-col"
-      style={{ width: "35%", height: "100%", minWidth: 280 }}>
+    <div className="bg-[#0b0b10] border-l border-[rgba(255,255,255,0.06)] flex flex-col"
+      style={{ width: "60%", height: "100%", minWidth: 280 }}>
 
       <div className="flex items-center gap-2 px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0">
         {activeBeat && <span className="text-[10px] font-mono text-[#55556a]">{activeBeat.layout}</span>}
@@ -136,7 +136,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 relative flex items-center justify-center overflow-hidden p-2">
+      <div ref={containerRef} className="flex-1 bg-[#0b0b10] relative flex items-center justify-center overflow-hidden p-2">
 
         {activeBeat ? (
           <ZoneCanvas

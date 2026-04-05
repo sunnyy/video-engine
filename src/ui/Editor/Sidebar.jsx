@@ -32,7 +32,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   };
 
   return (
-    <div className="w-[100px] h-full border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] py-4 px-2 flex flex-col gap-[4px] overflow-y-auto shrink-0">
+    <div className="w-[10%] h-full border-r border-[rgba(255,255,255,0.06)] bg-[#0b0b10] py-4 px-2 flex flex-col gap-[4px] overflow-y-auto shrink-0">
       <Item id="beats" icon="🎬" label="Beats" />
       {isTalkingHead && <Item id="avatar" icon="🎥" label="Avatar" />}
       <Item id="audio" icon="🎵" label="Audio" />

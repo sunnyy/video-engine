@@ -10,7 +10,7 @@ import ZoneHandle from "./ZoneHandle";
 const ZoneContentLayer = memo(({ zone, canvasScale }) => {
   const content  = zone.content || {};
   const st       = zone.style   || {};
-
+  const delayed  = (zone.start || 0) > 0;
   const rotation = st.rotation ?? 0;
   const scale_   = st.scale ?? 1;
   const insetPct = scale_ < 1 ? `${((1 - scale_) / 2) * 100}%` : "0%";
@@ -28,7 +28,7 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
         fontFamily: st.fontFamily || "inherit",
         color:      st.color      || "#ffffff",
         textAlign:  st.textAlign  || "center",
-        opacity:    st.opacity ?? 1,
+        opacity:    delayed ? 0.5 : (st.opacity ?? 1),
         background: st.background || "transparent",
         lineHeight: 1.2,
         pointerEvents: "none", userSelect: "none", overflow: "hidden",
@@ -47,7 +47,7 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
       top: insetPct, right: insetPct, bottom: insetPct, left: insetPct,
       overflow: "hidden",
       borderRadius: st.borderRadius || 0,
-      opacity: 1,
+      opacity: delayed ? 0.5 : 1,
       ...rotStyle,
     };
     const mediaStyle = { width: "100%", height: "100%", objectFit, display: "block" };
@@ -141,19 +141,34 @@ export default function ZoneCanvas({
       }}
     >
       {renderBg()}
-      {allZones.map(zone => (
-        <div key={`content_${zone.id}`} style={{
-          position: "absolute", left: `${zone.x}%`, top: `${zone.y}%`,
-          width: `${zone.width}%`, height: `${zone.height}%`,
-          zIndex: zone.zIndex ?? 1, overflow: "hidden",
-          borderRadius: zone.style?.borderRadius || 0,
-        }}>
-          {zone.background?.kind === "color" && (
-            <div style={{ position:"absolute", inset:0, background: zone.background.color }} />
-          )}
-          <ZoneContentLayer zone={zone} canvasScale={canvasScale} />
-        </div>
-      ))}
+      {allZones.map(zone => {
+        const content = zone.content || {};
+        const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar")
+                     || (zone.type === "text"  && !content.text);
+        return (
+          <div key={`content_${zone.id}`} style={{
+            position: "absolute", left: `${zone.x}%`, top: `${zone.y}%`,
+            width: `${zone.width}%`, height: `${zone.height}%`,
+            zIndex: zone.zIndex ?? 1, overflow: "hidden",
+            borderRadius: zone.style?.borderRadius || 0,
+          }}>
+            {zone.background?.kind === "color" && (
+              <div style={{ position:"absolute", inset:0, background: zone.background.color }} />
+            )}
+            <ZoneContentLayer zone={zone} canvasScale={canvasScale} />
+            {/* Zone border — rendered as inset div so overflow:hidden doesn't clip it */}
+            {isEmpty && (
+              <div style={{
+                position: "absolute", inset: 0,
+                border: "1.5px dashed rgba(255,255,255,0.35)",
+                borderRadius: zone.style?.borderRadius || 0,
+                pointerEvents: "none",
+                zIndex: 99,
+              }} />
+            )}
+          </div>
+        );
+      })}
       {allZones.map(zone => (
         <ZoneHandle key={`handle_${zone.id}`} zone={zone}
           isSelected={selectedZoneId === zone.id}

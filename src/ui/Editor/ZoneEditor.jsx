@@ -6,6 +6,7 @@ import React, { useEffect } from "react";
 import { transitionsRegistry } from "../../../src/core/transitionsRegistry";
 import { motionsRegistry }     from "../../../src/core/motionsRegistry";
 import { useProjectStore }     from "../../../src/store/useProjectStore";
+import { textStylePresets }    from "../../../src/core/textStylePresets";
 
 const FONT_FAMILIES = [
   { label: "Default",          value: "inherit" },
@@ -72,7 +73,7 @@ export default function ZoneEditor({
   beatId,
   slot, zone, zoneDef, zoneType,
   openPicker,
-  updateTextContent, updateTextStyle,
+  updateTextContent, updateTextStyle, updateTextStyleBulk,
   updateContentProp, updateBackgroundProp,
   setZoneStyle, setZoneLayout,
   setZoneStyleSilent, setZoneLayoutSilent,
@@ -131,6 +132,28 @@ export default function ZoneEditor({
             placeholder="Enter text..."
             className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-2 text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none placeholder-[#55556a] mb-3"
           />
+
+          {/* Style Presets — single call applies all keys at once */}
+          <div className="mb-4">
+            <Label>Presets</Label>
+            <div className="flex gap-[5px] flex-wrap mt-[5px]">
+              {textStylePresets.map(preset => (
+                <button
+                  key={preset.id}
+                  onClick={() => updateTextStyleBulk(slot, preset.style)}
+                  className="px-[8px] py-[4px] rounded-[6px] text-[11px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
+                  style={{
+                    background:  preset.style.background || "rgba(255,255,255,0.08)",
+                    color:       preset.style.color || "#ffffff",
+                    fontFamily:  preset.style.fontFamily || "inherit",
+                  }}
+                  title={`Apply ${preset.label}`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="grid grid-cols-3 gap-3 mb-3">
             <Sel label="Font" value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyle(slot,"fontFamily",v)} options={FONT_FAMILIES} />
@@ -243,48 +266,50 @@ export default function ZoneEditor({
 
       <Divider />
 
-      {/* ── BACKGROUND ── */}
-      <SectionTitle>Background</SectionTitle>
-      <div className="flex items-center gap-3 mb-3">
-        <div className="relative shrink-0 rounded-[8px] overflow-hidden cursor-pointer group border border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
-          style={{ width: 56, height: 40 }}
-          onClick={() => openPicker(slot, "background")}>
-          {bg.kind === "color" && <div className="absolute inset-0" style={{ background: bg.color }} />}
-          {bg.kind === "asset" && bg.asset?.src && <img src={bg.asset.src} className="absolute inset-0 w-full h-full object-cover" />}
-          {!bg.kind && <div className="absolute inset-0 bg-[#0e0e1a] flex items-center justify-center text-[#55556a] text-[18px]">＋</div>}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <button onClick={() => openPicker(slot, "background")}
-            className="text-[11px] font-bold text-[#7c5cfc] bg-transparent border-0 cursor-pointer text-left hover:text-[#a78fff] transition-colors">
-            {bg.kind ? "Change" : "Add Background"}
-          </button>
+      {/* ── BACKGROUND — asset zones only ── */}
+      {!isText && (
+        <>
+          <SectionTitle>Background</SectionTitle>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative shrink-0 rounded-[8px] overflow-hidden cursor-pointer group border border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
+              style={{ width: 56, height: 40 }}
+              onClick={() => openPicker(slot, "background")}>
+              {bg.kind === "color" && <div className="absolute inset-0" style={{ background: bg.color }} />}
+              {bg.kind === "asset" && bg.asset?.src && <img src={bg.asset.src} className="absolute inset-0 w-full h-full object-cover" />}
+              {!bg.kind && <div className="absolute inset-0 bg-[#0e0e1a] flex items-center justify-center text-[#55556a] text-[18px]">＋</div>}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <button onClick={() => openPicker(slot, "background")}
+                className="text-[11px] font-bold text-[#7c5cfc] bg-transparent border-0 cursor-pointer text-left hover:text-[#a78fff] transition-colors">
+                {bg.kind ? "Change" : "Add Background"}
+              </button>
+              {bg.kind && (
+                <button onClick={() => clearBackground(slot)}
+                  className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer text-left transition-colors">
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
           {bg.kind && (
-            <button onClick={() => clearBackground(slot)}
-              className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer text-left transition-colors">
-              Reset
-            </button>
+            <div className={`grid gap-3 mb-3 ${bg.kind === "asset" ? "grid-cols-3" : "grid-cols-1"}`}>
+              {bg.kind === "asset" && (
+                <>
+                  <Slider label="Opacity" value={Math.round((bg.asset?.opacity ?? 1)*100)}
+                    onChangeSilent={v => updateBackgroundProp(slot,"opacity",v/100)}
+                    onCommit={commit} min={10} max={100} unit="%" />
+                  <Slider label="Blur" value={bg.asset?.blur ?? 0}
+                    onChangeSilent={v => updateBackgroundProp(slot,"blur",v)}
+                    onCommit={commit} min={0} max={20} unit="px" />
+                </>
+              )}
+              <Slider label="Content Padding" value={padding}
+                onChangeSilent={v => setStyleSilent("contentPadding", v)}
+                onCommit={commit} min={0} max={60} unit="px" />
+            </div>
           )}
-        </div>
-      </div>
-
-      {/* Padding — shown for all zone types when BG is set */}
-      {bg.kind && (
-        <div className={`grid gap-3 mb-3 ${bg.kind === "asset" ? "grid-cols-3" : "grid-cols-1"}`}>
-          {bg.kind === "asset" && (
-            <>
-              <Slider label="Opacity" value={Math.round((bg.asset?.opacity ?? 1)*100)}
-                onChangeSilent={v => updateBackgroundProp(slot,"opacity",v/100)}
-                onCommit={commit} min={10} max={100} unit="%" />
-              <Slider label="Blur" value={bg.asset?.blur ?? 0}
-                onChangeSilent={v => updateBackgroundProp(slot,"blur",v)}
-                onCommit={commit} min={0} max={20} unit="px" />
-            </>
-          )}
-          <Slider label="Content Padding" value={padding}
-            onChangeSilent={v => setStyleSilent("contentPadding", v)}
-            onCommit={commit} min={0} max={60} unit="px" />
-        </div>
+        </>
       )}
 
       <Divider />

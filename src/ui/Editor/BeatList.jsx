@@ -175,7 +175,7 @@ function SortableBeat({
 
       {/* Info */}
       <div onClick={handleClick} className="flex flex-1 flex-col gap-[5px] min-w-0">
-        <span className="text-[13px] font-medium text-[#e8e8f0] line-clamp-2 leading-[1.3]">
+        <span className={`text-[13px] font-medium ${isActive ? "text-[#BEBAD3]" : "text-[#514E5A]"} line-clamp-2 leading-[1.3]`}>
           {beat.spoken}
         </span>
 

@@ -85,6 +85,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
   };
   const finalInset = makeInset(insetPct, insetPx);
 
+  const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar")
+               || (zone.type === "text" && !content.text);
+
   // Zone container — position only, no rotation, no transform (enter/exit handled below)
   const zoneContainerStyle = {
     position: "absolute",
@@ -157,6 +160,21 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
           </div>
         )}
 
+        {/* Asset placeholder — no src yet */}
+        {zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && (
+          <div style={{
+            ...insetBoxStyle,
+            background: "linear-gradient(135deg, rgba(40,40,70,0.9) 0%, rgba(20,20,50,0.9) 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width="15%" height="15%" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.2 }}>
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.5"/>
+              <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
+              <path d="M3 15l5-5 4 4 3-3 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+        )}
+
         {zone.type === "asset" && content.kind === "avatar" && (
           <AvatarLayer beat={beat} project={project} />
         )}
@@ -203,6 +221,17 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
         })()}
 
       </div>
+
+      {isEmpty && (
+        <div style={{
+          position: "absolute", inset: 0,
+          border: "1.5px dashed rgba(255,255,255,0.3)",
+          borderRadius: st.borderRadius || 0,
+          pointerEvents: "none",
+          zIndex: 99,
+        }} />
+      )}
+
     </div>
   );
 }

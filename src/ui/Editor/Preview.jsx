@@ -69,7 +69,7 @@ export default function Preview() {
 
   return (
 
-    <div className="bg-[#111118] border-l border-[rgba(255,255,255,0.06)] w-[35%] h-full overflow-y-auto flex flex-col items-center pb-4">
+    <div className="bg-[#ccc] border-l border-[rgba(255,255,255,0.06)] w-[35%] h-full overflow-y-auto flex flex-col items-center pb-4">
 
       <div
         className="w-[92%] rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[#0b0b10] p-4 flex justify-center"

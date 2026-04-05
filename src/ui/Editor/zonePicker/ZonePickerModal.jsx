@@ -50,18 +50,13 @@ export default function ZonePickerModal({
   const initialTab = tabKeyMap[activeTabs[0]] || "my";
 
   const [tab,setTab] = useState(initialTab);
-  const [category,setCategory] = useState("All");
-  const [myType,setMyType] = useState("All");
-  const [galleryType,setGalleryType] = useState("All");
   const [deletingId,setDeletingId] = useState(null);
 
   const fileInputRef = useRef();
 
   const {
     myAssets=[],
-    galleryAssets=[],
     loadMyAssets,
-    loadGalleryAssets,
     addMyAsset,
     removeMyAsset
   } = useAssetsStore();
@@ -152,13 +147,9 @@ export default function ZonePickerModal({
       return (
         <MyAssetsTab
           assets={myAssets}
-          myType={myType}
-          setMyType={setMyType}
           onSelect={(a)=>{
-
             normalizeAsset(a);
             onClose();
-
           }}
           onDelete={handleDelete}
           deletingId={deletingId}
@@ -169,24 +160,11 @@ export default function ZonePickerModal({
     }
 
     if (tab==="gallery") {
-
       return (
         <GalleryTab
-          assets={galleryAssets}
-          category={category}
-          setCategory={setCategory}
-          galleryType={galleryType}
-          setGalleryType={setGalleryType}
-          onSelect={(a)=>{
-
-            normalizeAsset(a);
-            onClose();
-
-          }}
-          renderPreview={renderPreview}
+          onSelect={(a) => { onSelect(a); onClose(); }}
         />
       );
-
     }
 
     if (tab==="blocks") {
@@ -216,7 +194,7 @@ export default function ZonePickerModal({
   return (
 
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]"
       onClick={onClose}
     >
 
@@ -261,13 +239,7 @@ export default function ZonePickerModal({
           {tabs.map((t)=>(
             <button
               key={t.key}
-              onClick={()=>{
-
-                setTab(t.key);
-
-                if (t.key==="gallery") loadGalleryAssets();
-
-              }}
+              onClick={()=>{ setTab(t.key); }}
               className={`px-4 py-1 rounded text-base ${
                 tab===t.key
                   ? "bg-purple-700 text-white"

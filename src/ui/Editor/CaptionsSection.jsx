@@ -61,7 +61,7 @@ export default function CaptionsSection({ beat }) {
   const setProject = useProjectStore((s) => s.setProject);
 
   const layout = layoutRegistry[beat.layout];
-  if (!layout?.structure?.caption) return null;
+  const captionStrategy = layout?.captionStrategy ?? "always";
 
   const caption = beat.caption || {
     show: true,
@@ -86,6 +86,16 @@ export default function CaptionsSection({ beat }) {
 
   return (
     <div className="flex flex-col gap-5">
+
+      {/* Notice when layout has text zones */}
+      {captionStrategy === "never" && (
+        <div className="flex items-start gap-2 px-3 py-[10px] rounded-[10px] bg-[rgba(124,92,252,0.08)] border border-[rgba(124,92,252,0.2)]">
+          <span className="text-[14px] shrink-0 mt-[1px]">ℹ️</span>
+          <p className="text-[11px] text-[#9494a8] leading-relaxed">
+            This layout has built-in text zones. Captions are <strong className="text-[#a78fff]">hidden by default</strong> to avoid overlap. Turn them on below if needed.
+          </p>
+        </div>
+      )}
       {/* Show / Text */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

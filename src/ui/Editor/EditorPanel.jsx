@@ -3,7 +3,6 @@
  * src/ui/Editor/EditorPanel.jsx
  */
 import React from "react";
-import BeatList from "./BeatList";
 import BeatEditor from "./BeatEditor";
 import AudioSection from "./AudioSection";
 import AvatarSection from "./AvatarSection";
@@ -45,9 +44,8 @@ export default function EditorPanel({ activeTab, selectedZoneId, onSelectZone })
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 bg-[#0b0b10]">
+    <div className="flex-1 flex flex-col h-full min-h-0">
       <div className="flex-1 flex min-h-0">
-        <BeatList />
         <BeatEditor selectedZoneId={selectedZoneId} onSelectZone={onSelectZone} />
       </div>
     </div>

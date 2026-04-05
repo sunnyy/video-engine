@@ -8,6 +8,7 @@ import TalkingHeadStep from "../ui/Workflow/TalkingHeadStep";
 
 import Header from "../ui/Editor/Header";
 import Sidebar from "../ui/Editor/Sidebar";
+import BeatList from "../ui/Editor/BeatList";
 import SystemMessage from "../ui/Editor/SystemMessage";
 import EditorPanel from "../ui/Editor/EditorPanel";
 import CanvasPreview from "../ui/Editor/CanvasPreview";
@@ -15,12 +16,12 @@ import CanvasPreview from "../ui/Editor/CanvasPreview";
 export default function Editor() {
   const { id } = useParams();
 
-  const setProject    = useProjectStore((s) => s.setProject);
+  const setProject = useProjectStore((s) => s.setProject);
   const setDatabaseId = useProjectStore((s) => s.setDatabaseId);
-  const project       = useProjectStore((s) => s.project);
+  const project = useProjectStore((s) => s.project);
 
-  const [loading, setLoading]               = useState(true);
-  const [activeTab, setActiveTab]           = useState("beats");
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("beats");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
 
   useEffect(() => {
@@ -52,9 +53,10 @@ export default function Editor() {
       return;
     }
     if (modifierHeld) {
-      setSelectedZoneIds(prev => {
+      setSelectedZoneIds((prev) => {
         const next = new Set(prev);
-        if (next.has(id)) next.delete(id); // toggle off
+        if (next.has(id))
+          next.delete(id); // toggle off
         else next.add(id);
         return next;
       });
@@ -67,9 +69,15 @@ export default function Editor() {
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
       <div className="flex flex-1 min-h-0">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        <div className="flex-1 flex flex-col h-full min-h-0 bg-[#0b0b10]">
+        <div className="flex flex-wrap w-[60%]">
           <SystemMessage />
+          <div className="flex flex-1">
+            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+            <BeatList />
+            <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} />
+          </div>
+        </div>
+        <div className="flex w-[40%]">
           <EditorPanel
             activeTab={activeTab}
             selectedZoneId={selectedZoneId}
@@ -77,10 +85,6 @@ export default function Editor() {
             onSelectZone={handleSelectZone}
           />
         </div>
-        <CanvasPreview
-          selectedZoneIds={selectedZoneIds}
-          onSelectZone={handleSelectZone}
-        />
       </div>
     </div>
   );

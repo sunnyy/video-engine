@@ -173,23 +173,37 @@ function fillTextZones(beats) {
 
     if (!textZones.length) return beat;
 
-    const zones = { ...beat.zones };
+    const zones  = { ...beat.zones };
+    const spoken = beat.spoken || "";
 
-    // text-order-1 gets the main spoken text
-    // additional text zones left empty for now (AI fill in future)
+    // Extract first ~4 words as a short hook for secondary zones
+    const shortHook = spoken.split(/\s+/).slice(0, 4).join(" ");
+    // Extract last sentence fragment as supporting text
+    const sentences = spoken.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+    const supporting = sentences.length > 1 ? sentences[sentences.length - 1] : shortHook;
+
     textZones.forEach((zoneDef, i) => {
       const existing = zones[zoneDef.id];
-      const hasText = existing?.content?.text;
-      if (!hasText) {
-        zones[zoneDef.id] = {
-          ...existing,
-          content: {
-            kind: "text",
-            text: i === 0 ? beat.spoken : "",
-          },
-          style: { ...(existing?.style || {}), ...zoneDef.style },
-        };
+      const hasText  = existing?.content?.text;
+      if (hasText) return;
+
+      let defaultText = "";
+      if (i === 0) {
+        // Primary text zone — full spoken
+        defaultText = spoken;
+      } else if (i === 1) {
+        // Secondary — shorter supporting line
+        defaultText = supporting;
+      } else {
+        // Tertiary+ — short hook
+        defaultText = shortHook;
       }
+
+      zones[zoneDef.id] = {
+        ...existing,
+        content: { kind: "text", text: defaultText },
+        style:   { ...(existing?.style || {}), ...zoneDef.style },
+      };
     });
 
     return { ...beat, zones };

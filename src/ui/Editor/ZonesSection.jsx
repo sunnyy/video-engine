@@ -8,7 +8,7 @@ import { getLayoutDef } from "../../core/layoutRegistry.js";
 import ZonePickerModal from "./zonePicker/ZonePickerModal";
 import ZoneEditor from "./ZoneEditor";
 
-export default function ZonesSection({ beat, project, selectedZoneId, selectedZoneIds, onSelectZone }) {
+export default function ZonesSection({ beat, project, selectedZoneId, onSelectZone }) {
   const updateBeat       = useProjectStore((s) => s.updateBeat);
   const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
 
@@ -20,7 +20,6 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
   const zones     = beat.zones || {};
   const zoneDefs  = layoutDef?.zones || [];
 
-  const isMultiSelect    = selectedZoneIds ? selectedZoneIds.size > 1 : false;
   const selectedZoneDef  = zoneDefs.find(z => z.id === selectedZoneId) || null;
   const selectedZoneData = zones[selectedZoneId] || {};
   const selectedZoneType = selectedZoneDef?.type || selectedZoneData.type || "asset";
@@ -38,11 +37,13 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     return data;
   };
 
+  /* ── Zone update helpers (normal — pushes history) ── */
   const updateZone = (slot, newData) => {
     const newZones = { ...zones, [slot]: { ...(zones[slot] || {}), ...newData } };
     updateBeat(beat.id, { zones: newZones });
   };
 
+  /* ── Zone update silent (no history — for sliders while dragging) ── */
   const updateZoneSilent = (slot, newData) => {
     const newZones = { ...zones, [slot]: { ...(zones[slot] || {}), ...newData } };
     updateBeatSilent(beat.id, { zones: newZones });
@@ -67,7 +68,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     };
     updateBeat(beat.id, { zones: newZones });
     setAddingZone(false);
-    onSelectZone(id, false);
+    onSelectZone(id);
   };
 
   const deleteZone = (slot) => {
@@ -84,6 +85,10 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
 
   const updateTextStyle = (slot, key, value) =>
     updateZone(slot, { style: { ...(zones[slot]?.style || {}), [key]: value } });
+
+  // Apply multiple style keys at once — avoids stale state from looping updateTextStyle
+  const updateTextStyleBulk = (slot, styleObj) =>
+    updateZone(slot, { style: { ...(zones[slot]?.style || {}), ...styleObj } });
 
   const updateContentProp = (slot, key, value) => {
     const zone    = zones[slot] || {};
@@ -140,17 +145,13 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     setPicker(null);
   };
 
-  const headerLabel = isMultiSelect
-    ? `${selectedZoneIds.size} zones selected`
-    : selectedZoneId ? `Zone: ${selectedZoneId}` : "Zones";
-
   return (
     <div className="flex flex-col h-full">
 
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="text-[11px] font-bold tracking-widest uppercase text-[#9494a8]"
           style={{ fontFamily: "'Syne', sans-serif" }}>
-          {headerLabel}
+          {selectedZoneId ? `Zone: ${selectedZoneId}` : "Zones"}
         </div>
         <button onClick={() => setAddingZone(v => !v)}
           className="px-2 py-[3px] rounded-[5px] text-[10px] font-bold text-[#7c5cfc] border border-[rgba(124,92,252,0.3)] hover:bg-[rgba(124,92,252,0.1)] bg-transparent cursor-pointer">
@@ -174,27 +175,14 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
         </div>
       )}
 
-      {/* Nothing selected */}
-      {!selectedZoneId && !isMultiSelect && (
+      {!selectedZoneId && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-40">
           <span className="text-[32px]">👆</span>
           <span className="text-[12px] text-[#9494a8] text-center">Click a zone on the canvas<br/>to edit it</span>
         </div>
       )}
 
-      {/* Multi-select — show nothing, just the count in header */}
-      {isMultiSelect && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 opacity-60">
-          <span className="text-[28px]">⊞</span>
-          <span className="text-[12px] text-[#9494a8] text-center">
-            {selectedZoneIds.size} zones selected<br/>
-            <span className="text-[10px] opacity-60">Drag · Arrow keys · Rotate</span>
-          </span>
-        </div>
-      )}
-
-      {/* Single zone editor */}
-      {selectedZoneId && !isMultiSelect && (
+      {selectedZoneId && (
         <div className="flex-1 overflow-y-auto">
           <ZoneEditor
             beatId={beat.id}
@@ -205,6 +193,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
             openPicker={openPicker}
             updateTextContent={updateTextContent}
             updateTextStyle={updateTextStyle}
+            updateTextStyleBulk={updateTextStyleBulk}
             updateContentProp={updateContentProp}
             updateBackgroundProp={updateBackgroundProp}
             setZoneStyle={setZoneStyle}
