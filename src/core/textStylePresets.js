@@ -29,9 +29,9 @@ export const textStylePresets = [
     label: "Headline",
     preview: { text: "Breaking News", bg: "#4724E1" },
     style: {
-      fontSize:      52,
+      fontSize:      62,
       fontWeight:    800,
-      fontFamily:    "'Syne', sans-serif",
+      fontFamily:    "'Outfit', sans-serif",
       color:         "#ffffff",
       textAlign:     "center",
       textShadow:    "0 2px 12px rgba(0,0,0,0.7)",
@@ -56,28 +56,13 @@ export const textStylePresets = [
     }
   },
 
-  {
-    id:    "caption",
-    label: "Caption",
-    preview: { text: "Supporting text", bg: "#0a0a12" },
-    style: {
-      fontSize:      24,
-      fontWeight:    500,
-      fontFamily:    "inherit",
-      color:         "#ffffff",
-      textAlign:     "center",
-      textShadow:    "none",
-      opacity:       0.8,
-      lineHeight:    1.4,
-    }
-  },
 
   {
     id:    "pill",
     label: "Pill",
     preview: { text: "Tag", bg: "#0a0a12" },
     style: {
-      fontSize:      22,
+      fontSize:      52,
       fontWeight:    700,
       fontFamily:    "'Outfit', sans-serif",
       color:         "#ffffff",
@@ -127,7 +112,7 @@ export const textStylePresets = [
     label: "Mono",
     preview: { text: "// data.log", bg: "#0a0f0a" },
     style: {
-      fontSize:      28,
+      fontSize:      48,
       fontWeight:    500,
       fontFamily:    "'JetBrains Mono', monospace",
       color:         "#00ff88",

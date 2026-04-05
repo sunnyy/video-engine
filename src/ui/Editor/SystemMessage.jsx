@@ -82,15 +82,15 @@ export default function SystemMessage() {
   const style = TYPE_STYLES[msg.type] || TYPE_STYLES.tip;
 
   return (
-    <div className="flex w-[100%] justify-items-center items-center gap-3 px-4 py-[10px] border-b mx-0"
+    <div className="flex w-full justify-center items-center gap-3 px-4 py-[10px] border-b mx-0"
       style={{ borderColor: style.border, background: style.bg }}>
       <span className="text-[16px] shrink-0">{msg.icon}</span>
-      <span className="flex-1 text-[13px]" style={{ color: style.text }}>{msg.text}</span>
+      <span className=" text-[13px]" style={{ color: style.text }}>{msg.text}</span>
       {visible.length > 1 && (
-        <span className="text-[12px] text-[#55556a] shrink-0">{visible.length} hints</span>
+        <span className="text-[12px] text-[#999] shrink-0">{visible.length} hints</span>
       )}
       <button onClick={() => setDismissed(d => new Set([...d, idx]))}
-        className="text-[#55556a] hover:text-[#e8e8f0] bg-transparent border-0 cursor-pointer text-[14px] shrink-0">
+        className="text-[#999] hover:text-[#e8e8f0] bg-transparent border-0 cursor-pointer text-[14px] shrink-0">
         ✕
       </button>
     </div>

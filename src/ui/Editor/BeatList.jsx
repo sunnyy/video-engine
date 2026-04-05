@@ -37,7 +37,7 @@ function LayoutChip({ layout }) {
   );
 }
 
-export default function BeatList() {
+export default function BeatList({ setActiveTab }) {
   const project = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
   const setActiveBeat = useProjectStore((s) => s.setActiveBeat);
@@ -58,7 +58,7 @@ export default function BeatList() {
   };
 
   return (
-    <div className="w-[30%] h-full overflow-y-auto bg-[#111118] border-r border-[rgba(255,255,255,0.06)] px-2 py-4 flex flex-col">
+    <div className="h-full overflow-y-auto bg-[#111118] border-r border-[rgba(255,255,255,0.06)] px-2 py-4 flex flex-col">
 
       {/* Header */}
       <div className="flex items-center justify-between px-2 mb-3">
@@ -90,6 +90,7 @@ export default function BeatList() {
                 index={index}
                 activeBeatId={activeBeatId}
                 setActiveBeat={setActiveBeat}
+                setActiveTab={setActiveTab}
                 deleteBeat={deleteBeat}
                 duplicateBeat={duplicateBeat}
               />
@@ -103,12 +104,8 @@ export default function BeatList() {
 }
 
 function SortableBeat({
-  beat,
-  index,
-  activeBeatId,
-  setActiveBeat,
-  deleteBeat,
-  duplicateBeat,
+  beat, index, activeBeatId, setActiveBeat, setActiveTab,
+  deleteBeat, duplicateBeat,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: beat.id });
@@ -120,14 +117,13 @@ function SortableBeat({
 
   const isActive = beat.id === activeBeatId;
 
-  const zone = beat.zones?.z1 || beat.zones?.z2 || beat.zones?.z3 || null;
-
   const duration = Number(beat.duration_sec || 0).toFixed(1);
 
   const handleClick = () => {
     const { seekToBeat } = useProjectStore.getState();
     if (seekToBeat) seekToBeat(beat.id);
     setActiveBeat(beat.id);
+    if (setActiveTab) setActiveTab("beats");
   };
 
   const handleDelete = () => {
@@ -170,7 +166,7 @@ function SortableBeat({
         onClick={handleClick}
         className="h-[70px] w-[50px] min-w-[50px] overflow-hidden rounded-[7px] border border-[rgba(255,255,255,0.06)] bg-[#16161f]"
       >
-        <Thumbnail zone={zone} />
+        <Thumbnail beat={beat} />
       </div>
 
       {/* Info */}
@@ -221,39 +217,62 @@ function SortableBeat({
   );
 }
 
-function Thumbnail({ zone }) {
-  if (!zone) return null;
+function Thumbnail({ beat }) {
+  // Find first zone with real content
+  const zones = beat?.zones || {};
+  const layoutBg = beat?.layoutBackground;
 
-  const content = zone.content || {};
-  const bg = zone.background || {};
+  // Search all zones for first image or video asset
+  let src = null;
+  let isVideo = false;
 
-  if (content.kind === "asset") {
-    const src = content.asset?.src;
-    if (!src) return null;
+  for (const zone of Object.values(zones)) {
+    const content = zone.content || {};
+    const bg      = zone.background || {};
 
-    const isVideo = src.endsWith(".mp4") || src.endsWith(".webm");
-
-    if (isVideo)
-      return <video src={src} muted className="h-full w-full object-cover" />;
-
-    return <img src={src} draggable={false} className="h-full w-full object-cover" />;
+    if (content.kind === "asset" && content.asset?.src) {
+      src = content.asset.src;
+      isVideo = src.endsWith(".mp4") || src.endsWith(".webm") || content.asset.type === "video";
+      break;
+    }
+    if (bg.kind === "asset" && bg.asset?.src) {
+      src = bg.asset.src;
+      isVideo = src.endsWith(".mp4") || src.endsWith(".webm") || bg.asset.type === "video";
+      break;
+    }
   }
 
-  if (bg.kind === "asset") {
-    const src = bg.asset?.src;
-    if (!src) return null;
-
-    const isVideo = src.endsWith(".mp4") || src.endsWith(".webm");
-
-    if (isVideo)
-      return <video src={src} muted className="h-full w-full object-cover" />;
-
-    return <img src={src} draggable={false} className="h-full w-full object-cover" />;
+  // Fall back to layoutBackground
+  if (!src && layoutBg) {
+    if (layoutBg.type === "color") {
+      return <div className="h-full w-full" style={{ background: layoutBg.value }} />;
+    }
+    if (layoutBg.type === "image" || layoutBg.type === "video") {
+      src = layoutBg.value;
+      isVideo = layoutBg.type === "video";
+    }
   }
 
-  if (bg.kind === "color") {
-    return <div className="h-full w-full" style={{ background: bg.color }} />;
+  if (!src) {
+    // Show layout label as colored block
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-[#1c1c28]">
+        <span style={{ fontSize: 8, color: "#55556a", fontFamily: "monospace" }}>
+          {beat?.layout?.slice(0, 6)}
+        </span>
+      </div>
+    );
   }
 
-  return null;
+  if (isVideo) {
+    return (
+      <video
+        src={src} muted playsInline preload="metadata"
+        className="h-full w-full object-cover"
+        onLoadedMetadata={e => { e.target.currentTime = 0.5; }}
+      />
+    );
+  }
+
+  return <img src={src} draggable={false} className="h-full w-full object-cover" />;
 }

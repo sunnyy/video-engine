@@ -46,17 +46,18 @@ export default function Header() {
 
   const handleModeChange = (mode) => {
     if (mode === project.meta.mode) return;
-    updateProjectMeta({ mode });
+    updateProjectMeta({ meta: { mode } });
   };
 
   const handleOrientationChange = (orientation) => {
     if (orientation === project.meta.orientation) return;
-    // Update dimensions too
     const isVertical = orientation === "9:16";
     updateProjectMeta({
-      orientation,
-      width:  isVertical ? 1080 : 1920,
-      height: isVertical ? 1920 : 1080,
+      meta: {
+        orientation,
+        width:  isVertical ? 1080 : 1920,
+        height: isVertical ? 1920 : 1080,
+      },
     });
   };
 

@@ -24,7 +24,7 @@ const TABS = [
   { key: "sfx",      label: "SFX",      color: "#f0e040" },
 ];
 
-export default function BeatEditor({ selectedZoneId, onSelectZone }) {
+export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZone, setActiveTab }) {
   const project      = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
   const [tab, setTab] = useState("layout");
@@ -33,6 +33,12 @@ export default function BeatEditor({ selectedZoneId, onSelectZone }) {
 
   const activeBeat = project.beats.find((b) => b.id === activeBeatId);
   if (!activeBeat) return null;
+
+  // When a zone is selected, switch to zones tab automatically
+  const handleSelectZone = (id, modifierHeld) => {
+    if (id !== null) setTab("zones");
+    onSelectZone?.(id, modifierHeld);
+  };
 
   return (
     <div className="flex-1 w-[70%] min-w-[320px] flex flex-col border-l border-[rgba(255,255,255,0.06)] ml-4 overflow-hidden">
@@ -72,7 +78,8 @@ export default function BeatEditor({ selectedZoneId, onSelectZone }) {
             beat={activeBeat}
             project={project}
             selectedZoneId={selectedZoneId}
-            onSelectZone={onSelectZone}
+            selectedZoneIds={selectedZoneIds}
+            onSelectZone={handleSelectZone}
           />
         )}
         {tab === "caption"  && <CaptionsSection beat={activeBeat} />}

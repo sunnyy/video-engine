@@ -38,15 +38,12 @@ export default function BrandingSection() {
 
   const update = (key, value) => {
     updateProjectMeta({
-      meta: {
-        ...project.meta,
-        brand: { ...brand, [key]: value },
-      },
+      meta: { brand: { ...brand, [key]: value } },
     });
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0b0b10] px-6 py-6 flex flex-col gap-6">
+    <div className="flex-1 w-full overflow-y-auto bg-[#0b0b10] px-6 py-6 flex flex-col gap-6">
 
       <h3 className="text-[16px] font-bold text-[#e8e8f0] mb-2"
         style={{ fontFamily:"'Syne',sans-serif" }}>Branding</h3>

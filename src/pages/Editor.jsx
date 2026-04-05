@@ -19,6 +19,7 @@ export default function Editor() {
   const setProject = useProjectStore((s) => s.setProject);
   const setDatabaseId = useProjectStore((s) => s.setDatabaseId);
   const project = useProjectStore((s) => s.project);
+  const activeBeatId = useProjectStore((s) => s.activeBeatId);
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("beats");
@@ -34,8 +35,7 @@ export default function Editor() {
     load();
   }, [id]);
 
-  // Clear selection when active beat changes
-  const activeBeatId = useProjectStore((s) => s.activeBeatId);
+  // Clear zone selection when active beat changes
   useEffect(() => {
     setSelectedZoneIds(new Set());
   }, [activeBeatId]);
@@ -44,7 +44,6 @@ export default function Editor() {
   if (!project.workflow.script_completed) return <ScriptStep />;
   if (project.meta.mode === "talking_head" && !project.workflow.avatar_completed) return <TalkingHeadStep />;
 
-  // Derived: single selected zone id (for ZoneEditor compatibility)
   const selectedZoneId = selectedZoneIds.size === 1 ? [...selectedZoneIds][0] : null;
 
   const handleSelectZone = (id, modifierHeld = false) => {
@@ -55,8 +54,7 @@ export default function Editor() {
     if (modifierHeld) {
       setSelectedZoneIds((prev) => {
         const next = new Set(prev);
-        if (next.has(id))
-          next.delete(id); // toggle off
+        if (next.has(id)) next.delete(id);
         else next.add(id);
         return next;
       });
@@ -68,18 +66,24 @@ export default function Editor() {
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
-      <div className="flex flex-1 min-h-0">
-        <div className="flex flex-wrap w-[60%]">
-          <SystemMessage />
-          <div className="flex flex-1">
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-            <BeatList />
-            <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} />
-          </div>
+      <SystemMessage />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="w-[7%]">
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
-        <div className="flex w-[40%]">
+
+        <div className="w-[23%]">
+          <BeatList setActiveTab={setActiveTab} />
+        </div>
+
+        <div className="w-[30%]">
+          <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} />
+        </div>
+
+        <div className="w-[40%]">
           <EditorPanel
             activeTab={activeTab}
+            setActiveTab={setActiveTab}
             selectedZoneId={selectedZoneId}
             selectedZoneIds={selectedZoneIds}
             onSelectZone={handleSelectZone}

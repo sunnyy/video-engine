@@ -10,11 +10,11 @@ import ZoneHandle from "./ZoneHandle";
 const ZoneContentLayer = memo(({ zone, canvasScale }) => {
   const content  = zone.content || {};
   const st       = zone.style   || {};
-  const delayed  = (zone.start || 0) > 0;
   const rotation = st.rotation ?? 0;
   const scale_   = st.scale ?? 1;
   const insetPct = scale_ < 1 ? `${((1 - scale_) / 2) * 100}%` : "0%";
   const rotStyle = rotation ? { transform: `rotate(${rotation}deg)`, transformOrigin: "center center" } : {};
+  const scaledBR = (r) => Math.round((r || 0) * canvasScale);
 
   if (zone.type === "text" && content.text) {
     return (
@@ -28,8 +28,9 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
         fontFamily: st.fontFamily || "inherit",
         color:      st.color      || "#ffffff",
         textAlign:  st.textAlign  || "center",
-        opacity:    delayed ? 0.5 : (st.opacity ?? 1),
+        opacity:    st.opacity ?? 1,
         background: st.background || "transparent",
+        borderRadius: scaledBR(st.borderRadius),
         lineHeight: 1.2,
         pointerEvents: "none", userSelect: "none", overflow: "hidden",
         ...rotStyle,
@@ -46,8 +47,7 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
       position: "absolute",
       top: insetPct, right: insetPct, bottom: insetPct, left: insetPct,
       overflow: "hidden",
-      borderRadius: st.borderRadius || 0,
-      opacity: delayed ? 0.5 : 1,
+      borderRadius: scaledBR(st.borderRadius),
       ...rotStyle,
     };
     const mediaStyle = { width: "100%", height: "100%", objectFit, display: "block" };
@@ -82,19 +82,17 @@ export default function ZoneCanvas({
 }) {
   const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
   const _pushHistory     = useProjectStore((s) => s._pushHistory);
-  const databaseId       = useProjectStore((s) => s.databaseId);
   const layoutDef        = getLayoutDef(beat?.layout);
   const beatZones        = beat?.zones || {};
 
-  // Derive single selectedZoneId for backward compat
   const selectedZoneId = selectedZoneIds instanceof Set
     ? (selectedZoneIds.size === 1 ? [...selectedZoneIds][0] : null)
     : selectedZoneIds;
 
-  const beatZonesRef       = useRef(beatZones);
-  const beatIdRef          = useRef(beat?.id);
-  beatZonesRef.current     = beatZones;
-  beatIdRef.current        = beat?.id;
+  const beatZonesRef   = useRef(beatZones);
+  const beatIdRef      = useRef(beat?.id);
+  beatZonesRef.current = beatZones;
+  beatIdRef.current    = beat?.id;
 
   const defZoneIds = new Set((layoutDef?.zones || []).map(z => z.id));
 
@@ -122,8 +120,7 @@ export default function ZoneCanvas({
 
   const handleUpdate = useCallback((zoneId, updates) => {
     const bz = beatZonesRef.current;
-    const existing = bz[zoneId] || {};
-    updateBeatSilent(beatIdRef.current, { zones: { ...bz, [zoneId]: { ...existing, ...updates } } });
+    updateBeatSilent(beatIdRef.current, { zones: { ...bz, [zoneId]: { ...(bz[zoneId] || {}), ...updates } } });
   }, [updateBeatSilent]);
 
   const handleUpdateMulti = useCallback((patchMap) => {
@@ -139,9 +136,10 @@ export default function ZoneCanvas({
 
   const handleSave = useCallback(async () => {
     const { updateProject } = await import("../../../src/services/projects/projectService");
-    const project = useProjectStore.getState().project;
-    if (project && databaseId) updateProject(databaseId, project);
-  }, [databaseId]);
+    const proj = useProjectStore.getState().project;
+    const dbId = useProjectStore.getState().databaseId;
+    if (proj && dbId) updateProject(dbId, proj);
+  }, []);
 
   const handleCanvasClick = useCallback((e) => {
     if (e.target === e.currentTarget) onSelectZone(null);
@@ -179,18 +177,17 @@ export default function ZoneCanvas({
             position: "absolute", left: `${zone.x}%`, top: `${zone.y}%`,
             width: `${zone.width}%`, height: `${zone.height}%`,
             zIndex: zone.zIndex ?? 1, overflow: "hidden",
-            borderRadius: zone.style?.borderRadius || 0,
+            borderRadius: Math.round((zone.style?.borderRadius || 0) * canvasScale),
           }}>
             {zone.background?.kind === "color" && (
               <div style={{ position:"absolute", inset:0, background: zone.background.color }} />
             )}
             <ZoneContentLayer zone={zone} canvasScale={canvasScale} />
-            {/* Zone border — rendered as inset div so overflow:hidden doesn't clip it */}
             {isEmpty && (
               <div style={{
                 position: "absolute", inset: 0,
                 border: "1.5px dashed rgba(255,255,255,0.35)",
-                borderRadius: zone.style?.borderRadius || 0,
+                borderRadius: Math.round((zone.style?.borderRadius || 0) * canvasScale),
                 pointerEvents: "none",
                 zIndex: 99,
               }} />

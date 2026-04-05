@@ -119,15 +119,14 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   }, [togglePlayPause, undo, redo]);
 
   return (
-    <div className="bg-[#0b0b10] border-l border-[rgba(255,255,255,0.06)] flex flex-col"
-      style={{ width: "60%", height: "100%", minWidth: 280 }}>
+    <div className="bg-[#0b0b10] border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
 
       <div className="flex items-center gap-2 px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0">
-        {activeBeat && <span className="text-[10px] font-mono text-[#55556a]">{activeBeat.layout}</span>}
+        {activeBeat && <span className="text-[10px] font-mono text-[#77777a]">{activeBeat.layout}</span>}
         {selectedZoneIds?.size > 1 && (
           <span className="text-[10px] font-mono text-[#7c5cfc]">{selectedZoneIds.size} selected</span>
         )}
-        <div className="ml-auto flex items-center gap-1 text-[10px] text-[#55556a] font-mono">
+        <div className="ml-auto flex items-center gap-1 text-[10px] text-[#77777a] font-mono">
           <span>Space ▶/⏸</span>
           <span className="mx-1 opacity-30">·</span>
           <span>⌘Z undo</span>

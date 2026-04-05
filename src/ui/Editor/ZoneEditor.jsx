@@ -140,8 +140,14 @@ export default function ZoneEditor({
               {textStylePresets.map(preset => (
                 <button
                   key={preset.id}
-                  onClick={() => updateTextStyleBulk(slot, preset.style)}
-                  className="px-[8px] py-[4px] rounded-[6px] text-[11px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
+                  onClick={() => {
+                    // If preset has no background, explicitly clear it so previous preset bg doesn't linger
+                    const fullStyle = preset.style.background
+                      ? preset.style
+                      : { ...preset.style, background: "transparent" };
+                    updateTextStyleBulk(slot, fullStyle);
+                  }}
+                  className="px-[20px] py-[10px] rounded-[6px] text-[16px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
                   style={{
                     background:  preset.style.background || "rgba(255,255,255,0.08)",
                     color:       preset.style.color || "#ffffff",
