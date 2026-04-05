@@ -71,7 +71,7 @@ function Divider() {
 
 export default function ZoneEditor({
   beatId,
-  slot, zone, zoneDef, zoneType,
+  slot, zone, zoneDef, zoneType, isCustomZone,
   openPicker,
   updateTextContent, updateTextStyle, updateTextStyleBulk,
   updateContentProp, updateBackgroundProp,
@@ -141,13 +141,12 @@ export default function ZoneEditor({
                 <button
                   key={preset.id}
                   onClick={() => {
-                    // If preset has no background, explicitly clear it so previous preset bg doesn't linger
                     const fullStyle = preset.style.background
                       ? preset.style
                       : { ...preset.style, background: "transparent" };
                     updateTextStyleBulk(slot, fullStyle);
                   }}
-                  className="px-[20px] py-[10px] rounded-[6px] text-[16px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
+                  className="px-[12px] py-[6px] rounded-[6px] text-[14px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
                   style={{
                     background:  preset.style.background || "rgba(255,255,255,0.08)",
                     color:       preset.style.color || "#ffffff",
@@ -172,7 +171,7 @@ export default function ZoneEditor({
           <div className="grid grid-cols-2 gap-3 mb-3">
             <Slider label="Font Size" value={style.fontSize ?? 32}
               onChangeSilent={v => setStyleSilent("fontSize", v)}
-              onCommit={commit} min={10} max={120} unit="px" />
+              onCommit={commit} min={10} max={200} unit="px" />
             <Slider label="Opacity" value={Math.round((style.opacity ?? 1)*100)}
               onChangeSilent={v => setStyleSilent("opacity", v/100)}
               onCommit={commit} min={0} max={100} unit="%" />
@@ -181,13 +180,13 @@ export default function ZoneEditor({
           <div className="grid grid-cols-2 gap-3 mb-3">
             <Slider label="Border Radius" value={radius}
               onChangeSilent={v => setStyleSilent("borderRadius", v)}
-              onCommit={commit} min={0} max={80} unit="px" />
+              onCommit={commit} min={0} max={200} unit="px" />
             <Slider label="Padding" value={padding}
               onChangeSilent={v => setStyleSilent("contentPadding", v)}
-              onCommit={commit} min={0} max={60} unit="px" />
+              onCommit={commit} min={0} max={100} unit="px" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <Label>Text Color</Label>
               <div className="flex items-center gap-2 bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[7px]">
@@ -207,6 +206,28 @@ export default function ZoneEditor({
                   className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer ml-auto">clear</button>
               </div>
             </div>
+          </div>
+
+          {/* ── Text Effect ── */}
+          <div className="grid grid-cols-2 gap-3 mb-1">
+            <div>
+              <Label>Text Effect</Label>
+              <select value={style.textEffect ?? "none"}
+                onChange={e => setZoneStyle(slot, "textEffect", e.target.value)}
+                className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[7px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer">
+                <option value="none">None</option>
+                <option value="typewriter">Typewriter</option>
+                <option value="wordReveal">Word Reveal</option>
+                <option value="fadeWords">Fade Words</option>
+                <option value="slideUp">Slide Up Lines</option>
+              </select>
+            </div>
+            {(style.textEffect && style.textEffect !== "none") && (
+              <Slider label="Effect Speed"
+                value={Math.round((style.textEffectSpeed ?? 1.0) * 10) / 10}
+                onChangeSilent={v => setStyleSilent("textEffectSpeed", v)}
+                onCommit={commit} min={0.25} max={3.0} step={0.25} unit="x" />
+            )}
           </div>
         </>
       )}
@@ -248,10 +269,10 @@ export default function ZoneEditor({
                 <Sel label="Object Fit" value={content.asset?.objectFit || "cover"} onChange={v => updateContentProp(slot,"objectFit",v)} options={["cover","contain"]} />
                 <Slider label="Rounded Border" value={radius}
                   onChangeSilent={v => setStyleSilent("borderRadius", v)}
-                  onCommit={commit} min={0} max={80} unit="px" />
+                  onCommit={commit} min={0} max={500} unit="px" />
                 <Slider label="Shadow" value={shadow}
                   onChangeSilent={v => setStyleSilent("shadowBlur", v)}
-                  onCommit={commit} min={0} max={60} unit="px" />
+                  onCommit={commit} min={0} max={100} unit="px" />
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <Sel label="Enter" value={content.asset?.enterTransition || "none"} onChange={v => updateContentProp(slot,"enterTransition",v)} options={enters} />
@@ -348,11 +369,22 @@ export default function ZoneEditor({
       <Divider />
 
       {/* ── ANIMATIONS ── */}
-      <SectionTitle>Animations</SectionTitle>
-      <div className="grid grid-cols-2 gap-3">
-        <Sel label="Enter Animation" value={enter} onChange={v => setZoneLayout(slot,"enterAnimation",v)} options={enters} />
-        <Sel label="Exit Animation"  value={exit}  onChange={v => setZoneLayout(slot,"exitAnimation",v)}  options={exits}  />
-      </div>
+      {isCustomZone ? (
+        <>
+          <SectionTitle>Animations</SectionTitle>
+          <div className="grid grid-cols-2 gap-3">
+            <Sel label="Enter" value={enter} onChange={v => setZoneLayout(slot,"enterAnimation",v)} options={enters} />
+            <Sel label="Exit"  value={exit}  onChange={v => setZoneLayout(slot,"exitAnimation",v)}  options={exits}  />
+          </div>
+        </>
+      ) : (
+        <div className="flex items-start gap-2 px-3 py-[8px] rounded-[8px] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]">
+          <span className="text-[12px] shrink-0 mt-[1px]">ℹ️</span>
+          <p className="text-[10px] text-[#55556a] leading-relaxed">
+            Animations are defined by the layout. Switch to a custom zone to override.
+          </p>
+        </div>
+      )}
 
       <Divider />
 

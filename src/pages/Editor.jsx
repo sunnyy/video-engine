@@ -72,11 +72,11 @@ export default function Editor() {
           <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
 
-        <div className="w-[23%]">
+        <div className="w-[18%]">
           <BeatList setActiveTab={setActiveTab} />
         </div>
 
-        <div className="w-[30%]">
+        <div className="w-[35%]">
           <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} />
         </div>
 

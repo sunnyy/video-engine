@@ -15,7 +15,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const undo          = useProjectStore((s) => s.undo);
   const redo          = useProjectStore((s) => s.redo);
 
-  const [isPlaying, setIsPlaying]   = useState(false);
+  const [isPlaying,  setIsPlaying]  = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
   const hasPlayedOnce = useRef(false);
   const playerRef     = useRef(null);
@@ -24,17 +24,20 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
 
   if (!project) return null;
 
-  const fps            = project.meta.fps;
-  const durationFrames = Math.max(1, Math.floor(project.duration_sec * fps));
-  const activeBeat     = project.beats.find(b => b.id === activeBeatId);
+  const fps            = project.meta.fps || 25;
   const videoW         = project.meta.width  || 1080;
   const videoH         = project.meta.height || 1920;
-  const availW         = containerSize.width  - 16;
-  const availH         = containerSize.height - 16;
-  const scale          = Math.min(availW / videoW, availH / videoH, 1);
-  const renderW        = Math.floor(videoW * scale);
-  const renderH        = Math.floor(videoH * scale);
+  const durationFrames = Math.max(1, Math.floor((project.duration_sec || 1) * fps));
+  const activeBeat     = project.beats.find(b => b.id === activeBeatId);
 
+  // Compute canvas dimensions to fit container maintaining aspect ratio
+  const availW    = containerSize.width  - 16;
+  const availH    = containerSize.height - 16;
+  const scale     = Math.min(availW / videoW, availH / videoH, 1);
+  const canvasW   = Math.floor(videoW * scale);
+  const canvasH   = Math.floor(videoH * scale);
+
+  /* ── Measure container ── */
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver(entries => {
@@ -45,6 +48,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     return () => ro.disconnect();
   }, []);
 
+  /* ── Sync active beat with player ── */
   useEffect(() => {
     if (!showPlayer) return;
     const interval = setInterval(() => {
@@ -60,6 +64,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     return () => clearInterval(interval);
   }, [project, fps, activeBeatId, showPlayer]);
 
+  /* ── seekToBeat ── */
   useEffect(() => {
     useProjectStore.setState({
       seekToBeat: (beatId) => {
@@ -69,6 +74,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         playerRef.current.pause();
         playerRef.current.seekTo(Math.floor(beat.start_sec * fps));
         setIsPlaying(false);
+        setShowPlayer(false);
         hasPlayedOnce.current = false;
       },
     });
@@ -96,7 +102,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   useEffect(() => { hasPlayedOnce.current = false; }, [activeBeatId]);
 
   const handleSelectZone = useCallback((id, modifierHeld = false) => {
-    if (isPlaying && id !== null) handlePause();
+    if (id !== null && isPlaying) handlePause();
     onSelectZone(id, modifierHeld);
   }, [isPlaying, handlePause, onSelectZone]);
 
@@ -104,6 +110,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     if (isPlaying) handlePause(); else handlePlay();
   }, [isPlaying, handlePlay, handlePause]);
 
+  /* ── Keyboard ── */
   useEffect(() => {
     const onKey = (e) => {
       const isTyping = ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName);
@@ -119,14 +126,17 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   }, [togglePlayPause, undo, redo]);
 
   return (
-    <div className="bg-[#0b0b10] border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
+    <div className="w-full bg-[#111118] border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
 
+      {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0">
-        {activeBeat && <span className="text-[10px] font-mono text-[#77777a]">{activeBeat.layout}</span>}
+        {activeBeat && (
+          <span className="text-[10px] font-mono text-[#55556a]">{activeBeat.layout}</span>
+        )}
         {selectedZoneIds?.size > 1 && (
           <span className="text-[10px] font-mono text-[#7c5cfc]">{selectedZoneIds.size} selected</span>
         )}
-        <div className="ml-auto flex items-center gap-1 text-[10px] text-[#77777a] font-mono">
+        <div className="ml-auto flex items-center gap-1 text-[10px] text-[#55556a] font-mono">
           <span>Space ▶/⏸</span>
           <span className="mx-1 opacity-30">·</span>
           <span>⌘Z undo</span>
@@ -135,23 +145,30 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 bg-[#0b0b10] relative flex items-center justify-center overflow-hidden p-2">
+      {/* Canvas area */}
+      <div ref={containerRef} className="flex-1 relative flex items-center justify-center overflow-hidden p-2">
 
-        {activeBeat ? (
-          <ZoneCanvas
-            beat={activeBeat}
-            selectedZoneIds={selectedZoneIds}
-            onSelectZone={handleSelectZone}
-            canvasW={renderW}
-            canvasH={renderH}
-            canvasScale={scale}
-          />
-        ) : (
+        {/* ZoneCanvas — always mounted, hidden behind player when playing */}
+        {activeBeat && (
+          <div style={{ display: showPlayer ? "none" : "flex", alignItems: "center", justifyContent: "center" }}>
+            <ZoneCanvas
+              beat={activeBeat}
+              selectedZoneIds={selectedZoneIds}
+              onSelectZone={handleSelectZone}
+              canvasW={canvasW}
+              canvasH={canvasH}
+              canvasScale={scale}
+            />
+          </div>
+        )}
+
+        {!activeBeat && !showPlayer && (
           <div className="text-[#55556a] text-[13px]">Select a beat to edit</div>
         )}
 
+        {/* Remotion Player — overlays when playing */}
         <div style={{
-          display: showPlayer ? "flex" : "none",
+          display:  showPlayer ? "flex" : "none",
           position: "absolute", inset: 0,
           alignItems: "center", justifyContent: "center",
           background: "#111118", zIndex: 50,
@@ -166,10 +183,11 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             compositionHeight={videoH}
             fps={fps}
             controls={false}
-            style={{ width: renderW, height: renderH, borderRadius: 8, overflow: "hidden" }}
+            style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden" }}
           />
         </div>
 
+        {/* Play button */}
         {!showPlayer && (
           <button onClick={handlePlay}
             className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-[7px] rounded-full text-[12px] font-bold text-white border-0 cursor-pointer transition-all hover:scale-105"
@@ -178,6 +196,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           </button>
         )}
 
+        {/* Pause button */}
         {showPlayer && (
           <button onClick={handlePause}
             className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-[7px] rounded-full text-[12px] font-bold text-white border-0 cursor-pointer transition-all hover:scale-105"

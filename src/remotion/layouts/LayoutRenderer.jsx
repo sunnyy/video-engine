@@ -179,12 +179,16 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
           <AvatarLayer beat={beat} project={project} />
         )}
 
-        {/* Text */}
-        {zone.type === "text" && (
-          <div style={{
+        {/* Text — with optional text effects */}
+        {zone.type === "text" && (() => {
+          const text       = content.text || "";
+          const textEffect = st.textEffect || "none";
+          const effectSpeed = st.textEffectSpeed ?? 1.0;
+
+          const baseStyle = {
             position:"absolute",
-            top:    finalInset, right:  finalInset,
-            bottom: finalInset, left:   finalInset,
+            top: finalInset, right: finalInset,
+            bottom: finalInset, left: finalInset,
             display:"flex",
             alignItems:"center",
             justifyContent: st.textAlign === "left" ? "flex-start" : st.textAlign === "right" ? "flex-end" : "center",
@@ -201,10 +205,90 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
             opacity:        st.opacity       ?? 1,
             background:     st.background    || "transparent",
             borderRadius:   st.borderRadius  || 0,
-          }}>
-            {content.text || ""}
-          </div>
-        )}
+            flexWrap:       "wrap",
+            overflow:       "hidden",
+          };
+
+          // ── No effect — plain text ──
+          if (textEffect === "none") {
+            return <div style={baseStyle}>{text}</div>;
+          }
+
+          // ── Typewriter — chars appear one by one ──
+          const usableDur = (totalDur * 0.9) / effectSpeed;
+
+          if (textEffect === "typewriter") {
+            const chars   = text.split("");
+            const visible = Math.floor(interpolate(local, [0, usableDur], [0, chars.length], { extrapolateRight: "clamp" }));
+            const blink   = Math.floor(local / 8) % 2 === 0;
+            const shown   = chars.slice(0, visible).join("");
+            const cursor  = visible < chars.length ? (blink ? "|" : "\u00A0") : "";
+            return (
+              <div style={baseStyle}>
+                {shown}{cursor}
+              </div>
+            );
+          }
+
+          // ── Word Reveal ──
+          if (textEffect === "wordReveal") {
+            const words         = text.split(/\s+/).filter(Boolean);
+            const framesPerWord = usableDur / Math.max(1, words.length);
+            const revealDur     = Math.max(framesPerWord * 0.6, 4);
+            return (
+              <div style={baseStyle}>
+                <span>
+                  {words.map((word, i) => {
+                    const prog = interpolate(local, [i * framesPerWord, i * framesPerWord + revealDur], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+                    return <span key={i} style={{ opacity: prog, display: "inline" }}>{word}{i < words.length - 1 ? " " : ""}</span>;
+                  })}
+                </span>
+              </div>
+            );
+          }
+
+          // ── Fade Words ──
+          if (textEffect === "fadeWords") {
+            const words         = text.split(/\s+/).filter(Boolean);
+            const framesPerWord = usableDur / Math.max(1, words.length);
+            const fadeDur       = Math.max(framesPerWord * 0.5, 3);
+            return (
+              <div style={baseStyle}>
+                <span>
+                  {words.map((word, i) => {
+                    const prog = interpolate(local, [i * framesPerWord, i * framesPerWord + fadeDur], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+                    return <span key={i} style={{ opacity: prog, display: "inline" }}>{word}{i < words.length - 1 ? " " : ""}</span>;
+                  })}
+                </span>
+              </div>
+            );
+          }
+
+          // ── Slide Up Lines — auto-chunk into 3-word lines ──
+          if (textEffect === "slideUp") {
+            const words     = text.split(/\s+/).filter(Boolean);
+            const lines     = [];
+            for (let i = 0; i < words.length; i += 3) lines.push(words.slice(i, i + 3).join(" "));
+            const framesPerLine = usableDur / Math.max(1, lines.length);
+            const slideDur      = Math.max(framesPerLine * 0.6, 6);
+            const align         = st.textAlign === "left" ? "flex-start" : st.textAlign === "right" ? "flex-end" : "center";
+            return (
+              <div style={{ ...baseStyle, flexDirection: "column", alignItems: align, gap: "0.15em" }}>
+                {lines.map((line, i) => {
+                  const prog = interpolate(local, [i * framesPerLine, i * framesPerLine + slideDur], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+                  return (
+                    <span key={i} style={{ opacity: prog, transform: `translateY(${interpolate(prog, [0, 1], [20, 0], { extrapolateRight: "clamp" })}px)`, display: "block", width: "100%" }}>
+                      {line}
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          // Fallback
+          return <div style={baseStyle}>{text}</div>;
+        })()}
 
         {/* Block */}
         {zone.type === "block" && (() => {

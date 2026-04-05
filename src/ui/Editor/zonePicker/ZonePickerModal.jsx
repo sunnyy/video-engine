@@ -4,9 +4,10 @@ import { deleteUserAsset } from "../../../services/assets/deleteUserAsset";
 import { useAssetsStore } from "../../../store/useAssetsStore";
 
 import MyAssetsTab from "./tabs/MyAssetsTab";
-import GalleryTab from "./tabs/GalleryTab";
-import BlocksTab from "./tabs/BlocksTab";
-import ColorsTab from "./tabs/ColorsTab";
+import GalleryTab  from "./tabs/GalleryTab";
+import BlocksTab   from "./tabs/BlocksTab";
+import ColorsTab   from "./tabs/ColorsTab";
+import TextTab     from "./tabs/TextTab";
 
 export default function ZonePickerModal({
   onSelect,
@@ -17,24 +18,22 @@ export default function ZonePickerModal({
 }) {
 
   const normalizeAsset = (a) => {
-
     if (!a) return;
 
-    if (a.url) {
-      onSelect({ url:a.url });
+    // Already structured — pass through directly
+    if (a.kind === "text" || a.kind === "block" || a.kind === "color") {
+      onSelect(a);
       return;
     }
 
-    if (a.asset?.src) {
-      onSelect({ url:a.asset.src });
+    if (a.kind === "asset") {
+      onSelect(a);
       return;
     }
 
-    if (a.src) {
-      onSelect({ url:a.src });
-      return;
-    }
-
+    if (a.url) { onSelect({ url: a.url }); return; }
+    if (a.asset?.src) { onSelect({ url: a.asset.src }); return; }
+    if (a.src) { onSelect({ url: a.src }); return; }
   };
 
   const defaultTabs = ["assets","gallery","blocks","colors"];
@@ -121,24 +120,16 @@ export default function ZonePickerModal({
 
   };
 
-  const tabs = useMemo(()=>{
-
+  const tabs = useMemo(() => {
     const all = [
-      { key:"my", label:"My Assets", type:"assets" },
-      { key:"gallery", label:"Gallery", type:"gallery" },
-      { key:"blocks", label:"Elements", type:"blocks" },
-      { key:"colors", label:"Colors", type:"colors" }
+      { key: "my",      label: "My Assets", type: "assets"  },
+      { key: "gallery", label: "Gallery",   type: "gallery" },
+      { key: "text",    label: "Text",      type: "text"    },
+      { key: "blocks",  label: "Elements",  type: "blocks"  },
+      { key: "colors",  label: "Colors",    type: "colors"  },
     ];
-
-    return all.filter(t => {
-
-      if (t.key==="blocks" && mode!=="content") return false;
-
-      return activeTabs.includes(t.type);
-
-    });
-
-  },[activeTabs,mode]);
+    return all.filter(t => activeTabs.includes(t.type) || t.type === "text" || t.type === "blocks");
+  }, [activeTabs]);
 
   const renderTab = () => {
 
@@ -157,6 +148,14 @@ export default function ZonePickerModal({
         />
       );
 
+    }
+
+    if (tab==="text") {
+      return (
+        <TextTab
+          onSelect={(a) => { onSelect(a); onClose(); }}
+        />
+      );
     }
 
     if (tab==="gallery") {

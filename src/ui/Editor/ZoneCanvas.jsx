@@ -10,11 +10,11 @@ import ZoneHandle from "./ZoneHandle";
 const ZoneContentLayer = memo(({ zone, canvasScale }) => {
   const content  = zone.content || {};
   const st       = zone.style   || {};
+  
   const rotation = st.rotation ?? 0;
   const scale_   = st.scale ?? 1;
   const insetPct = scale_ < 1 ? `${((1 - scale_) / 2) * 100}%` : "0%";
   const rotStyle = rotation ? { transform: `rotate(${rotation}deg)`, transformOrigin: "center center" } : {};
-  const scaledBR = (r) => Math.round((r || 0) * canvasScale);
 
   if (zone.type === "text" && content.text) {
     return (
@@ -30,7 +30,6 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
         textAlign:  st.textAlign  || "center",
         opacity:    st.opacity ?? 1,
         background: st.background || "transparent",
-        borderRadius: scaledBR(st.borderRadius),
         lineHeight: 1.2,
         pointerEvents: "none", userSelect: "none", overflow: "hidden",
         ...rotStyle,
@@ -47,7 +46,8 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
       position: "absolute",
       top: insetPct, right: insetPct, bottom: insetPct, left: insetPct,
       overflow: "hidden",
-      borderRadius: scaledBR(st.borderRadius),
+      borderRadius: st.borderRadius || 0,
+      
       ...rotStyle,
     };
     const mediaStyle = { width: "100%", height: "100%", objectFit, display: "block" };
@@ -177,17 +177,18 @@ export default function ZoneCanvas({
             position: "absolute", left: `${zone.x}%`, top: `${zone.y}%`,
             width: `${zone.width}%`, height: `${zone.height}%`,
             zIndex: zone.zIndex ?? 1, overflow: "hidden",
-            borderRadius: Math.round((zone.style?.borderRadius || 0) * canvasScale),
+            borderRadius: zone.style?.borderRadius || 0,
           }}>
             {zone.background?.kind === "color" && (
               <div style={{ position:"absolute", inset:0, background: zone.background.color }} />
             )}
             <ZoneContentLayer zone={zone} canvasScale={canvasScale} />
+            {/* Zone border — rendered as inset div so overflow:hidden doesn't clip it */}
             {isEmpty && (
               <div style={{
                 position: "absolute", inset: 0,
                 border: "1.5px dashed rgba(255,255,255,0.35)",
-                borderRadius: Math.round((zone.style?.borderRadius || 0) * canvasScale),
+                borderRadius: zone.style?.borderRadius || 0,
                 pointerEvents: "none",
                 zIndex: 99,
               }} />
@@ -218,6 +219,63 @@ export default function ZoneCanvas({
           pointerEvents: "none", zIndex: 999, lineHeight: "12px",
         }}>+{zone.start}s</div>
       ))}
+
+      {/* Caption preview — static render when caption is on */}
+      {beat?.caption?.show && beat?.caption?.text && (() => {
+        const cap      = beat.caption;
+        const words    = cap.text.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+        const pos      = cap.position || "bottom";
+        const fs       = Math.max(12, Math.round(72 * canvasScale));
+        const posStyle = pos === "top"
+          ? { top: "10%"  }
+          : pos === "middle"
+          ? { top: "50%", transform: "translateX(-50%) translateY(-50%)" }
+          : { bottom: "12%" };
+
+        return (
+          <div style={{
+            position: "absolute",
+            left: "50%",
+            transform: pos === "middle" ? "translateX(-50%) translateY(-50%)" : "translateX(-50%)",
+            width: "88%",
+            textAlign: "center",
+            pointerEvents: "none",
+            zIndex: 200,
+            lineHeight: 1.1,
+            ...posStyle,
+          }}>
+            {words.map((word, i) => (
+              <span key={i} style={{
+                display:       "inline-block",
+                margin:        `0 ${Math.max(2, 4 * canvasScale)}px`,
+                fontFamily:    "Impact, 'Arial Black', sans-serif",
+                fontSize:      fs,
+                fontWeight:    900,
+                color:         i === 0 ? "#7c5cfc" : "#ffffff",
+                textShadow:    `0 0 ${Math.round(12 * canvasScale)}px rgba(0,0,0,1), 0 0 ${Math.round(4 * canvasScale)}px rgba(0,0,0,1)`,
+                WebkitTextStroke: `${Math.max(1, Math.round(2 * canvasScale))}px rgba(0,0,0,0.8)`,
+              }}>
+                {word}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* CC badge */}
+      {beat?.caption && (
+        <div style={{
+          position: "absolute", bottom: 4, right: 6,
+          fontSize: Math.max(6, 8 * canvasScale),
+          fontFamily: "monospace",
+          color: beat.caption.show ? "rgba(124,92,252,1)" : "rgba(255,255,255,0.18)",
+          background: "rgba(0,0,0,0.7)",
+          padding: "1px 4px", borderRadius: 3,
+          pointerEvents: "none", zIndex: 999,
+        }}>
+          {beat.caption.show ? "CC" : "CC off"}
+        </div>
+      )}
     </div>
   );
 }

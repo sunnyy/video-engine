@@ -33,17 +33,21 @@ export default function BrandingSection() {
 
   const brand      = project.meta?.brand || {};
   const brandColor = brand.color || "#7c5cfc";
-  const brandName  = brand.name  || "";
   const brandFont  = brand.font  || "Syne";
 
   const update = (key, value) => {
+    const newBrand = { ...brand, [key]: value };
     updateProjectMeta({
-      meta: { brand: { ...brand, [key]: value } },
+      meta: {
+        brand:       newBrand,
+        // Keep legacy brand_color in sync so Caption.jsx fallback still works
+        brand_color: key === "color" ? value : brand.color ?? null,
+      },
     });
   };
 
   return (
-    <div className="flex-1 w-full overflow-y-auto bg-[#0b0b10] px-6 py-6 flex flex-col gap-6">
+    <div className="flex-1 overflow-y-auto bg-[#0b0b10] px-6 py-6 flex flex-col gap-6">
 
       <h3 className="text-[16px] font-bold text-[#e8e8f0] mb-2"
         style={{ fontFamily:"'Syne',sans-serif" }}>Branding</h3>
@@ -74,16 +78,6 @@ export default function BrandingSection() {
               }} />
           ))}
         </div>
-      </div>
-
-      {/* Brand Name */}
-      <div>
-        <Label>Brand Name / Handle</Label>
-        <input value={brandName}
-          onChange={e => update("name", e.target.value)}
-          placeholder="@yourchannel"
-          className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[14px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none" />
-        <div className="text-[12px] text-[#55556a] mt-[5px]">Used in CTA overlays and watermarks</div>
       </div>
 
       {/* Brand Font */}

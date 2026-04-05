@@ -1,40 +1,27 @@
 export function normalizeMeta(raw = {}) {
+  const orientation = raw.orientation ?? "9:16";
+  const mode = raw.mode ?? "faceless";
+  const fps = raw.fps ?? 25;
 
-  const orientation =
-    raw.orientation !== undefined
-      ? raw.orientation
-      : "vertical";
-
-  const mode =
-    raw.mode !== undefined
-      ? raw.mode
-      : "faceless";
-
-  const fps =
-    raw.fps !== undefined
-      ? raw.fps
-      : 25;
-
-  let width = 1080;
-  let height = 1920;
-
-  if (orientation === "horizontal") {
-    width = 1920;
-    height = 1080;
-  }
-
-  const brand_color =
-    raw.brand_color !== undefined
-      ? raw.brand_color
-      : null;
+  // Respect explicit width/height if set (e.g. after orientation toggle)
+  // otherwise derive from orientation
+  const isVertical = orientation === "9:16" || orientation === "vertical";
+  const width = raw.width ?? (isVertical ? 1080 : 1920);
+  const height = raw.height ?? (isVertical ? 1920 : 1080);
 
   return {
+    // Spread all raw fields first so nothing unknown gets dropped
+    ...raw,
+    // Then enforce/normalize the known fields
     orientation,
     mode,
     fps,
     width,
     height,
-    brand_color
+    brand_color: raw.brand_color ?? null,
+    // Preserve brand object (name, color, font)
+    brand: raw.brand ?? {},
+    // Preserve name
+    name: raw.name ?? "",
   };
-
 }

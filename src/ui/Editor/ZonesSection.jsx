@@ -12,9 +12,8 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
   const updateBeat       = useProjectStore((s) => s.updateBeat);
   const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
 
-  const [picker, setPicker]           = useState(null);
-  const [addingZone, setAddingZone]   = useState(false);
-  const [newZoneType, setNewZoneType] = useState("asset");
+  const [picker,        setPicker]        = useState(null); // { slot, type }
+  const [addZonePicker, setAddZonePicker] = useState(false); // open picker to add new zone
 
   const layoutDef = getLayoutDef(beat.layout);
   const zones     = beat.zones || {};
@@ -49,25 +48,36 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
     updateBeatSilent(beat.id, { zones: newZones });
   };
 
-  const addZone = () => {
-    const id     = `custom_${Date.now()}`;
-    const isText = newZoneType === "text";
-    const newZones = {
-      ...zones,
-      [id]: {
-        type: newZoneType,
-        x: 10, y: 10, width: 80, height: 20,
+  // Called when user picks content from the "add zone" picker
+  const handleAddZoneSelect = (asset) => {
+    const id  = `custom_${Date.now()}`;
+    const data = normalizeAsset(asset) || asset;
+
+    let zoneData;
+    if (data?.kind === "text") {
+      // Text preset selected
+      zoneData = {
+        type: "text", x: 5, y: 35, width: 90, height: 25,
         zIndex: 10, start: 0, end: null,
         enterAnimation: "fadeIn", exitAnimation: "none",
-        content: isText
-          ? { kind: "text", text: "New text" }
-          : { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
-        style: isText ? { fontSize: 32, fontWeight: 700, color: "#ffffff", textAlign: "center" } : {},
+        content: { kind: "text", text: data.text || "Your text here" },
+        style: { fontSize: 36, fontWeight: 700, color: "#ffffff", textAlign: "center", ...(data.style || {}) },
         background: {},
-      },
-    };
+      };
+    } else {
+      // Asset/element/color/block
+      zoneData = {
+        type: "asset", x: 10, y: 10, width: 80, height: 40,
+        zIndex: 10, start: 0, end: null,
+        enterAnimation: "fadeIn", exitAnimation: "none",
+        content: data?.kind ? data : { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
+        style: {}, background: {},
+      };
+    }
+
+    const newZones = { ...zones, [id]: zoneData };
     updateBeat(beat.id, { zones: newZones });
-    setAddingZone(false);
+    setAddZonePicker(false);
     onSelectZone(id);
   };
 
@@ -153,27 +163,13 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
           style={{ fontFamily: "'Syne', sans-serif" }}>
           {selectedZoneId ? `Zone: ${selectedZoneId}` : "Zones"}
         </div>
-        <button onClick={() => setAddingZone(v => !v)}
+        <button onClick={() => setAddZonePicker(true)}
           className="px-2 py-[3px] rounded-[5px] text-[10px] font-bold text-[#7c5cfc] border border-[rgba(124,92,252,0.3)] hover:bg-[rgba(124,92,252,0.1)] bg-transparent cursor-pointer">
           + Add Zone
         </button>
       </div>
 
-      {addingZone && (
-        <div className="mb-3 p-2 rounded-[8px] border border-[rgba(124,92,252,0.2)] bg-[rgba(124,92,252,0.05)] flex items-center gap-2 shrink-0">
-          {["asset", "text"].map(t => (
-            <button key={t} onClick={() => setNewZoneType(t)}
-              className={`px-2 py-[3px] rounded-[4px] text-[10px] font-bold capitalize border cursor-pointer
-                ${newZoneType === t ? "bg-[#7c5cfc] text-white border-[#7c5cfc]" : "bg-transparent text-[#7070a0] border-[rgba(255,255,255,0.1)]"}`}>
-              {t}
-            </button>
-          ))}
-          <button onClick={addZone}
-            className="ml-auto px-2 py-[3px] rounded-[4px] text-[10px] font-bold bg-[#7c5cfc] text-white border-0 cursor-pointer">
-            Add
-          </button>
-        </div>
-      )}
+      
 
       {!selectedZoneId && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-40">
@@ -213,6 +209,17 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
           mode={picker.type}
           onSelect={handleSelect}
           onClose={() => setPicker(null)}
+        />
+      )}
+
+      {/* Add zone picker — opens full picker so user can pick any content type */}
+      {addZonePicker && (
+        <ZonePickerModal
+          orientation={project.meta.orientation}
+          mode="content"
+          allowedTabs={["assets","gallery","text","blocks","colors"]}
+          onSelect={handleAddZoneSelect}
+          onClose={() => setAddZonePicker(false)}
         />
       )}
 

@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 
-import LayoutSelector from "./LayoutSelector";
-import ZonesSection from "./ZonesSection";
+import LayoutSelector  from "./LayoutSelector";
+import ZonesSection    from "./ZonesSection";
 import CaptionsSection from "./CaptionsSection";
-import OverlaySection from "./OverlaySection";
-import SFXSection from "./SFXSection";
+import SFXSection      from "./SFXSection";
 
 if (typeof document !== "undefined" && !document.getElementById("editor-fonts")) {
   const link = document.createElement("link");
@@ -17,11 +16,10 @@ if (typeof document !== "undefined" && !document.getElementById("editor-fonts"))
 }
 
 const TABS = [
-  { key: "layout",   label: "Layout",   color: "#7c5cfc" },
-  { key: "zones",    label: "Zones",    color: "#f97316" },
-  { key: "caption",  label: "Caption",  color: "#3b9eff" },
-  { key: "overlays", label: "Overlays", color: "#2dd4bf" },
-  { key: "sfx",      label: "SFX",      color: "#f0e040" },
+  { key: "layout",  label: "Layout",  color: "#7c5cfc" },
+  { key: "zones",   label: "Zones",   color: "#f97316" },
+  { key: "caption", label: "Caption", color: "#3b9eff" },
+  { key: "sfx",     label: "SFX",     color: "#f0e040" },
 ];
 
 export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZone, setActiveTab }) {
@@ -83,7 +81,6 @@ export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZo
           />
         )}
         {tab === "caption"  && <CaptionsSection beat={activeBeat} />}
-        {tab === "overlays" && <OverlaySection beat={activeBeat} />}
         {tab === "sfx"      && <SFXSection beat={activeBeat} />}
       </div>
 

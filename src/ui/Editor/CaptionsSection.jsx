@@ -60,17 +60,20 @@ export default function CaptionsSection({ beat }) {
   const project = useProjectStore((s) => s.project);
   const setProject = useProjectStore((s) => s.setProject);
 
-  const layout = layoutRegistry[beat.layout];
+  const layout          = layoutRegistry[beat.layout];
   const captionStrategy = layout?.captionStrategy ?? "always";
 
   const caption = beat.caption || {
-    show: true,
-    text: beat.spoken || "",
-    style: captionStyleKeys[0],
+    show:     true,
+    text:     beat.spoken || "",
+    style:    captionStyleKeys[0],
     position: "bottom",
   };
 
-  const brandColor = project?.meta?.brand_color ?? project?.visualIdentity?.colorStory?.accent ?? "#00F2EA";
+  const brandColor = project?.meta?.brand?.color
+    ?? project?.meta?.brand_color
+    ?? project?.visualIdentity?.colorStory?.accent
+    ?? "#00F2EA";
 
   const update = (key, value) => {
     updateBeat(beat.id, { caption: { ...caption, [key]: value } });
@@ -87,12 +90,12 @@ export default function CaptionsSection({ beat }) {
   return (
     <div className="flex flex-col gap-5">
 
-      {/* Notice when layout has text zones */}
+      {/* Strategy notice for text-zone layouts */}
       {captionStrategy === "never" && (
         <div className="flex items-start gap-2 px-3 py-[10px] rounded-[10px] bg-[rgba(124,92,252,0.08)] border border-[rgba(124,92,252,0.2)]">
           <span className="text-[14px] shrink-0 mt-[1px]">ℹ️</span>
           <p className="text-[11px] text-[#9494a8] leading-relaxed">
-            This layout has built-in text zones. Captions are <strong className="text-[#a78fff]">hidden by default</strong> to avoid overlap. Turn them on below if needed.
+            This layout has built-in text zones. Captions are <strong className="text-[#a78fff]">hidden by default</strong> to avoid overlap. Enable below if needed.
           </p>
         </div>
       )}

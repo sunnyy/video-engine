@@ -10,7 +10,7 @@ import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
 import { applyBeatVariation }     from "./beatVariationEngine";
 import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
 import { planBeatVisual }         from "./visualPlanner";
-import { getLayoutDef }           from "./layoutRegistry";
+import { getLayoutDef, layoutRegistry } from "./layoutRegistry";
 import blockRegistry              from "./blockRegistry";
 import { pickBeatSFX, OVERLAY_SFX_DEFAULTS } from "./sfxRegistry";
 import { autoAssignOverlays }     from "./overlayPlacementEngine";
@@ -55,15 +55,23 @@ function calculateDuration(spoken, intent, energy = 0.5) {
 }
 
 /* ── Caption ── */
-function chooseCaptionStyle(intent, energy = 0.5) {
-  if (energy >= 0.85) return "brutalSlam";
+/* ── Caption style — ONE per video based on overall tone ── */
+function pickVideoCaptionStyle(beats) {
+  // Determine dominant intent/energy across all beats
+  const avgEnergy = beats.reduce((s, b) => s + (b.energy ?? 0.5), 0) / (beats.length || 1);
+  const intents   = beats.map(b => b.intent).filter(Boolean);
+  const dominant  = intents.sort((a, b) =>
+    intents.filter(v => v === b).length - intents.filter(v => v === a).length
+  )[0] || "explanation";
+
+  if (avgEnergy >= 0.85) return "brutalSlam";
   const map = {
     shock: "wordBlaze", curiosity: "wordHighlight", proof: "premiumBlock",
     reveal: "glitchStamp", urgency: "brutalSlam", empathy: "editorialSerif",
     punchline: "markerPen", contrast: "wordHighlight", irony: "wordHighlight",
     hook: "wordBlaze", stat: "premiumBlock", quote: "editorialSerif",
   };
-  return map[intent] || "tiktokClean";
+  return map[dominant] || "wordBlaze";
 }
 
 function chooseCaptionAnimation(intent, energy = 0.5) {
@@ -77,7 +85,8 @@ function chooseCaptionAnimation(intent, energy = 0.5) {
   return map[intent] || "fade";
 }
 
-function chooseCaptionPosition(index, total, energy) {
+function chooseCaptionPosition(layoutId, index, total, energy) {
+  // "middle" for high energy mid-video beats, otherwise "bottom"
   if (index === 0 || index === total - 1) return "bottom";
   if (energy >= 0.8) return "middle";
   return "bottom";
@@ -173,37 +182,23 @@ function fillTextZones(beats) {
 
     if (!textZones.length) return beat;
 
-    const zones  = { ...beat.zones };
-    const spoken = beat.spoken || "";
+    const zones = { ...beat.zones };
 
-    // Extract first ~4 words as a short hook for secondary zones
-    const shortHook = spoken.split(/\s+/).slice(0, 4).join(" ");
-    // Extract last sentence fragment as supporting text
-    const sentences = spoken.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
-    const supporting = sentences.length > 1 ? sentences[sentences.length - 1] : shortHook;
-
+    // text-order-1 gets the main spoken text
+    // additional text zones left empty for now (AI fill in future)
     textZones.forEach((zoneDef, i) => {
       const existing = zones[zoneDef.id];
-      const hasText  = existing?.content?.text;
-      if (hasText) return;
-
-      let defaultText = "";
-      if (i === 0) {
-        // Primary text zone — full spoken
-        defaultText = spoken;
-      } else if (i === 1) {
-        // Secondary — shorter supporting line
-        defaultText = supporting;
-      } else {
-        // Tertiary+ — short hook
-        defaultText = shortHook;
+      const hasText = existing?.content?.text;
+      if (!hasText) {
+        zones[zoneDef.id] = {
+          ...existing,
+          content: {
+            kind: "text",
+            text: i === 0 ? beat.spoken : "",
+          },
+          style: { ...(existing?.style || {}), ...zoneDef.style },
+        };
       }
-
-      zones[zoneDef.id] = {
-        ...existing,
-        content: { kind: "text", text: defaultText },
-        style:   { ...(existing?.style || {}), ...zoneDef.style },
-      };
     });
 
     return { ...beat, zones };
@@ -260,6 +255,8 @@ export async function buildBeatsFromScript({
   }
 
   const total = sourceBeats.length;
+  // Pick ONE caption style for the entire video for consistency
+  const videoCaptionStyle = pickVideoCaptionStyle(sourceBeats);
   let currentStart           = 0;
   let previousLayout         = null;
   let previousPreviousLayout = null;
@@ -292,7 +289,9 @@ export async function buildBeatsFromScript({
     const z1Motion = visual.zones?.z1?.content?.asset?.motion;
     if (z1Motion) lastMotion = z1Motion;
 
-    const captionPosition = chooseCaptionPosition(index, total, energy);
+    const captionStrategy  = layoutRegistry[visual.layout]?.captionStrategy ?? "always";
+    const captionShowDefault = captionStrategy === "never" ? false : true;
+    const captionPosition  = chooseCaptionPosition(visual.layout, index, total, energy);
 
     const overlays = autoAssignOverlays({
       intent, energy,
@@ -329,9 +328,9 @@ export async function buildBeatsFromScript({
       block_props: item.block_props || null,
 
       caption: {
-        show:           true,
+        show:           captionShowDefault,
         text:           generateCaptionText(spoken),
-        style:          chooseCaptionStyle(intent, energy),
+        style:          videoCaptionStyle,
         animation:      chooseCaptionAnimation(intent, energy),
         position:       captionPosition,
         emphasis_words: item.emphasis_words || [],

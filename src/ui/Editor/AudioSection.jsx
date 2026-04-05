@@ -344,9 +344,24 @@ function MusicTrack({ audio, onSelectLibrary, onUpload, onRemove, onVolumeChange
   );
 }
 
+/* ── Shared sync helper — auto-called after TTS set ── */
+async function autoSyncBeats(ttsSrc, project) {
+  if (!ttsSrc || !project) return null;
+  try {
+    const duration = await measureAudioDuration(ttsSrc);
+    const synced   = syncBeatsToTTS(project.beats, duration);
+    return { beats: synced, duration };
+  } catch (e) {
+    console.error("Auto-sync failed", e);
+    return null;
+  }
+}
+
 /* ── Main export ── */
 export default function AudioSection() {
   const project           = useProjectStore((s) => s.project);
+  const setProject        = useProjectStore((s) => s.setProject);
+  const databaseId        = useProjectStore((s) => s.databaseId);
   const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
   const [uploading, setUploading] = useState({ tts: false, music: false });
@@ -370,7 +385,24 @@ export default function AudioSection() {
       const blob = await compressedRes.blob();
       const compressedFile = new File([blob], "compressed.m4a", { type: "audio/mp4" });
       const uploaded = await uploadUserAsset(compressedFile, null, pct => setProgress(p => ({ ...p, [type]: pct })));
-      updateProjectMeta({ audio: { ...audio, [type]: { src: uploaded.url, volume: type === "music" ? 0.12 : 1 } } });
+
+      const newAudio = { ...audio, [type]: { src: uploaded.url, volume: type === "music" ? 0.12 : 1 } };
+      updateProjectMeta({ audio: newAudio });
+
+      // Auto-sync beats when TTS is uploaded
+      if (type === "tts") {
+        setSyncing(true);
+        setSyncMsg("Auto-syncing beats...");
+        const result = await autoSyncBeats(uploaded.url, project);
+        if (result) {
+          const newProject = { ...project, audio: newAudio, beats: result.beats };
+          setProject(newProject);
+          const { updateProject } = await import("../../services/projects/projectService");
+          if (databaseId) await updateProject(databaseId, newProject);
+          setSyncMsg(`✓ Auto-synced to ${result.duration.toFixed(1)}s`);
+        }
+        setSyncing(false);
+      }
     } catch (e) {
       console.error("Audio upload failed", e);
     } finally {
@@ -392,25 +424,17 @@ export default function AudioSection() {
     if (!audio?.tts?.src) return;
     setSyncing(true);
     setSyncMsg("");
-    try {
-      const duration = await measureAudioDuration(audio.tts.src);
-      const synced   = syncBeatsToTTS(project.beats, duration);
-      // Update all beats via store
-      const { useProjectStore: store } = await import("../../store/useProjectStore");
-      const updateProject = store.getState().updateProjectMeta;
-      // Use direct project update
-      const { updateProject: dbUpdate } = await import("../../services/projects/projectService");
-      const databaseId = store.getState().databaseId;
-      const newProject = { ...project, beats: synced };
-      store.getState().setProject(newProject);
-      if (databaseId) await dbUpdate(databaseId, newProject);
-      setSyncMsg(`✓ Synced to ${duration.toFixed(1)}s TTS`);
-    } catch (e) {
+    const result = await autoSyncBeats(audio.tts.src, project);
+    if (result) {
+      const newProject = { ...project, beats: result.beats };
+      setProject(newProject);
+      const { updateProject } = await import("../../services/projects/projectService");
+      if (databaseId) await updateProject(databaseId, newProject);
+      setSyncMsg(`✓ Synced to ${result.duration.toFixed(1)}s TTS`);
+    } else {
       setSyncMsg("Sync failed — check TTS audio");
-      console.error(e);
-    } finally {
-      setSyncing(false);
     }
+    setSyncing(false);
   };
 
   const setVolume   = (type, volume) =>
@@ -426,7 +450,22 @@ export default function AudioSection() {
           onUpload={f => uploadAudio(f, "tts")}
           onRemove={() => removeAudio("tts")}
           onVolumeChange={v => setVolume("tts", v)}
-          onGenerated={ttsData => updateProjectMeta({ audio: { ...audio, tts: ttsData } })}
+        onGenerated={async (ttsData) => {
+          const newAudio = { ...audio, tts: ttsData };
+          updateProjectMeta({ audio: newAudio });
+          // Auto-sync beats to new TTS duration
+          setSyncing(true);
+          setSyncMsg("Auto-syncing beats...");
+          const result = await autoSyncBeats(ttsData.src, project);
+          if (result) {
+            const newProject = { ...project, audio: newAudio, beats: result.beats };
+            setProject(newProject);
+            const { updateProject } = await import("../../services/projects/projectService");
+            if (databaseId) await updateProject(databaseId, newProject);
+            setSyncMsg(`✓ Auto-synced to ${result.duration.toFixed(1)}s`);
+          }
+          setSyncing(false);
+        }}
           uploading={uploading.tts}
           progress={progress.tts}
         />
