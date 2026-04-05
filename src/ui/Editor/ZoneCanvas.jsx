@@ -2,7 +2,7 @@
  * ZoneCanvas.jsx
  * src/ui/Editor/canvas/ZoneCanvas.jsx
  */
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useRef } from "react";
 import { useProjectStore } from "../../../src/store/useProjectStore";
 import { getLayoutDef } from "../../../src/core/layoutRegistry";
 import ZoneHandle from "./ZoneHandle";
@@ -77,13 +77,24 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
 );
 
 export default function ZoneCanvas({
-  beat, selectedZoneId, onSelectZone,
-  // Explicit pixel dimensions passed from CanvasPreview — no recalculation
+  beat, selectedZoneIds, onSelectZone,
   canvasW, canvasH, canvasScale,
 }) {
-  const updateBeat = useProjectStore((s) => s.updateBeat);
-  const layoutDef  = getLayoutDef(beat?.layout);
-  const beatZones  = beat?.zones || {};
+  const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
+  const _pushHistory     = useProjectStore((s) => s._pushHistory);
+  const databaseId       = useProjectStore((s) => s.databaseId);
+  const layoutDef        = getLayoutDef(beat?.layout);
+  const beatZones        = beat?.zones || {};
+
+  // Derive single selectedZoneId for backward compat
+  const selectedZoneId = selectedZoneIds instanceof Set
+    ? (selectedZoneIds.size === 1 ? [...selectedZoneIds][0] : null)
+    : selectedZoneIds;
+
+  const beatZonesRef       = useRef(beatZones);
+  const beatIdRef          = useRef(beat?.id);
+  beatZonesRef.current     = beatZones;
+  beatIdRef.current        = beat?.id;
 
   const defZoneIds = new Set((layoutDef?.zones || []).map(z => z.id));
 
@@ -110,9 +121,27 @@ export default function ZoneCanvas({
   const allZones = [...defZones, ...extraZones];
 
   const handleUpdate = useCallback((zoneId, updates) => {
-    const existing = beatZones[zoneId] || {};
-    updateBeat(beat.id, { zones: { ...beatZones, [zoneId]: { ...existing, ...updates } } });
-  }, [beat.id, beatZones, updateBeat]);
+    const bz = beatZonesRef.current;
+    const existing = bz[zoneId] || {};
+    updateBeatSilent(beatIdRef.current, { zones: { ...bz, [zoneId]: { ...existing, ...updates } } });
+  }, [updateBeatSilent]);
+
+  const handleUpdateMulti = useCallback((patchMap) => {
+    const bz = beatZonesRef.current;
+    const newZones = { ...bz };
+    for (const [id, patch] of Object.entries(patchMap)) {
+      newZones[id] = { ...(bz[id] || {}), ...patch };
+    }
+    updateBeatSilent(beatIdRef.current, { zones: newZones });
+  }, [updateBeatSilent]);
+
+  const handlePushHistory = useCallback(() => _pushHistory(), [_pushHistory]);
+
+  const handleSave = useCallback(async () => {
+    const { updateProject } = await import("../../../src/services/projects/projectService");
+    const project = useProjectStore.getState().project;
+    if (project && databaseId) updateProject(databaseId, project);
+  }, [databaseId]);
 
   const handleCanvasClick = useCallback((e) => {
     if (e.target === e.currentTarget) onSelectZone(null);
@@ -171,9 +200,18 @@ export default function ZoneCanvas({
       })}
       {allZones.map(zone => (
         <ZoneHandle key={`handle_${zone.id}`} zone={zone}
-          isSelected={selectedZoneId === zone.id}
+          isSelected={selectedZoneIds instanceof Set
+            ? selectedZoneIds.has(zone.id)
+            : selectedZoneId === zone.id}
           canvasWidth={canvasW} canvasHeight={canvasH}
-          onSelect={onSelectZone} onUpdate={handleUpdate} />
+          onSelect={onSelectZone}
+          onUpdate={handleUpdate}
+          onUpdateMulti={handleUpdateMulti}
+          onPushHistory={handlePushHistory}
+          onSave={handleSave}
+          selectedZoneIds={selectedZoneIds instanceof Set ? selectedZoneIds : null}
+          allZones={allZones}
+        />
       ))}
       {allZones.filter(z => (z.start || 0) > 0).map(zone => (
         <div key={`delay_${zone.id}`} style={{
