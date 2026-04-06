@@ -24,7 +24,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
 
   const selectedZoneDef  = zoneDefs.find(z => z.id === selectedZoneId) || null;
   const selectedZoneData = zones[selectedZoneId] || {};
-  const selectedZoneType = selectedZoneDef?.type || selectedZoneData.type || "asset";
+  const selectedZoneType = selectedZoneData.type || selectedZoneDef?.type || "asset";
 
   const beatOverlays = Array.isArray(beat.overlays) ? beat.overlays : [];
 
@@ -121,11 +121,21 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
 
   const setContent = (slot, data) => {
     data = normalizeAsset(data);
-    if (data.kind === "block") { updateZone(slot, { content: { kind: "block", block: data.block } }); return; }
-    if (data.kind === "color") { updateZone(slot, { content: { kind: "color", color: data.color } }); return; }
+    if (data.kind === "text") {
+      updateZone(slot, { type: "text", content: { kind: "text", text: data.text || "" } });
+      return;
+    }
+    if (data.kind === "block") {
+      updateZone(slot, { type: "asset", content: { kind: "block", block: data.block } });
+      return;
+    }
+    if (data.kind === "color") {
+      updateZone(slot, { type: "asset", content: { kind: "color", color: data.color } });
+      return;
+    }
     if (data.kind === "asset") {
       const existing = zones[slot]?.content?.asset || {};
-      updateZone(slot, { content: { kind: "asset", asset: {
+      updateZone(slot, { type: "asset", content: { kind: "asset", asset: {
         src: data.asset.src, type: data.asset.type,
         objectFit:       existing.objectFit       || "cover",
         motion:          existing.motion          || "kenburns",
@@ -155,6 +165,12 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
   const setZoneStyleSilent = (slot, key, value) => updateZoneSilent(slot, { style: { ...(zones[slot]?.style || {}), [key]: value } });
   const setZoneLayout       = (slot, key, value) => updateZone(slot,       { [key]: value });
   const setZoneLayoutSilent = (slot, key, value) => updateZoneSilent(slot, { [key]: value });
+
+  const updateBlockProp = (slot, key, val) => {
+    const content = zones[slot]?.content || {};
+    const block   = content.block || {};
+    updateZone(slot, { content: { ...content, block: { ...block, props: { ...(block.props || {}), [key]: val } } } });
+  };
 
   const clearContent    = (slot) => updateZone(slot, { content: {} });
   const clearBackground = (slot) => updateZone(slot, { background: {} });
@@ -225,6 +241,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
             updateTextStyle={updateTextStyle}
             updateTextStyleBulk={updateTextStyleBulk}
             updateContentProp={updateContentProp}
+            updateBlockProp={updateBlockProp}
             updateBackgroundProp={updateBackgroundProp}
             setZoneStyle={setZoneStyle}
             setZoneStyleSilent={setZoneStyleSilent}

@@ -13,19 +13,22 @@ import CanvasPreview from "../ui/Editor/CanvasPreview";
 export default function Editor() {
   const { id } = useParams();
 
-  const setProject = useProjectStore((s) => s.setProject);
-  const setDatabaseId = useProjectStore((s) => s.setDatabaseId);
+  const setProject     = useProjectStore((s) => s.setProject);
+  const setDatabaseId  = useProjectStore((s) => s.setDatabaseId);
+  const setProjectName = useProjectStore((s) => s.setProjectName);
   const project = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("beats");
+  const [beatTab, setBeatTab] = useState("layout");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
 
   useEffect(() => {
     async function load() {
       const data = await getProjectById(id);
       setDatabaseId(data.id);
+      setProjectName(data.name);
       setProject(data.safe_project_json);
       setLoading(false);
     }
@@ -56,6 +59,9 @@ export default function Editor() {
       setSelectedZoneIds(new Set());
       return;
     }
+    // Auto-switch sidebar to Beats tab and BeatEditor to Zones tab
+    setActiveTab("beats");
+    setBeatTab("zones");
     if (modifierHeld) {
       setSelectedZoneIds((prev) => {
         const next = new Set(prev);
@@ -68,27 +74,36 @@ export default function Editor() {
     }
   };
 
+  const is169 = project.meta?.orientation === "16:9";
+
+  // Widen canvas column for landscape so the 16:9 preview has enough height
+  const cols = is169
+    ? { sidebar: "5%", beatList: "13%", canvas: "44%", panel: "38%" }
+    : { sidebar: "7%", beatList: "18%", canvas: "35%", panel: "40%" };
+
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
       <SystemMessage />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="w-[7%]">
+        <div style={{ width: cols.sidebar }}>
           <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
 
-        <div className="w-[18%]">
+        <div style={{ width: cols.beatList }}>
           <BeatList setActiveTab={setActiveTab} />
         </div>
 
-        <div className="w-[35%]">
+        <div style={{ width: cols.canvas }}>
           <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} onDeleteZone={handleDeleteZone} />
         </div>
 
-        <div className="w-[40%]">
+        <div style={{ width: cols.panel }}>
           <EditorPanel
             activeTab={activeTab}
             setActiveTab={setActiveTab}
+            beatTab={beatTab}
+            setBeatTab={setBeatTab}
             selectedZoneId={selectedZoneId}
             selectedZoneIds={selectedZoneIds}
             onSelectZone={handleSelectZone}

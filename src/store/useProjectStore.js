@@ -54,10 +54,12 @@ export const useProjectStore = create((set, get) => ({
   project:      null,
   activeBeatId: null,
   databaseId:   null,
+  projectName:  null,
   _history:     [],
   _future:      [],
 
-  setDatabaseId: (id) => set({ databaseId: id }),
+  setDatabaseId:  (id)   => set({ databaseId: id }),
+  setProjectName: (name) => set({ projectName: name }),
 
   setProject: (rawProject) => {
     const safeProject = buildSafeProject(rawProject);

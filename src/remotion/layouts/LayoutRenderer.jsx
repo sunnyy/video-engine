@@ -355,6 +355,7 @@ export default function LayoutRenderer({ beat, project, layoutDef }) {
     if (o.hidden) return [];
     return [{
       ...d,
+      type:           o.type           ?? d.type,
       x:              o.x              ?? d.x,
       y:              o.y              ?? d.y,
       width:          o.width          ?? d.width,

@@ -2,7 +2,7 @@
  * AudioSection.jsx
  * src/ui/Editor/AudioSection.jsx
  */
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useProjectStore }  from "../../store/useProjectStore";
 import { uploadUserAsset }  from "../../services/assets/uploadUserAsset";
 import { MUSIC_LIBRARY, MUSIC_KEYS, MUSIC_PREVIEW_URLS } from "../../core/musicRegistry";
@@ -48,17 +48,64 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
   const audioRef = useRef(null);
   const fileRef  = useRef(null);
 
-  const togglePlay = () => {
+  const ctxRef    = useRef(null);
+  const sourceRef = useRef(null);
+
+  const stopAudio = () => {
+    try { sourceRef.current?.stop(); } catch (_) {}
+    sourceRef.current = null;
+    ctxRef.current?.close();
+    ctxRef.current = null;
+  };
+
+  const togglePlay = async () => {
     if (!audio?.src) return;
     if (playing) {
-      audioRef.current?.pause();
+      stopAudio();
       setPlaying(false);
-    } else {
-      audioRef.current = new window.Audio(audio.src);
-      audioRef.current.volume = audio.volume ?? 1;
-      audioRef.current.play();
-      audioRef.current.onended = () => setPlaying(false);
+      return;
+    }
+
+    // Create + resume AudioContext synchronously inside click handler —
+    // BEFORE any awaits so Chrome doesn't suspend it under autoplay policy
+    const ctx = new AudioContext();
+    ctxRef.current = ctx;
+    // Kick it alive now while we're still in the user-gesture stack
+    await ctx.resume();
+
+    try {
       setPlaying(true);
+
+      // Read volume FRESH from store — avoids stale closure if slider was moved rapidly
+      const liveVol = useProjectStore.getState().project?.audio?.tts?.volume ?? audio.volume ?? 1;
+      console.log("[TTS preview] gain =", liveVol, "src =", audio.src);
+
+      const resp    = await fetch(audio.src);
+      const buf     = await resp.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(buf);
+
+      // Resume again after async gap — Chrome can re-suspend
+      if (ctx.state !== "running") await ctx.resume();
+
+      if (!ctxRef.current) return; // user stopped while loading
+
+      const source = ctx.createBufferSource();
+      source.buffer = decoded;
+
+      const gain = ctx.createGain();
+      gain.gain.value = liveVol;
+
+      source.connect(gain);
+      gain.connect(ctx.destination);
+
+      sourceRef.current = source;
+      source.start(ctx.currentTime);
+      source.onended = () => { setPlaying(false); ctx.close(); ctxRef.current = null; };
+    } catch (err) {
+      console.error("[TTS preview]", err);
+      setPlaying(false);
+      ctx.close();
+      ctxRef.current = null;
     }
   };
 
@@ -90,7 +137,7 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
       const uploaded = await uploadUserAsset(file, null, () => {});
 
       // Step 3 — Store Supabase URL on project
-      onGenerated({ src: uploaded.url, volume: 1, generated: true, voice: selectedVoice });
+      onGenerated({ src: uploaded.url, volume: 2, generated: true, voice: selectedVoice });
       setShowGenerate(false);
     } catch (e) {
       setError(e.message || "Generation failed");
@@ -222,7 +269,7 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
               <Label>Volume</Label>
               <span className="text-[12px] font-mono text-[#7070a0]">{Math.round((audio.volume ?? 1) * 100)}%</span>
             </div>
-            <input type="range" min={0} max={3} step={0.01} value={audio.volume ?? 1}
+            <input type="range" min={0} max={6} step={0.01} value={audio.volume ?? 1}
               onChange={e => onVolumeChange(Number(e.target.value))}
               className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 2 }} />
           </div>

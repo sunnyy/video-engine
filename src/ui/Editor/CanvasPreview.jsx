@@ -37,6 +37,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const fps            = project.meta.fps || 25;
   const videoW         = project.meta.width  || 1080;
   const videoH         = project.meta.height || 1920;
+  const is169          = project.meta.orientation === "16:9";
   const durationFrames = Math.max(1, Math.floor((project.duration_sec || 1) * fps));
   const activeBeat     = project.beats.find(b => b.id === activeBeatId);
 
@@ -96,6 +97,17 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     setShowPlayer(false);
   }, []);
 
+  const handleRestart = useCallback(() => {
+    setShowPlayer(true);
+    setIsPlaying(true);
+    hasPlayedOnce.current = true;
+    setTimeout(() => {
+      if (!playerRef.current) return;
+      playerRef.current.seekTo(0);
+      playerRef.current.play();
+    }, 60);
+  }, []);
+
   const handlePlay = useCallback(() => {
     setShowPlayer(true);
     setIsPlaying(true);
@@ -142,8 +154,9 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
 
       if (isTyping) return;
 
-      // ESC — deselect zone (always, no zone needed)
+      // ESC — deselect zone, but not if a modal is open
       if (e.code === "Escape") {
+        if (document.querySelector("[data-modal]")) return;
         onSelectZoneRef.current(null);
         return;
       }
@@ -247,35 +260,55 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       </div>
 
       {/* Canvas area */}
-      <div ref={containerRef} className="flex-1 relative flex items-center justify-center overflow-hidden p-2">
+      <div ref={containerRef} className="flex-1 relative flex items-start justify-center overflow-hidden p-2">
 
-        {/* Static edit canvas — Thumbnail behind zone handles */}
+        {/* Static edit canvas — Thumbnail + ZoneCanvas + controls */}
         {activeBeat && !showPlayer && (
-          <div style={{ position: "relative", width: canvasW, height: canvasH }}>
-            {/* Actual composition rendered as still frame */}
-            <Thumbnail
-              acknowledgeRemotionLicense
-              component={VideoComposition}
-              inputProps={{ project }}
-              frameToDisplay={Math.max(0, Math.floor((activeBeat.start_sec || 0) * fps))}
-              compositionWidth={videoW}
-              compositionHeight={videoH}
-              fps={fps}
-              durationInFrames={durationFrames}
-              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", display: "block" }}
-            />
-            {/* Zone drag/resize handles on top */}
-            <div style={{ position: "absolute", inset: 0 }}>
-              <ZoneCanvas
-                beat={activeBeat}
-                selectedZoneIds={selectedZoneIds}
-                onSelectZone={handleSelectZone}
-                canvasW={canvasW}
-                canvasH={canvasH}
-                canvasScale={scale}
-                videoOverlays={project.overlays || []}
-                onUpdateVideoOverlay={handleUpdateVideoOverlay}
+          <div
+            className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
+          >
+            {/* Canvas */}
+            <div style={{ position: "relative", width: canvasW, height: canvasH }}>
+              <Thumbnail
+                key={`thumb-${videoW}x${videoH}`}
+                acknowledgeRemotionLicense
+                component={VideoComposition}
+                inputProps={{ project }}
+                frameToDisplay={Math.floor((activeBeat.start_sec || 0) * fps) + 20}
+                compositionWidth={videoW}
+                compositionHeight={videoH}
+                fps={fps}
+                durationInFrames={durationFrames}
+                style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", display: "block" }}
               />
+              <div style={{ position: "absolute", inset: 0 }}>
+                <ZoneCanvas
+                  beat={activeBeat}
+                  selectedZoneIds={selectedZoneIds}
+                  onSelectZone={handleSelectZone}
+                  canvasW={canvasW}
+                  canvasH={canvasH}
+                  canvasScale={scale}
+                  videoOverlays={project.overlays || []}
+                  onUpdateVideoOverlay={handleUpdateVideoOverlay}
+                />
+              </div>
+            </div>
+
+            {/* Controls — right side for 9:16, bottom for 16:9 */}
+            <div className={`flex gap-2 ${is169 ? "flex-row" : "flex-col"}`}>
+              <button onClick={handlePlay}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white border-0 cursor-pointer transition-all hover:scale-110 text-[16px]"
+                style={{ background: "rgba(124,92,252,0.85)", backdropFilter: "blur(8px)" }}
+                title="Play">
+                ▶
+              </button>
+              <button onClick={handleRestart}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white border-0 cursor-pointer transition-all hover:scale-110 text-[16px]"
+                style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}
+                title="Restart">
+                ↺
+              </button>
             </div>
           </div>
         )}
@@ -288,40 +321,42 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         <div style={{
           display:  showPlayer ? "flex" : "none",
           position: "absolute", inset: 0,
-          alignItems: "center", justifyContent: "center",
+          alignItems: "flex-start", justifyContent: "center",
           background: "#111118", zIndex: 50,
+          padding: 8,
         }}>
-          <Player
-            ref={playerRef}
-            acknowledgeRemotionLicense
-            component={VideoComposition}
-            inputProps={{ project }}
-            durationInFrames={durationFrames}
-            compositionWidth={videoW}
-            compositionHeight={videoH}
-            fps={fps}
-            controls={false}
-            style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden" }}
-          />
+          <div className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}>
+            <Player
+              key={`player-${videoW}x${videoH}`}
+              ref={playerRef}
+              acknowledgeRemotionLicense
+              component={VideoComposition}
+              inputProps={{ project }}
+              durationInFrames={durationFrames}
+              compositionWidth={videoW}
+              compositionHeight={videoH}
+              fps={fps}
+              controls={false}
+              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden" }}
+            />
+
+            {/* Controls — right side for 9:16, bottom for 16:9 */}
+            <div className={`flex gap-2 ${is169 ? "flex-row" : "flex-col"}`}>
+              <button onClick={handlePause}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white border-0 cursor-pointer transition-all hover:scale-110 text-[16px]"
+                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
+                title="Pause">
+                ⏸
+              </button>
+              <button onClick={handleRestart}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white border-0 cursor-pointer transition-all hover:scale-110 text-[16px]"
+                style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}
+                title="Restart">
+                ↺
+              </button>
+            </div>
+          </div>
         </div>
-
-        {/* Play button */}
-        {!showPlayer && (
-          <button onClick={handlePlay}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-[7px] rounded-full text-[12px] font-bold text-white border-0 cursor-pointer transition-all hover:scale-105"
-            style={{ background: "rgba(124,92,252,0.85)", backdropFilter: "blur(8px)", zIndex: 10 }}>
-            ▶ Play
-          </button>
-        )}
-
-        {/* Pause button */}
-        {showPlayer && (
-          <button onClick={handlePause}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-[7px] rounded-full text-[12px] font-bold text-white border-0 cursor-pointer transition-all hover:scale-105"
-            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", zIndex: 60 }}>
-            ⏸ Pause
-          </button>
-        )}
 
       </div>
     </div>

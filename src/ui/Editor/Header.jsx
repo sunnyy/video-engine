@@ -1,10 +1,7 @@
 /**
  * Header.jsx
- * src/ui/Editor/Header.jsx
- * #17 — orientation toggle fix + project dropdown
- * #18 — back to dashboard
  */
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProjectStore } from "../../store/useProjectStore";
 import { getUserProjects, renameProject } from "../../services/projects/projectService";
@@ -15,6 +12,8 @@ export default function Header() {
   const project           = useProjectStore((s) => s.project);
   const databaseId        = useProjectStore((s) => s.databaseId);
   const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
+  const storedName        = useProjectStore((s) => s.projectName);
+  const setProjectName    = useProjectStore((s) => s.setProjectName);
 
   const [resolution,   setResolution]   = useState("1080p");
   const [progress,     setProgress]     = useState(null);
@@ -25,15 +24,11 @@ export default function Header() {
   const [nameVal,      setNameVal]      = useState("");
   const dropdownRef = useRef(null);
 
-  if (!project) return null;
-
-  const projectName = project.meta?.name || "Untitled Project";
-
+  // These MUST be above any conditional returns (React hooks rules)
   useEffect(() => {
     getUserProjects().then(setProjectList).catch(() => {});
   }, []);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -43,6 +38,10 @@ export default function Header() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  if (!project) return null;
+
+  const projectName = storedName || "Untitled Project";
 
   const handleModeChange = (mode) => {
     if (mode === project.meta.mode) return;
@@ -64,7 +63,7 @@ export default function Header() {
   const handleRename = async () => {
     if (!nameVal.trim() || !databaseId) return;
     await renameProject(databaseId, nameVal.trim());
-    updateProjectMeta({ name: nameVal.trim() });
+    setProjectName(nameVal.trim());
     setRenaming(false);
   };
 

@@ -1,329 +1,333 @@
 /**
  * backgroundPatternRegistry.js
  * src/core/backgroundPatternRegistry.js
- *
- * Every entry has full metadata so the director can pick intelligently:
- *   brightness  → "dark" | "mid" | "light"
- *   mood        → emotional quality of the background
- *   works_with  → what block/text colors work ON TOP of this
- *   intent      → which beat intents this background suits
- *   energy      → "high" | "medium" | "low"
  */
 
 export const backgroundPatternRegistry = {
 
-  /* ── DARK SOLIDS ─────────────────────────────────────────── */
+  /* ── BRIGHT SOLIDS ───────────────────────────────────────── */
 
-  pureBlack: {
-    style:       { background: "#000000" },
-    brightness:  "dark",
-    mood:        "dramatic",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow", "cyan"],
-    intent:      ["shock", "urgency", "reveal", "punchline"],
+  crimson: {
+    style:      { background: "#dc2626" },
+    brightness: "mid", mood: "intense", energy: "high",
+    works_with: ["white", "black", "yellow"],
+    intent:     ["shock", "urgency", "contrast"],
   },
-  inkBlack: {
-    style:       { background: "#0b0b14" },
-    brightness:  "dark",
-    mood:        "cinematic",
-    energy:      "medium",
-    works_with:  ["light", "white", "yellow", "purple"],
-    intent:      ["shock", "curiosity", "reveal", "contrast"],
+  scarlet: {
+    style:      { background: "#e11d48" },
+    brightness: "mid", mood: "bold", energy: "high",
+    works_with: ["white", "black", "yellow"],
+    intent:     ["shock", "urgency", "punchline"],
   },
+  orange: {
+    style:      { background: "#ea580c" },
+    brightness: "mid", mood: "energetic", energy: "high",
+    works_with: ["white", "black", "dark"],
+    intent:     ["urgency", "punchline", "curiosity"],
+  },
+  amber: {
+    style:      { background: "#d97706" },
+    brightness: "mid", mood: "warm", energy: "high",
+    works_with: ["dark", "black", "white"],
+    intent:     ["punchline", "proof", "urgency"],
+  },
+  sunYellow: {
+    style:      { background: "#eab308" },
+    brightness: "light", mood: "punchy", energy: "high",
+    works_with: ["dark", "black", "navy"],
+    intent:     ["punchline", "shock", "curiosity"],
+  },
+  lime: {
+    style:      { background: "#84cc16" },
+    brightness: "light", mood: "fresh", energy: "high",
+    works_with: ["dark", "black", "navy"],
+    intent:     ["punchline", "proof", "curiosity"],
+  },
+  emerald: {
+    style:      { background: "#10b981" },
+    brightness: "mid", mood: "growth", energy: "medium",
+    works_with: ["white", "dark", "black"],
+    intent:     ["proof", "empathy", "explanation"],
+  },
+  teal: {
+    style:      { background: "#14b8a6" },
+    brightness: "mid", mood: "calm", energy: "medium",
+    works_with: ["white", "dark", "black"],
+    intent:     ["explanation", "proof", "curiosity"],
+  },
+  sky: {
+    style:      { background: "#0ea5e9" },
+    brightness: "mid", mood: "open", energy: "medium",
+    works_with: ["white", "dark", "black"],
+    intent:     ["explanation", "curiosity", "empathy"],
+  },
+  cobalt: {
+    style:      { background: "#2563eb" },
+    brightness: "mid", mood: "serious", energy: "medium",
+    works_with: ["white", "yellow", "light"],
+    intent:     ["proof", "explanation", "curiosity"],
+  },
+  violet: {
+    style:      { background: "#7c3aed" },
+    brightness: "mid", mood: "creative", energy: "high",
+    works_with: ["white", "yellow", "light"],
+    intent:     ["curiosity", "reveal", "punchline"],
+  },
+  purple: {
+    style:      { background: "#9333ea" },
+    brightness: "mid", mood: "playful", energy: "high",
+    works_with: ["white", "yellow", "light"],
+    intent:     ["curiosity", "irony", "punchline"],
+  },
+  hotPink: {
+    style:      { background: "#ec4899" },
+    brightness: "mid", mood: "vibrant", energy: "high",
+    works_with: ["white", "dark", "black"],
+    intent:     ["punchline", "curiosity", "irony"],
+  },
+  coral: {
+    style:      { background: "#f43f5e" },
+    brightness: "mid", mood: "lively", energy: "high",
+    works_with: ["white", "dark", "black"],
+    intent:     ["urgency", "punchline", "shock"],
+  },
+
+  /* ── DARK SOLIDS (kept minimal) ──────────────────────────── */
+
   charcoal: {
-    style:       { background: "#111118" },
-    brightness:  "dark",
-    mood:        "structured",
-    energy:      "medium",
-    works_with:  ["light", "white", "yellow", "teal"],
-    intent:      ["proof", "explanation", "contrast"],
-  },
-  graphite: {
-    style:       { background: "#1a1a24" },
-    brightness:  "dark",
-    mood:        "neutral",
-    energy:      "low",
-    works_with:  ["light", "white", "orange"],
-    intent:      ["explanation", "empathy", "proof"],
+    style:      { background: "#111118" },
+    brightness: "dark", mood: "structured", energy: "medium",
+    works_with: ["light", "white", "yellow", "teal"],
+    intent:     ["proof", "explanation", "contrast"],
   },
   deepNavy: {
-    style:       { background: "#0a0e1a" },
-    brightness:  "dark",
-    mood:        "serious",
-    energy:      "medium",
-    works_with:  ["light", "white", "yellow", "cyan"],
-    intent:      ["proof", "curiosity", "explanation"],
+    style:      { background: "#0f172a" },
+    brightness: "dark", mood: "serious", energy: "medium",
+    works_with: ["light", "white", "yellow", "cyan"],
+    intent:     ["proof", "curiosity", "explanation"],
   },
-  deepPlum: {
-    style:       { background: "#0e0714" },
-    brightness:  "dark",
-    mood:        "mysterious",
-    energy:      "medium",
-    works_with:  ["light", "white", "pink", "gold"],
-    intent:      ["curiosity", "reveal", "irony"],
-  },
-  deepBurgundy: {
-    style:       { background: "#120508" },
-    brightness:  "dark",
-    mood:        "intense",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow"],
-    intent:      ["shock", "urgency", "contrast"],
+  richBlack: {
+    style:      { background: "#09090b" },
+    brightness: "dark", mood: "dramatic", energy: "high",
+    works_with: ["light", "white", "yellow", "cyan"],
+    intent:     ["shock", "urgency", "reveal"],
   },
 
   /* ── LIGHT SOLIDS ────────────────────────────────────────── */
 
   warmCream: {
-    style:       { background: "#f7f3ea" },
-    brightness:  "light",
-    mood:        "warm",
-    energy:      "low",
-    works_with:  ["dark", "black", "brown", "navy"],
-    intent:      ["empathy", "explanation", "story"],
+    style:      { background: "#fef3c7" },
+    brightness: "light", mood: "warm", energy: "low",
+    works_with: ["dark", "black", "brown", "navy"],
+    intent:     ["empathy", "explanation", "story"],
   },
   softWhite: {
-    style:       { background: "#f5f5f0" },
-    brightness:  "light",
-    mood:        "clean",
-    energy:      "low",
-    works_with:  ["dark", "black", "purple", "navy"],
-    intent:      ["explanation", "proof", "empathy"],
+    style:      { background: "#f8fafc" },
+    brightness: "light", mood: "clean", energy: "low",
+    works_with: ["dark", "black", "purple", "navy"],
+    intent:     ["explanation", "proof", "empathy"],
   },
-  lavenderLight: {
-    style:       { background: "#ddd6f3" },
-    brightness:  "light",
-    mood:        "playful",
-    energy:      "medium",
-    works_with:  ["dark", "purple", "navy"],
-    intent:      ["curiosity", "punchline", "empathy"],
-  },
-  skyLight: {
-    style:       { background: "#dcebfa" },
-    brightness:  "light",
-    mood:        "calm",
-    energy:      "low",
-    works_with:  ["dark", "navy", "black"],
-    intent:      ["explanation", "empathy", "proof"],
+  blushPink: {
+    style:      { background: "#fce7f3" },
+    brightness: "light", mood: "gentle", energy: "low",
+    works_with: ["dark", "purple", "navy"],
+    intent:     ["empathy", "story", "curiosity"],
   },
   mintLight: {
-    style:       { background: "#d9f0e3" },
-    brightness:  "light",
-    mood:        "fresh",
-    energy:      "low",
-    works_with:  ["dark", "green", "black"],
-    intent:      ["proof", "punchline", "empathy"],
+    style:      { background: "#d1fae5" },
+    brightness: "light", mood: "fresh", energy: "low",
+    works_with: ["dark", "green", "black"],
+    intent:     ["proof", "punchline", "empathy"],
+  },
+  lavenderLight: {
+    style:      { background: "#ede9fe" },
+    brightness: "light", mood: "playful", energy: "medium",
+    works_with: ["dark", "purple", "navy"],
+    intent:     ["curiosity", "punchline", "empathy"],
+  },
+  skyLight: {
+    style:      { background: "#e0f2fe" },
+    brightness: "light", mood: "calm", energy: "low",
+    works_with: ["dark", "navy", "black"],
+    intent:     ["explanation", "empathy", "proof"],
   },
 
-  /* ── DARK GRADIENTS ──────────────────────────────────────── */
-
-  gradientPurpleNight: {
-    style:       { background: "linear-gradient(135deg, #1a0b2e 0%, #0a0512 100%)" },
-    brightness:  "dark",
-    mood:        "mysterious",
-    energy:      "medium",
-    works_with:  ["light", "white", "pink", "yellow"],
-    intent:      ["curiosity", "reveal", "irony"],
-  },
-  gradientBlueDepth: {
-    style:       { background: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
-    brightness:  "dark",
-    mood:        "cinematic",
-    energy:      "medium",
-    works_with:  ["light", "white", "cyan", "yellow"],
-    intent:      ["proof", "explanation", "curiosity"],
-  },
-  gradientRoyalDark: {
-    style:       { background: "linear-gradient(135deg, #17142a 0%, #312e81 100%)" },
-    brightness:  "dark",
-    mood:        "dramatic",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow", "pink"],
-    intent:      ["shock", "reveal", "curiosity"],
-  },
-  gradientCyber: {
-    style:       { background: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)" },
-    brightness:  "dark",
-    mood:        "futuristic",
-    energy:      "high",
-    works_with:  ["light", "cyan", "pink", "yellow"],
-    intent:      ["shock", "curiosity", "contrast"],
-  },
-  gradientRedDark: {
-    style:       { background: "linear-gradient(135deg, #1a0505 0%, #3d0a0a 100%)" },
-    brightness:  "dark",
-    mood:        "intense",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow", "orange"],
-    intent:      ["shock", "urgency", "contrast"],
-  },
-  gradientEmeraldNight: {
-    style:       { background: "linear-gradient(135deg, #0b1f1a 0%, #1f4d3a 100%)" },
-    brightness:  "dark",
-    mood:        "grounded",
-    energy:      "medium",
-    works_with:  ["light", "white", "yellow", "mint"],
-    intent:      ["proof", "empathy", "explanation"],
-  },
-  gradientNightSky: {
-    style:       { background: "linear-gradient(135deg, #141e30 0%, #243b55 100%)" },
-    brightness:  "dark",
-    mood:        "calm",
-    energy:      "low",
-    works_with:  ["light", "white", "cyan"],
-    intent:      ["empathy", "story", "explanation"],
-  },
-
-  /* ── VIBRANT GRADIENTS ───────────────────────────────────── */
+  /* ── GRADIENTS ───────────────────────────────────────────── */
 
   gradientSunset: {
-    style:       { background: "linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)" },
-    brightness:  "mid",
-    mood:        "energetic",
-    energy:      "high",
-    works_with:  ["dark", "white", "navy"],
-    intent:      ["punchline", "urgency", "shock"],
+    style:      { background: "linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)" },
+    brightness: "mid", mood: "energetic", energy: "high",
+    works_with: ["dark", "white", "navy"],
+    intent:     ["punchline", "urgency", "shock"],
   },
   gradientNeonPink: {
-    style:       { background: "linear-gradient(135deg, #ff00cc 0%, #333399 100%)" },
-    brightness:  "mid",
-    mood:        "playful",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow"],
-    intent:      ["punchline", "curiosity", "irony"],
+    style:      { background: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },
+    brightness: "mid", mood: "electric", energy: "high",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["punchline", "curiosity", "irony"],
   },
-  gradientGold: {
-    style:       { background: "linear-gradient(135deg, #4a3510 0%, #c9a84c 50%, #ffd700 100%)" },
-    brightness:  "mid",
-    mood:        "premium",
-    energy:      "high",
-    works_with:  ["dark", "black", "navy"],
-    intent:      ["proof", "reveal", "punchline"],
+  gradientPurpleFire: {
+    style:      { background: "linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)" },
+    brightness: "mid", mood: "bold", energy: "high",
+    works_with: ["white", "yellow", "light"],
+    intent:     ["shock", "reveal", "curiosity"],
   },
   gradientOcean: {
-    style:       { background: "linear-gradient(135deg, #2e3192 0%, #1bffff 100%)" },
-    brightness:  "mid",
-    mood:        "fresh",
-    energy:      "medium",
-    works_with:  ["dark", "navy", "white"],
-    intent:      ["curiosity", "explanation", "proof"],
+    style:      { background: "linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)" },
+    brightness: "mid", mood: "fresh", energy: "medium",
+    works_with: ["dark", "white", "navy"],
+    intent:     ["curiosity", "explanation", "proof"],
   },
-  gradientLavender: {
-    style:       { background: "linear-gradient(135deg, #654ea3 0%, #eaafc8 100%)" },
-    brightness:  "mid",
-    mood:        "dreamy",
-    energy:      "medium",
-    works_with:  ["dark", "white", "black"],
-    intent:      ["empathy", "curiosity", "story"],
+  gradientGold: {
+    style:      { background: "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)" },
+    brightness: "mid", mood: "premium", energy: "high",
+    works_with: ["dark", "black", "navy"],
+    intent:     ["proof", "reveal", "punchline"],
+  },
+  gradientLime: {
+    style:      { background: "linear-gradient(135deg, #84cc16 0%, #10b981 100%)" },
+    brightness: "mid", mood: "fresh", energy: "high",
+    works_with: ["dark", "black", "navy"],
+    intent:     ["proof", "punchline", "urgency"],
+  },
+  gradientCandyFloss: {
+    style:      { background: "linear-gradient(135deg, #fde68a 0%, #fca5a5 50%, #c4b5fd 100%)" },
+    brightness: "light", mood: "playful", energy: "medium",
+    works_with: ["dark", "black", "navy"],
+    intent:     ["curiosity", "punchline", "story"],
+  },
+  gradientDeepPurple: {
+    style:      { background: "linear-gradient(135deg, #1e1b4b 0%, #7c3aed 100%)" },
+    brightness: "dark", mood: "dramatic", energy: "high",
+    works_with: ["light", "white", "yellow", "pink"],
+    intent:     ["shock", "reveal", "curiosity"],
+  },
+  gradientMidnight: {
+    style:      { background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)" },
+    brightness: "dark", mood: "cinematic", energy: "medium",
+    works_with: ["light", "white", "cyan", "yellow"],
+    intent:     ["proof", "explanation", "curiosity"],
   },
   gradientWarmLight: {
-    style:       { background: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)" },
-    brightness:  "light",
-    mood:        "warm",
-    energy:      "medium",
-    works_with:  ["dark", "brown", "navy"],
-    intent:      ["punchline", "empathy", "proof"],
+    style:      { background: "linear-gradient(135deg, #fef9c3 0%, #fde68a 50%, #fca5a5 100%)" },
+    brightness: "light", mood: "warm", energy: "medium",
+    works_with: ["dark", "brown", "navy"],
+    intent:     ["punchline", "empathy", "proof"],
   },
 
   /* ── NEON / GLOW ─────────────────────────────────────────── */
 
-  neonPurple: {
-    style:       { background: "radial-gradient(ellipse at center, #2d0a5e 0%, #0a0514 70%)" },
-    brightness:  "dark",
-    mood:        "electric",
-    energy:      "high",
-    works_with:  ["light", "white", "pink", "cyan"],
-    intent:      ["shock", "curiosity", "reveal"],
+  neonPurpleGlow: {
+    style:      { background: "radial-gradient(ellipse at 50% 40%, #7c3aed 0%, #3b0764 40%, #0a0514 100%)" },
+    brightness: "dark", mood: "electric", energy: "high",
+    works_with: ["light", "white", "pink", "cyan"],
+    intent:     ["shock", "curiosity", "reveal"],
   },
-  neonRed: {
-    style:       { background: "radial-gradient(ellipse at center, #4d0000 0%, #0a0000 70%)" },
-    brightness:  "dark",
-    mood:        "danger",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow"],
-    intent:      ["shock", "urgency", "contrast"],
+  neonCyanGlow: {
+    style:      { background: "radial-gradient(ellipse at 50% 40%, #06b6d4 0%, #0c4a6e 40%, #000a0a 100%)" },
+    brightness: "dark", mood: "futuristic", energy: "high",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["curiosity", "contrast", "reveal"],
   },
-  neonCyan: {
-    style:       { background: "radial-gradient(ellipse at center, #003333 0%, #000a0a 70%)" },
-    brightness:  "dark",
-    mood:        "futuristic",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow"],
-    intent:      ["curiosity", "contrast", "reveal"],
+  neonPinkGlow: {
+    style:      { background: "radial-gradient(ellipse at 50% 40%, #ec4899 0%, #831843 40%, #0a0005 100%)" },
+    brightness: "dark", mood: "vibrant", energy: "high",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["shock", "punchline", "curiosity"],
+  },
+  neonGreenGlow: {
+    style:      { background: "radial-gradient(ellipse at 50% 40%, #10b981 0%, #064e3b 40%, #000a05 100%)" },
+    brightness: "dark", mood: "matrix", energy: "high",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["curiosity", "contrast", "reveal"],
   },
 
   /* ── MESH ────────────────────────────────────────────────── */
 
   meshPurpleBlue: {
-    style:       { background: "radial-gradient(ellipse at 20% 20%, #2d1b69 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, #1a0a40 0%, transparent 50%), #0a0514" },
-    brightness:  "dark",
-    mood:        "cinematic",
-    energy:      "high",
-    works_with:  ["light", "white", "pink", "yellow"],
-    intent:      ["reveal", "curiosity", "shock"],
+    style:      { background: "radial-gradient(ellipse at 20% 20%, #7c3aed 0%, transparent 55%), radial-gradient(ellipse at 80% 80%, #2563eb 0%, transparent 55%), #0f0a1a" },
+    brightness: "dark", mood: "cinematic", energy: "high",
+    works_with: ["light", "white", "pink", "yellow"],
+    intent:     ["reveal", "curiosity", "shock"],
   },
-  meshOrangeRed: {
-    style:       { background: "radial-gradient(ellipse at 20% 80%, #4d1a00 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, #3d0a0a 0%, transparent 50%), #0a0000" },
-    brightness:  "dark",
-    mood:        "intense",
-    energy:      "high",
-    works_with:  ["light", "white", "yellow"],
-    intent:      ["shock", "urgency", "contrast"],
+  meshSunsetFire: {
+    style:      { background: "radial-gradient(ellipse at 20% 80%, #ea580c 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, #dc2626 0%, transparent 50%), #1a0500" },
+    brightness: "dark", mood: "intense", energy: "high",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["shock", "urgency", "contrast"],
+  },
+  meshOceanBreeze: {
+    style:      { background: "radial-gradient(ellipse at 30% 30%, #0ea5e9 0%, transparent 50%), radial-gradient(ellipse at 70% 70%, #10b981 0%, transparent 50%), #041225" },
+    brightness: "dark", mood: "calm", energy: "medium",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["curiosity", "explanation", "proof"],
   },
 
   /* ── PATTERNS ────────────────────────────────────────────── */
 
-  darkGrid: {
-    style:       { background: "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px), #0b0b14", backgroundSize: "32px 32px, 32px 32px" },
-    brightness:  "dark",
-    mood:        "structured",
-    energy:      "low",
-    works_with:  ["light", "white", "cyan", "yellow"],
-    intent:      ["proof", "explanation", "list"],
+  gridWhite: {
+    style:      { background: "linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px), #111118", backgroundSize: "48px 48px, 48px 48px" },
+    brightness: "dark", mood: "structured", energy: "low",
+    works_with: ["light", "white", "cyan", "yellow"],
+    intent:     ["proof", "explanation", "list"],
   },
-  darkDots: {
-    style:       { background: "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px), #0b0b14", backgroundSize: "20px 20px" },
-    brightness:  "dark",
-    mood:        "playful",
-    energy:      "medium",
-    works_with:  ["light", "white", "yellow"],
-    intent:      ["curiosity", "punchline", "list"],
+  gridPurple: {
+    style:      { background: "linear-gradient(rgba(124,92,252,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(124,92,252,0.35) 1px, transparent 1px), #0a0810", backgroundSize: "48px 48px, 48px 48px" },
+    brightness: "dark", mood: "futuristic", energy: "high",
+    works_with: ["light", "cyan", "pink", "yellow"],
+    intent:     ["curiosity", "shock", "contrast"],
   },
-  neonGrid: {
-    style:       { background: "linear-gradient(rgba(124,92,252,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(124,92,252,0.15) 1px, transparent 1px), #080810", backgroundSize: "40px 40px, 40px 40px" },
-    brightness:  "dark",
-    mood:        "futuristic",
-    energy:      "high",
-    works_with:  ["light", "cyan", "pink", "yellow"],
-    intent:      ["curiosity", "shock", "contrast"],
+  gridLight: {
+    style:      { background: "linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px), #f8fafc", backgroundSize: "40px 40px, 40px 40px" },
+    brightness: "light", mood: "structured", energy: "low",
+    works_with: ["dark", "black", "navy"],
+    intent:     ["explanation", "proof", "list"],
   },
-  lightGrid: {
-    style:       { background: "linear-gradient(rgba(0,0,0,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px), #f5f3ee", backgroundSize: "28px 28px, 28px 28px" },
-    brightness:  "light",
-    mood:        "structured",
-    energy:      "low",
-    works_with:  ["dark", "black", "navy"],
-    intent:      ["explanation", "proof", "list"],
+  dotsWhite: {
+    style:      { background: "radial-gradient(circle, rgba(255,255,255,0.45) 2px, transparent 2px), #111118", backgroundSize: "28px 28px" },
+    brightness: "dark", mood: "playful", energy: "medium",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["curiosity", "punchline", "list"],
+  },
+  dotsColor: {
+    style:      { background: "radial-gradient(circle, rgba(124,92,252,0.6) 2px, transparent 2px), #07060f", backgroundSize: "28px 28px" },
+    brightness: "dark", mood: "electric", energy: "high",
+    works_with: ["light", "white", "pink"],
+    intent:     ["curiosity", "shock", "reveal"],
+  },
+  diagonalStripes: {
+    style:      { background: "repeating-linear-gradient(45deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 2px, transparent 2px, transparent 28px), #111118", backgroundSize: "40px 40px" },
+    brightness: "dark", mood: "dynamic", energy: "medium",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["curiosity", "contrast", "list"],
+  },
+  diagonalBright: {
+    style:      { background: "repeating-linear-gradient(45deg, rgba(234,88,12,0.25) 0px, rgba(234,88,12,0.25) 4px, transparent 4px, transparent 24px), #1a0800", backgroundSize: "34px 34px" },
+    brightness: "dark", mood: "energetic", energy: "high",
+    works_with: ["light", "white", "yellow"],
+    intent:     ["urgency", "shock", "contrast"],
+  },
+  crosshatch: {
+    style:      { background: "repeating-linear-gradient(0deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 1px, transparent 1px, transparent 32px), repeating-linear-gradient(90deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 1px, transparent 1px, transparent 32px), #0d0d18", backgroundSize: "32px 32px" },
+    brightness: "dark", mood: "structured", energy: "low",
+    works_with: ["light", "white", "cyan"],
+    intent:     ["proof", "explanation", "list"],
   },
 };
 
 /* ── Category map ─────────────────────────────────────────── */
 export const backgroundCategories = {
-  dark:     ["pureBlack","inkBlack","charcoal","graphite","deepNavy","deepPlum","deepBurgundy"],
-  light:    ["warmCream","softWhite","lavenderLight","skyLight","mintLight"],
-  gradient: ["gradientPurpleNight","gradientBlueDepth","gradientRoyalDark","gradientCyber","gradientRedDark","gradientEmeraldNight","gradientNightSky"],
-  vibrant:  ["gradientSunset","gradientNeonPink","gradientGold","gradientOcean","gradientLavender","gradientWarmLight"],
-  neon:     ["neonPurple","neonRed","neonCyan"],
-  mesh:     ["meshPurpleBlue","meshOrangeRed"],
-  pattern:  ["darkGrid","darkDots","neonGrid","lightGrid"],
+  bright:   ["crimson","scarlet","orange","amber","sunYellow","lime","emerald","teal","sky","cobalt","violet","purple","hotPink","coral"],
+  light:    ["warmCream","softWhite","blushPink","mintLight","lavenderLight","skyLight"],
+  dark:     ["charcoal","deepNavy","richBlack"],
+  gradient: ["gradientSunset","gradientNeonPink","gradientPurpleFire","gradientOcean","gradientGold","gradientLime","gradientCandyFloss","gradientDeepPurple","gradientMidnight","gradientWarmLight"],
+  neon:     ["neonPurpleGlow","neonCyanGlow","neonPinkGlow","neonGreenGlow"],
+  mesh:     ["meshPurpleBlue","meshSunsetFire","meshOceanBreeze"],
+  pattern:  ["gridWhite","gridPurple","gridLight","dotsWhite","dotsColor","diagonalStripes","diagonalBright","crosshatch"],
 };
 
 /* ── Smart pickers ───────────────────────────────────────── */
 
-/**
- * Pick a background by intent. Returns the style object.
- * @param {string} intent
- * @param {string} [brightness] — force "dark"|"light"|"mid" or null for any
- */
 export function getBackgroundForIntent(intent, brightness = null) {
   const candidates = Object.entries(backgroundPatternRegistry)
     .filter(([, v]) => v.intent.includes(intent))
@@ -339,20 +343,13 @@ export function getBackgroundForIntent(intent, brightness = null) {
   return { key, ...backgroundPatternRegistry[key] };
 }
 
-/**
- * Pick a background that contrasts with a given surface color type.
- * @param {string} blockBrightness — "light"|"dark" (the block's dominant color)
- */
 export function getContrastingBackground(blockBrightness, intent = null) {
   const needed = blockBrightness === "light" ? "dark" : "light";
   return getBackgroundForIntent(intent || "explanation", needed);
 }
 
-/**
- * Get random background from a category.
- */
-export function getRandomBackground(category = "dark") {
-  const keys = backgroundCategories[category] || backgroundCategories.dark;
+export function getRandomBackground(category = "bright") {
+  const keys = backgroundCategories[category] || backgroundCategories.bright;
   const key  = keys[Math.floor(Math.random() * keys.length)];
   return { key, ...backgroundPatternRegistry[key] };
 }

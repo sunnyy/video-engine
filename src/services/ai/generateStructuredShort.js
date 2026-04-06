@@ -287,6 +287,7 @@ export async function generateStructuredShort({
   durationCategory = "short",
   generateImages   = false,
   generateTTS      = false,
+  ttsVoice         = "female_warm",
   language         = "english",
   videoType        = "viral",
   context          = "",
@@ -294,7 +295,11 @@ export async function generateStructuredShort({
   audience         = "general",
   tone             = "bold",
   projectId        = null,
+  onProgress       = null,
 }) {
+  const report = (step) => { if (onProgress) onProgress(step); };
+
+  report("script");
 
   const prompt = buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone });
 
@@ -329,6 +334,7 @@ export async function generateStructuredShort({
 
   // Auto-generate images if requested
   if (generateImages) {
+    report("images");
     await Promise.allSettled(beats.map(async (beat, beatIndex) => {
       const hint = parsedScript.beats[beatIndex]?.asset_hint;
       if (!hint?.prompt) return;
@@ -359,11 +365,12 @@ export async function generateStructuredShort({
   // Generate TTS if requested
   let ttsAudio = null;
   if (generateTTS && script.trim()) {
+    report("voiceover");
     try {
       const ttsRes = await fetch("http://localhost:5000/api/generate-tts", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ script, voice: "female_warm", speed: 1.0 }),
+        body:    JSON.stringify({ script, voice: ttsVoice, speed: 1.0 }),
       });
       if (ttsRes.ok) {
         const ttsData  = await ttsRes.json();
@@ -376,7 +383,7 @@ export async function generateStructuredShort({
         const duration = await measureAudioDuration(uploaded.url);
         beats = syncBeatsToTTS(beats, duration);
 
-        ttsAudio = { src: uploaded.url, volume: 1, generated: true, voice: "female_warm" };
+        ttsAudio = { src: uploaded.url, volume: 1, generated: true, voice: ttsVoice };
       }
     } catch (e) {
       console.warn("[TTS gen] failed:", e.message);

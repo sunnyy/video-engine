@@ -7,70 +7,16 @@ import { useProjectStore } from "../../../src/store/useProjectStore";
 import { getLayoutDef } from "../../../src/core/layoutRegistry";
 import ZoneHandle from "./ZoneHandle";
 
-const ZoneContentLayer = memo(({ zone, canvasScale }) => {
+// ZoneContentLayer only renders empty-zone indicators.
+// Actual content (text, images, blocks) is rendered by the Thumbnail behind ZoneCanvas.
+const ZoneContentLayer = memo(({ zone }) => {
   const content  = zone.content || {};
-  const st       = zone.style   || {};
-  const delayed  = (zone.start || 0) > 0;
-  const rotation = st.rotation ?? 0;
-  const scale_   = st.scale ?? 1;
-  const insetPct = scale_ < 1 ? `${((1 - scale_) / 2) * 100}%` : "0%";
-  const rotStyle = rotation ? { transform: `rotate(${rotation}deg)`, transformOrigin: "center center" } : {};
 
-  // Text zone — values driven by user style, must stay inline
-  if (zone.type === "text" && content.text) {
-    return (
-      <div style={{
-        position: "absolute", inset: 0,
-        display: "flex", alignItems: "center",
-        justifyContent: st.textAlign === "left" ? "flex-start" : st.textAlign === "right" ? "flex-end" : "center",
-        padding: "0 4px", boxSizing: "border-box",
-        fontSize:   Math.max(6, (st.fontSize || 32) * canvasScale),
-        fontWeight: st.fontWeight || 700,
-        fontFamily: st.fontFamily || "inherit",
-        color:      st.color      || "#ffffff",
-        textAlign:  st.textAlign  || "center",
-        opacity:    delayed ? 0.5 : (st.opacity ?? 1),
-        background: st.background || "transparent",
-        lineHeight: 1.2,
-        pointerEvents: "none", userSelect: "none", overflow: "hidden",
-        ...rotStyle,
-      }}>
-        {content.text}
-      </div>
-    );
-  }
+  const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
+               || (zone.type === "text"  && !content.text && content.kind !== "block");
 
-  // Block content indicator
-  if (content.kind === "block") {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <span className="text-[10px] font-mono text-[rgba(124,92,252,0.7)] bg-[rgba(124,92,252,0.1)] border border-[rgba(124,92,252,0.3)] rounded px-[5px] py-[2px]">
-          ⬛ {content.block?.type || "Block"}
-        </span>
-      </div>
-    );
-  }
+  if (!isEmpty) return null;
 
-  // Asset with src — insetPct, borderRadius, opacity are dynamic
-  if (zone.type === "asset" && content.asset?.src) {
-    const asset      = content.asset;
-    const objectFit  = asset.objectFit || st.objectFit || "cover";
-    const wrapperStyle = {
-      position: "absolute",
-      top: insetPct, right: insetPct, bottom: insetPct, left: insetPct,
-      overflow: "hidden",
-      borderRadius: st.borderRadius || 0,
-      opacity: delayed ? 0.5 : 1,
-      ...rotStyle,
-    };
-    const mediaStyle = { width: "100%", height: "100%", objectFit, display: "block" };
-    if (asset.type === "video") {
-      return <div style={wrapperStyle}><video src={asset.src} muted loop autoPlay playsInline style={mediaStyle} /></div>;
-    }
-    return <div style={wrapperStyle}><img src={asset.src} style={mediaStyle} /></div>;
-  }
-
-  // Empty zone fallback — hint or placeholder
   const hint     = zone.asset_hint;
   const keywords = hint?.keywords?.length ? hint.keywords : null;
 
@@ -102,10 +48,7 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
   );
 }, (prev, next) =>
   JSON.stringify(prev.zone.content)    === JSON.stringify(next.zone.content)    &&
-  JSON.stringify(prev.zone.style)      === JSON.stringify(next.zone.style)      &&
-  JSON.stringify(prev.zone.asset_hint) === JSON.stringify(next.zone.asset_hint) &&
-  prev.zone.start  === next.zone.start &&
-  prev.canvasScale === next.canvasScale
+  JSON.stringify(prev.zone.asset_hint) === JSON.stringify(next.zone.asset_hint)
 );
 
 export default function ZoneCanvas({
@@ -238,10 +181,7 @@ export default function ZoneCanvas({
             zIndex: zone.zIndex ?? 1,
             borderRadius: zone.style?.borderRadius || 0,
           }}>
-            {zone.background?.kind === "color" && (
-              <div className="absolute inset-0" style={{ background: zone.background.color }} />
-            )}
-            <ZoneContentLayer zone={zone} canvasScale={canvasScale} />
+            <ZoneContentLayer zone={zone} />
             {isEmpty && (
               <div
                 className="absolute inset-0 pointer-events-none"

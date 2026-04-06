@@ -96,6 +96,20 @@ const TTS_VOICES = {
   storyteller:  "fable",
 };
 
+/* Normalize TTS audio to -14 LUFS — OpenAI tts-1 outputs ~-23 LUFS (very quiet) */
+function normalizeTTS(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioFilters("loudnorm=I=-9:TP=-1:LRA=7")
+      .audioCodec("libmp3lame")
+      .audioBitrate("192k")
+      .output(outputPath)
+      .on("end", resolve)
+      .on("error", reject)
+      .run();
+  });
+}
+
 app.post("/api/generate-tts", async (req, res) => {
   try {
     const { script, voice = "female_warm", speed = 1.0 } = req.body;
@@ -104,17 +118,24 @@ app.post("/api/generate-tts", async (req, res) => {
 
     const resolvedVoice = TTS_VOICES[voice] || "nova";
     const mp3 = await openai.audio.speech.create({
-      model: "tts-1",
+      model: "tts-1-hd",
       voice: resolvedVoice,
       input: script.trim(),
       speed: Math.min(4.0, Math.max(0.25, Number(speed))),
     });
 
     const buffer   = Buffer.from(await mp3.arrayBuffer());
-    const filename = `tts-${Date.now()}.mp3`;
-    fs.writeFileSync(path.join(TEMP_DIR, filename), buffer);
-    const url = `http://localhost:5000/renders/${filename}`;
-    console.log("[TTS] Done:", url);
+    const rawName  = `tts-raw-${Date.now()}.mp3`;
+    const normName = `tts-${Date.now()}.mp3`;
+    const rawPath  = path.join(TEMP_DIR, rawName);
+    const normPath = path.join(TEMP_DIR, normName);
+
+    fs.writeFileSync(rawPath, buffer);
+    await normalizeTTS(rawPath, normPath);
+    fs.unlinkSync(rawPath);
+
+    const url = `http://localhost:5000/renders/${normName}`;
+    console.log("[TTS] Done (normalized):", url);
     res.json({ url });
   } catch (err) {
     console.error("[TTS] Error:", err?.message || err);

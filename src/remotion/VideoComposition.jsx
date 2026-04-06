@@ -213,7 +213,7 @@ export default function VideoComposition({ project }) {
 
       {audio?.tts?.src && (
         <Audio
-          key={audio.tts.src}
+          key={`tts-${audio.tts.src}`}
           src={audio.tts.src}
           volume={audio.tts.volume ?? 1}
         />
@@ -223,7 +223,7 @@ export default function VideoComposition({ project }) {
         <Audio
           key={audio.music.src}
           src={audio.music.src}
-          volume={musicVolume}
+          volume={() => musicVolume}
         />
       )}
 

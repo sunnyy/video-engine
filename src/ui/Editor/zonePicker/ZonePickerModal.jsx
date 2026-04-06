@@ -45,6 +45,18 @@ export default function ZonePickerModal({
 
   useEffect(() => { loadMyAssets(); }, []);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.code === "Escape") {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
   const renderPreview = (asset) => {
     const src = asset.thumbnail_url || asset.url;
     if (!src) return null;
@@ -92,7 +104,7 @@ export default function ZonePickerModal({
   const tabs = useMemo(() => {
     const all = [
       { key: "my",      label: "My Assets", type: "assets"  },
-      { key: "gallery", label: "Gallery",   type: "gallery" },
+      { key: "gallery", label: "Free Stock", type: "gallery" },
       { key: "text",    label: "Text",      type: "text"    },
       { key: "blocks",  label: "Elements",  type: "blocks"  },
       { key: "colors",  label: "Colors",    type: "colors"  },
@@ -119,7 +131,7 @@ export default function ZonePickerModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={onClose}>
+    <div data-modal className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={onClose}>
       <div className="bg-[#1c1c28] w-[1000px] h-[85vh] rounded-lg p-6 flex flex-col" onClick={e => e.stopPropagation()}>
 
         <div className="flex justify-between mb-4">

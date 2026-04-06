@@ -22,17 +22,19 @@ const TABS = [
   { key: "sfx",     label: "SFX",     color: "#f0e040" },
 ];
 
-export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZone, setActiveTab }) {
+export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZone, setActiveTab, beatTab, setBeatTab }) {
   const project      = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
-  const [tab, setTab] = useState("layout");
+  const [localTab, setLocalTab] = useState("layout");
+
+  const tab    = beatTab    ?? localTab;
+  const setTab = setBeatTab ?? setLocalTab;
 
   if (!project || !activeBeatId) return null;
 
   const activeBeat = project.beats.find((b) => b.id === activeBeatId);
   if (!activeBeat) return null;
 
-  // When a zone is selected, switch to zones tab automatically
   const handleSelectZone = (id, modifierHeld) => {
     if (id !== null) setTab("zones");
     onSelectZone?.(id, modifierHeld);

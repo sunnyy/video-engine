@@ -7,6 +7,7 @@ import { transitionsRegistry } from "../../../src/core/transitionsRegistry";
 import { motionsRegistry }     from "../../../src/core/motionsRegistry";
 import { useProjectStore }     from "../../../src/store/useProjectStore";
 import { textStylePresets }    from "../../../src/core/textStylePresets";
+import blockEditors            from "./blocks/blockEditors";
 
 const FONT_FAMILIES = [
   { label: "Default",          value: "inherit" },
@@ -74,7 +75,7 @@ export default function ZoneEditor({
   slot, zone, zoneDef, zoneType,
   openPicker,
   updateTextContent, updateTextStyle, updateTextStyleBulk,
-  updateContentProp,
+  updateContentProp, updateBlockProp,
   setZoneStyle, setZoneLayout,
   setZoneStyleSilent, setZoneLayoutSilent,
   clearContent,
@@ -86,7 +87,8 @@ export default function ZoneEditor({
   const content  = safeZone.content    || {};
   const style    = safeZone.style      || {};
 
-  const isText = zoneType === "text";
+  const isText  = zoneType === "text";
+  const isBlock = content.kind === "block";
 
   const enters  = Object.keys(transitionsRegistry.enter || {});
   const exits   = Object.keys(transitionsRegistry.exit  || {});
@@ -106,6 +108,20 @@ export default function ZoneEditor({
   const setStyleSilent  = (key, val) => setZoneStyleSilent(slot, key, val);
   const setLayoutSilent = (key, val) => setZoneLayoutSilent(slot, key, val);
 
+  // Layer order — compute from OTHER zones only
+  const otherZIndices = Object.entries(
+    useProjectStore.getState().project?.beats?.find(b => b.id === beatId)?.zones || {}
+  ).filter(([key]) => key !== slot).map(([, z]) => z.zIndex ?? 1);
+  const currentZIndex = safeZone.zIndex ?? 1;
+  const maxZ = otherZIndices.length ? Math.max(...otherZIndices) : currentZIndex;
+  const minZ = otherZIndices.length ? Math.min(...otherZIndices) : currentZIndex;
+  const isAtFront = otherZIndices.length > 0 && currentZIndex > maxZ;
+  const isAtBack  = currentZIndex <= 1 && (otherZIndices.length === 0 || currentZIndex <= minZ);
+  const bringToFront  = () => setZoneLayout(slot, "zIndex", maxZ + 1);
+  const moveForward   = () => setZoneLayout(slot, "zIndex", currentZIndex + 1);
+  const moveBackward  = () => setZoneLayout(slot, "zIndex", Math.max(1, currentZIndex - 1));
+  const sendToBack    = () => setZoneLayout(slot, "zIndex", Math.max(1, minZ - 1));
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.code !== "Delete") return;
@@ -124,6 +140,23 @@ export default function ZoneEditor({
       {isText && (
         <>
           <SectionTitle>Text</SectionTitle>
+          <div className="flex gap-4 mb-4">
+            {/* Type switcher — same pattern as asset preview */}
+            <div
+              onClick={() => openPicker(slot, "content")}
+              className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors flex flex-col items-center justify-center gap-1 bg-[#0e0e1a]"
+              style={{ width: 120, height: 120 }}
+            >
+              <span className="text-[32px] pointer-events-none">T</span>
+              <span className="text-[10px] text-[#9494a8] font-mono pointer-events-none">Text</span>
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
+                <span className="text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">Change</span>
+              </div>
+            </div>
+            <div className="flex-1 flex items-center">
+              <span className="text-[11px] text-[#55556a] font-mono leading-relaxed">Click the card to change this zone to an image, video, or block.</span>
+            </div>
+          </div>
           <textarea
             value={content.text || ""}
             onChange={e => updateTextContent(slot, e.target.value)}
@@ -231,8 +264,39 @@ export default function ZoneEditor({
         </>
       )}
 
+      {/* ── BLOCK ── */}
+      {isBlock && (() => {
+        const BlockEditor = blockEditors[content.block?.type];
+        return (
+          <>
+            <SectionTitle>Block</SectionTitle>
+            <div className="flex gap-4 mb-4">
+              {/* Type switcher */}
+              <div
+                onClick={() => openPicker(slot, "content")}
+                className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(124,92,252,0.3)] hover:border-[#7c5cfc] transition-colors flex flex-col items-center justify-center gap-1 bg-[#0e0e1a]"
+                style={{ width: 120, height: 120 }}
+              >
+                <span className="text-[28px] pointer-events-none">⬛</span>
+                <span className="text-[10px] text-[#a78bfa] font-mono pointer-events-none truncate w-full text-center px-1">{content.block?.type || "Block"}</span>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
+                  <span className="text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">Change</span>
+                </div>
+              </div>
+              <div className="flex-1 flex items-center">
+                <span className="text-[11px] text-[#55556a] font-mono leading-relaxed">Click the card to switch to a different block, image, or text.</span>
+              </div>
+            </div>
+            {BlockEditor
+              ? <><BlockEditor slot={slot} block={content.block} updateBlockProp={updateBlockProp} /><Divider /></>
+              : <div className="text-[11px] text-[#55556a] font-mono mb-4">No editor for: {content.block?.type}</div>
+            }
+          </>
+        );
+      })()}
+
       {/* ── ASSET ── */}
-      {!isText && (
+      {!isText && !isBlock && (
         <>
           <SectionTitle>Asset</SectionTitle>
           <div className="flex gap-4 mb-4">
@@ -284,6 +348,36 @@ export default function ZoneEditor({
         </>
       )}
 
+
+      <Divider />
+
+      {/* ── LAYER ORDER ── */}
+      <div className="flex items-center gap-2 mb-4">
+        <Label>Layer</Label>
+        <span className="text-[11px] font-mono text-[#55556a] ml-1">z{currentZIndex}</span>
+        <div className="flex gap-[4px] ml-auto">
+          {[
+            { label: "⤒", title: "Bring to Front", action: bringToFront, disabled: isAtFront },
+            { label: "↑", title: "Move Forward",   action: moveForward,  disabled: isAtFront },
+            { label: "↓", title: "Move Backward",  action: moveBackward, disabled: isAtBack  },
+            { label: "⤓", title: "Send to Back",   action: sendToBack,   disabled: isAtBack  },
+          ].map(({ label, title, action, disabled }) => (
+            <button
+              key={title}
+              onClick={action}
+              disabled={disabled}
+              title={title}
+              className="w-[28px] h-[28px] rounded-[6px] text-[13px] font-bold border flex items-center justify-center cursor-pointer transition-all"
+              style={disabled
+                ? { background: "transparent", borderColor: "rgba(255,255,255,0.05)", color: "#2e2e45", cursor: "not-allowed" }
+                : { background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)", color: "#9494a8" }
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <Divider />
 

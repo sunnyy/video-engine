@@ -110,7 +110,9 @@ export default function AIGenerator() {
   const [tone, setTone] = useState("bold");
   const [generateImages, setGenerateImages] = useState(false);
   const [generateTTS, setGenerateTTS] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState("female_warm");
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState("");
   const [error, setError] = useState("");
 
   const handleScratch = async () => {
@@ -156,6 +158,7 @@ export default function AIGenerator() {
     }
     setError("");
     setLoading(true);
+    setLoadingStep("script");
     try {
       const aiResult = await generateStructuredShort({
         topic,
@@ -167,9 +170,11 @@ export default function AIGenerator() {
         durationCategory,
         generateImages,
         generateTTS,
+        ttsVoice,
         brandColor: brandColor.trim() || null,
         audience,
         tone,
+        onProgress: (step) => setLoadingStep(step),
       });
 
       const safeProject = buildSafeProject({
@@ -195,11 +200,60 @@ export default function AIGenerator() {
       setError(err.message || "Generation failed. Please try again.");
     }
     setLoading(false);
+    setLoadingStep("");
+  };
+
+  const STEP_LABELS = {
+    script:    { label: "Generating script…",    sub: "AI is writing your video script" },
+    images:    { label: "Generating visuals…",   sub: "Creating images for each beat with AI" },
+    voiceover: { label: "Generating voiceover…", sub: "Synthesizing AI voice for your script" },
   };
 
   /* ── UI ── */
+  const stepInfo = STEP_LABELS[loadingStep] || { label: "Preparing…", sub: "Getting things ready" };
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#08080d" }}>
+
+      {/* Loading overlay */}
+      {loading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-10" style={{ background: "rgba(8,8,13,0.8)", backdropFilter: "blur(6px)" }}>
+          {/* Spinner */}
+          <div className="w-28 h-28 rounded-full border-[5px] border-[rgba(124,92,252,0.2)] border-t-[#7c5cfc] animate-spin" />
+
+          {/* Step label */}
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="text-[36px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>
+              {stepInfo.label}
+            </div>
+            <div className="text-[18px] text-[#55556a]">{stepInfo.sub}</div>
+          </div>
+
+          {/* Step indicators */}
+          <div className="flex items-center gap-6 mt-2">
+            {[
+              { key: "script",    label: "Script" },
+              ...(generateImages ? [{ key: "images",    label: "Visuals" }] : []),
+              ...(generateTTS    ? [{ key: "voiceover", label: "Voiceover" }] : []),
+            ].map(({ key, label }, i, arr) => {
+              const steps = ["script", ...(generateImages ? ["images"] : []), ...(generateTTS ? ["voiceover"] : [])];
+              const currentIdx = steps.indexOf(loadingStep);
+              const thisIdx    = steps.indexOf(key);
+              const done       = thisIdx < currentIdx;
+              const active     = thisIdx === currentIdx;
+              return (
+                <div key={key} className="flex items-center gap-6">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`w-4 h-4 rounded-full transition-all ${active ? "bg-[#7c5cfc] scale-125" : done ? "bg-[#4ade80]" : "bg-[rgba(255,255,255,0.15)]"}`} />
+                    <span className={`text-[14px] font-mono ${active ? "text-[#a78bfa]" : done ? "text-[#4ade80]" : "text-[#55556a]"}`}>{label}</span>
+                  </div>
+                  {i < arr.length - 1 && <div className="w-16 h-[1px] bg-[rgba(255,255,255,0.1)] mb-5" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div
         className="w-full max-w-[520px] rounded-[20px] border border-[rgba(255,255,255,0.07)] p-8 flex flex-col gap-5"
         style={{ background: "#111118" }}
@@ -386,6 +440,31 @@ export default function AIGenerator() {
               />
             </button>
           </div>
+
+          {/* Voice picker — shown when TTS is on */}
+          {generateTTS && (
+            <div className="grid grid-cols-2 gap-[6px] pl-1">
+              {[
+                { key: "female_warm",  label: "Female — Warm",    sub: "Nova" },
+                { key: "female_clear", label: "Female — Clear",   sub: "Shimmer" },
+                { key: "male_deep",    label: "Male — Deep",      sub: "Onyx" },
+                { key: "male_neutral", label: "Male — Neutral",   sub: "Echo" },
+              ].map(({ key, label, sub }) => (
+                <button
+                  key={key}
+                  onClick={() => setTtsVoice(key)}
+                  className="flex flex-col items-start px-3 py-[7px] rounded-[8px] border cursor-pointer transition-all text-left"
+                  style={ttsVoice === key
+                    ? { background: "rgba(124,92,252,0.12)", borderColor: "#7c5cfc" }
+                    : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }
+                  }
+                >
+                  <span className="text-[12px] font-semibold" style={{ color: ttsVoice === key ? "#a78bfa" : "#c8c8d8" }}>{label}</span>
+                  <span className="text-[10px] font-mono" style={{ color: ttsVoice === key ? "#7c5cfc" : "#55556a" }}>{sub}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {!generateImages && (
             <div className="text-[11px] text-[#99999a] bg-[rgba(255,255,255,0.03)] rounded-[6px] px-3 py-2 leading-relaxed">

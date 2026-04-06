@@ -148,7 +148,7 @@ export default function GalleryTab({ onSelect }) {
           onChange={e => setInputVal(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") { setPage(1); setQuery(inputVal); } }}
           placeholder="Search images and videos..."
-          className="flex-1 bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[8px] text-[13px] text-[#e8e8f0] placeholder-[#55556a] focus:border-[#7c5cfc] focus:outline-none"
+          className="flex-1 bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[12px] text-[15px] text-[#e8e8f0] placeholder-[#55556a] focus:border-[#7c5cfc] focus:outline-none"
         />
         <button
           onClick={() => { setPage(1); setQuery(inputVal); }}

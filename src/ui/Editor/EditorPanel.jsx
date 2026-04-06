@@ -12,10 +12,11 @@ import MyRulesSection      from "./MyRulesSection";
 
 export default function EditorPanel({
   activeTab, setActiveTab,
+  beatTab, setBeatTab,
   selectedZoneId, selectedZoneIds, onSelectZone,
 }) {
   const handleSelectZone = (id, modifierHeld) => {
-    if (id !== null) setActiveTab("beats");
+    if (id !== null) { setActiveTab("beats"); setBeatTab("zones"); }
     onSelectZone(id, modifierHeld);
   };
 
@@ -75,6 +76,8 @@ export default function EditorPanel({
           selectedZoneIds={selectedZoneIds}
           onSelectZone={handleSelectZone}
           setActiveTab={setActiveTab}
+          beatTab={beatTab}
+          setBeatTab={setBeatTab}
         />
       </div>
     </div>

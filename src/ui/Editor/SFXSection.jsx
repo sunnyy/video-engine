@@ -96,7 +96,7 @@ export default function SFXSection({ beat }) {
         id:       `sfx_${Date.now()}`,
         key,
         label:    sfx.label,
-        volume:   0.4,
+        volume:   0.15,
         position: 0,
         source:   "beat",
       }]
@@ -114,7 +114,7 @@ export default function SFXSection({ beat }) {
   };
 
   const autoAssign = () => {
-    const cue = pickBeatSFX(beat.intent || "explanation", beat.energy || 0.5, 0.4);
+    const cue = pickBeatSFX(beat.intent || "explanation", beat.energy || 0.5, 0.15);
     if (!cue) return;
     updateBeat(beat.id, { audio_cues: [...cues.filter(c => c.source !== "beat"), cue] });
   };
@@ -137,7 +137,7 @@ export default function SFXSection({ beat }) {
               Remove
             </button>
           </div>
-          <Slider label="Volume" value={beatCue.volume ?? 0.4}
+          <Slider label="Volume" value={beatCue.volume ?? 0.15}
             onChange={v => updateCue("volume", v)} unit="%" />
           <div className="flex flex-col gap-[3px]">
             <div className="flex justify-between">
