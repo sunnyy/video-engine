@@ -161,6 +161,36 @@ export const OVERLAY_TYPES = {
     allowedAnchors: ["mid-left","mid-right","top-center","bottom-center"],
   },
 
+  ImageOverlay: {
+    label:   "Image",
+    icon:    "🖼",
+    defaults: {
+      src:      "",
+      objectFit: "contain",
+      anchor:   "center",
+      scale:    1,
+      motion:   "fade",
+      delay:    0,
+    },
+    allowedAnchors: ["top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right"],
+  },
+
+  VideoOverlay: {
+    label:   "Video",
+    icon:    "▶",
+    defaults: {
+      src:      "",
+      objectFit: "contain",
+      anchor:   "center",
+      scale:    1,
+      motion:   "fade",
+      delay:    0,
+      loop:     true,
+      muted:    true,
+    },
+    allowedAnchors: ["top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right"],
+  },
+
 };
 
 export const OVERLAY_TYPE_KEYS = Object.keys(OVERLAY_TYPES);

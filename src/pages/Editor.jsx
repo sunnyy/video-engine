@@ -3,9 +3,6 @@ import { useParams } from "react-router-dom";
 import { useProjectStore } from "../store/useProjectStore";
 import { getProjectById } from "../services/projects/projectService";
 
-import ScriptStep from "../ui/Workflow/ScriptStep";
-import TalkingHeadStep from "../ui/Workflow/TalkingHeadStep";
-
 import Header from "../ui/Editor/Header";
 import Sidebar from "../ui/Editor/Sidebar";
 import BeatList from "../ui/Editor/BeatList";
@@ -41,8 +38,16 @@ export default function Editor() {
   }, [activeBeatId]);
 
   if (loading || !project) return null;
-  if (!project.workflow.script_completed) return <ScriptStep />;
-  if (project.meta.mode === "talking_head" && !project.workflow.avatar_completed) return <TalkingHeadStep />;
+
+  const handleDeleteZone = (zoneId) => {
+    const { project, activeBeatId, updateBeat } = useProjectStore.getState();
+    if (!project || !activeBeatId) return;
+    const beat = project.beats.find(b => b.id === activeBeatId);
+    if (!beat) return;
+    const newZones = { ...beat.zones };
+    delete newZones[zoneId];
+    updateBeat(activeBeatId, { zones: newZones });
+  };
 
   const selectedZoneId = selectedZoneIds.size === 1 ? [...selectedZoneIds][0] : null;
 
@@ -77,7 +82,7 @@ export default function Editor() {
         </div>
 
         <div className="w-[35%]">
-          <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} />
+          <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} onDeleteZone={handleDeleteZone} />
         </div>
 
         <div className="w-[40%]">

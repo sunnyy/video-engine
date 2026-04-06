@@ -85,8 +85,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
   };
   const finalInset = makeInset(insetPct, insetPx);
 
-  const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar")
-               || (zone.type === "text" && !content.text);
+  const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
+               || (zone.type === "text" && !content.text && content.kind !== "block");
 
   // Zone container — position only, no rotation, no transform (enter/exit handled below)
   const zoneContainerStyle = {
@@ -141,7 +141,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
       <div style={{ ...contentWrapperStyle, zIndex: 1 }}>
 
         {/* Asset — scale via inset */}
-        {zone.type === "asset" && content.asset?.src && (
+        {zone.type === "asset" && content.kind !== "block" && content.asset?.src && (
           <div style={insetBoxStyle}>
             <AssetRenderer
               zone={{
@@ -161,19 +161,41 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
         )}
 
         {/* Asset placeholder — no src yet */}
-        {zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && (
-          <div style={{
-            ...insetBoxStyle,
-            background: "linear-gradient(135deg, rgba(40,40,70,0.9) 0%, rgba(20,20,50,0.9) 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <svg width="15%" height="15%" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.2 }}>
-              <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.5"/>
-              <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
-              <path d="M3 15l5-5 4 4 3-3 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </div>
-        )}
+        {zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block" && (() => {
+          const hint = beat?.asset_hint;
+          const keywords = hint?.keywords?.length ? hint.keywords : null;
+          return (
+            <div style={{
+              ...insetBoxStyle,
+              background: "linear-gradient(135deg, rgba(40,40,70,0.9) 0%, rgba(20,20,50,0.9) 100%)",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              gap: Math.max(4, W * 0.008),
+            }}>
+              <svg width="10%" height="10%" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.15 }}>
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.5"/>
+                <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
+                <path d="M3 15l5-5 4 4 3-3 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              {keywords && (
+                <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap: Math.max(3, W * 0.006), padding: "0 8%" }}>
+                  {keywords.map((kw, i) => (
+                    <span key={i} style={{
+                      fontSize:     Math.max(10, W * 0.014),
+                      fontFamily:   "'JetBrains Mono', monospace",
+                      color:        "rgba(124,92,252,0.85)",
+                      background:   "rgba(124,92,252,0.18)",
+                      borderRadius: 4,
+                      padding:      `${Math.max(2, W * 0.003)}px ${Math.max(4, W * 0.008)}px`,
+                      whiteSpace:   "nowrap",
+                    }}>
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {zone.type === "asset" && content.kind === "avatar" && (
           <AvatarLayer beat={beat} project={project} />
@@ -290,8 +312,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
           return <div style={baseStyle}>{text}</div>;
         })()}
 
-        {/* Block */}
-        {zone.type === "block" && (() => {
+        {/* Block — check content.kind, not zone.type (layout zones keep type:"asset" even when block content is set) */}
+        {content.kind === "block" && (() => {
           const block = content.block;
           if (!block?.type) return null;
           const entry = blockRegistry[block.type];
@@ -328,9 +350,10 @@ export default function LayoutRenderer({ beat, project, layoutDef }) {
   const beatZones       = beat.zones || {};
   const defZoneIds      = new Set(layoutDef.zones.map(z => z.id));
 
-  const defZones = layoutDef.zones.map(d => {
+  const defZones = layoutDef.zones.flatMap(d => {
     const o = beatZones[d.id] || {};
-    return {
+    if (o.hidden) return [];
+    return [{
       ...d,
       x:              o.x              ?? d.x,
       y:              o.y              ?? d.y,
@@ -344,7 +367,7 @@ export default function LayoutRenderer({ beat, project, layoutDef }) {
       content:        o.content        || {},
       style:          { ...d.style, ...(o.style || {}) },
       background:     o.background     || {},
-    };
+    }];
   });
 
   const extraZones = Object.entries(beatZones)

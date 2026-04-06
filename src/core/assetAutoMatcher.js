@@ -73,6 +73,9 @@ export async function autoMatchAssets(
     });
   }
 
+  /* ── Only generate AI images when explicitly requested ── */
+  if (assetSource !== "ai") return beats;
+
   /* ── AI image generation — one prompt per asset zone per beat ── */
   const zoneJobs = [];
 

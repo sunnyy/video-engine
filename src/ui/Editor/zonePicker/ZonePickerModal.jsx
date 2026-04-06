@@ -1,7 +1,11 @@
+/**
+ * ZonePickerModal.jsx
+ */
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { uploadUserAsset } from "../../../services/assets/uploadUserAsset";
-import { deleteUserAsset } from "../../../services/assets/deleteUserAsset";
-import { useAssetsStore } from "../../../store/useAssetsStore";
+import { uploadUserAsset }   from "../../../services/assets/uploadUserAsset";
+import { deleteUserAsset }   from "../../../services/assets/deleteUserAsset";
+import { useAssetsStore }    from "../../../store/useAssetsStore";
+import { useProjectStore }   from "../../../store/useProjectStore";
 
 import MyAssetsTab from "./tabs/MyAssetsTab";
 import GalleryTab  from "./tabs/GalleryTab";
@@ -14,110 +18,75 @@ export default function ZonePickerModal({
   onClose,
   orientation,
   mode,
-  allowedTabs
+  allowedTabs,
 }) {
+  const databaseId = useProjectStore(s => s.databaseId);
 
   const normalizeAsset = (a) => {
     if (!a) return;
-
-    // Already structured — pass through directly
-    if (a.kind === "text" || a.kind === "block" || a.kind === "color") {
-      onSelect(a);
-      return;
-    }
-
-    if (a.kind === "asset") {
-      onSelect(a);
-      return;
-    }
-
-    if (a.url) { onSelect({ url: a.url }); return; }
-    if (a.asset?.src) { onSelect({ url: a.asset.src }); return; }
-    if (a.src) { onSelect({ url: a.src }); return; }
+    if (a.kind === "text" || a.kind === "block" || a.kind === "color") { onSelect(a); return; }
+    if (a.kind === "asset") { onSelect(a); return; }
+    if (a.url)       { onSelect({ url: a.url });       return; }
+    if (a.asset?.src){ onSelect({ url: a.asset.src }); return; }
+    if (a.src)       { onSelect({ url: a.src });       return; }
   };
 
-  const defaultTabs = ["assets","gallery","blocks","colors"];
-  const activeTabs = allowedTabs || defaultTabs;
+  const defaultTabs  = ["assets", "gallery", "blocks", "colors"];
+  const activeTabs   = allowedTabs || defaultTabs;
+  const tabKeyMap    = { assets: "my", gallery: "gallery", blocks: "blocks", colors: "colors" };
+  const initialTab   = tabKeyMap[activeTabs[0]] || "my";
 
-  const tabKeyMap = {
-    assets:"my",
-    gallery:"gallery",
-    blocks:"blocks",
-    colors:"colors"
-  };
-
-  const initialTab = tabKeyMap[activeTabs[0]] || "my";
-
-  const [tab,setTab] = useState(initialTab);
-  const [deletingId,setDeletingId] = useState(null);
-
+  const [tab,        setTab]        = useState(initialTab);
+  const [uploading,  setUploading]  = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const fileInputRef = useRef();
 
-  const {
-    myAssets=[],
-    loadMyAssets,
-    addMyAsset,
-    removeMyAsset
-  } = useAssetsStore();
+  const { myAssets = [], loadMyAssets, addMyAsset, removeMyAsset } = useAssetsStore();
 
-  useEffect(()=>{ loadMyAssets(); },[]);
+  useEffect(() => { loadMyAssets(); }, []);
 
   const renderPreview = (asset) => {
-
     const src = asset.thumbnail_url || asset.url;
     if (!src) return null;
-
-    const isVideo =
-      src.toLowerCase().endsWith(".mp4") ||
-      src.toLowerCase().endsWith(".webm");
-
+    const isVideo = /\.(mp4|webm)$/i.test(src);
     if (isVideo) {
-      return (
-        <video
-          src={src}
-          muted
-          playsInline
-          preload="metadata"
-          className="h-full w-full object-cover"
-        />
-      );
+      return <video src={src} muted playsInline preload="metadata" className="h-full w-full object-cover" />;
     }
-
-    return (
-      <img
-        src={src}
-        className="h-full w-full object-contain"
-      />
-    );
-
+    return <img src={src} className="h-full w-full object-contain" />;
   };
 
   const handleDelete = async (asset) => {
-
     setDeletingId(asset.id);
     await deleteUserAsset(asset);
     removeMyAsset(asset.id);
     setDeletingId(null);
-
   };
 
   const handleUpload = async (e) => {
-
-    let file = e.target.files[0];
+    const file = e.target.files[0];
     if (!file) return;
-
-    const asset = await uploadUserAsset(file);
-
-    addMyAsset({
-      id:asset.id,
-      url:asset.url,
-      type:asset.type,
-      source:"user"
-    });
-
-    normalizeAsset({ url:asset.url });
-    onClose();
-
+    setUploading(true);
+    try {
+      const asset = await uploadUserAsset(file, null, null, "project", databaseId);
+      addMyAsset({
+        id:         asset.id,
+        url:        asset.url,
+        file_path:  asset.file_path,
+        type:       asset.type,
+        name:       asset.name || file.name,
+        size:       asset.size || file.size,
+        scope:      "project",
+        project_id: databaseId,
+        source:     "user",
+      });
+      normalizeAsset({ url: asset.url });
+      onClose();
+    } catch (err) {
+      console.error("[upload]", err);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   };
 
   const tabs = useMemo(() => {
@@ -132,123 +101,55 @@ export default function ZonePickerModal({
   }, [activeTabs]);
 
   const renderTab = () => {
-
-    if (tab==="my") {
-
+    if (tab === "my") {
       return (
         <MyAssetsTab
           assets={myAssets}
-          onSelect={(a)=>{
-            normalizeAsset(a);
-            onClose();
-          }}
+          onSelect={(a) => { normalizeAsset(a); onClose(); }}
           onDelete={handleDelete}
           deletingId={deletingId}
           renderPreview={renderPreview}
         />
       );
-
     }
-
-    if (tab==="text") {
-      return (
-        <TextTab
-          onSelect={(a) => { onSelect(a); onClose(); }}
-        />
-      );
-    }
-
-    if (tab==="gallery") {
-      return (
-        <GalleryTab
-          onSelect={(a) => { onSelect(a); onClose(); }}
-        />
-      );
-    }
-
-    if (tab==="blocks") {
-
-      return (
-        <BlocksTab
-          onSelect={onSelect}
-          onClose={onClose}
-        />
-      );
-
-    }
-
-    if (tab==="colors") {
-
-      return (
-        <ColorsTab
-          onSelect={onSelect}
-          onClose={onClose}
-        />
-      );
-
-    }
-
+    if (tab === "text")    return <TextTab onSelect={(a) => { onSelect(a); onClose(); }} />;
+    if (tab === "gallery") return <GalleryTab onSelect={(a) => { onSelect(a); onClose(); }} />;
+    if (tab === "blocks")  return <BlocksTab  onSelect={onSelect} onClose={onClose} />;
+    if (tab === "colors")  return <ColorsTab  onSelect={onSelect} onClose={onClose} />;
   };
 
   return (
-
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]"
-      onClick={onClose}
-    >
-
-      <div
-        className="bg-[#1c1c28] w-[1000px] h-[85vh] rounded-lg p-6 flex flex-col"
-        onClick={(e)=>e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={onClose}>
+      <div className="bg-[#1c1c28] w-[1000px] h-[85vh] rounded-lg p-6 flex flex-col" onClick={e => e.stopPropagation()}>
 
         <div className="flex justify-between mb-4">
-
-          <h3 className="text-lg font-semibold">
-            Select Content
-          </h3>
-
+          <h3 className="text-lg font-semibold">Select Content</h3>
           <div className="flex gap-3">
-
             {activeTabs.includes("assets") && (
               <button
-                onClick={()=>fileInputRef.current.click()}
-                className="px-4 py-1 bg-indigo-600 text-white rounded text-sm"
+                onClick={() => fileInputRef.current.click()}
+                disabled={uploading}
+                className="px-4 py-1 bg-indigo-600 text-white rounded text-sm disabled:opacity-50"
               >
-                + Add Asset
+                {uploading ? "Uploading…" : "+ Add Asset"}
               </button>
             )}
-
             <button onClick={onClose}>✕</button>
-
           </div>
-
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*"
-          onChange={handleUpload}
-          className="hidden"
-        />
+        <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" onChange={handleUpload} className="hidden" />
 
         <div className="flex gap-4 mb-4">
-
-          {tabs.map((t)=>(
+          {tabs.map(t => (
             <button
               key={t.key}
-              onClick={()=>{ setTab(t.key); }}
-              className={`px-4 py-1 rounded text-base ${
-                tab===t.key
-                  ? "bg-purple-700 text-white"
-                  : "border"
-              }`}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-1 rounded text-base ${tab === t.key ? "bg-purple-700 text-white" : "border"}`}
             >
               {t.label}
             </button>
           ))}
-
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -256,9 +157,6 @@ export default function ZonePickerModal({
         </div>
 
       </div>
-
     </div>
-
   );
-
 }

@@ -6,7 +6,7 @@ import React, { useRef, useState } from "react";
 import { useProjectStore }  from "../../store/useProjectStore";
 import { uploadUserAsset }  from "../../services/assets/uploadUserAsset";
 import { MUSIC_LIBRARY, MUSIC_KEYS, MUSIC_PREVIEW_URLS } from "../../core/musicRegistry";
-import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTS";
+import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
 
 const TTS_VOICES = [
   { key: "female_warm",   label: "Female — Warm",     desc: "Nova · Warm & natural"     },

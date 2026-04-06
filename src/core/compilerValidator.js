@@ -97,13 +97,13 @@ export function validateBeats(beats) {
             text: beat.caption.text || "",
             style: beat.caption.style || "wordBlaze",
             animation: beat.caption.animation || "fade",
-            position: beat.caption.position || "bottom"
+            position: typeof beat.caption.position === "number" ? beat.caption.position : 80
           }
         : {
             text: "",
             style: "wordBlaze",
             animation: "fade",
-            position: "bottom"
+            position: 80
           },
 
       transition: beat.transition || {

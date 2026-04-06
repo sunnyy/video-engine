@@ -4,13 +4,13 @@
  */
 export const layoutDefaultsRegistry = {
   FullBleed: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1,
     zones: { z1: { assetEnter: "fadeIn", assetExit: "none", assetMotion: "kenburns" } },
   },
 
   HeadlineOverAsset: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.1,
     zones: {
       z1: { assetEnter: "fadeIn", assetExit: "none", assetMotion: "kenburns" },
@@ -19,7 +19,7 @@ export const layoutDefaultsRegistry = {
   },
 
   SplitAssets: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.2,
     zones: {
       z1: { assetEnter: "slideRightIn", assetExit: "none", assetMotion: "pushSlow" },
@@ -28,7 +28,7 @@ export const layoutDefaultsRegistry = {
   },
 
   ThreeStack: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.1,
     zones: {
       z1: { assetEnter: "slideDownIn", assetExit: "none", assetMotion: "kenburns" },
@@ -38,7 +38,7 @@ export const layoutDefaultsRegistry = {
   },
 
   HeadlineReveal: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.2,
     zones: {
       z1: { assetEnter: "popIn", assetExit: "slideUpOut", assetMotion: "none" },
@@ -48,7 +48,7 @@ export const layoutDefaultsRegistry = {
   },
 
   FourCollage: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.3,
     zones: {
       z1: { assetEnter: "fadeIn", assetExit: "none", assetMotion: "none" },
@@ -60,7 +60,7 @@ export const layoutDefaultsRegistry = {
   },
 
   CinematicLowerThird: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 0.9,
     zones: {
       z1: { assetEnter: "scaleIn", assetExit: "none", assetMotion: "kenburns" },
@@ -70,7 +70,7 @@ export const layoutDefaultsRegistry = {
   },
 
   SideBySide: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.0,
     zones: {
       z1: { assetEnter: "slideRightIn", assetExit: "none", assetMotion: "microZoom" },
@@ -80,7 +80,7 @@ export const layoutDefaultsRegistry = {
   },
 
   BigQuote: {
-    captionPosition: "top",
+    captionPosition: 15,
     motionIntensity: 0.8,
     zones: {
       z1: { assetEnter: "popIn", assetExit: "none", assetMotion: "none" },
@@ -89,7 +89,7 @@ export const layoutDefaultsRegistry = {
   },
 
   NumberHook: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.3,
     zones: {
       z1: { assetEnter: "scaleIn", assetExit: "none", assetMotion: "kenburns" },
@@ -99,7 +99,7 @@ export const layoutDefaultsRegistry = {
   },
 
   ListReveal: {
-    captionPosition: "top",
+    captionPosition: 15,
     motionIntensity: 1.0,
     zones: {
       z1: { assetEnter: "slideDownIn", assetExit: "none", assetMotion: "none" },
@@ -110,7 +110,7 @@ export const layoutDefaultsRegistry = {
   },
 
   AssetWithList: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.0,
     zones: {
       z1: { assetEnter: "scaleIn", assetExit: "none", assetMotion: "kenburns" },
@@ -121,7 +121,7 @@ export const layoutDefaultsRegistry = {
   },
 
   SplitTextAsset: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 1.1,
     zones: {
       z1: { assetEnter: "slideRightIn", assetExit: "none", assetMotion: "none" },
@@ -131,7 +131,7 @@ export const layoutDefaultsRegistry = {
   },
 
   StackedDuo: {
-    captionPosition: "middle",
+    captionPosition: 50,
     motionIntensity: 1.2,
     zones: {
       z1: { assetEnter: "slideDownIn", assetExit: "none", assetMotion: "kenburns" },
@@ -141,7 +141,7 @@ export const layoutDefaultsRegistry = {
   },
 
   Magazine: {
-    captionPosition: "bottom",
+    captionPosition: 80,
     motionIntensity: 0.9,
     zones: {
       z1: { assetEnter: "fadeIn", assetExit: "none", assetMotion: "microZoom" },

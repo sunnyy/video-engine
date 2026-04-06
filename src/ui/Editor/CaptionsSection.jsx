@@ -49,11 +49,13 @@ function CaptionPreview({ styleKey, brandColor }) {
   );
 }
 
-const POSITIONS = [
-  { key: "top", label: "Top" },
-  { key: "middle", label: "Middle" },
-  { key: "bottom", label: "Bottom" },
-];
+// Resolve legacy string position to number
+function resolvePositionY(p) {
+  if (typeof p === "number") return p;
+  if (p === "top")    return 15;
+  if (p === "middle") return 50;
+  return 80;
+}
 
 export default function CaptionsSection({ beat }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
@@ -67,7 +69,7 @@ export default function CaptionsSection({ beat }) {
     show:     true,
     text:     beat.spoken || "",
     style:    captionStyleKeys[0],
-    position: "bottom",
+    position: 80,
   };
 
   const brandColor = project?.meta?.brand?.color
@@ -136,7 +138,7 @@ export default function CaptionsSection({ beat }) {
           <textarea
             value={caption.text || beat.spoken || ""}
             onChange={(e) => update("text", e.target.value)}
-            rows={3}
+            rows={2}
             placeholder="Defaults to spoken text"
             className="bg-[#111118] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-2 text-[20px] text-[#e8e8f0] resize-none focus:border-[#7c5cfc] focus:outline-none transition-colors leading-relaxed"
           />
@@ -145,23 +147,30 @@ export default function CaptionsSection({ beat }) {
 
       {/* ── Position ── */}
       <div className="flex flex-col gap-2">
-        <span
-          className="text-[11px] font-bold tracking-widest uppercase text-[#55556a]"
-          style={{ fontFamily: "'JetBrains Mono',monospace" }}
-        >
-          Position
-        </span>
-        <div className="flex gap-[3px] bg-[#0e0e15] border border-[rgba(255,255,255,0.04)] rounded-[8px] p-[3px]">
-          {POSITIONS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => update("position", key)}
-              className={`flex-1 py-[8px] rounded-[6px] text-[14px]  text-[#e8e8f0] font-semibold transition-all bg-[#1c1c28] border-0
-                ${caption.position === key ? "border-2 border-blue-500" : "border-gray-500  hover:text-[#7070a0]"}`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          <span
+            className="text-[11px] font-bold tracking-widest uppercase text-[#55556a]"
+            style={{ fontFamily: "'JetBrains Mono',monospace" }}
+          >
+            Position
+          </span>
+          <span className="text-[11px] text-[#7c5cfc] font-mono">
+            {resolvePositionY(caption.position)}%
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-[#55556a]">Top</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={resolvePositionY(caption.position)}
+            onChange={(e) => update("position", Number(e.target.value))}
+            className="flex-1"
+            style={{ accentColor: "#7c5cfc" }}
+          />
+          <span className="text-[10px] text-[#55556a]">Bottom</span>
         </div>
       </div>
 
@@ -182,7 +191,7 @@ export default function CaptionsSection({ beat }) {
           </button>
         </div>
 
-        <div className="flex flex-col gap-4 overflow-y-auto pr-[2px]" style={{ maxHeight: 420 }}>
+        <div className="flex flex-col gap-4 overflow-y-auto pr-[2px]" style={{ maxHeight: 300 }}>
           {captionStyleKeys.map((key) => {
             const isSelected = caption.style === key;
             const entry = captionStyleRegistry[key];

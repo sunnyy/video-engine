@@ -2,18 +2,22 @@
  * CanvasPreview.jsx
  * src/ui/Editor/CanvasPreview.jsx
  */
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Player } from "@remotion/player";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Player, Thumbnail } from "@remotion/player";
 import { useProjectStore } from "../../store/useProjectStore";
 import VideoComposition from "../../remotion/VideoComposition";
 import ZoneCanvas from "./ZoneCanvas";
+import { getLayoutDef } from "../../core/layoutRegistry";
 
 export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
-  const project       = useProjectStore((s) => s.project);
-  const activeBeatId  = useProjectStore((s) => s.activeBeatId);
-  const setActiveBeat = useProjectStore((s) => s.setActiveBeat);
-  const undo          = useProjectStore((s) => s.undo);
-  const redo          = useProjectStore((s) => s.redo);
+  const project           = useProjectStore((s) => s.project);
+  const activeBeatId      = useProjectStore((s) => s.activeBeatId);
+  const setActiveBeat     = useProjectStore((s) => s.setActiveBeat);
+  const undo              = useProjectStore((s) => s.undo);
+  const redo              = useProjectStore((s) => s.redo);
+  const updateBeat        = useProjectStore((s) => s.updateBeat);
+  const updateBeatSilent  = useProjectStore((s) => s.updateBeatSilent);
+  const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
   const [isPlaying,  setIsPlaying]  = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
@@ -21,6 +25,12 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const playerRef     = useRef(null);
   const containerRef  = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 400, height: 700 });
+
+  // Refs so keyboard handler always reads fresh values without stale closures
+  const selectedZoneIdsRef = useRef(selectedZoneIds);
+  const onSelectZoneRef    = useRef(onSelectZone);
+  useEffect(() => { selectedZoneIdsRef.current = selectedZoneIds; }, [selectedZoneIds]);
+  useEffect(() => { onSelectZoneRef.current = onSelectZone; }, [onSelectZone]);
 
   if (!project) return null;
 
@@ -106,6 +116,13 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     onSelectZone(id, modifierHeld);
   }, [isPlaying, handlePause, onSelectZone]);
 
+  const handleUpdateVideoOverlay = useCallback((voId, updates) => {
+    const lp = useProjectStore.getState().project;
+    updateProjectMeta({
+      overlays: (lp?.overlays || []).map(o => o.id === voId ? { ...o, ...updates } : o),
+    });
+  }, [updateProjectMeta]);
+
   const togglePlayPause = useCallback(() => {
     if (isPlaying) handlePause(); else handlePlay();
   }, [isPlaying, handlePlay, handlePause]);
@@ -113,17 +130,93 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   /* ── Keyboard ── */
   useEffect(() => {
     const onKey = (e) => {
-      const isTyping = ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName);
+      const tag = e.target.tagName;
+      const isTyping = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
+        || e.target.isContentEditable;
+
+      // Global shortcuts — always work
       if (e.code === "Space" && !isTyping) { e.preventDefault(); togglePlayPause(); return; }
       if ((e.metaKey || e.ctrlKey) && e.code === "KeyZ" && !e.shiftKey && !isTyping) { e.preventDefault(); undo(); return; }
-      if (((e.metaKey || e.ctrlKey) && e.code === "KeyY") ||
-          ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "KeyZ")) {
-        if (!isTyping) { e.preventDefault(); redo(); }
+      if (!isTyping && ((e.metaKey || e.ctrlKey) && e.code === "KeyY")) { e.preventDefault(); redo(); return; }
+      if (!isTyping && (e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "KeyZ") { e.preventDefault(); redo(); return; }
+
+      if (isTyping) return;
+
+      // ESC — deselect zone (always, no zone needed)
+      if (e.code === "Escape") {
+        onSelectZoneRef.current(null);
+        return;
+      }
+
+      // Zone shortcuts — only when exactly one zone is selected
+      const ids = selectedZoneIdsRef.current;
+      const selectedZoneId = (ids instanceof Set && ids.size === 1) ? [...ids][0] : null;
+      if (!selectedZoneId) return;
+
+      // Read fresh beat directly from store — avoids stale closure completely
+      const { project: liveProject, activeBeatId: liveBeatId } = useProjectStore.getState();
+      const liveBeat = liveProject?.beats?.find(b => b.id === liveBeatId);
+      if (!liveBeat) return;
+
+      const bz       = liveBeat.zones || {};
+      const override = bz[selectedZoneId] || {};
+      const layoutDef = getLayoutDef(liveBeat.layout);
+      const defZone  = layoutDef?.zones?.find(z => z.id === selectedZoneId) || {};
+
+      // Delete / Backspace — remove zone or video overlay
+      if (e.code === "Delete" || e.code === "Backspace") {
+        e.preventDefault();
+        // Video overlay
+        if (selectedZoneId.startsWith("_vo_")) {
+          const voId = selectedZoneId.slice(4);
+          const { project: lp } = useProjectStore.getState();
+          updateProjectMeta({ overlays: (lp.overlays || []).filter(o => o.id !== voId) });
+          onSelectZoneRef.current(null);
+          return;
+        }
+        const isLayoutZone = layoutDef?.zones?.some(z => z.id === selectedZoneId);
+        if (isLayoutZone) {
+          updateBeat(liveBeat.id, {
+            zones: { ...bz, [selectedZoneId]: { ...override, hidden: true } },
+          });
+        } else {
+          const { [selectedZoneId]: _removed, ...rest } = bz;
+          updateBeat(liveBeat.id, { zones: rest });
+        }
+        onSelectZoneRef.current(null);
+        return;
+      }
+
+      // Ctrl+D — duplicate zone
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyD") {
+        e.preventDefault();
+        const x = override.x ?? defZone.x ?? 0;
+        const y = override.y ?? defZone.y ?? 0;
+        const newId = `z_dup_${Date.now()}`;
+        updateBeat(liveBeat.id, { zones: { ...bz, [newId]: { ...defZone, ...override, x: x + 2, y: y + 2 } } });
+        onSelectZoneRef.current(newId);
+        return;
+      }
+
+      // Arrow keys — nudge zone (plain arrow = 1%, Shift+arrow = 5%)
+      // Works with or without Ctrl/Cmd — avoids OS-level interception of Ctrl+Arrow on Windows
+      if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code)) {
+        e.preventDefault();
+        let x = override.x ?? defZone.x ?? 0;
+        let y = override.y ?? defZone.y ?? 0;
+        const step = e.shiftKey ? 5 : 1;
+        if (e.code === "ArrowLeft")  x -= step;
+        if (e.code === "ArrowRight") x += step;
+        if (e.code === "ArrowUp")    y -= step;
+        if (e.code === "ArrowDown")  y += step;
+        updateBeatSilent(liveBeat.id, { zones: { ...bz, [selectedZoneId]: { ...override, x, y } } });
+        return;
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [togglePlayPause, undo, redo]);
+    // capture:true — fires before any child handler, nothing can stopPropagation before us
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [togglePlayPause, undo, redo, updateBeatSilent]);
 
   return (
     <div className="w-full bg-[#111118] border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
@@ -142,23 +235,48 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           <span>⌘Z undo</span>
           <span className="mx-1 opacity-30">·</span>
           <span>⌘Y redo</span>
+          <span className="mx-1 opacity-30">·</span>
+          <span>⌘D dup</span>
+          <span className="mx-1 opacity-30">·</span>
+          <span>↑↓←→ move</span>
+          <span className="mx-1 opacity-30">·</span>
+          <span>Del remove</span>
+          <span className="mx-1 opacity-30">·</span>
+          <span>Esc deselect</span>
         </div>
       </div>
 
       {/* Canvas area */}
       <div ref={containerRef} className="flex-1 relative flex items-center justify-center overflow-hidden p-2">
 
-        {/* ZoneCanvas — always mounted, hidden behind player when playing */}
-        {activeBeat && (
-          <div style={{ display: showPlayer ? "none" : "flex", alignItems: "center", justifyContent: "center" }}>
-            <ZoneCanvas
-              beat={activeBeat}
-              selectedZoneIds={selectedZoneIds}
-              onSelectZone={handleSelectZone}
-              canvasW={canvasW}
-              canvasH={canvasH}
-              canvasScale={scale}
+        {/* Static edit canvas — Thumbnail behind zone handles */}
+        {activeBeat && !showPlayer && (
+          <div style={{ position: "relative", width: canvasW, height: canvasH }}>
+            {/* Actual composition rendered as still frame */}
+            <Thumbnail
+              acknowledgeRemotionLicense
+              component={VideoComposition}
+              inputProps={{ project }}
+              frameToDisplay={Math.max(0, Math.floor((activeBeat.start_sec || 0) * fps))}
+              compositionWidth={videoW}
+              compositionHeight={videoH}
+              fps={fps}
+              durationInFrames={durationFrames}
+              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", display: "block" }}
             />
+            {/* Zone drag/resize handles on top */}
+            <div style={{ position: "absolute", inset: 0 }}>
+              <ZoneCanvas
+                beat={activeBeat}
+                selectedZoneIds={selectedZoneIds}
+                onSelectZone={handleSelectZone}
+                canvasW={canvasW}
+                canvasH={canvasH}
+                canvasScale={scale}
+                videoOverlays={project.overlays || []}
+                onUpdateVideoOverlay={handleUpdateVideoOverlay}
+              />
+            </div>
           </div>
         )}
 

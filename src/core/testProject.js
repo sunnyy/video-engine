@@ -32,7 +32,7 @@ export const testProject = {
         show: true,
         style: "wordBlaze",
         animation: "fade",
-        position: "bottom",
+        position: 80,
         segments: []
       },
 
@@ -76,7 +76,7 @@ export const testProject = {
         show: true,
         style: "wordBlaze",
         animation: "fade",
-        position: "bottom",
+        position: 80,
         segments: []
       },
 

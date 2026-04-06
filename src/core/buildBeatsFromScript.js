@@ -86,10 +86,9 @@ function chooseCaptionAnimation(intent, energy = 0.5) {
 }
 
 function chooseCaptionPosition(layoutId, index, total, energy) {
-  // "middle" for high energy mid-video beats, otherwise "bottom"
-  if (index === 0 || index === total - 1) return "bottom";
-  if (energy >= 0.8) return "middle";
-  return "bottom";
+  if (index === 0 || index === total - 1) return 80;
+  if (energy >= 0.8) return 50;
+  return 80;
 }
 
 /* ── Transition ── */

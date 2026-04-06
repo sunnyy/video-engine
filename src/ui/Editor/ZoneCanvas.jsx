@@ -2,7 +2,7 @@
  * ZoneCanvas.jsx
  * src/ui/Editor/canvas/ZoneCanvas.jsx
  */
-import React, { memo, useCallback, useRef } from "react";
+import { memo, useCallback, useRef } from "react";
 import { useProjectStore } from "../../../src/store/useProjectStore";
 import { getLayoutDef } from "../../../src/core/layoutRegistry";
 import ZoneHandle from "./ZoneHandle";
@@ -10,12 +10,13 @@ import ZoneHandle from "./ZoneHandle";
 const ZoneContentLayer = memo(({ zone, canvasScale }) => {
   const content  = zone.content || {};
   const st       = zone.style   || {};
-  
+  const delayed  = (zone.start || 0) > 0;
   const rotation = st.rotation ?? 0;
   const scale_   = st.scale ?? 1;
   const insetPct = scale_ < 1 ? `${((1 - scale_) / 2) * 100}%` : "0%";
   const rotStyle = rotation ? { transform: `rotate(${rotation}deg)`, transformOrigin: "center center" } : {};
 
+  // Text zone — values driven by user style, must stay inline
   if (zone.type === "text" && content.text) {
     return (
       <div style={{
@@ -28,7 +29,7 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
         fontFamily: st.fontFamily || "inherit",
         color:      st.color      || "#ffffff",
         textAlign:  st.textAlign  || "center",
-        opacity:    st.opacity ?? 1,
+        opacity:    delayed ? 0.5 : (st.opacity ?? 1),
         background: st.background || "transparent",
         lineHeight: 1.2,
         pointerEvents: "none", userSelect: "none", overflow: "hidden",
@@ -39,15 +40,27 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
     );
   }
 
+  // Block content indicator
+  if (content.kind === "block") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <span className="text-[10px] font-mono text-[rgba(124,92,252,0.7)] bg-[rgba(124,92,252,0.1)] border border-[rgba(124,92,252,0.3)] rounded px-[5px] py-[2px]">
+          ⬛ {content.block?.type || "Block"}
+        </span>
+      </div>
+    );
+  }
+
+  // Asset with src — insetPct, borderRadius, opacity are dynamic
   if (zone.type === "asset" && content.asset?.src) {
-    const asset     = content.asset;
-    const objectFit = asset.objectFit || st.objectFit || "cover";
+    const asset      = content.asset;
+    const objectFit  = asset.objectFit || st.objectFit || "cover";
     const wrapperStyle = {
       position: "absolute",
       top: insetPct, right: insetPct, bottom: insetPct, left: insetPct,
       overflow: "hidden",
       borderRadius: st.borderRadius || 0,
-      
+      opacity: delayed ? 0.5 : 1,
       ...rotStyle,
     };
     const mediaStyle = { width: "100%", height: "100%", objectFit, display: "block" };
@@ -57,21 +70,40 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
     return <div style={wrapperStyle}><img src={asset.src} style={mediaStyle} /></div>;
   }
 
+  // Empty zone fallback — hint or placeholder
+  const hint     = zone.asset_hint;
+  const keywords = hint?.keywords?.length ? hint.keywords : null;
+
   return (
-    <div style={{
-      position: "absolute", inset: 0,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      background: zone.type === "text" ? "rgba(124,92,252,0.05)" : "rgba(255,255,255,0.02)",
-      pointerEvents: "none",
-    }}>
-      <span style={{ fontSize: Math.max(8, 11 * canvasScale), color: "rgba(255,255,255,0.12)", fontFamily: "'JetBrains Mono', monospace" }}>
-        {zone.type === "text" ? "T" : "⬡"}
-      </span>
+    <div className={`absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-[5%] box-border gap-2 ${zone.type === "text" ? "bg-[rgba(124,92,252,0.05)]" : "bg-[rgba(255,255,255,0.02)]"}`}>
+      {zone.type === "asset" && keywords ? (
+        <>
+          <div className="text-[11px] font-mono text-white/50 mb-0.5 tracking-[0.08em]">
+            Add Image/Video Related to:
+          </div>
+          <div className="flex flex-wrap justify-center gap-1">
+            {keywords.map((kw, i) => (
+              <span
+                key={i}
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(kw); }}
+                className="text-[13px] font-mono text-white bg-white/10 border border-white/20 rounded px-2 py-0.5 whitespace-nowrap cursor-copy pointer-events-auto hover:bg-white/20 transition-colors"
+              >
+                {kw}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <span className="text-[11px] font-mono text-white/20">
+          {zone.type === "text" ? "T" : "⬡"}
+        </span>
+      )}
     </div>
   );
 }, (prev, next) =>
-  JSON.stringify(prev.zone.content) === JSON.stringify(next.zone.content) &&
-  JSON.stringify(prev.zone.style)   === JSON.stringify(next.zone.style)   &&
+  JSON.stringify(prev.zone.content)    === JSON.stringify(next.zone.content)    &&
+  JSON.stringify(prev.zone.style)      === JSON.stringify(next.zone.style)      &&
+  JSON.stringify(prev.zone.asset_hint) === JSON.stringify(next.zone.asset_hint) &&
   prev.zone.start  === next.zone.start &&
   prev.canvasScale === next.canvasScale
 );
@@ -79,6 +111,7 @@ const ZoneContentLayer = memo(({ zone, canvasScale }) => {
 export default function ZoneCanvas({
   beat, selectedZoneIds, onSelectZone,
   canvasW, canvasH, canvasScale,
+  videoOverlays, onUpdateVideoOverlay,
 }) {
   const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
   const _pushHistory     = useProjectStore((s) => s._pushHistory);
@@ -96,15 +129,16 @@ export default function ZoneCanvas({
 
   const defZoneIds = new Set((layoutDef?.zones || []).map(z => z.id));
 
-  const defZones = (layoutDef?.zones || []).map(d => {
+  const defZones = (layoutDef?.zones || []).flatMap(d => {
     const o = beatZones[d.id] || {};
-    return {
+    if (o.hidden) return [];
+    return [{
       ...d,
       x: o.x ?? d.x, y: o.y ?? d.y,
       width: o.width ?? d.width, height: o.height ?? d.height,
       zIndex: o.zIndex ?? d.zIndex, start: o.start ?? d.start ?? 0,
       content: o.content || {}, style: { ...d.style, ...(o.style || {}) }, background: o.background || {},
-    };
+    }];
   });
 
   const extraZones = Object.entries(beatZones)
@@ -116,21 +150,59 @@ export default function ZoneCanvas({
       content: z.content || {}, style: z.style || {}, background: z.background || {},
     }));
 
-  const allZones = [...defZones, ...extraZones];
+  const voZones = (videoOverlays || [])
+    .filter(ov => ov.type === "ImageOverlay" || ov.type === "VideoOverlay")
+    .map(ov => ({
+      id:      `_vo_${ov.id}`,
+      _voId:   ov.id,
+      type:    "asset",
+      x:       ov.x      ?? 10,
+      y:       ov.y      ?? 20,
+      width:   ov.width  ?? 80,
+      height:  ov.height ?? 50,
+      zIndex:  ov.zIndex ?? 20,
+      start:   0,
+      content: { kind: "asset", asset: { src: ov.src, type: ov.type === "VideoOverlay" ? "video" : "image" } },
+      style:   { objectFit: ov.objectFit || "contain" },
+      background: {},
+      _isVideoOverlay: true,
+    }));
+
+  const allZones = [...defZones, ...extraZones, ...voZones];
+
+  // Attach beat's asset_hint to the first empty asset zone
+  const beatAssetHint = beat?.asset_hint || null;
+  if (beatAssetHint) {
+    let attached = false;
+    allZones.forEach(z => {
+      if (!attached && z.type === "asset" && !z.content?.asset?.src && !z._isVideoOverlay) {
+        z.asset_hint = beatAssetHint;
+        attached = true;
+      }
+    });
+  }
 
   const handleUpdate = useCallback((zoneId, updates) => {
+    if (zoneId.startsWith("_vo_") && onUpdateVideoOverlay) {
+      onUpdateVideoOverlay(zoneId.slice(4), updates);
+      return;
+    }
     const bz = beatZonesRef.current;
     updateBeatSilent(beatIdRef.current, { zones: { ...bz, [zoneId]: { ...(bz[zoneId] || {}), ...updates } } });
-  }, [updateBeatSilent]);
+  }, [updateBeatSilent, onUpdateVideoOverlay]);
 
   const handleUpdateMulti = useCallback((patchMap) => {
     const bz = beatZonesRef.current;
     const newZones = { ...bz };
     for (const [id, patch] of Object.entries(patchMap)) {
-      newZones[id] = { ...(bz[id] || {}), ...patch };
+      if (id.startsWith("_vo_") && onUpdateVideoOverlay) {
+        onUpdateVideoOverlay(id.slice(4), patch);
+      } else {
+        newZones[id] = { ...(bz[id] || {}), ...patch };
+      }
     }
     updateBeatSilent(beatIdRef.current, { zones: newZones });
-  }, [updateBeatSilent]);
+  }, [updateBeatSilent, onUpdateVideoOverlay]);
 
   const handlePushHistory = useCallback(() => _pushHistory(), [_pushHistory]);
 
@@ -145,57 +217,45 @@ export default function ZoneCanvas({
     if (e.target === e.currentTarget) onSelectZone(null);
   }, [onSelectZone]);
 
-  const bg = beat?.layoutBackground;
-  const renderBg = () => {
-    if (!bg) return <div style={{ position:"absolute", inset:0, background:"#0b0b10" }} />;
-    if (bg.type === "color") return <div style={{ position:"absolute", inset:0, background: bg.value }} />;
-    if (bg.type === "image") return <img src={bg.value} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }} />;
-    if (bg.type === "video") return <video src={bg.value} muted loop autoPlay style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }} />;
-    return <div style={{ position:"absolute", inset:0, background:"#0b0b10" }} />;
-  };
-
   return (
-    <div data-canvas onClick={handleCanvasClick}
+    <div
+      data-canvas
+      onClick={handleCanvasClick}
+      className="relative overflow-hidden rounded-[8px] shrink-0 cursor-default select-none"
       style={{
-        position: "relative",
-        width:    canvasW,
-        height:   canvasH,
-        overflow: "hidden",
-        borderRadius: 8,
+        width: canvasW, height: canvasH,
         boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-        flexShrink: 0,
-        cursor: "default",
       }}
     >
-      {renderBg()}
       {allZones.map(zone => {
         const content = zone.content || {};
-        const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar")
-                     || (zone.type === "text"  && !content.text);
+        const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
+                     || (zone.type === "text"  && !content.text && content.kind !== "block");
         return (
-          <div key={`content_${zone.id}`} style={{
-            position: "absolute", left: `${zone.x}%`, top: `${zone.y}%`,
+          <div key={`content_${zone.id}`} className="absolute overflow-hidden" style={{
+            left: `${zone.x}%`, top: `${zone.y}%`,
             width: `${zone.width}%`, height: `${zone.height}%`,
-            zIndex: zone.zIndex ?? 1, overflow: "hidden",
+            zIndex: zone.zIndex ?? 1,
             borderRadius: zone.style?.borderRadius || 0,
           }}>
             {zone.background?.kind === "color" && (
-              <div style={{ position:"absolute", inset:0, background: zone.background.color }} />
+              <div className="absolute inset-0" style={{ background: zone.background.color }} />
             )}
             <ZoneContentLayer zone={zone} canvasScale={canvasScale} />
-            {/* Zone border — rendered as inset div so overflow:hidden doesn't clip it */}
             {isEmpty && (
-              <div style={{
-                position: "absolute", inset: 0,
-                border: "1.5px dashed rgba(255,255,255,0.35)",
-                borderRadius: zone.style?.borderRadius || 0,
-                pointerEvents: "none",
-                zIndex: 99,
-              }} />
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  border: "1.5px dashed rgba(255,255,255,0.35)",
+                  borderRadius: zone.style?.borderRadius || 0,
+                  zIndex: 99,
+                }}
+              />
             )}
           </div>
         );
       })}
+
       {allZones.map(zone => (
         <ZoneHandle key={`handle_${zone.id}`} zone={zone}
           isSelected={selectedZoneIds instanceof Set
@@ -211,69 +271,26 @@ export default function ZoneCanvas({
           allZones={allZones}
         />
       ))}
+
       {allZones.filter(z => (z.start || 0) > 0).map(zone => (
-        <div key={`delay_${zone.id}`} style={{
-          position: "absolute", left: `${zone.x}%`, top: `${zone.y}%`,
-          fontSize: 8, color: "rgba(255,200,0,0.7)", background: "rgba(0,0,0,0.5)",
-          padding: "1px 3px", borderRadius: 3, fontFamily: "'JetBrains Mono', monospace",
-          pointerEvents: "none", zIndex: 999, lineHeight: "12px",
-        }}>+{zone.start}s</div>
+        <div key={`delay_${zone.id}`}
+          className="absolute text-[8px] font-mono text-[rgba(255,200,0,0.7)] bg-black/50 px-[3px] py-[1px] rounded-[3px] pointer-events-none leading-[12px]"
+          style={{ left: `${zone.x}%`, top: `${zone.y}%`, zIndex: 999 }}
+        >
+          +{zone.start}s
+        </div>
       ))}
 
-      {/* Caption preview — static render when caption is on */}
-      {beat?.caption?.show && beat?.caption?.text && (() => {
-        const cap      = beat.caption;
-        const words    = cap.text.trim().split(/\s+/).filter(Boolean).slice(0, 6);
-        const pos      = cap.position || "bottom";
-        const fs       = Math.max(12, Math.round(72 * canvasScale));
-        const posStyle = pos === "top"
-          ? { top: "10%"  }
-          : pos === "middle"
-          ? { top: "50%", transform: "translateX(-50%) translateY(-50%)" }
-          : { bottom: "12%" };
-
-        return (
-          <div style={{
-            position: "absolute",
-            left: "50%",
-            transform: pos === "middle" ? "translateX(-50%) translateY(-50%)" : "translateX(-50%)",
-            width: "88%",
-            textAlign: "center",
-            pointerEvents: "none",
-            zIndex: 200,
-            lineHeight: 1.1,
-            ...posStyle,
-          }}>
-            {words.map((word, i) => (
-              <span key={i} style={{
-                display:       "inline-block",
-                margin:        `0 ${Math.max(2, 4 * canvasScale)}px`,
-                fontFamily:    "Impact, 'Arial Black', sans-serif",
-                fontSize:      fs,
-                fontWeight:    900,
-                color:         i === 0 ? "#7c5cfc" : "#ffffff",
-                textShadow:    `0 0 ${Math.round(12 * canvasScale)}px rgba(0,0,0,1), 0 0 ${Math.round(4 * canvasScale)}px rgba(0,0,0,1)`,
-                WebkitTextStroke: `${Math.max(1, Math.round(2 * canvasScale))}px rgba(0,0,0,0.8)`,
-              }}>
-                {word}
-              </span>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* CC badge */}
       {beat?.caption && (
-        <div style={{
-          position: "absolute", bottom: 4, right: 6,
-          fontSize: Math.max(6, 8 * canvasScale),
-          fontFamily: "monospace",
-          color: beat.caption.show ? "rgba(124,92,252,1)" : "rgba(255,255,255,0.18)",
-          background: "rgba(0,0,0,0.7)",
-          padding: "1px 4px", borderRadius: 3,
-          pointerEvents: "none", zIndex: 999,
-        }}>
-          {beat.caption.show ? "CC" : "CC off"}
+        <div
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 font-mono bg-black/60 px-[6px] py-[2px] rounded-[3px] pointer-events-none whitespace-nowrap"
+          style={{
+            fontSize: Math.max(7, 9 * canvasScale),
+            color: beat.caption.show ? "rgba(124,92,252,0.9)" : "rgba(255,255,255,0.2)",
+            zIndex: 998,
+          }}
+        >
+          {beat.caption.show ? `CC · ${beat.caption.style}` : "CC off"}
         </div>
       )}
     </div>

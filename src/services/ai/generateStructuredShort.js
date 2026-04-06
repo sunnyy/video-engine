@@ -10,6 +10,11 @@
 
 import { buildBeatsFromScript } from "../../core/buildBeatsFromScript";
 import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/musicRegistry";
+import { generateZoneImage } from "../../server/assets/falService";
+import { getLayoutDef } from "../../core/layoutRegistry";
+import { uploadUserAsset } from "../assets/uploadUserAsset";
+import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
+import { getUserRules } from "../../hooks/useUserRules";
 
 /* ─────────────────────────────────────────────────────────────
    INTENT DEFINITIONS
@@ -131,14 +136,22 @@ function getLanguageInstruction(language) {
 /* ─────────────────────────────────────────────────────────────
    BUILD THE PROMPT
 ───────────────────────────────────────────────────────────── */
-function buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone, brandName }) {
-  const typeConfig = VIDEO_TYPE_CONFIGS[videoType] || VIDEO_TYPE_CONFIGS.viral;
-  const beatCount  = BEAT_COUNTS[durationCategory] || BEAT_COUNTS.short;
-  const langInstr  = getLanguageInstruction(language);
+function buildUserRulesBlock() {
+  const { do: doRules, dont: dontRules } = getUserRules();
+  if (!doRules.length && !dontRules.length) return "";
+  const lines = [];
+  if (doRules.length)   lines.push(`ALWAYS: ${doRules.join(" | ")}`);
+  if (dontRules.length) lines.push(`NEVER: ${dontRules.join(" | ")}`);
+  return `\nCREATOR RULES (highest priority — follow without exception):\n${lines.join("\n")}\n`;
+}
 
+function buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone }) {
+  const typeConfig    = VIDEO_TYPE_CONFIGS[videoType] || VIDEO_TYPE_CONFIGS.viral;
+  const beatCount     = BEAT_COUNTS[durationCategory] || BEAT_COUNTS.short;
+  const langInstr     = getLanguageInstruction(language);
   const audienceInstr = AUDIENCE_CONFIGS[audience] || AUDIENCE_CONFIGS.general;
-  const toneOverride  = TONE_OVERRIDES[tone]       || "";
-  const brandLine     = brandName ? `BRAND / CHANNEL: ${brandName} — you may reference this naturally in the last beat if it fits.` : "";
+  const toneOverride  = TONE_OVERRIDES[tone] || "";
+  const userRules     = buildUserRulesBlock();
 
   return `
 You are a viral short-form video scriptwriter and creative director.
@@ -151,11 +164,10 @@ STRUCTURE: ${typeConfig.structure}
 AVOID: ${typeConfig.avoid}
 
 AUDIENCE: ${audienceInstr}
-${brandLine}
 
 TOPIC: ${topic}
 ${context ? `\nCONTEXT / FACTS TO USE:\n${context}` : ""}
-
+${userRules}
 ${INTENT_GUIDE}
 
 ${VISUAL_HINT_GUIDE}
@@ -197,7 +209,11 @@ OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no explanation:
       "intent": "shock | curiosity | proof | irony | reveal | empathy | urgency | explanation | contrast | punchline",
       "energy": 0.0,
       "visual_hint": "faces | text_only | stat | comparison | list | scene | product | none",
-      "emphasis_words": ["word1", "word2"]
+      "emphasis_words": ["word1", "word2"],
+      "asset_hint": {
+        "keywords": ["keyword1", "keyword2", "keyword3"],
+        "prompt": "Specific photographable scene for image generation, e.g. 'fresh lemon and ginger on wooden surface, soft morning light, close-up'"
+      }
     }
   ]
 }
@@ -207,7 +223,9 @@ FIELD NOTES:
 - intent: the emotional/narrative purpose of this beat
 - energy: 0.0 (calm) to 1.0 (explosive) — vary this across beats
 - visual_hint: what kind of visual would best serve this beat
-- emphasis_words: 1–3 words from the spoken text that should be visually highlighted in captions
+- emphasis_words: 1–3 words from spoken text to highlight in captions
+- asset_hint.keywords: 2–4 concrete nouns describing what image to show
+- asset_hint.prompt: specific photographable scene for AI image gen — no abstractions, describe exactly what's in frame
 `.trim();
 }
 
@@ -250,6 +268,10 @@ function parseAIResponse(raw) {
                       : 0.5,
     visual_hint:    validHints.includes(beat.visual_hint) ? beat.visual_hint : "none",
     emphasis_words: Array.isArray(beat.emphasis_words) ? beat.emphasis_words : [],
+    asset_hint: beat.asset_hint ? {
+      keywords: Array.isArray(beat.asset_hint.keywords) ? beat.asset_hint.keywords : [],
+      prompt:   String(beat.asset_hint.prompt || "").trim(),
+    } : null,
   }));
 
   return parsed;
@@ -260,30 +282,21 @@ function parseAIResponse(raw) {
 ───────────────────────────────────────────────────────────── */
 export async function generateStructuredShort({
   topic,
-  mode            = "faceless",
-  orientation     = "9:16",
+  mode             = "faceless",
+  orientation      = "9:16",
   durationCategory = "short",
-  assetSource     = "stock",
-  uploadedAssets  = [],
-  language        = "english",
-  videoType       = "viral",
-  context         = "",
-  brandColor      = null,
-  brandName       = null,
-  audience        = "general",
-  tone            = "bold",
+  generateImages   = false,
+  generateTTS      = false,
+  language         = "english",
+  videoType        = "viral",
+  context          = "",
+  brandColor       = null,
+  audience         = "general",
+  tone             = "bold",
+  projectId        = null,
 }) {
 
-  const prompt = buildPrompt({
-    topic,
-    videoType,
-    language,
-    durationCategory,
-    context,
-    audience,
-    tone,
-    brandName,
-  });
+  const prompt = buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone });
 
   /* ── API call ── */
   const response = await fetch("http://localhost:5000/api/generate", {
@@ -302,48 +315,79 @@ export async function generateStructuredShort({
   const rawText      = data.text || data.content || JSON.stringify(data);
   const parsedScript = parseAIResponse(rawText);
 
-  /* ── Assemble beats ── */
-  const beats = await buildBeatsFromScript({
+  let beats = await buildBeatsFromScript({
     structuredBeats: parsedScript.beats,
-    mode,
-    videoType,
-    orientation,
-    durationCategory,
-    assetSource,
-    uploadedAssets,
-    language,
-    topic,
-    brandColor,
-    brandName,
-    audience,
-    tone,
+    mode, videoType, orientation, durationCategory,
+    language, topic, brandColor, audience, tone,
+    assetSource: generateImages ? "ai" : "none",
   });
 
+  // Attach asset_hint to each beat for editor display
+  parsedScript.beats.forEach((src, i) => {
+    if (beats[i] && src.asset_hint) beats[i].asset_hint = src.asset_hint;
+  });
+
+  // Auto-generate images if requested
+  if (generateImages) {
+    await Promise.allSettled(beats.map(async (beat, beatIndex) => {
+      const hint = parsedScript.beats[beatIndex]?.asset_hint;
+      if (!hint?.prompt) return;
+      const def       = getLayoutDef(beat.layout);
+      const assetZone = def?.zones.find(z => z.type === "asset");
+      if (!assetZone) return;
+      try {
+        const img = await generateZoneImage({
+          spoken: beat.spoken, intent: beat.intent,
+          visual_hint: beat.visual_hint, topic, orientation,
+          beatIndex, zoneIndex: 0, promptOverride: hint.prompt,
+          projectId,
+        });
+        if (img?.url) {
+          beat.zones[assetZone.id] = {
+            ...(beat.zones[assetZone.id] || {}),
+            content: { kind: "asset", asset: { src: img.url, type: "image", objectFit: "cover", motion: "kenburns" } },
+          };
+        }
+      } catch (e) {
+        console.warn(`[img gen] beat ${beatIndex} failed:`, e.message);
+      }
+    }));
+  }
+
   const script = parsedScript.beats.map(b => b.spoken).join(" ");
+
+  // Generate TTS if requested
+  let ttsAudio = null;
+  if (generateTTS && script.trim()) {
+    try {
+      const ttsRes = await fetch("http://localhost:5000/api/generate-tts", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ script, voice: "female_warm", speed: 1.0 }),
+      });
+      if (ttsRes.ok) {
+        const ttsData  = await ttsRes.json();
+        const audioRes = await fetch(ttsData.url);
+        const blob     = await audioRes.blob();
+        const file     = new File([blob], `tts-${Date.now()}.mp3`, { type: "audio/mpeg" });
+        const uploaded = await uploadUserAsset(file, "audio", null, "project", projectId);
+
+        // Sync beat durations to TTS duration
+        const duration = await measureAudioDuration(uploaded.url);
+        beats = syncBeatsToTTS(beats, duration);
+
+        ttsAudio = { src: uploaded.url, volume: 1, generated: true, voice: "female_warm" };
+      }
+    } catch (e) {
+      console.warn("[TTS gen] failed:", e.message);
+    }
+  }
 
   const autoMusicKey = pickAutoMusic(videoType, tone);
 
   return {
-    script,
-    beats,
-    meta: {
-      videoType:    parsedScript.videoType,
-      language:     parsedScript.language,
-      emotionalArc: parsedScript.emotionalArc,
-      brandColor,
-      brandName,
-      audience,
-      tone,
-    },
-    audio: {
-      tts:   null,
-      music: autoMusicKey ? {
-        musicKey: autoMusicKey,
-        src:      MUSIC_PREVIEW_URLS[autoMusicKey],
-        volume:   0.12,
-      } : null,
-    },
-    assetSource,
-    uploadedAssets,
+    script, beats,
+    meta: { videoType: parsedScript.videoType, language: parsedScript.language, emotionalArc: parsedScript.emotionalArc, brandColor, audience, tone },
+    audio: { tts: ttsAudio, music: autoMusicKey ? { musicKey: autoMusicKey, src: MUSIC_PREVIEW_URLS[autoMusicKey], volume: 0.12 } : null },
   };
 }

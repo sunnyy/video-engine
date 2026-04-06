@@ -1,22 +1,14 @@
 import { create } from "zustand";
 import { supabase } from "../lib/supabase";
 
-function normalizeOrientation(o) {
-  if (o === "9:16") return "vertical";
-  if (o === "16:9") return "horizontal";
-  return o || "any";
-}
-
 export const useAssetsStore = create((set, get) => ({
 
-  myAssets: [],
+  myAssets:      [],
   galleryAssets: [],
-
-  loadedMy: false,
+  loadedMy:      false,
   loadedGallery: false,
 
   loadMyAssets: async () => {
-
     if (get().loadedMy) return;
 
     const { data } = await supabase
@@ -24,91 +16,44 @@ export const useAssetsStore = create((set, get) => ({
       .select("*")
       .order("created_at", { ascending: false });
 
-    const assets =
-      data
-        ?.filter((a) => {
+    const assets = (data || [])
+      .filter(a => a.type && a.type !== "avatar" && a.type !== "tts")
+      .map(a => ({
+        id:         a.id,
+        url:        a.url,
+        file_path:  a.file_path,
+        type:       a.type,
+        name:       a.name  || a.url?.split("/").pop() || "asset",
+        size:       a.size  || 0,
+        scope:      a.scope || "project",
+        project_id: a.project_id || null,
+        orientation: a.orientation || "any",
+        source:     "user",
+      }));
 
-          if (!a.type) return false;
-          if (a.type === "audio") return false;
-          if (a.type === "avatar") return false;
-          if (a.type === "tts") return false;
-
-          return true;
-
-        })
-        .map((a) => ({
-          id: a.id,
-          url: a.url,
-          type: a.type,
-          orientation: a.orientation || "any",
-          source: "user"
-        })) || [];
-
-    set({
-      myAssets: assets,
-      loadedMy: true
-    });
-
+    set({ myAssets: assets, loadedMy: true });
   },
 
-  loadGalleryAssets: async (orientation = "9:16") => {
-    return false;
-
-    const o = normalizeOrientation(orientation);
-
-    const { data } = await supabase
-      .from("assets_library")
-      .select("*");
-
-    const assets =
-      data
-        ?.filter((a) => {
-
-          if (!o) return true;
-
-          return (
-            a.orientation === "any" ||
-            a.orientation === o
-          );
-
-        })
-        .map((a) => ({
-          id: a.id,
-          url: a.url,
-          thumbnail_url: a.thumbnail_url,
-          type: a.type,
-          orientation: a.orientation,
-          category: a.category,
-          title: a.title,
-          tags: a.tags || [],
-          source: "library"
-        })) || [];
-
-    set({
-      galleryAssets: assets,
-      loadedGallery: true
-    });
-
+  reloadMyAssets: async () => {
+    set({ loadedMy: false });
+    await get().loadMyAssets();
   },
 
   addMyAsset: (asset) => {
-
-    const current = get().myAssets;
-
-    set({
-      myAssets: [asset, ...current]
-    });
-
+    set({ myAssets: [asset, ...get().myAssets] });
   },
 
   removeMyAsset: (id) => {
+    set({ myAssets: get().myAssets.filter(a => a.id !== id) });
+  },
 
-    const current = get().myAssets;
-
+  updateMyAsset: (id, patch) => {
     set({
-      myAssets: current.filter((a) => a.id !== id)
+      myAssets: get().myAssets.map(a => a.id === id ? { ...a, ...patch } : a),
     });
+  },
 
-  }
+  /* Gallery (currently disabled, kept for future use) */
+  loadGalleryAssets: async () => { /* no-op */ },
 
 }));

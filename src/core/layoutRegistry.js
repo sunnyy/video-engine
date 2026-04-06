@@ -20,7 +20,7 @@ export const layoutRegistry = Object.fromEntries(
       captionStrategy: def.captionStrategy ?? "always",
       zones: def.zones.map((z) => z.id),
       supportsAvatar: def.zones.some((z) => z.content?.kind === "avatar"),
-      captionPosition: "bottom",
+      captionPosition: 80,
       structure: { heading: true, blocks: true, caption: true },
     },
   ]),

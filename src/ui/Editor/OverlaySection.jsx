@@ -245,7 +245,7 @@ function OverlayCard({ overlay, beat, onUpdate, onRemove }) {
   const safeAnchors = getSafePlacementAnchors({
     layout:           beat.layout,
     overlayType:      overlay.type,
-    captionPosition:  beat.caption?.position || "bottom",
+    captionPosition:  beat.caption?.position ?? 80,
     existingOverlays: (beat.overlays || []).filter(o => o.id !== overlay.id),
   });
 

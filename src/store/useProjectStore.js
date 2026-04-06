@@ -27,7 +27,7 @@ function createRawBeat(order, mode) {
       text: "",
       style: "wordBlaze",
       animation: "fade",
-      position: "bottom",
+      position: 80,
     },
     transition: { type: "cut", duration: 0.3 },
     spoken: "",

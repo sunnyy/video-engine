@@ -6,6 +6,8 @@
  * Uses concept-to-visual translation — not raw spoken text.
  */
 
+import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
+
 const SERVER = "http://localhost:5000";
 
 /* ── Concept → Visual Scene translator ──────────────────────
@@ -268,10 +270,15 @@ function buildImagePrompt({ spoken, intent, visual_hint, topic, orientation, bea
 }
 
 /* ── Generate single image ── */
-export async function generateZoneImage({ spoken, intent, visual_hint, topic, orientation, beatIndex = 0, zoneIndex = 0 }) {
-  // Vary beat index by zone so different zones in same beat get different compositions
+export async function generateZoneImage({
+  spoken, intent, visual_hint, topic, orientation,
+  beatIndex = 0, zoneIndex = 0, promptOverride = null,
+  projectId = null,
+}) {
   const effectiveIndex = beatIndex * 3 + zoneIndex;
-  const prompt = buildImagePrompt({ spoken, intent, visual_hint, topic, orientation, beatIndex: effectiveIndex });
+  const prompt = promptOverride
+    ? `${promptOverride}, ${orientation === "9:16" ? "vertical 9:16 portrait composition" : "horizontal 16:9 landscape composition"}, photorealistic, no text, no watermark, sharp focus, 8k quality`
+    : buildImagePrompt({ spoken, intent, visual_hint, topic, orientation, beatIndex: effectiveIndex });
 
   console.log(`[fal] Beat ${beatIndex} Zone ${zoneIndex}: "${prompt.slice(0, 80)}..."`);
 
@@ -284,12 +291,25 @@ export async function generateZoneImage({ spoken, intent, visual_hint, topic, or
   if (!res.ok) throw new Error(`Fal.ai proxy failed: ${res.status}`);
 
   const data = await res.json();
-  return {
-    url:    data.url,
-    type:   "image",
-    width:  orientation === "9:16" ? 768  : 1344,
-    height: orientation === "9:16" ? 1344 : 768,
-  };
+  const falUrl = data.url;
+  if (!falUrl) throw new Error("No image URL returned from Fal.ai");
+
+  const w = orientation === "9:16" ? 768  : 1344;
+  const h = orientation === "9:16" ? 1344 : 768;
+
+  // Re-upload to Supabase for permanent storage (Fal.ai URLs expire)
+  try {
+    const imgRes = await fetch(falUrl);
+    if (!imgRes.ok) throw new Error("Failed to fetch Fal.ai image");
+    const blob   = await imgRes.blob();
+    const file   = new File([blob], `ai-gen-${Date.now()}.jpg`, { type: "image/jpeg" });
+    const asset  = await uploadUserAsset(file, "image", null, "project", projectId);
+    console.log(`[fal] Beat ${beatIndex} saved to Supabase: ${asset.url}`);
+    return { url: asset.url, assetId: asset.id, type: "image", width: w, height: h };
+  } catch (e) {
+    console.warn(`[fal] Re-upload failed for beat ${beatIndex}, using temporary Fal.ai URL:`, e.message);
+    return { url: falUrl, type: "image", width: w, height: h };
+  }
 }
 
 /* ── Generate multiple images with concurrency ── */

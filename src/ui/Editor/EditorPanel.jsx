@@ -2,18 +2,18 @@
  * EditorPanel.jsx
  * src/ui/Editor/EditorPanel.jsx
  */
-import React from "react";
-import BeatEditor         from "./BeatEditor";
-import AudioSection       from "./AudioSection";
-import AvatarSection      from "./AvatarSection";
+import BeatEditor          from "./BeatEditor";
+import AudioSection        from "./AudioSection";
+import AvatarSection       from "./AvatarSection";
 import VideoOverlaySection from "./VideoOverlaySection";
-import BrandingSection    from "./BrandingSection";
+import BrandingSection     from "./BrandingSection";
+import FilesSection        from "./FilesSection";
+import MyRulesSection      from "./MyRulesSection";
 
 export default function EditorPanel({
   activeTab, setActiveTab,
   selectedZoneId, selectedZoneIds, onSelectZone,
 }) {
-  // When a zone is selected from canvas, switch to beats tab so ZonesSection is visible
   const handleSelectZone = (id, modifierHeld) => {
     if (id !== null) setActiveTab("beats");
     onSelectZone(id, modifierHeld);
@@ -51,9 +51,24 @@ export default function EditorPanel({
     );
   }
 
-  // Default: beats tab — shows BeatEditor with zones, captions, etc.
+  if (activeTab === "files") {
+    return (
+      <div className="flex-1 flex flex-col h-full min-h-0">
+        <FilesSection />
+      </div>
+    );
+  }
+
+  if (activeTab === "myRules") {
+    return (
+      <div className="flex-1 flex flex-col h-full min-h-0">
+        <MyRulesSection />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1  flex flex-col h-full min-h-0">
+    <div className="flex-1 flex flex-col h-full min-h-0">
       <div className="flex-1 flex min-h-0">
         <BeatEditor
           selectedZoneId={selectedZoneId}

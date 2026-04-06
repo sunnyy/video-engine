@@ -202,9 +202,10 @@ export default function ZoneHandle({
     return zone.id;
   };
 
+  const isVideoOverlay = zone._isVideoOverlay ?? false;
   const outlineColor = isSelected
-    ? (isMulti ? "#2dd4bf" : "#7c5cfc")
-    : hovered ? (zone.type === "text" ? "rgba(167,143,255,0.6)" : "rgba(255,255,255,0.5)")
+    ? (isVideoOverlay ? "#00d4c8" : isMulti ? "#2dd4bf" : "#7c5cfc")
+    : hovered ? (isVideoOverlay ? "rgba(0,212,200,0.6)" : zone.type === "text" ? "rgba(167,143,255,0.6)" : "rgba(255,255,255,0.5)")
     : "transparent";
 
   const isVisible = isSelected || hovered;
@@ -217,7 +218,10 @@ export default function ZoneHandle({
       style={{
         position:  "absolute",
         left: pxX, top: pxY, width: pxW, height: pxH,
-        zIndex:    (zone.zIndex ?? 1) + 100,
+        // Scale z-index by zone's visual layer so higher-layer zones are always
+        // clickable above lower-layer zones, even when the lower zone is selected.
+        // Selected gets +50 boost within its own layer (not a global 9000).
+        zIndex:    (zone.zIndex ?? 1) * 100 + (isSelected ? 50 : 0),
         cursor:    "grab",
         boxSizing: "border-box",
       }}
@@ -258,7 +262,7 @@ export default function ZoneHandle({
             left: `calc(${h.x * 100}% - ${HANDLE_SIZE / 2}px)`,
             top:  `calc(${h.y * 100}% - ${HANDLE_SIZE / 2}px)`,
             background: "#7c5cfc", border: "1.5px solid #fff",
-            borderRadius: 2, cursor: h.cursor, zIndex: 999,
+            borderRadius: 2, cursor: h.cursor, zIndex: 9999,
           }}
         />
       ))}
@@ -273,7 +277,7 @@ export default function ZoneHandle({
             position: "absolute", right: -18, bottom: -18,
             width: 20, height: 20, borderRadius: "50%",
             background: "#1a1a2e", border: "1.5px solid #7c5cfc",
-            cursor: "crosshair", zIndex: 999,
+            cursor: "crosshair", zIndex: 9999,
             display: "flex", alignItems: "center", justifyContent: "center",
             userSelect: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
           }}

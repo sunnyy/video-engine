@@ -71,13 +71,13 @@ function Divider() {
 
 export default function ZoneEditor({
   beatId,
-  slot, zone, zoneDef, zoneType, isCustomZone,
+  slot, zone, zoneDef, zoneType,
   openPicker,
   updateTextContent, updateTextStyle, updateTextStyleBulk,
-  updateContentProp, updateBackgroundProp,
+  updateContentProp,
   setZoneStyle, setZoneLayout,
   setZoneStyleSilent, setZoneLayoutSilent,
-  clearContent, clearBackground,
+  clearContent,
   onDelete,
 }) {
   const commitBeat = useProjectStore(s => s.commitBeat);
@@ -85,7 +85,6 @@ export default function ZoneEditor({
   const safeZone = zone || {};
   const content  = safeZone.content    || {};
   const style    = safeZone.style      || {};
-  const bg       = safeZone.background || {};
 
   const isText = zoneType === "text";
 
@@ -269,75 +268,22 @@ export default function ZoneEditor({
                 <Sel label="Object Fit" value={content.asset?.objectFit || "cover"} onChange={v => updateContentProp(slot,"objectFit",v)} options={["cover","contain"]} />
                 <Slider label="Rounded Border" value={radius}
                   onChangeSilent={v => setStyleSilent("borderRadius", v)}
-                  onCommit={commit} min={0} max={500} unit="px" />
+                  onCommit={commit} min={0} max={300} unit="px" />
                 <Slider label="Shadow" value={shadow}
                   onChangeSilent={v => setStyleSilent("shadowBlur", v)}
                   onCommit={commit} min={0} max={100} unit="px" />
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <Sel label="Enter" value={content.asset?.enterTransition || "none"} onChange={v => updateContentProp(slot,"enterTransition",v)} options={enters} />
-                <Sel label="Exit"  value={content.asset?.exitTransition  || "none"} onChange={v => updateContentProp(slot,"exitTransition",v)}  options={exits} />
+                <Sel label="Enter" value={enter} onChange={v => setZoneLayout(slot,"enterAnimation",v)} options={enters} />
+                <Sel label="Exit"  value={exit}  onChange={v => setZoneLayout(slot,"exitAnimation",v)}  options={exits}  />
                 <Sel label="Motion" value={content.asset?.motion || "none"} onChange={v => updateContentProp(slot,"motion",v)} options={motions} />
               </div>
 
-              {/* Padding — only when BG is set */}
-              {bg.kind && (
-                <Slider label="Content Padding" value={padding}
-                  onChangeSilent={v => setStyleSilent("contentPadding", v)}
-                  onCommit={commit} min={0} max={60} unit="px" />
-              )}
             </div>
           </div>
         </>
       )}
 
-      <Divider />
-
-      {/* ── BACKGROUND — asset zones only ── */}
-      {!isText && (
-        <>
-          <SectionTitle>Background</SectionTitle>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="relative shrink-0 rounded-[8px] overflow-hidden cursor-pointer group border border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
-              style={{ width: 56, height: 40 }}
-              onClick={() => openPicker(slot, "background")}>
-              {bg.kind === "color" && <div className="absolute inset-0" style={{ background: bg.color }} />}
-              {bg.kind === "asset" && bg.asset?.src && <img src={bg.asset.src} className="absolute inset-0 w-full h-full object-cover" />}
-              {!bg.kind && <div className="absolute inset-0 bg-[#0e0e1a] flex items-center justify-center text-[#55556a] text-[18px]">＋</div>}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <button onClick={() => openPicker(slot, "background")}
-                className="text-[11px] font-bold text-[#7c5cfc] bg-transparent border-0 cursor-pointer text-left hover:text-[#a78fff] transition-colors">
-                {bg.kind ? "Change" : "Add Background"}
-              </button>
-              {bg.kind && (
-                <button onClick={() => clearBackground(slot)}
-                  className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer text-left transition-colors">
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-          {bg.kind && (
-            <div className={`grid gap-3 mb-3 ${bg.kind === "asset" ? "grid-cols-3" : "grid-cols-1"}`}>
-              {bg.kind === "asset" && (
-                <>
-                  <Slider label="Opacity" value={Math.round((bg.asset?.opacity ?? 1)*100)}
-                    onChangeSilent={v => updateBackgroundProp(slot,"opacity",v/100)}
-                    onCommit={commit} min={10} max={100} unit="%" />
-                  <Slider label="Blur" value={bg.asset?.blur ?? 0}
-                    onChangeSilent={v => updateBackgroundProp(slot,"blur",v)}
-                    onCommit={commit} min={0} max={20} unit="px" />
-                </>
-              )}
-              <Slider label="Content Padding" value={padding}
-                onChangeSilent={v => setStyleSilent("contentPadding", v)}
-                onCommit={commit} min={0} max={60} unit="px" />
-            </div>
-          )}
-        </>
-      )}
 
       <Divider />
 
@@ -368,25 +314,6 @@ export default function ZoneEditor({
 
       <Divider />
 
-      {/* ── ANIMATIONS ── */}
-      {isCustomZone ? (
-        <>
-          <SectionTitle>Animations</SectionTitle>
-          <div className="grid grid-cols-2 gap-3">
-            <Sel label="Enter" value={enter} onChange={v => setZoneLayout(slot,"enterAnimation",v)} options={enters} />
-            <Sel label="Exit"  value={exit}  onChange={v => setZoneLayout(slot,"exitAnimation",v)}  options={exits}  />
-          </div>
-        </>
-      ) : (
-        <div className="flex items-start gap-2 px-3 py-[8px] rounded-[8px] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]">
-          <span className="text-[12px] shrink-0 mt-[1px]">ℹ️</span>
-          <p className="text-[10px] text-[#55556a] leading-relaxed">
-            Animations are defined by the layout. Switch to a custom zone to override.
-          </p>
-        </div>
-      )}
-
-      <Divider />
 
       {/* ── DELETE ── */}
       <button onClick={onDelete}

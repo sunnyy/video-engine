@@ -4,6 +4,13 @@
  */
 import { layoutRegistry } from "../core/layoutRegistry.js";
 
+function resolvePositionY(p) {
+  if (typeof p === "number") return Math.max(0, Math.min(100, p));
+  if (p === "top")    return 15;
+  if (p === "middle") return 50;
+  return 80;
+}
+
 export function normalizeBeat(raw = {}, index = 0, meta = {}) {
   const mode = meta?.mode || "faceless";
 
@@ -62,7 +69,7 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
       text:           captionRaw.text || raw.spoken || "",
       style:          captionRaw.style          || "wordBlaze",
       animation:      captionRaw.animation      || "fade",
-      position:       captionRaw.position       || "bottom",
+      position:       resolvePositionY(captionRaw.position),
       emphasis_words: captionRaw.emphasis_words || [],
     },
 
@@ -75,6 +82,11 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     energy:      raw.energy      ?? 0.5,
     visual_hint: raw.visual_hint || "none",
     language:    raw.language    || meta?.language || "english",
+
+    asset_hint: raw.asset_hint
+      ? { keywords: Array.isArray(raw.asset_hint.keywords) ? raw.asset_hint.keywords : [],
+          prompt:   String(raw.asset_hint.prompt || "").trim() }
+      : null,
 
     duration_sec: duration,
     start_sec:    start,

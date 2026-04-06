@@ -6,7 +6,6 @@
  * Looks up layout definition from layoutRegistry and passes to LayoutRenderer.
  */
 
-import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 
 import LayoutRenderer from "./layouts/LayoutRenderer.jsx";
@@ -14,7 +13,7 @@ import SFXRenderer from "./elements/SFXRenderer.jsx";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import GrainOverlay from "./effects/GrainOverlay";
 import VignetteLayer from "./effects/VignetteLayer";
-import { layoutRegistry, getLayoutDef } from "../core/layoutRegistry.js";
+import { getLayoutDef } from "../core/layoutRegistry.js";
 
 export default function BeatRenderer({ beat, project }) {
   const frame = useCurrentFrame();
@@ -23,7 +22,7 @@ export default function BeatRenderer({ beat, project }) {
   const layoutId = beat?.layout || "FullBleed";
   const layoutDef = getLayoutDef(layoutId);
 
-  const overlays = beat.overlays || {};
+  const overlays = Array.isArray(beat.overlays) ? beat.overlays : [];
 
   const beatStart = Math.floor((beat.start_sec || 0) * fps);
   const beatEnd = Math.floor((beat.end_sec || 0) * fps);

@@ -2,8 +2,15 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 
 import { captionStyleRegistry } from "../../core/captionStyleRegistry.jsx";
-import { captionPositions }     from "../../core/captionPositionRegistry";
 import { getLayoutSafeAreas }   from "../../core/getLayoutSafeAreas";
+
+// Resolve caption.position (number 0-100) with backward compat for old string values
+function resolvePositionY(position) {
+  if (typeof position === "number") return Math.max(0, Math.min(100, position));
+  if (position === "top")    return 15;
+  if (position === "middle") return 50;
+  return 80; // "bottom" or default
+}
 
 export default function Caption({ caption, beat, project }) {
 
@@ -31,8 +38,7 @@ export default function Caption({ caption, beat, project }) {
   const brandFont = project?.meta?.brand?.font ?? null;
 
   /* ── resolve position + safe areas ── */
-  const positionConfig = captionPositions[caption.position || "bottom"]
-    ?? captionPositions.bottom;
+  const positionY   = resolvePositionY(caption.position);
   const safeAreas   = getLayoutSafeAreas(beat.layout);
   const captionSafe = safeAreas?.caption || {};
 
@@ -53,27 +59,26 @@ export default function Caption({ caption, beat, project }) {
   });
 
   return (
-    <AbsoluteFill
-      style={{
-        pointerEvents: "none",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingLeft:   captionSafe.left   ?? 40,
-        paddingRight:  captionSafe.right  ?? 40,
-        paddingTop:    captionSafe.top    ?? 40,
-        paddingBottom: captionSafe.bottom ?? 60,
-        ...positionConfig.container,
-      }}
-    >
-      <div style={{
-        width: "100%",
-        maxWidth: 960,
-        lineHeight: 1.1,
-        fontFamily: brandFont ? `'${brandFont}', sans-serif` : undefined,
-      }}>
-        {rendered}
+    <AbsoluteFill style={{ pointerEvents: "none", zIndex: 100 }}>
+      <div
+        style={{
+          position:  "absolute",
+          top:       `${positionY}%`,
+          left:      captionSafe.left  ?? 40,
+          right:     captionSafe.right ?? 40,
+          transform: "translateY(-50%)",
+          display:   "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{
+          width: "100%",
+          maxWidth: 960,
+          lineHeight: 1.1,
+          fontFamily: brandFont ? `'${brandFont}', sans-serif` : undefined,
+        }}>
+          {rendered}
+        </div>
       </div>
     </AbsoluteFill>
   );

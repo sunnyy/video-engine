@@ -264,6 +264,38 @@ function ArrowPointer({ overlay, motionStyle, frame, fps }) {
   );
 }
 
+/* ── Media overlay components ── */
+
+function ImageOverlay({ overlay }) {
+  return (
+    <img
+      src={overlay.src}
+      style={{
+        width: "100%", height: "100%",
+        objectFit: overlay.objectFit || "contain",
+        display: "block",
+      }}
+    />
+  );
+}
+
+function VideoOverlay({ overlay }) {
+  return (
+    <video
+      src={overlay.src}
+      autoPlay
+      loop={overlay.loop ?? true}
+      muted={overlay.muted ?? true}
+      playsInline
+      style={{
+        width: "100%", height: "100%",
+        objectFit: overlay.objectFit || "contain",
+        display: "block",
+      }}
+    />
+  );
+}
+
 /* ── Main renderer ── */
 export default function OverlayRenderer({ overlays }) {
   const frame = useCurrentFrame();
@@ -274,6 +306,30 @@ export default function OverlayRenderer({ overlays }) {
   return (
     <>
       {overlays.filter(Boolean).map((overlay, index) => {
+        // Media overlays — positioned by x/y/width/height percent
+        if (overlay.type === "ImageOverlay" || overlay.type === "VideoOverlay") {
+          if (!overlay.src) return null;
+          const startFrame = overlay.start_sec != null ? Math.round(overlay.start_sec * fps) : 0;
+          const endFrame   = overlay.end_sec   != null ? Math.round(overlay.end_sec   * fps) : Infinity;
+          if (frame < startFrame || frame >= endFrame) return null;
+          return (
+            <div key={overlay.id || index} style={{
+              position: "absolute",
+              left:   `${overlay.x      ?? 0}%`,
+              top:    `${overlay.y      ?? 0}%`,
+              width:  `${overlay.width  ?? 100}%`,
+              height: `${overlay.height ?? 100}%`,
+              zIndex: overlay.zIndex ?? 200,
+              pointerEvents: "none",
+            }}>
+              {overlay.type === "ImageOverlay"
+                ? <ImageOverlay overlay={overlay} />
+                : <VideoOverlay overlay={overlay} />}
+            </div>
+          );
+        }
+
+        // Graphic overlays — anchor-based
         const anchorStyle = ANCHOR_POSITIONS[overlay.anchor] || ANCHOR_POSITIONS["top-left"];
         const motionStyle = useMotionStyle(overlay.motion, overlay.delay, fps, frame);
 

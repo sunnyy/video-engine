@@ -20,7 +20,7 @@ export const DEFAULT_BEAT = {
 export const DEFAULT_CAPTION = {
   show: true,
   style: "clean",
-  position: "bottom",
+  position: 80,
   animation: "fade",
 };
 

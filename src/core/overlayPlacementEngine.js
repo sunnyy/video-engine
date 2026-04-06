@@ -35,6 +35,13 @@ const ANCHOR_REGION = {
    If caption is at top, exclude all top anchors.
 ───────────────────────────────────────────────────────────── */
 function getCaptionExcludedRegion(captionPosition) {
+  // Handle numeric % values (0-100 from top)
+  if (typeof captionPosition === "number") {
+    if (captionPosition <= 25) return "top";
+    if (captionPosition >= 65) return "bottom";
+    return "mid";
+  }
+  // Legacy string fallback
   if (captionPosition === "bottom") return "bottom";
   if (captionPosition === "top")    return "top";
   if (captionPosition === "middle") return "mid";
