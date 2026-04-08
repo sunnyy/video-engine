@@ -2,13 +2,15 @@
  * ZoneEditor.jsx
  * src/ui/Editor/ZoneEditor.jsx
  */
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { transitionsRegistry } from "../../../src/core/transitionsRegistry";
 import { motionsRegistry }     from "../../../src/core/motionsRegistry";
 import { useProjectStore }     from "../../../src/store/useProjectStore";
 import { textStylePresets }    from "../../../src/core/textStylePresets";
 import { backgroundPatternRegistry } from "../../../src/core/backgroundPatternRegistry";
 import { TEXT_EFFECT_OPTIONS } from "../../../src/core/textEffectRegistry.jsx";
+import { ANIMATED_BORDER_OPTIONS } from "../../../src/core/animatedBorderRegistry.js";
+import { ASSET_SHINE_OPTIONS }     from "../../../src/core/assetShineRegistry.jsx";
 import blockEditors            from "./blocks/blockEditors";
 
 const FONT_FAMILIES = [
@@ -121,7 +123,6 @@ export default function ZoneEditor({
   openPicker,
   updateTextContent, updateTextStyle, updateTextStyleBulk,
   updateContentProp, updateBlockProp,
-  updateBackgroundProp,
   setZoneStyle, setZoneLayout,
   setZoneStyleSilent, setZoneLayoutSilent,
   patchZoneSilent,
@@ -418,6 +419,94 @@ export default function ZoneEditor({
           {/* Zone Background + Padding */}
           <ZoneBgRow bg={bg} slot={slot} openPicker={openPicker} clearBackground={clearBackground}
             padding={padding} setStyleSilent={setStyleSilent} commit={commit} />
+
+          {/* Animated Border */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-[6px]">
+              <Label>Animated Border</Label>
+              {style.animatedBorder && (
+                <button onClick={() => setZoneStyle(slot, "animatedBorder", null)}
+                  className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">
+                  remove
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-[6px]">
+              {ANIMATED_BORDER_OPTIONS.map(opt => {
+                const isActive = style.animatedBorder === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => setZoneStyle(slot, "animatedBorder", isActive ? null : opt.id)}
+                    title={opt.label}
+                    className="flex items-center gap-[5px] px-[8px] py-[4px] rounded-[6px] text-[11px] font-bold border cursor-pointer transition-all"
+                    style={isActive
+                      ? { background: "rgba(124,92,252,0.18)", borderColor: "#7c5cfc", color: "#a78bfa" }
+                      : { background: "transparent", borderColor: "rgba(255,255,255,0.08)", color: "#7070a0" }
+                    }
+                  >
+                    <span style={{
+                      display: "inline-block", width: 10, height: 10, borderRadius: "50%",
+                      background: opt.swatchColor, flexShrink: 0,
+                      boxShadow: isActive ? `0 0 5px ${opt.swatchColor}` : "none",
+                    }} />
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {style.animatedBorder && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Slider label="Border Width"
+                  value={style.animatedBorderWidth ?? 12}
+                  onChangeSilent={v => setStyleSilent("animatedBorderWidth", v)}
+                  onCommit={commit} min={4} max={60} step={1} unit="px" />
+                <Slider label="Speed"
+                  value={Math.round((style.animatedBorderSpeed ?? 0.7) * 10) / 10}
+                  onChangeSilent={v => setStyleSilent("animatedBorderSpeed", v)}
+                  onCommit={commit} min={0.1} max={4} step={0.1} unit="×" />
+              </div>
+            )}
+          </div>
+
+          {/* Shine Effect */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-[6px]">
+              <Label>Shine Effect</Label>
+              {style.shineEffect && (
+                <button onClick={() => setZoneStyle(slot, "shineEffect", null)}
+                  className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">
+                  remove
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-[6px]">
+              {ASSET_SHINE_OPTIONS.map(opt => {
+                const isActive = style.shineEffect === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setZoneStyle(slot, "shineEffect", isActive ? null : opt.value)}
+                    className="px-[8px] py-[4px] rounded-[6px] text-[11px] font-bold border cursor-pointer transition-all"
+                    style={isActive
+                      ? { background: "rgba(124,92,252,0.18)", borderColor: "#7c5cfc", color: "#a78bfa" }
+                      : { background: "transparent", borderColor: "rgba(255,255,255,0.08)", color: "#7070a0" }
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {style.shineEffect && (
+              <div className="mt-3">
+                <Slider label="Speed"
+                  value={Math.round((style.shineSpeed ?? 1.0) * 10) / 10}
+                  onChangeSilent={v => setStyleSilent("shineSpeed", v)}
+                  onCommit={commit} min={0.25} max={4} step={0.25} unit="×" />
+              </div>
+            )}
+          </div>
         </>
       )}
 

@@ -22,7 +22,7 @@ export default [
         enterAnimation:"slideRightIn", exitAnimation:"none", style:{ objectFit:"cover" } },
       { id:"z2", type:"asset", role:"supporting_image", order:2, x:40, y:0, width:60, height:100, zIndex:1, start:0.15, end:null,
         enterAnimation:"slideLeftIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z3", type:"text", role:"headline", maxChars:12, order:1, x:3, y:40, width:36, height:20, zIndex:3, start:0.3, end:null,
+      { id:"z3", type:"text", role:"headline", maxChars:42, order:1, x:3, y:40, width:36, height:14, zIndex:3, start:0.3, end:null,
         enterAnimation:"fadeIn", exitAnimation:"none",
         style:{ fontSize:100, fontWeight:900, color:"#ffffff", textAlign:"left", textShadow:"0 2px 12px rgba(0,0,0,0.9)" } },
       { id:"z4", type:"text", role:"subtext", maxChars:12, order:2, x:61, y:40, width:36, height:20, zIndex:3, start:0.45, end:null,

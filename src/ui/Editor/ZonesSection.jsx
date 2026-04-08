@@ -160,10 +160,6 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
     }
   };
 
-  const updateBackgroundProp = (slot, key, value) => {
-    const bg = zones[slot]?.background || {};
-    updateZoneSilent(slot, { background: { ...bg, asset: { ...(bg.asset || {}), [key]: value } } });
-  };
 
   const setZoneStyle       = (slot, key, value) => updateZone(slot,       { style: { ...(zones[slot]?.style || {}), [key]: value } });
   const setZoneStyleSilent = (slot, key, value) => updateZoneSilent(slot, { style: { ...(zones[slot]?.style || {}), [key]: value } });
@@ -254,7 +250,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
             updateTextStyleBulk={updateTextStyleBulk}
             updateContentProp={updateContentProp}
             updateBlockProp={updateBlockProp}
-            updateBackgroundProp={updateBackgroundProp}
+
             setZoneStyle={setZoneStyle}
             setZoneStyleSilent={setZoneStyleSilent}
             setZoneLayout={setZoneLayout}

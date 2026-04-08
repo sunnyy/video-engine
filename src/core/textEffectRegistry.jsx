@@ -49,21 +49,19 @@ const textEffectRegistry = {
       const revealDur     = Math.max(framesPerWord * 0.6, 4);
       return (
         <div style={baseStyle}>
-          <span>
-            {words.map((word, i) => {
-              const prog = interpolate(
-                local,
-                [i * framesPerWord, i * framesPerWord + revealDur],
-                [0, 1],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-              );
-              return (
-                <span key={i} style={{ opacity: prog, display: "inline" }}>
-                  {word}{i < words.length - 1 ? " " : ""}
-                </span>
-              );
-            })}
-          </span>
+          {words.map((word, i) => {
+            const prog = interpolate(
+              local,
+              [i * framesPerWord, i * framesPerWord + revealDur],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+            );
+            return (
+              <span key={i} style={{ opacity: prog, display: "inline" }}>
+                {word}{i < words.length - 1 ? "\u00A0" : ""}
+              </span>
+            );
+          })}
         </div>
       );
     },
@@ -78,21 +76,19 @@ const textEffectRegistry = {
       const fadeDur       = Math.max(framesPerWord * 0.5, 3);
       return (
         <div style={baseStyle}>
-          <span>
-            {words.map((word, i) => {
-              const prog = interpolate(
-                local,
-                [i * framesPerWord, i * framesPerWord + fadeDur],
-                [0, 1],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-              );
-              return (
-                <span key={i} style={{ opacity: prog, display: "inline" }}>
-                  {word}{i < words.length - 1 ? " " : ""}
-                </span>
-              );
-            })}
-          </span>
+          {words.map((word, i) => {
+            const prog = interpolate(
+              local,
+              [i * framesPerWord, i * framesPerWord + fadeDur],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+            );
+            return (
+              <span key={i} style={{ opacity: prog, display: "inline" }}>
+                {word}{i < words.length - 1 ? "\u00A0" : ""}
+              </span>
+            );
+          })}
         </div>
       );
     },
@@ -109,7 +105,7 @@ const textEffectRegistry = {
       const slideDur      = Math.max(framesPerLine * 0.6, 6);
       const align         = baseStyle.textAlign === "left" ? "flex-start" : baseStyle.textAlign === "right" ? "flex-end" : "center";
       return (
-        <div style={{ ...baseStyle, flexDirection: "column", alignItems: align, gap: "0.15em" }}>
+        <div style={{ ...baseStyle, display: "flex", flexDirection: "column", alignItems: align, gap: "0.15em" }}>
           {lines.map((line, i) => {
             const prog = interpolate(
               local,

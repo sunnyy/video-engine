@@ -20,6 +20,7 @@ import blockRegistry              from "./blockRegistry";
 import { pickBeatSFX, OVERLAY_SFX_DEFAULTS } from "./sfxRegistry";
 import { textStylePresets }               from "./textStylePresets";
 import { PIPELINE_EFFECTS }              from "./textEffectRegistry.jsx";
+import { PIPELINE_SHINE_EFFECTS }        from "./assetShineRegistry.jsx";
 import { autoAssignOverlays }     from "./overlayPlacementEngine";
 import { composeBeat }            from "./elements/elementComposer";
 
@@ -621,6 +622,27 @@ export async function buildBeatsFromScript({
   beats = fillTextZones(beats, dna?.typographySystem || null, {
     colorStory:  dna?.colorStory  || null,
     brandColor:  brandColor       || null,
+  });
+
+  /* ── Assign one-shot shine effects to asset zones ── */
+  beats = beats.map(beat => {
+    const layoutDef = getLayoutDef(beat.layout);
+    if (!layoutDef) return beat;
+    const zones = { ...beat.zones };
+    layoutDef.zones.forEach(zoneDef => {
+      if (zoneDef.type !== "asset") return;
+      const existing = zones[zoneDef.id] || {};
+      if (existing.style?.shineEffect) return; // already set
+      const seed = (beat.intent || "").charCodeAt(0) + (zoneDef.id || "").charCodeAt(1) + beat.order * 13;
+      // ~60% chance of getting a shine — skip the rest for visual breathing room
+      if (seed % 5 < 2) return;
+      const shine = PIPELINE_SHINE_EFFECTS[seed % PIPELINE_SHINE_EFFECTS.length];
+      zones[zoneDef.id] = {
+        ...existing,
+        style: { ...(existing.style || {}), shineEffect: shine },
+      };
+    });
+    return { ...beat, zones };
   });
 
   /* ── Extract block props ── */

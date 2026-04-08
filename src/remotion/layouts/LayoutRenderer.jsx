@@ -19,6 +19,8 @@ import CompositionDecorativeLayer from "../elements/CompositionDecorativeLayer";
 import blockRegistry from "../../core/blockRegistry";
 import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
 import textEffectRegistry from "../../core/textEffectRegistry.jsx";
+import animatedBorderRegistry from "../../core/animatedBorderRegistry.js";
+import assetShineRegistry     from "../../core/assetShineRegistry.jsx";
 
 function resolveEnterStyle(animation, progress, W, H) {
   switch (animation) {
@@ -67,6 +69,73 @@ function BlurredAssetBackground({ src }) {
         background: "rgba(0,0,0,0.38)",
       }} />
     </>
+  );
+}
+
+/* ── Animated border frame ─────────────────────────────────── */
+/**
+ * Wraps children in a spinning conic-gradient border.
+ * Technique (mirrors the CSS ::before / ::after trick):
+ *   1. Outer div: overflow:hidden + borderRadius  → clips the huge spinner
+ *   2. Huge spinner div: conic-gradient, rotated each frame
+ *   3. Inner div: inset by borderWidth, overflow:hidden  → the image fills it,
+ *      naturally masking out the gradient center — leaving only the border strip visible
+ */
+function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidth, overrideSpeed, children }) {
+  const def = animatedBorderRegistry[borderKey];
+  // If unknown key, just render children unwrapped
+  if (!def) return <div style={{ position:"absolute", inset:0, overflow:"hidden", borderRadius: borderRadius||0 }}>{children}</div>;
+
+  const { gradient, glowColor, blurAmount } = def;
+  const borderWidth = overrideWidth ?? def.borderWidth;
+  const speed       = overrideSpeed ?? def.speed;
+  const br  = borderRadius || 0;
+  const deg = ((frame / fps) * speed * 360) % 360;
+
+  return (
+    // Outer wrapper — clips spinner to zone bounds
+    <div style={{ position:"absolute", inset:0, borderRadius:br, overflow:"hidden" }}>
+
+      {/* Rotating conic gradient — fills the entire wrapper */}
+      <div style={{
+        position:           "absolute",
+        top:                "50%",
+        left:               "50%",
+        width:              "9999px",
+        height:             "9999px",
+        backgroundRepeat:   "no-repeat",
+        backgroundPosition: "0 0",
+        backgroundImage:    gradient,
+        transform:          `translate(-50%, -50%) rotate(${deg}deg)`,
+        zIndex:             0,
+      }} />
+
+      {/* Inner content box — inset by borderWidth, clips image & hides gradient center */}
+      <div style={{
+        position:     "absolute",
+        top:          borderWidth,
+        left:         borderWidth,
+        right:        borderWidth,
+        bottom:       borderWidth,
+        borderRadius: Math.max(0, br - borderWidth),
+        overflow:     "hidden",
+        zIndex:       1,
+      }}>
+        {children}
+      </div>
+
+      {/* Inset glow via box-shadow — sits on top, no clip needed */}
+      {blurAmount > 0 && (
+        <div style={{
+          position:      "absolute",
+          inset:         0,
+          borderRadius:  br,
+          boxShadow:     `inset 0 0 ${blurAmount * 2}px ${glowColor}99, 0 0 ${blurAmount * 3}px ${glowColor}66`,
+          zIndex:        2,
+          pointerEvents: "none",
+        }} />
+      )}
+    </div>
   );
 }
 
@@ -173,9 +242,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
       {/* Content wrapper with rotation */}
       <div style={{ ...contentWrapperStyle, zIndex: 1 }}>
 
-        {/* Asset — scale via inset */}
-        {zone.type === "asset" && content.kind !== "block" && content.asset?.src && (
-          <div style={insetBoxStyle}>
+        {/* Asset — with optional animated border + one-shot shine */}
+        {zone.type === "asset" && content.kind !== "block" && content.asset?.src && (() => {
+          const assetEl = (
             <AssetRenderer
               zone={{
                 src:             content.asset.src,
@@ -190,8 +259,37 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
               beat={beat}
               slot={zone.id}
             />
-          </div>
-        )}
+          );
+
+          // One-shot shine overlay — plays once at beat start, then disappears
+          const shineEntry = st.shineEffect ? assetShineRegistry[st.shineEffect] : null;
+          const shineSpeedMul = st.shineSpeed ?? 1.0;
+          const shineDur  = shineEntry ? Math.round(shineEntry.durationFrames / shineSpeedMul) : 0;
+          const shineEl   = shineEntry ? shineEntry.render(local, shineDur, interpolate) : null;
+
+          const inner = (
+            <>
+              {assetEl}
+              {shineEl}
+            </>
+          );
+
+          if (st.animatedBorder) {
+            return (
+              <AnimatedBorderFrame
+                borderKey={st.animatedBorder}
+                borderRadius={st.borderRadius || 0}
+                frame={frame}
+                fps={fps}
+                overrideWidth={st.animatedBorderWidth ?? undefined}
+                overrideSpeed={st.animatedBorderSpeed ?? undefined}
+              >
+                {inner}
+              </AnimatedBorderFrame>
+            );
+          }
+          return <div style={insetBoxStyle}>{inner}</div>;
+        })()}
 
         {/* Asset placeholder — no src yet */}
         {zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block" && (() => {
@@ -241,25 +339,22 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
           const effectSpeed = st.textEffectSpeed ?? 1.0;
 
           const baseStyle = {
-            position:       "relative",
-            display:        "flex",
-            flexWrap:       "wrap",
-            alignItems:     "center",
-            justifyContent: st.textAlign === "left" ? "flex-start" : st.textAlign === "right" ? "flex-end" : "center",
-            width:          "100%",
-            padding:        st.padding       || "0 8px",
-            boxSizing:      "border-box",
-            fontSize:       st.fontSize      || 32,
-            fontWeight:     st.fontWeight    || 700,
-            fontFamily:     st.fontFamily    || "inherit",
-            color:          st.color         || "#ffffff",
-            textAlign:      st.textAlign     || "center",
-            textShadow:     st.textShadow    || "none",
-            lineHeight:     st.lineHeight    || 1.15,
-            letterSpacing:  st.letterSpacing || "normal",
-            opacity:        st.opacity       ?? 1,
-            background:     st.background    || "transparent",
-            borderRadius:   st.borderRadius  || 0,
+            position:      "relative",
+            display:       "block",
+            width:         "100%",
+            padding:       st.padding       || "0 8px",
+            boxSizing:     "border-box",
+            fontSize:      st.fontSize      || 32,
+            fontWeight:    st.fontWeight    || 700,
+            fontFamily:    st.fontFamily    || "inherit",
+            color:         st.color         || "#ffffff",
+            textAlign:     st.textAlign     || "center",
+            textShadow:    st.textShadow    || "none",
+            lineHeight:    st.lineHeight    || 1.15,
+            letterSpacing: st.letterSpacing || "normal",
+            opacity:       st.opacity       ?? 1,
+            background:    st.background    || "transparent",
+            borderRadius:  st.borderRadius  || 0,
           };
 
           const effectEntry = textEffectRegistry[textEffect];
