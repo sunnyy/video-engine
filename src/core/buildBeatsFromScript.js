@@ -18,6 +18,8 @@ import { pickDecoratives }        from "./designLibrary/decorativePicker";
 import { resolveBeatColors }      from "./elements/colorContrastResolver";
 import blockRegistry              from "./blockRegistry";
 import { pickBeatSFX, OVERLAY_SFX_DEFAULTS } from "./sfxRegistry";
+import { textStylePresets }               from "./textStylePresets";
+import { PIPELINE_EFFECTS }              from "./textEffectRegistry.jsx";
 import { autoAssignOverlays }     from "./overlayPlacementEngine";
 import { composeBeat }            from "./elements/elementComposer";
 
@@ -277,10 +279,25 @@ function injectBlockContent(beats) {
 }
 
 
-/* ── Fill text zones — applies DNA font + color correction only ── */
+// Presets that have background colors — their bg needs DNA-aware replacement
+const PRESET_BG_IDS = new Set(["pill", "brutal"]);
+
+// Which presets suit which zone role (primary headline vs secondary/label)
+const PRESET_FOR_PRIMARY   = ["hero", "headline", "brutal", "neon", "gradient-text"];
+const PRESET_FOR_SECONDARY = ["subtitle", "editorial", "mono", "pill"];
+
+function pickPresetForZone(zoneDef, order, intent) {
+  const isPrimary = order === 0 || zoneDef.role === "headline" || zoneDef.role === "stat" || zoneDef.role === "quote";
+  const pool = isPrimary ? PRESET_FOR_PRIMARY : PRESET_FOR_SECONDARY;
+  // Use a stable seed based on intent + layout so the same beat always gets the same preset
+  const seed = (intent || "").charCodeAt(0) + (zoneDef.id || "").charCodeAt(0);
+  return pool[seed % pool.length];
+}
+
+/* ── Fill text zones — applies DNA font + color + preset flair ── */
 // Layout definition is the authority on font size, weight, alignment.
-// This function only overrides: fontFamily (DNA), color, textShadow (readability).
-// Text content is set by generateZoneContent (AI) before this runs.
+// Preset provides: fontFamily, fontWeight, textShadow, letterSpacing, lineHeight, (bg stripped).
+// DNA inject wins on: color, background (if preset has one).
 function fillTextZones(beats, typographySystem = null, colorOptions = {}) {
   const fontFamily = typographySystem
     ? (TYPOGRAPHY_SYSTEMS[typographySystem]?.heading || null)
@@ -305,18 +322,22 @@ function fillTextZones(beats, typographySystem = null, colorOptions = {}) {
     if (!textZones.length) return beat;
 
     const zones = { ...beat.zones };
-
-    // Layouts with asset zones have image backgrounds — text must always be white
     const hasAssetZones = def.zones.some(z => z.type === "asset");
 
-    textZones.forEach((zoneDef) => {
+    textZones.forEach((zoneDef, order) => {
       const existing = zones[zoneDef.id];
 
-      // Only inject: DNA fontFamily, color correction, readability shadow.
-      // Everything else (fontSize, fontWeight, textAlign, letterSpacing, lineHeight)
-      // comes from the layout definition — do NOT override it.
-      const inject = {};
+      // Pick a preset for this zone and extract only typography flair
+      const presetId   = pickPresetForZone(zoneDef, order, beat.intent);
+      const preset     = textStylePresets.find(p => p.id === presetId);
+      const presetFlair = preset ? (() => {
+        // Strip layout-authority props (fontSize, fontWeight, textAlign) — keep typography flair
+        const { fontSize, fontWeight, textAlign, color, background, ...flair } = preset.style;
+        return flair;
+      })() : {};
 
+      // DNA color inject — always wins over preset color
+      const inject = { ...presetFlair };
       if (fontFamily) inject.fontFamily = fontFamily;
 
       if (hasAssetZones) {
@@ -324,11 +345,25 @@ function fillTextZones(beats, typographySystem = null, colorOptions = {}) {
         inject.textShadow = beat.energy >= 0.7
           ? "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)"
           : "0 2px 18px rgba(0,0,0,0.9)";
+        delete inject.background; // no bg overlay on asset zones
       } else {
         inject.color = colors.text;
-        if (colors.textShadow && colors.textShadow !== "none") {
+        // If preset has a background, replace hardcoded color with DNA accent
+        if (preset && PRESET_BG_IDS.has(presetId) && colors.accent) {
+          inject.background = colors.accent;
+        }
+        if (colors.textShadow && colors.textShadow !== "none" && !presetFlair.textShadow) {
           inject.textShadow = colors.textShadow;
         }
+      }
+
+      // Store which preset was applied so ZoneEditor can highlight it
+      inject._presetId = presetId;
+
+      // Assign a default text effect if the zone doesn't already have one
+      if (!existing?.style?.textEffect) {
+        const seed2 = (beat.intent || "").charCodeAt(0) + order * 7 + (zoneDef.id || "").charCodeAt(1);
+        inject.textEffect = PIPELINE_EFFECTS[seed2 % PIPELINE_EFFECTS.length];
       }
 
       const existingContent = existing?.content || { kind: "text", text: "" };
@@ -336,7 +371,7 @@ function fillTextZones(beats, typographySystem = null, colorOptions = {}) {
       zones[zoneDef.id] = {
         ...existing,
         content: existingContent,
-        // Layout def wins on size/weight/alignment; inject wins on font/color
+        // Layout def wins on size/weight/alignment; preset flair + DNA color inject layered on top
         style: { ...zoneDef.style, ...(existing?.style || {}), ...inject },
       };
     });

@@ -35,52 +35,6 @@ export default [
     ],
   },
 
-  // 4 — Four-grid collage escalation
-  {
-    id: "CollageEscalate",
-    label: "Collage Escalate",
-    intent: ["showcase", "list", "comparison"],
-    energy: ["high", "medium"],
-    orientation: ["9:16"],
-    assetCount: 4, textCount: 1,
-    captionStrategy: "never",
-    zones: [
-      { id:"z1", type:"text", role:"headline", maxChars:25, order:1, x:5, y:2, width:90, height:11, zIndex:4, start:0, end:null,
-        enterAnimation:"slideDownIn", exitAnimation:"none",
-        style:{ fontSize:96, fontWeight:700, color:"#ffffff", textAlign:"center" } },
-      { id:"z2", type:"asset", role:"hero_image", order:1, x:1, y:14, width:48, height:38, zIndex:2, start:0.2, end:null,
-        enterAnimation:"slideRightIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:10 } },
-      { id:"z3", type:"asset", role:"supporting_image", order:2, x:51, y:14, width:48, height:38, zIndex:2, start:0.4, end:null,
-        enterAnimation:"slideLeftIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:10 } },
-      { id:"z4", type:"asset", role:"supporting_image", order:3, x:1, y:53, width:48, height:38, zIndex:2, start:0.6, end:null,
-        enterAnimation:"slideRightIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:10 } },
-      { id:"z5", type:"asset", role:"supporting_image", order:4, x:51, y:53, width:48, height:38, zIndex:2, start:0.75, end:null,
-        enterAnimation:"slideLeftIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:10 } },
-    ],
-  },
-
-  // 8 — Three-row assets (escalating stack)
-  {
-    id: "EscalatingStack",
-    label: "Escalating Stack",
-    intent: ["list", "showcase", "escalate"],
-    energy: ["medium", "high"],
-    orientation: ["9:16"],
-    assetCount: 3, textCount: 1,
-    captionStrategy: "never",
-    zones: [
-      { id:"z1", type:"text", role:"headline", maxChars:25, order:1, x:5, y:2, width:90, height:11, zIndex:4, start:0, end:null,
-        enterAnimation:"slideDownIn", exitAnimation:"none",
-        style:{ fontSize:96, fontWeight:700, color:"#ffffff", textAlign:"center" } },
-      { id:"z2", type:"asset", role:"hero_image", order:1, x:1, y:14, width:98, height:26, zIndex:2, start:0.2, end:null,
-        enterAnimation:"slideRightIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:10 } },
-      { id:"z3", type:"asset", role:"supporting_image", order:2, x:1, y:42, width:98, height:26, zIndex:2, start:0.45, end:null,
-        enterAnimation:"slideLeftIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:10 } },
-      { id:"z4", type:"asset", role:"supporting_image", order:3, x:1, y:70, width:98, height:28, zIndex:2, start:0.7, end:null,
-        enterAnimation:"slideRightIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:10 } },
-    ],
-  },
-
   // 9 — Title full-width + image below (escalating reveal)
   {
     id: "TitleThenAsset",

@@ -109,7 +109,7 @@ export default function ZonePickerModal({
       { key: "blocks",  label: "Elements",  type: "blocks"  },
       { key: "colors",  label: "Colors",    type: "colors"  },
     ];
-    return all.filter(t => activeTabs.includes(t.type) || t.type === "text" || t.type === "blocks");
+    return all.filter(t => activeTabs.includes(t.type));
   }, [activeTabs]);
 
   const renderTab = () => {

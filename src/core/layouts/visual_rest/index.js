@@ -8,38 +8,6 @@
 
 export default [
 
-  // 1 — Pure full bleed, captions only
-  {
-    id: "FullBleed",
-    label: "Full Bleed",
-    intent: ["hook", "scene", "cta"],
-    energy: ["low", "medium", "high"],
-    orientation: ["9:16", "16:9"],
-    assetCount: 1, textCount: 0,
-    captionStrategy: "always",
-    zones: [
-      { id:"z1", type:"asset", role:"background_image", order:1, x:0, y:0, width:100, height:100, zIndex:1, start:0, end:null,
-        enterAnimation:"fadeIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-    ],
-  },
-
-  // 4 — Two assets side by side, full height
-  {
-    id: "SplitAssets",
-    label: "Split Assets",
-    intent: ["comparison", "scene", "showcase"],
-    energy: ["medium", "high"],
-    orientation: ["9:16", "16:9"],
-    assetCount: 2, textCount: 0,
-    captionStrategy: "always",
-    zones: [
-      { id:"z1", type:"asset", role:"hero_image", order:1, x:0, y:0, width:49.5, height:100, zIndex:1, start:0, end:null,
-        enterAnimation:"slideRightIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z2", type:"asset", role:"supporting_image", order:2, x:50.5, y:0, width:49.5, height:100, zIndex:1, start:0.15, end:null,
-        enterAnimation:"slideLeftIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-    ],
-  },
-
   // 5 — Three equal horizontal bands
   {
     id: "ThreeStack",

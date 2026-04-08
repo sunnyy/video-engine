@@ -169,6 +169,14 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
   const setZoneStyleSilent = (slot, key, value) => updateZoneSilent(slot, { style: { ...(zones[slot]?.style || {}), [key]: value } });
   const setZoneLayout       = (slot, key, value) => updateZone(slot,       { [key]: value });
   const setZoneLayoutSilent = (slot, key, value) => updateZoneSilent(slot, { [key]: value });
+  // Patch layout fields AND style keys in one atomic call (prevents second call clobbering first)
+  const patchZoneSilent = (slot, layoutPatch, stylePatch) => {
+    const cur = zones[slot] || {};
+    const merged = { ...cur, ...(layoutPatch || {}) };
+    if (stylePatch) merged.style = { ...(cur.style || {}), ...stylePatch };
+    const newZones = { ...zones, [slot]: merged };
+    updateBeatSilent(beat.id, { zones: newZones });
+  };
 
   const updateBlockProp = (slot, key, val) => {
     const content = zones[slot]?.content || {};
@@ -251,6 +259,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
             setZoneStyleSilent={setZoneStyleSilent}
             setZoneLayout={setZoneLayout}
             setZoneLayoutSilent={setZoneLayoutSilent}
+            patchZoneSilent={patchZoneSilent}
             clearContent={clearContent}
             clearBackground={clearBackground}
             onDelete={() => deleteZone(selectedZoneId)}
@@ -312,6 +321,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
         <ZonePickerModal
           orientation={project.meta.orientation}
           mode={picker.type}
+          allowedTabs={picker.type === "background" ? ["colors"] : undefined}
           onSelect={handleSelect}
           onClose={() => setPicker(null)}
         />

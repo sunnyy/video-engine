@@ -389,8 +389,7 @@ export async function generateStructuredShort({
 
     const spoken = beat.spoken || "";
     const wordList = spoken.trim().split(/\s+/).filter(Boolean);
-    const midpoint = Math.ceil(wordList.length * 0.55);
-    const firstHalf  = wordList.slice(0, midpoint).join(" ");
+    const midpoint   = Math.ceil(wordList.length * 0.55);
     const secondHalf = wordList.slice(midpoint).join(" ") || spoken;
 
     // Intent-based label tag
@@ -419,20 +418,28 @@ export async function generateStructuredShort({
       const role = zoneDef.role || "subtext";
 
       if (role === "headline") {
-        fallbackText = firstHalf || spoken;
-      } else if (role === "subtext") {
-        fallbackText = idx === 0 ? spoken : secondHalf;
+        // Short and punchy — first 4–5 words only, never the full sentence
+        const headlineWords = wordList.slice(0, Math.min(5, Math.ceil(wordList.length * 0.38)));
+        fallbackText = headlineWords.join(" ");
       } else if (role === "label") {
         fallbackText = labelTag;
       } else if (role === "stat") {
         fallbackText = statText;
-      } else if (role === "quote") {
-        fallbackText = spoken;
+      } else {
+        // subtext / quote / other — full sentence for first zone, second half for subsequent
+        fallbackText = idx === 0 ? spoken : secondHalf;
       }
 
-      // Trim to maxChars if defined
+      // Clip at word boundary if over maxChars — no ellipsis, never cut mid-word
       if (zoneDef.maxChars && fallbackText.length > zoneDef.maxChars) {
-        fallbackText = fallbackText.slice(0, zoneDef.maxChars - 1).trim() + "…";
+        const words = fallbackText.split(/\s+/);
+        let clipped = "";
+        for (const w of words) {
+          const next = clipped ? `${clipped} ${w}` : w;
+          if (next.length > zoneDef.maxChars) break;
+          clipped = next;
+        }
+        fallbackText = clipped || words[0];
       }
 
       beat.zones[zoneDef.id] = {

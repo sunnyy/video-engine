@@ -58,6 +58,8 @@ export default function Caption({ caption, beat, project }) {
     beatDuration: safeBeatDuration,
   });
 
+  const fontScale = (caption.fontSize ?? 100) / 100;
+
   return (
     <AbsoluteFill style={{ pointerEvents: "none", zIndex: 100 }}>
       <div
@@ -76,6 +78,7 @@ export default function Caption({ caption, beat, project }) {
           maxWidth: 960,
           lineHeight: 1.1,
           fontFamily: brandFont ? `'${brandFont}', sans-serif` : undefined,
+          zoom: fontScale !== 1 ? fontScale : undefined,
         }}>
           {rendered}
         </div>

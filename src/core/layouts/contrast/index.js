@@ -8,26 +8,6 @@
 
 export default [
 
-  // 1 — Hard vertical split: left vs right
-  {
-    id: "VerticalSplit",
-    label: "Vertical Split",
-    intent: ["contrast", "comparison", "proof"],
-    energy: ["high", "medium"],
-    orientation: ["9:16"],
-    assetCount: 2, textCount: 1,
-    captionStrategy: "never",
-    zones: [
-      { id:"z1", type:"asset", role:"hero_image", order:1, x:0, y:0, width:49, height:100, zIndex:1, start:0, end:null,
-        enterAnimation:"slideRightIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z2", type:"asset", role:"supporting_image", order:2, x:51, y:0, width:49, height:100, zIndex:1, start:0.2, end:null,
-        enterAnimation:"slideLeftIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z3", type:"text", role:"headline", maxChars:25, order:1, x:5, y:44, width:90, height:12, zIndex:3, start:0.3, end:null,
-        enterAnimation:"popIn", exitAnimation:"none",
-        style:{ fontSize:100, fontWeight:900, color:"#ffffff", textAlign:"center", textShadow:"0 2px 16px rgba(0,0,0,0.9)", letterSpacing:"-1px" } },
-    ],
-  },
-
   // 4 — Diagonal split (one color each side + text)
   {
     id: "DiagonalContrast",
@@ -48,30 +28,6 @@ export default [
       { id:"z4", type:"text", role:"subtext", maxChars:12, order:2, x:61, y:40, width:36, height:20, zIndex:3, start:0.45, end:null,
         enterAnimation:"fadeIn", exitAnimation:"none",
         style:{ fontSize:100, fontWeight:900, color:"#ffffff", textAlign:"right", textShadow:"0 2px 12px rgba(0,0,0,0.9)" } },
-    ],
-  },
-
-  // 5 — Image + strong contrast label (irony/punchline)
-  {
-    id: "IronyContrast",
-    label: "Irony Contrast",
-    intent: ["contrast", "irony", "reveal"],
-    energy: ["medium", "high"],
-    orientation: ["9:16"],
-    assetCount: 1, textCount: 3,
-    captionStrategy: "never",
-    zones: [
-      { id:"z1", type:"asset", role:"hero_image", order:1, x:0, y:0, width:100, height:60, zIndex:1, start:0, end:null,
-        enterAnimation:"scaleIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z2", type:"text", role:"label", maxChars:20, order:1, x:5, y:5, width:90, height:18, zIndex:3, start:0, end:null,
-        enterAnimation:"slideDownIn", exitAnimation:"none",
-        style:{ fontSize:54, fontWeight:900, color:"#ffffff", textAlign:"left", textShadow:"0 2px 16px rgba(0,0,0,0.9)", opacity:0.65 } },
-      { id:"z3", type:"text", role:"headline", maxChars:30, order:2, x:4, y:63, width:92, height:26, zIndex:3, start:0.35, end:null,
-        enterAnimation:"popIn", exitAnimation:"none",
-        style:{ fontSize:104, fontWeight:900, color:"#ffffff", textAlign:"center", lineHeight:1.0, letterSpacing:"-2px" } },
-      { id:"z4", type:"text", role:"subtext", maxChars:40, order:3, x:5, y:91, width:90, height:8, zIndex:3, start:0.65, end:null,
-        enterAnimation:"fadeIn", exitAnimation:"none",
-        style:{ fontSize:56, fontWeight:500, color:"#ffffff", textAlign:"center" } },
     ],
   },
 
@@ -132,30 +88,4 @@ export default [
     ],
   },
 
-  // 10 — Magazine editorial contrast: image + opposing text columns
-  {
-    id: "EditorialContrast",
-    label: "Editorial Contrast",
-    intent: ["contrast", "comparison", "proof"],
-    energy: ["low", "medium"],
-    orientation: ["9:16"],
-    assetCount: 1, textCount: 4,
-    captionStrategy: "never",
-    zones: [
-      { id:"z1", type:"asset", role:"hero_image", order:1, x:3, y:5, width:94, height:48, zIndex:1, start:0, end:null,
-        enterAnimation:"fadeIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:16 } },
-      { id:"z2", type:"text", role:"headline", maxChars:20, order:1, x:3, y:56, width:45, height:22, zIndex:2, start:0.3, end:null,
-        enterAnimation:"slideRightIn", exitAnimation:"none",
-        style:{ fontSize:96, fontWeight:900, color:"#ffffff", textAlign:"left", lineHeight:1.0, letterSpacing:"-1px" } },
-      { id:"z3", type:"text", role:"subtext", maxChars:20, order:2, x:52, y:56, width:45, height:22, zIndex:2, start:0.45, end:null,
-        enterAnimation:"slideLeftIn", exitAnimation:"none",
-        style:{ fontSize:96, fontWeight:900, color:"#ffffff", textAlign:"right", lineHeight:1.0, letterSpacing:"-1px", opacity:0.65 } },
-      { id:"z4", type:"text", role:"subtext", maxChars:35, order:3, x:3, y:80, width:45, height:16, zIndex:2, start:0.6, end:null,
-        enterAnimation:"fadeIn", exitAnimation:"none",
-        style:{ fontSize:56, fontWeight:400, color:"#ffffff", textAlign:"left", lineHeight:1.4 } },
-      { id:"z5", type:"text", role:"subtext", maxChars:35, order:4, x:52, y:80, width:45, height:16, zIndex:2, start:0.72, end:null,
-        enterAnimation:"fadeIn", exitAnimation:"none",
-        style:{ fontSize:56, fontWeight:400, color:"#ffffff", textAlign:"right", lineHeight:1.4 } },
-    ],
-  },
 ];

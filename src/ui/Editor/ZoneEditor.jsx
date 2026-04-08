@@ -7,6 +7,8 @@ import { transitionsRegistry } from "../../../src/core/transitionsRegistry";
 import { motionsRegistry }     from "../../../src/core/motionsRegistry";
 import { useProjectStore }     from "../../../src/store/useProjectStore";
 import { textStylePresets }    from "../../../src/core/textStylePresets";
+import { backgroundPatternRegistry } from "../../../src/core/backgroundPatternRegistry";
+import { TEXT_EFFECT_OPTIONS } from "../../../src/core/textEffectRegistry.jsx";
 import blockEditors            from "./blocks/blockEditors";
 
 const FONT_FAMILIES = [
@@ -70,15 +72,60 @@ function Divider() {
   return <div className="h-[1px] bg-[rgba(255,255,255,0.05)] my-4" />;
 }
 
+function ZoneBgRow({ bg, slot, openPicker, clearBackground, padding, setStyleSilent, commit }) {
+  const bgStyle = bg?.kind === "pattern"
+    ? (backgroundPatternRegistry[bg.key]?.style || { background: "#111" })
+    : bg?.kind === "color"
+    ? { background: bg.color, backgroundSize: bg.backgroundSize || "auto" }
+    : null;
+
+  return (
+    <div className="flex flex-col gap-3 mb-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Zone Background</Label>
+          <div className="flex items-center gap-2">
+            <div
+              onClick={() => openPicker(slot, "background")}
+              className="relative w-[36px] h-[28px] rounded-[6px] border border-[rgba(255,255,255,0.1)] overflow-hidden cursor-pointer shrink-0 bg-[#0b0b10] hover:border-[#7c5cfc] transition-colors"
+            >
+              {bgStyle && <div className="absolute inset-0" style={bgStyle} />}
+              {!bgStyle && <div className="absolute inset-0 flex items-center justify-center text-[#55556a] text-[14px]">+</div>}
+            </div>
+            <button onClick={() => openPicker(slot, "background")}
+              className="text-[11px] text-[#7c5cfc] hover:text-[#9d7fff] bg-transparent border-0 cursor-pointer">
+              {bgStyle ? "Change" : "Add"}
+            </button>
+            {bgStyle && (
+              <button onClick={() => clearBackground(slot)}
+                className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer ml-auto">
+                clear
+              </button>
+            )}
+          </div>
+          {bg?.kind === "pattern" && bg.key && (
+            <div className="text-[9px] font-mono text-[#55556a] mt-1 truncate">{bg.key}</div>
+          )}
+        </div>
+        <Slider label="Padding" value={padding}
+          onChangeSilent={v => setStyleSilent("contentPadding", v)}
+          onCommit={commit} min={0} max={120} unit="px" />
+      </div>
+    </div>
+  );
+}
+
 export default function ZoneEditor({
   beatId,
   slot, zone, zoneDef, zoneType,
   openPicker,
   updateTextContent, updateTextStyle, updateTextStyleBulk,
   updateContentProp, updateBlockProp,
+  updateBackgroundProp,
   setZoneStyle, setZoneLayout,
   setZoneStyleSilent, setZoneLayoutSilent,
-  clearContent,
+  patchZoneSilent,
+  clearContent, clearBackground,
   onDelete,
 }) {
   const commitBeat = useProjectStore(s => s.commitBeat);
@@ -101,6 +148,7 @@ export default function ZoneEditor({
   const radius  = style.borderRadius ?? 0;
   const shadow  = style.shadowBlur   ?? 0;
   const padding = style.contentPadding ?? 0;
+  const bg      = safeZone.background || {};
 
   const commit = () => commitBeat(beatId);
 
@@ -140,57 +188,59 @@ export default function ZoneEditor({
       {isText && (
         <>
           <SectionTitle>Text</SectionTitle>
-          <div className="flex gap-4 mb-4">
-            {/* Type switcher — same pattern as asset preview */}
+          <div className="flex gap-3 mb-4">
+            {/* Type switcher */}
             <div
               onClick={() => openPicker(slot, "content")}
               className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors flex flex-col items-center justify-center gap-1 bg-[#0e0e1a]"
-              style={{ width: 120, height: 120 }}
+              style={{ width: 80, height: 80 }}
             >
-              <span className="text-[32px] pointer-events-none">T</span>
-              <span className="text-[10px] text-[#9494a8] font-mono pointer-events-none">Text</span>
+              <span className="text-[24px] pointer-events-none">T</span>
+              <span className="text-[9px] text-[#9494a8] font-mono pointer-events-none">Text</span>
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
                 <span className="text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">Change</span>
               </div>
             </div>
-            <div className="flex-1 flex items-center">
-              <span className="text-[11px] text-[#55556a] font-mono leading-relaxed">Click the card to change this zone to an image, video, or block.</span>
-            </div>
+            <textarea
+              value={content.text || ""}
+              onChange={e => updateTextContent(slot, e.target.value)}
+              rows={4}
+              placeholder="Enter text..."
+              className="flex-1 bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-2 text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none placeholder-[#55556a]"
+            />
           </div>
-          <textarea
-            value={content.text || ""}
-            onChange={e => updateTextContent(slot, e.target.value)}
-            rows={3}
-            placeholder="Enter text..."
-            className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-2 text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none placeholder-[#55556a] mb-3"
-          />
 
           {/* Style Presets — single call applies all keys at once */}
           <div className="mb-4">
             <Label>Presets</Label>
             <div className="flex gap-[5px] flex-wrap mt-[5px]">
-              {textStylePresets.map(preset => (
-                <button
-                  key={preset.id}
-                  onClick={() => {
-                    // Apply only visual flair — never override layout's fontSize/fontWeight/textAlign
-                    const { fontSize, fontWeight, textAlign, ...flair } = preset.style;
-                    const flairStyle = flair.background
-                      ? flair
-                      : { ...flair, background: "transparent" };
-                    updateTextStyleBulk(slot, flairStyle);
-                  }}
-                  className="px-[12px] py-[6px] rounded-[6px] text-[14px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
-                  style={{
-                    background:  preset.style.background || "rgba(255,255,255,0.08)",
-                    color:       preset.style.color || "#ffffff",
-                    fontFamily:  preset.style.fontFamily || "inherit",
-                  }}
-                  title={`Apply ${preset.label}`}
-                >
-                  {preset.label}
-                </button>
-              ))}
+              {textStylePresets.map(preset => {
+                const isActive = (style._presetId === preset.id);
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() => {
+                      const { fontSize, fontWeight, textAlign, ...flair } = preset.style;
+                      const flairStyle = flair.background
+                        ? flair
+                        : { ...flair, background: "transparent" };
+                      updateTextStyleBulk(slot, { ...flairStyle, _presetId: preset.id });
+                    }}
+                    className="px-[12px] py-[6px] rounded-[6px] text-[14px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
+                    style={{
+                      background:  preset.style.background || "rgba(255,255,255,0.08)",
+                      color:       preset.style.color || "#ffffff",
+                      fontFamily:  preset.style.fontFamily || "inherit",
+                      outline:     isActive ? "2px solid #7c5cfc" : "2px solid transparent",
+                      outlineOffset: "2px",
+                      boxShadow:   isActive ? "0 0 8px rgba(124,92,252,0.6)" : "none",
+                    }}
+                    title={`Apply ${preset.label}`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -204,7 +254,12 @@ export default function ZoneEditor({
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <Slider label="Font Size" value={Math.round(parseFloat(style.fontSize ?? 32))}
-              onChangeSilent={v => setStyleSilent("fontSize", v)}
+              onChangeSilent={v => {
+                const curFont = parseFloat(style.fontSize ?? 32);
+                const curH    = safeZone.height ?? zoneDef?.height ?? 20;
+                const newH    = curFont > 0 ? Math.max(3, Math.round(curH * (v / curFont))) : curH;
+                patchZoneSilent(slot, { height: newH }, { fontSize: v });
+              }}
               onCommit={commit} min={10} max={300} unit="px" />
             <Slider label="Opacity" value={Math.round((style.opacity ?? 1)*100)}
               onChangeSilent={v => setStyleSilent("opacity", v/100)}
@@ -253,6 +308,10 @@ export default function ZoneEditor({
             </div>
           </div>
 
+          {/* Zone Background + Padding */}
+          <ZoneBgRow bg={bg} slot={slot} openPicker={openPicker} clearBackground={clearBackground}
+            padding={padding} setStyleSilent={setStyleSilent} commit={commit} />
+
           {/* ── Text Effect ── */}
           <div className="grid grid-cols-2 gap-3 mb-1">
             <div>
@@ -260,11 +319,9 @@ export default function ZoneEditor({
               <select value={style.textEffect ?? "none"}
                 onChange={e => setZoneStyle(slot, "textEffect", e.target.value)}
                 className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[7px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer">
-                <option value="none">None</option>
-                <option value="typewriter">Typewriter</option>
-                <option value="wordReveal">Word Reveal</option>
-                <option value="fadeWords">Fade Words</option>
-                <option value="slideUp">Slide Up Lines</option>
+                {TEXT_EFFECT_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
             {(style.textEffect && style.textEffect !== "none") && (
@@ -343,7 +400,7 @@ export default function ZoneEditor({
             <div className="flex-1 flex flex-col gap-3">
               <div className="grid grid-cols-3 gap-2">
                 <Sel label="Object Fit" value={content.asset?.objectFit || "cover"} onChange={v => updateContentProp(slot,"objectFit",v)} options={["cover","contain"]} />
-                <Slider label="Rounded Border" value={radius}
+                <Slider label="Rounded" value={radius}
                   onChangeSilent={v => setStyleSilent("borderRadius", v)}
                   onCommit={commit} min={0} max={300} unit="px" />
                 <Slider label="Shadow" value={shadow}
@@ -355,9 +412,12 @@ export default function ZoneEditor({
                 <Sel label="Exit"  value={exit}  onChange={v => setZoneLayout(slot,"exitAnimation",v)}  options={exits}  />
                 <Sel label="Motion" value={content.asset?.motion || "none"} onChange={v => updateContentProp(slot,"motion",v)} options={motions} />
               </div>
-
             </div>
           </div>
+
+          {/* Zone Background + Padding */}
+          <ZoneBgRow bg={bg} slot={slot} openPicker={openPicker} clearBackground={clearBackground}
+            padding={padding} setStyleSilent={setStyleSilent} commit={commit} />
         </>
       )}
 

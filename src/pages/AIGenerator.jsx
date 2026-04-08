@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { generateStructuredShort } from "../services/ai/generateStructuredShort";
 import { buildSafeProject } from "../normalize/normalizeProject";
@@ -112,7 +112,6 @@ export default function AIGenerator() {
   const [generateTTS, setGenerateTTS] = useState(false);
   const [ttsVoice, setTtsVoice] = useState("female_warm");
   const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState("");
   const [error, setError] = useState("");
 
   const handleScratch = async () => {
@@ -158,7 +157,6 @@ export default function AIGenerator() {
     }
     setError("");
     setLoading(true);
-    setLoadingStep("script");
     try {
       const aiResult = await generateStructuredShort({
         topic,
@@ -174,7 +172,7 @@ export default function AIGenerator() {
         brandColor: brandColor.trim() || null,
         audience,
         tone,
-        onProgress: (step) => setLoadingStep(step),
+        onProgress: () => {},
       });
 
       const safeProject = buildSafeProject({
@@ -201,57 +199,108 @@ export default function AIGenerator() {
       setError(err.message || "Generation failed. Please try again.");
     }
     setLoading(false);
-    setLoadingStep("");
   };
 
-  const STEP_LABELS = {
-    script:    { label: "Generating script…",    sub: "AI is writing your video script" },
-    images:    { label: "Generating visuals…",   sub: "Creating images for each beat with AI" },
-    voiceover: { label: "Generating voiceover…", sub: "Synthesizing AI voice for your script" },
-  };
+  const LOADING_MESSAGES = [
+    "Crafting your story…",
+    "Building your vision…",
+    "Bringing ideas to life…",
+    "Designing your moments…",
+    "Weaving it all together…",
+    "Shaping something great…",
+    "Putting the pieces in place…",
+    "Making it cinematic…",
+  ];
 
-  /* ── UI ── */
-  const stepInfo = STEP_LABELS[loadingStep] || { label: "Preparing…", sub: "Getting things ready" };
+  const [msgIdx, setMsgIdx] = useState(0);
+  const msgTimer = useRef(null);
+
+  useEffect(() => {
+    if (loading) {
+      setMsgIdx(0);
+      msgTimer.current = setInterval(() => setMsgIdx(i => (i + 1) % LOADING_MESSAGES.length), 2600);
+    } else {
+      clearInterval(msgTimer.current);
+    }
+    return () => clearInterval(msgTimer.current);
+  }, [loading]);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#08080d" }}>
 
       {/* Loading overlay */}
       {loading && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-10" style={{ background: "rgba(8,8,13,0.8)", backdropFilter: "blur(6px)" }}>
-          {/* Spinner */}
-          <div className="w-28 h-28 rounded-full border-[5px] border-[rgba(124,92,252,0.2)] border-t-[#7c5cfc] animate-spin" />
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 48,
+          background: "rgba(8,8,13,0.93)", backdropFilter: "blur(10px)",
+        }}>
+          <style>{`
+            @keyframes ai-spin-cw  { to { transform: rotate(360deg);  } }
+            @keyframes ai-spin-ccw { to { transform: rotate(-360deg); } }
+            @keyframes ai-pulse-glow {
+              0%, 100% { opacity: 0.35; transform: scale(0.92); }
+              50%       { opacity: 0.75; transform: scale(1.08); }
+            }
+            @keyframes ai-dot {
+              0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+              40%            { opacity: 1;   transform: scale(1.2); }
+            }
+            @keyframes ai-fade-msg {
+              0%   { opacity: 0; transform: translateY(8px); }
+              15%  { opacity: 1; transform: translateY(0);   }
+              85%  { opacity: 1; transform: translateY(0);   }
+              100% { opacity: 0; transform: translateY(-6px);}
+            }
+          `}</style>
 
-          {/* Step label */}
-          <div className="flex flex-col items-center gap-3 text-center">
-            <div className="text-[36px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>
-              {stepInfo.label}
-            </div>
-            <div className="text-[18px] text-[#55556a]">{stepInfo.sub}</div>
+          {/* Rings */}
+          <div style={{ position: "relative", width: 128, height: 128 }}>
+            {/* Outer ring */}
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: "50%",
+              border: "2.5px solid rgba(124,92,252,0.18)",
+              borderTopColor: "#7c5cfc", borderRightColor: "rgba(124,92,252,1)",
+              animation: "ai-spin-cw 1.6s linear infinite",
+            }} />
+            {/* Middle ring */}
+            <div style={{
+              position: "absolute", inset: 18, borderRadius: "50%",
+              border: "2px solid rgba(167,139,250,0.12)",
+              borderBottomColor: "#a78bfa", borderLeftColor: "rgba(167,139,250,1)",
+              animation: "ai-spin-ccw 1.1s linear infinite",
+            }} />
+            {/* Inner glow orb */}
+            <div style={{
+              position: "absolute", inset: 36, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(124,92,252,0.55) 0%, rgba(124,92,252,0.1) 60%, transparent 100%)",
+              animation: "ai-pulse-glow 2.2s ease-in-out infinite",
+            }} />
           </div>
 
-          {/* Step indicators */}
-          <div className="flex items-center gap-6 mt-2">
-            {[
-              { key: "script",    label: "Script" },
-              ...(generateImages ? [{ key: "images",    label: "Visuals" }] : []),
-              ...(generateTTS    ? [{ key: "voiceover", label: "Voiceover" }] : []),
-            ].map(({ key, label }, i, arr) => {
-              const steps = ["script", ...(generateImages ? ["images"] : []), ...(generateTTS ? ["voiceover"] : [])];
-              const currentIdx = steps.indexOf(loadingStep);
-              const thisIdx    = steps.indexOf(key);
-              const done       = thisIdx < currentIdx;
-              const active     = thisIdx === currentIdx;
-              return (
-                <div key={key} className="flex items-center gap-6">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className={`w-4 h-4 rounded-full transition-all ${active ? "bg-[#7c5cfc] scale-125" : done ? "bg-[#4ade80]" : "bg-[rgba(255,255,255,0.15)]"}`} />
-                    <span className={`text-[14px] font-mono ${active ? "text-[#a78bfa]" : done ? "text-[#4ade80]" : "text-[#55556a]"}`}>{label}</span>
-                  </div>
-                  {i < arr.length - 1 && <div className="w-16 h-[1px] bg-[rgba(255,255,255,0.1)] mb-5" />}
-                </div>
-              );
-            })}
+          {/* Message */}
+          <div style={{ textAlign: "center", minHeight: 72 }}>
+            <div key={msgIdx} style={{
+              fontSize: 30, fontWeight: 700, color: "#e8e8f0",
+              fontFamily: "'Syne', sans-serif", marginBottom: 10,
+              animation: "ai-fade-msg 2.6s ease forwards",
+            }}>
+              {LOADING_MESSAGES[msgIdx]}
+            </div>
+            <div style={{ fontSize: 13, color: "#7a7a7a", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em" }}>
+              THIS MAY TAKE A MOMENT
+            </div>
+          </div>
+
+          {/* Pulsing dots */}
+          <div style={{ display: "flex", gap: 10 }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{
+                width: 7, height: 7, borderRadius: "50%",
+                background: "#7c5cfc",
+                animation: `ai-dot 1.4s ease-in-out ${i * 0.22}s infinite`,
+              }} />
+            ))}
           </div>
         </div>
       )}

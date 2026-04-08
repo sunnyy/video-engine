@@ -46,19 +46,24 @@ function pickMotion(energy, index = 0, lastMotion = null, motionStyle = null) {
 /* ─────────────────────────────────────────────────────────────
    STYLE PRESETS — asset zone visual variety
 ───────────────────────────────────────────────────────────── */
+// Scale is intentionally always 1.0 — inset spacing is expressed via zone size/position
+// or user-controlled padding, not by shrinking the image inside the zone.
 const STYLE_PRESETS = [
-  { scale: 1.0,  borderRadius: 0,  shadowBlur: 0  },
-  { scale: 1.0,  borderRadius: 0,  shadowBlur: 0  },
-  { scale: 0.92, borderRadius: 12, shadowBlur: 20 },
-  { scale: 0.88, borderRadius: 16, shadowBlur: 24 },
-  { scale: 0.82, borderRadius: 20, shadowBlur: 28 },
-  { scale: 0.78, borderRadius: 24, shadowBlur: 30 },
+  { scale: 1.0, borderRadius: 0,  shadowBlur: 0  },
+  { scale: 1.0, borderRadius: 0,  shadowBlur: 0  },
+  { scale: 1.0, borderRadius: 8,  shadowBlur: 0  },
+  { scale: 1.0, borderRadius: 12, shadowBlur: 18 },
+  { scale: 1.0, borderRadius: 16, shadowBlur: 24 },
+  { scale: 1.0, borderRadius: 20, shadowBlur: 28 },
 ];
 
 function pickStylePreset(energy) {
-  if (energy >= 0.8) return STYLE_PRESETS[Math.floor(Math.random() * 2)];
+  // High energy → sharp full-bleed
+  if (energy >= 0.8) return STYLE_PRESETS[Math.floor(Math.random() * 3)];
+  // Low energy → rounded card with shadow
   if (energy <= 0.3) return STYLE_PRESETS[3 + Math.floor(Math.random() * 3)];
-  return STYLE_PRESETS[Math.floor(Math.random() * STYLE_PRESETS.length)];
+  // Mid → light variety
+  return STYLE_PRESETS[Math.floor(Math.random() * 4)];
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -66,11 +71,11 @@ function pickStylePreset(energy) {
    Soft bias — only applied when ≥2 preferred candidates exist.
 ───────────────────────────────────────────────────────────── */
 const ROLE_PREFERRED = {
-  hook:     ["NumberHook","ThreePartHook","HeadlineReveal","TopTitleHook","DuoStackHook"],
+  hook:     ["HeadlineReveal","DuoStackHook"],
   proof:    ["AssetWithList","SideBySide","FourCollage","DataRowsProof"],
-  escalate: ["BuildingList","CollageEscalate","EscalatingStack","TitleThenAsset"],
-  reveal:   ["ProductReveal","TitleFirstReveal","QuoteReveal","StatReveal"],
-  cta:      ["CardCTA"],
+  escalate: ["BuildingList","TitleThenAsset"],
+  reveal:   ["ProductReveal"],
+  cta:      [],
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -155,7 +160,7 @@ function pickLayout({
     if (recentFiltered.length) candidates = recentFiltered;
   }
 
-  return candidates[Math.floor(Math.random() * candidates.length)]?.id || "FullBleed";
+  return candidates[Math.floor(Math.random() * candidates.length)]?.id || "DuoStackHook";
 }
 
 /* ─────────────────────────────────────────────────────────────

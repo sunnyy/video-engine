@@ -195,15 +195,17 @@ export default function ZoneCanvas({
           return (
             <div key={`content_${zone.id}`} className="absolute"
               style={{
-                left:         `${zone.x}%`,
-                top:          `${zone.y}%`,
-                width:        `${zone.width}%`,
-                height:       isText ? "auto" : `${zone.height}%`,
-                minHeight:    isText ? "3%" : undefined,
-                zIndex:       zone.zIndex ?? 1,
-                borderRadius: zone.style?.borderRadius || 0,
-                overflow:     isText ? "visible" : "hidden",
-                opacity:      zone.style?.opacity ?? 1,
+                left:          `${zone.x}%`,
+                top:           `${zone.y}%`,
+                width:         `${zone.width}%`,
+                height:        `${zone.height}%`,
+                zIndex:        zone.zIndex ?? 1,
+                borderRadius:  zone.style?.borderRadius || 0,
+                overflow:      isText ? "visible" : "hidden",
+                opacity:       zone.style?.opacity ?? 1,
+                display:       isText ? "flex"   : undefined,
+                alignItems:    isText ? "center" : undefined,
+                flexDirection: isText ? "column" : undefined,
               }}>
               <ZoneContentLayer zone={zone} />
               {isEmpty && (

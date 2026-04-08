@@ -174,6 +174,24 @@ export default function CaptionsSection({ beat }) {
         </div>
       </div>
 
+      {/* ── Font Size ── */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold tracking-widest uppercase text-[#55556a]"
+            style={{ fontFamily: "'JetBrains Mono',monospace" }}>
+            Font Size
+          </span>
+          <span className="text-[11px] text-[#7c5cfc] font-mono">{caption.fontSize ?? 100}%</span>
+        </div>
+        <input
+          type="range" min={50} max={200} step={5}
+          value={caption.fontSize ?? 100}
+          onChange={(e) => update("fontSize", Number(e.target.value))}
+          className="w-full"
+          style={{ accentColor: "#7c5cfc" }}
+        />
+      </div>
+
       {/* ── Style grid — scrollable, shows ~3-4 at a time ── */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between mb-1">

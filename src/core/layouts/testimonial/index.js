@@ -20,7 +20,7 @@ export default [
     zones: [
       { id:"z1", type:"asset", role:"background_image", order:1, x:0, y:0, width:100, height:100, zIndex:1, start:0, end:null,
         enterAnimation:"fadeIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z2", type:"text", role:"quote", maxChars:85, order:1, x:5, y:55, width:90, height:32, zIndex:3, start:0.35, end:null,
+      { id:"z2", type:"text", role:"quote", maxChars:85, order:1, x:5, y:55, width:90, height:8, zIndex:3, start:0.35, end:null,
         enterAnimation:"slideUpIn", exitAnimation:"none",
         style:{ fontSize:100, fontWeight:700, color:"#ffffff", textAlign:"left", lineHeight:1.2, textShadow:"0 2px 16px rgba(0,0,0,0.9)", fontStyle:"italic" } },
       { id:"z3", type:"text", role:"subtext", maxChars:30, order:2, x:5, y:89, width:90, height:9, zIndex:3, start:0.65, end:null,

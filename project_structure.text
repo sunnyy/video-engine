@@ -70,13 +70,13 @@
     - assetMatcher.js
     - assetStrategyEngine.js
     - audioCueEngine.js
+    - autoAssignElements.js
     - backgroundPatternRegistry.js
     - beatIntent
       - beatIntentClassifier.js
       - beatIntentTypes.js
     - beatVariationEngine.js
     - blockContentExtractors.js
-    - blockEligibilityEngine.js
     - blockRegistry.js
     - buildBeatsFromScript.js
     - calculateTimeline.js
@@ -84,16 +84,48 @@
     - captionPositionRegistry.jsx
     - captionStyleRegistry.jsx
     - captionTimingEngine.js
+    - colorContrastResolver.js
     - colorUtils.js
     - compilerValidator.js
     - createEmptyProject.js
     - debugProject.js
+    - designLibrary
+      - decorativePicker.js
+      - decorativeRegistry.js
+      - layoutBackgroundMapper.js
+    - elements
+      - colorContrastResolver.js
+      - compositionRules.js
+      - elementComposer.js
+      - elementSchema.js
+    - elementsRegistry.jsx
     - getAvailableLayouts.js
     - getLayoutSafeAreas.js
-    - layoutCapabilityRegistry.js
-    - layoutDefaultsRegistry.js
+    - layoutDefinitions.js
     - layoutRegistry.js
     - layoutResolver.js
+    - layouts
+      - contrast
+        - index.js
+      - cta
+        - index.js
+      - escalate
+        - index.js
+      - explanation
+        - index.js
+      - hook
+        - index.js
+      - index.js
+      - proof
+        - index.js
+      - reveal
+        - index.js
+      - stat
+        - index.js
+      - testimonial
+        - index.js
+      - visual_rest
+        - index.js
     - motionsRegistry.js
     - musicRegistry.js
     - overlayPlacementEngine.js
@@ -103,13 +135,16 @@
     - sfxRegistry.js
     - syncBeatsToTTs.js
     - testProject.js
+    - textStylePresets.js
     - transitionsRegistry.js
     - validateProject.js
+    - videoDNA.js
     - visualDirector.js
-    - visualGrammar.js
     - visualIdentityEngine.js
     - visualPlanner.js
     - zoneContrastEngine.js
+  - hooks
+    - useUserRules.js
   - index.css
   - lib
     - supabase.js
@@ -146,26 +181,26 @@
       - AssetRenderer.jsx
       - AvatarLayer.jsx
       - Caption.jsx
+      - composition
+        - BlobShapeRenderer.jsx
+        - ColorTintRenderer.jsx
+        - CompositionLayerRenderer.jsx
+        - DiagonalCutRenderer.jsx
+        - DotGridRenderer.jsx
+        - GradientVignetteRenderer.jsx
+        - HeroWordRenderer.jsx
+        - LabelBadgeRenderer.jsx
+        - NoiseGradientRenderer.jsx
+        - StarBurstRenderer.jsx
+        - TickerBarRenderer.jsx
+      - CompositionDecorativeLayer.jsx
+      - DecorativeRenderer.jsx
+      - ElementRenderer.jsx
       - OverlayRenderer.jsx
       - SFXRenderer.jsx
     - layouts
-      - BigTopSmallBottom.jsx
-      - CenterAvatar.jsx
-      - FloatingAvatar.jsx
-      - FourGrid.jsx
-      - FullZone.jsx
       - LayoutBackgroundRenderer.jsx
-      - LayoutZoneRenderer.jsx
-      - LeftHeavy.jsx
-      - OneTopTwoBottom.jsx
-      - PictureInPicture.jsx
-      - RightHeavy.jsx
-      - SideAvatar.jsx
-      - SixGrid.jsx
-      - SmallTopBigBottom.jsx
-      - SplitZone.jsx
-      - ThreeZone.jsx
-      - TwoTopOneBottom.jsx
+      - LayoutRenderer.jsx
     - Root.jsx
     - VideoComposition.jsx
   - server
@@ -175,7 +210,56 @@
     - compressVideo.cjs
     - index.js
     - temp
+      - img-1775629863039-53leim3qvqb.png
+      - img-1775629863064-onga8l7jfe.jpg
+      - img-1775629863073-5d1qpwmbuea.jpg
+      - img-1775629863074-r8cnv4udfmd.jpg
+      - img-1775629863098-izu6ntdice.jpg
+      - img-1775629863119-f0ytzd5dsqs.jpg
+      - img-1775629863121-1ptabx5cs1wi.jpg
+      - img-1775629909117-q48993tio0r.png
+      - img-1775629909130-4nh3dppdr9g.jpg
+      - img-1775629909133-sz4b847m9io.jpg
+      - img-1775629909135-bgkr0ubwvz8.jpg
+      - img-1775629909147-wdi3cchqabs.jpg
+      - img-1775629909173-yzumf6fsenn.jpg
+      - img-1775629909191-njbppd9n17n.jpg
+      - img-1775629934567-8858odlgyor.jpg
+      - img-1775629934796-hgoryu49jah.jpg
+      - img-1775629934827-v27o1lq968.jpg
+      - img-1775629934854-p9knyr45mt.jpg
+      - img-1775629934867-7933b4pj52n.png
+      - img-1775629934886-fgrc7szsj9d.jpg
+      - img-1775629934892-49rg0bmdyt3.jpg
+      - img-1775630202149-0vgjn86qjc6.jpg
+      - img-1775630202160-5ryw840rulm.jpg
+      - img-1775630202162-56brkgtc22.jpg
+      - img-1775630202167-0hffhjmk16k.png
+      - img-1775630202180-sx9yna174.jpg
+      - img-1775630202196-o5clms5pgaa.jpg
+      - img-1775630202436-yya56ue7prd.jpg
+      - img-1775630205368-38z7blvqdi7.png
+      - img-1775630205378-jvi0dvl1vca.jpg
+      - img-1775630205395-vt8zqksbk48.jpg
+      - img-1775630205544-fqln7txoqif.jpg
+      - img-1775630205561-gcnp1x8btab.jpg
+      - img-1775630205586-mkbdby4qjhe.jpg
+      - img-1775630205589-tjy7esknz3h.jpg
+      - img-1775654280506-vt6lmyn2gfb.jpg
+      - img-1775654280803-f9u0am249w.jpg
+      - img-1775654280817-abitmdli2h.jpg
+      - img-1775654280826-y9d57n4rwgh.jpg
+      - img-1775654280843-a9xpjbxclhf.jpg
+      - img-1775654280858-jinrjauyuq.jpg
+      - img-1775654280863-ja5r4qggqer.jpg
+      - music-1775629863122.mp3
+      - music-1775629909194.mp3
+      - music-1775629934894.mp3
+      - music-1775630202439.mp3
+      - music-1775630205590.mp3
+      - music-1775654280867.mp3
       - render-006ce208-b6ba-48bb-9ffa-c83b20817d8b.mp4
+      - render-0075123a-6db6-4c6d-b4bc-bd3c813af7a5.mp4
       - render-0c57f997-dce6-4e9a-af9a-c4e1fe4d0d18.mp4
       - render-1773074276742.mp4
       - render-1774606450659.mp4
@@ -186,9 +270,32 @@
       - render-1774985417295.mp4
       - render-1774990639991.mp4
       - render-34811e89-c18e-4ef0-a7bc-d28a85a883c2.mp4
+      - render-375deaf7-67ed-40c7-90ee-608cd7b4d11c.mp4
       - render-62473504-ae21-471e-92f2-9356f174299d.mp4
       - render-7ca9d991-7348-4a79-be7b-3cdad49f91f8.mp4
       - render-9230af1e-9d00-4ef0-8823-9365d023c41c.mp4
+      - render-9ac1e7fb-93dc-4936-978e-afb0992c0188.mp4
+      - render-b09fa3f0-b449-4cdd-aea1-15917a97755a.mp4
+      - render-f275f1c6-e5b4-4fc2-83fa-854479c87b1b.mp4
+      - search-1775478874260-ad2zc8njz3i.png
+      - search-1775478875094-rl3nz31bmfm.jpg
+      - search-1775478875471-3y870fcnqhl.png
+      - search-1775478875748-291fm4ji4p8.jpg
+      - search-1775479203441-flhvg3d88mw.png
+      - search-1775479203576-h710q1navg.png
+      - search-1775479203873-21k0xtwkeky.png
+      - search-1775480244607-pjj8aw53gr.png
+      - search-1775480245213-44ibi5mzkvo.png
+      - search-1775480245497-hhgjnxzjrg6.png
+      - search-1775480245780-j08rralk5oo.png
+      - search-1775480424369-2vhqy9c6x8d.png
+      - search-1775480424719-gc53lh9k6i.png
+      - search-1775480425530-2dsjozhxinp.png
+      - search-1775480537694-s0d73smlpdp.jpg
+      - search-1775481148635-nj7p98b8x4h.jpg
+      - search-1775481368245-vqwugfplbz.jpg
+      - search-1775481480057-sq9vsb4l30d.jpg
+      - search-1775485994486-o402trsa59.jpg
       - tts-1775139755245.mp3
       - tts-1775140392523.mp3
       - tts-1775149577883.mp3
@@ -198,9 +305,91 @@
       - tts-1775157322890.mp3
       - tts-1775157909696.mp3
       - tts-1775158231987.mp3
+      - tts-1775325477543.mp3
+      - tts-1775413550049.mp3
+      - tts-1775417186777.mp3
+      - tts-1775418815995.mp3
+      - tts-1775427755850.mp3
+      - tts-1775428241596.mp3
+      - tts-1775433894504.mp3
+      - tts-1775438029386.mp3
+      - tts-1775438192067.mp3
+      - tts-1775438526901.mp3
+      - tts-1775441052775.mp3
+      - tts-1775444319533.mp3
+      - tts-1775444415133.mp3
+      - tts-1775444620050.mp3
+      - tts-1775446342388.mp3
+      - tts-1775446591243.mp3
+      - tts-1775446880942.mp3
+      - tts-1775478277377.mp3
+      - tts-1775478883979.mp3
+      - tts-1775480022238.mp3
+      - tts-1775480255226.mp3
+      - tts-1775480436897.mp3
+      - tts-1775480556977.mp3
+      - tts-1775481163131.mp3
+      - tts-1775481379366.mp3
+      - tts-1775481491219.mp3
+      - tts-1775482091148.mp3
+      - tts-1775482428323.mp3
+      - tts-1775485477104.mp3
+      - tts-1775485576653.mp3
+      - tts-1775486006817.mp3
+      - tts-1775487035003.mp3
+      - tts-1775487150696.mp3
+      - tts-1775488337310.mp3
+      - tts-1775489065169.mp3
+      - tts-1775489199721.mp3
+      - tts-1775489978914.mp3
+      - tts-1775490092896.mp3
+      - tts-1775490235947.mp3
+      - tts-1775490631269.mp3
+      - tts-1775491289815.mp3
+      - tts-1775491489812.mp3
+      - tts-1775492354524.mp3
+      - tts-1775564613185.mp3
+      - tts-1775565791014.mp3
+      - tts-1775566204701.mp3
+      - tts-1775566787970.mp3
+      - tts-1775566936993.mp3
+      - tts-1775567057137.mp3
+      - tts-1775568748265.mp3
+      - tts-1775583572425.mp3
+      - tts-1775606560634.mp3
+      - tts-1775606802049.mp3
+      - tts-1775607284665.mp3
+      - tts-1775608176716.mp3
+      - tts-1775608450211.mp3
+      - tts-1775609227299.mp3
+      - tts-1775609325637.mp3
+      - tts-1775609994519.mp3
+      - tts-1775610449143.mp3
+      - tts-1775611098372.mp3
+      - tts-1775611616880.mp3
+      - tts-1775611731184.mp3
+      - tts-1775616135541.mp3
+      - tts-1775616585126.mp3
+      - tts-1775616862238.mp3
+      - tts-1775617055897.mp3
+      - tts-1775617929135.mp3
+      - tts-1775618605621.mp3
+      - tts-1775619579018.mp3
+      - tts-1775619820887.mp3
+      - tts-1775624218312.mp3
+      - tts-1775624395089.mp3
+      - tts-1775624840292.mp3
+      - tts-1775625833015.mp3
+      - tts-1775626331299.mp3
+      - tts-1775626775488.mp3
+      - tts-1775628924091.mp3
+      - tts-1775630024773.mp3
+      - tts-1775654175872.mp3
+      - tts-1775655487353.mp3
   - services
     - ai
       - generateStructuredShort.js
+      - generateZoneContent.js
     - assets
       - deleteUserAsset.js
       - getAssets.js
@@ -238,35 +427,43 @@
           - SlideshowEditor.jsx
           - StatExplosionEditor.jsx
       - BrandingSection.jsx
+      - CanvasPreview.jsx
       - CaptionsSection.jsx
       - EditorPanel.jsx
+      - FilesSection.jsx
       - Header.jsx
       - LayoutPreview.jsx
       - LayoutSelector.jsx
+      - MyRulesSection.jsx
+      - OverlayEditor.jsx
       - OverlaySection.jsx
       - Preview.jsx
       - SFXSection.jsx
       - Sidebar.jsx
       - SystemMessage.jsx
       - VideoOverlaySection.jsx
+      - ZoneCanvas.jsx
+      - ZoneEditor.jsx
+      - ZoneHandle.jsx
       - zonePicker
         - tabs
           - BlocksTab.jsx
+          - blockThumbnails.jsx
           - ColorsTab.jsx
           - GalleryTab.jsx
           - MyAssetsTab.jsx
+          - TextTab.jsx
         - ZonePickerModal.jsx
       - zones
         - tabs
           - BackgroundTab.jsx
           - ContentTab.jsx
+          - LayoutTab.jsx
           - StylingTab.jsx
+          - TextTab.jsx
         - ZoneCard.jsx
         - ZonePreview.jsx
       - ZonesSection.jsx
-    - Workflow
-      - ScriptStep.jsx
-      - TalkingHeadStep.jsx
 - Strategy.txt
 - tailwind.config.js
 - Tasks.txt

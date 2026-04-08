@@ -17,6 +17,8 @@ import ElementRenderer from "../elements/ElementRenderer";
 import CompositionLayerRenderer from "../elements/composition/CompositionLayerRenderer";
 import CompositionDecorativeLayer from "../elements/CompositionDecorativeLayer";
 import blockRegistry from "../../core/blockRegistry";
+import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
+import textEffectRegistry from "../../core/textEffectRegistry.jsx";
 
 function resolveEnterStyle(animation, progress, W, H) {
   switch (animation) {
@@ -98,22 +100,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
   const st      = zone.style      || {};
   const bg      = zone.background || {};
 
-  const scale          = st.scale          ?? 1;
   const rotation       = st.rotation       ?? 0;
   const contentPadding = st.contentPadding ?? 0;
-
-  // Scale as inset — shrinks content within zone, background fills full zone
-  const scaleInset  = scale < 1 ? ((1 - scale) / 2) * 100 : 0;
-  // contentPadding adds extra inset in px on top of scale inset
-  const insetPct    = scaleInset > 0 ? `${scaleInset}%` : "0%";
-  const insetPx     = contentPadding > 0 ? `${contentPadding}px` : null;
-  // Combine: use calc() when both are present
-  const makeInset = (pct, px) => {
-    if (px && pct !== "0%") return `calc(${pct} + ${px})`;
-    if (px) return px;
-    return pct;
-  };
-  const finalInset = makeInset(insetPct, insetPx);
+  const finalInset     = contentPadding > 0 ? `${contentPadding}px` : "0px";
 
   const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
                || (zone.type === "text" && !content.text && content.kind !== "block");
@@ -121,32 +110,33 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
   // Zone container — position only, no rotation, no transform (enter/exit handled below)
   const isTextZone = zone.type === "text";
   const zoneContainerStyle = {
-    position:  "absolute",
-    left:      `${zone.x     ?? 0}%`,
-    top:       `${zone.y     ?? 0}%`,
-    width:     `${zone.width ?? 100}%`,
-    // Text zones auto-size to content; all others use explicit height
-    height:    isTextZone ? "auto" : `${zone.height ?? 100}%`,
-    minHeight: isTextZone ? `${Math.min(zone.height ?? 5, 5)}%` : undefined,
-    zIndex:    zone.zIndex ?? 1,
-    overflow:  isTextZone ? "visible" : "hidden",
-    opacity:   (animStyle.opacity ?? 1) * (st.opacity ?? 1),
-    transform: animStyle.transform || undefined,
+    position:       "absolute",
+    left:           `${zone.x     ?? 0}%`,
+    top:            `${zone.y     ?? 0}%`,
+    width:          `${zone.width ?? 100}%`,
+    height:         `${zone.height ?? 100}%`,
+    zIndex:         zone.zIndex ?? 1,
+    overflow:       isTextZone ? "visible" : "hidden",
+    opacity:        (animStyle.opacity ?? 1) * (st.opacity ?? 1),
+    transform:      animStyle.transform || undefined,
+    // Vertical centering for text zones
+    display:        isTextZone ? "flex"   : undefined,
+    flexDirection:  isTextZone ? "column" : undefined,
+    justifyContent: isTextZone ? "center" : undefined,
   };
 
   // Content wrapper — rotation applied here, inside zone bounds
-  // Text zones: relative so wrapper grows with content; others: absolute fill
   const contentWrapperStyle = isTextZone
     ? {
-        position: "relative",
-        width:    "100%",
-        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        position:        "relative",
+        width:           "100%",
+        transform:       rotation ? `rotate(${rotation}deg)` : undefined,
         transformOrigin: "center center",
       }
     : {
-        position: "absolute",
-        inset:    0,
-        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        position:        "absolute",
+        inset:           0,
+        transform:       rotation ? `rotate(${rotation}deg)` : undefined,
         transformOrigin: "center center",
       };
 
@@ -168,9 +158,12 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
     <div style={zoneContainerStyle}>
 
       {/* Zone background — full zone, no rotation, no inset */}
-      {bg.kind === "color" && (
-        <div style={{ position:"absolute", inset:0, zIndex:0, background: bg.color, backgroundSize: bg.backgroundSize || "auto" }} />
-      )}
+      {(bg.kind === "color" || bg.kind === "pattern") && (() => {
+        const bgStyle = bg.kind === "pattern"
+          ? (backgroundPatternRegistry[bg.key]?.style || { background: "#111" })
+          : { background: bg.color, backgroundSize: bg.backgroundSize || "auto" };
+        return <div style={{ position:"absolute", inset:0, zIndex:0, ...bgStyle }} />;
+      })()}
       {bg.kind === "asset" && bg.asset?.src && (
         <div style={{ position:"absolute", inset:0, zIndex:0, opacity: bg.asset.opacity ?? 1, filter: bg.asset.blur > 0 ? `blur(${bg.asset.blur}px)` : undefined }}>
           <AssetRenderer zone={{ src: bg.asset.src, objectFit: bg.asset.objectFit || "cover", enterTransition:"none", exitTransition:"none", motion: bg.asset.motion || "none", type: bg.asset.type || "image" }} beat={beat} slot={`${zone.id}_bg`} />
@@ -243,8 +236,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
 
         {/* Text — with optional text effects */}
         {zone.type === "text" && (() => {
-          const text       = content.text || "";
-          const textEffect = st.textEffect || "none";
+          const text        = content.text || "";
+          const textEffect  = st.textEffect || "none";
           const effectSpeed = st.textEffectSpeed ?? 1.0;
 
           const baseStyle = {
@@ -269,84 +262,10 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
             borderRadius:   st.borderRadius  || 0,
           };
 
-          // ── No effect — plain text ──
-          if (textEffect === "none") {
-            return <div style={baseStyle}>{text}</div>;
+          const effectEntry = textEffectRegistry[textEffect];
+          if (effectEntry) {
+            return effectEntry.render(text, local, totalDur, baseStyle, effectSpeed, interpolate);
           }
-
-          // ── Typewriter — chars appear one by one ──
-          const usableDur = (totalDur * 0.9) / effectSpeed;
-
-          if (textEffect === "typewriter") {
-            const chars   = text.split("");
-            const visible = Math.floor(interpolate(local, [0, usableDur], [0, chars.length], { extrapolateRight: "clamp" }));
-            const blink   = Math.floor(local / 8) % 2 === 0;
-            const shown   = chars.slice(0, visible).join("");
-            const cursor  = visible < chars.length ? (blink ? "|" : "\u00A0") : "";
-            return (
-              <div style={baseStyle}>
-                {shown}{cursor}
-              </div>
-            );
-          }
-
-          // ── Word Reveal ──
-          if (textEffect === "wordReveal") {
-            const words         = text.split(/\s+/).filter(Boolean);
-            const framesPerWord = usableDur / Math.max(1, words.length);
-            const revealDur     = Math.max(framesPerWord * 0.6, 4);
-            return (
-              <div style={baseStyle}>
-                <span>
-                  {words.map((word, i) => {
-                    const prog = interpolate(local, [i * framesPerWord, i * framesPerWord + revealDur], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-                    return <span key={i} style={{ opacity: prog, display: "inline" }}>{word}{i < words.length - 1 ? " " : ""}</span>;
-                  })}
-                </span>
-              </div>
-            );
-          }
-
-          // ── Fade Words ──
-          if (textEffect === "fadeWords") {
-            const words         = text.split(/\s+/).filter(Boolean);
-            const framesPerWord = usableDur / Math.max(1, words.length);
-            const fadeDur       = Math.max(framesPerWord * 0.5, 3);
-            return (
-              <div style={baseStyle}>
-                <span>
-                  {words.map((word, i) => {
-                    const prog = interpolate(local, [i * framesPerWord, i * framesPerWord + fadeDur], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-                    return <span key={i} style={{ opacity: prog, display: "inline" }}>{word}{i < words.length - 1 ? " " : ""}</span>;
-                  })}
-                </span>
-              </div>
-            );
-          }
-
-          // ── Slide Up Lines — auto-chunk into 3-word lines ──
-          if (textEffect === "slideUp") {
-            const words     = text.split(/\s+/).filter(Boolean);
-            const lines     = [];
-            for (let i = 0; i < words.length; i += 3) lines.push(words.slice(i, i + 3).join(" "));
-            const framesPerLine = usableDur / Math.max(1, lines.length);
-            const slideDur      = Math.max(framesPerLine * 0.6, 6);
-            const align         = st.textAlign === "left" ? "flex-start" : st.textAlign === "right" ? "flex-end" : "center";
-            return (
-              <div style={{ ...baseStyle, flexDirection: "column", alignItems: align, gap: "0.15em" }}>
-                {lines.map((line, i) => {
-                  const prog = interpolate(local, [i * framesPerLine, i * framesPerLine + slideDur], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-                  return (
-                    <span key={i} style={{ opacity: prog, transform: `translateY(${interpolate(prog, [0, 1], [20, 0], { extrapolateRight: "clamp" })}px)`, display: "block", width: "100%" }}>
-                      {line}
-                    </span>
-                  );
-                })}
-              </div>
-            );
-          }
-
-          // Fallback
           return <div style={baseStyle}>{text}</div>;
         })()}
 

@@ -19,8 +19,9 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const updateBeatSilent  = useProjectStore((s) => s.updateBeatSilent);
   const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
-  const [isPlaying,  setIsPlaying]  = useState(false);
-  const [showPlayer, setShowPlayer] = useState(false);
+  const [isPlaying,   setIsPlaying]   = useState(false);
+  const [showPlayer,  setShowPlayer]  = useState(false);
+  const [pausedFrame, setPausedFrame] = useState(null);
   const hasPlayedOnce = useRef(false);
   const playerRef     = useRef(null);
   const containerRef  = useRef(null);
@@ -92,12 +93,16 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   }, [project, fps]);
 
   const handlePause = useCallback(() => {
-    if (playerRef.current) playerRef.current.pause();
+    if (playerRef.current) {
+      setPausedFrame(playerRef.current.getCurrentFrame());
+      playerRef.current.pause();
+    }
     setIsPlaying(false);
     setShowPlayer(false);
   }, []);
 
   const handleRestart = useCallback(() => {
+    setPausedFrame(null);
     setShowPlayer(true);
     setIsPlaying(true);
     hasPlayedOnce.current = true;
@@ -121,7 +126,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     }, 60);
   }, [activeBeat, fps]);
 
-  useEffect(() => { hasPlayedOnce.current = false; }, [activeBeatId]);
+  useEffect(() => { hasPlayedOnce.current = false; setPausedFrame(null); }, [activeBeatId]);
 
   const handleSelectZone = useCallback((id, modifierHeld = false) => {
     if (id !== null && isPlaying) handlePause();
@@ -275,16 +280,13 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
                 component={VideoComposition}
                 inputProps={{ project }}
                 frameToDisplay={(() => {
-                  const beatStart = Math.floor((activeBeat.start_sec || 0) * fps);
+                  // After pausing: show exactly where the player stopped
+                  if (pausedFrame !== null) return pausedFrame;
+                  // First load (never played): show beat in its "settled" state
+                  const beatStart    = Math.floor((activeBeat.start_sec || 0) * fps);
                   const beatDuration = Math.floor(((activeBeat.end_sec || 0) - (activeBeat.start_sec || 0)) * fps);
-                  // Find latest zone start in frames
                   const zones = Object.values(activeBeat.zones || {});
-                  const maxZoneStartFrame = zones.reduce((max, z) => {
-                    const zf = Math.floor((z.start || 0) * fps);
-                    return Math.max(max, zf);
-                  }, 0);
-                  // Show at: latest zone start + 30 frames (enough for any enter animation to finish)
-                  // but never beyond the beat's own duration
+                  const maxZoneStartFrame = zones.reduce((max, z) => Math.max(max, Math.floor((z.start || 0) * fps)), 0);
                   const settled = maxZoneStartFrame + 30;
                   return beatStart + Math.min(settled, beatDuration - 1);
                 })()}
