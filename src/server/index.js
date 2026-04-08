@@ -29,20 +29,15 @@ app.use("/renders", express.static(TEMP_DIR));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-/* ── Bundle cache — only bundle once per server session ── */
-let cachedBundle = null;
+/* ── Bundle — rebuilt on every render so code changes are always picked up ── */
 async function getBundle() {
-  if (cachedBundle) {
-    console.log("[bundle] Using cached bundle");
-    return cachedBundle;
-  }
   console.log("[bundle] Building bundle...");
-  cachedBundle = await bundle({
+  const result = await bundle({
     entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx"),
     publicDir:  PUBLIC_DIR,
   });
-  console.log("[bundle] Done:", cachedBundle);
-  return cachedBundle;
+  console.log("[bundle] Done:", result);
+  return result;
 }
 
 /* ── Download external image to local temp ── */
@@ -468,6 +463,9 @@ app.post("/api/render", async (req, res) => {
       outputDir:    framesDir,
       imageFormat:  "jpeg",
       concurrency:  2,
+      chromiumOptions: {
+        gl: "angle",          // enables GPU compositing — required for mix-blend-mode, CSS masks, filters
+      },
       onFrameUpdate: () => {
         rendered++;
         renderJobs[jobId].progress = Math.round((rendered / comp.durationInFrames) * 90);

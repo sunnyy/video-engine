@@ -8,7 +8,7 @@
  * content is inset from edges.
  */
 
-import React from "react";
+import React from "react"; // eslint-disable-line
 import { useCurrentFrame, useVideoConfig, interpolate, Img, OffthreadVideo } from "remotion";
 import AssetRenderer from "../elements/AssetRenderer";
 import AvatarLayer from "../elements/AvatarLayer";
@@ -35,7 +35,7 @@ function resolveEnterStyle(animation, progress, W, H) {
   }
 }
 
-function resolveExitStyle(animation, progress, W, H) {
+function resolveExitStyle(animation, progress, _W, H) {
   switch (animation) {
     case "fadeOut":      return { opacity: interpolate(progress,[0,1],[1,0],{extrapolateRight:"clamp"}) };
     case "slideUpOut":   return { opacity: interpolate(progress,[0.6,1],[1,0],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(progress,[0,1],[0,-H*0.1],{extrapolateRight:"clamp"})}px)` };
@@ -82,27 +82,12 @@ function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidt
   const br          = borderRadius || 0;
   const padding     = contentPadding ?? 0;
 
-  // Ring mask using the padding + mask-composite XOR trick.
-  // `padding: borderWidth` makes content-box inset by exactly borderWidth.
-  // Two identical white gradients — one clipped to content-box, one to border-box.
-  // XOR composite leaves only the padding ring visible.
-  // Because border-radius is on the same element, BOTH the outer and inner edges
-  // follow the rounded shape automatically — no SVG, no calc needed.
-  const ringMaskStyle = {
-    padding:              borderWidth,
-    borderRadius:         br,
-    boxSizing:            "border-box",
-    WebkitMaskImage:      "linear-gradient(#fff 0 0), linear-gradient(#fff 0 0)",
-    WebkitMaskOrigin:     "content-box, border-box",
-    WebkitMaskClip:       "content-box, border-box",
-    WebkitMaskComposite:  "destination-out",
-    maskImage:            "linear-gradient(#fff 0 0), linear-gradient(#fff 0 0)",
-    maskOrigin:           "content-box, border-box",
-    maskClip:             "content-box, border-box",
-    maskComposite:        "exclude",
-  };
-
-  // Content inset = border strip + user padding. Both are independent.
+  // No CSS masks — they are unreliable in headless Chromium.
+  // Technique: spinner fills the rounded outer container (overflow:hidden clips outer edge).
+  // Content div sits on top (higher z-index) at borderWidth inset, filling its area completely.
+  // The image naturally covers the spinner center; spinner only shows around the strip edges.
+  // Padding is an additional inset inside the content div — the gap shows the spinner color
+  // which blends naturally with the border (acts like a colored gutter matching the border).
   const contentInset = borderWidth + padding;
   const contentBr    = Math.max(0, br - contentInset);
 
@@ -169,16 +154,8 @@ function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidt
   return (
     <div style={{ position:"absolute", inset:0, borderRadius:br, overflow:"hidden" }}>
 
-      {/* Content behind — inset by borderWidth + padding */}
-      <div style={{
-        position:"absolute", inset:contentInset, borderRadius:contentBr,
-        overflow:"hidden", zIndex:1,
-      }}>
-        {children}
-      </div>
-
-      {/* Spinner — masked to only show the outer borderWidth ring, sits on top */}
-      <div style={{ position:"absolute", inset:0, zIndex:2, pointerEvents:"none", ...ringMaskStyle }}>
+      {/* Spinner z:0 — fills the outer rounded container */}
+      <div style={{ position:"absolute", inset:0, zIndex:0, pointerEvents:"none" }}>
         <div style={{
           position:"absolute", top:"50%", left:"50%",
           width:"9999px", height:"9999px",
@@ -188,11 +165,20 @@ function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidt
         }} />
       </div>
 
+      {/* Content z:1 — sits on top, inset by borderWidth so spinner peeks around the edges */}
+      <div style={{
+        position:"absolute", inset:contentInset, borderRadius:contentBr,
+        overflow:"hidden", zIndex:1,
+      }}>
+        {children}
+      </div>
+
+      {/* Glow z:2 — on top of both */}
       {blurAmount > 0 && (
         <div style={{
           position:"absolute", inset:0, borderRadius:br,
           boxShadow:`inset 0 0 ${blurAmount*2}px ${glowColor}99, 0 0 ${blurAmount*3}px ${glowColor}66`,
-          zIndex:3, pointerEvents:"none",
+          zIndex:2, pointerEvents:"none",
         }} />
       )}
     </div>
