@@ -117,6 +117,21 @@ const animatedBorderRegistry = {
     blurAmount:  6,
   },
 
+  // ── Turbulence-based effects (rendered via SVG feTurbulence in AnimatedBorderFrame) ──
+
+  fireGlow: {
+    label:        "Fire Glow",
+    swatchColor:  "#dd8448",
+    type:         "turbulence",       // flag: AnimatedBorderFrame renders this differently
+    turbColor:    "#dd8448",          // main border color
+    turbColor2:   "rgba(255,60,0,0.35)", // outer glow ring
+    turbScale:    5,                  // feDisplacementMap scale (wobble amount)
+    glowColor:    "#dd8448",
+    speed:        1.0,
+    borderWidth:  10,
+    blurAmount:   0,
+  },
+
 };
 
 export default animatedBorderRegistry;

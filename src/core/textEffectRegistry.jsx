@@ -58,7 +58,7 @@ const textEffectRegistry = {
             );
             return (
               <span key={i} style={{ opacity: prog, display: "inline" }}>
-                {word}{i < words.length - 1 ? "\u00A0" : ""}
+                {word}{i < words.length - 1 ? " " : ""}
               </span>
             );
           })}
@@ -85,7 +85,7 @@ const textEffectRegistry = {
             );
             return (
               <span key={i} style={{ opacity: prog, display: "inline" }}>
-                {word}{i < words.length - 1 ? "\u00A0" : ""}
+                {word}{i < words.length - 1 ? " " : ""}
               </span>
             );
           })}

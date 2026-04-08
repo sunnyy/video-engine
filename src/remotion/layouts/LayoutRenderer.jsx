@@ -73,66 +73,126 @@ function BlurredAssetBackground({ src }) {
 }
 
 /* ── Animated border frame ─────────────────────────────────── */
-/**
- * Wraps children in a spinning conic-gradient border.
- * Technique (mirrors the CSS ::before / ::after trick):
- *   1. Outer div: overflow:hidden + borderRadius  → clips the huge spinner
- *   2. Huge spinner div: conic-gradient, rotated each frame
- *   3. Inner div: inset by borderWidth, overflow:hidden  → the image fills it,
- *      naturally masking out the gradient center — leaving only the border strip visible
- */
-function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidth, overrideSpeed, children }) {
+function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidth, overrideSpeed, contentPadding, children }) {
   const def = animatedBorderRegistry[borderKey];
-  // If unknown key, just render children unwrapped
   if (!def) return <div style={{ position:"absolute", inset:0, overflow:"hidden", borderRadius: borderRadius||0 }}>{children}</div>;
 
-  const { gradient, glowColor, blurAmount } = def;
   const borderWidth = overrideWidth ?? def.borderWidth;
   const speed       = overrideSpeed ?? def.speed;
-  const br  = borderRadius || 0;
+  const br          = borderRadius || 0;
+  const padding     = contentPadding ?? 0;
+
+  // Ring mask using the padding + mask-composite XOR trick.
+  // `padding: borderWidth` makes content-box inset by exactly borderWidth.
+  // Two identical white gradients — one clipped to content-box, one to border-box.
+  // XOR composite leaves only the padding ring visible.
+  // Because border-radius is on the same element, BOTH the outer and inner edges
+  // follow the rounded shape automatically — no SVG, no calc needed.
+  const ringMaskStyle = {
+    padding:              borderWidth,
+    borderRadius:         br,
+    boxSizing:            "border-box",
+    WebkitMaskImage:      "linear-gradient(#fff 0 0), linear-gradient(#fff 0 0)",
+    WebkitMaskOrigin:     "content-box, border-box",
+    WebkitMaskClip:       "content-box, border-box",
+    WebkitMaskComposite:  "destination-out",
+    maskImage:            "linear-gradient(#fff 0 0), linear-gradient(#fff 0 0)",
+    maskOrigin:           "content-box, border-box",
+    maskClip:             "content-box, border-box",
+    maskComposite:        "exclude",
+  };
+
+  // Content inset = border strip + user padding. Both are independent.
+  const contentInset = borderWidth + padding;
+  const contentBr    = Math.max(0, br - contentInset);
+
+  // ── Turbulence branch (e.g. Fire Glow) ─────────────────────
+  if (def.type === "turbulence") {
+    const t       = (frame / fps) * speed;
+    const freq    = (0.012 + Math.sin(t * 2.3) * 0.004 + Math.cos(t * 1.7) * 0.003).toFixed(5);
+    const seed    = Math.floor(t * 8) % 256;
+    const flicker = 0.55 + Math.sin(t * 7.3) * 0.15 + Math.cos(t * 11.1) * 0.1;
+    const { turbColor, turbColor2, turbScale, glowColor } = def;
+
+    return (
+      <div style={{ position:"absolute", inset:0, borderRadius:br, overflow:"visible" }}>
+
+        <svg style={{ position:"absolute", width:0, height:0, overflow:"hidden" }}>
+          <defs>
+            <filter id="abf-fire-turb" x="-15%" y="-15%" width="130%" height="130%">
+              <feTurbulence type="turbulence" baseFrequency={freq} numOctaves="3" seed={seed} result="turb" />
+              <feDisplacementMap in="SourceGraphic" in2="turb" scale={turbScale ?? 5} xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </defs>
+        </svg>
+
+        {/* Wobbly border ring — CSS border so it's naturally just the strip */}
+        <div style={{
+          position:"absolute", inset:0, borderRadius:br,
+          border:   `${borderWidth}px solid ${turbColor}`,
+          filter:   "url(#abf-fire-turb)",
+          boxSizing:"border-box", zIndex:1, pointerEvents:"none",
+        }} />
+        <div style={{
+          position:"absolute", inset:0, borderRadius:br,
+          border:   `${borderWidth + 2}px solid ${turbColor}`,
+          opacity:  flicker * 0.6, filter:"blur(3px)",
+          boxSizing:"border-box", zIndex:0, pointerEvents:"none",
+        }} />
+        <div style={{
+          position:"absolute", inset:-4, borderRadius:br+4,
+          border:   `${borderWidth + 8}px solid ${turbColor2 || "rgba(255,60,0,0.3)"}`,
+          opacity:  flicker, filter:"blur(10px)",
+          boxSizing:"border-box", zIndex:0, pointerEvents:"none",
+        }} />
+        <div style={{
+          position:"absolute", inset:0, borderRadius:br,
+          background:`linear-gradient(-30deg,${glowColor}22,transparent 35%,transparent 65%,${glowColor}22)`,
+          mixBlendMode:"overlay", zIndex:2, pointerEvents:"none",
+        }} />
+
+        {/* Content — inset by borderWidth + padding, both independent */}
+        <div style={{
+          position:"absolute", inset:contentInset, borderRadius:contentBr,
+          overflow:"hidden", zIndex:3,
+        }}>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Default: conic-gradient spinner ────────────────────────
+  const { gradient, glowColor, blurAmount } = def;
   const deg = ((frame / fps) * speed * 360) % 360;
 
   return (
-    // Outer wrapper — clips spinner to zone bounds
     <div style={{ position:"absolute", inset:0, borderRadius:br, overflow:"hidden" }}>
 
-      {/* Rotating conic gradient — fills the entire wrapper */}
+      {/* Content behind — inset by borderWidth + padding */}
       <div style={{
-        position:           "absolute",
-        top:                "50%",
-        left:               "50%",
-        width:              "9999px",
-        height:             "9999px",
-        backgroundRepeat:   "no-repeat",
-        backgroundPosition: "0 0",
-        backgroundImage:    gradient,
-        transform:          `translate(-50%, -50%) rotate(${deg}deg)`,
-        zIndex:             0,
-      }} />
-
-      {/* Inner content box — inset by borderWidth, clips image & hides gradient center */}
-      <div style={{
-        position:     "absolute",
-        top:          borderWidth,
-        left:         borderWidth,
-        right:        borderWidth,
-        bottom:       borderWidth,
-        borderRadius: Math.max(0, br - borderWidth),
-        overflow:     "hidden",
-        zIndex:       1,
+        position:"absolute", inset:contentInset, borderRadius:contentBr,
+        overflow:"hidden", zIndex:1,
       }}>
         {children}
       </div>
 
-      {/* Inset glow via box-shadow — sits on top, no clip needed */}
+      {/* Spinner — masked to only show the outer borderWidth ring, sits on top */}
+      <div style={{ position:"absolute", inset:0, zIndex:2, pointerEvents:"none", ...ringMaskStyle }}>
+        <div style={{
+          position:"absolute", top:"50%", left:"50%",
+          width:"9999px", height:"9999px",
+          backgroundRepeat:"no-repeat", backgroundPosition:"0 0",
+          backgroundImage:gradient,
+          transform:`translate(-50%,-50%) rotate(${deg}deg)`,
+        }} />
+      </div>
+
       {blurAmount > 0 && (
         <div style={{
-          position:      "absolute",
-          inset:         0,
-          borderRadius:  br,
-          boxShadow:     `inset 0 0 ${blurAmount * 2}px ${glowColor}99, 0 0 ${blurAmount * 3}px ${glowColor}66`,
-          zIndex:        2,
-          pointerEvents: "none",
+          position:"absolute", inset:0, borderRadius:br,
+          boxShadow:`inset 0 0 ${blurAmount*2}px ${glowColor}99, 0 0 ${blurAmount*3}px ${glowColor}66`,
+          zIndex:3, pointerEvents:"none",
         }} />
       )}
     </div>
@@ -186,6 +246,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
     height:         `${zone.height ?? 100}%`,
     zIndex:         zone.zIndex ?? 1,
     overflow:       isTextZone ? "visible" : "hidden",
+    overflowX:      isTextZone ? "hidden"  : undefined,
     opacity:        (animStyle.opacity ?? 1) * (st.opacity ?? 1),
     transform:      animStyle.transform || undefined,
     // Vertical centering for text zones
@@ -283,6 +344,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
                 fps={fps}
                 overrideWidth={st.animatedBorderWidth ?? undefined}
                 overrideSpeed={st.animatedBorderSpeed ?? undefined}
+                contentPadding={contentPadding}
               >
                 {inner}
               </AnimatedBorderFrame>
@@ -355,6 +417,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
             opacity:       st.opacity       ?? 1,
             background:    st.background    || "transparent",
             borderRadius:  st.borderRadius  || 0,
+            whiteSpace:    "normal",
+            overflowWrap:  "break-word",
+            wordBreak:     "break-word",
           };
 
           const effectEntry = textEffectRegistry[textEffect];
