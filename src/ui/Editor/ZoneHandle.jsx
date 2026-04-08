@@ -124,15 +124,17 @@ export default function ZoneHandle({
     e.stopPropagation();
     e.preventDefault();
     onPushHistory();
+    const origFontSize = zone.type === "text" ? parseFloat(zone.style?.fontSize ?? 0) : 0;
     resizeStart.current = {
       mouseX: e.clientX, mouseY: e.clientY,
       origX: zone.x, origY: zone.y, origW: zone.width, origH: zone.height,
+      origFontSize,
       handle: handleId,
     };
 
     const onMove = (me) => {
       if (!resizeStart.current) return;
-      const { mouseX, mouseY, origX, origY, origW, origH, handle } = resizeStart.current;
+      const { mouseX, mouseY, origX, origY, origW, origH, origFontSize, handle } = resizeStart.current;
       const dx = ((me.clientX - mouseX) / canvasWidth)  * 100;
       const dy = ((me.clientY - mouseY) / canvasHeight) * 100;
       let x = origX, y = origY, w = origW, h = origH;
@@ -144,10 +146,16 @@ export default function ZoneHandle({
       y = Math.max(0, Math.min(95, y));
       w = Math.min(100 - x, w);
       h = Math.min(100 - y, h);
-      onUpdate(zone.id, {
+      const update = {
         x: Math.round(x*10)/10, y: Math.round(y*10)/10,
         width: Math.round(w*10)/10, height: Math.round(h*10)/10,
-      });
+      };
+      // Scale font size proportionally when height changes
+      if (zone.type === "text" && origFontSize > 0 && (handle.includes("n") || handle.includes("s"))) {
+        const newFontSize = Math.max(8, Math.round(origFontSize * (h / origH)));
+        update.style = { ...(zone.style || {}), fontSize: newFontSize };
+      }
+      onUpdate(zone.id, update);
     };
 
     const onUp = () => {
@@ -218,12 +226,10 @@ export default function ZoneHandle({
       style={{
         position:  "absolute",
         left: pxX, top: pxY, width: pxW, height: pxH,
-        // Scale z-index by zone's visual layer so higher-layer zones are always
-        // clickable above lower-layer zones, even when the lower zone is selected.
-        // Selected gets +50 boost within its own layer (not a global 9000).
         zIndex:    (zone.zIndex ?? 1) * 100 + (isSelected ? 50 : 0),
         cursor:    "grab",
         boxSizing: "border-box",
+        overflow:  "visible",
       }}
     >
       {/* Rotated visual outline */}

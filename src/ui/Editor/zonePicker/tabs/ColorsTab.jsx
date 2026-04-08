@@ -56,11 +56,7 @@ export default function ColorsTab({ onSelect, onClose }) {
               <div
                 key={key}
                 onClick={() => {
-                  onSelect({
-                    kind:           "color",
-                    color:          style.background,
-                    backgroundSize: style.backgroundSize || "auto",
-                  });
+                  onSelect({ kind: "pattern", key });
                   onClose();
                 }}
                 onMouseEnter={() => setHovered(key)}
@@ -71,11 +67,10 @@ export default function ColorsTab({ onSelect, onClose }) {
                 {/* Swatch */}
                 <div
                   style={{
-                    aspectRatio:    "4/3",
-                    background:     style.background,
-                    backgroundSize: style.backgroundSize || "cover",
-                    transform:      isHovered ? "scale(1.03)" : "scale(1)",
-                    transition:     "transform 0.15s",
+                    aspectRatio: "4/3",
+                    ...style,
+                    transform:  isHovered ? "scale(1.03)" : "scale(1)",
+                    transition: "transform 0.15s",
                   }}
                 />
                 {/* Label */}

@@ -5,12 +5,14 @@
 import React, { useState } from "react";
 import { useProjectStore }  from "../../store/useProjectStore";
 import { layoutRegistry, getLayoutDef } from "../../core/layoutRegistry.js";
+import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry.js";
 import ZonePicker    from "./zonePicker/ZonePickerModal";
 import LayoutPreview from "./LayoutPreview";
 
 const TRANSITION_OPTIONS = [
-  "cut","crossfade","slideLeft","slideRight",
-  "zoomIn","zoomOut","blurFade","slideWhip","zoomCut","scaleJump",
+  "cut","fade","dissolve","dipBlack","dipWhite",
+  "slideLeft","slideRight","slideUp","slideDown",
+  "zoom","whipPan","spin","glitch","flash",
 ];
 
 function FieldLabel({ children }) {
@@ -193,12 +195,14 @@ export default function LayoutSelector({ beat }) {
 
   const setLayoutBackground = (asset) => {
     let background;
-    if (asset.kind === "color") {
-      background = { type:"color", value:asset.color, backgroundSize: asset.backgroundSize || "auto", objectFit:"cover" };
+    if (asset.kind === "pattern") {
+      background = { type: "pattern", value: asset.key };
+    } else if (asset.kind === "color") {
+      background = { type: "color", value: asset.color, backgroundSize: asset.backgroundSize || "auto", objectFit: "cover" };
     } else {
       const src     = asset.asset?.src || asset.url;
       const isVideo = src?.endsWith(".mp4") || src?.endsWith(".webm");
-      background    = { type: isVideo ? "video" : "image", value:src, objectFit:"cover" };
+      background    = { type: isVideo ? "video" : "image", value: src, objectFit: "cover" };
     }
     updateBeat(beat.id, { layoutBackground: background });
   };
@@ -208,10 +212,16 @@ export default function LayoutSelector({ beat }) {
 
   const renderBgPreview = () => {
     if (!bg) return null;
-    if (bg.type === "color") return <div className="absolute inset-0" style={{ background:bg.value }} />;
+    if (bg.type === "pattern") {
+      const entry = backgroundPatternRegistry[bg.value];
+      return <div className="absolute inset-0" style={entry?.style || { background: "#0b0b10" }} />;
+    }
+    if (bg.type === "color" || bg.type === "gradient") return <div className="absolute inset-0" style={{ background: bg.value, backgroundSize: bg.backgroundSize || "cover" }} />;
     if (bg.type === "image") return <img src={bg.value} className="absolute inset-0 w-full h-full object-cover" />;
     if (bg.type === "video") return <video src={bg.value} muted loop className="absolute inset-0 w-full h-full object-cover" />;
   };
+
+  const bgLabel = bg?.type === "pattern" ? (bg.value || "pattern") : bg?.type === "color" ? "custom color" : bg?.type || null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -235,10 +245,15 @@ export default function LayoutSelector({ beat }) {
                 {renderBgPreview()}
                 {!bg && <div className="absolute inset-0 flex items-center justify-center text-[#55556a] text-[16px]">+</div>}
               </div>
-              <button onClick={() => setPickerOpen(true)}
-                className="text-[12px] text-[#7c5cfc] hover:text-[#9d7fff] transition-colors bg-transparent border-0 cursor-pointer">
-                {bg ? "Change" : "Add"}
-              </button>
+              <div className="flex flex-col">
+                <button onClick={() => setPickerOpen(true)}
+                  className="text-[12px] text-[#7c5cfc] hover:text-[#9d7fff] transition-colors bg-transparent border-0 cursor-pointer text-left">
+                  {bg ? "Change" : "Add"}
+                </button>
+                {bgLabel && (
+                  <span className="text-[9px] font-mono text-[#55556a] truncate max-w-[100px]">{bgLabel}</span>
+                )}
+              </div>
               {bg && (
                 <button onClick={() => updateBeat(beat.id, { layoutBackground: { type:"color", value:"#000000" } })}
                   className="text-[12px] text-[#55556a] hover:text-[#f87171] transition-colors bg-transparent border-0 cursor-pointer">
@@ -251,7 +266,7 @@ export default function LayoutSelector({ beat }) {
           <div className="grid grid-cols-3 gap-2">
             <div>
               <FieldLabel>Padding</FieldLabel>
-              <input type="range" min={0} max={60} value={padding}
+              <input type="range" min={0} max={120} value={padding}
                 onChange={e => updateBeat(beat.id, { layoutPadding: Number(e.target.value) })}
                 className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height:2 }} />
               <span className="text-[10px] font-mono text-[#7070a0]">{padding}px</span>

@@ -119,14 +119,14 @@ export default function VideoComposition({ project }) {
         const overlap = transition.duration || 0;
 
         const startFrame = index === 0 ? baseStart : baseStart - overlap;
-        const durationFrames = baseDuration + overlap;
+        const durationFrames = index === 0 ? baseDuration : baseDuration + overlap;
 
         const localFrame = frame - startFrame;
 
         let style = {};
         let transformParts = [];
 
-        if (index !== 0 && overlap > 0) {
+        if (overlap > 0) {
 
           const progress = interpolate(
             localFrame,
@@ -174,6 +174,38 @@ export default function VideoComposition({ project }) {
               transformParts.push(
                 `scale(${interpolate(progress,[0,1],[1.2,1])})`
               );
+              break;
+
+            case "dipBlack":
+            case "dipWhite":
+              // Entering beat fades in; the outgoing beat fades to black/white via its own zIndex order
+              style.opacity = progress;
+              break;
+
+            case "whipPan":
+              // Fast horizontal blur-like slide
+              transformParts.push(
+                `translateX(${interpolate(progress,[0,1],[meta.width * 0.4, 0])}px)`
+              );
+              style.opacity = interpolate(progress,[0,0.3],[0,1],{ extrapolateRight:"clamp" });
+              break;
+
+            case "spin":
+              transformParts.push(
+                `rotate(${interpolate(progress,[0,1],[180,0])}deg)`
+              );
+              style.opacity = progress;
+              break;
+
+            case "glitch":
+              transformParts.push(
+                `scale(${interpolate(progress,[0,0.5,1],[1.08,1.02,1])})`
+              );
+              style.opacity = interpolate(progress,[0,0.2,0.4,0.6,0.8,1],[0,1,0.6,1,0.8,1],{ extrapolateRight:"clamp" });
+              break;
+
+            case "flash":
+              style.opacity = interpolate(progress,[0,0.15,1],[0,1,1],{ extrapolateRight:"clamp" });
               break;
 
             default:

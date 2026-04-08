@@ -4,6 +4,7 @@
  */
 
 import { generateCaptionText }   from "./captionTimingEngine";
+import { TYPOGRAPHY_SYSTEMS }     from "./videoDNA";
 import { autoMatchAssets }        from "./assetAutoMatcher";
 import { validateBeats }          from "./compilerValidator";
 import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
@@ -11,14 +12,68 @@ import { applyBeatVariation }     from "./beatVariationEngine";
 import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
 import { planBeatVisual }         from "./visualPlanner";
 import { getLayoutDef, layoutRegistry } from "./layoutRegistry";
+import { resolveColors }          from "./colorContrastResolver";
+import { autoAssignElements }     from "./autoAssignElements";
+import { pickDecoratives }        from "./designLibrary/decorativePicker";
+import { resolveBeatColors }      from "./elements/colorContrastResolver";
 import blockRegistry              from "./blockRegistry";
 import { pickBeatSFX, OVERLAY_SFX_DEFAULTS } from "./sfxRegistry";
 import { autoAssignOverlays }     from "./overlayPlacementEngine";
+import { composeBeat }            from "./elements/elementComposer";
 
 import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
 import { extractBlockProps }  from "./ai/blockPropExtractor";
 import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
 import { validateAIOutputs }  from "./ai/aiOutputValidator";
+
+/* ── Block zone placement ──────────────────────────────────────
+   Returns the optimal bounding box for a block overlay given the
+   layout's asset zones.  The block must not obscure the main image.
+───────────────────────────────────────────────────────────── */
+function getBlockZone(layoutDef) {
+  const assetZones = (layoutDef?.zones || []).filter(z => z.type === "asset");
+
+  if (!assetZones.length) {
+    // Text-only layout — block fills the centre column
+    return { x: 4, y: 15, width: 92, height: 72, zIndex: 8 };
+  }
+
+  // Compute bounding box of all asset zones together
+  const minX = Math.min(...assetZones.map(z => z.x));
+  const minY = Math.min(...assetZones.map(z => z.y));
+  const maxX = Math.max(...assetZones.map(z => z.x + z.width));
+  const maxY = Math.max(...assetZones.map(z => z.y + z.height));
+  const coverageX = maxX - minX;
+  const coverageY = maxY - minY;
+
+  // Full-bleed or near-full-bleed asset → block sits in lower third
+  if (coverageX >= 70 && coverageY >= 70) {
+    return { x: 4, y: 52, width: 92, height: 44, zIndex: 8 };
+  }
+
+  // Asset dominates top half → block below it
+  if (minY <= 10 && maxY <= 60) {
+    return { x: 4, y: maxY + 2, width: 92, height: Math.min(44, 96 - maxY - 2), zIndex: 8 };
+  }
+
+  // Asset dominates bottom half → block above it
+  if (minY >= 40) {
+    return { x: 4, y: 4, width: 92, height: Math.min(44, minY - 6), zIndex: 8 };
+  }
+
+  // Asset on left → block on right
+  if (minX <= 10 && maxX <= 55) {
+    return { x: maxX + 2, y: 10, width: Math.min(44, 96 - maxX - 2), height: 80, zIndex: 8 };
+  }
+
+  // Asset on right → block on left
+  if (minX >= 45) {
+    return { x: 4, y: 10, width: Math.min(44, minX - 6), height: 80, zIndex: 8 };
+  }
+
+  // Default: lower-third overlay
+  return { x: 4, y: 52, width: 92, height: 44, zIndex: 8 };
+}
 
 /* ── Helpers ── */
 function words(text) {
@@ -91,6 +146,58 @@ function chooseCaptionPosition(layoutId, index, total, energy) {
   return 80;
 }
 
+/* ── Block candidate — deterministic, no AI call needed ─────── */
+// Returns a block type key or null. Runs on every beat unconditionally.
+// Target: blocks appear in ~40–55% of beats, biased toward content-rich intents.
+const BLOCK_RULES = [
+  // Stat/proof with a number → StatExplosion
+  { match: (i, _e, _vh, s) => (i === "stat" || i === "proof") && /\d/.test(s), type: "StatExplosion",  chance: 0.50 },
+  // Contrast → BeforeAfter
+  { match: (i) => i === "contrast",                                             type: "BeforeAfter",    chance: 0.45 },
+  // List visual hint or list intent → ListCountdown
+  { match: (i, _e, vh) => vh === "list" || i === "list",                       type: "ListCountdown",  chance: 0.50 },
+  // Empathy → quote
+  { match: (i) => i === "empathy",                                              type: "QuoteHighlight", chance: 0.30 },
+  // Curiosity → quote
+  { match: (i) => i === "curiosity",                                            type: "QuoteHighlight", chance: 0.20 },
+  // Irony → before/after contrast
+  { match: (i) => i === "irony",                                                type: "BeforeAfter",    chance: 0.30 },
+  // Reveal → quote
+  { match: (i) => i === "reveal",                                               type: "QuoteHighlight", chance: 0.25 },
+  // Explanation → process steps
+  { match: (i) => i === "explanation",                                          type: "ProcessSteps",   chance: 0.22 },
+  // Urgency / shock → problem solution
+  { match: (i) => i === "urgency" || i === "shock",                            type: "ProblemSolution", chance: 0.25 },
+  // Punchline → hook impact
+  { match: (i) => i === "punchline",                                            type: "HookImpact",     chance: 0.20 },
+  // Proof without a number → stat explosion
+  { match: (i) => i === "proof",                                                type: "StatExplosion",  chance: 0.28 },
+];
+
+function pickBlockCandidate(intent, energy, visual_hint, spoken, role) {
+  for (const rule of BLOCK_RULES) {
+    if (rule.match(intent, energy, visual_hint, spoken)) {
+      return Math.random() < rule.chance ? rule.type : null;
+    }
+  }
+  // Hook beats: HookImpact at moderate chance
+  if (role === "hook" && Math.random() < 0.55) return "HookImpact";
+  // CTA beats: HookImpact
+  if (role === "cta" && Math.random() < 0.50) return "HookImpact";
+  return null;
+}
+
+/* ── Beat role — position-based, optional hint for layout picker ── */
+function assignBeatRole(index, total) {
+  if (total <= 1) return "hook";
+  if (index === 0)         return "hook";
+  if (index === total - 1) return "cta";
+  const pos = index / (total - 1); // 0..1
+  if (pos <= 0.25) return "proof";
+  if (pos <= 0.60) return "escalate";
+  return "reveal";
+}
+
 /* ── Transition ── */
 function chooseTransition(layoutId, index, energy = 0.5, isLast = false) {
   if (index === 0) return { type: "cut",     duration: 0.25 };
@@ -153,7 +260,7 @@ function injectBlockContent(beats) {
 
       const props = (beat.block_props && Object.keys(beat.block_props).length)
         ? beat.block_props
-        : (def.defaultProps || {});
+        : (def.defaults || def.defaultProps || {});
 
       zones[block.zone] = {
         ...zones[block.zone],
@@ -169,11 +276,27 @@ function injectBlockContent(beats) {
   });
 }
 
-/* ── Fill text zones from spoken content ── */
-function fillTextZones(beats) {
+
+/* ── Fill text zones — applies DNA font + color correction only ── */
+// Layout definition is the authority on font size, weight, alignment.
+// This function only overrides: fontFamily (DNA), color, textShadow (readability).
+// Text content is set by generateZoneContent (AI) before this runs.
+function fillTextZones(beats, typographySystem = null, colorOptions = {}) {
+  const fontFamily = typographySystem
+    ? (TYPOGRAPHY_SYSTEMS[typographySystem]?.heading || null)
+    : null;
+
   return beats.map(beat => {
     const def = getLayoutDef(beat.layout);
     if (!def) return beat;
+
+    // Resolve colors for this beat's background context
+    const colors = resolveColors({
+      colorStory:  colorOptions.colorStory || null,
+      brandColor:  colorOptions.brandColor  || null,
+      brandColor2: colorOptions.brandColor2 || null,
+      energy:      beat.energy ?? 0.5,
+    });
 
     const textZones = def.zones
       .filter(z => z.type === "text")
@@ -183,21 +306,39 @@ function fillTextZones(beats) {
 
     const zones = { ...beat.zones };
 
-    // text-order-1 gets the main spoken text
-    // additional text zones left empty for now (AI fill in future)
-    textZones.forEach((zoneDef, i) => {
+    // Layouts with asset zones have image backgrounds — text must always be white
+    const hasAssetZones = def.zones.some(z => z.type === "asset");
+
+    textZones.forEach((zoneDef) => {
       const existing = zones[zoneDef.id];
-      const hasText = existing?.content?.text;
-      if (!hasText) {
-        zones[zoneDef.id] = {
-          ...existing,
-          content: {
-            kind: "text",
-            text: i === 0 ? beat.spoken : "",
-          },
-          style: { ...(existing?.style || {}), ...zoneDef.style },
-        };
+
+      // Only inject: DNA fontFamily, color correction, readability shadow.
+      // Everything else (fontSize, fontWeight, textAlign, letterSpacing, lineHeight)
+      // comes from the layout definition — do NOT override it.
+      const inject = {};
+
+      if (fontFamily) inject.fontFamily = fontFamily;
+
+      if (hasAssetZones) {
+        inject.color      = "#ffffff";
+        inject.textShadow = beat.energy >= 0.7
+          ? "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)"
+          : "0 2px 18px rgba(0,0,0,0.9)";
+      } else {
+        inject.color = colors.text;
+        if (colors.textShadow && colors.textShadow !== "none") {
+          inject.textShadow = colors.textShadow;
+        }
       }
+
+      const existingContent = existing?.content || { kind: "text", text: "" };
+
+      zones[zoneDef.id] = {
+        ...existing,
+        content: existingContent,
+        // Layout def wins on size/weight/alignment; inject wins on font/color
+        style: { ...zoneDef.style, ...(existing?.style || {}), ...inject },
+      };
     });
 
     return { ...beat, zones };
@@ -220,6 +361,7 @@ export async function buildBeatsFromScript({
   brandName        = null,
   audience         = "general",
   tone             = "bold",
+  dna              = null,
 }) {
 
   /* ── Source beats ── */
@@ -256,11 +398,10 @@ export async function buildBeatsFromScript({
   const total = sourceBeats.length;
   // Pick ONE caption style for the entire video for consistency
   const videoCaptionStyle = pickVideoCaptionStyle(sourceBeats);
-  let currentStart           = 0;
-  let previousLayout         = null;
-  let previousPreviousLayout = null;
-  let lastMotion             = null;
-  let lastSFXKey             = null;
+  let currentStart  = 0;
+  let usedLayoutIds = [];
+  let lastMotion    = null;
+  let lastSFXKey    = null;
 
   /* ── Build beats ── */
   let beats = sourceBeats.map((item, index) => {
@@ -276,15 +417,18 @@ export async function buildBeatsFromScript({
     currentStart    = end_sec;
 
     /* Visual plan */
+    const role         = assignBeatRole(index, total);
+    const hasImageHint = !!(item.asset_hint?.search_query || item.asset_hint?.prompt);
     const visual = planBeatVisual({
-      mode, intent, energy, visual_hint, orientation,
-      block_candidate: item.block_candidate || null,
-      previousLayout, previousPreviousLayout, lastMotion,
+      mode, intent, energy, orientation,
+      usedLayoutIds, lastMotion,
       brandColor, beatIndex: index,
+      hasImageHint, role,
+      colorStory:  dna?.colorStory  || null,
+      motionStyle: dna?.motionStyle || null,
     });
 
-    previousPreviousLayout = previousLayout;
-    previousLayout         = visual.layout;
+    usedLayoutIds = [...usedLayoutIds, visual.layout];
     const z1Motion = visual.zones?.z1?.content?.asset?.motion;
     if (z1Motion) lastMotion = z1Motion;
 
@@ -312,19 +456,93 @@ export async function buildBeatsFromScript({
     }
     if (sfxCue) lastSFXKey = sfxCue.key;
 
-    const zones = enforceLayoutZones(visual.layout, visual.zones || {});
+    // Deterministic block assignment — runs for every beat regardless of source
+    const blockCandidate = pickBlockCandidate(intent, energy, visual_hint, spoken, role);
+    const blockDef       = blockCandidate ? blockRegistry[blockCandidate] : null;
+
+    // Blocks coexist with the chosen layout — never override to FullBleed
+    const finalLayout = visual.layout;
+    let zones;
+    let finalBlocks = [];
+
+    if (blockCandidate && blockDef) {
+      const variant    = blockDef.variants?.[0] || "default";
+      const layoutDef  = getLayoutDef(finalLayout);
+      zones            = enforceLayoutZones(finalLayout, visual.zones || {});
+
+      // Place block in the best available spot given the layout's asset zones
+      const bz = getBlockZone(layoutDef);
+      zones["bz1"] = {
+        type: "asset",
+        x: bz.x, y: bz.y, width: bz.width, height: bz.height,
+        zIndex: bz.zIndex, start: 0, end: null,
+        content: { kind: "block", block: { type: blockCandidate, variant, props: { ...blockDef.defaults } } },
+        style: {}, background: {},
+      };
+      finalBlocks = [{ type: blockCandidate, zone: "bz1", variant }];
+
+      // Check which text zones the block would cover
+      const bzBottom = bz.y + bz.height;
+      let blockCoversPrimaryText = false;
+      const zonesToHide = [];
+
+      (layoutDef?.zones || []).forEach(zoneDef => {
+        if (zoneDef.type !== "text") return;
+        const zTop    = zoneDef.y ?? 0;
+        const zBottom = zTop + (zoneDef.height ?? 20);
+        const overlap = Math.min(zBottom, bzBottom) - Math.max(zTop, bz.y);
+        if (overlap > 10) {
+          // Cancel block if it covers any headline/stat/quote zone (regardless of order)
+          // OR the very first zone in any layout — these are always protected content
+          const isProtected =
+            zoneDef.role === "headline" ||
+            zoneDef.role === "stat"     ||
+            zoneDef.role === "quote"    ||
+            (zoneDef.order ?? 1) <= 1;
+          if (isProtected) {
+            blockCoversPrimaryText = true; // cancel block — don't erase main content
+          } else {
+            zonesToHide.push(zoneDef.id);
+          }
+        }
+      });
+
+      if (blockCoversPrimaryText) {
+        // Block would erase the primary headline — cancel it, let layout text show
+        delete zones["bz1"];
+        finalBlocks = [];
+      } else {
+        // Safe: only hide secondary text zones the block physically covers
+        zonesToHide.forEach(id => {
+          zones[id] = { ...(zones[id] || {}), hidden: true };
+        });
+      }
+    } else {
+      zones = enforceLayoutZones(visual.layout, visual.zones || {});
+    }
+
+    // Auto-assign decorative/icon/emoji elements
+    // Use layout definition to determine hasAsset — actual src values are filled later by autoMatchAssets
+    const hasAsset = (getLayoutDef(finalLayout)?.assetCount ?? 0) > 0;
+    const elementZones = autoAssignElements({
+      intent, energy, role, layout: finalLayout, hasAsset, dna,
+      brandColor:  brandColor  || null,
+      brandColor2: null, // filled from project meta at render time
+    });
+    elementZones.forEach(ez => { zones[ez.id] = ez; });
 
     return {
       id:    crypto.randomUUID(),
       order: index,
 
-      layout:           visual.layout,
+      layout:           finalLayout,
       layoutPadding:    visual.layoutPadding || 0,
       layoutBackground: visual.layoutBackground,
 
       zones,
-      blocks:      visual.blocks    || [],
-      block_props: item.block_props || null,
+      blocks:           finalBlocks,
+      block_props:      item.block_props || null,
+      block_candidate:  blockCandidate,
 
       caption: {
         show:           captionShowDefault,
@@ -340,15 +558,35 @@ export async function buildBeatsFromScript({
 
       transition: chooseTransition(visual.layout, index, energy, isLast),
 
-      spoken, intent, energy, visual_hint, language,
+      spoken, intent, energy, visual_hint, language, role,
+      asset_hint: item.asset_hint || null,
       duration_sec: duration,
       start_sec, end_sec,
     };
   });
 
+  /* ── Composition pass — attach beat.composition to each beat ── */
+  {
+    const prevComps = [];
+    beats = beats.map((beat, index) => {
+      const composition = composeBeat({
+        beat,
+        dna,
+        brandColor: brandColor || null,
+        beatIndex:  index,
+        previousCompositions: prevComps,
+      });
+      prevComps.push(composition);
+      return { ...beat, composition };
+    });
+  }
+
   /* ── Post-processing ── */
   beats = injectBlockContent(beats);
-  beats = fillTextZones(beats);
+  beats = fillTextZones(beats, dna?.typographySystem || null, {
+    colorStory:  dna?.colorStory  || null,
+    brandColor:  brandColor       || null,
+  });
 
   /* ── Extract block props ── */
   const beatsWithBlocks = beats.filter(b => b.blocks?.length > 0);
@@ -380,7 +618,7 @@ export async function buildBeatsFromScript({
               ...zone,
               content: {
                 ...zone.content,
-                block: { ...zone.content.block, props },
+                block: { ...zone.content.block, props: { ...zone.content.block.props, ...props } },
               },
             };
           }
@@ -395,6 +633,23 @@ export async function buildBeatsFromScript({
   beats = await autoMatchAssets(beats, orientation, { assetSource, uploadedAssets, topic, language });
   beats = applyBeatVariation(beats);
   beats = applyCaptionEmphasis(beats);
+
+  /* ── Design pass — decoratives + resolved colors ── */
+  {
+    const usedDecorativeIds = [];
+    beats = beats.map(beat => {
+      // Pick decoratives
+      const decoratives = pickDecoratives(beat, dna, usedDecorativeIds);
+      decoratives.forEach(d => usedDecorativeIds.push(d.decorativeId));
+
+      // Resolve colors against the beat's background
+      const bgStyle = beat.layoutBackground?.style || null;
+      const resolvedColors = resolveBeatColors(bgStyle, dna);
+
+      return { ...beat, decoratives, resolvedColors };
+    });
+  }
+
   beats = validateBeats(beats);
 
   return beats;

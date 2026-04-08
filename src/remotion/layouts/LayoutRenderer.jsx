@@ -9,10 +9,13 @@
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate, Img, OffthreadVideo } from "remotion";
 import AssetRenderer from "../elements/AssetRenderer";
 import AvatarLayer from "../elements/AvatarLayer";
 import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
+import ElementRenderer from "../elements/ElementRenderer";
+import CompositionLayerRenderer from "../elements/composition/CompositionLayerRenderer";
+import CompositionDecorativeLayer from "../elements/CompositionDecorativeLayer";
 import blockRegistry from "../../core/blockRegistry";
 
 function resolveEnterStyle(animation, progress, W, H) {
@@ -36,6 +39,33 @@ function resolveExitStyle(animation, progress, W, H) {
     case "scaleOut":     return { opacity: interpolate(progress,[0.5,1],[1,0],{extrapolateRight:"clamp"}), transform:`scale(${interpolate(progress,[0,1],[1,0.85],{extrapolateRight:"clamp"})})` };
     default:             return {};
   }
+}
+
+/* ── Blurred asset background ─────────────────────────────── */
+function BlurredAssetBackground({ src }) {
+  const isVideo = /\.(mp4|webm)$/i.test(src);
+  const mediaStyle = {
+    position:  "absolute",
+    top:       "-8%", left: "-8%",
+    width:     "116%", height: "116%",
+    objectFit: "cover",
+    filter:    "blur(32px)",
+    opacity:   0.6,
+    zIndex:    0,
+  };
+  return (
+    <>
+      {isVideo
+        ? <OffthreadVideo src={src} muted style={mediaStyle} />
+        : <Img            src={src}        style={mediaStyle} />
+      }
+      {/* Dark scrim so text stays readable */}
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 0,
+        background: "rgba(0,0,0,0.38)",
+      }} />
+    </>
+  );
 }
 
 const ENTER_DUR = { fadeIn:18, slideUpIn:16, slideDownIn:16, slideLeftIn:16, slideRightIn:16, popIn:14, scaleIn:18, none:0 };
@@ -89,26 +119,36 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
                || (zone.type === "text" && !content.text && content.kind !== "block");
 
   // Zone container — position only, no rotation, no transform (enter/exit handled below)
+  const isTextZone = zone.type === "text";
   const zoneContainerStyle = {
-    position: "absolute",
-    left:     `${zone.x      ?? 0}%`,
-    top:      `${zone.y      ?? 0}%`,
-    width:    `${zone.width  ?? 100}%`,
-    height:   `${zone.height ?? 100}%`,
-    zIndex:    zone.zIndex   ?? 1,
-    overflow: "hidden",
-    // Enter/exit animation on container
-    opacity:   animStyle.opacity ?? 1,
+    position:  "absolute",
+    left:      `${zone.x     ?? 0}%`,
+    top:       `${zone.y     ?? 0}%`,
+    width:     `${zone.width ?? 100}%`,
+    // Text zones auto-size to content; all others use explicit height
+    height:    isTextZone ? "auto" : `${zone.height ?? 100}%`,
+    minHeight: isTextZone ? `${Math.min(zone.height ?? 5, 5)}%` : undefined,
+    zIndex:    zone.zIndex ?? 1,
+    overflow:  isTextZone ? "visible" : "hidden",
+    opacity:   (animStyle.opacity ?? 1) * (st.opacity ?? 1),
     transform: animStyle.transform || undefined,
   };
 
   // Content wrapper — rotation applied here, inside zone bounds
-  const contentWrapperStyle = {
-    position: "absolute",
-    inset:    0,
-    transform: rotation ? `rotate(${rotation}deg)` : undefined,
-    transformOrigin: "center center",
-  };
+  // Text zones: relative so wrapper grows with content; others: absolute fill
+  const contentWrapperStyle = isTextZone
+    ? {
+        position: "relative",
+        width:    "100%",
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        transformOrigin: "center center",
+      }
+    : {
+        position: "absolute",
+        inset:    0,
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        transformOrigin: "center center",
+      };
 
   // Inset box for scale + padding effect
   const insetBoxStyle = {
@@ -208,12 +248,12 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
           const effectSpeed = st.textEffectSpeed ?? 1.0;
 
           const baseStyle = {
-            position:"absolute",
-            top: finalInset, right: finalInset,
-            bottom: finalInset, left: finalInset,
-            display:"flex",
-            alignItems:"center",
+            position:       "relative",
+            display:        "flex",
+            flexWrap:       "wrap",
+            alignItems:     "center",
             justifyContent: st.textAlign === "left" ? "flex-start" : st.textAlign === "right" ? "flex-end" : "center",
+            width:          "100%",
             padding:        st.padding       || "0 8px",
             boxSizing:      "border-box",
             fontSize:       st.fontSize      || 32,
@@ -227,8 +267,6 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
             opacity:        st.opacity       ?? 1,
             background:     st.background    || "transparent",
             borderRadius:   st.borderRadius  || 0,
-            flexWrap:       "wrap",
-            overflow:       "hidden",
           };
 
           // ── No effect — plain text ──
@@ -381,11 +419,43 @@ export default function LayoutRenderer({ beat, project, layoutDef }) {
       content: z.content || {}, style: z.style || {}, background: z.background || {},
     }));
 
+  const allZones     = [...defZones, ...extraZones];
+  const contentZones = allZones.filter(z => z.type !== "element");
+  const elementZones = allZones.filter(z => z.type === "element");
+
+  // Blurred asset bg: only when no explicit layoutBackground is set on this beat.
+  const hasExplicitBg = !!beat?.layoutBackground;
+  const blurSrc = !hasExplicitBg
+    ? contentZones.find(z => z.type === "asset" && z.content?.asset?.src)?.content?.asset?.src ?? null
+    : null;
+
+  const pad = beat?.layoutPadding || 0;
+
   return (
     <div style={{ position:"absolute", inset:0, width:"100%", height:"100%", overflow:"hidden" }}>
-      <LayoutBackgroundRenderer background={beat?.layoutBackground} beat={beat} />
-      {[...defZones, ...extraZones].map(zone => (
-        <ZoneLayer key={zone.id} zone={zone} beat={beat} project={project} W={W} H={H} beatDurationSec={beatDurationSec} />
+      {blurSrc
+        ? <BlurredAssetBackground src={blurSrc} />
+        : <LayoutBackgroundRenderer background={beat?.layoutBackground} beat={beat} />
+      }
+      {/* Composition background + overlay layers (beneath zone content) */}
+      <CompositionLayerRenderer beat={beat} layerFilter={[0, 1, 3]} />
+      {/* Zone content — inset by layoutPadding */}
+      <div style={{ position:"absolute", inset: pad, overflow:"hidden" }}>
+        {contentZones.map(zone => (
+          <ZoneLayer key={zone.id} zone={zone} beat={beat} project={project} W={W - pad * 2} H={H - pad * 2} beatDurationSec={beatDurationSec} />
+        ))}
+      </div>
+      {/* Composition frame + decorative layers (above zone content) */}
+      <CompositionLayerRenderer beat={beat} layerFilter={[2, 4]} />
+      {beat.decoratives?.length > 0 && (
+        <CompositionDecorativeLayer
+          decoratives={beat.decoratives}
+          canvasW={W}
+          canvasH={H}
+        />
+      )}
+      {elementZones.map(zone => (
+        <ElementRenderer key={zone.id} zone={zone} beatDurationSec={beatDurationSec} />
       ))}
     </div>
   );

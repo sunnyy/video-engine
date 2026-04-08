@@ -31,11 +31,11 @@ function Sel({ value, onChange, options }) {
   );
 }
 
-function Slider({ label, value, onChange, min = 0, max = 100, unit = "" }) {
+function Slider({ label, value, onChange, min = 0, max = 100, step = 1, unit = "", decimals = 0 }) {
   return (
     <div className="flex flex-col gap-[2px]">
-      <div className="flex justify-between"><Label>{label}</Label><span className="text-[10px] font-mono text-[#7070a0]">{value}{unit}</span></div>
-      <input type="range" min={min} max={max} value={value} onChange={e => onChange(Number(e.target.value))}
+      <div className="flex justify-between"><Label>{label}</Label><span className="text-[10px] font-mono text-[#7070a0]">{Number(value).toFixed(decimals)}{unit}</span></div>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))}
         className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 2 }} />
     </div>
   );
@@ -46,13 +46,15 @@ export default function TextTab({ slot, zone, zoneDef, updateTextContent, update
   const style      = zone?.style   || {};
 
   const text       = content.text      || "";
-  const fontSize   = style.fontSize    ?? zoneDef?.style?.fontSize    ?? 32;
+  const fontSize   = Math.round(parseFloat(style.fontSize    ?? zoneDef?.style?.fontSize    ?? 32));
   const fontWeight = style.fontWeight  ?? zoneDef?.style?.fontWeight  ?? 700;
   const fontFamily = style.fontFamily  ?? zoneDef?.style?.fontFamily  ?? "inherit";
   const color      = style.color       ?? zoneDef?.style?.color       ?? "#ffffff";
   const textAlign  = style.textAlign   ?? zoneDef?.style?.textAlign   ?? "center";
-  const opacity    = style.opacity     ?? zoneDef?.style?.opacity     ?? 1;
-  const background = style.background  ?? "transparent";
+  const lineHeight     = parseFloat(style.lineHeight    ?? zoneDef?.style?.lineHeight    ?? 1.15);
+  const letterSpacing  = parseFloat(style.letterSpacing ?? zoneDef?.style?.letterSpacing ?? 0);
+  const opacity        = style.opacity     ?? zoneDef?.style?.opacity     ?? 1;
+  const background     = style.background  ?? "transparent";
 
   return (
     <div className="flex flex-col gap-2 py-1">
@@ -87,8 +89,10 @@ export default function TextTab({ slot, zone, zoneDef, updateTextContent, update
         </div>
       </div>
 
-      <Slider label="Font Size" value={fontSize} onChange={v => updateTextStyle(slot,"fontSize",v)} min={10} max={120} unit="px" />
-      <Slider label="Opacity"   value={Math.round(opacity*100)} onChange={v => updateTextStyle(slot,"opacity",v/100)} min={10} max={100} unit="%" />
+      <Slider label="Font Size"      value={fontSize}                    onChange={v => updateTextStyle(slot,"fontSize",v)}      min={10}   max={300}  step={1}    unit="px" />
+      <Slider label="Line Height"    value={lineHeight}                  onChange={v => updateTextStyle(slot,"lineHeight",v)}    min={0.7}  max={3}    step={0.05} unit="×" decimals={2} />
+      <Slider label="Letter Spacing" value={letterSpacing}               onChange={v => updateTextStyle(slot,"letterSpacing",v)} min={-10}  max={50}   step={0.5}  unit="px" decimals={1} />
+      <Slider label="Opacity"        value={Math.round(opacity*100)}     onChange={v => updateTextStyle(slot,"opacity",v/100)}   min={10}   max={100}  step={1}    unit="%" />
 
       {/* Color + BG color */}
       <div className="grid grid-cols-2 gap-2">

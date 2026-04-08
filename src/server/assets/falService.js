@@ -18,11 +18,11 @@ const CONCEPT_VISUALS = {
   // Money / Finance
   money:       "stacks of cash banknotes on a dark surface, cinematic lighting",
   millionaire: "luxury penthouse interior, city skyline view at night, expensive decor",
-  revenue:     "financial growth chart on screen, modern office, data visualization",
+  revenue:     "gold coins and currency notes on dark surface, financial wealth, cinematic lighting",
   profit:      "gold coins stacked, financial charts trending upward, dark background",
   income:      "wallet with cash, credit cards, financial freedom concept",
   salary:      "paycheck envelope, professional desk, corporate office",
-  investment:  "stock market screen with green charts, trading floor, financial data",
+  investment:  "gold bars and coins on dark marble surface, wealth and luxury, cinematic lighting",
   bank:        "modern bank interior, vault, financial institution architecture",
   rupees:      "Indian currency notes, financial wealth, gold accent",
   lakh:        "Indian currency stacks, wealth display, cinematic dark background",
@@ -106,8 +106,8 @@ const CONCEPT_VISUALS = {
   gain:          "upward trending graph arrow, success chart, growth visualization",
   lose:          "empty scale, balance concept, minimalist dark background",
   shot:          "target bullseye with arrow, precision, goal achievement concept",
-  studies:       "scientific research papers on desk, academic study, data and charts",
-  show:          "presentation screen with data, conference room, professional display",
+  studies:       "scientist in modern laboratory surrounded by glassware, research environment, dramatic lighting",
+  show:          "dramatic stage spotlight on empty podium, theater curtains, professional presentation space",
   kicker:        "dramatic spotlight on empty stage, reveal moment, theatrical lighting",
   swear:         "handshake in dramatic lighting, commitment concept, professional trust",
 
@@ -124,7 +124,7 @@ const CONCEPT_VISUALS = {
   "technology":      "multiple screens with data visualizations, server room blue lighting, tech hub",
   "digital":         "abstract digital data streams, binary code visualization, glowing blue matrix",
   "data":            "data center server rows, blue lighting, organized cables, technology infrastructure",
-  "analysis":        "complex data dashboard with charts, real-time analytics, dark screen environment",
+  "analysis":        "scientist examining samples in modern laboratory, clean bright environment, professional",
   "algorithm":       "abstract network of glowing nodes, data flowing, dark tech background, connections",
   "machine":         "robotic assembly line in motion, precision machines, industrial automation, sparks",
   "learning":        "abstract neural pathways lighting up, brain scan visualization, medical tech",
@@ -135,7 +135,7 @@ const CONCEPT_VISUALS = {
   "music":           "professional recording studio, mixing board, microphone with sound waves visualization",
   "art":             "dramatic art gallery with spotlit paintings, high contrast museum lighting, dark walls",
   "creating":        "3D printing in action, creative workshop, innovation in progress, dramatic lighting",
-  "predicting":      "predictive analytics dashboard, graphs and forecasts, futuristic data screen",
+  "predicting":      "crystal ball glowing in dark studio, future concept, mysterious dramatic light",
   "shopping":        "modern e-commerce interface on screen, digital shopping cart, tech retail concept",
   "accuracy":        "precision target bullseye, laser beam hitting center, sharp focus, dark background",
   "habits":          "behavioral data visualization, user pattern analysis, abstract flowchart, dark bg",
@@ -238,8 +238,8 @@ function buildImagePrompt({ spoken, intent, visual_hint, topic, orientation, bea
 
   /* Visual hint override */
   const hintOverride = {
-    stat:       "data visualization screen, charts and numbers, modern tech environment",
-    comparison: "two contrasting environments side by side, duality concept",
+    stat:       "dramatic close-up of stacked gold coins on dark surface, wealth concept, cinematic lighting",
+    comparison: "two contrasting environments side by side, duality concept, dramatic lighting",
     list:       "organized collection of objects, systematic arrangement, clean composition",
     scene:      sceneDescription,
     product:    "product on minimalist surface, studio photography, clean background",
@@ -264,7 +264,8 @@ function buildImagePrompt({ spoken, intent, visual_hint, topic, orientation, bea
     atmosphere,
     composition,
     aspectHint,
-    "photorealistic, no text, no watermark, sharp focus, 8k quality, professional photography",
+    "photorealistic, sharp focus, 8k quality, professional photography",
+    "no text, no numbers, no statistics, no charts, no graphs, no labels, no captions, no watermark, no typography, no writing, no signs",
     "no faces, no people, no portraits, no humans",
   ].join(", ");
 }
@@ -276,8 +277,9 @@ export async function generateZoneImage({
   projectId = null,
 }) {
   const effectiveIndex = beatIndex * 3 + zoneIndex;
+  const NO_TEXT = "no text, no numbers, no statistics, no charts, no graphs, no labels, no captions, no watermark, no typography, no writing, no signs";
   const prompt = promptOverride
-    ? `${promptOverride}, ${orientation === "9:16" ? "vertical 9:16 portrait composition" : "horizontal 16:9 landscape composition"}, photorealistic, no text, no watermark, sharp focus, 8k quality`
+    ? `${promptOverride}, ${orientation === "9:16" ? "vertical 9:16 portrait composition" : "horizontal 16:9 landscape composition"}, photorealistic, sharp focus, 8k quality, ${NO_TEXT}`
     : buildImagePrompt({ spoken, intent, visual_hint, topic, orientation, beatIndex: effectiveIndex });
 
   console.log(`[fal] Beat ${beatIndex} Zone ${zoneIndex}: "${prompt.slice(0, 80)}..."`);
@@ -297,11 +299,16 @@ export async function generateZoneImage({
   const w = orientation === "9:16" ? 768  : 1344;
   const h = orientation === "9:16" ? 1344 : 768;
 
-  // Re-upload to Supabase for permanent storage (Fal.ai URLs expire)
+  // Re-upload to Supabase for permanent storage (Fal.ai URLs expire).
+  // Fetch via server proxy to avoid browser QUIC/HTTP3 issues with fal.media CDN.
   try {
-    const imgRes = await fetch(falUrl);
-    if (!imgRes.ok) throw new Error("Failed to fetch Fal.ai image");
-    const blob   = await imgRes.blob();
+    const proxyRes = await fetch(`${SERVER}/api/proxy-image`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ url: falUrl }),
+    });
+    if (!proxyRes.ok) throw new Error(`Proxy returned ${proxyRes.status}`);
+    const blob   = await proxyRes.blob();
     const file   = new File([blob], `ai-gen-${Date.now()}.jpg`, { type: "image/jpeg" });
     const asset  = await uploadUserAsset(file, "image", null, "project", projectId);
     console.log(`[fal] Beat ${beatIndex} saved to Supabase: ${asset.url}`);

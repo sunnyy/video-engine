@@ -188,6 +188,7 @@ export default function AIGenerator() {
           tone,
         },
         script: { text: aiResult.script, emotionalArc: aiResult.meta?.emotionalArc },
+        dna: aiResult.meta?.dna || null,
         audio: aiResult.audio || { tts: null, music: null },
         beats: aiResult.beats,
         workflow: { script_completed: true, avatar_completed: false, beats_initialized: true },

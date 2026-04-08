@@ -164,7 +164,7 @@ export default function StatExplosionBlock({ block }) {
         {/* Label */}
         <div style={{
           fontFamily: BLOCK_FONTS[preset.labelFont],
-          fontSize: 20, fontWeight:500,
+          fontSize: 40, fontWeight:500,
           letterSpacing:"0.16em", textTransform:"uppercase",
           color: colors.textDim, marginBottom: 18,
           ...fadeY(labelP),
@@ -211,7 +211,7 @@ export default function StatExplosionBlock({ block }) {
         {/* Description */}
         {props.description && (
           <div style={{
-            fontFamily: BLOCK_FONTS.dm, fontSize:24,
+            fontFamily: BLOCK_FONTS.dm, fontSize:44,
             color: colors.textDim, marginTop:22, letterSpacing:"0.02em",
             ...fadeY(descP),
           }}>

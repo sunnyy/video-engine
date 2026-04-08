@@ -84,8 +84,12 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     language:    raw.language    || meta?.language || "english",
 
     asset_hint: raw.asset_hint
-      ? { keywords: Array.isArray(raw.asset_hint.keywords) ? raw.asset_hint.keywords : [],
-          prompt:   String(raw.asset_hint.prompt || "").trim() }
+      ? {
+          keywords:     Array.isArray(raw.asset_hint.keywords) ? raw.asset_hint.keywords : [],
+          prompt:       String(raw.asset_hint.prompt || "").trim(),
+          visual_type:  raw.asset_hint.visual_type === "entity" ? "entity" : "abstract",
+          search_query: raw.asset_hint.search_query ? String(raw.asset_hint.search_query).trim() : null,
+        }
       : null,
 
     duration_sec: duration,

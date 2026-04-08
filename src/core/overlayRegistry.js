@@ -200,9 +200,9 @@ export const OVERLAY_TYPE_KEYS = Object.keys(OVERLAY_TYPES);
    Used by visualDirector for automated generation.
 ───────────────────────────────────────────────────────────── */
 export const INTENT_OVERLAYS = {
-  shock:       ["Badge:BREAKING", "LiveDot"],
-  proof:       ["StatCallout", "Badge:VERIFIED"],
-  urgency:     ["Badge:LIMITED", "LiveDot"],
+  shock:       ["LiveDot"],
+  proof:       ["StatCallout"],
+  urgency:     ["LiveDot"],
   curiosity:   ["ArrowPointer"],
   punchline:   ["EmojiFloat"],
   reveal:      ["HighlightBox"],

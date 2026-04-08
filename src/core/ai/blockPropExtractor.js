@@ -51,8 +51,10 @@ const BLOCK_SCHEMAS = {
   HookImpact: {
     desc: "Extract the main hook/headline",
     props: {
+      eyebrow:  "short category label above headline (max 3 words) or empty string — string",
       headline: "short punchy headline (max 6 words) — string",
-      subline:  "optional supporting line (max 8 words) or empty string — string",
+      sub:      "optional supporting line (max 8 words) or empty string — string",
+      cta:      "call-to-action button text (max 4 words) or empty string — string",
       accent:   "hex color, default #f5c518 — string",
     }
   },
@@ -67,9 +69,11 @@ const BLOCK_SCHEMAS = {
   ProblemSolution: {
     desc: "Extract a problem and its solution",
     props: {
-      problem:  "the problem being described — string",
-      solution: "the solution or answer — string",
-      accent:   "hex color, default #f0e040 — string",
+      problemLabel:  "label for the problem side (e.g. 'The Problem', 'Before') — string, max 3 words",
+      problem:       "the problem being described — string",
+      solutionLabel: "label for the solution side (e.g. 'The Fix', 'After') — string, max 3 words",
+      solution:      "the solution or answer — string",
+      accent:        "hex color, default #f0e040 — string",
     }
   },
 };
@@ -123,18 +127,34 @@ Rules:
 
     if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
-    const results = await response.json();
-    if (!Array.isArray(results)) throw new Error("Invalid response format");
+    let raw = await response.json();
+
+    // Normalize: AI sometimes wraps array in an object
+    let results = raw;
+    if (!Array.isArray(results)) {
+      // Try common wrapper keys
+      results = raw.data || raw.blocks || raw.results || raw.beats || null;
+      if (!Array.isArray(results)) {
+        console.warn("[blockPropExtractor] Unexpected response format, skipping extraction");
+        return beats;
+      }
+    }
 
     return beats.map(beat => {
       if (!beat.block_candidate) return beat;
 
       const beatIdx = beatsWithBlocks.indexOf(beat);
       const result  = results.find(r => r.index === beatIdx);
+      const props   = result?.props;
+
+      // Only apply if props is a non-empty object
+      if (!props || typeof props !== "object" || Array.isArray(props) || !Object.keys(props).length) {
+        return beat;
+      }
 
       return {
         ...beat,
-        block_props: result?.props || null,
+        block_props: props,
       };
     });
 

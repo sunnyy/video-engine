@@ -281,17 +281,16 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
     );
   }
 
-  /* PATTERN FALLBACK */
+  /* PATTERN — look up style object directly from registry */
 
-  const pattern =
-    backgroundPatternRegistry[value]?.() ||
-    backgroundPatternRegistry.softGradient();
+  const entry = backgroundPatternRegistry[value];
+  const patternStyle = entry?.style || { background: "#0b0b10" };
 
   return (
     <div
       style={{
         ...baseStyle,
-        ...pattern
+        ...patternStyle,
       }}
     />
   );

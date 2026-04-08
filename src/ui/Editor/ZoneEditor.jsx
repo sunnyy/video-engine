@@ -173,10 +173,12 @@ export default function ZoneEditor({
                 <button
                   key={preset.id}
                   onClick={() => {
-                    const fullStyle = preset.style.background
-                      ? preset.style
-                      : { ...preset.style, background: "transparent" };
-                    updateTextStyleBulk(slot, fullStyle);
+                    // Apply only visual flair — never override layout's fontSize/fontWeight/textAlign
+                    const { fontSize, fontWeight, textAlign, ...flair } = preset.style;
+                    const flairStyle = flair.background
+                      ? flair
+                      : { ...flair, background: "transparent" };
+                    updateTextStyleBulk(slot, flairStyle);
                   }}
                   className="px-[12px] py-[6px] rounded-[6px] text-[14px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
                   style={{
@@ -201,12 +203,23 @@ export default function ZoneEditor({
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <Slider label="Font Size" value={style.fontSize ?? 32}
+            <Slider label="Font Size" value={Math.round(parseFloat(style.fontSize ?? 32))}
               onChangeSilent={v => setStyleSilent("fontSize", v)}
-              onCommit={commit} min={10} max={200} unit="px" />
+              onCommit={commit} min={10} max={300} unit="px" />
             <Slider label="Opacity" value={Math.round((style.opacity ?? 1)*100)}
               onChangeSilent={v => setStyleSilent("opacity", v/100)}
               onCommit={commit} min={0} max={100} unit="%" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <Slider label="Line Height"
+              value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
+              onChangeSilent={v => setStyleSilent("lineHeight", v)}
+              onCommit={commit} min={0.7} max={3} step={0.05} unit="×" />
+            <Slider label="Letter Spacing"
+              value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
+              onChangeSilent={v => setStyleSilent("letterSpacing", v)}
+              onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-3">

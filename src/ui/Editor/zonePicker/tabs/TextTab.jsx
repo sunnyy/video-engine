@@ -24,10 +24,12 @@ const BG_PREVIEWS = {
 export default function TextTab({ onSelect }) {
 
   const handleSelect = (preset) => {
+    // Apply only visual flair — fontSize/fontWeight/textAlign come from the layout definition
+    const { fontSize, fontWeight, textAlign, ...flair } = preset.style;
     onSelect({
       kind: "text",
       text: preset.preview?.text || "Your text here",
-      style: preset.style,
+      style: flair,
     });
   };
 
@@ -91,7 +93,7 @@ export default function TextTab({ onSelect }) {
               }}>
                 <span>{preset.label}</span>
                 <span style={{ fontSize: 9, color: "#55556a", fontFamily: "monospace" }}>
-                  {st.fontSize}px · {st.fontWeight}
+                  {st.fontFamily?.match(/'([^']+)'/)?.[1] || "Default"}
                 </span>
               </div>
             </div>

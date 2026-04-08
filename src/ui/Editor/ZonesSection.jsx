@@ -147,6 +147,10 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
 
   const setBackground = (slot, data) => {
     data = normalizeAsset(data);
+    if (data.kind === "pattern") {
+      updateZone(slot, { background: { kind: "pattern", key: data.key } });
+      return;
+    }
     if (data.kind === "color") {
       updateZone(slot, { background: { kind: "color", color: data.color, backgroundSize: data.backgroundSize || "auto" } });
       return;

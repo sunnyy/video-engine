@@ -31,9 +31,10 @@ export default function BrandingSection() {
 
   if (!project) return null;
 
-  const brand      = project.meta?.brand || {};
-  const brandColor = brand.color || "#7c5cfc";
-  const brandFont  = brand.font  || "Syne";
+  const brand        = project.meta?.brand || {};
+  const brandColor   = brand.color   || "#7c5cfc";
+  const brandColor2  = brand.color2  || "#f5c518";
+  const brandFont    = brand.font    || "Syne";
 
   const update = (key, value) => {
     const newBrand = { ...brand, [key]: value };
@@ -52,9 +53,9 @@ export default function BrandingSection() {
       <h3 className="text-[16px] font-bold text-[#e8e8f0] mb-2"
         style={{ fontFamily:"'Syne',sans-serif" }}>Branding</h3>
 
-      {/* Brand Color */}
+      {/* Brand Color — Primary */}
       <div>
-        <Label>Brand Color</Label>
+        <Label>Primary Color</Label>
         <div className="flex items-center gap-3">
           <input type="color" value={brandColor}
             onChange={e => update("color", e.target.value)}
@@ -66,11 +67,10 @@ export default function BrandingSection() {
               className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[14px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none font-mono" />
           </div>
         </div>
-        {/* Color preview on overlays/blocks */}
         <div className="mt-3 flex gap-2">
-          {["#7c5cfc","#f5c518","#ff4d6d","#2dd4bf","#f97316","#ffffff"].map(c => (
+          {["#7c5cfc","#f5c518","#ff4d6d","#2dd4bf","#f97316","#ffffff","#e11d48","#0ea5e9"].map(c => (
             <button key={c} onClick={() => update("color", c)}
-              className="w-[28px] h-[28px] rounded-full border-2 transition-all cursor-pointer"
+              className="w-[26px] h-[26px] rounded-full border-2 transition-all cursor-pointer shrink-0"
               style={{
                 background: c,
                 borderColor: brandColor === c ? "#fff" : "transparent",
@@ -78,6 +78,39 @@ export default function BrandingSection() {
               }} />
           ))}
         </div>
+      </div>
+
+      {/* Brand Color — Secondary */}
+      <div>
+        <Label>Secondary Color</Label>
+        <div className="text-[11px] text-[#5c5c80] mb-2" style={{ fontFamily:"'JetBrains Mono',monospace" }}>
+          Used for accents, highlights, badges
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="color" value={brandColor2}
+            onChange={e => update("color2", e.target.value)}
+            className="w-[48px] h-[48px] rounded-[10px] border border-[rgba(255,255,255,0.08)] cursor-pointer bg-[#16161f] p-[3px]" />
+          <div className="flex-1">
+            <input value={brandColor2}
+              onChange={e => update("color2", e.target.value)}
+              placeholder="#f5c518"
+              className="w-full bg-[#16161f] border border-[rgba(255,255,255,0.07)] rounded-[8px] px-3 py-[8px] text-[14px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none font-mono" />
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2">
+          {["#f5c518","#7c5cfc","#ffffff","#ff4d6d","#2dd4bf","#f97316","#a3e635","#fb7185"].map(c => (
+            <button key={c} onClick={() => update("color2", c)}
+              className="w-[26px] h-[26px] rounded-full border-2 transition-all cursor-pointer shrink-0"
+              style={{
+                background: c,
+                borderColor: brandColor2 === c ? "#fff" : "transparent",
+                transform: brandColor2 === c ? "scale(1.15)" : "scale(1)",
+              }} />
+          ))}
+        </div>
+        {/* Preview swatch */}
+        <div className="mt-3 h-[6px] rounded-full overflow-hidden"
+          style={{ background: `linear-gradient(90deg, ${brandColor} 0%, ${brandColor2} 100%)` }} />
       </div>
 
       {/* Brand Font */}

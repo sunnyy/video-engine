@@ -15,6 +15,8 @@ import { getLayoutDef } from "../../core/layoutRegistry";
 import { uploadUserAsset } from "../assets/uploadUserAsset";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
 import { getUserRules } from "../../hooks/useUserRules";
+import { generateVideoDNA } from "../../core/videoDNA";
+import { generateZoneContent } from "./generateZoneContent";
 
 /* ─────────────────────────────────────────────────────────────
    INTENT DEFINITIONS
@@ -212,7 +214,9 @@ OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no explanation:
       "emphasis_words": ["word1", "word2"],
       "asset_hint": {
         "keywords": ["keyword1", "keyword2", "keyword3"],
-        "prompt": "Specific photographable scene for image generation, e.g. 'fresh lemon and ginger on wooden surface, soft morning light, close-up'"
+        "prompt": "Specific photographable scene for image generation, e.g. 'fresh lemon and ginger on wooden surface, soft morning light, close-up'",
+        "visual_type": "entity | abstract",
+        "search_query": "exact search query if entity, else null"
       }
     }
   ]
@@ -225,7 +229,15 @@ FIELD NOTES:
 - visual_hint: what kind of visual would best serve this beat
 - emphasis_words: 1–3 words from spoken text to highlight in captions
 - asset_hint.keywords: 2–4 concrete nouns describing what image to show
-- asset_hint.prompt: specific photographable scene for AI image gen — no abstractions, describe exactly what's in frame
+- asset_hint.prompt: specific photographable scene for AI image gen — no abstractions, describe exactly what's in frame. CRITICAL: describe only the visual scene, never include text, numbers, statistics, charts, graphs, or any written content in the description
+- asset_hint.visual_type: "entity" if the beat shows a real named thing (brand, app, tool, company, product, movie, show, person, team) — use image search for these. "abstract" for generic concepts (growth, motivation, technology, lifestyle) — use AI generation.
+- asset_hint.search_query: ONLY set if visual_type is "entity". Write a precise image search query that will return the LOGO or OFFICIAL IMAGE of that entity. Rules:
+  * For apps/tools/software: "<Name> logo" e.g. "ChatGPT logo", "Notion logo", "Midjourney logo"
+  * For companies/brands: "<Brand> logo official" e.g. "OpenAI logo official", "Nike logo"
+  * For movies/shows: "<Title> official movie poster" e.g. "Dune 2 official movie poster"
+  * For people: "<Full Name> official photo" e.g. "Elon Musk official photo"
+  * Always target the logo/poster/official image — NOT a random scene or article about them.
+  * Set to null for abstract visual_type.
 `.trim();
 }
 
@@ -269,8 +281,10 @@ function parseAIResponse(raw) {
     visual_hint:    validHints.includes(beat.visual_hint) ? beat.visual_hint : "none",
     emphasis_words: Array.isArray(beat.emphasis_words) ? beat.emphasis_words : [],
     asset_hint: beat.asset_hint ? {
-      keywords: Array.isArray(beat.asset_hint.keywords) ? beat.asset_hint.keywords : [],
-      prompt:   String(beat.asset_hint.prompt || "").trim(),
+      keywords:     Array.isArray(beat.asset_hint.keywords) ? beat.asset_hint.keywords : [],
+      prompt:       String(beat.asset_hint.prompt || "").trim(),
+      visual_type:  beat.asset_hint.visual_type === "entity" ? "entity" : "abstract",
+      search_query: beat.asset_hint.search_query ? String(beat.asset_hint.search_query).trim() : null,
     } : null,
   }));
 
@@ -320,11 +334,16 @@ export async function generateStructuredShort({
   const rawText      = data.text || data.content || JSON.stringify(data);
   const parsedScript = parseAIResponse(rawText);
 
+  const dna = generateVideoDNA({ videoType, tone });
+
   let beats = await buildBeatsFromScript({
     structuredBeats: parsedScript.beats,
     mode, videoType, orientation, durationCategory,
     language, topic, brandColor, audience, tone,
-    assetSource: generateImages ? "ai" : "none",
+    // Always "none" here — the image loop below handles ALL image assignment
+    // (both search scraping for entities and Fal.ai for abstract beats)
+    assetSource: "none",
+    dna,
   });
 
   // Attach asset_hint to each beat for editor display
@@ -332,32 +351,230 @@ export async function generateStructuredShort({
     if (beats[i] && src.asset_hint) beats[i].asset_hint = src.asset_hint;
   });
 
-  // Auto-generate images if requested
-  if (generateImages) {
-    report("images");
-    await Promise.allSettled(beats.map(async (beat, beatIndex) => {
-      const hint = parsedScript.beats[beatIndex]?.asset_hint;
-      if (!hint?.prompt) return;
-      const def       = getLayoutDef(beat.layout);
-      const assetZone = def?.zones.find(z => z.type === "asset");
-      if (!assetZone) return;
-      try {
-        const img = await generateZoneImage({
-          spoken: beat.spoken, intent: beat.intent,
-          visual_hint: beat.visual_hint, topic, orientation,
-          beatIndex, zoneIndex: 0, promptOverride: hint.prompt,
-          projectId,
-        });
-        if (img?.url) {
-          beat.zones[assetZone.id] = {
-            ...(beat.zones[assetZone.id] || {}),
-            content: { kind: "asset", asset: { src: img.url, type: "image", objectFit: "cover", motion: "kenburns" } },
+  /* ── Phase 3: AI zone content — fills text zones intelligently ── */
+  report("content");
+  try {
+    const layoutDefs = beats.map(b => getLayoutDef(b.layout));
+    const zoneContentArr = await generateZoneContent({ beats, layoutDefs, topic, videoDNA: dna });
+
+    zoneContentArr.forEach(({ beatIndex, zones: zc }) => {
+      if (!beats[beatIndex]) return;
+      const beat = beats[beatIndex];
+      Object.entries(zc).forEach(([zoneId, content]) => {
+        if (!beat.zones[zoneId]) return;
+        if (content.text !== undefined) {
+          beat.zones[zoneId] = {
+            ...beat.zones[zoneId],
+            content: { kind: "text", text: content.text },
           };
         }
-      } catch (e) {
-        console.warn(`[img gen] beat ${beatIndex} failed:`, e.message);
+        if (content.prompt !== undefined) {
+          // Store AI-generated image prompt for this zone
+          beat.zones[zoneId] = {
+            ...beat.zones[zoneId],
+            _assetPrompt: content.prompt,
+          };
+        }
+      });
+    });
+  } catch (e) {
+    console.warn("[generateZoneContent] failed, using spoken text fallback:", e.message);
+  }
+
+  // Always run: fill any text zones still empty after AI call (or if AI call failed).
+  // Uses spoken text split by role so every zone has readable content.
+  beats.forEach(beat => {
+    const def = getLayoutDef(beat.layout);
+    if (!def) return;
+
+    const spoken = beat.spoken || "";
+    const wordList = spoken.trim().split(/\s+/).filter(Boolean);
+    const midpoint = Math.ceil(wordList.length * 0.55);
+    const firstHalf  = wordList.slice(0, midpoint).join(" ");
+    const secondHalf = wordList.slice(midpoint).join(" ") || spoken;
+
+    // Intent-based label tag
+    const INTENT_LABELS = {
+      shock: "WILD FACT", curiosity: "DID YOU KNOW", proof: "PROOF",
+      reveal: "REVEALED", urgency: "ACT NOW", empathy: "REAL TALK",
+      explanation: "HOW IT WORKS", contrast: "THE TRUTH", irony: "IRONY",
+      punchline: "PLOT TWIST", stat: "THE STAT", hook: "WAIT FOR IT",
+    };
+    const labelTag = INTENT_LABELS[beat.intent] || "FACT";
+
+    // Extract first number from spoken, or fallback symbol
+    const numMatch = spoken.match(/[\d,.]+%?[kKmMbB]?/);
+    const statText = numMatch ? numMatch[0] : "—";
+
+    const textZones = def.zones
+      .filter(z => z.type === "text")
+      .sort((a, b) => (a.order ?? 1) - (b.order ?? 1));
+
+    textZones.forEach((zoneDef, idx) => {
+      const zone = beat.zones[zoneDef.id];
+      if (!zone) return;
+      if (zone.content?.text?.trim()) return; // already filled — skip
+
+      let fallbackText = spoken; // default
+      const role = zoneDef.role || "subtext";
+
+      if (role === "headline") {
+        fallbackText = firstHalf || spoken;
+      } else if (role === "subtext") {
+        fallbackText = idx === 0 ? spoken : secondHalf;
+      } else if (role === "label") {
+        fallbackText = labelTag;
+      } else if (role === "stat") {
+        fallbackText = statText;
+      } else if (role === "quote") {
+        fallbackText = spoken;
       }
-    }));
+
+      // Trim to maxChars if defined
+      if (zoneDef.maxChars && fallbackText.length > zoneDef.maxChars) {
+        fallbackText = fallbackText.slice(0, zoneDef.maxChars - 1).trim() + "…";
+      }
+
+      beat.zones[zoneDef.id] = {
+        ...zone,
+        content: { kind: "text", text: fallbackText },
+      };
+    });
+  });
+
+  // Image processing:
+  // - Entity image search ALWAYS runs (free, deterministic, no AI cost)
+  // - Abstract AI generation only runs when generateImages=true
+  report("images");
+  // Process beats with limited concurrency (2 at a time) to avoid fal.ai rate limits
+  const processBeat = async (beat, beatIndex) => {
+    const hint     = parsedScript.beats[beatIndex]?.asset_hint || null;
+    const isEntity = hint?.visual_type === "entity" && !!hint.search_query;
+
+    // Skip if no entity to search AND image gen is off
+    if (!isEntity && !generateImages) return;
+
+    const def = getLayoutDef(beat.layout);
+    let defAssetZones = (def?.zones || [])
+      .filter(z => z.type === "asset")
+      .filter(z => beat.zones[z.id]?.content?.kind !== "block")
+      .filter(z => !beat.zones[z.id]?.content?.asset?.src);
+
+    // For text-only layouts, inject a full-bleed background zone
+    let injectedBgZone = null;
+    if (defAssetZones.length === 0 && hint) {
+      injectedBgZone = { id: "_bg_img", type: "asset" };
+      defAssetZones = [injectedBgZone];
+    }
+
+    if (!defAssetZones.length) return;
+
+    const isLogo    = isEntity && /logo|icon/i.test(hint.search_query);
+    const objectFit = isLogo ? "contain" : "cover";
+    const motion    = isLogo ? "none" : "kenburns";
+
+    try {
+      // Tier 1 — entity beats: search for the official image (always runs)
+      let sharedEntityImgUrl = null;
+      if (isEntity) {
+        console.log(`[img] Beat ${beatIndex}: entity search — "${hint.search_query}"`);
+        try {
+          const searchRes = await fetch("http://localhost:5000/api/search-image", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ query: hint.search_query }),
+          });
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const tempUrl    = searchData.url || null;
+            if (tempUrl) {
+              try {
+                const imgRes   = await fetch(tempUrl);
+                const blob     = await imgRes.blob();
+                const ext      = blob.type.includes("png") ? "png" : "jpg";
+                const file     = new File([blob], `entity-${Date.now()}.${ext}`, { type: blob.type });
+                const uploaded = await uploadUserAsset(file, "image", null, "project", projectId);
+                sharedEntityImgUrl = uploaded.url;
+                console.log(`[img] Beat ${beatIndex}: entity → Supabase — ${sharedEntityImgUrl}`);
+              } catch {
+                sharedEntityImgUrl = tempUrl; // fallback: use temp URL directly
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`[img] Beat ${beatIndex}: entity search failed —`, e.message);
+        }
+      }
+
+      // Tier 2 — per-zone image placement
+      await Promise.allSettled(defAssetZones.map(async (assetZone, zoneIdx) => {
+        let imgUrl = sharedEntityImgUrl; // entity beats share the found image
+
+        // Abstract AI generation — only when generateImages=true and no entity image found
+        if (!imgUrl && generateImages) {
+          const zonePrompt = assetZone !== injectedBgZone
+            ? beat.zones[assetZone.id]?._assetPrompt || null
+            : null;
+          const genPrompt = zonePrompt || hint?.prompt || null;
+
+          if (genPrompt) {
+            console.log(`[img] Beat ${beatIndex} zone ${zoneIdx}: AI gen — "${genPrompt.slice(0, 60)}..."`);
+            const img = await generateZoneImage({
+              spoken: beat.spoken, intent: beat.intent,
+              visual_hint: beat.visual_hint, topic, orientation,
+              beatIndex, zoneIndex: zoneIdx, promptOverride: genPrompt,
+              projectId,
+            });
+            imgUrl = img?.url || null;
+          }
+
+          // Final fallback — generate from spoken text alone
+          if (!imgUrl) {
+            console.log(`[img] Beat ${beatIndex} zone ${zoneIdx}: fallback from spoken text`);
+            const img = await generateZoneImage({
+              spoken: beat.spoken, intent: beat.intent,
+              visual_hint: beat.visual_hint, topic, orientation,
+              beatIndex, zoneIndex: zoneIdx,
+              projectId,
+            });
+            imgUrl = img?.url || null;
+          }
+        }
+
+        if (!imgUrl) return;
+
+        if (assetZone === injectedBgZone) {
+          // Background image for text-only layouts: full-bleed, dimmed behind text
+          beat.zones["_bg_img"] = {
+            type:    "asset",
+            x:       0, y: 0, width: 100, height: 100,
+            zIndex:  0,
+            start:   0, end: null,
+            content: { kind: "asset", asset: { src: imgUrl, type: "image", objectFit: "cover", motion } },
+            style:   { opacity: 0.45 },
+            background: {},
+          };
+        } else {
+          beat.zones[assetZone.id] = {
+            ...(beat.zones[assetZone.id] || {}),
+            content: { kind: "asset", asset: { src: imgUrl, type: "image", objectFit, motion } },
+            ...(isLogo ? { background: { kind: "color", color: "#0d0d14" }, style: { ...(beat.zones[assetZone.id]?.style || {}), borderRadius: 16, contentPadding: 16 } } : {}),
+          };
+        }
+      }));
+    } catch (e) {
+      console.warn(`[img gen] beat ${beatIndex} failed:`, e.message);
+    }
+  };
+
+  // Run beats 4 at a time — fal.ai fails fast on overload so Bing fallback kicks in quickly
+  for (let i = 0; i < beats.length; i += 4) {
+    await Promise.allSettled([
+      processBeat(beats[i],     i),
+      i + 1 < beats.length ? processBeat(beats[i + 1], i + 1) : Promise.resolve(),
+      i + 2 < beats.length ? processBeat(beats[i + 2], i + 2) : Promise.resolve(),
+      i + 3 < beats.length ? processBeat(beats[i + 3], i + 3) : Promise.resolve(),
+    ]);
   }
 
   const script = parsedScript.beats.map(b => b.spoken).join(" ");
@@ -394,7 +611,7 @@ export async function generateStructuredShort({
 
   return {
     script, beats,
-    meta: { videoType: parsedScript.videoType, language: parsedScript.language, emotionalArc: parsedScript.emotionalArc, brandColor, audience, tone },
+    meta: { videoType: parsedScript.videoType, language: parsedScript.language, emotionalArc: parsedScript.emotionalArc, brandColor, audience, tone, dna },
     audio: { tts: ttsAudio, music: autoMusicKey ? { musicKey: autoMusicKey, src: MUSIC_PREVIEW_URLS[autoMusicKey], volume: 0.12 } : null },
   };
 }

@@ -244,7 +244,7 @@ function Thumbnail({ beat }) {
 
   // Fall back to layoutBackground
   if (!src && layoutBg) {
-    if (layoutBg.type === "color") {
+    if (layoutBg.type === "color" || layoutBg.type === "gradient") {
       return <div className="h-full w-full" style={{ background: layoutBg.value }} />;
     }
     if (layoutBg.type === "image" || layoutBg.type === "video") {

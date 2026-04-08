@@ -33,6 +33,8 @@ export function buildSafeProject(raw = {}) {
 
     overlays: raw.overlays || [],
 
+    dna: raw.dna || null,
+
     beats:        [],
     duration_sec: 0,
 

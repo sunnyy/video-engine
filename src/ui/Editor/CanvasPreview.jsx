@@ -274,7 +274,20 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
                 acknowledgeRemotionLicense
                 component={VideoComposition}
                 inputProps={{ project }}
-                frameToDisplay={Math.floor((activeBeat.start_sec || 0) * fps) + 20}
+                frameToDisplay={(() => {
+                  const beatStart = Math.floor((activeBeat.start_sec || 0) * fps);
+                  const beatDuration = Math.floor(((activeBeat.end_sec || 0) - (activeBeat.start_sec || 0)) * fps);
+                  // Find latest zone start in frames
+                  const zones = Object.values(activeBeat.zones || {});
+                  const maxZoneStartFrame = zones.reduce((max, z) => {
+                    const zf = Math.floor((z.start || 0) * fps);
+                    return Math.max(max, zf);
+                  }, 0);
+                  // Show at: latest zone start + 30 frames (enough for any enter animation to finish)
+                  // but never beyond the beat's own duration
+                  const settled = maxZoneStartFrame + 30;
+                  return beatStart + Math.min(settled, beatDuration - 1);
+                })()}
                 compositionWidth={videoW}
                 compositionHeight={videoH}
                 fps={fps}
@@ -337,6 +350,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               compositionHeight={videoH}
               fps={fps}
               controls={false}
+              numberOfSharedAudioTags={16}
               style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden" }}
             />
 

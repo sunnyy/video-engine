@@ -78,7 +78,12 @@ app.post("/api/generate", async (req, res) => {
       ],
       temperature: 0.7,
     });
-    const parsed = JSON.parse(completion.choices[0].message.content);
+    const raw = completion.choices[0].message.content;
+    const cleaned = raw
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/gi, "")
+      .trim();
+    const parsed = JSON.parse(cleaned);
     res.json(parsed);
   } catch (err) {
     console.error("[generate]", err.message);
@@ -154,32 +159,169 @@ const MUSIC_FILENAMES = {
 };
 function getMusicFilename(key) { return MUSIC_FILENAMES[key] || `${key}.mp3`; }
 
+/* ---------------- IMAGE SEARCH (Bing scrape — no API key) ---------------- */
+async function bingScrapeImages(query) {
+  const url = `https://www.bing.com/images/async?q=${encodeURIComponent(query)}&first=1&count=10&adlt=Moderate&mmasync=1`;
+  const r   = await fetch(url, {
+    headers: {
+      "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Referer":         "https://www.bing.com/images/search",
+    },
+  });
+  if (!r.ok) throw new Error(`Bing scrape HTTP ${r.status}`);
+  const html = await r.text();
+
+  // Bing HTML-encodes quotes: murl&quot;:&quot;URL&quot;
+  const murls = [...html.matchAll(/murl&quot;:&quot;(https?:[^&]+)&quot;/g)].map(m => m[1]);
+  const turls = [...html.matchAll(/turl&quot;:&quot;(https?:[^&]+)&quot;/g)].map(m => m[1]);
+
+  const results = [];
+  for (let i = 0; i < Math.max(murls.length, turls.length); i++) {
+    results.push({ murl: murls[i] || null, turl: turls[i] || null });
+  }
+
+  console.log(`[search] Bing found ${results.length} results for "${query}"`);
+  return results;
+}
+
+/* Download image to a temp file, return { localUrl, filePath } */
+async function cacheImageStrict(url) {
+  if (!url) return null;
+  if (/\.(svg|gif|ico)/i.test(url.split("?")[0])) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.startsWith("image/")) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length < 5000) return null;
+    const ext      = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
+    const fname    = `search-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const filePath = path.join(TEMP_DIR, fname);
+    fs.writeFileSync(filePath, buffer);
+    return { localUrl: `http://localhost:5000/renders/${fname}`, filePath };
+  } catch {
+    return null;
+  }
+}
+
+app.post("/api/search-image", async (req, res) => {
+  const { query } = req.body;
+  if (!query?.trim()) return res.status(400).json({ error: "No query" });
+
+  try {
+    const results = await bingScrapeImages(query);
+    if (!results.length) return res.status(404).json({ error: "No results", query });
+
+    const isLogoQuery = /logo|poster|icon/i.test(query);
+    const urls = results.map(r => r.murl).filter(Boolean);
+    const sorted = isLogoQuery
+      ? [...urls.filter(u => /\.png(\?|$)/i.test(u)), ...urls.filter(u => !/\.png(\?|$)/i.test(u))]
+      : urls;
+
+    for (const imgUrl of sorted) {
+      const cached = await cacheImageStrict(imgUrl);
+      if (cached) {
+        console.log(`[search] Cached for "${query}": ${imgUrl}`);
+        // Send response first, then schedule temp file deletion after client has time to fetch it
+        res.json({ url: cached.localUrl, source: "bing_scrape", query });
+        setTimeout(() => {
+          try { fs.unlinkSync(cached.filePath); } catch {}
+          console.log(`[search] Cleaned temp: ${path.basename(cached.filePath)}`);
+        }, 30_000); // 30s — plenty of time for client to download + upload to Supabase
+        return;
+      }
+    }
+
+    res.status(404).json({ error: "No usable image found", query });
+  } catch (e) {
+    console.error("[search] Bing scrape failed:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/* Quick test endpoint — GET /api/test-search?q=ChatGPT+logo */
+app.get("/api/test-search", async (req, res) => {
+  const query = req.query.q;
+  if (!query) return res.status(400).json({ error: "Pass ?q=query" });
+  try {
+    const results = await bingScrapeImages(query);
+    res.json({ query, count: results.length, results: results.slice(0, 5) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 /* ---------------- FAL.AI IMAGE GENERATION ---------------- */
 app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt, orientation } = req.body;
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
 
-    const imageSize = orientation === "9:16" ? "portrait_4_3" : "landscape_4_3";
-    const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
-      method:  "POST",
-      headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, image_size: imageSize, num_images: 1, num_inference_steps: 4, enable_safety_checker: true }),
-    });
+    const imageSize = orientation === "9:16" ? "portrait_16_9" : "landscape_16_9";
 
-    if (!falRes.ok) {
-      const err = await falRes.text();
-      console.error("[fal.ai] Error:", err);
+    // Retry up to 2 times for 500 errors only.
+    // 502/503/429 = fal.ai is overloaded — fail immediately so caller falls back to Bing.
+    const NO_RETRY_CODES = new Set([429, 502, 503]);
+    let url = null;
+    let lastErr = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1000));
+      try {
+        const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+          method:  "POST",
+          headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, image_size: imageSize, num_images: 1, num_inference_steps: 4, enable_safety_checker: false }),
+        });
+
+        if (!falRes.ok) {
+          lastErr = await falRes.text();
+          console.warn(`[fal.ai] Attempt ${attempt + 1} failed (${falRes.status}):`, lastErr.slice(0, 80));
+          if (NO_RETRY_CODES.has(falRes.status)) break; // no point retrying
+          continue;
+        }
+
+        const data = await falRes.json();
+        url = data?.images?.[0]?.url || null;
+        if (url) break;
+        lastErr = "No image URL in response";
+      } catch (e) {
+        lastErr = e.message;
+        console.warn(`[fal.ai] Attempt ${attempt + 1} threw:`, lastErr);
+      }
+    }
+
+    if (!url) {
+      console.error("[fal.ai] Failed:", lastErr);
       return res.status(500).json({ error: "Fal.ai request failed" });
     }
 
-    const data = await falRes.json();
-    const url  = data?.images?.[0]?.url;
-    if (!url) return res.status(500).json({ error: "No image returned" });
     res.json({ url });
   } catch (err) {
     console.error("[fal.ai]", err);
     res.status(500).json({ error: "Image generation failed" });
+  }
+});
+
+/* Proxy-download a fal.media URL server-side (avoids browser QUIC/HTTP3 issues) */
+app.post("/api/proxy-image", async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: "url required" });
+
+    const imgRes = await fetch(url);
+    if (!imgRes.ok) return res.status(502).json({ error: "Failed to fetch image" });
+
+    const buffer      = await imgRes.arrayBuffer();
+    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Length", buffer.byteLength);
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error("[proxy-image]", err);
+    res.status(500).json({ error: "Proxy failed" });
   }
 });
 
@@ -230,7 +372,7 @@ app.post("/api/render", async (req, res) => {
   res.json({ success: true, jobId });
 
   try {
-    let { project, resolution = "1080p" } = req.body;
+    let { project } = req.body;
 
     console.log("[render] Job", jobId, "— caching external assets...");
     const tempFiles = []; // track all temp files to clean up after render

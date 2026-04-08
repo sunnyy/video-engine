@@ -85,6 +85,7 @@ export default function Preview() {
           compositionHeight={project.meta.height}
           fps={fps}
           controls
+          numberOfSharedAudioTags={16}
           style={{
             maxHeight: 720,
             borderRadius: 12,

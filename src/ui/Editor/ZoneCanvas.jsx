@@ -5,6 +5,8 @@
 import { memo, useCallback, useRef } from "react";
 import { useProjectStore } from "../../../src/store/useProjectStore";
 import { getLayoutDef } from "../../../src/core/layoutRegistry";
+import { elementsRegistry } from "../../../src/core/elementsRegistry";
+import CompositionLayerRenderer from "../../../src/remotion/elements/composition/CompositionLayerRenderer";
 import ZoneHandle from "./ZoneHandle";
 
 // ZoneContentLayer only renders empty-zone indicators.
@@ -170,56 +172,78 @@ export default function ZoneCanvas({
         boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
       }}
     >
-      {allZones.map(zone => {
-        const content = zone.content || {};
-        const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
-                     || (zone.type === "text"  && !content.text && content.kind !== "block");
-        return (
-          <div key={`content_${zone.id}`} className="absolute overflow-hidden" style={{
-            left: `${zone.x}%`, top: `${zone.y}%`,
-            width: `${zone.width}%`, height: `${zone.height}%`,
-            zIndex: zone.zIndex ?? 1,
-            borderRadius: zone.style?.borderRadius || 0,
-          }}>
-            <ZoneContentLayer zone={zone} />
-            {isEmpty && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  border: "1.5px dashed rgba(255,255,255,0.35)",
-                  borderRadius: zone.style?.borderRadius || 0,
-                  zIndex: 99,
-                }}
-              />
-            )}
+      {/* Composition background + overlay layers (beneath zone content) */}
+      <CompositionLayerRenderer beat={beat} layerFilter={[0, 1, 3]} />
+
+      {/* layoutPadding inset — mirrors LayoutRenderer behaviour */}
+      <div style={{ position: "absolute", inset: (beat?.layoutPadding || 0) * canvasScale, overflow: "hidden" }}>
+        {allZones.map(zone => {
+          if (zone.type === "element") {
+            const entry = elementsRegistry[zone.content?.elementId];
+            if (!entry) return null;
+            const props = { ...entry.defaultProps, ...(zone.content?.props || {}) };
+            return (
+              <div key={`content_${zone.id}`} className="absolute" style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%`, zIndex: zone.zIndex ?? 5, pointerEvents: "none" }}>
+                {entry.render(props)}
+              </div>
+            );
+          }
+          const content = zone.content || {};
+          const isText  = zone.type === "text";
+          const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
+                       || (isText && !content.text && content.kind !== "block");
+          return (
+            <div key={`content_${zone.id}`} className="absolute"
+              style={{
+                left:         `${zone.x}%`,
+                top:          `${zone.y}%`,
+                width:        `${zone.width}%`,
+                height:       isText ? "auto" : `${zone.height}%`,
+                minHeight:    isText ? "3%" : undefined,
+                zIndex:       zone.zIndex ?? 1,
+                borderRadius: zone.style?.borderRadius || 0,
+                overflow:     isText ? "visible" : "hidden",
+                opacity:      zone.style?.opacity ?? 1,
+              }}>
+              <ZoneContentLayer zone={zone} />
+              {isEmpty && (
+                <div className="absolute inset-0 pointer-events-none"
+                  style={{ border: "1.5px dashed rgba(255,255,255,0.35)", borderRadius: zone.style?.borderRadius || 0, zIndex: 99 }}
+                />
+              )}
+            </div>
+          );
+        })}
+
+        {/* Composition frame + decorative layers */}
+        <CompositionLayerRenderer beat={beat} layerFilter={[2, 4]} />
+
+        {allZones
+          .filter(zone => zone.type !== "element" && zone.id !== "_bg_img")
+          .map(zone => (
+            <ZoneHandle key={`handle_${zone.id}`} zone={zone}
+              isSelected={selectedZoneIds instanceof Set ? selectedZoneIds.has(zone.id) : selectedZoneId === zone.id}
+              canvasWidth={canvasW - (beat?.layoutPadding || 0) * canvasScale * 2}
+              canvasHeight={canvasH - (beat?.layoutPadding || 0) * canvasScale * 2}
+              onSelect={onSelectZone}
+              onUpdate={handleUpdate}
+              onUpdateMulti={handleUpdateMulti}
+              onPushHistory={handlePushHistory}
+              onSave={handleSave}
+              selectedZoneIds={selectedZoneIds instanceof Set ? selectedZoneIds : null}
+              allZones={allZones}
+            />
+          ))}
+
+        {allZones.filter(z => (z.start || 0) > 0).map(zone => (
+          <div key={`delay_${zone.id}`}
+            className="absolute text-[8px] font-mono text-[rgba(255,200,0,0.7)] bg-black/50 px-[3px] py-[1px] rounded-[3px] pointer-events-none leading-[12px]"
+            style={{ left: `${zone.x}%`, top: `${zone.y}%`, zIndex: 999 }}
+          >
+            +{zone.start}s
           </div>
-        );
-      })}
-
-      {allZones.map(zone => (
-        <ZoneHandle key={`handle_${zone.id}`} zone={zone}
-          isSelected={selectedZoneIds instanceof Set
-            ? selectedZoneIds.has(zone.id)
-            : selectedZoneId === zone.id}
-          canvasWidth={canvasW} canvasHeight={canvasH}
-          onSelect={onSelectZone}
-          onUpdate={handleUpdate}
-          onUpdateMulti={handleUpdateMulti}
-          onPushHistory={handlePushHistory}
-          onSave={handleSave}
-          selectedZoneIds={selectedZoneIds instanceof Set ? selectedZoneIds : null}
-          allZones={allZones}
-        />
-      ))}
-
-      {allZones.filter(z => (z.start || 0) > 0).map(zone => (
-        <div key={`delay_${zone.id}`}
-          className="absolute text-[8px] font-mono text-[rgba(255,200,0,0.7)] bg-black/50 px-[3px] py-[1px] rounded-[3px] pointer-events-none leading-[12px]"
-          style={{ left: `${zone.x}%`, top: `${zone.y}%`, zIndex: 999 }}
-        >
-          +{zone.start}s
-        </div>
-      ))}
+        ))}
+      </div>{/* end layoutPadding inset */}
 
       {beat?.caption && (
         <div

@@ -66,6 +66,15 @@ export function validateBeats(beats) {
 
     }
 
+    // Preserve extra zones not in the layout def:
+    // bz1 (block zones), _bg_img (injected background), element zones (el_*)
+    if (beat.zones) {
+      const defZoneSet = new Set(layoutDef ? layoutDef.zones : ["z1"]);
+      Object.entries(beat.zones).forEach(([id, zone]) => {
+        if (!defZoneSet.has(id)) zones[id] = zone;
+      });
+    }
+
     const cleanBeat = {
 
       id: beat.id || `beat_${index}`,
@@ -117,13 +126,23 @@ export function validateBeats(beats) {
       end_sec
     };
 
-    if (beat.asset_settings) {
-      cleanBeat.asset_settings = beat.asset_settings;
-    }
+    if (beat.asset_settings) cleanBeat.asset_settings = beat.asset_settings;
+    if (beat.audio_cues)    cleanBeat.audio_cues    = beat.audio_cues;
 
-    if (beat.audio_cues) {
-      cleanBeat.audio_cues = beat.audio_cues;
-    }
+    // Preserve runtime fields that validators must not strip
+    if (beat.composition)    cleanBeat.composition    = beat.composition;
+    if (beat.overlays)       cleanBeat.overlays       = beat.overlays;
+    if (beat.intent)         cleanBeat.intent         = beat.intent;
+    if (beat.energy   != null) cleanBeat.energy       = beat.energy;
+    if (beat.role)           cleanBeat.role           = beat.role;
+    if (beat.language)       cleanBeat.language       = beat.language;
+    if (beat.asset_hint)     cleanBeat.asset_hint     = beat.asset_hint;
+    if (beat.visual_hint)    cleanBeat.visual_hint    = beat.visual_hint;
+    if (beat.block_props)    cleanBeat.block_props    = beat.block_props;
+    if (beat.block_candidate) cleanBeat.block_candidate = beat.block_candidate;
+    if (beat.layoutPadding != null) cleanBeat.layoutPadding = beat.layoutPadding;
+    if (beat.decoratives)    cleanBeat.decoratives    = beat.decoratives;
+    if (beat.resolvedColors) cleanBeat.resolvedColors = beat.resolvedColors;
 
     return cleanBeat;
 

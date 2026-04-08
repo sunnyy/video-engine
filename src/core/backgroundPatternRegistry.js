@@ -11,25 +11,25 @@ export const backgroundPatternRegistry = {
     style:      { background: "#dc2626" },
     brightness: "mid", mood: "intense", energy: "high",
     works_with: ["white", "black", "yellow"],
-    intent:     ["shock", "urgency", "contrast"],
+    intent:     ["shock", "urgency", "contrast", "irony"],
   },
   scarlet: {
     style:      { background: "#e11d48" },
     brightness: "mid", mood: "bold", energy: "high",
     works_with: ["white", "black", "yellow"],
-    intent:     ["shock", "urgency", "punchline"],
+    intent:     ["shock", "urgency", "punchline", "reveal", "irony"],
   },
   orange: {
     style:      { background: "#ea580c" },
     brightness: "mid", mood: "energetic", energy: "high",
     works_with: ["white", "black", "dark"],
-    intent:     ["urgency", "punchline", "curiosity"],
+    intent:     ["urgency", "punchline", "curiosity", "contrast"],
   },
   amber: {
     style:      { background: "#d97706" },
     brightness: "mid", mood: "warm", energy: "high",
     works_with: ["dark", "black", "white"],
-    intent:     ["punchline", "proof", "urgency"],
+    intent:     ["punchline", "proof", "urgency", "reveal", "contrast"],
   },
   sunYellow: {
     style:      { background: "#eab308" },
@@ -89,28 +89,7 @@ export const backgroundPatternRegistry = {
     style:      { background: "#f43f5e" },
     brightness: "mid", mood: "lively", energy: "high",
     works_with: ["white", "dark", "black"],
-    intent:     ["urgency", "punchline", "shock"],
-  },
-
-  /* ── DARK SOLIDS (kept minimal) ──────────────────────────── */
-
-  charcoal: {
-    style:      { background: "#111118" },
-    brightness: "dark", mood: "structured", energy: "medium",
-    works_with: ["light", "white", "yellow", "teal"],
-    intent:     ["proof", "explanation", "contrast"],
-  },
-  deepNavy: {
-    style:      { background: "#0f172a" },
-    brightness: "dark", mood: "serious", energy: "medium",
-    works_with: ["light", "white", "yellow", "cyan"],
-    intent:     ["proof", "curiosity", "explanation"],
-  },
-  richBlack: {
-    style:      { background: "#09090b" },
-    brightness: "dark", mood: "dramatic", energy: "high",
-    works_with: ["light", "white", "yellow", "cyan"],
-    intent:     ["shock", "urgency", "reveal"],
+    intent:     ["urgency", "punchline", "shock", "irony", "contrast"],
   },
 
   /* ── LIGHT SOLIDS ────────────────────────────────────────── */
@@ -158,7 +137,7 @@ export const backgroundPatternRegistry = {
     style:      { background: "linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)" },
     brightness: "mid", mood: "energetic", energy: "high",
     works_with: ["dark", "white", "navy"],
-    intent:     ["punchline", "urgency", "shock"],
+    intent:     ["punchline", "urgency", "shock", "reveal", "contrast"],
   },
   gradientNeonPink: {
     style:      { background: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },
@@ -215,7 +194,7 @@ export const backgroundPatternRegistry = {
     intent:     ["punchline", "empathy", "proof"],
   },
 
-  /* ── NEON / GLOW ─────────────────────────────────────────── */
+  /* ── NEON / GLOW / MESH ──────────────────────────────────── */
 
   neonPurpleGlow: {
     style:      { background: "radial-gradient(ellipse at 50% 40%, #7c3aed 0%, #3b0764 40%, #0a0514 100%)" },
@@ -242,8 +221,6 @@ export const backgroundPatternRegistry = {
     intent:     ["curiosity", "contrast", "reveal"],
   },
 
-  /* ── MESH ────────────────────────────────────────────────── */
-
   meshPurpleBlue: {
     style:      { background: "radial-gradient(ellipse at 20% 20%, #7c3aed 0%, transparent 55%), radial-gradient(ellipse at 80% 80%, #2563eb 0%, transparent 55%), #0f0a1a" },
     brightness: "dark", mood: "cinematic", energy: "high",
@@ -254,7 +231,7 @@ export const backgroundPatternRegistry = {
     style:      { background: "radial-gradient(ellipse at 20% 80%, #ea580c 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, #dc2626 0%, transparent 50%), #1a0500" },
     brightness: "dark", mood: "intense", energy: "high",
     works_with: ["light", "white", "yellow"],
-    intent:     ["shock", "urgency", "contrast"],
+    intent:     ["shock", "urgency", "contrast", "irony", "reveal"],
   },
   meshOceanBreeze: {
     style:      { background: "radial-gradient(ellipse at 30% 30%, #0ea5e9 0%, transparent 50%), radial-gradient(ellipse at 70% 70%, #10b981 0%, transparent 50%), #041225" },
@@ -266,49 +243,49 @@ export const backgroundPatternRegistry = {
   /* ── PATTERNS ────────────────────────────────────────────── */
 
   gridWhite: {
-    style:      { background: "linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px), #111118", backgroundSize: "48px 48px, 48px 48px" },
+    style:      { backgroundImage: "linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)", backgroundColor: "#111118", backgroundSize: "48px 48px, 48px 48px" },
     brightness: "dark", mood: "structured", energy: "low",
     works_with: ["light", "white", "cyan", "yellow"],
     intent:     ["proof", "explanation", "list"],
   },
   gridPurple: {
-    style:      { background: "linear-gradient(rgba(124,92,252,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(124,92,252,0.35) 1px, transparent 1px), #0a0810", backgroundSize: "48px 48px, 48px 48px" },
+    style:      { backgroundImage: "linear-gradient(rgba(124,92,252,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(124,92,252,0.35) 1px, transparent 1px)", backgroundColor: "#0a0810", backgroundSize: "48px 48px, 48px 48px" },
     brightness: "dark", mood: "futuristic", energy: "high",
     works_with: ["light", "cyan", "pink", "yellow"],
     intent:     ["curiosity", "shock", "contrast"],
   },
   gridLight: {
-    style:      { background: "linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px), #f8fafc", backgroundSize: "40px 40px, 40px 40px" },
+    style:      { backgroundImage: "linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px)", backgroundColor: "#f8fafc", backgroundSize: "40px 40px, 40px 40px" },
     brightness: "light", mood: "structured", energy: "low",
     works_with: ["dark", "black", "navy"],
     intent:     ["explanation", "proof", "list"],
   },
   dotsWhite: {
-    style:      { background: "radial-gradient(circle, rgba(255,255,255,0.45) 2px, transparent 2px), #111118", backgroundSize: "28px 28px" },
+    style:      { backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.45) 2px, transparent 2px)", backgroundColor: "#111118", backgroundSize: "28px 28px" },
     brightness: "dark", mood: "playful", energy: "medium",
     works_with: ["light", "white", "yellow"],
     intent:     ["curiosity", "punchline", "list"],
   },
   dotsColor: {
-    style:      { background: "radial-gradient(circle, rgba(124,92,252,0.6) 2px, transparent 2px), #07060f", backgroundSize: "28px 28px" },
+    style:      { backgroundImage: "radial-gradient(circle, rgba(124,92,252,0.6) 2px, transparent 2px)", backgroundColor: "#07060f", backgroundSize: "28px 28px" },
     brightness: "dark", mood: "electric", energy: "high",
     works_with: ["light", "white", "pink"],
     intent:     ["curiosity", "shock", "reveal"],
   },
   diagonalStripes: {
-    style:      { background: "repeating-linear-gradient(45deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 2px, transparent 2px, transparent 28px), #111118", backgroundSize: "40px 40px" },
+    style:      { backgroundImage: "repeating-linear-gradient(45deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 2px, transparent 2px, transparent 28px)", backgroundColor: "#111118", backgroundSize: "40px 40px" },
     brightness: "dark", mood: "dynamic", energy: "medium",
     works_with: ["light", "white", "yellow"],
     intent:     ["curiosity", "contrast", "list"],
   },
   diagonalBright: {
-    style:      { background: "repeating-linear-gradient(45deg, rgba(234,88,12,0.25) 0px, rgba(234,88,12,0.25) 4px, transparent 4px, transparent 24px), #1a0800", backgroundSize: "34px 34px" },
+    style:      { backgroundImage: "repeating-linear-gradient(45deg, rgba(234,88,12,0.25) 0px, rgba(234,88,12,0.25) 4px, transparent 4px, transparent 24px)", backgroundColor: "#1a0800", backgroundSize: "34px 34px" },
     brightness: "dark", mood: "energetic", energy: "high",
     works_with: ["light", "white", "yellow"],
-    intent:     ["urgency", "shock", "contrast"],
+    intent:     ["urgency", "shock", "contrast", "irony", "reveal"],
   },
   crosshatch: {
-    style:      { background: "repeating-linear-gradient(0deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 1px, transparent 1px, transparent 32px), repeating-linear-gradient(90deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 1px, transparent 1px, transparent 32px), #0d0d18", backgroundSize: "32px 32px" },
+    style:      { backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 1px, transparent 1px, transparent 32px), repeating-linear-gradient(90deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 1px, transparent 1px, transparent 32px)", backgroundColor: "#0d0d18", backgroundSize: "32px 32px" },
     brightness: "dark", mood: "structured", energy: "low",
     works_with: ["light", "white", "cyan"],
     intent:     ["proof", "explanation", "list"],
@@ -319,27 +296,49 @@ export const backgroundPatternRegistry = {
 export const backgroundCategories = {
   bright:   ["crimson","scarlet","orange","amber","sunYellow","lime","emerald","teal","sky","cobalt","violet","purple","hotPink","coral"],
   light:    ["warmCream","softWhite","blushPink","mintLight","lavenderLight","skyLight"],
-  dark:     ["charcoal","deepNavy","richBlack"],
   gradient: ["gradientSunset","gradientNeonPink","gradientPurpleFire","gradientOcean","gradientGold","gradientLime","gradientCandyFloss","gradientDeepPurple","gradientMidnight","gradientWarmLight"],
-  neon:     ["neonPurpleGlow","neonCyanGlow","neonPinkGlow","neonGreenGlow"],
-  mesh:     ["meshPurpleBlue","meshSunsetFire","meshOceanBreeze"],
+  neon:     ["neonPurpleGlow","neonCyanGlow","neonPinkGlow","neonGreenGlow","meshPurpleBlue","meshSunsetFire","meshOceanBreeze"],
   pattern:  ["gridWhite","gridPurple","gridLight","dotsWhite","dotsColor","diagonalStripes","diagonalBright","crosshatch"],
+};
+
+/* ── Color family membership ─────────────────────────────── */
+// Used to bias background selection toward the video DNA's primary hue.
+const COLOR_FAMILY_KEYS = {
+  warm:     new Set(["crimson","scarlet","orange","amber","coral","gradientSunset","gradientGold","meshSunsetFire","diagonalBright"]),
+  cool:     new Set(["emerald","teal","sky","cobalt","neonCyanGlow","neonGreenGlow","meshOceanBreeze","gradientOcean","gradientMidnight","gridWhite","crosshatch"]),
+  electric: new Set(["violet","purple","hotPink","gradientNeonPink","gradientPurpleFire","neonPurpleGlow","neonPinkGlow","meshPurpleBlue","gridPurple","dotsColor"]),
+  neutral:  new Set(["warmCream","softWhite","blushPink","mintLight","lavenderLight","skyLight","sunYellow","lime","gradientLime","gradientCandyFloss","dotsWhite","diagonalStripes"]),
 };
 
 /* ── Smart pickers ───────────────────────────────────────── */
 
-export function getBackgroundForIntent(intent, brightness = null) {
-  const candidates = Object.entries(backgroundPatternRegistry)
+/**
+ * @param {string}  intent
+ * @param {string|null} brightness   "light" | "mid" | "dark" | null — exact match
+ * @param {string|null} colorFamily  "warm" | "cool" | "electric" | "neutral" | null
+ * @param {boolean} excludeLight     When true, always exclude brightness:"light" entries
+ *                                   (use when DNA bg is dark — light bgs clash badly)
+ */
+export function getBackgroundForIntent(intent, brightness = null, colorFamily = null, excludeLight = false) {
+  let candidates = Object.entries(backgroundPatternRegistry)
     .filter(([, v]) => v.intent.includes(intent))
     .filter(([, v]) => !brightness || v.brightness === brightness)
+    .filter(([, v]) => !excludeLight || v.brightness !== "light")
     .map(([k]) => k);
 
-  const pool = candidates.length ? candidates
-    : Object.keys(backgroundPatternRegistry).filter(k =>
-        !brightness || backgroundPatternRegistry[k].brightness === brightness
-      );
+  if (!candidates.length) {
+    candidates = Object.keys(backgroundPatternRegistry)
+      .filter(k => !brightness || backgroundPatternRegistry[k].brightness === brightness)
+      .filter(k => !excludeLight || backgroundPatternRegistry[k].brightness !== "light");
+  }
 
-  const key = pool[Math.floor(Math.random() * pool.length)];
+  // Soft-bias toward DNA color family: 40% chance to prefer family, never forces it exclusively
+  if (colorFamily && COLOR_FAMILY_KEYS[colorFamily] && Math.random() < 0.4) {
+    const familyCandidates = candidates.filter(k => COLOR_FAMILY_KEYS[colorFamily].has(k));
+    if (familyCandidates.length >= 2) candidates = familyCandidates;
+  }
+
+  const key = candidates[Math.floor(Math.random() * candidates.length)];
   return { key, ...backgroundPatternRegistry[key] };
 }
 
