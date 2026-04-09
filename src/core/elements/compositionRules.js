@@ -72,5 +72,4 @@ export const COMPOSITION_RULES = [
   // ── ANIMATION RULES ──
   { rule: "one_animated_dec",    enforce: "max 1 animated decorative per beat (sparkle or circle_badge)"  },
   { rule: "ticker_always_moves", enforce: "ticker_bar animation speed always between 20-40s"              },
-  { rule: "kenburns_on_cover",   enforce: "asset_fill with objectFit:cover always gets kenburns motion"   },
 ];

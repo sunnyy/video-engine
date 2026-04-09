@@ -187,7 +187,12 @@ export default function ZoneCanvas({
       return;
     }
     const bz = beatZonesRef.current;
-    updateBeatSilent(beatIdRef.current, { zones: { ...bz, [zoneId]: { ...(bz[zoneId] || {}), ...updates } } });
+    const existing = bz[zoneId] || {};
+    // Deep-merge style so callers can pass partial style patches (e.g. { style: { rotation: 45 } })
+    // without wiping other style keys
+    const merged = { ...existing, ...updates };
+    if (updates.style) merged.style = { ...(existing.style || {}), ...updates.style };
+    updateBeatSilent(beatIdRef.current, { zones: { ...bz, [zoneId]: merged } });
   }, [updateBeatSilent, onUpdateVideoOverlay]);
 
   const handleUpdateMulti = useCallback((patchMap) => {
@@ -243,8 +248,8 @@ export default function ZoneCanvas({
             );
           }
 
-          if (zone.type === "decorative") {
-            // Don't render decorative SVGs in the canvas overlay — the Remotion Thumbnail
+          if (zone.type === "decorative" || zone.type === "icon") {
+            // Don't render decorative/icon SVGs in the canvas overlay — the Remotion Thumbnail
             // already shows them correctly with proper z-ordering. Rendering here would put
             // the SVG in a separate DOM layer above the Thumbnail, covering text that should
             // be on top. ZoneHandle handles click-selection, so interactivity is unaffected.
@@ -266,8 +271,10 @@ export default function ZoneCanvas({
                 height:        `${zone.height}%`,
                 zIndex:        zone.zIndex ?? 1,
                 borderRadius:  zone.style?.borderRadius || 0,
-                overflow:      isText ? "visible" : "hidden",
+                overflow:      isText || zone.style?.transform ? "visible" : "hidden",
                 opacity:       zone.style?.opacity ?? 1,
+                transform:     zone.style?.transform || undefined,
+                transformOrigin: "center center",
                 display:       isText ? "flex"   : undefined,
                 alignItems:    isText ? "center" : undefined,
                 flexDirection: isText ? "column" : undefined,

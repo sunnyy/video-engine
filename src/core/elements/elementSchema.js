@@ -72,7 +72,7 @@ export const ELEMENT_TYPES = {
     category:  "background",
     layer:     0,
     variants: [
-      { id: "af_cover",   objectFit: "cover",   motion: "kenburns_in"  },
+      { id: "af_cover",   objectFit: "cover"  },
       { id: "af_blurred", objectFit: "cover",   blur: 40, opacity: 0.4 },
       { id: "af_top",     objectFit: "cover",   position: "top"        },
     ],

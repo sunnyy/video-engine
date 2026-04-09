@@ -8,6 +8,7 @@
  */
 
 import { findLayouts, getLayoutDef } from "./layoutRegistry.js";
+import iconRegistry from "./iconRegistry.jsx";
 import { getBackgroundForIntent } from "./backgroundPatternRegistry.js";
 import { resolveColors } from "./colorContrastResolver.js";
 
@@ -24,14 +25,14 @@ function energyLevel(energy) {
    MOTION POOL
 ───────────────────────────────────────────────────────────── */
 const MOTIONS_BY_ENERGY = {
-  high:   ["kenburns", "cinematicPush", "droneRise", "microZoom"],
-  medium: ["kenburns", "pushSlow", "slowZoom", "parallax"],
-  low:    ["slowZoom", "microZoom", "pushSlow", "parallax"],
+  high:   ["cinematicPush", "droneRise", "microZoom"],
+  medium: ["pushSlow", "slowZoom", "microZoom"],
+  low:    ["slowZoom", "microZoom", "pushSlow"],
 };
 
 // motionStyle (from DNA) overrides energy-based pool
 const MOTIONS_BY_STYLE = {
-  kinetic: ["kenburns", "droneRise", "cinematicPush", "microZoom"],
+  kinetic: ["droneRise", "cinematicPush", "microZoom"],
   smooth:  ["slowZoom", "microZoom", "pushSlow", "parallax"],
   static:  ["parallax", "microZoom"],
 };
@@ -71,11 +72,9 @@ function pickStylePreset(energy) {
    Soft bias — only applied when ≥2 preferred candidates exist.
 ───────────────────────────────────────────────────────────── */
 const ROLE_PREFERRED = {
-  hook:     ["HeadlineReveal","DuoStackHook"],
   proof:    ["AssetWithList","SideBySide","FourCollage","DataRowsProof"],
   escalate: ["BuildingList","TitleThenAsset"],
   reveal:   ["ProductReveal"],
-  cta:      [],
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -113,14 +112,20 @@ function pickLayout({
   usedLayoutIds = [],   // all layouts used so far in this video
   hasImageHint = false,
   role = null,
+  niche = null,
 }) {
   const level = energyLevel(energy);
   const layoutIntent = AI_TO_LAYOUT_INTENT[intent] || intent;
 
-  // Try intent + energy + orientation
-  let candidates = findLayouts({ intent: layoutIntent, energy: level, orientation });
+  // Try intent + energy + orientation + niche
+  let candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, niche });
 
   // Relax energy if no match
+  if (!candidates.length) {
+    candidates = findLayouts({ intent: layoutIntent, orientation, niche });
+  }
+
+  // Relax niche if still no match
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, orientation });
   }
@@ -175,6 +180,8 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle }) {
   const stylePreset = pickStylePreset(energy);
   const zones = {};
 
+  const iconIds = Object.keys(iconRegistry);
+
   def.zones.forEach((zone, i) => {
     if (zone.type === "asset") {
       const motion = pickMotion(energy, beatIndex + i, lastMotion, motionStyle);
@@ -186,7 +193,7 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle }) {
             type: "image",
             objectFit: zone.style?.objectFit || "cover",
             motion,
-            enterTransition: "none", // LayoutRenderer handles timing
+            enterTransition: "none",
             exitTransition: "none",
           },
         },
@@ -200,10 +207,24 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle }) {
 
     if (zone.type === "text") {
       zones[zone.id] = {
-        content: {
-          kind: "text",
-          text: "", // AI fills this via script
-        },
+        content: { kind: "text", text: "" }, // AI fills this via generateZoneContent
+        style: { ...zone.style },
+      };
+    }
+
+    if (zone.type === "decorative") {
+      // Default to a circle shape; the editor / AI can override
+      zones[zone.id] = {
+        content: { shape: "circle" },
+        style: { ...zone.style },
+      };
+    }
+
+    if (zone.type === "icon") {
+      // Pick a random icon from the registry as a placeholder
+      const iconId = iconIds[(beatIndex + i) % iconIds.length];
+      zones[zone.id] = {
+        content: { iconId },
         style: { ...zone.style },
       };
     }
@@ -318,6 +339,7 @@ export function planBeatVisual({
   role                   = null,
   colorStory             = null,
   motionStyle            = null,
+  niche                  = null,
 }) {
   const layout = pickLayout({
     intent,
@@ -326,6 +348,7 @@ export function planBeatVisual({
     usedLayoutIds,
     hasImageHint,
     role,
+    niche,
   });
 
   const zones = buildZones({

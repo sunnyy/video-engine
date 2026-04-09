@@ -159,7 +159,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
       updateZone(slot, { type: "asset", content: { kind: "asset", asset: {
         src: data.asset.src, type: data.asset.type,
         objectFit:       existing.objectFit       || "cover",
-        motion:          existing.motion          || "kenburns",
+        motion:          existing.motion          || "none",
         enterTransition: existing.enterTransition || "none",
         exitTransition:  existing.exitTransition  || "none",
       }}});

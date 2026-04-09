@@ -462,6 +462,7 @@ export async function buildBeatsFromScript({
       hasImageHint, role,
       colorStory:  dna?.colorStory  || null,
       motionStyle: dna?.motionStyle || null,
+      niche:       dna?.niche       || null,
     });
 
     usedLayoutIds = [...usedLayoutIds, visual.layout];

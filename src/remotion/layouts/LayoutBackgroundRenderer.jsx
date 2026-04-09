@@ -112,19 +112,6 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
         );
         break;
 
-      case "kenburns":
-        transformParts.push(
-          `scale(${interpolate(frame,[0,beatFrames],[1.05,1.2])})`
-        );
-
-        transformParts.push(
-          `translateX(${interpolate(frame,[0,beatFrames],[0,-60])}px)`
-        );
-
-        transformParts.push(
-          `translateY(${interpolate(frame,[0,beatFrames],[0,-40])}px)`
-        );
-        break;
 
       case "parallax":
         transformParts.push(

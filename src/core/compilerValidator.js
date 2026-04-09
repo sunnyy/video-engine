@@ -40,7 +40,7 @@ export function validateBeats(beats) {
                     src: null,
                     type: "image",
                     objectFit: "cover",
-                    motion: "kenburns"
+                    motion: "none"
                   }
                 }
               };
@@ -59,7 +59,7 @@ export function validateBeats(beats) {
               src: null,
               type: "image",
               objectFit: "cover",
-              motion: "kenburns"
+              motion: "none"
             }
           }
         };

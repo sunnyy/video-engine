@@ -29,7 +29,7 @@ function findAssetZones(layoutId, zones) {
 }
 
 function chooseMotion(beatIndex, zoneIndex) {
-  const motions = ["kenburns", "pushSlow", "cinematicPush", "slowZoom", "pullSlow"];
+  const motions = ["none", "pushSlow", "cinematicPush", "slowZoom", "pullSlow"];
   return motions[(beatIndex + zoneIndex) % motions.length];
 }
 

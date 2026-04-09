@@ -69,7 +69,7 @@ function ToggleBtn({ active, onClick, children, title }) {
   );
 }
 
-function Slider({ label, value, onChangeSilent, onCommit, min = 0, max = 100, step = 1, unit = "", right }) {
+function Slider({ label, value, onChangeSilent, onCommit, onStart, min = 0, max = 100, step = 1, unit = "", right }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-[6px]">
@@ -80,6 +80,7 @@ function Slider({ label, value, onChangeSilent, onCommit, min = 0, max = 100, st
         </div>
       </div>
       <input type="range" min={min} max={max} step={step} value={value}
+        onPointerDown={onStart}
         onChange={e => onChangeSilent(Number(e.target.value))}
         onMouseUp={onCommit} onTouchEnd={onCommit}
         className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 4 }} />
@@ -141,13 +142,14 @@ function Section({ title, icon, children, defaultOpen = true, badge }) {
 }
 
 /* ── Rotation control with snap buttons ── */
-function RotationControl({ value, onChangeSilent, onCommit, label = "Rotation" }) {
+function RotationControl({ value, onChangeSilent, onCommit, onStart, label = "Rotation" }) {
   const snap = (deg) => {
+    onStart?.();
     const next = Math.max(-180, Math.min(180, value + deg));
     onChangeSilent(next);
     setTimeout(onCommit, 0);
   };
-  const reset = () => { onChangeSilent(0); setTimeout(onCommit, 0); };
+  const reset = () => { onStart?.(); onChangeSilent(0); setTimeout(onCommit, 0); };
   return (
     <div>
       <div className="flex justify-between items-center mb-[5px]">
@@ -168,6 +170,7 @@ function RotationControl({ value, onChangeSilent, onCommit, label = "Rotation" }
         </div>
       </div>
       <input type="range" min={-180} max={180} step={1} value={value}
+        onPointerDown={onStart}
         onChange={e => onChangeSilent(Number(e.target.value))}
         onMouseUp={onCommit} onTouchEnd={onCommit}
         className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 3 }} />
@@ -220,7 +223,8 @@ export default function ZoneEditor({
   patchZoneSilent, clearContent, clearBackground, onDelete,
   allZoneZIndices,
 }) {
-  const commitBeat = useProjectStore(s => s.commitBeat);
+  const commitBeat    = useProjectStore(s => s.commitBeat);
+  const pushHistory   = useProjectStore(s => s._pushHistory);
 
   const safeZone = zone || {};
   const content  = safeZone.content || {};
@@ -245,7 +249,29 @@ export default function ZoneEditor({
   const opacity = style.opacity ?? 1;
   const rotation = style.rotation ?? 0;
 
+  // Parse skewX/skewY from style.transform string (e.g. "skewX(10deg) skewY(-5deg)")
+  const parseSkew = (str, axis) => {
+    if (!str) return 0;
+    const m = str.match(new RegExp(`${axis}\\(([\\-\\d.]+)deg\\)`));
+    return m ? parseFloat(m[1]) : 0;
+  };
+  const skewX = parseSkew(style.transform, "skewX");
+  const skewY = parseSkew(style.transform, "skewY");
+  const buildTransform = (x, y) => {
+    const parts = [];
+    if (x !== 0) parts.push(`skewX(${x}deg)`);
+    if (y !== 0) parts.push(`skewY(${y}deg)`);
+    return parts.join(" ") || "";
+  };
+
   const commit = () => commitBeat(beatId);
+  // Save to DB only — no history push (use with onStart={pushHistory} pattern)
+  const commitSave = async () => {
+    const { updateProject } = await import("../../../src/services/projects/projectService");
+    const proj = useProjectStore.getState().project;
+    const dbId = useProjectStore.getState().databaseId;
+    if (proj && dbId) updateProject(dbId, proj);
+  };
   const setStyleSilent  = (key, val) => setZoneStyleSilent(slot, key, val);
   const setLayoutSilent = (key, val) => setZoneLayoutSilent(slot, key, val);
 
@@ -474,11 +500,21 @@ export default function ZoneEditor({
       <Section title="Transform" icon="⟳" defaultOpen={false}>
         <div className="mb-3">
           <RotationControl value={rotation}
-            onChangeSilent={v => setStyleSilent("rotation", v)} onCommit={commit} />
+            onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
         </div>
         <Slider label="Text Curve" value={style.textCurve ?? 0}
           onChangeSilent={v => setStyleSilent("textCurve", v)}
           onCommit={commit} min={-80} max={80} step={5} unit="°" />
+        <div className="mt-3">
+          <Slider label="Skew X" value={skewX}
+            onChangeSilent={v => setStyleSilent("transform", buildTransform(v, skewY))}
+            onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
+        </div>
+        <div className="mt-3">
+          <Slider label="Skew Y" value={skewY}
+            onChangeSilent={v => setStyleSilent("transform", buildTransform(skewX, v))}
+            onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
+        </div>
       </Section>
 
       {/* Background */}
@@ -531,27 +567,7 @@ export default function ZoneEditor({
         </div>
       </Section>
 
-      {/* Layer */}
-      <Section title="Layer" icon="⧉" defaultOpen={false}>
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono text-[#55556a]">z-index: {currentZIndex}</span>
-          <div className="flex gap-[4px] ml-auto">
-            {[
-              { label: "⤒", title: "Bring to Front", action: () => setZoneLayout(slot, "zIndex", maxZ + 1), disabled: isAtFront },
-              { label: "↑", title: "Move Forward",   action: () => setZoneLayout(slot, "zIndex", currentZIndex + 1), disabled: isAtFront },
-              { label: "↓", title: "Move Backward",  action: () => setZoneLayout(slot, "zIndex", Math.max(1, currentZIndex - 1)), disabled: isAtBack },
-              { label: "⤓", title: "Send to Back",   action: () => setZoneLayout(slot, "zIndex", Math.max(1, minZ - 1)), disabled: isAtBack },
-            ].map(({ label, title, action, disabled }) => (
-              <button key={title} onClick={action} disabled={disabled} title={title}
-                className="w-[32px] h-[32px] rounded-[6px] text-[14px] font-bold border flex items-center justify-center cursor-pointer transition-all"
-                style={disabled
-                  ? { background: "transparent", borderColor: "rgba(255,255,255,0.04)", color: "#2e2e45", cursor: "not-allowed" }
-                  : { background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)", color: "#9494a8" }}
-              >{label}</button>
-            ))}
-          </div>
-        </div>
-      </Section>
+      <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} />
 
       <div className="pt-4">
         <button onClick={onDelete}
@@ -749,11 +765,21 @@ export default function ZoneEditor({
         {/* Transform */}
         <Section title="Transform" icon="⟳" defaultOpen={false}>
           <div className="mb-3">
-            <RotationControl value={rotation} onChangeSilent={v => setStyleSilent("rotation", v)} onCommit={commit} />
+            <RotationControl value={rotation} onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
           </div>
-          <Slider label="Opacity" value={Math.round(opacity * 100)}
-            onChangeSilent={v => setStyleSilent("opacity", v / 100)}
-            onCommit={commit} min={0} max={100} unit="%" />
+          <Slider label="Skew X" value={skewX}
+            onChangeSilent={v => setStyleSilent("transform", buildTransform(v, skewY))}
+            onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
+          <div className="mt-3">
+            <Slider label="Skew Y" value={skewY}
+              onChangeSilent={v => setStyleSilent("transform", buildTransform(skewX, v))}
+              onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
+          </div>
+          <div className="mt-3">
+            <Slider label="Opacity" value={Math.round(opacity * 100)}
+              onChangeSilent={v => setStyleSilent("opacity", v / 100)}
+              onCommit={commit} min={0} max={100} unit="%" />
+          </div>
         </Section>
 
         {/* Gradient (shapes only) */}
@@ -974,6 +1000,21 @@ export default function ZoneEditor({
               )}
             </div>
           </div>
+        </div>
+      </Section>
+
+      {/* Transform */}
+      <Section title="Transform" icon="⟳" defaultOpen={false}>
+        <div className="mb-3">
+          <RotationControl value={rotation} onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
+        </div>
+        <Slider label="Skew X" value={skewX}
+          onChangeSilent={v => setStyleSilent("transform", buildTransform(v, skewY))}
+          onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
+        <div className="mt-3">
+          <Slider label="Skew Y" value={skewY}
+            onChangeSilent={v => setStyleSilent("transform", buildTransform(skewX, v))}
+            onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
         </div>
       </Section>
 

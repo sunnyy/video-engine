@@ -20,8 +20,8 @@ const INTENT_ENERGY_FALLBACK = {
 
 const MOTION_BY_ENERGY = {
   high:   ["cinematicPush", "pushSlow", "zoomIn"],
-  medium: ["kenburns",      "slowZoom", "pushSlow"],
-  low:    ["slowZoom",      "kenburns", "pullSlow"],
+  medium: ["slowZoom",      "pushSlow", "microZoom"],
+  low:    ["slowZoom",      "pullSlow", "microZoom"],
 };
 
 function resolveLayout({ intent, energy, orientation, lastLayout, previousLayout }) {

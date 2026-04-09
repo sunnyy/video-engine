@@ -479,7 +479,7 @@ export async function generateStructuredShort({
 
     const isLogo    = isEntity && /logo|icon/i.test(hint.search_query);
     const objectFit = isLogo ? "contain" : "cover";
-    const motion    = isLogo ? "none" : "kenburns";
+    const motion    = "none";
 
     try {
       // Tier 1 — entity beats: search for the official image (always runs)

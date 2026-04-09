@@ -78,11 +78,6 @@ export default function AssetRenderer({ zone, beat, slot }) {
         transformParts.push(`translateX(${interpolate(frame,[0,beatFrames],[motion.xStart||0,motion.xEnd||0])}px)`);
         transformParts.push(`translateY(${interpolate(frame,[0,beatFrames],[motion.yStart||0,motion.yEnd||0])}px)`);
         break;
-      case "kenburns":
-        transformParts.push(`scale(${interpolate(frame,[0,beatFrames],[1.05,1.2])})`);
-        transformParts.push(`translateX(${interpolate(frame,[0,beatFrames],[0,-60])}px)`);
-        transformParts.push(`translateY(${interpolate(frame,[0,beatFrames],[0,-40])}px)`);
-        break;
       case "parallax":
         transformParts.push(`translateX(${interpolate(frame,[0,beatFrames],[motion.xStart||0,motion.xEnd||0])}px)`);
         break;

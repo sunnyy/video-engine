@@ -231,7 +231,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
   const isDecorativeZone = zone.type === "decorative";
 
   const rotateStr        = rotation ? `rotate(${rotation}deg)` : "";
-  const containerTransform = [animStyle.transform, rotateStr].filter(Boolean).join(" ") || undefined;
+  const staticTransform  = st.transform || ""; // e.g. "skewY(-6deg)" from layout def
+  const containerTransform = [animStyle.transform, rotateStr, staticTransform].filter(Boolean).join(" ") || undefined;
+  const hasStaticTransform = !!staticTransform;
 
   const zoneContainerStyle = {
     position:        "absolute",
@@ -240,8 +242,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
     width:           `${zone.width ?? 100}%`,
     height:          isTextZone ? "auto" : `${zone.height ?? 100}%`,
     zIndex:          zone.zIndex ?? 1,
-    // overflow:visible lets rotated corners show outside the original bounding rect
-    overflow:        rotation || isTextZone || isDecorativeZone ? "visible" : "hidden",
+    // overflow:visible lets rotated/skewed corners show outside the original bounding rect
+    overflow:        rotation || hasStaticTransform || isTextZone || isDecorativeZone ? "visible" : "hidden",
     opacity:         (animStyle.opacity ?? 1) * (isDecorativeZone ? 1 : (st.opacity ?? 1)),
     transform:       containerTransform,
     transformOrigin: "center center",
@@ -487,7 +489,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
         })()}
 
         {/* Decorative shape or icon — SVG rendered inline */}
-        {zone.type === "decorative" && (() => {
+        {(zone.type === "decorative" || zone.type === "icon") && (() => {
           const iconId = zone.content?.iconId;
           const shape  = zone.content?.shape || "circle";
           const instanceId = zone.id.replace(/[^a-z0-9]/gi, "_");

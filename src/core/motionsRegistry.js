@@ -42,24 +42,6 @@ export const motionsRegistry = {
     scaleEnd: 1.1,
   }),
 
-  /* ── KEN BURNS — scale + gentle pan, stays in bounds ── */
-
-  kenburns: () => ({
-    type: "kenburns",
-    scaleStart: 1.1,
-    scaleEnd: 1.28,
-    panX: -40,   // reduced from -80 to stay in bounds
-    panY: -20,   // reduced from -40
-  }),
-
-  kenburnsReverse: () => ({
-    type: "kenburnsReverse",
-    scaleStart: 1.28,
-    scaleEnd: 1.1,
-    panX: 40,
-    panY: 20,
-  }),
-
   /* ── DRONE RISE — vertical only, stays in bounds ── */
 
   droneRise: () => ({

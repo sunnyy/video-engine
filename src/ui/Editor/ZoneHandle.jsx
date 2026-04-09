@@ -43,6 +43,7 @@ export default function ZoneHandle({
   const pxW      = (zone.width  / 100) * canvasWidth;
   const pxH      = (zone.height / 100) * canvasHeight;
   const rotation = zone.style?.rotation ?? 0;
+  const staticTransform = zone.style?.transform || "";
 
   const isMulti = selectedZoneIds && selectedZoneIds.size > 1 && selectedZoneIds.has(zone.id);
 
@@ -52,6 +53,8 @@ export default function ZoneHandle({
     if (e.target.dataset.rotate) return;
     e.stopPropagation();
     e.preventDefault();
+    // Return focus to canvas so Ctrl+Z fires our undo, not a native input undo
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 
     dragMoved.current = false;
 
@@ -107,7 +110,14 @@ export default function ZoneHandle({
     const onUp = (ue) => {
       ue.stopPropagation();
       if (!dragMoved.current) {
-        onSelect(zone.id, ue.shiftKey || ue.metaKey || ue.ctrlKey);
+        const additive = ue.shiftKey || ue.metaKey || ue.ctrlKey;
+        // Pure click on an already-selected zone (no modifier) → deselect,
+        // so the next click can reach a zone underneath.
+        if (isSelected && !additive && !isMulti) {
+          onSelect(null, false);
+        } else {
+          onSelect(zone.id, additive);
+        }
       } else {
         onSave(zone.id);
       }
@@ -119,12 +129,13 @@ export default function ZoneHandle({
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp, true);
-  }, [zone, canvasWidth, canvasHeight, isMulti, selectedZoneIds, allZones, onSelect, onUpdate, onUpdateMulti, onPushHistory, onSave]);
+  }, [zone, isSelected, canvasWidth, canvasHeight, isMulti, selectedZoneIds, allZones, onSelect, onUpdate, onUpdateMulti, onPushHistory, onSave]);
 
   /* ── Resize (single only) ── */
   const onResizeDown = useCallback((e, handleId) => {
     e.stopPropagation();
     e.preventDefault();
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     onPushHistory();
     const origFontSize = zone.type === "text" ? parseFloat(zone.style?.fontSize ?? 0) : 0;
     resizeStart.current = {
@@ -154,8 +165,8 @@ export default function ZoneHandle({
 
       // Shift on a corner handle: lock aspect ratio by using whichever axis moved more
       if (lockRatio) {
-        const absDx = Math.abs(localDxPx);
-        const absDy = Math.abs(localDyPx);
+        const absDx = Math.abs(me.clientX - mouseX);
+        const absDy = Math.abs(me.clientY - mouseY);
         if (absDx >= absDy) {
           h = w / aspectRatio;
           if (handle.includes("n")) y = origY + (origH - h);
@@ -172,7 +183,7 @@ export default function ZoneHandle({
       // Scale font size proportionally when height changes
       if (zone.type === "text" && origFontSize > 0 && (handle.includes("n") || handle.includes("s"))) {
         const newFontSize = Math.max(8, Math.round(origFontSize * (h / origH)));
-        update.style = { ...(zone.style || {}), fontSize: newFontSize };
+        update.style = { fontSize: newFontSize };
       }
       onUpdate(zone.id, update);
     };
@@ -192,6 +203,7 @@ export default function ZoneHandle({
   const onRotateDown = useCallback((e) => {
     e.stopPropagation();
     e.preventDefault();
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     onPushHistory();
 
     const centerX  = pxX + pxW / 2;
@@ -209,7 +221,7 @@ export default function ZoneHandle({
       let newRot  = Math.round(origRotation + (angle - startAngle));
       const snaps = [0, 90, 180, 270, -90, -180, -270, 360, -360];
       for (const s of snaps) { if (Math.abs(newRot - s) < 5) { newRot = s; break; } }
-      onUpdate(zone.id, { style: { ...(zone.style || {}), rotation: newRot } });
+      onUpdate(zone.id, { style: { rotation: newRot } });
     };
 
     const onUp = () => {
@@ -253,7 +265,7 @@ export default function ZoneHandle({
       {/* Visual outline — no pointer events, purely decorative */}
       <div style={{
         position:        "absolute", inset: 0,
-        transform:       rotation ? `rotate(${rotation}deg)` : undefined,
+        transform:       [rotation ? `rotate(${rotation}deg)` : "", staticTransform].filter(Boolean).join(" ") || undefined,
         transformOrigin: "center center",
         outline:         `1.5px solid ${outlineColor}`,
         outlineOffset:   "-1px",
@@ -262,19 +274,10 @@ export default function ZoneHandle({
         pointerEvents:   "none",
       }} />
 
-      {/* Hit area:
-          - Unselected: full zone is clickable (to select it)
-          - Selected: only the 10px border strip is interactive (interior clicks pass through to zones below) */}
-      {!isSelected ? (
-        <div onMouseDown={onMouseDown} style={{ position: "absolute", inset: 0, pointerEvents: "auto", cursor: "grab" }} />
-      ) : (
-        <>
-          <div onMouseDown={onMouseDown} style={{ position: "absolute", top: 0,    left: 0, right: 0,  height: 10, pointerEvents: "auto", cursor: "grab" }} />
-          <div onMouseDown={onMouseDown} style={{ position: "absolute", bottom: 0, left: 0, right: 0,  height: 10, pointerEvents: "auto", cursor: "grab" }} />
-          <div onMouseDown={onMouseDown} style={{ position: "absolute", top: 0,    left: 0, bottom: 0, width:  10, pointerEvents: "auto", cursor: "grab" }} />
-          <div onMouseDown={onMouseDown} style={{ position: "absolute", top: 0,    right: 0,bottom: 0, width:  10, pointerEvents: "auto", cursor: "grab" }} />
-        </>
-      )}
+      {/* Hit area — always full zone, behind handles (zIndex: 1).
+          Drag  → moves the zone.
+          Click (no drag) → selects if unselected; deselects if already selected. */}
+      <div onMouseDown={onMouseDown} style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "auto", cursor: isSelected ? "grab" : "default" }} />
 
       {/* Label */}
       {isVisible && (
@@ -300,7 +303,7 @@ export default function ZoneHandle({
             left: `calc(${h.x * 100}% - ${HANDLE_SIZE / 2}px)`,
             top:  `calc(${h.y * 100}% - ${HANDLE_SIZE / 2}px)`,
             background: "#7c5cfc", border: "1.5px solid #fff",
-            borderRadius: 2, cursor: h.cursor, zIndex: 9999,
+            borderRadius: 2, cursor: h.cursor, zIndex: 9999, pointerEvents: "auto",
           }}
         />
       ))}
@@ -315,7 +318,7 @@ export default function ZoneHandle({
             position: "absolute", right: -18, bottom: -18,
             width: 20, height: 20, borderRadius: "50%",
             background: "#1a1a2e", border: "1.5px solid #7c5cfc",
-            cursor: "crosshair", zIndex: 9999,
+            cursor: "crosshair", zIndex: 9999, pointerEvents: "auto",
             display: "flex", alignItems: "center", justifyContent: "center",
             userSelect: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
           }}
