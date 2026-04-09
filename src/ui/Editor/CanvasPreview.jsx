@@ -237,7 +237,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   }, [togglePlayPause, undo, redo, updateBeatSilent]);
 
   return (
-    <div className="w-full bg-[#111118] border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
+    <div className="w-full bg-black border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0">
@@ -247,7 +247,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         {selectedZoneIds?.size > 1 && (
           <span className="text-[10px] font-mono text-[#7c5cfc]">{selectedZoneIds.size} selected</span>
         )}
-        <div className="ml-auto flex items-center gap-1 text-[10px] text-[#55556a] font-mono">
+        <div className="ml-auto flex items-center gap-1 text-[12px] text-[#777] font-mono">
           <span>Space ▶/⏸</span>
           <span className="mx-1 opacity-30">·</span>
           <span>⌘Z undo</span>
@@ -278,7 +278,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
                 key={`thumb-${videoW}x${videoH}`}
                 acknowledgeRemotionLicense
                 component={VideoComposition}
-                inputProps={{ project }}
+                inputProps={{ project, previewMode: true }}
                 frameToDisplay={(() => {
                   // After pausing: show exactly where the player stopped
                   if (pausedFrame !== null) return pausedFrame;

@@ -12,7 +12,7 @@ function ScopeBadge({ scope }) {
         : { background: "rgba(0,0,0,0.55)", color: "#aaa" }
       }
     >
-      {scope === "global" ? "G" : "P"}
+      {scope === "global" ? "L" : "P"}
     </span>
   );
 }

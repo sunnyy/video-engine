@@ -54,34 +54,7 @@ const assetShineRegistry = {
     },
   },
 
-  // 3 — Bright oval lens flare blob drifting from top-left to bottom-right
-  flare: {
-    label: "Lens Flare",
-    durationFrames: 35,
-    render(frame, dur, interpolate) {
-      if (frame > dur) return null;
-      const x     = interpolate(frame, [0, dur], [-10, 110], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-      const y     = interpolate(frame, [0, dur], [10,  70],  { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-      const fade  = frame > dur * 0.75 ? interpolate(frame, [dur * 0.75, dur], [1, 0], { extrapolateRight: "clamp" }) : 1;
-      const enter = frame < 6 ? interpolate(frame, [0, 6], [0, 1], { extrapolateLeft: "clamp" }) : 1;
-      return (
-        <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 5, opacity: fade * enter }}>
-          <div style={{
-            position:         "absolute",
-            left:             `${x}%`, top: `${y}%`,
-            width:            "60%", height: "30%",
-            transform:        "translate(-50%, -50%)",
-            borderRadius:     "50%",
-            background:       "radial-gradient(ellipse, rgba(255,255,240,0.65) 0%, rgba(255,220,120,0.2) 50%, transparent 75%)",
-            filter:           "blur(4px)",
-            mixBlendMode:     "screen",
-          }} />
-        </div>
-      );
-    },
-  },
-
-  // 4 — Horizontal scan line sweeping top → bottom
+  // 3 — Horizontal scan line sweeping top → bottom
   scan: {
     label: "Scan",
     durationFrames: 32,
@@ -102,46 +75,7 @@ const assetShineRegistry = {
     },
   },
 
-  // 5 — Small glinting sparkle that travels diagonally across the frame
-  glint: {
-    label: "Glint",
-    durationFrames: 28,
-    render(frame, dur, interpolate) {
-      if (frame > dur) return null;
-      const x     = interpolate(frame, [0, dur], [0, 100],  { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-      const y     = interpolate(frame, [0, dur], [20, 80],  { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-      const scale = frame < 8
-        ? interpolate(frame, [0, 8], [0, 1], { extrapolateLeft: "clamp" })
-        : frame > dur - 6
-          ? interpolate(frame, [dur - 6, dur], [1, 0], { extrapolateRight: "clamp" })
-          : 1;
-      return (
-        <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 5 }}>
-          {/* Main sparkle */}
-          <div style={{
-            position:     "absolute",
-            left:         `${x}%`, top: `${y}%`,
-            width:        24, height: 24,
-            transform:    `translate(-50%, -50%) scale(${scale})`,
-            borderRadius: "50%",
-            background:   "radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,200,0.5) 50%, transparent 70%)",
-            filter:       "blur(1px)",
-          }} />
-          {/* Trailing tail */}
-          <div style={{
-            position:   "absolute",
-            left:       `${x - 8}%`, top: `${y}%`,
-            width:      "10%", height: 3,
-            transform:  `translate(0, -50%) scaleX(${scale})`,
-            background: "linear-gradient(to right, transparent, rgba(255,255,255,0.5))",
-            transformOrigin: "right center",
-          }} />
-        </div>
-      );
-    },
-  },
-
-  // 6 — Warm fiery sweep top → bottom (like a burning reveal)
+  // 5 — Warm fiery sweep top → bottom (like a burning reveal)
   burn: {
     label: "Burn",
     durationFrames: 38,
@@ -286,4 +220,4 @@ export const ASSET_SHINE_OPTIONS = Object.entries(assetShineRegistry).map(([key,
 }));
 
 /** Subset for AI pipeline auto-assignment */
-export const PIPELINE_SHINE_EFFECTS = ["shine", "flash", "flare", "scan", "glint", "streak", "anamorphic"];
+export const PIPELINE_SHINE_EFFECTS = ["shine", "flash", "scan", "streak", "anamorphic"];

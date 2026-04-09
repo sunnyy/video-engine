@@ -45,9 +45,9 @@ export default [
     assetCount: 1, textCount: 2,
     captionStrategy: "never",
     zones: [
-      { id:"z1", type:"text", role:"headline", maxChars:28, order:1, x:4, y:6, width:92, height:32, zIndex:3, start:0, end:null,
+      { id:"z1", type:"text", role:"headline", maxChars:28, order:1, x:4, y:6, width:92, height:12, zIndex:3, start:0, end:null,
         enterAnimation:"slideDownIn", exitAnimation:"none",
-        style:{ fontSize:104, fontWeight:900, color:"#ffffff", textAlign:"center", lineHeight:1.0, letterSpacing:"-2px" } },
+        style:{ fontSize:100, fontWeight:900, color:"#ffffff", textAlign:"center", lineHeight:1.0, letterSpacing:"-2px" } },
       { id:"z2", type:"asset", role:"hero_image", order:1, x:3, y:40, width:94, height:48, zIndex:1, start:0.5, end:null,
         enterAnimation:"scaleIn", exitAnimation:"none", style:{ objectFit:"cover", borderRadius:16 } },
       { id:"z3", type:"text", role:"subtext", maxChars:40, order:2, x:4, y:90, width:92, height:8, zIndex:3, start:0.8, end:null,

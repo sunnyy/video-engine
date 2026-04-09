@@ -43,7 +43,7 @@ function loadCaptionFonts() {
 
 }
 
-export default function VideoComposition({ project }) {
+export default function VideoComposition({ project, previewMode = false }) {
 
   if (!project) return null;
 
@@ -226,7 +226,7 @@ export default function VideoComposition({ project }) {
             durationInFrames={durationFrames}
           >
             <AbsoluteFill style={{ ...style, zIndex: 2 }}>
-              <BeatRenderer beat={beat} project={project} />
+              <BeatRenderer beat={beat} project={project} previewMode={previewMode} />
             </AbsoluteFill>
           </Sequence>
         );

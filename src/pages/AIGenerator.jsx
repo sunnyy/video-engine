@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { generateStructuredShort } from "../services/ai/generateStructuredShort";
 import { buildSafeProject } from "../normalize/normalizeProject";
-import { createProject } from "../services/projects/projectService";
+import { createProject, updateProject, deleteProject } from "../services/projects/projectService";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 
 /* ── Options ──────────────────────────────────────────────── */
@@ -158,6 +158,18 @@ export default function AIGenerator() {
     setError("");
     setLoading(true);
     try {
+      // Create the project row first so we have an ID to tag uploaded assets with
+      const placeholder = buildSafeProject({
+        meta: { orientation, mode, videoType, language, brand_color: brandColor.trim() || null, audience, tone },
+        script: { text: "", emotionalArc: [] },
+        dna: null,
+        audio: { tts: null, music: null },
+        beats: [],
+        workflow: { script_completed: false, avatar_completed: false, beats_initialized: false },
+      });
+      const saved = await createProject({ name: topic.slice(0, 60), rawAI: null, safeProject: placeholder });
+      const projectId = saved.id;
+
       const aiResult = await generateStructuredShort({
         topic,
         context,
@@ -172,6 +184,7 @@ export default function AIGenerator() {
         brandColor: brandColor.trim() || null,
         audience,
         tone,
+        projectId,
         onProgress: () => {},
       });
 
@@ -192,11 +205,15 @@ export default function AIGenerator() {
         workflow: { script_completed: true, avatar_completed: false, beats_initialized: true },
       });
 
-      const saved = await createProject({ name: topic.slice(0, 60), rawAI: aiResult, safeProject });
-      navigate(`/editor/${saved.id}`);
+      await updateProject(projectId, safeProject);
+      navigate(`/editor/${projectId}`);
     } catch (err) {
       console.error(err);
       setError(err.message || "Generation failed. Please try again.");
+      // Clean up the placeholder project if generation failed
+      if (typeof projectId !== "undefined") {
+        deleteProject(projectId).catch(() => {});
+      }
     }
     setLoading(false);
   };

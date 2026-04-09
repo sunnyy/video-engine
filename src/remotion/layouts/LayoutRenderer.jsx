@@ -21,6 +21,8 @@ import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry"
 import textEffectRegistry from "../../core/textEffectRegistry.jsx";
 import animatedBorderRegistry from "../../core/animatedBorderRegistry.js";
 import assetShineRegistry     from "../../core/assetShineRegistry.jsx";
+import { renderDecorativeSVG, getClipPathCSS, getSVGClipContent } from "../../core/decorativeShapeRegistry.js";
+import { renderIconSVG } from "../../core/iconRegistry.jsx";
 
 function resolveEnterStyle(animation, progress, W, H) {
   switch (animation) {
@@ -188,16 +190,17 @@ function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidt
 const ENTER_DUR = { fadeIn:18, slideUpIn:16, slideDownIn:16, slideLeftIn:16, slideRightIn:16, popIn:14, scaleIn:18, none:0 };
 const EXIT_DUR  = { fadeOut:14, slideUpOut:14, slideDownOut:14, scaleOut:14, none:0 };
 
-function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
+function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = false }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const startFrame = Math.round((zone.start ?? 0) * fps);
   const endFrame   = zone.end != null ? Math.round(zone.end * fps) : Math.round(beatDurationSec * fps);
 
-  if (frame < startFrame || frame >= endFrame) return null;
+  // In preview mode: always show every zone at full opacity with no animation
+  if (!previewMode && (frame < startFrame || frame >= endFrame)) return null;
 
-  const local    = frame - startFrame;
+  const local    = previewMode ? endFrame - 1 : frame - startFrame;
   const totalDur = endFrame - startFrame;
 
   const enterDur  = ENTER_DUR[zone.enterAnimation] || 0;
@@ -209,7 +212,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
   const exitProg  = exitDur > 0 && local >= exitStart ? interpolate(local,[exitStart,totalDur],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"}) : 0;
   const exitSt    = exitProg > 0 ? resolveExitStyle(zone.exitAnimation, exitProg, W, H) : {};
 
-  const animStyle = exitProg > 0 ? { ...enterSt, ...exitSt } : enterSt;
+  const animStyle = previewMode ? { opacity: 1 } : (exitProg > 0 ? { ...enterSt, ...exitSt } : enterSt);
 
   const content = zone.content    || {};
   const st      = zone.style      || {};
@@ -224,6 +227,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
 
   // Zone container — position only, no rotation, no transform (enter/exit handled below)
   const isTextZone = zone.type === "text";
+  const isDecorativeZone = zone.type === "decorative";
   const zoneContainerStyle = {
     position:       "absolute",
     left:           `${zone.x     ?? 0}%`,
@@ -233,7 +237,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
     zIndex:         zone.zIndex ?? 1,
     overflow:       isTextZone ? "visible" : "hidden",
     overflowX:      isTextZone ? "hidden"  : undefined,
-    opacity:        (animStyle.opacity ?? 1) * (st.opacity ?? 1),
+    opacity:        (animStyle.opacity ?? 1) * (isDecorativeZone ? 1 : (st.opacity ?? 1)),
     transform:      animStyle.transform || undefined,
     // Vertical centering for text zones
     display:        isTextZone ? "flex"   : undefined,
@@ -321,6 +325,32 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
             </>
           );
 
+          // Clip-path masking — shape-masked asset
+          if (st.clipShape) {
+            const clipId   = `clip_${zone.id.replace(/[^a-z0-9]/gi, "_")}`;
+            const cssClip  = getClipPathCSS(st.clipShape);
+            const svgClip  = !cssClip ? getSVGClipContent(st.clipShape) : null;
+            const clipStyle = cssClip
+              ? { ...insetBoxStyle, clipPath: cssClip }
+              : insetBoxStyle;
+            return (
+              <>
+                {svgClip && (
+                  <svg width="0" height="0" style={{ position: "absolute" }}>
+                    <defs>
+                      <clipPath id={clipId} clipPathUnits="objectBoundingBox">
+                        <g dangerouslySetInnerHTML={{ __html: svgClip }} />
+                      </clipPath>
+                    </defs>
+                  </svg>
+                )}
+                <div style={{ ...clipStyle, clipPath: svgClip ? `url(#${clipId})` : clipStyle.clipPath }}>
+                  {inner}
+                </div>
+              </>
+            );
+          }
+
           if (st.animatedBorder) {
             return (
               <AnimatedBorderFrame
@@ -380,39 +410,104 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
           <AvatarLayer beat={beat} project={project} />
         )}
 
-        {/* Text — with optional text effects */}
+        {/* Text — with optional text effects (suppressed in previewMode) */}
         {zone.type === "text" && (() => {
           const text        = content.text || "";
-          const textEffect  = st.textEffect || "none";
+          const textEffect  = previewMode ? "none" : (st.textEffect || "none");
           const effectSpeed = st.textEffectSpeed ?? 1.0;
 
           const baseStyle = {
-            position:      "relative",
-            display:       "block",
-            width:         "100%",
-            padding:       st.padding       || "0 8px",
-            boxSizing:     "border-box",
-            fontSize:      st.fontSize      || 32,
-            fontWeight:    st.fontWeight    || 700,
-            fontFamily:    st.fontFamily    || "inherit",
-            color:         st.color         || "#ffffff",
-            textAlign:     st.textAlign     || "center",
-            textShadow:    st.textShadow    || "none",
-            lineHeight:    st.lineHeight    || 1.15,
-            letterSpacing: st.letterSpacing || "normal",
-            opacity:       st.opacity       ?? 1,
-            background:    st.background    || "transparent",
-            borderRadius:  st.borderRadius  || 0,
-            whiteSpace:    "normal",
-            overflowWrap:  "break-word",
-            wordBreak:     "break-word",
+            position:        "relative",
+            display:         "block",
+            width:           "100%",
+            padding:         st.padding       || "0 8px",
+            boxSizing:       "border-box",
+            fontSize:        st.fontSize      || 32,
+            fontWeight:      st.fontWeight    || 700,
+            fontFamily:      st.fontFamily    || "inherit",
+            fontStyle:       st.fontStyle     || "normal",
+            textDecoration:  st.textDecoration || "none",
+            color:           st.color         || "#ffffff",
+            textAlign:       st.textAlign     || "center",
+            textShadow:      st.textShadow    || "none",
+            lineHeight:      st.lineHeight    || 1.15,
+            letterSpacing:   st.letterSpacing || "normal",
+            opacity:         st.opacity       ?? 1,
+            background:      st.background    || "transparent",
+            borderRadius:    st.borderRadius  || 0,
+            whiteSpace:      "normal",
+            overflowWrap:    "break-word",
+            wordBreak:       "break-word",
+            WebkitTextStroke: st.textStrokeWidth > 0
+              ? `${st.textStrokeWidth}px ${st.textStrokeColor || "#000000"}`
+              : undefined,
           };
+
+          // Curved text — SVG textPath (bypasses text effects)
+          if (st.textCurve) {
+            const angle  = Math.min(Math.abs(st.textCurve), 80) * Math.PI / 180;
+            const Wp     = 1000;
+            const r      = Wp / 2 / Math.sin(angle / 2);
+            const sagitta = r * (1 - Math.cos(angle / 2));
+            const isUp   = st.textCurve > 0;
+            const baseY  = isUp ? (sagitta + 4) : 4;
+            const d      = isUp
+              ? `M 0,${baseY.toFixed(1)} A ${r.toFixed(1)},${r.toFixed(1)} 0 0,0 ${Wp},${baseY.toFixed(1)}`
+              : `M 0,${baseY.toFixed(1)} A ${r.toFixed(1)},${r.toFixed(1)} 0 0,1 ${Wp},${baseY.toFixed(1)}`;
+            const fs     = parseFloat(st.fontSize || 32);
+            const viewH  = Math.ceil(sagitta + fs * 1.6 + 8);
+            const pathId = `tc_${zone.id.replace(/[^a-z0-9]/gi, "_")}`;
+            return (
+              <svg viewBox={`0 0 ${Wp} ${viewH}`} width="100%" height="100%"
+                style={{ overflow: "visible", opacity: baseStyle.opacity }}>
+                <defs><path id={pathId} d={d} /></defs>
+                <text
+                  fontSize={baseStyle.fontSize}
+                  fontFamily={baseStyle.fontFamily}
+                  fontWeight={baseStyle.fontWeight}
+                  fontStyle={baseStyle.fontStyle}
+                  fill={baseStyle.color}
+                  letterSpacing={st.letterSpacing || undefined}
+                >
+                  <textPath href={`#${pathId}`} startOffset="50%" textAnchor="middle">
+                    {text}
+                  </textPath>
+                </text>
+              </svg>
+            );
+          }
 
           const effectEntry = textEffectRegistry[textEffect];
           if (effectEntry) {
             return effectEntry.render(text, local, totalDur, baseStyle, effectSpeed, interpolate);
           }
           return <div style={baseStyle}>{text}</div>;
+        })()}
+
+        {/* Decorative shape or icon — SVG rendered inline */}
+        {zone.type === "decorative" && (() => {
+          const iconId = zone.content?.iconId;
+          const shape  = zone.content?.shape || "circle";
+          const instanceId = zone.id.replace(/[^a-z0-9]/gi, "_");
+          const svg = iconId
+            ? renderIconSVG(iconId, st)
+            : renderDecorativeSVG(shape, st, instanceId);
+          if (!svg) return null;
+          const rot = st.rotation ?? 0;
+          return (
+            <div style={{
+              position: "absolute", inset: 0, overflow: "visible",
+              transform: rot ? `rotate(${rot}deg)` : undefined,
+              transformOrigin: "center center",
+            }}>
+              <svg
+                viewBox={svg.viewBox}
+                width="100%" height="100%"
+                style={{ display: "block", overflow: "visible", opacity: st.opacity ?? 1 }}
+                dangerouslySetInnerHTML={{ __html: svg.content }}
+              />
+            </div>
+          );
         })()}
 
         {/* Block — check content.kind, not zone.type (layout zones keep type:"asset" even when block content is set) */}
@@ -445,7 +540,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec }) {
   );
 }
 
-export default function LayoutRenderer({ beat, project, layoutDef }) {
+export default function LayoutRenderer({ beat, project, layoutDef, previewMode = false }) {
   const { width: W, height: H } = useVideoConfig();
   if (!layoutDef) return null;
 
@@ -507,7 +602,7 @@ export default function LayoutRenderer({ beat, project, layoutDef }) {
       {/* Zone content — inset by layoutPadding */}
       <div style={{ position:"absolute", inset: pad, overflow:"hidden" }}>
         {contentZones.map(zone => (
-          <ZoneLayer key={zone.id} zone={zone} beat={beat} project={project} W={W - pad * 2} H={H - pad * 2} beatDurationSec={beatDurationSec} />
+          <ZoneLayer key={zone.id} zone={zone} beat={beat} project={project} W={W - pad * 2} H={H - pad * 2} beatDurationSec={beatDurationSec} previewMode={previewMode} />
         ))}
       </div>
       {/* Composition frame + decorative layers (above zone content) */}

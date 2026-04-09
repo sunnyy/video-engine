@@ -5,7 +5,7 @@
  * File manager panel: Global assets (cross-project) + Project-specific assets.
  * Upload, preview, delete. Audio shown as list rows, images/videos as grid.
  */
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAssetsStore }   from "../../store/useAssetsStore";
 import { useProjectStore }  from "../../store/useProjectStore";
 import { uploadUserAsset }  from "../../services/assets/uploadUserAsset";
@@ -172,26 +172,20 @@ export default function FilesSection() {
   const fileInputRef = useRef();
 
   const databaseId = useProjectStore(s => s.databaseId);
-  const { myAssets, loadMyAssets, reloadMyAssets, addMyAsset, removeMyAsset } = useAssetsStore();
+  const { myAssets, loadMyAssets, addMyAsset, removeMyAsset } = useAssetsStore();
 
-  // Reload assets when project changes
-  const prevProject = useRef(null);
+  // Load assets the first time this tab is opened (or when the project changes).
+  // The store guards against re-fetching if already loaded for this project this session.
   useEffect(() => {
-    if (prevProject.current !== databaseId) {
-      prevProject.current = databaseId;
-      reloadMyAssets();
-    } else {
-      loadMyAssets();
-    }
+    if (databaseId) loadMyAssets(databaseId);
   }, [databaseId]);
 
   const filtered = myAssets.filter(a => {
     if (scope === "global") {
       if (a.scope !== "global") return false;
     } else {
-      // "This Project": show assets explicitly tied to this project OR unassigned (project_id = null)
       if (a.scope === "global") return false;
-      if (a.project_id !== null && a.project_id !== databaseId) return false;
+      if (a.project_id !== databaseId) return false;
     }
     if (typeFilter === "Image") return a.type === "image";
     if (typeFilter === "Video") return a.type === "video";
@@ -277,7 +271,7 @@ export default function FilesSection() {
       <div className="flex gap-[6px] p-[4px] rounded-[8px] bg-[#111118]">
         {[
           { key: "project", label: "This Project" },
-          { key: "global",  label: "Global"       },
+          { key: "global",  label: "My Library"   },
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -317,7 +311,7 @@ export default function FilesSection() {
           <p className="text-[13px] text-[#55556a] text-center">
             No {typeFilter !== "All" ? typeFilter.toLowerCase() + " " : ""}files here.<br />
             {scope === "global"
-              ? "Upload global assets to use them across all projects."
+              ? "Upload to My Library to reuse assets across all projects."
               : "Upload assets for this project."}
           </p>
         </div>
@@ -357,7 +351,7 @@ export default function FilesSection() {
       {/* Footer */}
       <div className="mt-auto pt-4 border-t border-[rgba(255,255,255,0.06)]">
         <p className="text-[11px] text-[#55556a] leading-relaxed">
-          Global assets are available across all projects.
+          My Library assets are available across all projects.
           Project assets are tied to this project only.
         </p>
       </div>

@@ -43,21 +43,35 @@ export async function uploadUserAsset(
     else assetType = "image";
   }
 
+  const row = {
+    user_id:   user.id,
+    url:       publicUrl,
+    file_path: filePath,
+    type:      assetType,
+    name:      file.name,
+    size:      file.size,
+    scope,
+    project_id: scope === "project" ? (projectId || null) : null,
+  };
+
   const { data, error } = await supabase
     .from("user_assets")
-    .insert({
-      user_id:    user.id,
-      url:        publicUrl,
-      file_path:  filePath,
-      type:       assetType,
-      name:       file.name,
-      size:       file.size,
-      scope,
-      project_id: scope === "project" ? (projectId || null) : null,
-    })
+    .insert(row)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // If project_id column doesn't exist yet, retry without it
+    if (error.message?.includes("project_id")) {
+      const { data: data2, error: err2 } = await supabase
+        .from("user_assets")
+        .insert({ ...row, project_id: undefined })
+        .select()
+        .single();
+      if (err2) throw err2;
+      return data2;
+    }
+    throw error;
+  }
   return data;
 }

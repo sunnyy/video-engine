@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useProjectStore } from "../../store/useProjectStore";
 import { getUserProjects, renameProject } from "../../services/projects/projectService";
 import validateProject from "../../core/validateProject";
+import SystemMessage from "./SystemMessage";
 
 export default function Header() {
   const navigate          = useNavigate();
@@ -118,6 +119,8 @@ export default function Header() {
             style={{ fontFamily:"'Syne',sans-serif" }}>VE</div>
         </div>
 
+        
+
         {/* Project name + dropdown */}
         <div ref={dropdownRef} className="relative">
           {renaming ? (
@@ -178,6 +181,8 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      <SystemMessage />
 
       {/* Right — controls */}
       <div className="flex items-center gap-3">

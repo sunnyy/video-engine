@@ -6,7 +6,6 @@ import { getProjectById } from "../services/projects/projectService";
 import Header from "../ui/Editor/Header";
 import Sidebar from "../ui/Editor/Sidebar";
 import BeatList from "../ui/Editor/BeatList";
-import SystemMessage from "../ui/Editor/SystemMessage";
 import EditorPanel from "../ui/Editor/EditorPanel";
 import CanvasPreview from "../ui/Editor/CanvasPreview";
 
@@ -78,13 +77,13 @@ export default function Editor() {
 
   // Widen canvas column for landscape so the 16:9 preview has enough height
   const cols = is169
-    ? { sidebar: "5%", beatList: "13%", canvas: "44%", panel: "38%" }
-    : { sidebar: "7%", beatList: "18%", canvas: "35%", panel: "40%" };
+    ? { sidebar: "5%", beatList: "15%", canvas: "50%", panel: "30%" }
+    : { sidebar: "7%", beatList: "18%", canvas: "45%", panel: "30%" };
 
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
-      <SystemMessage />
+      
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div style={{ width: cols.sidebar }}>
           <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />

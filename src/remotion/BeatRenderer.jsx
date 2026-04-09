@@ -15,7 +15,7 @@ import GrainOverlay from "./effects/GrainOverlay";
 import VignetteLayer from "./effects/VignetteLayer";
 import { getLayoutDef } from "../core/layoutRegistry.js";
 
-export default function BeatRenderer({ beat, project }) {
+export default function BeatRenderer({ beat, project, previewMode = false }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -61,6 +61,7 @@ export default function BeatRenderer({ beat, project }) {
         beat={beat}
         project={project}
         layoutDef={layoutDef}
+        previewMode={previewMode}
       />
 
       <OverlayRenderer overlays={overlays} />

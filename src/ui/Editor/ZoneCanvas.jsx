@@ -6,6 +6,8 @@ import { memo, useCallback, useRef } from "react";
 import { useProjectStore } from "../../../src/store/useProjectStore";
 import { getLayoutDef } from "../../../src/core/layoutRegistry";
 import { elementsRegistry } from "../../../src/core/elementsRegistry";
+import { renderDecorativeSVG, getClipPathCSS } from "../../../src/core/decorativeShapeRegistry.js";
+import { renderIconSVG } from "../../../src/core/iconRegistry.jsx";
 import CompositionLayerRenderer from "../../../src/remotion/elements/composition/CompositionLayerRenderer";
 import ZoneHandle from "./ZoneHandle";
 
@@ -188,8 +190,37 @@ export default function ZoneCanvas({
               </div>
             );
           }
-          const content = zone.content || {};
-          const isText  = zone.type === "text";
+
+          if (zone.type === "decorative") {
+            const st     = zone.style || {};
+            const iconId = zone.content?.iconId;
+            const svg    = iconId
+              ? renderIconSVG(iconId, st)
+              : renderDecorativeSVG(zone.content?.shape || "circle", st, zone.id);
+            const rot = st.rotation ?? 0;
+            return (
+              <div key={`content_${zone.id}`} className="absolute" style={{
+                left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%`,
+                zIndex: zone.zIndex ?? 5, pointerEvents: "none",
+                opacity: st.opacity ?? 1,
+                transform: rot ? `rotate(${rot}deg)` : undefined,
+                transformOrigin: "center center",
+                overflow: "visible",
+              }}>
+                {svg && (
+                  <svg viewBox={svg.viewBox} width="100%" height="100%"
+                    style={{ display: "block", overflow: "visible" }}
+                    dangerouslySetInnerHTML={{ __html: svg.content }}
+                  />
+                )}
+              </div>
+            );
+          }
+
+          const content  = zone.content || {};
+          const isText   = zone.type === "text";
+          const clipShape = zone.style?.clipShape;
+          const clipPath  = clipShape ? getClipPathCSS(clipShape) : null;
           const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
                        || (isText && !content.text && content.kind !== "block");
           return (
@@ -206,6 +237,7 @@ export default function ZoneCanvas({
                 display:       isText ? "flex"   : undefined,
                 alignItems:    isText ? "center" : undefined,
                 flexDirection: isText ? "column" : undefined,
+                clipPath:      clipPath || undefined,
               }}>
               <ZoneContentLayer zone={zone} />
               {isEmpty && (

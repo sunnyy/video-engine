@@ -7,6 +7,7 @@
  */
 
 import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
+import { useAssetsStore }  from "../../store/useAssetsStore";
 
 const SERVER = "http://localhost:5000";
 
@@ -312,6 +313,11 @@ export async function generateZoneImage({
     const file   = new File([blob], `ai-gen-${Date.now()}.jpg`, { type: "image/jpeg" });
     const asset  = await uploadUserAsset(file, "image", null, "project", projectId);
     console.log(`[fal] Beat ${beatIndex} saved to Supabase: ${asset.url}`);
+    useAssetsStore.getState().addMyAsset({
+      id: asset.id, url: asset.url, file_path: asset.file_path,
+      type: "image", name: asset.name || file.name, size: asset.size || file.size,
+      scope: "project", project_id: projectId || null, source: "user",
+    });
     return { url: asset.url, assetId: asset.id, type: "image", width: w, height: h };
   } catch (e) {
     console.warn(`[fal] Re-upload failed for beat ${beatIndex}, using temporary Fal.ai URL:`, e.message);

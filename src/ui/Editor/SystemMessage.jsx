@@ -82,7 +82,7 @@ export default function SystemMessage() {
   const style = TYPE_STYLES[msg.type] || TYPE_STYLES.tip;
 
   return (
-    <div className="flex w-full justify-center items-center gap-3 px-4 py-[10px] border-b mx-0"
+    <div className="flex justify-center items-center gap-3 px-4 py-[10px] border-b mx-0"
       style={{ borderColor: style.border, background: style.bg }}>
       <span className="text-[16px] shrink-0">{msg.icon}</span>
       <span className=" text-[13px]" style={{ color: style.text }}>{msg.text}</span>

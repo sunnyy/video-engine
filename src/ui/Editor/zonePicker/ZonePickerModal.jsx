@@ -12,6 +12,8 @@ import GalleryTab  from "./tabs/GalleryTab";
 import BlocksTab   from "./tabs/BlocksTab";
 import ColorsTab   from "./tabs/ColorsTab";
 import TextTab     from "./tabs/TextTab";
+import ShapesTab   from "./tabs/ShapesTab";
+import IconsTab    from "./tabs/IconsTab";
 
 export default function ZonePickerModal({
   onSelect,
@@ -31,9 +33,9 @@ export default function ZonePickerModal({
     if (a.src)       { onSelect({ url: a.src });       return; }
   };
 
-  const defaultTabs  = ["assets", "gallery", "blocks", "colors"];
+  const defaultTabs  = ["assets", "gallery", "blocks", "colors", "shapes", "icons"];
   const activeTabs   = allowedTabs || defaultTabs;
-  const tabKeyMap    = { assets: "my", gallery: "gallery", blocks: "blocks", colors: "colors" };
+  const tabKeyMap    = { assets: "my", gallery: "gallery", blocks: "blocks", colors: "colors", shapes: "shapes", icons: "icons" };
   const initialTab   = tabKeyMap[activeTabs[0]] || "my";
 
   const [tab,        setTab]        = useState(initialTab);
@@ -43,7 +45,7 @@ export default function ZonePickerModal({
 
   const { myAssets = [], loadMyAssets, addMyAsset, removeMyAsset } = useAssetsStore();
 
-  useEffect(() => { loadMyAssets(); }, []);
+  useEffect(() => { loadMyAssets(databaseId); }, [databaseId]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -108,6 +110,8 @@ export default function ZonePickerModal({
       { key: "text",    label: "Text",      type: "text"    },
       { key: "blocks",  label: "Elements",  type: "blocks"  },
       { key: "colors",  label: "Colors",    type: "colors"  },
+      { key: "shapes",  label: "Shapes",    type: "shapes"  },
+      { key: "icons",   label: "Icons",     type: "icons"   },
     ];
     return all.filter(t => activeTabs.includes(t.type));
   }, [activeTabs]);
@@ -124,10 +128,12 @@ export default function ZonePickerModal({
         />
       );
     }
-    if (tab === "text")    return <TextTab onSelect={(a) => { onSelect(a); onClose(); }} />;
+    if (tab === "text")    return <TextTab    onSelect={(a) => { onSelect(a); onClose(); }} />;
     if (tab === "gallery") return <GalleryTab onSelect={(a) => { onSelect(a); onClose(); }} />;
     if (tab === "blocks")  return <BlocksTab  onSelect={onSelect} onClose={onClose} />;
     if (tab === "colors")  return <ColorsTab  onSelect={onSelect} onClose={onClose} />;
+    if (tab === "shapes")  return <ShapesTab  onSelect={(a) => { onSelect(a); onClose(); }} />;
+    if (tab === "icons")   return <IconsTab   onSelect={(a) => { onSelect(a); onClose(); }} />;
   };
 
   return (

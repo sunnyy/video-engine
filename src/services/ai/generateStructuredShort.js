@@ -13,6 +13,7 @@ import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/musicRegistry";
 import { generateZoneImage } from "../../server/assets/falService";
 import { getLayoutDef } from "../../core/layoutRegistry";
 import { uploadUserAsset } from "../assets/uploadUserAsset";
+import { useAssetsStore }  from "../../store/useAssetsStore";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
 import { getUserRules } from "../../hooks/useUserRules";
 import { generateVideoDNA } from "../../core/videoDNA";
@@ -503,6 +504,11 @@ export async function generateStructuredShort({
                 const uploaded = await uploadUserAsset(file, "image", null, "project", projectId);
                 sharedEntityImgUrl = uploaded.url;
                 console.log(`[img] Beat ${beatIndex}: entity → Supabase — ${sharedEntityImgUrl}`);
+                useAssetsStore.getState().addMyAsset({
+                  id: uploaded.id, url: uploaded.url, file_path: uploaded.file_path,
+                  type: "image", name: uploaded.name || file.name, size: uploaded.size || file.size,
+                  scope: "project", project_id: projectId || null, source: "user",
+                });
               } catch {
                 sharedEntityImgUrl = tempUrl; // fallback: use temp URL directly
               }
