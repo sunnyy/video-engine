@@ -2,14 +2,66 @@
  * ZoneCanvas.jsx
  * src/ui/Editor/canvas/ZoneCanvas.jsx
  */
-import { memo, useCallback, useRef } from "react";
+import { memo, useCallback, useRef, useEffect } from "react";
 import { useProjectStore } from "../../../src/store/useProjectStore";
 import { getLayoutDef } from "../../../src/core/layoutRegistry";
 import { elementsRegistry } from "../../../src/core/elementsRegistry";
-import { renderDecorativeSVG, getClipPathCSS } from "../../../src/core/decorativeShapeRegistry.js";
-import { renderIconSVG } from "../../../src/core/iconRegistry.jsx";
+import { getClipPathCSS } from "../../../src/core/decorativeShapeRegistry.js";
 import CompositionLayerRenderer from "../../../src/remotion/elements/composition/CompositionLayerRenderer";
 import ZoneHandle from "./ZoneHandle";
+
+/**
+ * Hidden measurement div — renders text with the same styles as LayoutRenderer
+ * and uses ResizeObserver to keep zone.height in sync with actual text height.
+ */
+function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate }) {
+  const ref         = useRef(null);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const lastPct     = useRef(null);
+
+  const st   = zone.style   || {};
+  const text = zone.content?.text || "\u200B"; // zero-width space keeps 1-line height
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const sync = () => {
+      const h = el.offsetHeight;
+      if (h <= 0) return;
+      const pct = Math.round((h / canvasH) * 1000) / 10; // 1 decimal place
+      if (lastPct.current !== null && Math.abs(pct - lastPct.current) < 0.3) return;
+      lastPct.current = pct;
+      onUpdateRef.current({ height: pct });
+    };
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    sync();
+    return () => ro.disconnect();
+  }, [canvasH]); // stable — uses refs for callback and lastPct
+
+  return (
+    <div ref={ref} style={{
+      position:      "absolute",
+      visibility:    "hidden",
+      pointerEvents: "none",
+      top: 0, left: 0,
+      width:         `${(zone.width / 100) * canvasW}px`,
+      padding:       st.padding      || "0 8px",
+      fontSize:      (st.fontSize    || 32) * canvasScale,
+      fontWeight:    st.fontWeight   || 700,
+      fontFamily:    st.fontFamily   || "inherit",
+      lineHeight:    st.lineHeight   || 1.15,
+      letterSpacing: st.letterSpacing || "normal",
+      whiteSpace:    "normal",
+      overflowWrap:  "break-word",
+      wordBreak:     "break-word",
+      boxSizing:     "border-box",
+    }}>
+      {text}
+    </div>
+  );
+}
 
 // ZoneContentLayer only renders empty-zone indicators.
 // Actual content (text, images, blocks) is rendered by the Thumbnail behind ZoneCanvas.
@@ -115,7 +167,7 @@ export default function ZoneCanvas({
       _isVideoOverlay: true,
     }));
 
-  const allZones = [...defZones, ...extraZones, ...voZones];
+  const allZones = [...defZones, ...extraZones, ...voZones].sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
 
   // Attach beat's asset_hint to the first empty asset zone
   const beatAssetHint = beat?.asset_hint || null;
@@ -168,17 +220,17 @@ export default function ZoneCanvas({
     <div
       data-canvas
       onClick={handleCanvasClick}
-      className="relative overflow-hidden rounded-[8px] shrink-0 cursor-default select-none"
+      className="relative rounded-[8px] shrink-0 cursor-default select-none"
       style={{
         width: canvasW, height: canvasH,
-        boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+        overflow: "visible",
       }}
     >
       {/* Composition background + overlay layers (beneath zone content) */}
       <CompositionLayerRenderer beat={beat} layerFilter={[0, 1, 3]} />
 
       {/* layoutPadding inset — mirrors LayoutRenderer behaviour */}
-      <div style={{ position: "absolute", inset: (beat?.layoutPadding || 0) * canvasScale, overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: (beat?.layoutPadding || 0) * canvasScale, overflow: "visible" }}>
         {allZones.map(zone => {
           if (zone.type === "element") {
             const entry = elementsRegistry[zone.content?.elementId];
@@ -192,29 +244,11 @@ export default function ZoneCanvas({
           }
 
           if (zone.type === "decorative") {
-            const st     = zone.style || {};
-            const iconId = zone.content?.iconId;
-            const svg    = iconId
-              ? renderIconSVG(iconId, st)
-              : renderDecorativeSVG(zone.content?.shape || "circle", st, zone.id);
-            const rot = st.rotation ?? 0;
-            return (
-              <div key={`content_${zone.id}`} className="absolute" style={{
-                left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%`,
-                zIndex: zone.zIndex ?? 5, pointerEvents: "none",
-                opacity: st.opacity ?? 1,
-                transform: rot ? `rotate(${rot}deg)` : undefined,
-                transformOrigin: "center center",
-                overflow: "visible",
-              }}>
-                {svg && (
-                  <svg viewBox={svg.viewBox} width="100%" height="100%"
-                    style={{ display: "block", overflow: "visible" }}
-                    dangerouslySetInnerHTML={{ __html: svg.content }}
-                  />
-                )}
-              </div>
-            );
+            // Don't render decorative SVGs in the canvas overlay — the Remotion Thumbnail
+            // already shows them correctly with proper z-ordering. Rendering here would put
+            // the SVG in a separate DOM layer above the Thumbnail, covering text that should
+            // be on top. ZoneHandle handles click-selection, so interactivity is unaffected.
+            return null;
           }
 
           const content  = zone.content || {};
@@ -243,6 +277,15 @@ export default function ZoneCanvas({
               {isEmpty && (
                 <div className="absolute inset-0 pointer-events-none"
                   style={{ border: "1.5px dashed rgba(255,255,255,0.35)", borderRadius: zone.style?.borderRadius || 0, zIndex: 99 }}
+                />
+              )}
+              {isText && (
+                <TextAutoHeight
+                  zone={zone}
+                  canvasW={canvasW - (beat?.layoutPadding || 0) * canvasScale * 2}
+                  canvasH={canvasH - (beat?.layoutPadding || 0) * canvasScale * 2}
+                  canvasScale={canvasScale}
+                  onUpdate={(upd) => handleUpdate(zone.id, upd)}
                 />
               )}
             </div>

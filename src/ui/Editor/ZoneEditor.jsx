@@ -218,6 +218,7 @@ export default function ZoneEditor({
   setZoneStyle, setZoneLayout,
   setZoneStyleSilent, setZoneLayoutSilent,
   patchZoneSilent, clearContent, clearBackground, onDelete,
+  allZoneZIndices,
 }) {
   const commitBeat = useProjectStore(s => s.commitBeat);
 
@@ -248,15 +249,13 @@ export default function ZoneEditor({
   const setStyleSilent  = (key, val) => setZoneStyleSilent(slot, key, val);
   const setLayoutSilent = (key, val) => setZoneLayoutSilent(slot, key, val);
 
-  /* Layer z-index helpers */
-  const otherZIndices = Object.entries(
-    useProjectStore.getState().project?.beats?.find(b => b.id === beatId)?.zones || {}
-  ).filter(([key]) => key !== slot).map(([, z]) => z.zIndex ?? 1);
-  const currentZIndex = safeZone.zIndex ?? 1;
+  /* Layer z-index helpers — use effective z-indices (layout def merged) passed from ZonesSection */
+  const otherZIndices = allZoneZIndices || [];
+  const currentZIndex = safeZone.zIndex ?? zoneDef?.zIndex ?? 1;
   const maxZ = otherZIndices.length ? Math.max(...otherZIndices) : currentZIndex;
   const minZ = otherZIndices.length ? Math.min(...otherZIndices) : currentZIndex;
   const isAtFront = otherZIndices.length > 0 && currentZIndex >= maxZ;
-  const isAtBack  = currentZIndex <= 1 && (otherZIndices.length === 0 || currentZIndex <= minZ);
+  const isAtBack  = otherZIndices.length === 0 || currentZIndex <= minZ;
 
   useEffect(() => {
     const onKey = (e) => {
@@ -391,7 +390,7 @@ export default function ZoneEditor({
         </div>
 
         {/* Text stroke */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <Slider label="Stroke" value={style.textStrokeWidth ?? 0}
             onChangeSilent={v => setStyleSilent("textStrokeWidth", v)}
             onCommit={commit} min={0} max={15} step={0.5} unit="px" />
@@ -400,6 +399,53 @@ export default function ZoneEditor({
               onChange={v => updateTextStyle(slot, "textStrokeColor", v)} />
           )}
         </div>
+
+        {/* Text shadow — uses patchZoneSilent for atomic multi-key updates */}
+        {(() => {
+          const shadowBlur  = style.textShadowBlur  ?? 0;
+          const shadowX     = style.textShadowX     ?? 2;
+          const shadowY     = style.textShadowY     ?? 2;
+          const shadowColor = style.textShadowColor ?? "#000000";
+          const buildCSS    = (b, x, y, c) => b > 0 ? `${x}px ${y}px ${b}px ${c}` : "none";
+          const patchShadow = (patch) => patchZoneSilent(slot, {}, {
+            ...patch,
+            textShadow: buildCSS(
+              patch.textShadowBlur  ?? shadowBlur,
+              patch.textShadowX     ?? shadowX,
+              patch.textShadowY     ?? shadowY,
+              patch.textShadowColor ?? shadowColor,
+            ),
+          });
+          return (
+            <div>
+              <div className="flex items-center justify-between mb-[6px]">
+                <Label>Text Shadow</Label>
+                {shadowBlur > 0 && (
+                  <button
+                    onClick={() => updateTextStyleBulk(slot, { textShadow: "none", textShadowBlur: 0, textShadowX: 2, textShadowY: 2 })}
+                    className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer"
+                  >clear</button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Slider label="Blur" value={shadowBlur}
+                  onChangeSilent={v => patchShadow({ textShadowBlur: v })}
+                  onCommit={commit} min={0} max={40} unit="px" />
+                <Slider label="Offset X" value={shadowX}
+                  onChangeSilent={v => patchShadow({ textShadowX: v })}
+                  onCommit={commit} min={-30} max={30} unit="px" />
+                <Slider label="Offset Y" value={shadowY}
+                  onChangeSilent={v => patchShadow({ textShadowY: v })}
+                  onCommit={commit} min={-30} max={30} unit="px" />
+                <ColorRow label="Shadow Color" value={shadowColor}
+                  onChange={v => updateTextStyleBulk(slot, {
+                    textShadowColor: v,
+                    textShadow: buildCSS(shadowBlur, shadowX, shadowY, v),
+                  })} />
+              </div>
+            </div>
+          );
+        })()}
       </Section>
 
       {/* Spacing */}

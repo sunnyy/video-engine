@@ -23,7 +23,8 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
   const zoneDefs  = layoutDef?.zones || [];
 
   const selectedZoneDef  = zoneDefs.find(z => z.id === selectedZoneId) || null;
-  const selectedZoneData = zones[selectedZoneId] || {};
+  // Merge layout def defaults so ZoneEditor sees the effective values (e.g. zIndex from layout def)
+  const selectedZoneData = { ...(selectedZoneDef || {}), ...(zones[selectedZoneId] || {}) };
   const selectedZoneType = selectedZoneData.type || selectedZoneDef?.type || "asset";
 
   const beatOverlays = Array.isArray(beat.overlays) ? beat.overlays : [];
@@ -348,6 +349,17 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
             clearContent={clearContent}
             clearBackground={clearBackground}
             onDelete={() => deleteZone(selectedZoneId)}
+            allZoneZIndices={Object.entries(zones)
+              .filter(([id]) => id !== selectedZoneId)
+              .map(([id, z]) => {
+                const def = zoneDefs.find(d => d.id === id);
+                return z.zIndex ?? def?.zIndex ?? 1;
+              })
+              .concat(
+                zoneDefs
+                  .filter(d => d.id !== selectedZoneId && !(d.id in zones))
+                  .map(d => d.zIndex ?? 1)
+              )}
           />
         </div>
       )}

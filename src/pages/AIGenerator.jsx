@@ -167,7 +167,7 @@ export default function AIGenerator() {
         beats: [],
         workflow: { script_completed: false, avatar_completed: false, beats_initialized: false },
       });
-      const saved = await createProject({ name: topic.slice(0, 60), rawAI: null, safeProject: placeholder });
+      const saved = await createProject({ name: topic.slice(0, 60), rawAI: {}, safeProject: placeholder });
       const projectId = saved.id;
 
       const aiResult = await generateStructuredShort({

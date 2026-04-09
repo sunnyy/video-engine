@@ -156,15 +156,17 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       if ((e.metaKey || e.ctrlKey) && e.code === "KeyZ" && !e.shiftKey && !isTyping) { e.preventDefault(); undo(); return; }
       if (!isTyping && ((e.metaKey || e.ctrlKey) && e.code === "KeyY")) { e.preventDefault(); redo(); return; }
       if (!isTyping && (e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "KeyZ") { e.preventDefault(); redo(); return; }
+      // Prevent browser defaults for shortcuts we handle (Ctrl+D = bookmark, etc.)
+      if (!isTyping && (e.metaKey || e.ctrlKey) && e.code === "KeyD") { e.preventDefault(); }
 
-      if (isTyping) return;
-
-      // ESC — deselect zone, but not if a modal is open
+      // ESC — always deselect zone (even when typing), unless a modal is open
       if (e.code === "Escape") {
         if (document.querySelector("[data-modal]")) return;
         onSelectZoneRef.current(null);
         return;
       }
+
+      if (isTyping) return;
 
       // Zone shortcuts — only when exactly one zone is selected
       const ids = selectedZoneIdsRef.current;
@@ -256,7 +258,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           <span className="mx-1 opacity-30">·</span>
           <span>⌘D dup</span>
           <span className="mx-1 opacity-30">·</span>
-          <span>↑↓←→ move</span>
+          <span>↑↓←→ move · ⇧drag lock ratio</span>
           <span className="mx-1 opacity-30">·</span>
           <span>Del remove</span>
           <span className="mx-1 opacity-30">·</span>
@@ -337,7 +339,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           display:  showPlayer ? "flex" : "none",
           position: "absolute", inset: 0,
           alignItems: "flex-start", justifyContent: "center",
-          background: "#111118", zIndex: 50,
+          background: "black", zIndex: 50,
           padding: 8,
         }}>
           <div className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}>

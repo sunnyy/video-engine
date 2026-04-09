@@ -55,7 +55,13 @@ const decorativeShapeRegistry = {
 
   // ── Rectangles ────────────────────────────────────────────
   square: {
-    label: "Rectangle", icon: "□", group: "basic",
+    label: "Square", icon: "□", group: "basic",
+    clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
+    defaults: { color: "#ffffff", opacity: 1, strokeWidth: 3, filled: false, borderRadius: 0, rotation: 0 },
+  },
+
+  rectangle: {
+    label: "Rectangle", icon: "▬", group: "basic",
     clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
     defaults: { color: "#ffffff", opacity: 1, strokeWidth: 3, filled: false, borderRadius: 0, rotation: 0 },
   },
@@ -375,6 +381,7 @@ export function renderDecorativeSVG(shapeId, style = {}, instanceId = "x") {
 
     // ── Square / Rectangle ───────────────────────────────
     case "square":
+    case "rectangle":
     case "pill":
     case "gradient_bar": {
       const br    = st.borderRadius ?? 0;

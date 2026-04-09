@@ -11,8 +11,6 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remo
 import LayoutRenderer from "./layouts/LayoutRenderer.jsx";
 import SFXRenderer from "./elements/SFXRenderer.jsx";
 import OverlayRenderer from "./elements/OverlayRenderer";
-import GrainOverlay from "./effects/GrainOverlay";
-import VignetteLayer from "./effects/VignetteLayer";
 import { getLayoutDef } from "../core/layoutRegistry.js";
 
 export default function BeatRenderer({ beat, project, previewMode = false }) {
@@ -67,10 +65,6 @@ export default function BeatRenderer({ beat, project, previewMode = false }) {
       <OverlayRenderer overlays={overlays} />
 
       <SFXRenderer beat={beat} />
-
-      <GrainOverlay intensity={0.25} />
-
-      <VignetteLayer strength={0.35} />
 
     </AbsoluteFill>
   );

@@ -225,39 +225,41 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
   const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
                || (zone.type === "text" && !content.text && content.kind !== "block");
 
-  // Zone container — position only, no rotation, no transform (enter/exit handled below)
+  // Zone container — rotation lives HERE so content is never clipped by the zone boundary.
+  // Enter/exit animation transforms are combined with rotation on the same element.
   const isTextZone = zone.type === "text";
   const isDecorativeZone = zone.type === "decorative";
+
+  const rotateStr        = rotation ? `rotate(${rotation}deg)` : "";
+  const containerTransform = [animStyle.transform, rotateStr].filter(Boolean).join(" ") || undefined;
+
   const zoneContainerStyle = {
-    position:       "absolute",
-    left:           `${zone.x     ?? 0}%`,
-    top:            `${zone.y     ?? 0}%`,
-    width:          `${zone.width ?? 100}%`,
-    height:         `${zone.height ?? 100}%`,
-    zIndex:         zone.zIndex ?? 1,
-    overflow:       isTextZone ? "visible" : "hidden",
-    overflowX:      isTextZone ? "hidden"  : undefined,
-    opacity:        (animStyle.opacity ?? 1) * (isDecorativeZone ? 1 : (st.opacity ?? 1)),
-    transform:      animStyle.transform || undefined,
+    position:        "absolute",
+    left:            `${zone.x     ?? 0}%`,
+    top:             `${zone.y     ?? 0}%`,
+    width:           `${zone.width ?? 100}%`,
+    height:          isTextZone ? "auto" : `${zone.height ?? 100}%`,
+    zIndex:          zone.zIndex ?? 1,
+    // overflow:visible lets rotated corners show outside the original bounding rect
+    overflow:        rotation || isTextZone || isDecorativeZone ? "visible" : "hidden",
+    opacity:         (animStyle.opacity ?? 1) * (isDecorativeZone ? 1 : (st.opacity ?? 1)),
+    transform:       containerTransform,
+    transformOrigin: "center center",
     // Vertical centering for text zones
-    display:        isTextZone ? "flex"   : undefined,
-    flexDirection:  isTextZone ? "column" : undefined,
-    justifyContent: isTextZone ? "center" : undefined,
+    display:         isTextZone ? "flex"   : undefined,
+    flexDirection:   isTextZone ? "column" : undefined,
+    justifyContent:  isTextZone ? "center" : undefined,
   };
 
-  // Content wrapper — rotation applied here, inside zone bounds
+  // Content wrapper — NO rotation here (container handles it)
   const contentWrapperStyle = isTextZone
     ? {
-        position:        "relative",
-        width:           "100%",
-        transform:       rotation ? `rotate(${rotation}deg)` : undefined,
-        transformOrigin: "center center",
+        position: "relative",
+        width:    "100%",
       }
     : {
-        position:        "absolute",
-        inset:           0,
-        transform:       rotation ? `rotate(${rotation}deg)` : undefined,
-        transformOrigin: "center center",
+        position: "absolute",
+        inset:    0,
       };
 
   // Inset box for scale + padding effect
@@ -493,15 +495,11 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             ? renderIconSVG(iconId, st)
             : renderDecorativeSVG(shape, st, instanceId);
           if (!svg) return null;
-          const rot = st.rotation ?? 0;
           return (
-            <div style={{
-              position: "absolute", inset: 0, overflow: "visible",
-              transform: rot ? `rotate(${rot}deg)` : undefined,
-              transformOrigin: "center center",
-            }}>
+            <div style={{ position: "absolute", inset: 0, overflow: "visible" }}>
               <svg
                 viewBox={svg.viewBox}
+                preserveAspectRatio="none"
                 width="100%" height="100%"
                 style={{ display: "block", overflow: "visible", opacity: st.opacity ?? 1 }}
                 dangerouslySetInnerHTML={{ __html: svg.content }}
@@ -579,7 +577,9 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
       content: z.content || {}, style: z.style || {}, background: z.background || {},
     }));
 
-  const allZones     = [...defZones, ...extraZones];
+  // Sort by zIndex so DOM order matches visual stacking — required because transform
+  // (rotation, animations) creates stacking contexts that ignore CSS z-index across siblings.
+  const allZones     = [...defZones, ...extraZones].sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
   const contentZones = allZones.filter(z => z.type !== "element");
   const elementZones = allZones.filter(z => z.type === "element");
 

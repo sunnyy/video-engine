@@ -153,7 +153,7 @@ export default function AssetRenderer({ zone, beat, slot }) {
   return (
     <AbsoluteFill style={{
       display: "flex", alignItems: "center",
-      justifyContent: "center", overflow: "visible",
+      justifyContent: "center", overflow: "hidden",
     }}>
       <div style={{ width: "100%", height: "100%", ...style }}>
         {isVideo ? (

@@ -90,15 +90,17 @@ export default function ZoneHandle({
       if (isMulti && onUpdateMulti) {
         const updates = {};
         for (const [id, orig] of Object.entries(dragStart.current.origPositions)) {
-          const newX = Math.max(0, Math.min(100 - orig.width,  orig.x + dxPct));
-          const newY = Math.max(0, Math.min(100 - orig.height, orig.y + dyPct));
-          updates[id] = { x: Math.round(newX*10)/10, y: Math.round(newY*10)/10 };
+          updates[id] = {
+            x: Math.round((orig.x + dxPct) * 10) / 10,
+            y: Math.round((orig.y + dyPct) * 10) / 10,
+          };
         }
         onUpdateMulti(updates);
       } else {
-        const newX = Math.max(0, Math.min(100 - zone.width,  dragStart.current.origX + dxPct));
-        const newY = Math.max(0, Math.min(100 - zone.height, dragStart.current.origY + dyPct));
-        onUpdate(zone.id, { x: Math.round(newX*10)/10, y: Math.round(newY*10)/10 });
+        onUpdate(zone.id, {
+          x: Math.round((dragStart.current.origX + dxPct) * 10) / 10,
+          y: Math.round((dragStart.current.origY + dyPct) * 10) / 10,
+        });
       }
     };
 
@@ -135,17 +137,34 @@ export default function ZoneHandle({
     const onMove = (me) => {
       if (!resizeStart.current) return;
       const { mouseX, mouseY, origX, origY, origW, origH, origFontSize, handle } = resizeStart.current;
+
       const dx = ((me.clientX - mouseX) / canvasWidth)  * 100;
       const dy = ((me.clientY - mouseY) / canvasHeight) * 100;
+
       let x = origX, y = origY, w = origW, h = origH;
-      if (handle.includes("e")) w = Math.max(5, origW + dx);
-      if (handle.includes("s")) h = Math.max(5, origH + dy);
-      if (handle.includes("w")) { x = Math.min(origX + origW - 5, origX + dx); w = Math.max(5, origW - dx); }
-      if (handle.includes("n")) { y = Math.min(origY + origH - 5, origY + dy); h = Math.max(5, origH - dy); }
-      x = Math.max(0, Math.min(95, x));
-      y = Math.max(0, Math.min(95, y));
-      w = Math.min(100 - x, w);
-      h = Math.min(100 - y, h);
+
+      const isCorner  = handle.length === 2; // "nw","ne","se","sw"
+      const lockRatio = me.shiftKey && isCorner;
+      const aspectRatio = origW / origH;
+
+      if (handle.includes("e")) w = Math.max(2, origW + dx);
+      if (handle.includes("s")) h = Math.max(2, origH + dy);
+      if (handle.includes("w")) { x = origX + dx; w = Math.max(2, origW - dx); }
+      if (handle.includes("n")) { y = origY + dy; h = Math.max(2, origH - dy); }
+
+      // Shift on a corner handle: lock aspect ratio by using whichever axis moved more
+      if (lockRatio) {
+        const absDx = Math.abs(localDxPx);
+        const absDy = Math.abs(localDyPx);
+        if (absDx >= absDy) {
+          h = w / aspectRatio;
+          if (handle.includes("n")) y = origY + (origH - h);
+        } else {
+          w = h * aspectRatio;
+          if (handle.includes("w")) x = origX + (origW - w);
+        }
+      }
+
       const update = {
         x: Math.round(x*10)/10, y: Math.round(y*10)/10,
         width: Math.round(w*10)/10, height: Math.round(h*10)/10,
@@ -220,19 +239,18 @@ export default function ZoneHandle({
 
   return (
     <div
-      onMouseDown={onMouseDown}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        position:  "absolute",
+        position:      "absolute",
         left: pxX, top: pxY, width: pxW, height: pxH,
-        zIndex:    (zone.zIndex ?? 1) * 100 + (isSelected ? 50 : 0),
-        cursor:    "grab",
-        boxSizing: "border-box",
-        overflow:  "visible",
+        zIndex:        (zone.zIndex ?? 1) + (isSelected ? 2 : 0),
+        boxSizing:     "border-box",
+        overflow:      "visible",
+        pointerEvents: "none", // pass clicks through — only children with explicit pointerEvents capture
       }}
     >
-      {/* Rotated visual outline */}
+      {/* Visual outline — no pointer events, purely decorative */}
       <div style={{
         position:        "absolute", inset: 0,
         transform:       rotation ? `rotate(${rotation}deg)` : undefined,
@@ -243,6 +261,20 @@ export default function ZoneHandle({
         background:      isSelected ? (isMulti ? "rgba(45,212,191,0.04)" : "rgba(124,92,252,0.04)") : "transparent",
         pointerEvents:   "none",
       }} />
+
+      {/* Hit area:
+          - Unselected: full zone is clickable (to select it)
+          - Selected: only the 10px border strip is interactive (interior clicks pass through to zones below) */}
+      {!isSelected ? (
+        <div onMouseDown={onMouseDown} style={{ position: "absolute", inset: 0, pointerEvents: "auto", cursor: "grab" }} />
+      ) : (
+        <>
+          <div onMouseDown={onMouseDown} style={{ position: "absolute", top: 0,    left: 0, right: 0,  height: 10, pointerEvents: "auto", cursor: "grab" }} />
+          <div onMouseDown={onMouseDown} style={{ position: "absolute", bottom: 0, left: 0, right: 0,  height: 10, pointerEvents: "auto", cursor: "grab" }} />
+          <div onMouseDown={onMouseDown} style={{ position: "absolute", top: 0,    left: 0, bottom: 0, width:  10, pointerEvents: "auto", cursor: "grab" }} />
+          <div onMouseDown={onMouseDown} style={{ position: "absolute", top: 0,    right: 0,bottom: 0, width:  10, pointerEvents: "auto", cursor: "grab" }} />
+        </>
+      )}
 
       {/* Label */}
       {isVisible && (
