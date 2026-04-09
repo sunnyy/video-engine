@@ -8,24 +8,19 @@
 import React from "react";
 import { textStylePresets } from "../../../../core/textStylePresets";
 
-const BG_PREVIEWS = {
-  hero:           "linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 100%)",
-  headline:       "linear-gradient(135deg, #0a0a1a 0%, #0a1a2e 100%)",
-  editorial:      "linear-gradient(160deg, #f5f0e8 0%, #e8e4db 100%)",
-  caption:        "#0d0d18",
-  pill:           "#0a0a12",
-  neon:           "#050510",
-  brutal:         "#ff2200",
-  mono:           "#0a0f0a",
-  "gradient-text":"#0a0a0a",
-  subtitle:       "#0d0d18",
+const ENERGY_COLOR = {
+  explosive: "#f87171",
+  high:      "#fb923c",
+  medium:    "#a78bfa",
+  calm:      "#34d399",
+  low:       "#60a5fa",
 };
 
 export default function TextTab({ onSelect }) {
 
   const handleSelect = (preset) => {
-    // Apply only visual flair — fontSize/fontWeight/textAlign come from the layout definition
-    const { fontSize, fontWeight, textAlign, ...flair } = preset.style;
+    // Apply only visual flair — fontSize/fontWeight/textAlign/opacity come from the layout or user intent
+    const { fontSize, fontWeight, textAlign, opacity, ...flair } = preset.style;
     onSelect({
       kind: "text",
       text: preset.preview?.text || "Your text here",
@@ -41,10 +36,11 @@ export default function TextTab({ onSelect }) {
 
       <div className="grid grid-cols-2 gap-3 overflow-y-auto content-start">
         {textStylePresets.map(preset => {
-          const bg       = BG_PREVIEWS[preset.id] || "#0d0d18";
+          const bg       = preset.preview?.bg || "#0d0d18";
           const st       = preset.style;
           const isLight  = preset.id === "editorial";
           const fontSize = Math.min(st.fontSize || 32, 52); // cap preview size
+          const energyColor = ENERGY_COLOR[preset.energy] || "#55556a";
 
           return (
             <div
@@ -79,22 +75,31 @@ export default function TextTab({ onSelect }) {
                 </span>
               </div>
 
-              {/* Label */}
+              {/* Label + metadata */}
               <div style={{
-                padding:     "6px 10px",
+                padding:     "5px 8px",
                 borderTop:   "1px solid rgba(255,255,255,0.05)",
-                fontSize:    11,
-                fontWeight:  600,
-                color:       "rgba(148,148,168,0.7)",
-                background:  "rgba(0,0,0,0.3)",
-                display:     "flex",
-                alignItems:  "center",
-                justifyContent: "space-between",
+                background:  "rgba(0,0,0,0.35)",
               }}>
-                <span>{preset.label}</span>
-                <span style={{ fontSize: 9, color: "#55556a", fontFamily: "monospace" }}>
-                  {st.fontFamily?.match(/'([^']+)'/)?.[1] || "Default"}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(148,148,168,0.85)" }}>{preset.label}</span>
+                  {preset.energy && (
+                    <span style={{ fontSize: 8, fontFamily: "monospace", color: energyColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      {preset.energy}
+                    </span>
+                  )}
+                </div>
+                {preset.roles?.length > 0 && (
+                  <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                    {preset.roles.slice(0, 3).map(r => (
+                      <span key={r} style={{
+                        fontSize: 8, fontFamily: "monospace", color: "#55556a",
+                        background: "rgba(255,255,255,0.05)", borderRadius: 3,
+                        padding: "1px 4px",
+                      }}>{r}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

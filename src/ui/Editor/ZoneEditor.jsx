@@ -321,8 +321,32 @@ export default function ZoneEditor({
             return (
               <button key={preset.id}
                 onClick={() => {
-                  const { fontSize, fontWeight, textAlign, ...flair } = preset.style;
-                  updateTextStyleBulk(slot, { ...flair, background: flair.background || "transparent", _presetId: preset.id });
+                  // Clear every property that presets control so stale values
+                  // (e.g. fontStyle:"italic" from a previous preset) don't bleed through.
+                  const PRESET_RESET = {
+                    fontFamily:      "inherit",
+                    fontWeight:      700,
+                    fontStyle:       "normal",
+                    textAlign:       "center",
+                    color:           "#ffffff",
+                    textShadow:      "none",
+                    letterSpacing:   "normal",
+                    lineHeight:      1.15,
+                    background:      "transparent",
+                    borderRadius:    0,
+                    WebkitTextStroke: undefined,
+                    textDecoration:  "none",
+                    paddingLeft:     undefined,
+                    borderLeft:      undefined,
+                  };
+                  // Only preserve fontSize (layout controls sizing).
+                  const { fontSize, ...flair } = preset.style;
+                  updateTextStyleBulk(slot, {
+                    ...PRESET_RESET,
+                    ...flair,
+                    background: flair.background || "transparent",
+                    _presetId: preset.id,
+                  });
                 }}
                 className="px-[10px] py-[5px] rounded-[6px] text-[13px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
                 style={{

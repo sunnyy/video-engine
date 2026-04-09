@@ -182,6 +182,11 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle }) {
 
   const iconIds = Object.keys(iconRegistry);
 
+  // Accent shapes — small, filled, used as decorative accents
+  const ACCENT_SHAPES = ["circle", "diamond", "triangle", "star", "hexagon", "pill"];
+  // Frame/border shapes — stroke-only, used when a decorative zone is large (border frame or ring)
+  const FRAME_SHAPE_DEFAULT = "square"; // stroke square = frame border
+
   def.zones.forEach((zone, i) => {
     if (zone.type === "asset") {
       const motion = pickMotion(energy, beatIndex + i, lastMotion, motionStyle);
@@ -213,19 +218,34 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle }) {
     }
 
     if (zone.type === "decorative") {
-      // Default to a circle shape; the editor / AI can override
+      // Pick shape based on zone size and borderRadius hint from layout definition:
+      //   - borderRadius >= 999  → "ring"  (circle ring border overlay, e.g. around a circular asset)
+      //   - large zone (>60%)    → stroke rectangle (frame border around asset)
+      //   - small zone           → filled accent shape (circle, diamond, triangle…)
+      const br      = zone.style?.borderRadius ?? 0;
+      const isRing  = br >= 999;
+      const isLarge = (zone.width ?? 0) > 60 || (zone.height ?? 0) > 60;
+      let shape, filled;
+      if (isRing) {
+        shape = "ring"; filled = false;
+      } else if (isLarge) {
+        shape = FRAME_SHAPE_DEFAULT; filled = false;
+      } else {
+        shape  = ACCENT_SHAPES[(beatIndex + i) % ACCENT_SHAPES.length];
+        filled = true;
+      }
       zones[zone.id] = {
-        content: { shape: "circle" },
-        style: { ...zone.style },
+        content: { shape },
+        style: { ...zone.style, color: zone.style?.color || "#ffffff", filled },
       };
     }
 
     if (zone.type === "icon") {
-      // Pick a random icon from the registry as a placeholder
+      // Pick deterministically from the icon registry; inject a visible white default color
       const iconId = iconIds[(beatIndex + i) % iconIds.length];
       zones[zone.id] = {
         content: { iconId },
-        style: { ...zone.style },
+        style: { ...zone.style, color: zone.style?.color || "#ffffff", filled: true },
       };
     }
   });
@@ -288,7 +308,7 @@ const INTENT_TO_BG_INTENT = {
   visual_rest: "empathy",
 };
 
-function buildLayoutBackground(intent, energy, colorStory = null, layoutId = null) {
+function buildLayoutBackground(intent, energy, colorStory = null, layoutId = null, niche = null) {
   const def = layoutId ? getLayoutDef(layoutId) : null;
   const hasAssetZone = def ? def.zones.some(z => z.type === "asset") : true;
 
@@ -305,7 +325,7 @@ function buildLayoutBackground(intent, energy, colorStory = null, layoutId = nul
   // Asset layouts: high energy allows any brightness, low energy prefers dark
   const brightness = (!hasAssetZone || energy < 0.65) ? "dark" : null;
 
-  const bg = getBackgroundForIntent(bgIntent, brightness, colorFamily, bgIsDark);
+  const bg = getBackgroundForIntent(bgIntent, brightness, colorFamily, bgIsDark, niche);
 
   // Always return a registry key — LayoutBackgroundRenderer resolves the style,
   // and LayoutSelector can display/replace it from the Colors picker.
@@ -362,7 +382,7 @@ export function planBeatVisual({
   return {
     layout,
     layoutPadding:    0,
-    layoutBackground: buildLayoutBackground(intent, energy, colorStory, layout),
+    layoutBackground: buildLayoutBackground(intent, energy, colorStory, layout, niche),
     choreography:     buildChoreography(energy),
     zones,
     blocks:    [],

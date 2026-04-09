@@ -119,6 +119,7 @@ export function pickLayoutBackground(layoutDef, beat, videoDNA) {
   const energy     = beat?.energy ?? 0.5;
   const bucket     = energyBucket(energy);
   const bgIntent   = INTENT_BG_MAP[intent] || "explanation";
+  const niche      = videoDNA?.niche || null;
 
   // Determine preferred brightness
   let preferBrightness = rules.brightness_prefer;
@@ -156,9 +157,15 @@ export function pickLayoutBackground(layoutDef, beat, videoDNA) {
     }
   }
 
+  // Niche bias: prefer entries that match the video's niche (soft — only when ≥2 match)
+  if (niche && candidates.length > 1) {
+    const nicheMatch = candidates.filter(k => backgroundPatternRegistry[k]?.niche?.includes(niche));
+    if (nicheMatch.length >= 2) candidates = nicheMatch;
+  }
+
   // Fallback: just use intent-based picker
   if (!candidates.length) {
-    return getBackgroundForIntent(bgIntent, preferBrightness);
+    return getBackgroundForIntent(bgIntent, preferBrightness, null, false, niche);
   }
 
   // Deterministic pick: use beat id as seed
