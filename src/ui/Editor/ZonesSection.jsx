@@ -90,11 +90,15 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
       };
     } else if (data?.kind === "icon") {
       const def = data.defaults || {};
+      // Phosphor icon (from Iconify) or local registry
+      const iconContent = data.iconify
+        ? { iconify: data.iconify, ...(data.iconId ? { iconId: data.iconId } : {}) }
+        : { iconId: data.iconId };
       zoneData = {
-        type: "decorative", x: 30, y: 35, width: 40, height: 30,
+        type: "icon", x: 30, y: 35, width: 40, height: 30,
         zIndex: 10, start: 0, end: null,
         enterAnimation: "fadeIn", exitAnimation: "none",
-        content: { iconId: data.iconId },
+        content: iconContent,
         style: { color: def.color || "#ffffff", opacity: 1, filled: true, strokeWidth: 0 },
         background: {},
       };
@@ -152,6 +156,18 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
 
   const setContent = (slot, data) => {
     data = normalizeAsset(data);
+    if (data.kind === "icon") {
+      const iconContent = data.iconify
+        ? { iconify: data.iconify, ...(data.iconId ? { iconId: data.iconId } : {}) }
+        : { iconId: data.iconId };
+      const def = data.defaults || {};
+      updateZone(slot, {
+        type: "icon",
+        content: iconContent,
+        style: { ...(zones[slot]?.style || {}), color: def.color || "#ffffff", opacity: 1 },
+      });
+      return;
+    }
     if (data.kind === "text") {
       updateZone(slot, { type: "text", content: { kind: "text", text: data.text || "" } });
       return;

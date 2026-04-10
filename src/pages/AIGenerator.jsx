@@ -113,11 +113,10 @@ function Toggle({ value, onChange }) {
 }
 
 /* ── Advanced summary line ────────────────────────────────── */
-function buildAdvancedSummary({ tone, videoType, language, mode, audience, brandColor }) {
+function buildAdvancedSummary({ tone, videoType, mode, audience, brandColor }) {
   const parts = [];
   if (videoType !== "auto") parts.push(VIDEO_TYPES.find((o) => o.value === videoType)?.label || videoType);
   if (tone !== "auto") parts.push(TONES.find((o) => o.value === tone)?.label || tone);
-  if (language !== "auto") parts.push(language);
   if (mode !== "faceless") parts.push("Talking Head");
   if (audience !== "general") parts.push(AUDIENCES.find((o) => o.value === audience)?.label || audience);
   if (brandColor) parts.push("Brand color set");
@@ -140,7 +139,7 @@ export default function AIGenerator() {
   const [tone, setTone] = useState("auto");
   const [videoType, setVideoType] = useState("auto");
   const [mode, setMode] = useState("faceless");
-  const [language, setLanguage] = useState("auto");
+  const [language, setLanguage] = useState("english");
   const [brandColor, setBrandColor] = useState("");
   const [generateImages, setGenerateImages] = useState(true);
   const [generateTTS, setGenerateTTS] = useState(true);
@@ -273,7 +272,6 @@ export default function AIGenerator() {
   const advancedSummary = buildAdvancedSummary({
     tone,
     videoType,
-    language,
     mode,
     audience,
     brandColor: brandColor.trim(),
@@ -422,8 +420,8 @@ export default function AIGenerator() {
           />
         </div>
 
-        {/* Orientation + Duration */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Orientation + Duration + Language */}
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <Label>Orientation</Label>
             <Select value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
@@ -431,6 +429,10 @@ export default function AIGenerator() {
           <div>
             <Label>Duration</Label>
             <Select value={durationCategory} onChange={setDurationCategory} options={DURATIONS} />
+          </div>
+          <div>
+            <Label>Language</Label>
+            <Select value={language} onChange={setLanguage} options={LANGUAGES} />
           </div>
         </div>
 
@@ -536,16 +538,10 @@ export default function AIGenerator() {
                 </div>
               </div>
 
-              {/* Row: Video Type + Language */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Video Type</Label>
-                  <Select value={videoType} onChange={setVideoType} options={VIDEO_TYPES} />
-                </div>
-                <div>
-                  <Label>Language</Label>
-                  <Select value={language} onChange={setLanguage} options={LANGUAGES} />
-                </div>
+              {/* Row: Video Type */}
+              <div>
+                <Label>Video Type</Label>
+                <Select value={videoType} onChange={setVideoType} options={VIDEO_TYPES} />
               </div>
 
               {/* Row: Mode + Brand Color */}

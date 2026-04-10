@@ -21,6 +21,7 @@ import animatedBorderRegistry from "../../core/animatedBorderRegistry.js";
 import assetShineRegistry     from "../../core/assetShineRegistry.jsx";
 import { getClipPathCSS, getSVGClipContent } from "../../core/decorativeShapeRegistry.js";
 import { renderIconSVG } from "../../core/iconRegistry.jsx";
+import { IconifyZone }  from "../elements/IconifyZone.jsx";
 
 function resolveEnterStyle(animation, progress, W, H) {
   switch (animation) {
@@ -509,11 +510,30 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           }} />
         )}
 
-        {/* Icon zones — SVG rendered inline */}
+        {/* Icon zones — Iconify (Phosphor) first, local registry fallback */}
         {zone.type === "icon" && (() => {
+          const iconifyDef     = zone.iconify;           // baked into layout def
+          const contentIconify = zone.content?.iconify;  // user-picked
+          const resolvedIconify = contentIconify ?? iconifyDef;
+          const iconColor = st.color ?? "#ffffff";
+
+          if (resolvedIconify?.set && resolvedIconify?.icon) {
+            return (
+              <div style={{ position: "absolute", inset: 0 }}>
+                <IconifyZone
+                  set={resolvedIconify.set}
+                  icon={resolvedIconify.icon}
+                  color={iconColor}
+                  style={st}
+                />
+              </div>
+            );
+          }
+
+          // Fallback — local iconRegistry
           const iconId = zone.content?.iconId;
           if (!iconId) return null;
-          const svg = renderIconSVG(iconId, st);
+          const svg = renderIconSVG(iconId, { ...st, color: iconColor });
           if (!svg) return null;
           return (
             <div style={{ position: "absolute", inset: 0, overflow: "visible" }}>

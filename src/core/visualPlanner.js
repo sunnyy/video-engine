@@ -12,6 +12,7 @@ import { getBackgroundForIntent } from "./backgroundPatternRegistry.js";
 import { resolveColors } from "./colorContrastResolver.js";
 import { resolveIconForZone } from "./resolveIconForZone.js";
 import { getNicheColorFamily, getNicheAvoid } from "./nichePaletteRegistry.js";
+import { LOCAL_TO_PHOSPHOR } from "../services/assets/iconifyService.js";
 
 /* ─────────────────────────────────────────────────────────────
    ENERGY LEVEL
@@ -219,13 +220,26 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle, inte
     }
 
     if (zone.type === "icon") {
-      const fakeBeat = { intent, energy, layoutBackground: null };
-      const dna = colorStory ? { colorStory, niche } : null;
-      const { iconId, color } = resolveIconForZone(fakeBeat, zone, dna, brandColor);
-      zones[zone.id] = {
-        content: { iconId },
-        style: { ...zone.style, color, filled: true },
-      };
+      // If the layout def already bakes in an iconify reference, honour it — no need to resolve
+      if (zone.iconify?.set && zone.iconify?.icon) {
+        zones[zone.id] = {
+          content: { iconify: zone.iconify },
+          style: { ...zone.style },
+        };
+      } else {
+        const fakeBeat = { intent, energy, layoutBackground: null };
+        const dna = colorStory ? { colorStory, niche } : null;
+        const { iconId, color } = resolveIconForZone(fakeBeat, zone, dna, brandColor);
+        // Map local icon to Phosphor equivalent if one exists
+        const phosphorIcon = LOCAL_TO_PHOSPHOR[iconId];
+        const content = phosphorIcon
+          ? { iconify: { set: "ph", icon: phosphorIcon }, iconId }
+          : { iconId };
+        zones[zone.id] = {
+          content,
+          style: { ...zone.style, color, filled: true },
+        };
+      }
     }
   });
 
