@@ -64,7 +64,8 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     layoutBackground,
     layoutPadding:    raw.layoutPadding || 0,
 
-    avatarZone:   raw.avatarZone   ?? null,
+    // undefined = never set (auto-detect from zone type), null = user explicitly chose Asset, string = explicit zone id
+    avatarZone:   raw.avatarZone,
     deletedZones: Array.isArray(raw.deletedZones) ? raw.deletedZones : [],
 
     zones,

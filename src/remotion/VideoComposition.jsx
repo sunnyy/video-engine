@@ -80,14 +80,44 @@ export default function VideoComposition({ project, previewMode = false }) {
   let avatarObjectFit = "cover";
 
   // Resolve which zone id carries the avatar this beat.
-  // Priority: explicit beat.avatarZone → first zone with type "avatar" in beat.zones → null.
+  // null   = user explicitly chose "Asset" tab — do NOT show avatar
+  // string = user explicitly chose a zone — show there
+  // undefined = never set — auto-detect from zones with type "avatar"
   const resolveAvatarZoneId = (beat) => {
-    if (beat?.avatarZone) return beat.avatarZone;
+    if (beat?.avatarZone === null)      return null;   // explicit opt-out
+    if (beat?.avatarZone)               return beat.avatarZone; // explicit zone
+    // undefined: auto-detect from pipeline-generated zone types
     if (beat?.zones) {
       const found = Object.entries(beat.zones).find(([, z]) => z.type === "avatar");
       if (found) return found[0];
     }
     return null;
+  };
+
+  // Enter/exit durations mirror LayoutRenderer
+  const AVATAR_ENTER_DUR = { fadeIn:18, slideUpIn:16, slideDownIn:16, slideLeftIn:16, slideRightIn:16, popIn:14, scaleIn:18, none:0 };
+  const AVATAR_EXIT_DUR  = { fadeOut:14, slideUpOut:14, slideDownOut:14, scaleOut:14, none:0 };
+
+  const resolveAvatarEnterStyle = (anim, p, W, H) => {
+    switch (anim) {
+      case "fadeIn":      return { opacity: interpolate(p,[0,1],[0,1],{extrapolateRight:"clamp"}) };
+      case "slideUpIn":   return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[H*0.08,0],{extrapolateRight:"clamp"})}px)` };
+      case "slideDownIn": return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[-H*0.08,0],{extrapolateRight:"clamp"})}px)` };
+      case "slideLeftIn": return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateX(${interpolate(p,[0,1],[W*0.1,0],{extrapolateRight:"clamp"})}px)` };
+      case "slideRightIn":return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateX(${interpolate(p,[0,1],[-W*0.1,0],{extrapolateRight:"clamp"})}px)` };
+      case "popIn":       return { opacity: interpolate(p,[0,0.3],[0,1],{extrapolateRight:"clamp"}), transform:`scale(${interpolate(p,[0,0.6,0.8,1],[0.7,1.05,0.97,1],{extrapolateRight:"clamp"})})` };
+      case "scaleIn":     return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`scale(${interpolate(p,[0,1],[1.15,1],{extrapolateRight:"clamp"})})` };
+      default:            return {};
+    }
+  };
+  const resolveAvatarExitStyle = (anim, p, H) => {
+    switch (anim) {
+      case "fadeOut":     return { opacity: interpolate(p,[0,1],[1,0],{extrapolateRight:"clamp"}) };
+      case "slideUpOut":  return { opacity: interpolate(p,[0.6,1],[1,0],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[0,-H*0.1],{extrapolateRight:"clamp"})}px)` };
+      case "slideDownOut":return { opacity: interpolate(p,[0.6,1],[1,0],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[0,H*0.1],{extrapolateRight:"clamp"})}px)` };
+      case "scaleOut":    return { opacity: interpolate(p,[0.5,1],[1,0],{extrapolateRight:"clamp"}), transform:`scale(${interpolate(p,[0,1],[1,0.85],{extrapolateRight:"clamp"})})` };
+      default:            return {};
+    }
   };
 
   if (talkMode && avatar?.src && currentBeat) {
@@ -106,16 +136,47 @@ export default function VideoComposition({ project, previewMode = false }) {
       const w      = resolved.width  ?? 100;
       const h      = resolved.height ?? 100;
 
+      // ── Animation ───────────────────────────────────────────────────────────
+      const beatStartFrame = Math.round(currentBeat.start_sec * fps);
+      const zoneStart      = Math.round((resolved.start ?? 0) * fps);
+      const zoneEnd        = resolved.end != null
+        ? Math.round(resolved.end * fps)
+        : Math.round((currentBeat.end_sec - currentBeat.start_sec) * fps);
+      const local    = frame - beatStartFrame - zoneStart;
+      const totalDur = zoneEnd - zoneStart;
+
+      const enterAnim = resolved.enterAnimation ?? "none";
+      const exitAnim  = resolved.exitAnimation  ?? "none";
+      const enterDur  = AVATAR_ENTER_DUR[enterAnim] || 0;
+      const exitDur   = AVATAR_EXIT_DUR[exitAnim]   || 0;
+
+      const enterProg = enterDur > 0
+        ? interpolate(local, [0, enterDur], [0, 1], { extrapolateLeft:"clamp", extrapolateRight:"clamp", easing: Easing.out(Easing.cubic) })
+        : 1;
+      const exitStart = totalDur - exitDur;
+      const exitProg  = exitDur > 0 && local >= exitStart
+        ? interpolate(local, [exitStart, totalDur], [0, 1], { extrapolateLeft:"clamp", extrapolateRight:"clamp", easing: Easing.out(Easing.cubic) })
+        : 0;
+
+      const zoneW = (w / 100) * innerW;
+      const zoneH = (h / 100) * innerH;
+      const enterSt = resolveAvatarEnterStyle(enterAnim, enterProg, zoneW, zoneH);
+      const exitSt  = exitProg > 0 ? resolveAvatarExitStyle(exitAnim, exitProg, zoneH) : {};
+      const animSt  = exitProg > 0 ? { ...enterSt, ...exitSt } : enterSt;
+
       avatarObjectFit = resolved.style?.objectFit ?? "cover";
       avatarBoxStyle = {
-        position:     "absolute",
-        left:         pad + (x / 100) * innerW,
-        top:          pad + (y / 100) * innerH,
-        width:        (w / 100) * innerW,
-        height:       (h / 100) * innerH,
-        zIndex:       3,   // above beats (z:2), below overlays (z:110)
-        overflow:     "hidden",
-        borderRadius: resolved.style?.borderRadius || 0,
+        position:        "absolute",
+        left:            pad + (x / 100) * innerW,
+        top:             pad + (y / 100) * innerH,
+        width:           zoneW,
+        height:          zoneH,
+        zIndex:          3,
+        overflow:        "hidden",
+        borderRadius:    resolved.style?.borderRadius || 0,
+        opacity:         animSt.opacity,
+        transform:       animSt.transform,
+        transformOrigin: "center center",
       };
     }
   }

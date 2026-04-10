@@ -927,6 +927,7 @@ export default function ZoneEditor({
                 onChange={v => setZoneStyle(slot, "objectFit", v)}
               />
             </div>
+
           </div>
         ) : (
           <div className="flex gap-4 mb-4">
