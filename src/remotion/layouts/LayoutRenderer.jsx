@@ -303,12 +303,11 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
       {/* Content wrapper with rotation */}
       <div style={{ ...contentWrapperStyle, zIndex: 1 }}>
 
-        {/* Avatar zone — rendered transparent here; VideoComposition places the
-            single global OffthreadVideo on top so playback is never interrupted */}
+        {/* Avatar zone — visual is handled by the single global Html5Video in VideoComposition.
+            Nothing is rendered here; the global video is positioned over this zone's area. */}
 
         {/* Asset — with optional animated border + one-shot shine */}
-        {effectiveType === "asset" && content.kind !== "block" && content.asset?.src &&
-          !(zone.id === beat?.avatarZone && project?.meta?.mode === "talking_head" && project?.avatar?.src) && (() => {
+        {effectiveType === "asset" && content.kind !== "block" && content.asset?.src && !isAvatarZone && (() => {
           const assetEl = (
             <AssetRenderer
               zone={{
@@ -586,7 +585,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
     const o = beatZones[d.id] || {};
     return [{
       ...d,
-      type:           o.type           ?? d.type,
+      type:           d.type,                    // layout def is authoritative; beat zone type is ignored for layout zones
       x:              o.x              ?? d.x,
       y:              o.y              ?? d.y,
       width:          o.width          ?? d.width,

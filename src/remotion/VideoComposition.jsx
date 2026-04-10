@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   AbsoluteFill,
   Sequence,
@@ -7,7 +7,8 @@ import {
   interpolate,
   Easing,
   Audio,
-  OffthreadVideo,
+  Html5Video,
+  useRemotionEnvironment,
 } from "remotion";
 
 import BeatRenderer from "./BeatRenderer";
@@ -22,17 +23,27 @@ import { getLayoutDef } from "../core/layoutRegistry.js";
 function loadCaptionFonts() {
 
   const fonts = [
+    // ── Core layout fonts ──
     "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap",
-    "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap",
-    "https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap",
-    "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&display=swap",
-    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap",
-    "https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&display=swap",
-    "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&display=swap",
-    "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,400;1,600&display=swap",
-    "https://fonts.googleapis.com/css2?family=Oswald:wght@600;700;900&display=swap",
-    "https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap",
-    "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap"
+    "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap",
+    "https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap",
+    "https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap",
+    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap",
+    // ── videoDNA typography systems ──
+    "https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,300;1,400&display=swap",
+    "https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&display=swap",
+    "https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap",
+    "https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap",
+    "https://fonts.googleapis.com/css2?family=Pacifico&display=swap",
   ];
 
   fonts.forEach((url) => {
@@ -58,6 +69,7 @@ export default function VideoComposition({ project, previewMode = false }) {
 
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const { isRendering } = useRemotionEnvironment();
 
   const { beats, meta, audio, overlays } = project;
 
@@ -67,119 +79,55 @@ export default function VideoComposition({ project, previewMode = false }) {
 
   const currentBeat = beats.find((beat) => {
     const start = Math.floor(beat.start_sec * fps);
-    const end = Math.floor(beat.end_sec * fps);
+    const end   = Math.floor(beat.end_sec   * fps);
     return frame >= start && frame < end;
   });
 
-  // ── Global avatar positioning ──────────────────────────────────────────────
-  // Single OffthreadVideo rendered outside all Sequences so it never remounts
-  // (remounting would restart playback). Position follows currentBeat's avatarZone.
-  const avatar    = project.avatar;
-  const talkMode  = meta?.mode === "talking_head";
-  let avatarBoxStyle = null;
-  let avatarObjectFit = "cover";
+  const avatar   = project.avatar;
+  const talkMode = meta?.mode === "talking_head";
 
-  // Resolve which zone id carries the avatar this beat.
-  // null   = user explicitly chose "Asset" tab — do NOT show avatar
-  // string = user explicitly chose a zone — show there
-  // undefined = never set — auto-detect from zones with type "avatar"
-  const resolveAvatarZoneId = (beat) => {
-    if (beat?.avatarZone === null)      return null;   // explicit opt-out
-    if (beat?.avatarZone)               return beat.avatarZone; // explicit zone
-    // undefined: auto-detect from pipeline-generated zone types
-    if (beat?.zones) {
-      const found = Object.entries(beat.zones).find(([, z]) => z.type === "avatar");
-      if (found) return found[0];
+
+  // ── Avatar visual positioning ──────────────────────────────────────────────
+  // Resolve which zone in the current beat is the avatar zone, and compute its
+  // absolute pixel geometry so the global Html5Video can sit there.
+  const avatarInfo = useMemo(() => {
+    if (!talkMode || !avatar?.src || !currentBeat) return null;
+
+    let zoneId = currentBeat.avatarZone;
+    if (zoneId === null) return null;  // user explicitly switched to Asset mode
+
+    const layoutDef = getLayoutDef(currentBeat.layout);
+
+    if (!zoneId) {
+      // auto-detect: first zone the layout marks as "avatar" type
+      zoneId = layoutDef?.zones?.find(z => z.type === "avatar")?.id ?? null;
     }
-    return null;
-  };
+    if (!zoneId) return null;
 
-  // Enter/exit durations mirror LayoutRenderer
-  const AVATAR_ENTER_DUR = { fadeIn:18, slideUpIn:16, slideDownIn:16, slideLeftIn:16, slideRightIn:16, popIn:14, scaleIn:18, none:0 };
-  const AVATAR_EXIT_DUR  = { fadeOut:14, slideUpOut:14, slideDownOut:14, scaleOut:14, none:0 };
+    const defZone  = layoutDef?.zones?.find(z => z.id === zoneId) || {};
+    const beatZone = (currentBeat.zones || {})[zoneId] || {};
+    const pad      = currentBeat.layoutPadding || 0;
 
-  const resolveAvatarEnterStyle = (anim, p, W, H) => {
-    switch (anim) {
-      case "fadeIn":      return { opacity: interpolate(p,[0,1],[0,1],{extrapolateRight:"clamp"}) };
-      case "slideUpIn":   return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[H*0.08,0],{extrapolateRight:"clamp"})}px)` };
-      case "slideDownIn": return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[-H*0.08,0],{extrapolateRight:"clamp"})}px)` };
-      case "slideLeftIn": return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateX(${interpolate(p,[0,1],[W*0.1,0],{extrapolateRight:"clamp"})}px)` };
-      case "slideRightIn":return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`translateX(${interpolate(p,[0,1],[-W*0.1,0],{extrapolateRight:"clamp"})}px)` };
-      case "popIn":       return { opacity: interpolate(p,[0,0.3],[0,1],{extrapolateRight:"clamp"}), transform:`scale(${interpolate(p,[0,0.6,0.8,1],[0.7,1.05,0.97,1],{extrapolateRight:"clamp"})})` };
-      case "scaleIn":     return { opacity: interpolate(p,[0,0.4],[0,1],{extrapolateRight:"clamp"}), transform:`scale(${interpolate(p,[0,1],[1.15,1],{extrapolateRight:"clamp"})})` };
-      default:            return {};
-    }
-  };
-  const resolveAvatarExitStyle = (anim, p, H) => {
-    switch (anim) {
-      case "fadeOut":     return { opacity: interpolate(p,[0,1],[1,0],{extrapolateRight:"clamp"}) };
-      case "slideUpOut":  return { opacity: interpolate(p,[0.6,1],[1,0],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[0,-H*0.1],{extrapolateRight:"clamp"})}px)` };
-      case "slideDownOut":return { opacity: interpolate(p,[0.6,1],[1,0],{extrapolateRight:"clamp"}), transform:`translateY(${interpolate(p,[0,1],[0,H*0.1],{extrapolateRight:"clamp"})}px)` };
-      case "scaleOut":    return { opacity: interpolate(p,[0.5,1],[1,0],{extrapolateRight:"clamp"}), transform:`scale(${interpolate(p,[0,1],[1,0.85],{extrapolateRight:"clamp"})})` };
-      default:            return {};
-    }
-  };
+    const x    = beatZone.x      ?? defZone.x      ?? 0;
+    const y    = beatZone.y      ?? defZone.y      ?? 0;
+    const w    = beatZone.width  ?? defZone.width  ?? 100;
+    const h    = beatZone.height ?? defZone.height ?? 100;
+    const zIdx = beatZone.zIndex ?? defZone.zIndex ?? 2;
 
-  if (talkMode && avatar?.src && currentBeat) {
-    const zoneId = resolveAvatarZoneId(currentBeat);
-    if (zoneId) {
-      const layoutDef = getLayoutDef(currentBeat.layout);
-      const zoneDef   = layoutDef?.zones?.find(z => z.id === zoneId) || {};
-      const beatZone  = currentBeat.zones?.[zoneId] || {};
-      const resolved  = { ...zoneDef, ...beatZone };
-
-      const pad    = currentBeat.layoutPadding || 0;
-      const innerW = meta.width  - pad * 2;
-      const innerH = meta.height - pad * 2;
-      const x      = resolved.x      ?? 0;
-      const y      = resolved.y      ?? 0;
-      const w      = resolved.width  ?? 100;
-      const h      = resolved.height ?? 100;
-
-      // ── Animation ───────────────────────────────────────────────────────────
-      const beatStartFrame = Math.round(currentBeat.start_sec * fps);
-      const zoneStart      = Math.round((resolved.start ?? 0) * fps);
-      const zoneEnd        = resolved.end != null
-        ? Math.round(resolved.end * fps)
-        : Math.round((currentBeat.end_sec - currentBeat.start_sec) * fps);
-      const local    = frame - beatStartFrame - zoneStart;
-      const totalDur = zoneEnd - zoneStart;
-
-      const enterAnim = resolved.enterAnimation ?? "none";
-      const exitAnim  = resolved.exitAnimation  ?? "none";
-      const enterDur  = AVATAR_ENTER_DUR[enterAnim] || 0;
-      const exitDur   = AVATAR_EXIT_DUR[exitAnim]   || 0;
-
-      const enterProg = enterDur > 0
-        ? interpolate(local, [0, enterDur], [0, 1], { extrapolateLeft:"clamp", extrapolateRight:"clamp", easing: Easing.out(Easing.cubic) })
-        : 1;
-      const exitStart = totalDur - exitDur;
-      const exitProg  = exitDur > 0 && local >= exitStart
-        ? interpolate(local, [exitStart, totalDur], [0, 1], { extrapolateLeft:"clamp", extrapolateRight:"clamp", easing: Easing.out(Easing.cubic) })
-        : 0;
-
-      const zoneW = (w / 100) * innerW;
-      const zoneH = (h / 100) * innerH;
-      const enterSt = resolveAvatarEnterStyle(enterAnim, enterProg, zoneW, zoneH);
-      const exitSt  = exitProg > 0 ? resolveAvatarExitStyle(exitAnim, exitProg, zoneH) : {};
-      const animSt  = exitProg > 0 ? { ...enterSt, ...exitSt } : enterSt;
-
-      avatarObjectFit = resolved.style?.objectFit ?? "cover";
-      avatarBoxStyle = {
-        position:        "absolute",
-        left:            pad + (x / 100) * innerW,
-        top:             pad + (y / 100) * innerH,
-        width:           zoneW,
-        height:          zoneH,
-        zIndex:          3,
-        overflow:        "hidden",
-        borderRadius:    resolved.style?.borderRadius || 0,
-        opacity:         animSt.opacity,
-        transform:       animSt.transform,
-        transformOrigin: "center center",
-      };
-    }
-  }
+    return {
+      style: {
+        position:     "absolute",
+        left:         pad > 0 ? `calc(${x}% + ${pad}px)` : `${x}%`,
+        top:          pad > 0 ? `calc(${y}% + ${pad}px)` : `${y}%`,
+        width:        pad > 0 ? `calc(${w}% - ${pad * 2}px)` : `${w}%`,
+        height:       pad > 0 ? `calc(${h}% - ${pad * 2}px)` : `${h}%`,
+        zIndex:       zIdx,
+        overflow:     "hidden",
+        borderRadius: beatZone.style?.borderRadius ?? defZone.style?.borderRadius ?? 0,
+      },
+      objectFit: beatZone.style?.objectFit ?? defZone.style?.objectFit ?? "cover",
+    };
+  }, [talkMode, avatar, currentBeat]);
 
   let musicVolume = audio?.music?.volume ?? 0.8;
 
@@ -206,8 +154,6 @@ export default function VideoComposition({ project, previewMode = false }) {
         height: meta.height
       }}
     >
-
-      {/* Avatar video is rendered per-zone inside LayoutRenderer — not as a global layer */}
 
       {beats.map((beat, index) => {
 
@@ -330,11 +276,17 @@ export default function VideoComposition({ project, previewMode = false }) {
           }
         }
 
-        // Merge in+out styles — outgoing overrides incoming once out phase starts
+        // No zIndex on the beat wrapper — this is intentional.
+        // Without an explicit zIndex, the beat AbsoluteFill creates no stacking context
+        // during normal (cut) transitions, so zone zIndexes (assets z=1-2, text z=3-4)
+        // float up and compete directly with the global avatar video (z = avatarZone.zIndex).
+        // During animated transitions (fade/slide), opacity/transform naturally create a
+        // stacking context but with z-order "auto" (≈ 0), so the global avatar (explicit z)
+        // remains visible above the transitioning beat — the person keeps talking through cuts.
         const isInOutgoing = localFrame >= outStart && outOverlap > 0;
         const finalStyle = isInOutgoing
-          ? { ...inStyle, ...outStyle, zIndex: 2 }
-          : { ...inStyle, zIndex: 2 };
+          ? { ...inStyle, ...outStyle }
+          : { ...inStyle };
 
         return (
           <Sequence key={beat.id} from={startFrame} durationInFrames={durationFrames}>
@@ -349,14 +301,31 @@ export default function VideoComposition({ project, previewMode = false }) {
 
       })}
 
-      {/* Single persistent avatar — never remounts across beat changes */}
-      {talkMode && avatar?.src && avatarBoxStyle && (
-        <div style={avatarBoxStyle}>
-          <OffthreadVideo
+      {/* ── Global avatar visual ────────────────────────────────────────────
+          Single Html5Video (muted) positioned at the current beat's avatar zone.
+          Never remounts across beat transitions → the nativeAudioRef audio element
+          plays uninterrupted alongside it.
+          Hidden (0×0) when no beat has an avatar zone active. */}
+      {/* Global avatar — always mounted so the video element never remounts and audio
+          plays continuously. Positioned at the avatar zone when active; 0×0 hidden
+          otherwise so the audio track keeps running without any visual presence. */}
+      {talkMode && avatar?.src && (
+        <div style={avatarInfo?.style ?? {
+          position: "absolute", width: 0, height: 0,
+          overflow: "hidden", pointerEvents: "none",
+        }}>
+          <Html5Video
             src={avatar.src}
-            style={{ width: "100%", height: "100%", objectFit: avatarObjectFit }}
+            muted={isRendering}
+            style={{ width: "100%", height: "100%", objectFit: avatarInfo?.objectFit ?? "cover" }}
           />
         </div>
+      )}
+
+      {/* Render-mode audio — Remotion extracts the avatar audio track here.
+          Not rendered in preview (nativeAudioRef handles that instead). */}
+      {isRendering && talkMode && avatar?.src && (
+        <Audio key={`avatar-render-${avatar.src}`} src={avatar.src} volume={1} />
       )}
 
       {videoOverlays.length > 0 && (

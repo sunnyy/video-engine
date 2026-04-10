@@ -196,11 +196,9 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         }
         const isLayoutZone = layoutDef?.zones?.some(z => z.id === selectedZoneId);
         if (isLayoutZone) {
-          // Layout zones can't be removed from the def — track deletion in deletedZones instead
-          const prev = liveBeat.deletedZones || [];
-          if (!prev.includes(selectedZoneId)) {
-            updateBeat(liveBeat.id, { deletedZones: [...prev, selectedZoneId] });
-          }
+          updateBeat(liveBeat.id, {
+            zones: { ...bz, [selectedZoneId]: { ...override, hidden: true } },
+          });
         } else {
           const { [selectedZoneId]: _removed, ...rest } = bz;
           updateBeat(liveBeat.id, { zones: rest });

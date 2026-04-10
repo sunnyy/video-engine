@@ -12,8 +12,8 @@ import CanvasPreview from "../ui/Editor/CanvasPreview";
 export default function Editor() {
   const { id } = useParams();
 
-  const setProject     = useProjectStore((s) => s.setProject);
-  const setDatabaseId  = useProjectStore((s) => s.setDatabaseId);
+  const setProject = useProjectStore((s) => s.setProject);
+  const setDatabaseId = useProjectStore((s) => s.setDatabaseId);
   const setProjectName = useProjectStore((s) => s.setProjectName);
   const project = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
@@ -44,7 +44,7 @@ export default function Editor() {
   const handleDeleteZone = (zoneId) => {
     const { project, activeBeatId, updateBeat } = useProjectStore.getState();
     if (!project || !activeBeatId) return;
-    const beat = project.beats.find(b => b.id === activeBeatId);
+    const beat = project.beats.find((b) => b.id === activeBeatId);
     if (!beat) return;
     const newZones = { ...beat.zones };
     delete newZones[zoneId];
@@ -77,13 +77,13 @@ export default function Editor() {
 
   // Widen canvas column for landscape so the 16:9 preview has enough height
   const cols = is169
-    ? { sidebar: "5%", beatList: "15%", canvas: "50%", panel: "30%" }
+    ? { sidebar: "7%", beatList: "18%", canvas: "45%", panel: "30%" }
     : { sidebar: "7%", beatList: "18%", canvas: "45%", panel: "30%" };
 
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
-      
+
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div style={{ width: cols.sidebar }}>
           <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -94,7 +94,11 @@ export default function Editor() {
         </div>
 
         <div style={{ width: cols.canvas }}>
-          <CanvasPreview selectedZoneIds={selectedZoneIds} onSelectZone={handleSelectZone} onDeleteZone={handleDeleteZone} />
+          <CanvasPreview
+            selectedZoneIds={selectedZoneIds}
+            onSelectZone={handleSelectZone}
+            onDeleteZone={handleDeleteZone}
+          />
         </div>
 
         <div style={{ width: cols.panel }}>

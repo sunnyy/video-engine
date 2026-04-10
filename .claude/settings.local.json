@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(node -e \"const d=require\\('./temp.json'\\); const b=d.beats.find\\(b=>b.layout==='FourCollage'\\); console.log\\(JSON.stringify\\({layout:b?.layout, zones:b?.zones},null,2\\)\\)\")",
+      "Bash(grep -n \"export.*resolveColors\\\\|function resolveColors\" /c/Users/Sunny/Desktop/video-engine/src/core/*.js)",
+      "Bash(grep -n \"resolvePresetColor\\\\|resolvePresetBackground\" /c/Users/Sunny/Desktop/video-engine/src/core/*.js)",
+      "Bash(node -e \"const d=require\\('./temp.json'\\); const b=d.beats[0]; const {getLayoutDef}=require\\('./src/core/layoutRegistry.js'\\); const ld=getLayoutDef\\(b.layout\\); ld.zones.forEach\\(z=>console.log\\(z.id,'type:',z.type,'zIndex:',z.zIndex\\)\\);\")",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"const r = require\\('./node_modules/remotion/package.json'\\); console.log\\(r.version\\)\")",
+      "Bash(node -e \"const r = require\\('remotion'\\); console.log\\(Object.keys\\(r\\).filter\\(k => /video|audio/i.test\\(k\\)\\)\\)\")",
+      "Bash(node -e \"const r = require\\('remotion'\\); console.log\\(Object.keys\\(r\\).filter\\(k => /environ|render|player/i.test\\(k\\)\\)\\)\")"
     ]
   }
 }

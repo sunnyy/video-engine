@@ -74,7 +74,7 @@ export default [
         enterAnimation:"popIn", exitAnimation:"none",
         style:{ objectFit:"cover", borderRadius:14,
           outline:"8px solid #ffffff", outlineOffset:"-8px" } },
-      { id:"z3", type:"text", role:"headline", maxChars:28, order:1, x:4, y:76, width:92, height:18, zIndex:3, start:0.6, end:null,
+      { id:"z3", type:"text", role:"headline", maxChars:28, order:1, x:4, y:76, width:92, height:18, zIndex:4, start:0.6, end:null,
         enterAnimation:"slideUpIn", exitAnimation:"none",
         style:{ fontSize:112, fontWeight:900, fontFamily:"'Bebas Neue', sans-serif",
           color:"#ffffff", textAlign:"left", lineHeight:0.95,

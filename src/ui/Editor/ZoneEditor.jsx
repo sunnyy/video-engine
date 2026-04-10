@@ -367,7 +367,7 @@ export default function ZoneEditor({
       <Section title="Typography" icon="Aa">
         {/* Font family */}
         <div className="mb-3">
-          <Sel label="Font Family" value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyle(slot, "fontFamily", v)} options={FONT_FAMILIES} />
+          <Sel label="Font Family" value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyleBulk(slot, { fontFamily: v, _userFontFamily: true })} options={FONT_FAMILIES} />
         </div>
 
         {/* Font size + opacity */}
@@ -896,7 +896,7 @@ export default function ZoneEditor({
                   <video src={avatarSrc} muted playsInline
                     style={{ width: 96, height: 120, objectFit: style.objectFit || "cover", borderRadius: 8, display: "block" }} />
                   <div className="text-[11px] font-mono text-[#a78bfa] text-center">
-                    Talking head video will appear in this zone
+                    Talking head video will appear in this zone.
                   </div>
                 </>
               ) : (
