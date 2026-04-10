@@ -252,17 +252,28 @@ function fillTextZones(beats, colorOptions = {}) {
       // Build inject: preset flair is the base, then contextual overrides on top.
       const inject = { ...presetFlair };
 
+      // Determine if niche bg is light — drives contrast decisions everywhere
+      const nicheBg     = colorOptions.colorStory?.bg || colorOptions.dna?.colorStory?.bg || "#0b0b10";
+      const bgIsLight   = (() => {
+        try {
+          const h = nicheBg.replace("#","");
+          const full = h.length===3 ? h.split("").map(c=>c+c).join("") : h;
+          const r=parseInt(full.slice(0,2),16)/255, g=parseInt(full.slice(2,4),16)/255, b=parseInt(full.slice(4,6),16)/255;
+          const toL = c => c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4);
+          return (0.2126*toL(r)+0.7152*toL(g)+0.0722*toL(b)) >= 0.18;
+        } catch { return false; }
+      })();
+      const paletteText = colorOptions.colorStory?.text || colorOptions.dna?.colorStory?.text || "#ffffff";
+      const primary     = colorOptions.colorStory?.primary || colorOptions.dna?.colorStory?.primary || "#7c5cfc";
+
       if (hasAssetZones) {
-        // Asset layouts: force white for readability.
-        // Exception: keep thematic non-white preset colors (gold, cyan, neon — colorRole: "fixed"
-        // or auto-detected as intentional because they're not #ffffff).
-        const rawColor   = preset?.style?.color;
-        const isThematic = rawColor && rawColor !== "#ffffff" && rawColor !== "white"
-          && rawColor !== "transparent" && preset?.colorRole !== "brand";
-        inject.color = isThematic ? rawColor : "#ffffff";
-        inject.textShadow = beat.energy >= 0.7
-          ? "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)"
-          : "0 2px 18px rgba(0,0,0,0.9)";
+        // Asset layouts: use palette text color (contrast-safe for this niche's bg).
+        inject.color = paletteText;
+        inject.textShadow = bgIsLight
+          ? "none"
+          : (beat.energy >= 0.7
+            ? "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)"
+            : "0 2px 18px rgba(0,0,0,0.9)");
         delete inject.background; // no bg overlay on asset zones
       } else {
         // Non-asset layouts: resolve through three-tier color system.
@@ -272,9 +283,19 @@ function fillTextZones(beats, colorOptions = {}) {
         const resolvedBg = resolvePresetBackground(preset, colorContext);
         if (resolvedBg) inject.background = resolvedBg;
 
-        if (colors.textShadow && colors.textShadow !== "none" && !presetFlair.textShadow) {
+        if (!bgIsLight && colors.textShadow && colors.textShadow !== "none" && !presetFlair.textShadow) {
           inject.textShadow = colors.textShadow;
+        } else if (bgIsLight) {
+          inject.textShadow = "none";
         }
+      }
+
+      // WebkitTextStroke: replace hardcoded color with DNA primary
+      if (inject.textStrokeColor || presetFlair.textStrokeColor) {
+        inject.textStrokeColor = primary;
+      }
+      if (inject.WebkitTextStrokeColor || presetFlair.WebkitTextStrokeColor) {
+        inject.WebkitTextStrokeColor = primary;
       }
 
       // Store which preset was applied so ZoneEditor can highlight it

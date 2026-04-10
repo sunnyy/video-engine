@@ -208,10 +208,14 @@ STORYTELLING APPROACHES (pick what fits the topic, don't force a pattern):
 - The challenge: you probably can't do this, here's why
 - The revelation: slow build to one shocking truth
 
+NICHE — Pick exactly one from this list based on the topic:
+entertainment | gaming | sports | finance | education | health | lifestyle | food | travel | tech | spiritual | skincare | business | music | comedy | news | motivational
+
 OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no explanation:
 {
   "videoType": "${videoType}",
   "language": "${language || 'english'}",
+  "niche": "one value from the niche list above",
   "emotionalArc": "one sentence describing the emotional journey of this video",
   "beats": [
     {
@@ -270,6 +274,14 @@ function parseAIResponse(raw) {
   if (!Array.isArray(parsed.beats) || parsed.beats.length === 0) {
     throw new Error("AI returned no beats");
   }
+
+  // Validate niche
+  const validNiches = [
+    "entertainment","gaming","sports","finance","education","health","lifestyle",
+    "food","travel","tech","spiritual","skincare","business","music","comedy",
+    "news","motivational",
+  ];
+  parsed.niche = validNiches.includes(parsed.niche) ? parsed.niche : null;
 
   // Sanitise each beat
   const validIntents = [
@@ -343,7 +355,18 @@ export async function generateStructuredShort({
   const rawText      = data.text || data.content || JSON.stringify(data);
   const parsedScript = parseAIResponse(rawText);
 
-  const dna = generateVideoDNA({ videoType, tone });
+  // Compute average energy across beats for palette selection
+  const avgEnergy = parsedScript.beats.length
+    ? parsedScript.beats.reduce((s, b) => s + (b.energy ?? 0.5), 0) / parsedScript.beats.length
+    : 0.7;
+
+  const dna = generateVideoDNA({
+    videoType,
+    tone,
+    niche:      parsedScript.niche || null,
+    energy:     avgEnergy,
+    brandColor: brandColor || null,
+  });
 
   let beats = await buildBeatsFromScript({
     structuredBeats: parsedScript.beats,
@@ -368,17 +391,25 @@ export async function generateStructuredShort({
 
     zoneContentArr.forEach(({ beatIndex, zones: zc }) => {
       if (!beats[beatIndex]) return;
-      const beat = beats[beatIndex];
+      const beat      = beats[beatIndex];
+      const layoutDef = layoutDefs[beatIndex];
+      // Build a map of zoneId → zone type from the layout def for validation
+      const defZoneTypes = {};
+      (layoutDef?.zones || []).forEach(z => { defZoneTypes[z.id] = z.type; });
+
       Object.entries(zc).forEach(([zoneId, content]) => {
         if (!beat.zones[zoneId]) return;
-        if (content.text !== undefined) {
+        const defType = defZoneTypes[zoneId];
+
+        // Only write text into text zones — never clobber asset zones with text content
+        if (content.text !== undefined && defType === "text") {
           beat.zones[zoneId] = {
             ...beat.zones[zoneId],
             content: { kind: "text", text: content.text },
           };
         }
-        if (content.prompt !== undefined) {
-          // Store AI-generated image prompt for this zone
+        // Only store asset prompts for asset zones — never for text zones
+        if (content.prompt !== undefined && defType === "asset") {
           beat.zones[zoneId] = {
             ...beat.zones[zoneId],
             _assetPrompt: content.prompt,
@@ -476,11 +507,16 @@ export async function generateStructuredShort({
       .filter(z => beat.zones[z.id]?.content?.kind !== "block")
       .filter(z => !beat.zones[z.id]?.content?.asset?.src);
 
-    // For text-only layouts, inject a full-bleed background zone
-    let injectedBgZone = null;
+    // For text-only layouts, add a real full-bleed asset zone for the background image
+    let injectedBgZoneId = null;
     if (defAssetZones.length === 0 && hint) {
-      injectedBgZone = { id: "_bg_img", type: "asset" };
-      defAssetZones = [injectedBgZone];
+      // Use the next available zone number after existing layout zones
+      const existingNums = Object.keys(beat.zones)
+        .map(id => parseInt(id.replace(/\D/g, ""), 10))
+        .filter(n => !isNaN(n));
+      const nextN = existingNums.length ? Math.max(...existingNums) + 1 : 1;
+      injectedBgZoneId = `z${nextN}`;
+      defAssetZones = [{ id: injectedBgZoneId, type: "asset" }];
     }
 
     if (!defAssetZones.length) return;
@@ -533,9 +569,9 @@ export async function generateStructuredShort({
 
         // Abstract AI generation — only when generateImages=true and no entity image found
         if (!imgUrl && generateImages) {
-          const zonePrompt = assetZone !== injectedBgZone
-            ? beat.zones[assetZone.id]?._assetPrompt || null
-            : null;
+          const zonePrompt = injectedBgZoneId
+            ? null
+            : beat.zones[assetZone.id]?._assetPrompt || null;
           const genPrompt = zonePrompt || hint?.prompt || null;
 
           if (genPrompt) {
@@ -564,15 +600,16 @@ export async function generateStructuredShort({
 
         if (!imgUrl) return;
 
-        if (assetZone === injectedBgZone) {
-          // Background image for text-only layouts: full-bleed, dimmed behind text
-          beat.zones["_bg_img"] = {
+        if (assetZone.id === injectedBgZoneId) {
+          // Text-only layout: inject as a real full-bleed asset zone behind text zones
+          beat.zones[injectedBgZoneId] = {
             type:    "asset",
-            x:       0, y: 0, width: 100, height: 100,
+            x: 0, y: 0, width: 100, height: 100,
             zIndex:  0,
             start:   0, end: null,
-            content: { kind: "asset", asset: { src: imgUrl, type: "image", objectFit: "cover", motion } },
-            style:   { opacity: 1.0 },
+            enterAnimation: "fadeIn", exitAnimation: "none",
+            content: { kind: "asset", asset: { src: imgUrl, type: "image", objectFit: "cover", motion: "none" } },
+            style:   { opacity: 1, borderRadius: 0 },
             background: {},
           };
         } else {

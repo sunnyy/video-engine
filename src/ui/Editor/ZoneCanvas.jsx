@@ -9,12 +9,13 @@ import { elementsRegistry } from "../../../src/core/elementsRegistry";
 import { getClipPathCSS } from "../../../src/core/decorativeShapeRegistry.js";
 import CompositionLayerRenderer from "../../../src/remotion/elements/composition/CompositionLayerRenderer";
 import ZoneHandle from "./ZoneHandle";
+import { getTypographyForRole } from "../../../src/core/videoDNA.js";
 
 /**
  * Hidden measurement div — renders text with the same styles as LayoutRenderer
  * and uses ResizeObserver to keep zone.height in sync with actual text height.
  */
-function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate }) {
+function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typographySystem }) {
   const ref         = useRef(null);
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
@@ -22,6 +23,10 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate }) {
 
   const st   = zone.style   || {};
   const text = zone.content?.text || "\u200B"; // zero-width space keeps 1-line height
+
+  const dnaTypo = (!st._userFontFamily && typographySystem && zone.role)
+    ? getTypographyForRole(typographySystem, zone.role)
+    : null;
 
   useEffect(() => {
     const el = ref.current;
@@ -49,8 +54,8 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate }) {
       width:         `${(zone.width / 100) * canvasW}px`,
       padding:       st.padding      || "0 8px",
       fontSize:      (st.fontSize    || 32) * canvasScale,
-      fontWeight:    st.fontWeight   || 700,
-      fontFamily:    st.fontFamily   || "inherit",
+      fontWeight:    dnaTypo?.fontWeight ?? st.fontWeight ?? 700,
+      fontFamily:    dnaTypo?.fontFamily ?? st.fontFamily ?? "inherit",
       lineHeight:    st.lineHeight   || 1.15,
       letterSpacing: st.letterSpacing || "normal",
       whiteSpace:    "normal",
@@ -112,8 +117,9 @@ export default function ZoneCanvas({
   canvasW, canvasH, canvasScale,
   videoOverlays, onUpdateVideoOverlay,
 }) {
-  const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
-  const _pushHistory     = useProjectStore((s) => s._pushHistory);
+  const updateBeatSilent   = useProjectStore((s) => s.updateBeatSilent);
+  const _pushHistory       = useProjectStore((s) => s._pushHistory);
+  const typographySystem   = useProjectStore((s) => s.project?.meta?.dna?.typographySystem);
   const layoutDef        = getLayoutDef(beat?.layout);
   const beatZones        = beat?.zones || {};
 
@@ -128,9 +134,11 @@ export default function ZoneCanvas({
 
   const defZoneIds = new Set((layoutDef?.zones || []).map(z => z.id));
 
+  const deletedZones = new Set(beat?.deletedZones || []);
+
   const defZones = (layoutDef?.zones || []).flatMap(d => {
+    if (deletedZones.has(d.id)) return [];
     const o = beatZones[d.id] || {};
-    if (o.hidden) return [];
     return [{
       ...d,
       x: o.x ?? d.x, y: o.y ?? d.y,
@@ -293,6 +301,7 @@ export default function ZoneCanvas({
                   canvasH={canvasH - (beat?.layoutPadding || 0) * canvasScale * 2}
                   canvasScale={canvasScale}
                   onUpdate={(upd) => handleUpdate(zone.id, upd)}
+                  typographySystem={typographySystem}
                 />
               )}
             </div>
@@ -303,7 +312,7 @@ export default function ZoneCanvas({
         <CompositionLayerRenderer beat={beat} layerFilter={[2, 4]} />
 
         {allZones
-          .filter(zone => zone.type !== "element" && zone.id !== "_bg_img")
+          .filter(zone => zone.type !== "element")
           .map(zone => (
             <ZoneHandle key={`handle_${zone.id}`} zone={zone}
               isSelected={selectedZoneIds instanceof Set ? selectedZoneIds.has(zone.id) : selectedZoneId === zone.id}

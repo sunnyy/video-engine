@@ -374,9 +374,11 @@ export default function ZoneEditor({
           <Slider label="Size" value={Math.round(parseFloat(style.fontSize ?? 32))}
             onChangeSilent={v => {
               const curFont = parseFloat(style.fontSize ?? 32);
-              const curH    = safeZone.height ?? zoneDef?.height ?? 20;
-              const newH    = curFont > 0 ? Math.max(3, Math.round(curH * (v / curFont))) : curH;
-              patchZoneSilent(slot, { height: newH }, { fontSize: v });
+              const ratio   = curFont > 0 ? v / curFont : 1;
+              const curW    = safeZone.width  ?? zoneDef?.width  ?? 50;
+              const newW    = Math.max(5, Math.round(curW * ratio * 10) / 10);
+              // Width scales with font size; TextAutoHeight governs height automatically
+              patchZoneSilent(slot, { width: newW }, { fontSize: v });
             }}
             onCommit={commit} min={10} max={300} unit="px" />
           <Slider label="Opacity" value={Math.round(opacity * 100)}

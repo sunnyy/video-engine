@@ -28,7 +28,10 @@ function loadCaptionFonts() {
     "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap",
     "https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&display=swap",
     "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&display=swap",
-    "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,400;1,600&display=swap"
+    "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,400;1,600&display=swap",
+    "https://fonts.googleapis.com/css2?family=Oswald:wght@600;700;900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap",
+    "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap"
   ];
 
   fonts.forEach((url) => {

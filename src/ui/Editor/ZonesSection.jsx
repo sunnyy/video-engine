@@ -115,9 +115,19 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
   };
 
   const deleteZone = (slot) => {
-    const newZones = { ...zones };
-    delete newZones[slot];
-    updateBeat(beat.id, { zones: newZones });
+    const isLayoutZone = zoneDefs.some(z => z.id === slot);
+    if (isLayoutZone) {
+      // Layout zone — can't remove from def, track in deletedZones
+      const prev = beat.deletedZones || [];
+      if (!prev.includes(slot)) {
+        updateBeat(beat.id, { deletedZones: [...prev, slot] });
+      }
+    } else {
+      // Custom zone — remove from zones dict entirely
+      const newZones = { ...zones };
+      delete newZones[slot];
+      updateBeat(beat.id, { zones: newZones });
+    }
     if (selectedZoneId === slot) onSelectZone(null);
   };
 
@@ -231,15 +241,17 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
   const defZoneIds   = new Set(zoneDefs.map(z => z.id));
   const TYPE_COLOR   = { asset: "#7c5cfc", text: "#fb923c", decorative: "#22d3ee", element: "#eab308", block: "#ec4899" };
 
+  const deletedZonesSet = new Set(beat.deletedZones || []);
+
   const allRows = [
-    // Layout-defined zones
-    ...zoneDefs.filter(z => !zones[z.id]?.hidden).map(z => {
+    // Layout-defined zones (excluding ones the user has deleted)
+    ...zoneDefs.filter(z => !deletedZonesSet.has(z.id)).map(z => {
       const zData = zones[z.id] || {};
       const type  = zData.type || z.type || "asset";
       return { id: z.id, name: z.label || z.id, type, isCustom: false, isOverlay: false };
     }),
-    // Custom zones (exclude _bg_img — auto-managed background, not user-editable)
-    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id) && id !== "_bg_img").map(([id, z]) => {
+    // Custom zones added by the pipeline or user (not in the layout def)
+    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id)).map(([id, z]) => {
       const type = z.type || "asset";
       const name = type === "text"
         ? (z.content?.text?.slice(0, 16) || "Text")

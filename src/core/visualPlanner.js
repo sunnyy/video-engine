@@ -11,6 +11,7 @@ import { findLayouts, getLayoutDef } from "./layoutRegistry.js";
 import { getBackgroundForIntent } from "./backgroundPatternRegistry.js";
 import { resolveColors } from "./colorContrastResolver.js";
 import { resolveIconForZone } from "./resolveIconForZone.js";
+import { getNicheColorFamily, getNicheAvoid } from "./nichePaletteRegistry.js";
 
 /* ─────────────────────────────────────────────────────────────
    ENERGY LEVEL
@@ -180,10 +181,6 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle, inte
   const stylePreset = pickStylePreset(energy);
   const zones = {};
 
-  // Accent shapes — small, filled, used as decorative accents
-  const ACCENT_SHAPES = ["circle", "diamond", "triangle", "star", "hexagon", "pill"];
-  // Frame/border shapes — stroke-only, used when a decorative zone is large (border frame or ring)
-  const FRAME_SHAPE_DEFAULT = "square"; // stroke square = frame border
 
   def.zones.forEach((zone, i) => {
     if (zone.type === "asset") {
@@ -216,26 +213,9 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle, inte
     }
 
     if (zone.type === "decorative") {
-      // Pick shape based on zone size and borderRadius hint from layout definition:
-      //   - borderRadius >= 999  → "ring"  (circle ring border overlay, e.g. around a circular asset)
-      //   - large zone (>60%)    → stroke rectangle (frame border around asset)
-      //   - small zone           → filled accent shape (circle, diamond, triangle…)
-      const br      = zone.style?.borderRadius ?? 0;
-      const isRing  = br >= 999;
-      const isLarge = (zone.width ?? 0) > 60 || (zone.height ?? 0) > 60;
-      let shape, filled;
-      if (isRing) {
-        shape = "ring"; filled = false;
-      } else if (isLarge) {
-        shape = FRAME_SHAPE_DEFAULT; filled = false;
-      } else {
-        shape  = ACCENT_SHAPES[(beatIndex + i) % ACCENT_SHAPES.length];
-        filled = true;
-      }
-      zones[zone.id] = {
-        content: { shape },
-        style: { ...zone.style, color: zone.style?.color || "#ffffff", filled },
-      };
+      // Decorative zones are skipped during auto-assignment — not rendered by the pipeline.
+      // Layouts that define decorative zones (gradient overlays, dividers, etc.) render
+      // them directly from the layout def style in LayoutRenderer without needing zone data.
     }
 
     if (zone.type === "icon") {
@@ -311,8 +291,9 @@ function buildLayoutBackground(intent, energy, colorStory = null, layoutId = nul
   const def = layoutId ? getLayoutDef(layoutId) : null;
   const hasAssetZone = def ? def.zones.some(z => z.type === "asset") : true;
 
-  // Derive DNA color family to keep backgrounds coherent with the video's palette
-  const colorFamily = getDNAColorFamily(colorStory?.primary || null);
+  // Use niche color family from registry — much more accurate than deriving from primary hex
+  const colorFamily = niche ? getNicheColorFamily(niche) : getDNAColorFamily(colorStory?.primary || null);
+  const nicheAvoid  = niche ? getNicheAvoid(niche) : [];
 
   // When DNA bg is dark, never pick light-brightness backgrounds
   const colors   = colorStory ? resolveColors({ colorStory, energy }) : null;
@@ -324,7 +305,7 @@ function buildLayoutBackground(intent, energy, colorStory = null, layoutId = nul
   // Asset layouts: high energy allows any brightness, low energy prefers dark
   const brightness = (!hasAssetZone || energy < 0.65) ? "dark" : null;
 
-  const bg = getBackgroundForIntent(bgIntent, brightness, colorFamily, bgIsDark, niche);
+  const bg = getBackgroundForIntent(bgIntent, brightness, colorFamily, bgIsDark, niche, nicheAvoid);
 
   // Always return a registry key — LayoutBackgroundRenderer resolves the style,
   // and LayoutSelector can display/replace it from the Colors picker.

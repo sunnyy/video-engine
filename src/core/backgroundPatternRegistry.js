@@ -723,22 +723,46 @@ export function getBackgroundsForNiche(niche) {
  * @param {boolean} excludeLight
  * @param {string|null} niche        filter by niche when provided
  */
-export function getBackgroundForIntent(intent, brightness = null, colorFamily = null, excludeLight = false, niche = null) {
+export function getBackgroundForIntent(intent, brightness = null, colorFamily = null, excludeLight = false, niche = null, avoid = []) {
+  // Resolve which color family a background key belongs to using COLOR_FAMILY_KEYS sets
+  const getFamilyOf = (k) => {
+    for (const [family, keys] of Object.entries(COLOR_FAMILY_KEYS)) {
+      if (keys.has(k)) return family;
+    }
+    return null;
+  };
+
+  // True if this key's color family is in the avoid list
+  const isAvoided = (k) => {
+    if (!avoid?.length) return false;
+    const bgFamily = getFamilyOf(k);
+    return bgFamily !== null && avoid.includes(bgFamily);
+  };
+
   let candidates = Object.entries(backgroundPatternRegistry)
     .filter(([, v]) => v.intent.includes(intent))
     .filter(([, v]) => !brightness || v.brightness === brightness)
     .filter(([, v]) => !excludeLight || v.brightness !== "light")
     .filter(([, v]) => !niche || v.niche?.includes(niche))
-    .map(([k]) => k);
+    .map(([k]) => k)
+    .filter(k => !isAvoided(k));
 
   if (!candidates.length) {
+    // Relax niche constraint, keep avoid
     candidates = Object.keys(backgroundPatternRegistry)
       .filter(k => !brightness || backgroundPatternRegistry[k].brightness === brightness)
       .filter(k => !excludeLight || backgroundPatternRegistry[k].brightness !== "light")
-      .filter(k => !niche || backgroundPatternRegistry[k].niche?.includes(niche));
+      .filter(k => !isAvoided(k));
   }
 
-  if (colorFamily && COLOR_FAMILY_KEYS[colorFamily] && Math.random() < 0.4) {
+  // Last resort — no filtering at all
+  if (!candidates.length) {
+    candidates = Object.keys(backgroundPatternRegistry);
+  }
+
+  // colorFamily filter: always apply when a family is specified (not random 40%).
+  // Strong preference — only falls back to full pool if fewer than 2 family matches exist.
+  if (colorFamily && COLOR_FAMILY_KEYS[colorFamily]) {
     const familyCandidates = candidates.filter(k => COLOR_FAMILY_KEYS[colorFamily].has(k));
     if (familyCandidates.length >= 2) candidates = familyCandidates;
   }

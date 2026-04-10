@@ -180,10 +180,26 @@ export default function ZoneHandle({
         x: Math.round(x*10)/10, y: Math.round(y*10)/10,
         width: Math.round(w*10)/10, height: Math.round(h*10)/10,
       };
-      // Scale font size proportionally when height changes
-      if (zone.type === "text" && origFontSize > 0 && (handle.includes("n") || handle.includes("s"))) {
-        const newFontSize = Math.max(8, Math.round(origFontSize * (h / origH)));
-        update.style = { fontSize: newFontSize };
+      // Text zone resize logic:
+      // - Width changed (e/w/corner): always drop height so TextAutoHeight recomputes
+      //   the correct wrap height. Shift = no font scaling (just stretch the container).
+      // - Height only (n/s): keep dragged height. Shift = no font scaling.
+      if (zone.type === "text" && origFontSize > 0) {
+        const isVertOnly = !handle.includes("e") && !handle.includes("w");
+        if (isVertOnly) {
+          // Pure vertical: height from drag, optionally scale font
+          if (!me.shiftKey) {
+            update.style = { fontSize: Math.max(8, Math.round(origFontSize * (h / origH))) };
+          }
+        } else {
+          // Width involved: let TextAutoHeight govern height (avoids flicker)
+          delete update.height;
+          if (!me.shiftKey) {
+            // Scale font by width ratio — text grows/shrinks with the zone
+            update.style = { fontSize: Math.max(8, Math.round(origFontSize * (w / origW))) };
+          }
+          // Shift held: font stays, zone just gets wider/narrower → text reflows/wraps
+        }
       }
       onUpdate(zone.id, update);
     };

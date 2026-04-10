@@ -16,9 +16,10 @@ import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 import ElementRenderer from "../elements/ElementRenderer";
 import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
 import textEffectRegistry from "../../core/textEffectRegistry.jsx";
+import { getTypographyForRole } from "../../core/videoDNA.js";
 import animatedBorderRegistry from "../../core/animatedBorderRegistry.js";
 import assetShineRegistry     from "../../core/assetShineRegistry.jsx";
-import { renderDecorativeSVG, getClipPathCSS, getSVGClipContent } from "../../core/decorativeShapeRegistry.js";
+import { getClipPathCSS, getSVGClipContent } from "../../core/decorativeShapeRegistry.js";
 import { renderIconSVG } from "../../core/iconRegistry.jsx";
 
 function resolveEnterStyle(animation, progress, W, H) {
@@ -241,7 +242,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
     zIndex:          zone.zIndex ?? 1,
     // overflow:visible lets rotated/skewed corners show outside the original bounding rect
     overflow:        rotation || hasStaticTransform || isTextZone || isDecorativeZone ? "visible" : "hidden",
-    opacity:         (animStyle.opacity ?? 1) * (isDecorativeZone ? 1 : (st.opacity ?? 1)),
+    // Text zones are always fully opaque — layout-def opacity values are ignored for text.
+    // Asset/decorative zones respect st.opacity for intended visual effects (overlays, rings, etc).
+    opacity:         (animStyle.opacity ?? 1) * (isTextZone ? 1 : (st.opacity ?? 1)),
     transform:       containerTransform,
     transformOrigin: "center center",
     // Vertical centering for text zones
@@ -417,6 +420,14 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           const textEffect  = previewMode ? "none" : (st.textEffect || "none");
           const effectSpeed = st.textEffectSpeed ?? 1.0;
 
+          // DNA typography override — applies fontFamily + fontWeight by zone role.
+          // Only overrides when the zone style hasn't been manually edited by the user
+          // (user edits set st._userFontFamily / st._userFontWeight flags).
+          const typographySystem = project?.meta?.dna?.typographySystem;
+          const dnaTypo = (!st._userFontFamily && typographySystem && zone.role)
+            ? getTypographyForRole(typographySystem, zone.role)
+            : null;
+
           const baseStyle = {
             position:        "relative",
             display:         "block",
@@ -424,8 +435,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             padding:         st.padding       || "0 8px",
             boxSizing:       "border-box",
             fontSize:        st.fontSize      || 32,
-            fontWeight:      st.fontWeight    || 700,
-            fontFamily:      st.fontFamily    || "inherit",
+            fontWeight:      dnaTypo?.fontWeight ?? st.fontWeight ?? 700,
+            fontFamily:      dnaTypo?.fontFamily ?? st.fontFamily ?? "inherit",
             fontStyle:       st.fontStyle     || "normal",
             textDecoration:  st.textDecoration || "none",
             color:           st.color         || "#ffffff",
@@ -433,7 +444,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             textShadow:      st.textShadow    || "none",
             lineHeight:      st.lineHeight    || 1.15,
             letterSpacing:   st.letterSpacing || "normal",
-            opacity:         st.opacity       ?? 1,
+            opacity:         1,
             background:      st.background    || "transparent",
             borderRadius:    st.borderRadius  || 0,
             whiteSpace:      "normal",
@@ -485,14 +496,24 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           return <div style={baseStyle}>{text}</div>;
         })()}
 
-        {/* Decorative shape or icon — SVG rendered inline */}
-        {(zone.type === "decorative" || zone.type === "icon") && (() => {
+        {/* Decorative — gradient/color overlays from layout def style.background only.
+            SVG shape decoratives are disabled (not used by pipeline). */}
+        {zone.type === "decorative" && st.background && (
+          <div style={{
+            position:     "absolute",
+            inset:        0,
+            background:   st.background,
+            opacity:      st.opacity ?? 1,
+            borderRadius: st.borderRadius || 0,
+            pointerEvents:"none",
+          }} />
+        )}
+
+        {/* Icon zones — SVG rendered inline */}
+        {zone.type === "icon" && (() => {
           const iconId = zone.content?.iconId;
-          const shape  = zone.content?.shape || "circle";
-          const instanceId = zone.id.replace(/[^a-z0-9]/gi, "_");
-          const svg = iconId
-            ? renderIconSVG(iconId, st)
-            : renderDecorativeSVG(shape, st, instanceId);
+          if (!iconId) return null;
+          const svg = renderIconSVG(iconId, st);
           if (!svg) return null;
           return (
             <div style={{ position: "absolute", inset: 0, overflow: "visible" }}>
@@ -532,9 +553,11 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
   const beatZones       = beat.zones || {};
   const defZoneIds      = new Set(layoutDef.zones.map(z => z.id));
 
+  const deletedZones = new Set(beat.deletedZones || []);
+
   const defZones = layoutDef.zones.flatMap(d => {
+    if (deletedZones.has(d.id)) return [];
     const o = beatZones[d.id] || {};
-    if (o.hidden) return [];
     return [{
       ...d,
       type:           o.type           ?? d.type,
@@ -569,8 +592,8 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
   const contentZones = allZones.filter(z => z.type !== "element");
   const elementZones = allZones.filter(z => z.type === "element");
 
-  // Blurred asset bg: only when the beat has no explicit layoutBackground set.
-  // When a layoutBackground is set (by pipeline or user), always use LayoutBackgroundRenderer.
+  // Background: layoutBackground is always set by pipeline (pattern or image).
+  // If no layoutBackground, blur the first asset zone as an ambient background.
   const hasExplicitBg = !!beat?.layoutBackground;
   const blurSrc = !hasExplicitBg
     ? contentZones.find(z => z.type === "asset" && z.content?.asset?.src)?.content?.asset?.src ?? null

@@ -14,7 +14,17 @@ function resolvePositionY(p) {
 export function normalizeBeat(raw = {}, index = 0, meta = {}) {
   const mode = meta?.mode || "faceless";
 
-  const zones = raw.zones || {
+  // Strip any legacy hidden flag from zone objects (old data cleanup).
+  const rawZones = raw.zones
+    ? Object.fromEntries(
+        Object.entries(raw.zones).map(([id, z]) => {
+          const { hidden: _hidden, ...rest } = z;
+          return [id, rest];
+        })
+      )
+    : null;
+
+  const zones = rawZones || {
     z1: {
       role: mode === "talking_head" ? "avatar" : "asset",
       content: { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
@@ -22,6 +32,7 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
       style: {},
     },
   };
+
 
   const captionRaw = raw.caption || {};
 
@@ -52,6 +63,8 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     layout:           raw.layout || "FullBleed",
     layoutBackground,
     layoutPadding:    raw.layoutPadding || 0,
+
+    deletedZones: Array.isArray(raw.deletedZones) ? raw.deletedZones : [],
 
     zones,
 

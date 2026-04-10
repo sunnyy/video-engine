@@ -106,8 +106,9 @@ export function resolveColors({
   // Accent2 (secondary): user brand2 > blended > complementary
   const accent2 = brandColor2 || blend(accent, bgDark ? "#ffffff" : "#000000", 0.3);
 
-  // Text: always high contrast against bg
-  const text = bgDark ? "#ffffff" : "#0a0a0a";
+  // Text: use palette's own text color if set (niche palettes define this for contrast-safety),
+  // else derive from bg brightness.
+  const text = colorStory?.text || (bgDark ? "#ffffff" : "#0a0a0a");
 
   // Text shadow intensity based on energy and bg darkness
   const shadowStrength = bgDark ? (energy >= 0.7 ? "0 4px 24px rgba(0,0,0,0.95)" : "0 2px 16px rgba(0,0,0,0.8)") : "none";

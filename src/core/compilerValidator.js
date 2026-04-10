@@ -66,8 +66,7 @@ export function validateBeats(beats) {
 
     }
 
-    // Preserve extra zones not in the layout def:
-    // bz1 (block zones), _bg_img (injected background), element zones (el_*)
+    // Preserve extra zones not in the layout def (block zones, element zones, user-added zones):
     if (beat.zones) {
       const defZoneSet = new Set(layoutDef ? layoutDef.zones : ["z1"]);
       Object.entries(beat.zones).forEach(([id, zone]) => {
