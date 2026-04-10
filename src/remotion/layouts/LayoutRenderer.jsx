@@ -11,7 +11,6 @@
 import React from "react"; // eslint-disable-line
 import { useCurrentFrame, useVideoConfig, interpolate, Img, OffthreadVideo } from "remotion";
 import AssetRenderer from "../elements/AssetRenderer";
-import AvatarLayer from "../elements/AvatarLayer";
 import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 import ElementRenderer from "../elements/ElementRenderer";
 import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
@@ -221,13 +220,19 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
   const contentPadding = st.contentPadding ?? 0;
   const finalInset     = contentPadding > 0 ? `${contentPadding}px` : "0px";
 
-  const isEmpty = (zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block")
-               || (zone.type === "text" && !content.text && content.kind !== "block");
+  // Zones typed "avatar" by the pipeline are asset zones designated for the talking-head video.
+  // Treat them as asset zones throughout.
+  const effectiveType = zone.type === "avatar" ? "asset" : zone.type;
+
+  const isAvatarZone = effectiveType === "asset" && zone.id === beat?.avatarZone
+    && project?.meta?.mode === "talking_head" && !!project?.avatar?.src;
+  const isEmpty = (effectiveType === "asset" && !content.asset?.src && !isAvatarZone && content.kind !== "block")
+               || (effectiveType === "text" && !content.text && content.kind !== "block");
 
   // Zone container — rotation lives HERE so content is never clipped by the zone boundary.
   // Enter/exit animation transforms are combined with rotation on the same element.
-  const isTextZone = zone.type === "text";
-  const isDecorativeZone = zone.type === "decorative";
+  const isTextZone = effectiveType === "text";
+  const isDecorativeZone = effectiveType === "decorative";
 
   const rotateStr        = rotation ? `rotate(${rotation}deg)` : "";
   const staticTransform  = st.transform || ""; // e.g. "skewY(-6deg)" from layout def
@@ -298,8 +303,12 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
       {/* Content wrapper with rotation */}
       <div style={{ ...contentWrapperStyle, zIndex: 1 }}>
 
+        {/* Avatar zone — rendered transparent here; VideoComposition places the
+            single global OffthreadVideo on top so playback is never interrupted */}
+
         {/* Asset — with optional animated border + one-shot shine */}
-        {zone.type === "asset" && content.kind !== "block" && content.asset?.src && (() => {
+        {effectiveType === "asset" && content.kind !== "block" && content.asset?.src &&
+          !(zone.id === beat?.avatarZone && project?.meta?.mode === "talking_head" && project?.avatar?.src) && (() => {
           const assetEl = (
             <AssetRenderer
               zone={{
@@ -374,8 +383,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           return <div style={insetBoxStyle}>{inner}</div>;
         })()}
 
-        {/* Asset placeholder — no src yet */}
-        {zone.type === "asset" && !content.asset?.src && content.kind !== "avatar" && content.kind !== "block" && (() => {
+        {/* Asset placeholder — no src yet and not an avatar zone */}
+        {effectiveType === "asset" && !content.asset?.src && !isAvatarZone && content.kind !== "block" && (() => {
           const hint = beat?.asset_hint;
           const keywords = hint?.keywords?.length ? hint.keywords : null;
           return (
@@ -411,12 +420,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           );
         })()}
 
-        {zone.type === "asset" && content.kind === "avatar" && (
-          <AvatarLayer beat={beat} project={project} />
-        )}
 
         {/* Text — with optional text effects (suppressed in previewMode) */}
-        {zone.type === "text" && (() => {
+        {effectiveType === "text" && (() => {
           const text        = content.text || "";
           const textEffect  = previewMode ? "none" : (st.textEffect || "none");
           const effectSpeed = st.textEffectSpeed ?? 1.0;
@@ -499,7 +505,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
 
         {/* Decorative — gradient/color overlays from layout def style.background only.
             SVG shape decoratives are disabled (not used by pipeline). */}
-        {zone.type === "decorative" && st.background && (
+        {effectiveType === "decorative" && st.background && (
           <div style={{
             position:     "absolute",
             inset:        0,
@@ -511,7 +517,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
         )}
 
         {/* Icon zones — Iconify (Phosphor) first, local registry fallback */}
-        {zone.type === "icon" && (() => {
+        {effectiveType === "icon" && (() => {
           const iconifyDef     = zone.iconify;           // baked into layout def
           const contentIconify = zone.content?.iconify;  // user-picked
           const resolvedIconify = contentIconify ?? iconifyDef;

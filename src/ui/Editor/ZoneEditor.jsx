@@ -214,7 +214,7 @@ function ZoneBgRow({ bg, slot, openPicker, clearBackground, padding, setStyleSil
 
 /* ══════════════════════════════════════════════════ */
 export default function ZoneEditor({
-  beatId, slot, zone, zoneDef, zoneType,
+  beatId, beat, project, slot, zone, zoneDef, zoneType,
   openPicker,
   updateTextContent, updateTextStyle, updateTextStyleBulk,
   updateContentProp, updateBlockProp,
@@ -225,6 +225,7 @@ export default function ZoneEditor({
 }) {
   const commitBeat    = useProjectStore(s => s.commitBeat);
   const pushHistory   = useProjectStore(s => s._pushHistory);
+  const updateBeat    = useProjectStore(s => s.updateBeat);
 
   const safeZone = zone || {};
   const content  = safeZone.content || {};
@@ -846,46 +847,124 @@ export default function ZoneEditor({
   }
 
   /* ── ASSET ── */
+  const isTalkingHead  = project?.meta?.mode === "talking_head";
+  const avatarSrc      = project?.avatar?.src || null;
+  const isAvatarZone   = isTalkingHead && beat?.avatarZone === slot;
+
+  const setAvatarMode = (wantAvatar) => {
+    if (!beat) return;
+    updateBeat(beatId, { avatarZone: wantAvatar ? slot : null });
+  };
+
   return (
     <div className="pb-6">
 
       {/* Content */}
       <Section title="Content" icon="🖼">
-        <div className="flex gap-4 mb-4">
-          <div className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
-            style={{ width: 96, height: 120 }} onClick={() => openPicker(slot, "content")}>
-            {content.asset?.src
-              ? <img src={content.asset.src} className="w-full h-full object-cover" />
-              : <div className="w-full h-full bg-[#0e0e1a] flex flex-col items-center justify-center gap-1 opacity-50">
-                  <span className="text-[22px]">＋</span>
-                  <span className="text-[9px] text-[#9494a8] text-center px-1">Add Asset</span>
-                </div>}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
-              <span className="text-white text-[10px] font-bold opacity-0 group-hover:opacity-100">{content.asset?.src ? "Change" : "Add"}</span>
-            </div>
-            {content.asset?.src && (
-              <button onClick={e => { e.stopPropagation(); clearContent(slot); }}
-                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#ff4444] text-white text-[10px] flex items-center justify-center border-0 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity font-bold">✕</button>
-            )}
-          </div>
 
-          <div className="flex-1 flex flex-col gap-3">
+        {/* Asset / Avatar tab switch — only in talking head mode */}
+        {isTalkingHead && (
+          <div className="flex gap-[5px] mb-4">
+            <button
+              onClick={() => setAvatarMode(false)}
+              className="flex-1 py-[7px] rounded-[7px] text-[12px] font-bold border cursor-pointer transition-all"
+              style={!isAvatarZone
+                ? { background: "rgba(124,92,252,0.18)", borderColor: "#7c5cfc", color: "#c4b5fd" }
+                : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "#7070a0" }}
+            >
+              Asset
+            </button>
+            <button
+              onClick={() => setAvatarMode(true)}
+              className="flex-1 py-[7px] rounded-[7px] text-[12px] font-bold border cursor-pointer transition-all"
+              style={isAvatarZone
+                ? { background: "rgba(124,92,252,0.18)", borderColor: "#7c5cfc", color: "#c4b5fd" }
+                : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "#7070a0" }}
+            >
+              Avatar
+            </button>
+          </div>
+        )}
+
+        {/* Avatar mode — show talking head info instead of asset picker */}
+        {isAvatarZone ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-[10px]"
+              style={{ background: "rgba(124,92,252,0.06)", border: "1px solid rgba(124,92,252,0.2)" }}>
+              {avatarSrc ? (
+                <>
+                  <video src={avatarSrc} muted playsInline
+                    style={{ width: 96, height: 120, objectFit: style.objectFit || "cover", borderRadius: 8, display: "block" }} />
+                  <div className="text-[11px] font-mono text-[#a78bfa] text-center">
+                    Talking head video will appear in this zone
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-[44px] h-[44px] rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.25)" }}>
+                    <span style={{ fontSize: 20 }}>🎥</span>
+                  </div>
+                  <div className="text-[11px] font-mono text-[#7070a0] text-center">
+                    No avatar video uploaded yet.<br />
+                    <span className="text-[#7c5cfc]">Upload in the Avatar tab.</span>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Object fit */}
             <div>
-              <Label>Fit</Label>
-              <BtnGroup fullWidth
-                options={[{ label: "Cover", value: "cover" }, { label: "Contain", value: "contain" }]}
-                value={content.asset?.objectFit || "cover"}
-                onChange={v => updateContentProp(slot, "objectFit", v)} />
+              <Label>Object Fit</Label>
+              <BtnGroup
+                fullWidth
+                options={[
+                  { label: "Cover",   value: "cover"   },
+                  { label: "Contain", value: "contain" },
+                  { label: "Fill",    value: "fill"    },
+                ]}
+                value={style.objectFit || "cover"}
+                onChange={v => setZoneStyle(slot, "objectFit", v)}
+              />
             </div>
-            <Slider label="Opacity" value={Math.round(opacity * 100)}
-              onChangeSilent={v => setStyleSilent("opacity", v / 100)}
-              onCommit={commit} min={0} max={100} unit="%" />
-            <Slider label="Shadow" value={shadow}
-              onChangeSilent={v => setStyleSilent("shadowBlur", v)}
-              onCommit={commit} min={0} max={100} unit="px" />
           </div>
-        </div>
+        ) : (
+          <div className="flex gap-4 mb-4">
+            <div className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
+              style={{ width: 96, height: 120 }} onClick={() => openPicker(slot, "content")}>
+              {content.asset?.src
+                ? <img src={content.asset.src} className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-[#0e0e1a] flex flex-col items-center justify-center gap-1 opacity-50">
+                    <span className="text-[22px]">＋</span>
+                    <span className="text-[9px] text-[#9494a8] text-center px-1">Add Asset</span>
+                  </div>}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
+                <span className="text-white text-[10px] font-bold opacity-0 group-hover:opacity-100">{content.asset?.src ? "Change" : "Add"}</span>
+              </div>
+              {content.asset?.src && (
+                <button onClick={e => { e.stopPropagation(); clearContent(slot); }}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#ff4444] text-white text-[10px] flex items-center justify-center border-0 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity font-bold">✕</button>
+              )}
+            </div>
+
+            <div className="flex-1 flex flex-col gap-3">
+              {/* Object fit */}
+              <div>
+                <Label>Fit</Label>
+                <BtnGroup fullWidth
+                  options={[{ label: "Cover", value: "cover" }, { label: "Contain", value: "contain" }]}
+                  value={content.asset?.objectFit || "cover"}
+                  onChange={v => updateContentProp(slot, "objectFit", v)} />
+              </div>
+              <Slider label="Opacity" value={Math.round(opacity * 100)}
+                onChangeSilent={v => setStyleSilent("opacity", v / 100)}
+                onCommit={commit} min={0} max={100} unit="%" />
+              <Slider label="Shadow" value={shadow}
+                onChangeSilent={v => setStyleSilent("shadowBlur", v)}
+                onCommit={commit} min={0} max={100} unit="px" />
+            </div>
+          </div>
+        )}
       </Section>
 
       {/* Shape */}

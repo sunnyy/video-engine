@@ -7,7 +7,7 @@ import {
   interpolate,
   Easing,
   Audio,
-  Video
+  OffthreadVideo,
 } from "remotion";
 
 import BeatRenderer from "./BeatRenderer";
@@ -15,6 +15,7 @@ import Caption from "./elements/Caption";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { transitionsRegistry } from "../core/transitionsRegistry";
 import { buildVisualIdentity } from "../core/visualIdentityEngine";
+import { getLayoutDef } from "../core/layoutRegistry.js";
 
 /* FONT LOADER */
 
@@ -58,7 +59,7 @@ export default function VideoComposition({ project, previewMode = false }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const { beats, meta, audio, avatar, overlays } = project;
+  const { beats, meta, audio, overlays } = project;
 
   const visualIdentity = buildVisualIdentity(project);
 
@@ -69,6 +70,55 @@ export default function VideoComposition({ project, previewMode = false }) {
     const end = Math.floor(beat.end_sec * fps);
     return frame >= start && frame < end;
   });
+
+  // ── Global avatar positioning ──────────────────────────────────────────────
+  // Single OffthreadVideo rendered outside all Sequences so it never remounts
+  // (remounting would restart playback). Position follows currentBeat's avatarZone.
+  const avatar    = project.avatar;
+  const talkMode  = meta?.mode === "talking_head";
+  let avatarBoxStyle = null;
+  let avatarObjectFit = "cover";
+
+  // Resolve which zone id carries the avatar this beat.
+  // Priority: explicit beat.avatarZone → first zone with type "avatar" in beat.zones → null.
+  const resolveAvatarZoneId = (beat) => {
+    if (beat?.avatarZone) return beat.avatarZone;
+    if (beat?.zones) {
+      const found = Object.entries(beat.zones).find(([, z]) => z.type === "avatar");
+      if (found) return found[0];
+    }
+    return null;
+  };
+
+  if (talkMode && avatar?.src && currentBeat) {
+    const zoneId = resolveAvatarZoneId(currentBeat);
+    if (zoneId) {
+      const layoutDef = getLayoutDef(currentBeat.layout);
+      const zoneDef   = layoutDef?.zones?.find(z => z.id === zoneId) || {};
+      const beatZone  = currentBeat.zones?.[zoneId] || {};
+      const resolved  = { ...zoneDef, ...beatZone };
+
+      const pad    = currentBeat.layoutPadding || 0;
+      const innerW = meta.width  - pad * 2;
+      const innerH = meta.height - pad * 2;
+      const x      = resolved.x      ?? 0;
+      const y      = resolved.y      ?? 0;
+      const w      = resolved.width  ?? 100;
+      const h      = resolved.height ?? 100;
+
+      avatarObjectFit = resolved.style?.objectFit ?? "cover";
+      avatarBoxStyle = {
+        position:     "absolute",
+        left:         pad + (x / 100) * innerW,
+        top:          pad + (y / 100) * innerH,
+        width:        (w / 100) * innerW,
+        height:       (h / 100) * innerH,
+        zIndex:       3,   // above beats (z:2), below overlays (z:110)
+        overflow:     "hidden",
+        borderRadius: resolved.style?.borderRadius || 0,
+      };
+    }
+  }
 
   let musicVolume = audio?.music?.volume ?? 0.8;
 
@@ -96,18 +146,7 @@ export default function VideoComposition({ project, previewMode = false }) {
       }}
     >
 
-      {meta.mode === "talking_head" && avatar?.src && (
-        <AbsoluteFill style={{ zIndex: 1 }}>
-          <Video
-            src={avatar.src}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain"
-            }}
-          />
-        </AbsoluteFill>
-      )}
+      {/* Avatar video is rendered per-zone inside LayoutRenderer — not as a global layer */}
 
       {beats.map((beat, index) => {
 
@@ -249,6 +288,16 @@ export default function VideoComposition({ project, previewMode = false }) {
 
       })}
 
+      {/* Single persistent avatar — never remounts across beat changes */}
+      {talkMode && avatar?.src && avatarBoxStyle && (
+        <div style={avatarBoxStyle}>
+          <OffthreadVideo
+            src={avatar.src}
+            style={{ width: "100%", height: "100%", objectFit: avatarObjectFit }}
+          />
+        </div>
+      )}
+
       {videoOverlays.length > 0 && (
         <AbsoluteFill style={{ zIndex: 110 }}>
           <OverlayRenderer overlays={videoOverlays} />
@@ -259,7 +308,7 @@ export default function VideoComposition({ project, previewMode = false }) {
         <Caption caption={currentBeat.caption} beat={currentBeat} project={project} />
       )}
 
-      {audio?.tts?.src && (
+      {audio?.tts?.src && !talkMode && (
         <Audio
           key={`tts-${audio.tts.src}`}
           src={audio.tts.src}

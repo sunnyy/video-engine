@@ -1,30 +1,18 @@
 import React from "react";
-import { Video } from "remotion";
+import { OffthreadVideo } from "remotion";
 
 export default function AvatarLayer({ zone }) {
-
   if (!zone?.src) return null;
 
-  const objectFit = zone.objectFit || "cover";
-
   return (
-    <div
+    <OffthreadVideo
+      src={zone.src}
+      muted={false}
       style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 5
+        width:      "100%",
+        height:     "100%",
+        objectFit:  zone.objectFit ?? "cover",
       }}
-    >
-      <Video
-        src={zone.src}
-        muted={false}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit
-        }}
-      />
-    </div>
+    />
   );
-
 }

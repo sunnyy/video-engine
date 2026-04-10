@@ -422,6 +422,21 @@ export async function buildBeatsFromScript({
     const finalLayout = visual.layout;
     const zones = enforceLayoutZones(finalLayout, visual.zones || {});
 
+    // Talking head: decide which zone (if any) shows the avatar video for this beat.
+    // Rules: high-energy beats and data/visual beats use content; conversational/hook beats use face.
+    let avatarZone = null;
+    if (mode === "talking_head") {
+      const FACE_INTENTS = new Set(["hook", "shock", "empathy", "reveal", "punchline", "urgency", "curiosity"]);
+      const DATA_INTENTS = new Set(["proof", "stat", "explanation", "contrast", "irony", "list", "visual_rest"]);
+      const wantsFace = FACE_INTENTS.has(intent) && energy < 0.8;
+      if (wantsFace && !DATA_INTENTS.has(intent)) {
+        // Pick the first primary_asset zone from the layout def
+        const layoutDef = getLayoutDef(finalLayout);
+        const firstAsset = layoutDef?.zones?.find(z => z.type === "asset");
+        avatarZone = firstAsset?.id ?? null;
+      }
+    }
+
     return {
       id:    crypto.randomUUID(),
       order: index,
@@ -430,6 +445,7 @@ export async function buildBeatsFromScript({
       layoutPadding:    visual.layoutPadding || 0,
       layoutBackground: visual.layoutBackground,
 
+      avatarZone,
       zones,
       blocks:      [],
       block_props: null,

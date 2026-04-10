@@ -64,6 +64,7 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     layoutBackground,
     layoutPadding:    raw.layoutPadding || 0,
 
+    avatarZone:   raw.avatarZone   ?? null,
     deletedZones: Array.isArray(raw.deletedZones) ? raw.deletedZones : [],
 
     zones,

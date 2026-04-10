@@ -359,6 +359,8 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
         <div className="flex-1 overflow-y-auto">
           <ZoneEditor
             beatId={beat.id}
+            beat={beat}
+            project={project}
             slot={selectedZoneId}
             zone={selectedZoneData}
             zoneDef={selectedZoneDef}
