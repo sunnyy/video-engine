@@ -42,10 +42,14 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const durationFrames = Math.max(1, Math.floor((project.duration_sec || 1) * fps));
   const activeBeat     = project.beats.find(b => b.id === activeBeatId);
 
-  // Compute canvas dimensions to fit container maintaining aspect ratio
+  // Compute canvas dimensions to fit container maintaining aspect ratio.
+  // For 16:9 (landscape): scale to full available width — container scrolls vertically.
+  // For 9:16 (portrait):  fit within both dimensions so it never overflows.
   const availW    = containerSize.width  - 16;
   const availH    = containerSize.height - 16;
-  const scale     = Math.min(availW / videoW, availH / videoH, 1);
+  const scale     = is169
+    ? Math.min(availW / videoW, 1)
+    : Math.min(availW / videoW, availH / videoH, 1);
   const canvasW   = Math.floor(videoW * scale);
   const canvasH   = Math.floor(videoH * scale);
 
@@ -261,7 +265,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       </div>
 
       {/* Canvas area */}
-      <div ref={containerRef} className="flex-1 relative flex items-start justify-center overflow-hidden p-2">
+      <div ref={containerRef} className={`flex-1 relative flex items-start justify-center p-2 ${is169 ? "overflow-y-auto" : "overflow-hidden"}`}>
 
         {/* Static edit canvas — Thumbnail + ZoneCanvas + controls */}
         {activeBeat && !showPlayer && (
@@ -331,10 +335,12 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         {/* Remotion Player — overlays when playing */}
         <div style={{
           display:  showPlayer ? "flex" : "none",
-          position: "absolute", inset: 0,
+          position: is169 ? "relative" : "absolute",
+          ...(is169 ? {} : { inset: 0 }),
           alignItems: "flex-start", justifyContent: "center",
           background: "black", zIndex: 50,
           padding: 8,
+          width: "100%",
         }}>
           <div className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}>
             <Player

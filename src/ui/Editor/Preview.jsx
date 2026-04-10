@@ -87,7 +87,7 @@ export default function Preview() {
           controls
           numberOfSharedAudioTags={16}
           style={{
-            maxHeight: 720,
+            width: "100%",
             borderRadius: 12,
             overflow: "hidden",
           }}

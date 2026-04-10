@@ -75,7 +75,8 @@ export default function Editor() {
 
   const is169 = project.meta?.orientation === "16:9";
 
-  // Widen canvas column for landscape so the 16:9 preview has enough height
+  // 16:9 needs a wider canvas column so the landscape canvas fills more height.
+  // 9:16 stays narrower — portrait fills height naturally.
   const cols = is169
     ? { sidebar: "7%", beatList: "18%", canvas: "45%", panel: "30%" }
     : { sidebar: "7%", beatList: "18%", canvas: "45%", panel: "30%" };

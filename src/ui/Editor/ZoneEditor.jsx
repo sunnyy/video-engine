@@ -886,51 +886,33 @@ export default function ZoneEditor({
           </div>
         )}
 
-        {/* Avatar mode — show talking head info instead of asset picker */}
+        {/* Content picker — conditional on avatar vs asset mode */}
         {isAvatarZone ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-[10px]"
-              style={{ background: "rgba(124,92,252,0.06)", border: "1px solid rgba(124,92,252,0.2)" }}>
-              {avatarSrc ? (
-                <>
-                  <video src={avatarSrc} muted playsInline
-                    style={{ width: 96, height: 120, objectFit: style.objectFit || "cover", borderRadius: 8, display: "block" }} />
-                  <div className="text-[11px] font-mono text-[#a78bfa] text-center">
-                    Talking head video will appear in this zone.
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-[44px] h-[44px] rounded-full flex items-center justify-center"
-                    style={{ background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.25)" }}>
-                    <span style={{ fontSize: 20 }}>🎥</span>
-                  </div>
-                  <div className="text-[11px] font-mono text-[#7070a0] text-center">
-                    No avatar video uploaded yet.<br />
-                    <span className="text-[#7c5cfc]">Upload in the Avatar tab.</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Object fit */}
-            <div>
-              <Label>Object Fit</Label>
-              <BtnGroup
-                fullWidth
-                options={[
-                  { label: "Cover",   value: "cover"   },
-                  { label: "Contain", value: "contain" },
-                  { label: "Fill",    value: "fill"    },
-                ]}
-                value={style.objectFit || "cover"}
-                onChange={v => setZoneStyle(slot, "objectFit", v)}
-              />
-            </div>
-
+          <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-[10px] mb-3"
+            style={{ background: "rgba(124,92,252,0.06)", border: "1px solid rgba(124,92,252,0.2)" }}>
+            {avatarSrc ? (
+              <>
+                <video src={avatarSrc} muted playsInline
+                  style={{ width: 96, height: 120, objectFit: style.objectFit || "cover", borderRadius: 8, display: "block" }} />
+                <div className="text-[11px] font-mono text-[#a78bfa] text-center">
+                  Talking head video will appear in this zone.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-[44px] h-[44px] rounded-full flex items-center justify-center"
+                  style={{ background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.25)" }}>
+                  <span style={{ fontSize: 20 }}>🎥</span>
+                </div>
+                <div className="text-[11px] font-mono text-[#7070a0] text-center">
+                  No avatar video uploaded yet.<br />
+                  <span className="text-[#7c5cfc]">Upload in the Avatar tab.</span>
+                </div>
+              </>
+            )}
           </div>
         ) : (
-          <div className="flex gap-4 mb-4">
+          <div className="flex gap-4 mb-3">
             <div className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
               style={{ width: 96, height: 120 }} onClick={() => openPicker(slot, "content")}>
               {content.asset?.src
@@ -947,25 +929,31 @@ export default function ZoneEditor({
                   className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#ff4444] text-white text-[10px] flex items-center justify-center border-0 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity font-bold">✕</button>
               )}
             </div>
-
-            <div className="flex-1 flex flex-col gap-3">
-              {/* Object fit */}
-              <div>
-                <Label>Fit</Label>
-                <BtnGroup fullWidth
-                  options={[{ label: "Cover", value: "cover" }, { label: "Contain", value: "contain" }]}
-                  value={content.asset?.objectFit || "cover"}
-                  onChange={v => updateContentProp(slot, "objectFit", v)} />
-              </div>
-              <Slider label="Opacity" value={Math.round(opacity * 100)}
-                onChangeSilent={v => setStyleSilent("opacity", v / 100)}
-                onCommit={commit} min={0} max={100} unit="%" />
-              <Slider label="Shadow" value={shadow}
-                onChangeSilent={v => setStyleSilent("shadowBlur", v)}
-                onCommit={commit} min={0} max={100} unit="px" />
-            </div>
           </div>
         )}
+
+        {/* Unified zone-level controls — same for asset and avatar mode */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <Label>Object Fit</Label>
+            <BtnGroup
+              fullWidth
+              options={[
+                { label: "Cover",   value: "cover"   },
+                { label: "Contain", value: "contain" },
+                { label: "Fill",    value: "fill"    },
+              ]}
+              value={beat?.zones?.[slot]?.style?.objectFit || content.asset?.objectFit || "cover"}
+              onChange={v => setZoneStyle(slot, "objectFit", v)}
+            />
+          </div>
+          <Slider label="Opacity" value={Math.round(opacity * 100)}
+            onChangeSilent={v => setStyleSilent("opacity", v / 100)}
+            onCommit={commit} min={0} max={100} unit="%" />
+          <Slider label="Shadow" value={shadow}
+            onChangeSilent={v => setStyleSilent("shadowBlur", v)}
+            onCommit={commit} min={0} max={100} unit="px" />
+        </div>
       </Section>
 
       {/* Shape */}

@@ -25,6 +25,20 @@ export function measureAudioDuration(src) {
 }
 
 /**
+ * Measure video duration from a URL in the browser.
+ * Uses a <video> element — more reliable than Audio for .mp4 files.
+ */
+export function measureVideoDuration(src) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.addEventListener("loadedmetadata", () => resolve(video.duration));
+    video.addEventListener("error", reject);
+    video.src = src;
+    video.load();
+  });
+}
+
+/**
  * Sync beat durations to TTS duration.
  * @param {object[]} beats
  * @param {number}   ttsDuration  — total TTS audio duration in seconds

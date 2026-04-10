@@ -4,9 +4,10 @@
  *
  * Upload and manage the talking head video. Nothing else.
  */
-import React, { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
+import { measureVideoDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
 
 function Label({ children }) {
   return (
@@ -33,10 +34,14 @@ function PillBtn({ active, onClick, children }) {
 
 export default function AvatarSection() {
   const project           = useProjectStore((s) => s.project);
+  const setProject        = useProjectStore((s) => s.setProject);
+  const databaseId        = useProjectStore((s) => s.databaseId);
   const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
   const [uploading, setUploading] = useState(false);
   const [progress,  setProgress]  = useState(0);
+  const [syncing,   setSyncing]   = useState(false);
+  const [syncMsg,   setSyncMsg]   = useState("");
   const [error,     setError]     = useState("");
   const [dragging,  setDragging]  = useState(false);
 
@@ -44,8 +49,38 @@ export default function AvatarSection() {
 
   if (!project) return null;
 
-  const avatar = project.avatar || null;
+  const avatar    = project.avatar || null;
+  const canvasW   = project.meta?.width  || 1080;
+  const canvasH   = project.meta?.height || 1920;
+  const isPortrait = canvasH > canvasW;
   const mode   = project.meta?.mode || "faceless";
+
+  // Sync beats proportionally to the avatar video duration.
+  // Mirrors AudioSection's syncToTTS — can be called manually or auto on upload.
+  const syncBeatsToAvatarVideo = useCallback(async (avatarSrc, avatarOverride = null) => {
+    if (!avatarSrc || !project) return null;
+    setSyncing(true);
+    setSyncMsg("Syncing beats to video duration…");
+    try {
+      const duration   = await measureVideoDuration(avatarSrc);
+      const synced     = syncBeatsToTTS(project.beats, duration);
+      const newProject = {
+        ...project,
+        ...(avatarOverride ? { avatar: avatarOverride } : {}),
+        beats: synced,
+      };
+      setProject(newProject);
+      const { updateProject } = await import("../../services/projects/projectService");
+      if (databaseId) await updateProject(databaseId, newProject);
+      setSyncMsg(`✓ Beats synced to ${duration.toFixed(1)}s`);
+      return newProject;
+    } catch {
+      setSyncMsg("Sync failed");
+      return null;
+    } finally {
+      setSyncing(false);
+    }
+  }, [project, setProject, databaseId]);
 
   const doUpload = useCallback(async (file) => {
     if (!file || !file.type.startsWith("video/")) {
@@ -53,6 +88,7 @@ export default function AvatarSection() {
       return;
     }
     setError("");
+    setSyncMsg("");
     setUploading(true);
     setProgress(0);
 
@@ -66,17 +102,21 @@ export default function AvatarSection() {
       const blob = await compressedRes.blob();
       const compressedFile = new File([blob], "avatar.mp4", { type: "video/mp4" });
 
-      const uploaded = await uploadUserAsset(compressedFile, "avatar", (pct) => setProgress(pct));
-      updateProjectMeta({
-        avatar: { src: uploaded.url, objectFit: avatar?.objectFit || "cover" },
-      });
+      const uploaded  = await uploadUserAsset(compressedFile, "avatar", (pct) => setProgress(pct));
+      setUploading(false);
+
+      const newAvatar = { src: uploaded.url, objectFit: avatar?.objectFit || "cover" };
+      const synced    = await syncBeatsToAvatarVideo(uploaded.url, newAvatar);
+
+      // If sync failed, at least persist the avatar itself
+      if (!synced) updateProjectMeta({ avatar: newAvatar });
     } catch (e) {
       setError(e.message || "Upload failed.");
-    } finally {
       setUploading(false);
+    } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [avatar, updateProjectMeta]);
+  }, [avatar, syncBeatsToAvatarVideo, updateProjectMeta]);
 
   const handleFileChange = (e) => doUpload(e.target.files?.[0]);
 
@@ -154,7 +194,14 @@ export default function AvatarSection() {
               src={avatar.src}
               controls
               playsInline
-              style={{ width: "100%", maxHeight: 260, objectFit: avatar.objectFit || "cover", display: "block" }}
+              style={{
+                display:     "table",
+                width:       "100%",
+                margin:      "auto",
+                maxWidth:    isPortrait ? 300 : "100%",
+                aspectRatio: `${canvasW}/${canvasH}`,
+                objectFit:   avatar.objectFit || "cover",
+              }}
             />
             <button
               onClick={removeAvatar}
@@ -186,7 +233,7 @@ export default function AvatarSection() {
         </div>
       )}
 
-      {/* Progress */}
+      {/* Upload progress */}
       {uploading && (
         <div className="flex flex-col gap-2">
           <div className="flex justify-between">
@@ -197,6 +244,35 @@ export default function AvatarSection() {
             <div className="h-full rounded-full transition-all"
               style={{ width: `${progress}%`, background: "#7c5cfc" }} />
           </div>
+        </div>
+      )}
+
+      {/* Sync status */}
+      {syncing && (
+        <div className="text-[11px] font-mono text-[#a78bfa] px-1">{syncMsg}</div>
+      )}
+      {!syncing && syncMsg && (
+        <div className="text-[11px] font-mono px-1"
+          style={{ color: syncMsg.startsWith("✓") ? "#4ade80" : "#fb923c" }}>
+          {syncMsg}
+        </div>
+      )}
+
+      {/* Manual sync — mirrors "Sync Beats to TTS Duration" in AudioSection */}
+      {avatar?.src && (
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => syncBeatsToAvatarVideo(avatar.src)}
+            disabled={syncing || uploading}
+            className="w-full py-[10px] rounded-[10px] text-[14px] font-bold transition-all cursor-pointer disabled:opacity-50"
+            style={{
+              background: "rgba(124,92,252,0.1)",
+              border: "1px solid rgba(124,92,252,0.2)",
+              color: "#a78bfa",
+            }}
+          >
+            {syncing ? "Syncing…" : "⟳ Sync Beats to Avatar Duration"}
+          </button>
         </div>
       )}
 

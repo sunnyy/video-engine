@@ -312,7 +312,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             <AssetRenderer
               zone={{
                 src:             content.asset.src,
-                objectFit:       content.asset.objectFit || st.objectFit || "cover",
+                objectFit:       zone._userObjectFit || content.asset.objectFit || "cover",
                 enterTransition: "none",
                 exitTransition:  "none",
                 motion:          content.asset.motion || "none",
@@ -585,19 +585,22 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
     const o = beatZones[d.id] || {};
     return [{
       ...d,
-      type:           d.type,                    // layout def is authoritative; beat zone type is ignored for layout zones
-      x:              o.x              ?? d.x,
-      y:              o.y              ?? d.y,
-      width:          o.width          ?? d.width,
-      height:         o.height         ?? d.height,
-      zIndex:         o.zIndex         ?? d.zIndex,
-      start:          o.start          ?? d.start,
-      end:            o.end            !== undefined ? o.end : d.end,
-      enterAnimation: o.enterAnimation ?? d.enterAnimation,
-      exitAnimation:  o.exitAnimation  ?? d.exitAnimation,
-      content:        o.content        || {},
-      style:          { ...d.style, ...(o.style || {}) },
-      background:     o.background     || {},
+      type:            d.type,                    // layout def is authoritative; beat zone type is ignored for layout zones
+      x:               o.x              ?? d.x,
+      y:               o.y              ?? d.y,
+      width:           o.width          ?? d.width,
+      height:          o.height         ?? d.height,
+      zIndex:          o.zIndex         ?? d.zIndex,
+      start:           o.start          ?? d.start,
+      end:             o.end            !== undefined ? o.end : d.end,
+      enterAnimation:  o.enterAnimation ?? d.enterAnimation,
+      exitAnimation:   o.exitAnimation  ?? d.exitAnimation,
+      content:         o.content        || {},
+      style:           { ...d.style, ...(o.style || {}) },
+      background:      o.background     || {},
+      // Raw beat-zone objectFit — user's explicit override, not mixed with layout-def defaults.
+      // Used for asset/avatar rendering so layout-def "cover" default never shadows user's choice.
+      _userObjectFit:  o.style?.objectFit,
     }];
   });
 
@@ -609,6 +612,8 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
       zIndex: z.zIndex ?? 10, start: z.start ?? 0, end: z.end ?? null,
       enterAnimation: z.enterAnimation || "fadeIn", exitAnimation: z.exitAnimation || "none",
       content: z.content || {}, style: z.style || {}, background: z.background || {},
+      // For extra zones the style has no layout-def layer, so _userObjectFit = style.objectFit directly
+      _userObjectFit: z.style?.objectFit,
     }));
 
   // Sort by zIndex so DOM order matches visual stacking — required because transform
@@ -618,10 +623,16 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
   const elementZones = allZones.filter(z => z.type === "element");
 
   // Background: layoutBackground is always set by pipeline (pattern or image).
-  // If no layoutBackground, blur the first asset zone as an ambient background.
+  // If no layoutBackground, blur the first non-avatar asset zone as an ambient background.
   const hasExplicitBg = !!beat?.layoutBackground;
+  const talkMode      = project?.meta?.mode === "talking_head";
+  const avatarHasSrc  = !!project?.avatar?.src;
+  // Resolve which zone id is the active avatar zone (explicit beat override or layout-def default)
+  const activeAvatarZoneId = (talkMode && avatarHasSrc)
+    ? (beat?.avatarZone !== undefined ? beat.avatarZone : (layoutDef.zones.find(z => z.type === "avatar")?.id ?? null))
+    : null;
   const blurSrc = !hasExplicitBg
-    ? contentZones.find(z => z.type === "asset" && z.content?.asset?.src)?.content?.asset?.src ?? null
+    ? contentZones.find(z => z.type === "asset" && z.content?.asset?.src && z.id !== activeAvatarZoneId)?.content?.asset?.src ?? null
     : null;
 
   const pad = beat?.layoutPadding || 0;
