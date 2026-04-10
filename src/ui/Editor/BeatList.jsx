@@ -4,38 +4,6 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 import { useProjectStore } from "../../store/useProjectStore";
 
-// Layout → color chip mapping
-const LAYOUT_COLORS = {
-  ThreeZone:      { bg: "rgba(124,92,252,0.15)", border: "rgba(124,92,252,0.25)", text: "#a78fff" },
-  SplitZone:      { bg: "rgba(59,158,255,0.15)", border: "rgba(59,158,255,0.25)", text: "#7bbfff" },
-  TwoTopOneBottom:{ bg: "rgba(45,212,191,0.15)", border: "rgba(45,212,191,0.25)", text: "#5eead4" },
-  FourGrid:       { bg: "rgba(249,115,22,0.15)", border: "rgba(249,115,22,0.25)", text: "#fb923c" },
-  SplitV:         { bg: "rgba(59,158,255,0.15)", border: "rgba(59,158,255,0.25)", text: "#7bbfff" },
-  Full:           { bg: "rgba(239,68,68,0.15)",  border: "rgba(239,68,68,0.25)",  text: "#f87171" },
-};
-
-function LayoutChip({ layout }) {
-  const c =
-    LAYOUT_COLORS[layout] || {
-      bg: "rgba(148,148,168,0.15)",
-      border: "rgba(148,148,168,0.25)",
-      text: "#9494a8",
-    };
-
-  return (
-    <span
-      className="text-[11px] font-semibold px-[6px] py-[2px] rounded-full"
-      style={{
-        background: c.bg,
-        border: `1px solid ${c.border}`,
-        color: c.text,
-        letterSpacing: "0.04em",
-      }}
-    >
-      {layout}
-    </span>
-  );
-}
 
 /* ── Delete beat modal ── */
 function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
@@ -77,8 +45,6 @@ function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
             </div>
           )}
           <div className="flex items-center gap-2 mt-[2px]">
-            <span className="text-[10px] font-mono text-[#55556a]">{beat.layout}</span>
-            <span className="text-[10px] font-mono text-[#55556a]">·</span>
             <span className="text-[10px] font-mono text-[#55556a]">{Number(beat.duration_sec || 0).toFixed(1)}s</span>
           </div>
         </div>
@@ -385,8 +351,6 @@ function SortableBeat({
           >
             {duration}s
           </span>
-
-          <LayoutChip layout={beat.layout} />
         </div>
       </div>
 

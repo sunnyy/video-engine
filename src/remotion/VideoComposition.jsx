@@ -205,8 +205,8 @@ export default function VideoComposition({ project, previewMode = false }) {
               inTransformParts.push(`translateY(${interpolate(progress,[0,1],[-meta.height,0])}px)`);
               break;
             case "zoom":
-              inTransformParts.push(`scale(${interpolate(progress,[0,1],[1.2,1])})`);
-              inStyle.opacity = progress;
+              inTransformParts.push(`scale(${interpolate(progress,[0,1],[1.55,1])})`);
+              inStyle.opacity = interpolate(progress,[0,0.4,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
             case "dipBlack":
             case "dipWhite":
@@ -234,6 +234,44 @@ export default function VideoComposition({ project, previewMode = false }) {
 
         if (inTransformParts.length) inStyle.transform = inTransformParts.join(" ");
 
+        // ── INTRO transition (first beat only — how the video opens) ──
+        if (index === 0) {
+          const introKey = beat.introTransition || "none";
+          const INTRO_FRAMES = Math.round(fps * 0.5); // 0.5s opening
+          if (introKey !== "none" && introKey !== "cut" && localFrame < INTRO_FRAMES) {
+            const introProgress = interpolate(localFrame, [0, INTRO_FRAMES], [0, 1], {
+              extrapolateLeft: "clamp", extrapolateRight: "clamp",
+              easing: Easing.out(Easing.cubic),
+            });
+            const introParts = [];
+            switch (introKey) {
+              case "fadeIn":
+                inStyle.opacity = introProgress;
+                break;
+              case "zoomIn":
+                introParts.push(`scale(${interpolate(introProgress, [0, 1], [1.45, 1])})`);
+                inStyle.opacity = interpolate(introProgress,[0,0.4,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
+                break;
+              case "slideUp":
+                introParts.push(`translateY(${interpolate(introProgress, [0, 1], [meta.height * 0.06, 0])}px)`);
+                inStyle.opacity = introProgress;
+                break;
+              case "slideDown":
+                introParts.push(`translateY(${interpolate(introProgress, [0, 1], [-meta.height * 0.06, 0])}px)`);
+                inStyle.opacity = introProgress;
+                break;
+              case "flash":
+                inStyle.opacity = interpolate(introProgress, [0, 0.15, 1], [0, 1, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+                break;
+              default:
+                break;
+            }
+            if (introParts.length) {
+              inStyle.transform = introParts.join(" ") + (inStyle.transform ? ` ${inStyle.transform}` : "");
+            }
+          }
+        }
+
         // ── OUTGOING transition style (applied to this beat as the next one enters over it) ──
         let outStyle = {};
         let dipOverlay = null;
@@ -251,7 +289,8 @@ export default function VideoComposition({ project, previewMode = false }) {
               outStyle.opacity = interpolate(outProgress,[0,1],[1,0]);
               break;
             case "zoom":
-              outStyle.opacity = interpolate(outProgress,[0,1],[1,0]);
+              outStyle.transform = `scale(${interpolate(outProgress,[0,1],[1,0.82])})`;
+              outStyle.opacity   = interpolate(outProgress,[0.5,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
             case "dipBlack":
               dipOverlay = `rgba(0,0,0,${outProgress})`;

@@ -12,6 +12,7 @@ import { ANIMATED_BORDER_OPTIONS } from "../../../src/core/animatedBorderRegistr
 import { ASSET_SHINE_OPTIONS }     from "../../../src/core/assetShineRegistry.jsx";
 import decorativeShapeRegistry, { renderDecorativeSVG, DECORATIVE_SHAPE_OPTIONS } from "../../../src/core/decorativeShapeRegistry.js";
 import iconRegistry, { ICON_OPTIONS, renderIconSVG } from "../../../src/core/iconRegistry.jsx";
+import { decorativeById, decorativeRegistry } from "../../../src/core/designLibrary/decorativeRegistry.js";
 import blockEditors            from "./blocks/blockEditors";
 
 /* ── Font options ── */
@@ -630,6 +631,94 @@ export default function ZoneEditor({
             ? <BlockEditor slot={slot} block={content.block} updateBlockProp={updateBlockProp} />
             : <div className="text-[11px] text-[#55556a] font-mono">No editor for: {content.block?.type}</div>}
         </Section>
+        <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
+        </Accordion>
+        <div className="pt-4">
+          <button onClick={onDelete}
+            className="w-full py-[8px] rounded-[8px] text-[12px] font-bold text-[#ff6060] border border-[rgba(255,60,60,0.15)] hover:bg-[rgba(255,60,60,0.08)] bg-transparent cursor-pointer transition-colors">
+            Delete Zone <span className="opacity-30 text-[10px] ml-1">Del</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── USER-PLACED DECORATIVE (from decorativeRegistry via DecorativesTab) ── */
+  if (zoneType === "decorative" && content.decorativeId) {
+    const decId  = content.decorativeId;
+    const entry  = decorativeById[decId];
+    const color  = style.color || "#ffffff";
+    const sw     = style.strokeWidth ?? 3;
+
+    // Build SVG preview with user color injected
+    const svgPreview = entry
+      ? entry.svg.replace(/currentColor/g, color)
+      : null;
+
+    // Group siblings for "similar" picker — same category
+    const siblings = decorativeRegistry.filter(d => d.category === entry?.category);
+
+    return (
+      <div className="pb-6">
+        <Accordion defaultSection="Decorative">
+        <Section title="Decorative">
+          {/* SVG Preview */}
+          {svgPreview && (
+            <div className="mb-4 flex justify-center">
+              <div className="w-[80px] h-[60px] flex items-center justify-center rounded-[8px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)]">
+                <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", opacity: style.opacity ?? 1 }}
+                  dangerouslySetInnerHTML={{ __html: svgPreview.replace(/<svg /, '<svg width="56" height="56" preserveAspectRatio="xMidYMid meet" ') }} />
+              </div>
+            </div>
+          )}
+
+          {/* Color */}
+          <div className="mb-3">
+            <ColorRow label="Color" value={color} onChange={v => setZoneStyle(slot, "color", v)} />
+          </div>
+
+          {/* Stroke width — useful for stroke-based SVGs */}
+          <div className="mb-3">
+            <Slider label="Stroke Width" value={sw}
+              onChangeSilent={v => setStyleSilent("strokeWidth", v)}
+              onCommit={commit} min={1} max={20} step={1} unit="px" />
+          </div>
+
+          {/* Swap — pick another from same category */}
+          {siblings.length > 1 && (
+            <div className="mb-1">
+              <Label>Swap</Label>
+              <div className="grid grid-cols-6 gap-[4px] mt-[5px]">
+                {siblings.map(s => {
+                  const isActive = s.id === decId;
+                  const swapSvg = s.svg.replace(/currentColor/g, "#ffffff");
+                  return (
+                    <button key={s.id} title={s.id}
+                      onClick={() => setZoneLayout(slot, "content", { decorativeId: s.id })}
+                      className="aspect-square rounded-[6px] border cursor-pointer transition-all flex items-center justify-center p-[5px]"
+                      style={isActive ? ACTIVE_BTN : INACTIVE_BTN}
+                    >
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        dangerouslySetInnerHTML={{ __html: swapSvg.replace(/<svg /, '<svg width="18" height="18" preserveAspectRatio="xMidYMid meet" ') }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </Section>
+
+        <Section title="Transform" defaultOpen={false}>
+          <div className="mb-3">
+            <RotationControl value={rotation} onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
+          </div>
+          <div className="mb-3">
+            <Slider label="Opacity" value={Math.round(opacity * 100)}
+              onChangeSilent={v => setStyleSilent("opacity", v / 100)}
+              onCommit={commit} min={0} max={100} unit="%" />
+          </div>
+        </Section>
+
         <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
         </Accordion>
         <div className="pt-4">

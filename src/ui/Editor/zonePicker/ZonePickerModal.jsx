@@ -7,13 +7,13 @@ import { deleteUserAsset }   from "../../../services/assets/deleteUserAsset";
 import { useAssetsStore }    from "../../../store/useAssetsStore";
 import { useProjectStore }   from "../../../store/useProjectStore";
 
-import MyAssetsTab from "./tabs/MyAssetsTab";
-import GalleryTab  from "./tabs/GalleryTab";
-import BlocksTab   from "./tabs/BlocksTab";
-import ColorsTab   from "./tabs/ColorsTab";
-import TextTab     from "./tabs/TextTab";
-import ShapesTab   from "./tabs/ShapesTab";
-import IconsTab    from "./tabs/IconsTab";
+import MyAssetsTab    from "./tabs/MyAssetsTab";
+import GalleryTab     from "./tabs/GalleryTab";
+import BlocksTab      from "./tabs/BlocksTab";
+import ColorsTab      from "./tabs/ColorsTab";
+import TextTab        from "./tabs/TextTab";
+import IconsTab       from "./tabs/IconsTab";
+import DecorativesTab from "./tabs/DecorativesTab";
 
 export default function ZonePickerModal({
   onSelect,
@@ -33,9 +33,9 @@ export default function ZonePickerModal({
     if (a.src)       { onSelect({ url: a.src });       return; }
   };
 
-  const defaultTabs  = ["assets", "gallery", "blocks", "colors", "shapes", "icons"];
+  const defaultTabs  = ["assets", "gallery", "blocks", "colors", "icons", "decoratives"];
   const activeTabs   = allowedTabs || defaultTabs;
-  const tabKeyMap    = { assets: "my", gallery: "gallery", blocks: "blocks", colors: "colors", shapes: "shapes", icons: "icons" };
+  const tabKeyMap    = { assets: "my", gallery: "gallery", blocks: "blocks", colors: "colors", icons: "icons", decoratives: "decoratives" };
   const initialTab   = tabKeyMap[activeTabs[0]] || "my";
 
   const [tab,        setTab]        = useState(initialTab);
@@ -105,13 +105,13 @@ export default function ZonePickerModal({
 
   const tabs = useMemo(() => {
     const all = [
-      { key: "my",      label: "My Assets", type: "assets"  },
-      { key: "gallery", label: "Free Stock", type: "gallery" },
-      { key: "text",    label: "Text",      type: "text"    },
-      { key: "blocks",  label: "Elements",  type: "blocks"  },
-      { key: "colors",  label: "Colors",    type: "colors"  },
-      { key: "shapes",  label: "Shapes",    type: "shapes"  },
-      { key: "icons",   label: "Icons",     type: "icons"   },
+      { key: "my",          label: "My Assets",   type: "assets"      },
+      { key: "gallery",     label: "Free Stock",  type: "gallery"     },
+      { key: "text",        label: "Text",        type: "text"        },
+      { key: "blocks",      label: "Elements",    type: "blocks"      },
+      { key: "colors",      label: "Colors",      type: "colors"      },
+      { key: "icons",       label: "Icons",       type: "icons"       },
+      { key: "decoratives", label: "Decoratives", type: "decoratives" },
     ];
     return all.filter(t => activeTabs.includes(t.type));
   }, [activeTabs]);
@@ -132,8 +132,8 @@ export default function ZonePickerModal({
     if (tab === "gallery") return <GalleryTab onSelect={(a) => { onSelect(a); onClose(); }} />;
     if (tab === "blocks")  return <BlocksTab  onSelect={onSelect} onClose={onClose} />;
     if (tab === "colors")  return <ColorsTab  onSelect={onSelect} onClose={onClose} />;
-    if (tab === "shapes")  return <ShapesTab  onSelect={(a) => { onSelect(a); onClose(); }} />;
-    if (tab === "icons")   return <IconsTab   onSelect={(a) => { onSelect(a); onClose(); }} />;
+    if (tab === "icons")       return <IconsTab       onSelect={(a) => { onSelect(a); onClose(); }} />;
+    if (tab === "decoratives") return <DecorativesTab onSelect={(a) => { onSelect(a); onClose(); }} />;
   };
 
   return (

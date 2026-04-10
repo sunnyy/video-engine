@@ -21,6 +21,7 @@ import assetShineRegistry     from "../../core/assetShineRegistry.jsx";
 import { getClipPathCSS, getSVGClipContent } from "../../core/decorativeShapeRegistry.js";
 import { renderIconSVG } from "../../core/iconRegistry.jsx";
 import { IconifyZone }  from "../elements/IconifyZone.jsx";
+import { decorativeById } from "../../core/designLibrary/decorativeRegistry.js";
 
 function resolveEnterStyle(animation, progress, W, H) {
   switch (animation) {
@@ -505,18 +506,71 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           return <div style={baseStyle}>{text}</div>;
         })()}
 
-        {/* Decorative — gradient/color overlays from layout def style.background only.
-            SVG shape decoratives are disabled (not used by pipeline). */}
-        {effectiveType === "decorative" && st.background && (
-          <div style={{
-            position:     "absolute",
-            inset:        0,
-            background:   st.background,
-            opacity:      st.opacity ?? 1,
-            borderRadius: st.borderRadius || 0,
-            pointerEvents:"none",
-          }} />
-        )}
+        {/* Decorative — two variants:
+            1. User-placed (content.decorativeId) → render SVG from registry, color-injected
+            2. Layout-level (style.background, no decorativeId) → CSS gradient/color overlay */}
+        {effectiveType === "decorative" && (() => {
+          const decId = zone.content?.decorativeId;
+          if (decId) {
+            const entry = decorativeById[decId];
+            if (!entry) return null;
+            const color = st.color || "#ffffff";
+
+            // CSS-only decoratives (lines, dividers, dashes)
+            if (entry.render === "css_repeat" && entry.css) {
+              const injectColor = (val) =>
+                typeof val === "string" ? val.replace(/currentColor/g, color) : val;
+              const cssStyle = Object.fromEntries(
+                Object.entries(entry.css).map(([k, v]) => [k, injectColor(v)])
+              );
+              return (
+                <div style={{
+                  position: "absolute", inset: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  pointerEvents: "none",
+                }}>
+                  <div style={{ width: "100%", ...cssStyle }} />
+                </div>
+              );
+            }
+
+            // SVG decoratives
+            if (entry.svg) {
+              const svgStr = entry.svg.replace(/currentColor/g, color);
+              return (
+                <div style={{
+                  position:     "absolute",
+                  inset:        0,
+                  display:      "flex",
+                  alignItems:   "center",
+                  justifyContent: "center",
+                  pointerEvents: "none",
+                  overflow:     "visible",
+                }}
+                  dangerouslySetInnerHTML={{ __html: svgStr.replace(
+                    /<svg /,
+                    '<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible" '
+                  ) }}
+                />
+              );
+            }
+            return null;
+          }
+          // Layout-level CSS overlay (gradient dividers, color bars baked into layouts)
+          if (st.background) {
+            return (
+              <div style={{
+                position:     "absolute",
+                inset:        0,
+                background:   st.background,
+                opacity:      st.opacity ?? 1,
+                borderRadius: st.borderRadius || 0,
+                pointerEvents:"none",
+              }} />
+            );
+          }
+          return null;
+        })()}
 
         {/* Icon zones — Iconify (Phosphor) first, local registry fallback */}
         {effectiveType === "icon" && (() => {
@@ -601,6 +655,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
       content:         o.content        || {},
       style:           { ...d.style, ...(o.style || {}) },
       background:      o.background     || {},
+      hidden:          o.hidden         || false,
       // Raw beat-zone objectFit — user's explicit override, not mixed with layout-def defaults.
       // Used for asset/avatar rendering so layout-def "cover" default never shadows user's choice.
       _userObjectFit:  o.style?.objectFit,
@@ -615,6 +670,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
       zIndex: z.zIndex ?? 10, start: z.start ?? 0, end: z.end ?? null,
       enterAnimation: z.enterAnimation || "fadeIn", exitAnimation: z.exitAnimation || "none",
       content: z.content || {}, style: z.style || {}, background: z.background || {},
+      hidden: z.hidden || false,
       // For extra zones the style has no layout-def layer, so _userObjectFit = style.objectFit directly
       _userObjectFit: z.style?.objectFit,
     }));

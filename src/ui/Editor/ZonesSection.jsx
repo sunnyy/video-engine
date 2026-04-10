@@ -213,13 +213,12 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
         background: {},
       };
     } else if (data?.kind === "decorative") {
-      const def = data.defaults || {};
       zoneData = {
-        type: "decorative", x: 20, y: 40, width: 60, height: 20,
+        type: "decorative", x: 10, y: 10, width: 30, height: 30,
         zIndex: 10, start: 0, end: null,
         enterAnimation: "fadeIn", exitAnimation: "none",
-        content: { shape: data.shape || "circle" },
-        style: { ...def },
+        content: { decorativeId: data.decorativeId || null },
+        style: { color: "#ffffff", opacity: 1, strokeWidth: 3 },
         background: {},
       };
     } else if (data?.kind === "icon") {
@@ -394,14 +393,14 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
   const deletedZonesSet = new Set(beat.deletedZones || []);
 
   const allRows = [
-    // Layout-defined zones (excluding ones the user has deleted)
-    ...zoneDefs.filter(z => !deletedZonesSet.has(z.id)).map(z => {
+    // Layout-defined zones (excluding ones the user has deleted or hidden)
+    ...zoneDefs.filter(z => !deletedZonesSet.has(z.id) && !zones[z.id]?.hidden).map(z => {
       const zData = zones[z.id] || {};
       const type  = zData.type || z.type || "asset";
       return { id: z.id, name: z.label || z.id, type, isCustom: false, isOverlay: false };
     }),
-    // Custom zones added by the pipeline or user (not in the layout def)
-    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id)).map(([id, z]) => {
+    // Custom zones added by the pipeline or user (not in the layout def, not hidden)
+    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id) && !zones[id]?.hidden).map(([id, z]) => {
       const type = z.type || "asset";
       const name = type === "text"
         ? (z.content?.text?.slice(0, 16) || "Text")

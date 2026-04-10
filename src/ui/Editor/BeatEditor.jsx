@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 
-import LayoutSelector  from "./LayoutSelector";
 import ZonesSection    from "./ZonesSection";
+import BeatSection     from "./BeatSection";
 import CaptionsSection from "./CaptionsSection";
 import SFXSection      from "./SFXSection";
 
@@ -16,7 +16,7 @@ if (typeof document !== "undefined" && !document.getElementById("editor-fonts"))
 }
 
 const TABS = [
-  { key: "layout",  label: "Layout",  color: "#7c5cfc" },
+  { key: "beat",    label: "Beat",    color: "#7c5cfc" },
   { key: "zones",   label: "Zones",   color: "#f97316" },
   { key: "caption", label: "Caption", color: "#3b9eff" },
   { key: "sfx",     label: "SFX",     color: "#f0e040" },
@@ -25,7 +25,7 @@ const TABS = [
 export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZone, setActiveTab, beatTab, setBeatTab }) {
   const project      = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
-  const [localTab, setLocalTab] = useState("layout");
+  const [localTab, setLocalTab] = useState("zones");
 
   const tab    = beatTab    ?? localTab;
   const setTab = setBeatTab ?? setLocalTab;
@@ -72,7 +72,7 @@ export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZo
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-5 py-5">
-        {tab === "layout"   && <LayoutSelector beat={activeBeat} />}
+        {tab === "beat"     && <BeatSection beat={activeBeat} isFirst={activeBeat.order === 0} />}
         {tab === "zones"    && (
           <ZonesSection
             beat={activeBeat}

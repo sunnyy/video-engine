@@ -139,6 +139,7 @@ export default function ZoneCanvas({
   const defZones = (layoutDef?.zones || []).flatMap(d => {
     if (deletedZones.has(d.id)) return [];
     const o = beatZones[d.id] || {};
+    if (o.hidden) return [];
     return [{
       ...d,
       x: o.x ?? d.x, y: o.y ?? d.y,
@@ -150,6 +151,7 @@ export default function ZoneCanvas({
 
   const extraZones = Object.entries(beatZones)
     .filter(([id]) => !defZoneIds.has(id))
+    .filter(([, z]) => !z.hidden)
     .map(([id, z]) => ({
       id, type: z.type || "asset",
       x: z.x ?? 0, y: z.y ?? 0, width: z.width ?? 50, height: z.height ?? 20,
