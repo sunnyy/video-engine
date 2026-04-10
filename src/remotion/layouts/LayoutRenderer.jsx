@@ -14,9 +14,6 @@ import AssetRenderer from "../elements/AssetRenderer";
 import AvatarLayer from "../elements/AvatarLayer";
 import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 import ElementRenderer from "../elements/ElementRenderer";
-import CompositionLayerRenderer from "../elements/composition/CompositionLayerRenderer";
-import CompositionDecorativeLayer from "../elements/CompositionDecorativeLayer";
-import blockRegistry from "../../core/blockRegistry";
 import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
 import textEffectRegistry from "../../core/textEffectRegistry.jsx";
 import animatedBorderRegistry from "../../core/animatedBorderRegistry.js";
@@ -510,19 +507,6 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           );
         })()}
 
-        {/* Block — check content.kind, not zone.type (layout zones keep type:"asset" even when block content is set) */}
-        {content.kind === "block" && (() => {
-          const block = content.block;
-          if (!block?.type) return null;
-          const entry = blockRegistry[block.type];
-          if (!entry?.renderer) return null;
-          const BR = entry.renderer;
-          return (
-            <div style={{ position:"absolute", inset:0 }}>
-              <BR block={block} variant={block.variant || entry.variants?.[0] || "default"} zone={zone} beat={beat} project={project} />
-            </div>
-          );
-        })()}
 
       </div>
 
@@ -585,7 +569,8 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
   const contentZones = allZones.filter(z => z.type !== "element");
   const elementZones = allZones.filter(z => z.type === "element");
 
-  // Blurred asset bg: only when no explicit layoutBackground is set on this beat.
+  // Blurred asset bg: only when the beat has no explicit layoutBackground set.
+  // When a layoutBackground is set (by pipeline or user), always use LayoutBackgroundRenderer.
   const hasExplicitBg = !!beat?.layoutBackground;
   const blurSrc = !hasExplicitBg
     ? contentZones.find(z => z.type === "asset" && z.content?.asset?.src)?.content?.asset?.src ?? null
@@ -599,23 +584,12 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
         ? <BlurredAssetBackground src={blurSrc} />
         : <LayoutBackgroundRenderer background={beat?.layoutBackground} beat={beat} />
       }
-      {/* Composition background + overlay layers (beneath zone content) */}
-      <CompositionLayerRenderer beat={beat} layerFilter={[0, 1, 3]} />
       {/* Zone content — inset by layoutPadding */}
       <div style={{ position:"absolute", inset: pad, overflow:"hidden" }}>
         {contentZones.map(zone => (
           <ZoneLayer key={zone.id} zone={zone} beat={beat} project={project} W={W - pad * 2} H={H - pad * 2} beatDurationSec={beatDurationSec} previewMode={previewMode} />
         ))}
       </div>
-      {/* Composition frame + decorative layers (above zone content) */}
-      <CompositionLayerRenderer beat={beat} layerFilter={[2, 4]} />
-      {beat.decoratives?.length > 0 && (
-        <CompositionDecorativeLayer
-          decoratives={beat.decoratives}
-          canvasW={W}
-          canvasH={H}
-        />
-      )}
       {elementZones.map(zone => (
         <ElementRenderer key={zone.id} zone={zone} beatDurationSec={beatDurationSec} />
       ))}

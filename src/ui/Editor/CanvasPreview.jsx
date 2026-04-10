@@ -242,14 +242,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     <div className="w-full bg-black border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0">
-        {activeBeat && (
-          <span className="text-[10px] font-mono text-[#55556a]">{activeBeat.layout}</span>
-        )}
-        {selectedZoneIds?.size > 1 && (
-          <span className="text-[10px] font-mono text-[#7c5cfc]">{selectedZoneIds.size} selected</span>
-        )}
-        <div className="ml-auto flex items-center gap-1 text-[12px] text-[#777] font-mono">
+      <div className="flex items-center px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0">
+        <div className="flex items-center gap-2 text-[12px] text-[#777] font-mono">
           <span>Space ▶/⏸</span>
           <span className="mx-1 opacity-30">·</span>
           <span>⌘Z undo</span>

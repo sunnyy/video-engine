@@ -231,7 +231,7 @@ export default function ZoneEditor({
   const style    = safeZone.style   || {};
 
   const isText       = zoneType === "text";
-  const isDecorative = zoneType === "decorative";
+  const isDecorative = zoneType === "decorative" || zoneType === "icon";
   const isBlock      = content.kind === "block";
 
   const enters  = Object.keys(transitionsRegistry.enter || {});

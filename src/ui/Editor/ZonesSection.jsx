@@ -238,8 +238,8 @@ export default function ZonesSection({ beat, project, selectedZoneId, onSelectZo
       const type  = zData.type || z.type || "asset";
       return { id: z.id, name: z.label || z.id, type, isCustom: false, isOverlay: false };
     }),
-    // Custom zones
-    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id)).map(([id, z]) => {
+    // Custom zones (exclude _bg_img — auto-managed background, not user-editable)
+    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id) && id !== "_bg_img").map(([id, z]) => {
       const type = z.type || "asset";
       const name = type === "text"
         ? (z.content?.text?.slice(0, 16) || "Text")

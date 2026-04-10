@@ -66,7 +66,7 @@ export const textStylePresets = [
       fontSize: 80,
       fontWeight: 700,
       fontFamily: "'Playfair Display', serif",
-      fontStyle: "italic",
+      fontStyle: "normal",
       color: "#ffffff",
       textAlign: "left",
       textShadow: "0 2px 16px rgba(0,0,0,0.6)",
@@ -210,6 +210,7 @@ export const textStylePresets = [
   {
     id: "pill-tag",
     label: "Pill Tag",
+    backgroundRole: "primary",
     roles: ["tagline", "label"],
     suitable_on: "both",
     niche: ["entertainment", "tech", "gaming", "lifestyle"],
@@ -483,6 +484,7 @@ export const textStylePresets = [
   {
     id: "quote-highlight",
     label: "Quote Highlight",
+    backgroundRole: "primary",
     roles: ["quote"],
     suitable_on: "both",
     niche: ["entertainment", "education", "lifestyle"],
@@ -510,6 +512,7 @@ export const textStylePresets = [
   {
     id: "badge-label",
     label: "Badge",
+    backgroundRole: "primary",
     roles: ["label"],
     suitable_on: "both",
     niche: ["entertainment", "tech", "gaming", "sports"],

@@ -13,6 +13,10 @@
  *   speed       — rotations per second
  *   borderWidth — px inset between outer container and inner content
  *   blurAmount  — px blur on the glow layer (0 = no glow)
+ *   niche       — niches this border suits
+ *   intent      — beat intents this border suits
+ *   energy      — energy levels this border suits
+ *   mood        — descriptive mood tag
  */
 
 const animatedBorderRegistry = {
@@ -25,6 +29,10 @@ const animatedBorderRegistry = {
     speed:       0.8,
     borderWidth: 12,
     blurAmount:  6,
+    niche:       ["gaming", "tech", "entertainment"],
+    intent:      ["hook", "shock", "escalate", "reveal"],
+    energy:      ["high"],
+    mood:        "futuristic",
   },
 
   fire: {
@@ -35,6 +43,10 @@ const animatedBorderRegistry = {
     speed:       0.7,
     borderWidth: 14,
     blurAmount:  8,
+    niche:       ["gaming", "sports", "entertainment", "food"],
+    intent:      ["hook", "urgency", "escalate", "shock"],
+    energy:      ["high"],
+    mood:        "intense",
   },
 
   neon: {
@@ -45,6 +57,10 @@ const animatedBorderRegistry = {
     speed:       1.0,
     borderWidth: 10,
     blurAmount:  7,
+    niche:       ["gaming", "entertainment", "tech"],
+    intent:      ["hook", "contrast", "reveal", "escalate"],
+    energy:      ["high"],
+    mood:        "electric",
   },
 
   gold: {
@@ -55,6 +71,10 @@ const animatedBorderRegistry = {
     speed:       0.5,
     borderWidth: 16,
     blurAmount:  5,
+    niche:       ["finance", "lifestyle", "entertainment", "sports"],
+    intent:      ["proof", "reveal", "stat", "testimonial"],
+    energy:      ["medium", "high"],
+    mood:        "premium",
   },
 
   plasma: {
@@ -65,6 +85,10 @@ const animatedBorderRegistry = {
     speed:       0.9,
     borderWidth: 12,
     blurAmount:  8,
+    niche:       ["gaming", "entertainment", "lifestyle"],
+    intent:      ["hook", "shock", "curiosity", "reveal"],
+    energy:      ["high"],
+    mood:        "bold",
   },
 
   arctic: {
@@ -75,6 +99,10 @@ const animatedBorderRegistry = {
     speed:       0.6,
     borderWidth: 10,
     blurAmount:  5,
+    niche:       ["lifestyle", "health", "education", "travel"],
+    intent:      ["visual_rest", "proof", "explanation", "reveal"],
+    energy:      ["low", "medium"],
+    mood:        "calm",
   },
 
   rainbow: {
@@ -85,6 +113,10 @@ const animatedBorderRegistry = {
     speed:       0.5,
     borderWidth: 14,
     blurAmount:  4,
+    niche:       ["entertainment", "lifestyle", "food"],
+    intent:      ["hook", "punchline", "curiosity", "irony"],
+    energy:      ["high", "medium"],
+    mood:        "playful",
   },
 
   lava: {
@@ -95,6 +127,10 @@ const animatedBorderRegistry = {
     speed:       0.6,
     borderWidth: 16,
     blurAmount:  9,
+    niche:       ["gaming", "sports", "entertainment"],
+    intent:      ["shock", "urgency", "contrast", "escalate"],
+    energy:      ["high"],
+    mood:        "danger",
   },
 
   hologram: {
@@ -105,6 +141,10 @@ const animatedBorderRegistry = {
     speed:       1.0,
     borderWidth: 10,
     blurAmount:  4,
+    niche:       ["tech", "gaming", "entertainment"],
+    intent:      ["hook", "reveal", "curiosity"],
+    energy:      ["high", "medium"],
+    mood:        "futuristic",
   },
 
   sunset: {
@@ -115,30 +155,73 @@ const animatedBorderRegistry = {
     speed:       0.7,
     borderWidth: 12,
     blurAmount:  6,
+    niche:       ["lifestyle", "travel", "food", "entertainment"],
+    intent:      ["reveal", "visual_rest", "empathy", "testimonial"],
+    energy:      ["medium"],
+    mood:        "warm",
   },
-
-  // ── Turbulence-based effects (rendered via SVG feTurbulence in AnimatedBorderFrame) ──
 
   fireGlow: {
     label:        "Fire Glow",
     swatchColor:  "#dd8448",
-    type:         "turbulence",       // flag: AnimatedBorderFrame renders this differently
-    turbColor:    "#dd8448",          // main border color
-    turbColor2:   "rgba(255,60,0,0.35)", // outer glow ring
-    turbScale:    5,                  // feDisplacementMap scale (wobble amount)
+    type:         "turbulence",
+    turbColor:    "#dd8448",
+    turbColor2:   "rgba(255,60,0,0.35)",
+    turbScale:    5,
     glowColor:    "#dd8448",
     speed:        1.0,
     borderWidth:  10,
     blurAmount:   0,
+    niche:        ["gaming", "sports", "entertainment"],
+    intent:       ["hook", "urgency", "escalate", "shock"],
+    energy:       ["high"],
+    mood:         "intense",
   },
 
 };
 
 export default animatedBorderRegistry;
 
-/** Ordered list for pickers (id + label + swatchColor) */
 export const ANIMATED_BORDER_OPTIONS = Object.entries(animatedBorderRegistry).map(([id, entry]) => ({
   id,
   label:       entry.label,
   swatchColor: entry.swatchColor,
+  niche:       entry.niche,
+  intent:      entry.intent,
+  energy:      entry.energy,
+  mood:        entry.mood,
 }));
+
+/**
+ * resolveAnimatedBorderForZone
+ * Picks the best animated border for a given beat context.
+ *
+ * @param {object} beat  — { intent, energy }
+ * @param {object} dna   — { niche, colorStory }
+ * @returns {string} border key
+ */
+export function resolveAnimatedBorderForZone(beat, dna) {
+  const intent = beat.intent ?? "hook";
+  const niche  = dna?.niche  ?? "entertainment";
+  const energy = beat.energy >= 0.7 ? "high" : beat.energy >= 0.4 ? "medium" : "low";
+
+  let candidates = Object.entries(animatedBorderRegistry).filter(([, b]) =>
+    b.intent.includes(intent) && b.niche.includes(niche) && b.energy.includes(energy)
+  ).map(([id]) => id);
+
+  if (candidates.length < 2) {
+    candidates = Object.entries(animatedBorderRegistry).filter(([, b]) =>
+      b.intent.includes(intent) && b.niche.includes(niche)
+    ).map(([id]) => id);
+  }
+
+  if (candidates.length < 2) {
+    candidates = Object.entries(animatedBorderRegistry).filter(([, b]) =>
+      b.intent.includes(intent)
+    ).map(([id]) => id);
+  }
+
+  if (!candidates.length) candidates = Object.keys(animatedBorderRegistry);
+
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}

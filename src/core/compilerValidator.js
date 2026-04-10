@@ -130,7 +130,6 @@ export function validateBeats(beats) {
     if (beat.audio_cues)    cleanBeat.audio_cues    = beat.audio_cues;
 
     // Preserve runtime fields that validators must not strip
-    if (beat.composition)    cleanBeat.composition    = beat.composition;
     if (beat.overlays)       cleanBeat.overlays       = beat.overlays;
     if (beat.intent)         cleanBeat.intent         = beat.intent;
     if (beat.energy   != null) cleanBeat.energy       = beat.energy;
@@ -141,7 +140,6 @@ export function validateBeats(beats) {
     if (beat.block_props)    cleanBeat.block_props    = beat.block_props;
     if (beat.block_candidate) cleanBeat.block_candidate = beat.block_candidate;
     if (beat.layoutPadding != null) cleanBeat.layoutPadding = beat.layoutPadding;
-    if (beat.decoratives)    cleanBeat.decoratives    = beat.decoratives;
     if (beat.resolvedColors) cleanBeat.resolvedColors = beat.resolvedColors;
 
     return cleanBeat;

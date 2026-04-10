@@ -8,9 +8,9 @@
  */
 
 import { findLayouts, getLayoutDef } from "./layoutRegistry.js";
-import iconRegistry from "./iconRegistry.jsx";
 import { getBackgroundForIntent } from "./backgroundPatternRegistry.js";
 import { resolveColors } from "./colorContrastResolver.js";
+import { resolveIconForZone } from "./resolveIconForZone.js";
 
 /* ─────────────────────────────────────────────────────────────
    ENERGY LEVEL
@@ -173,14 +173,12 @@ function pickLayout({
    Fills zone content slots from beat script data.
    Text zones filled by order, asset zones filled by order.
 ───────────────────────────────────────────────────────────── */
-function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle }) {
+function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle, intent, niche, brandColor, colorStory }) {
   const def = getLayoutDef(layoutId);
   if (!def) return {};
 
   const stylePreset = pickStylePreset(energy);
   const zones = {};
-
-  const iconIds = Object.keys(iconRegistry);
 
   // Accent shapes — small, filled, used as decorative accents
   const ACCENT_SHAPES = ["circle", "diamond", "triangle", "star", "hexagon", "pill"];
@@ -241,11 +239,12 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle }) {
     }
 
     if (zone.type === "icon") {
-      // Pick deterministically from the icon registry; inject a visible white default color
-      const iconId = iconIds[(beatIndex + i) % iconIds.length];
+      const fakeBeat = { intent, energy, layoutBackground: null };
+      const dna = colorStory ? { colorStory, niche } : null;
+      const { iconId, color } = resolveIconForZone(fakeBeat, zone, dna, brandColor);
       zones[zone.id] = {
         content: { iconId },
-        style: { ...zone.style, color: zone.style?.color || "#ffffff", filled: true },
+        style: { ...zone.style, color, filled: true },
       };
     }
   });
@@ -377,6 +376,10 @@ export function planBeatVisual({
     lastMotion,
     beatIndex,
     motionStyle,
+    intent,
+    niche,
+    brandColor: _brandColor,
+    colorStory,
   });
 
   return {

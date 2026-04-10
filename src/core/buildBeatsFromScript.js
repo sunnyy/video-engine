@@ -4,7 +4,6 @@
  */
 
 import { generateCaptionText }   from "./captionTimingEngine";
-import { TYPOGRAPHY_SYSTEMS }     from "./videoDNA";
 import { autoMatchAssets }        from "./assetAutoMatcher";
 import { validateBeats }          from "./compilerValidator";
 import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
@@ -13,15 +12,14 @@ import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
 import { planBeatVisual }         from "./visualPlanner";
 import { getLayoutDef, layoutRegistry } from "./layoutRegistry";
 import { resolveColors }          from "./colorContrastResolver";
-import { autoAssignElements }     from "./autoAssignElements";
-import { pickDecoratives }        from "./designLibrary/decorativePicker";
+import { resolvePresetColor, resolvePresetBackground } from "./resolveColor.js";
 import { resolveBeatColors }      from "./elements/colorContrastResolver";
-import { pickBeatSFX, OVERLAY_SFX_DEFAULTS } from "./sfxRegistry";
+import { backgroundPatternRegistry } from "./backgroundPatternRegistry.js";
+import { pickBeatSFX } from "./sfxRegistry";
 import { textStylePresets }               from "./textStylePresets";
 import { PIPELINE_EFFECTS }              from "./textEffectRegistry.jsx";
 import { PIPELINE_SHINE_EFFECTS }        from "./assetShineRegistry.jsx";
-import { autoAssignOverlays }     from "./overlayPlacementEngine";
-import { composeBeat }            from "./elements/elementComposer";
+import { resolveAnimatedBorderForZone }  from "./animatedBorderRegistry.js";
 
 import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
 import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
@@ -92,7 +90,7 @@ function chooseCaptionAnimation(intent, energy = 0.5) {
   return map[intent] || "fade";
 }
 
-function chooseCaptionPosition(layoutId, index, total, energy) {
+function chooseCaptionPosition(_layoutId, index, total, energy) {
   if (index === 0 || index === total - 1) return 80;
   if (energy >= 0.8) return 50;
   return 80;
@@ -110,7 +108,7 @@ function assignBeatRole(index, total) {
 }
 
 /* ── Transition ── */
-function chooseTransition(layoutId, index, energy = 0.5, isLast = false) {
+function chooseTransition(_layoutId, index, energy = 0.5, isLast = false) {
   if (index === 0) return { type: "cut",     duration: 0.25 };
   if (isLast)      return { type: "blurFade", duration: 0.3  };
   const high = energy >= 0.75;
@@ -173,8 +171,6 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
   return fixed;
 }
 
-// Presets that have background colors — their bg needs DNA-aware replacement
-const PRESET_BG_IDS = new Set(["pill", "brutal"]);
 
 function pickPresetForZone(zoneDef, order, intent, energy = 0.5, niche = null) {
   const role = zoneDef.role || (order === 0 ? "headline" : "subtext");
@@ -210,18 +206,21 @@ function pickPresetForZone(zoneDef, order, intent, energy = 0.5, niche = null) {
 /* ── Fill text zones — applies DNA font + color + preset flair ── */
 // Preset is the primary visual identity: fontFamily, fontWeight, textAlign, color.
 // Layout def only controls: fontSize (zone sizing).
-// DNA typography system can override fontFamily.
-// On asset layouts: color is kept from preset if non-white, else forced white for readability.
-function fillTextZones(beats, typographySystem = null, colorOptions = {}) {
-  const fontFamily = typographySystem
-    ? (TYPOGRAPHY_SYSTEMS[typographySystem]?.heading || null)
-    : null;
+// Presets drive all typography (fontFamily, fontWeight, etc.) — no blanket DNA override.
+// Color resolution: resolvePresetColor() — white presets follow brand/DNA, thematic colors stay fixed.
+// On asset layouts: override to white for readability (thematic non-white colors are kept).
+function fillTextZones(beats, colorOptions = {}) {
+  // Build the context object used by resolvePresetColor / resolvePresetBackground
+  const colorContext = {
+    dna:   colorOptions.dna   || null,
+    brand: { color: colorOptions.brandColor || null, color2: colorOptions.brandColor2 || null },
+  };
 
   return beats.map(beat => {
     const def = getLayoutDef(beat.layout);
     if (!def) return beat;
 
-    // Resolve colors for this beat's background context
+    // resolveColors still used for textShadow and legacy blockBg/accent
     const colors = resolveColors({
       colorStory:  colorOptions.colorStory || null,
       brandColor:  colorOptions.brandColor  || null,
@@ -242,38 +241,37 @@ function fillTextZones(beats, typographySystem = null, colorOptions = {}) {
       const existing = zones[zoneDef.id];
 
       // Pick a preset for this zone and extract only typography flair
-      const presetId   = pickPresetForZone(zoneDef, order, beat.intent, beat.energy ?? 0.5, colorOptions.niche || null);
-      const preset     = textStylePresets.find(p => p.id === presetId);
+      const presetId    = pickPresetForZone(zoneDef, order, beat.intent, beat.energy ?? 0.5, colorOptions.niche || null);
+      const preset      = textStylePresets.find(p => p.id === presetId);
       const presetFlair = preset ? (() => {
-        // Strip only fontSize/opacity — keep fontFamily, fontWeight, textAlign, color,
-        // letterSpacing, lineHeight so each preset is visually distinct.
+        // Strip fontSize/opacity — keep fontFamily, fontWeight, textAlign, color, etc.
         const { fontSize, opacity, ...flair } = preset.style;
         return flair;
       })() : {};
 
       // Build inject: preset flair is the base, then contextual overrides on top.
       const inject = { ...presetFlair };
-      if (fontFamily) inject.fontFamily = fontFamily; // DNA typography system override
 
       if (hasAssetZones) {
-        // On asset layouts force readable white + strong shadow.
-        // Keep the preset color only if the preset explicitly intends a colored treatment
-        // (i.e. the preset's color is NOT white — e.g. Neon green, Gold, etc.).
-        const presetColor = preset?.style?.color;
-        const presetIntendedColor = presetColor && presetColor !== "#ffffff";
-        inject.color = presetIntendedColor ? presetColor : "#ffffff";
+        // Asset layouts: force white for readability.
+        // Exception: keep thematic non-white preset colors (gold, cyan, neon — colorRole: "fixed"
+        // or auto-detected as intentional because they're not #ffffff).
+        const rawColor   = preset?.style?.color;
+        const isThematic = rawColor && rawColor !== "#ffffff" && rawColor !== "white"
+          && rawColor !== "transparent" && preset?.colorRole !== "brand";
+        inject.color = isThematic ? rawColor : "#ffffff";
         inject.textShadow = beat.energy >= 0.7
           ? "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)"
           : "0 2px 18px rgba(0,0,0,0.9)";
         delete inject.background; // no bg overlay on asset zones
       } else {
-        // Non-asset layouts: preset color wins; fall back to DNA/resolved color.
-        const presetColor = preset?.style?.color;
-        inject.color = presetColor || colors.text;
-        // If preset has a background, replace hardcoded color with DNA accent
-        if (preset && PRESET_BG_IDS.has(presetId) && colors.accent) {
-          inject.background = colors.accent;
-        }
+        // Non-asset layouts: resolve through three-tier color system.
+        inject.color = resolvePresetColor(preset, colorContext);
+
+        // Resolve background for pill/badge/quote presets (backgroundRole: "primary")
+        const resolvedBg = resolvePresetBackground(preset, colorContext);
+        if (resolvedBg) inject.background = resolvedBg;
+
         if (colors.textShadow && colors.textShadow !== "none" && !presetFlair.textShadow) {
           inject.textShadow = colors.textShadow;
         }
@@ -307,17 +305,17 @@ export async function buildBeatsFromScript({
   script           = "",
   structuredBeats  = null,
   mode             = "faceless",
-  videoType        = "viral",
+  videoType:        _videoType        = "viral",
   orientation      = "9:16",
-  durationCategory = "short",
+  durationCategory: _durationCategory = "short",
   assetSource      = "stock",
   uploadedAssets   = [],
   language         = "english",
   topic            = "",
   brandColor       = null,
-  brandName        = null,
-  audience         = "general",
-  tone             = "bold",
+  brandName:        _brandName        = null,
+  audience:         _audience         = "general",
+  tone:             _tone             = "bold",
   dna              = null,
 }) {
 
@@ -392,18 +390,6 @@ export async function buildBeatsFromScript({
     const captionShowDefault = captionStrategy === "never" ? false : true;
     const captionPosition  = chooseCaptionPosition(visual.layout, index, total, energy);
 
-    const overlays = autoAssignOverlays({
-      intent, energy,
-      layout:          visual.layout,
-      captionPosition,
-      brandColor,
-    });
-
-    overlays.forEach(ov => {
-      if (!ov.sfx && OVERLAY_SFX_DEFAULTS[ov.type]) {
-        ov.sfx = OVERLAY_SFX_DEFAULTS[ov.type];
-      }
-    });
 
     let sfxCue = pickBeatSFX(intent, energy, 0.4);
     if (sfxCue?.key === lastSFXKey) {
@@ -414,16 +400,6 @@ export async function buildBeatsFromScript({
 
     const finalLayout = visual.layout;
     const zones = enforceLayoutZones(finalLayout, visual.zones || {});
-
-    // Auto-assign decorative/icon/emoji elements
-    // Use layout definition to determine hasAsset — actual src values are filled later by autoMatchAssets
-    const hasAsset = (getLayoutDef(finalLayout)?.assetCount ?? 0) > 0;
-    const elementZones = autoAssignElements({
-      intent, energy, role, layout: finalLayout, hasAsset, dna,
-      brandColor:  brandColor  || null,
-      brandColor2: null, // filled from project meta at render time
-    });
-    elementZones.forEach(ez => { zones[ez.id] = ez; });
 
     return {
       id:    crypto.randomUUID(),
@@ -446,7 +422,7 @@ export async function buildBeatsFromScript({
         emphasis_words: item.emphasis_words || [],
       },
 
-      overlays,
+      overlays: [],
       audio_cues: sfxCue ? [sfxCue] : [],
 
       transition: chooseTransition(visual.layout, index, energy, isLast),
@@ -458,47 +434,64 @@ export async function buildBeatsFromScript({
     };
   });
 
-  /* ── Composition pass — attach beat.composition to each beat ── */
-  {
-    const prevComps = [];
-    beats = beats.map((beat, index) => {
-      const composition = composeBeat({
-        beat,
-        dna,
-        brandColor: brandColor || null,
-        beatIndex:  index,
-        previousCompositions: prevComps,
-      });
-      prevComps.push(composition);
-      return { ...beat, composition };
-    });
-  }
-
   /* ── Post-processing ── */
-  beats = fillTextZones(beats, dna?.typographySystem || null, {
+  beats = fillTextZones(beats, {
+    dna,
     colorStory:  dna?.colorStory  || null,
     brandColor:  brandColor       || null,
     niche:       dna?.niche       || null,
   });
 
-  /* ── Assign one-shot shine effects to asset zones ── */
+  /* ── Assign asset zone visual styling: border radius, animated border, shine ── */
   beats = beats.map(beat => {
     const layoutDef = getLayoutDef(beat.layout);
     if (!layoutDef) return beat;
     const zones = { ...beat.zones };
+
     layoutDef.zones.forEach(zoneDef => {
       if (zoneDef.type !== "asset") return;
       const existing = zones[zoneDef.id] || {};
-      if (existing.style?.shineEffect) return; // already set
-      const seed = (beat.intent || "").charCodeAt(0) + (zoneDef.id || "").charCodeAt(1) + beat.order * 13;
-      // ~60% chance of getting a shine — skip the rest for visual breathing room
-      if (seed % 5 < 2) return;
-      const shine = PIPELINE_SHINE_EFFECTS[seed % PIPELINE_SHINE_EFFECTS.length];
-      zones[zoneDef.id] = {
-        ...existing,
-        style: { ...(existing.style || {}), shineEffect: shine },
-      };
+      const existingStyle = existing.style || {};
+
+      // Deterministic seed unique to this beat+zone combination
+      const seed = (beat.intent || "").charCodeAt(0) + (zoneDef.id || "").charCodeAt(1) + (beat.order ?? 0) * 13;
+
+      // Full-canvas zones (fill the whole background) — skip rounding/borders,
+      // they would just clip at the canvas edge and the effect wouldn't be visible.
+      const isFullCanvas = (zoneDef.width ?? 100) >= 90 && (zoneDef.height ?? 100) >= 85;
+
+      const styleUpdates = {};
+
+      // ── Border radius (100–150px) ──────────────────────────────────────────
+      // Skip if: full canvas, layout already set a specific radius, already edited,
+      // or layout uses an outline (polaroid frame) — rounding breaks the square frame.
+      const hasOutline = !!(zoneDef.style?.outline || zoneDef.style?.outlineOffset);
+      if (!isFullCanvas && !hasOutline && !existingStyle.borderRadius && !(zoneDef.style?.borderRadius > 0)) {
+        styleUpdates.borderRadius = 100 + (seed % 51); // 100–150
+      }
+
+      // ── Animated border (~25% of non-full-canvas zones) ───────────────────
+      if (!isFullCanvas && !existingStyle.animatedBorder && !existingStyle.clipShape) {
+        if (seed % 4 === 0) {
+          styleUpdates.animatedBorder = resolveAnimatedBorderForZone(beat, dna);
+        }
+      }
+
+      // ── One-shot shine effect (~60% of all asset zones) ───────────────────
+      if (!existingStyle.shineEffect) {
+        if (seed % 5 >= 2) {
+          styleUpdates.shineEffect = PIPELINE_SHINE_EFFECTS[seed % PIPELINE_SHINE_EFFECTS.length];
+        }
+      }
+
+      if (Object.keys(styleUpdates).length > 0) {
+        zones[zoneDef.id] = {
+          ...existing,
+          style: { ...existingStyle, ...styleUpdates },
+        };
+      }
     });
+
     return { ...beat, zones };
   });
 
@@ -507,21 +500,13 @@ export async function buildBeatsFromScript({
   beats = applyBeatVariation(beats);
   beats = applyCaptionEmphasis(beats);
 
-  /* ── Design pass — decoratives + resolved colors ── */
-  {
-    const usedDecorativeIds = [];
-    beats = beats.map(beat => {
-      // Pick decoratives
-      const decoratives = pickDecoratives(beat, dna, usedDecorativeIds);
-      decoratives.forEach(d => usedDecorativeIds.push(d.decorativeId));
-
-      // Resolve colors against the beat's background
-      const bgStyle = beat.layoutBackground?.style || null;
-      const resolvedColors = resolveBeatColors(bgStyle, dna);
-
-      return { ...beat, decoratives, resolvedColors };
-    });
-  }
+  /* ── Resolve colors per beat ── */
+  beats = beats.map(beat => {
+    const bgEntry = backgroundPatternRegistry[beat.layoutBackground?.value];
+    const bgStyle = bgEntry?.style || null;
+    const resolvedColors = resolveBeatColors(bgStyle, dna);
+    return { ...beat, resolvedColors };
+  });
 
   beats = validateBeats(beats);
 

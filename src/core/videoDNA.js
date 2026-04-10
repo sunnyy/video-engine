@@ -99,13 +99,16 @@ function detectNiche(videoType = "") {
 
 /* ── Main export ─────────────────────────────────────────────── */
 export function generateVideoDNA({ videoType = "viral", tone = "bold" }) {
-  const key    = `${videoType}:${tone}`;
+  // "auto" means the user didn't pick — fall back to "viral" / "bold" as sane defaults
+  const effectiveType = (!videoType || videoType === "auto") ? "viral" : videoType;
+  const effectiveTone = (!tone     || tone     === "auto") ? "bold"  : tone;
+  const key    = `${effectiveType}:${effectiveTone}`;
   const preset = DNA_PRESETS[key] || FALLBACK;
 
   return {
     typographySystem: preset.typography,
     colorStory:       COLOR_STORIES[preset.color] || COLOR_STORIES.electric,
     motionStyle:      preset.motion,
-    niche:            detectNiche(videoType),
+    niche:            detectNiche(effectiveType),
   };
 }

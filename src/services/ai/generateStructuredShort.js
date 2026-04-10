@@ -124,16 +124,19 @@ const BEAT_COUNTS = {
    LANGUAGE INSTRUCTION
 ───────────────────────────────────────────────────────────── */
 function getLanguageInstruction(language) {
+  if (!language || language === "auto") {
+    return "Choose the most natural language for this topic. Default to English unless another language clearly fits better.";
+  }
   const instructions = {
-    hindi:    "Write entirely in Hindi (Devanagari script). Natural spoken Hindi, not formal.",
-    hinglish: "Write in Hinglish — mix of Hindi and English as Indians naturally speak. Roman script.",
-    english:  "Write in English. Natural spoken English, not formal or written style.",
-    tamil:    "Write entirely in Tamil script. Natural spoken Tamil.",
-    telugu:   "Write entirely in Telugu script. Natural spoken Telugu.",
-    arabic:   "Write entirely in Arabic. Natural spoken Arabic, right-to-left.",
+    hindi:      "Write entirely in Hindi (Devanagari script). Natural spoken Hindi, not formal.",
+    hinglish:   "Write in Hinglish — mix of Hindi and English as Indians naturally speak. Roman script.",
+    english:    "Write in English. Natural spoken English, not formal or written style.",
+    tamil:      "Write entirely in Tamil script. Natural spoken Tamil.",
+    telugu:     "Write entirely in Telugu script. Natural spoken Telugu.",
+    arabic:     "Write entirely in Arabic. Natural spoken Arabic, right-to-left.",
     portuguese: "Write in Brazilian Portuguese. Natural spoken style.",
   };
-  return instructions[language?.toLowerCase()] || instructions.english;
+  return instructions[language.toLowerCase()] || instructions.english;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -149,20 +152,25 @@ function buildUserRulesBlock() {
 }
 
 function buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone }) {
-  const typeConfig    = VIDEO_TYPE_CONFIGS[videoType] || VIDEO_TYPE_CONFIGS.viral;
+  // "auto" values → let AI infer from the topic
+  const effectiveVideoType = (!videoType || videoType === "auto") ? "viral" : videoType;
+  const typeConfig    = VIDEO_TYPE_CONFIGS[effectiveVideoType] || VIDEO_TYPE_CONFIGS.viral;
   const beatCount     = BEAT_COUNTS[durationCategory] || BEAT_COUNTS.short;
   const langInstr     = getLanguageInstruction(language);
   const audienceInstr = AUDIENCE_CONFIGS[audience] || AUDIENCE_CONFIGS.general;
-  const toneOverride  = TONE_OVERRIDES[tone] || "";
+  const toneOverride  = (!tone || tone === "auto") ? "Choose the tone that best fits this topic — be natural and authentic." : (TONE_OVERRIDES[tone] || "");
   const userRules     = buildUserRulesBlock();
+
+  const videoTypeLabel = (!videoType || videoType === "auto") ? "auto (infer from topic)" : videoType;
+  const toneLabel      = (!tone || tone === "auto")           ? "auto (infer from topic)" : tone;
 
   return `
 You are a viral short-form video scriptwriter and creative director.
 
 LANGUAGE: ${langInstr}
 
-VIDEO TYPE: ${videoType}
-TONE: ${typeConfig.tone}. ${toneOverride}
+VIDEO TYPE: ${videoTypeLabel}
+TONE: ${toneLabel} — ${typeConfig.tone}. ${toneOverride}
 STRUCTURE: ${typeConfig.structure}
 AVOID: ${typeConfig.avoid}
 
@@ -564,7 +572,7 @@ export async function generateStructuredShort({
             zIndex:  0,
             start:   0, end: null,
             content: { kind: "asset", asset: { src: imgUrl, type: "image", objectFit: "cover", motion } },
-            style:   { opacity: 0.45 },
+            style:   { opacity: 1.0 },
             background: {},
           };
         } else {
