@@ -8,8 +8,78 @@
 
 import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
 import { useAssetsStore }  from "../../store/useAssetsStore";
+import { supabase }        from "../../lib/supabase";
 
 const SERVER = "http://localhost:5000";
+
+/* ── AI Image Library — reuse before generating ─────────────*/
+
+async function findExistingImage(assetHint, dna) {
+  try {
+    const { keywords, visual_type } = assetHint || {};
+    const niche = dna?.niche;
+    if (!niche || !visual_type || !keywords?.length) return null;
+
+    const { data, error } = await supabase
+      .from("ai_image_library")
+      .select("id, src, prompt, context, tags, reuse_count")
+      .eq("niche", niche)
+      .eq("visual_type", visual_type)
+      .contains("tags", keywords.slice(0, 2))
+      .limit(10);
+
+    if (error || !data?.length) return null;
+
+    const match = data[Math.floor(Math.random() * data.length)];
+    console.log(`[ai_image_library] Reusing existing image (niche=${niche}, visual_type=${visual_type}): ${match.src}`);
+
+    // Fire-and-forget reuse count increment
+    supabase
+      .from("ai_image_library")
+      .update({ reuse_count: (match.reuse_count || 0) + 1 })
+      .eq("id", match.id)
+      .then(() => {});
+
+    return match;
+  } catch (e) {
+    console.warn("[ai_image_library] findExistingImage error:", e.message);
+    return null;
+  }
+}
+
+async function saveToImageLibrary({ src, prompt, assetHint, beat, dna, orientation, width, height }) {
+  try {
+    const energy = typeof beat?.energy === "number"
+      ? (beat.energy >= 0.7 ? "high" : beat.energy <= 0.35 ? "low" : "medium")
+      : "medium";
+
+    const record = {
+      src,
+      prompt,
+      search_query:  assetHint?.search_query  || null,
+      subject:       assetHint?.keywords?.[0] || null,
+      context:       assetHint?.prompt        || null,
+      mood:          beat?.layoutBackground?.mood || null,
+      visual_type:   assetHint?.visual_type   || null,
+      niche:         dna?.niche               || null,
+      intent:        beat?.intent             || null,
+      energy,
+      color_mood:    dna?.colorStory?.mood    || null,
+      tags:          assetHint?.keywords      || [],
+      width,
+      height,
+      orientation,
+      generator:     "fal",
+      reuse_count:   0,
+    };
+
+    const { error } = await supabase.from("ai_image_library").insert(record);
+    if (error) console.warn("[ai_image_library] Save failed:", error.message);
+    else console.log(`[ai_image_library] Saved — niche=${record.niche} intent=${record.intent} subject=${record.subject}`);
+  } catch (e) {
+    console.warn("[ai_image_library] saveToImageLibrary error:", e.message);
+  }
+}
 
 /* ── Concept → Visual Scene translator ──────────────────────
    Maps abstract concepts/words to concrete photographable scenes.
@@ -276,7 +346,21 @@ export async function generateZoneImage({
   spoken, intent, visual_hint, topic, orientation,
   beatIndex = 0, zoneIndex = 0, promptOverride = null,
   projectId = null,
+  // Library metadata (optional — enables reuse check + save)
+  assetHint = null, dna = null, beat = null,
 }) {
+  const w = orientation === "9:16" ? 768  : 1344;
+  const h = orientation === "9:16" ? 1344 : 768;
+
+  // ── Check library for reusable image before generating ──
+  if (assetHint && dna) {
+    const existing = await findExistingImage(assetHint, dna);
+    if (existing) {
+      return { url: existing.src, type: "image", width: w, height: h, reused: true };
+    }
+  }
+
+  // ── Generate new image via Fal.ai ──
   const effectiveIndex = beatIndex * 3 + zoneIndex;
   const NO_TEXT = "no text, no numbers, no statistics, no charts, no graphs, no labels, no captions, no watermark, no typography, no writing, no signs";
   const prompt = promptOverride
@@ -297,9 +381,6 @@ export async function generateZoneImage({
   const falUrl = data.url;
   if (!falUrl) throw new Error("No image URL returned from Fal.ai");
 
-  const w = orientation === "9:16" ? 768  : 1344;
-  const h = orientation === "9:16" ? 1344 : 768;
-
   // Re-upload to Supabase for permanent storage (Fal.ai URLs expire).
   // Fetch via server proxy to avoid browser QUIC/HTTP3 issues with fal.media CDN.
   try {
@@ -318,6 +399,10 @@ export async function generateZoneImage({
       type: "image", name: asset.name || file.name, size: asset.size || file.size,
       scope: "project", project_id: projectId || null, source: "user",
     });
+
+    // Fire-and-forget: save to library for future reuse
+    saveToImageLibrary({ src: asset.url, prompt, assetHint, beat, dna, orientation, width: w, height: h });
+
     return { url: asset.url, assetId: asset.id, type: "image", width: w, height: h };
   } catch (e) {
     console.warn(`[fal] Re-upload failed for beat ${beatIndex}, using temporary Fal.ai URL:`, e.message);

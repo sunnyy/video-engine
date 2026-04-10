@@ -112,6 +112,48 @@ const VIDEO_TYPE_CONFIGS = {
 };
 
 /* ─────────────────────────────────────────────────────────────
+   NICHE VOICE RULES
+───────────────────────────────────────────────────────────── */
+const NICHE_VOICE_RULES = `
+NICHE VOICE RULES — apply to every word of spoken text:
+- entertainment: conversational, punchy, uses 'you', rhetorical questions, dramatic pauses
+- gaming: energetic, uses gaming slang naturally, competitive framing, hype language
+- finance: authoritative but accessible, uses specific numbers, contrarian takes
+- spiritual: reverent but modern, poetic rhythm, metaphorical, emotionally warm
+- food: sensory language, descriptive, makes viewer hungry/curious
+- health: empowering, science-backed tone, avoids fear-mongering
+- skincare: aspirational, gentle, ingredient-aware, transformation-focused
+- tech: precise, slightly nerdy, impressed by innovation, future-focused
+- sports: high energy, stats-driven, tribal, celebrates effort
+- education: curious, builds on what viewer knows, aha-moment focused
+- travel: wanderlust-inducing, vivid scene-setting, personal feeling
+- comedy: subverts expectations, timing-aware, self-aware humor
+- motivational: direct, no fluff, uses 'you' aggressively, action-oriented
+- news: urgent, factual, uses 'just happened' framing
+- lifestyle: relatable, aspirational, first-person feel
+- music: emotional, scene-setting, artist/culture aware
+- business: results-focused, ROI-minded, respects viewer's time
+`;
+
+/* ─────────────────────────────────────────────────────────────
+   SPOKEN TEXT PERSONALITY RULES
+───────────────────────────────────────────────────────────── */
+const SPOKEN_PERSONALITY_RULES = `
+SPOKEN TEXT QUALITY RULES — non-negotiable:
+- Sound like a real human said it, not an AI summary
+- Match the niche voice above precisely — the personality should be audible
+- Have sentence variety — mix short punchy sentences with longer flowing ones
+- Never start two consecutive beats with the same word
+- Use specific details, numbers, names where relevant — never vague generalities
+- Hook beats MUST create genuine curiosity or shock — never just state a fact plainly
+- If the niche is gaming: you can say "bro", "no cap", "insane clutch"
+- If the niche is finance: mention real figures, timeframes, % gains/losses
+- If the niche is food: use words like "crispy", "melt", "punch of flavor"
+- If the niche is spiritual: rhythm matters — let lines breathe
+- Each beat should have distinct emotional texture — don't let energy flatten
+`;
+
+/* ─────────────────────────────────────────────────────────────
    BEAT COUNT BY DURATION
 ───────────────────────────────────────────────────────────── */
 const BEAT_COUNTS = {
@@ -165,7 +207,7 @@ function buildPrompt({ topic, videoType, language, durationCategory, context, au
   const toneLabel      = (!tone || tone === "auto")           ? "auto (infer from topic)" : tone;
 
   return `
-You are a viral short-form video scriptwriter and creative director.
+You are a viral short-form video scriptwriter and creative director with a distinct creative voice for every niche.
 
 LANGUAGE: ${langInstr}
 
@@ -179,6 +221,8 @@ AUDIENCE: ${audienceInstr}
 TOPIC: ${topic}
 ${context ? `\nCONTEXT / FACTS TO USE:\n${context}` : ""}
 ${userRules}
+${NICHE_VOICE_RULES}
+${SPOKEN_PERSONALITY_RULES}
 ${INTENT_GUIDE}
 
 ${VISUAL_HINT_GUIDE}
@@ -580,7 +624,7 @@ export async function generateStructuredShort({
               spoken: beat.spoken, intent: beat.intent,
               visual_hint: beat.visual_hint, topic, orientation,
               beatIndex, zoneIndex: zoneIdx, promptOverride: genPrompt,
-              projectId,
+              projectId, assetHint: hint, dna, beat,
             });
             imgUrl = img?.url || null;
           }
@@ -592,7 +636,7 @@ export async function generateStructuredShort({
               spoken: beat.spoken, intent: beat.intent,
               visual_hint: beat.visual_hint, topic, orientation,
               beatIndex, zoneIndex: zoneIdx,
-              projectId,
+              projectId, assetHint: hint, dna, beat,
             });
             imgUrl = img?.url || null;
           }

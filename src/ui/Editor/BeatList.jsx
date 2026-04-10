@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -37,6 +37,186 @@ function LayoutChip({ layout }) {
   );
 }
 
+/* ── Delete beat modal ── */
+function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
+  const isTts    = warnings.includes("tts");
+  const isAvatar = warnings.includes("avatar");
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+      onClick={onCancel}
+    >
+      <div
+        className="relative w-[380px] rounded-[16px] border p-6 flex flex-col gap-4"
+        style={{
+          background: "#16162a",
+          borderColor: "rgba(248,113,113,0.3)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(248,113,113,0.1)",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Icon + title */}
+        <div className="flex items-center gap-3">
+          <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center shrink-0"
+            style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)" }}>
+            <span style={{ fontSize: 18 }}>🗑️</span>
+          </div>
+          <div>
+            <div className="text-[15px] font-bold text-[#f0e0e0]">Delete beat?</div>
+            <div className="text-[11px] text-[#7070a0] font-mono mt-[2px]">This cannot be undone</div>
+          </div>
+        </div>
+
+        {/* Beat info */}
+        <div className="px-3 py-[10px] rounded-[10px] flex flex-col gap-[4px]"
+          style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.12)" }}>
+          {beat.spoken && (
+            <div className="text-[12px] text-[#c0c0d8] leading-relaxed line-clamp-2">
+              "{beat.spoken}"
+            </div>
+          )}
+          <div className="flex items-center gap-2 mt-[2px]">
+            <span className="text-[10px] font-mono text-[#55556a]">{beat.layout}</span>
+            <span className="text-[10px] font-mono text-[#55556a]">·</span>
+            <span className="text-[10px] font-mono text-[#55556a]">{Number(beat.duration_sec || 0).toFixed(1)}s</span>
+          </div>
+        </div>
+
+        {/* Sync warnings */}
+        {(isTts || isAvatar) && (
+          <div className="flex flex-col gap-2">
+            {isTts && (
+              <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+                style={{ background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.15)" }}>
+                <span className="text-[15px] shrink-0 mt-[1px]">🎙️</span>
+                <div>
+                  <div className="text-[12px] font-bold text-[#fbbf80] mb-[2px]">Voiceover will desync</div>
+                  <div className="text-[11px] text-[#9090b0] leading-relaxed">
+                    Deleting this beat will shift all TTS audio timing. Regenerate voiceover after to restore sync.
+                  </div>
+                </div>
+              </div>
+            )}
+            {isAvatar && (
+              <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+                style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.15)" }}>
+                <span className="text-[15px] shrink-0 mt-[1px]">🎥</span>
+                <div>
+                  <div className="text-[12px] font-bold text-[#c4b5fd] mb-[2px]">Avatar video will break</div>
+                  <div className="text-[11px] text-[#9090b0] leading-relaxed">
+                    Removing a beat will shift the avatar video out of sync with the remaining audio.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-[9px] rounded-[9px] text-[13px] font-bold border cursor-pointer transition-all"
+            style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.1)", color: "#7070a0" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-[9px] rounded-[9px] text-[13px] font-bold border cursor-pointer transition-all"
+            style={{ background: "rgba(248,113,113,0.15)", borderColor: "rgba(248,113,113,0.35)", color: "#f87171" }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Duplicate warning modal ── */
+function DuplicateWarnModal({ warnings, onConfirm, onCancel }) {
+  const isTts    = warnings.includes("tts");
+  const isAvatar = warnings.includes("avatar");
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+      onClick={onCancel}
+    >
+      <div
+        className="relative w-[380px] rounded-[16px] border p-6 flex flex-col gap-4"
+        style={{
+          background: "#16162a",
+          borderColor: "rgba(251,146,60,0.3)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(251,146,60,0.1)",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Icon + title */}
+        <div className="flex items-center gap-3">
+          <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center shrink-0"
+            style={{ background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.25)" }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+          </div>
+          <div>
+            <div className="text-[15px] font-bold text-[#f0e8d8]">Sync will break</div>
+            <div className="text-[11px] text-[#7070a0] font-mono mt-[2px]">Heads up before duplicating</div>
+          </div>
+        </div>
+
+        {/* Warning items */}
+        <div className="flex flex-col gap-2">
+          {isTts && (
+            <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+              style={{ background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.15)" }}>
+              <span className="text-[16px] shrink-0 mt-[1px]">🎙️</span>
+              <div>
+                <div className="text-[12px] font-bold text-[#fbbf80] mb-[2px]">Voiceover will desync</div>
+                <div className="text-[11px] text-[#9090b0] leading-relaxed">
+                  Your TTS audio was generated for the current beat order. After duplicating, regenerate voiceover to restore sync.
+                </div>
+              </div>
+            </div>
+          )}
+          {isAvatar && (
+            <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+              style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.15)" }}>
+              <span className="text-[16px] shrink-0 mt-[1px]">🎥</span>
+              <div>
+                <div className="text-[12px] font-bold text-[#c4b5fd] mb-[2px]">Avatar video will break</div>
+                <div className="text-[11px] text-[#9090b0] leading-relaxed">
+                  The duplicated beat will show the avatar video out of sequence with the original audio track.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-[9px] rounded-[9px] text-[13px] font-bold border cursor-pointer transition-all"
+            style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.1)", color: "#7070a0" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-[9px] rounded-[9px] text-[13px] font-bold border cursor-pointer transition-all"
+            style={{ background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.35)", color: "#fbbf80" }}
+          >
+            Duplicate anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BeatList({ setActiveTab }) {
   const project = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
@@ -44,6 +224,8 @@ export default function BeatList({ setActiveTab }) {
   const reorderBeats = useProjectStore((s) => s.reorderBeats);
   const deleteBeat = useProjectStore((s) => s.deleteBeat);
   const duplicateBeat = useProjectStore((s) => s.duplicateBeat);
+  const [dupWarn, setDupWarn]     = useState(null); // { beatId, warnings: [] }
+  const [deleteTarget, setDeleteTarget] = useState(null); // { beat, warnings: [] }
 
   if (!project) return null;
 
@@ -91,13 +273,30 @@ export default function BeatList({ setActiveTab }) {
                 activeBeatId={activeBeatId}
                 setActiveBeat={setActiveBeat}
                 setActiveTab={setActiveTab}
-                deleteBeat={deleteBeat}
-                duplicateBeat={duplicateBeat}
+                onDeleteRequest={setDeleteTarget}
+                onDuplicateRequest={setDupWarn}
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
+      {deleteTarget && (
+        <DeleteBeatModal
+          beat={deleteTarget.beat}
+          warnings={deleteTarget.warnings}
+          onConfirm={() => { deleteBeat(deleteTarget.beat.id); setDeleteTarget(null); }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {dupWarn && (
+        <DuplicateWarnModal
+          warnings={dupWarn.warnings}
+          onConfirm={() => { duplicateBeat(dupWarn.beatId); setDupWarn(null); }}
+          onCancel={() => setDupWarn(null)}
+        />
+      )}
 
     </div>
   );
@@ -105,7 +304,7 @@ export default function BeatList({ setActiveTab }) {
 
 function SortableBeat({
   beat, index, activeBeatId, setActiveBeat, setActiveTab,
-  deleteBeat, duplicateBeat,
+  onDeleteRequest, onDuplicateRequest,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: beat.id });
@@ -127,7 +326,11 @@ function SortableBeat({
   };
 
   const handleDelete = () => {
-    if (window.confirm("Delete this beat?")) deleteBeat(beat.id);
+    const { project } = useProjectStore.getState();
+    const warnings = [];
+    if (project?.audio?.tts?.src) warnings.push("tts");
+    if (project?.avatar?.src && project?.meta?.mode === "talking_head") warnings.push("avatar");
+    onDeleteRequest({ beat, warnings });
   };
 
   return (
@@ -193,7 +396,16 @@ function SortableBeat({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            duplicateBeat(beat.id);
+            const { project } = useProjectStore.getState();
+            const warnings = [];
+            if (project?.audio?.tts?.src) warnings.push("tts");
+            if (project?.avatar?.src && project?.meta?.mode === "talking_head") warnings.push("avatar");
+            if (warnings.length > 0) {
+              onDuplicateRequest({ beatId: beat.id, warnings });
+            } else {
+              const { duplicateBeat } = useProjectStore.getState();
+              duplicateBeat(beat.id);
+            }
           }}
           className="w-[20px] h-[20px] flex items-center justify-center rounded text-[12px] text-[#55556a] hover:text-[#7bbfff] hover:bg-[#1c1c28] transition"
           title="Duplicate"

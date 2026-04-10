@@ -1,7 +1,7 @@
 /**
  * ZoneEditor.jsx — grouped, collapsible zone editor
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext, createContext } from "react";
 import { transitionsRegistry } from "../../../src/core/transitionsRegistry";
 import { motionsRegistry }     from "../../../src/core/motionsRegistry";
 import { useProjectStore }     from "../../../src/store/useProjectStore";
@@ -118,22 +118,43 @@ function Sel({ label, value, onChange, options }) {
   );
 }
 
+/* ── Accordion context ── */
+const AccordionCtx = createContext(null);
+
+function Accordion({ defaultSection, children }) {
+  const [openSection, setOpenSection] = useState(defaultSection ?? null);
+  return (
+    <AccordionCtx.Provider value={{ openSection, setOpenSection }}>
+      {children}
+    </AccordionCtx.Provider>
+  );
+}
+
 /* ── Collapsible section wrapper ── */
-function Section({ title, icon, children, defaultOpen = true, badge }) {
-  const [open, setOpen] = useState(defaultOpen);
+function Section({ title, children, defaultOpen = true, badge }) {
+  const accordion = useContext(AccordionCtx);
+  // Controlled by accordion if inside one, otherwise local state
+  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const open = accordion ? accordion.openSection === title : localOpen;
+  const toggle = () => {
+    if (accordion) {
+      accordion.setOpenSection(prev => prev === title ? null : title);
+    } else {
+      setLocalOpen(o => !o);
+    }
+  };
   return (
     <div className="mb-0">
-      <button onClick={() => setOpen(o => !o)}
+      <button onClick={toggle}
         className="w-full flex items-center justify-between py-[8px] px-0 group bg-transparent border-0 cursor-pointer"
       >
         <span className="flex items-center gap-[6px]">
-          {icon && <span className="text-[12px] opacity-60">{icon}</span>}
-          <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#55556a] group-hover:text-[#9494a8] transition-colors"
+          <span className="text-[13px] font-bold tracking-[0.10em] uppercase text-[#7878a0] group-hover:text-[#b0b0cc] transition-colors"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}>{title}</span>
           {badge && <span className="text-[9px] px-[5px] py-[1px] rounded-[4px] bg-[rgba(124,92,252,0.15)] text-[#7c5cfc] font-bold">{badge}</span>}
         </span>
-        <span className="text-[#3a3a55] group-hover:text-[#7070a0] text-[10px] transition-all"
-          style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", display: "inline-block", transition: "transform 0.15s" }}>▾</span>
+        <span className="text-[#55556a] group-hover:text-[#9090b0] text-[20px] transition-all"
+          style={{ transform: open ? "rotate(-180deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.15s" }}>▾</span>
       </button>
       {open && <div className="pb-5">{children}</div>}
       <div className="h-[1px] bg-[rgba(255,255,255,0.04)]" />
@@ -297,6 +318,7 @@ export default function ZoneEditor({
   /* ── TEXT ── */
   if (isText) return (
     <div className="pb-6">
+    <Accordion defaultSection="Content">
 
       {/* Content */}
       <Section title="Content" icon="✏️">
@@ -347,6 +369,7 @@ export default function ZoneEditor({
                     ...flair,
                     background: flair.background || "transparent",
                     _presetId: preset.id,
+                    _userPreset: true,
                   });
                 }}
                 className="px-[10px] py-[5px] rounded-[6px] text-[13px] font-bold border-0 cursor-pointer transition-all hover:scale-105"
@@ -365,12 +388,10 @@ export default function ZoneEditor({
 
       {/* Typography */}
       <Section title="Typography" icon="Aa">
-        {/* Font family */}
         <div className="mb-3">
           <Sel label="Font Family" value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyleBulk(slot, { fontFamily: v, _userFontFamily: true })} options={FONT_FAMILIES} />
         </div>
 
-        {/* Font size + opacity */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Slider label="Size" value={Math.round(parseFloat(style.fontSize ?? 32))}
             onChangeSilent={v => {
@@ -378,7 +399,6 @@ export default function ZoneEditor({
               const ratio   = curFont > 0 ? v / curFont : 1;
               const curW    = safeZone.width  ?? zoneDef?.width  ?? 50;
               const newW    = Math.max(5, Math.round(curW * ratio * 10) / 10);
-              // Width scales with font size; TextAutoHeight governs height automatically
               patchZoneSilent(slot, { width: newW }, { fontSize: v });
             }}
             onCommit={commit} min={10} max={300} unit="px" />
@@ -387,7 +407,6 @@ export default function ZoneEditor({
             onCommit={commit} min={0} max={100} unit="%" />
         </div>
 
-        {/* Font weight buttons */}
         <div className="mb-3">
           <Label>Weight</Label>
           <BtnGroup fullWidth options={FONT_WEIGHTS.map(w => ({ label: w.label, value: String(w.value) }))}
@@ -395,7 +414,6 @@ export default function ZoneEditor({
             onChange={v => updateTextStyle(slot, "fontWeight", Number(v))} />
         </div>
 
-        {/* Style toggles (I/U/S) + Alignment buttons */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <Label>Style</Label>
@@ -432,17 +450,39 @@ export default function ZoneEditor({
           </div>
         </div>
 
-        {/* Colors */}
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <ColorRow label="Text Color" value={style.color ?? "#ffffff"}
-            onChange={v => updateTextStyle(slot, "color", v)} />
-          <ColorRow label="BG Color"
+          <Slider label="Line Height"
+            value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
+            onChangeSilent={v => setStyleSilent("lineHeight", v)}
+            onCommit={commit} min={0.7} max={3} step={0.05} unit="×" />
+          <Slider label="Letter Spacing"
+            value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
+            onChangeSilent={v => setStyleSilent("letterSpacing", v)}
+            onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
+        </div>
+
+        <ColorRow label="Text Color" value={style.color ?? "#ffffff"}
+          onChange={v => updateTextStyle(slot, "color", v)} />
+      </Section>
+
+      {/* Decoration */}
+      <Section title="Decoration" icon="🎨" defaultOpen={false}>
+        <div className="mb-3">
+          <ColorRow label="Background Color"
             value={!style.background || style.background === "transparent" ? "#000000" : style.background}
             onChange={v => updateTextStyle(slot, "background", v)}
             onClear={() => updateTextStyle(slot, "background", "transparent")} />
         </div>
 
-        {/* Text stroke */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Slider label="Border Radius" value={radius}
+            onChangeSilent={v => setStyleSilent("borderRadius", v)}
+            onCommit={commit} min={0} max={200} unit="px" />
+          <Slider label="Padding" value={padding}
+            onChangeSilent={v => setStyleSilent("contentPadding", v)}
+            onCommit={commit} min={0} max={100} unit="px" />
+        </div>
+
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Slider label="Stroke" value={style.textStrokeWidth ?? 0}
             onChangeSilent={v => setStyleSilent("textStrokeWidth", v)}
@@ -453,7 +493,6 @@ export default function ZoneEditor({
           )}
         </div>
 
-        {/* Text shadow — uses patchZoneSilent for atomic multi-key updates */}
         {(() => {
           const shadowBlur  = style.textShadowBlur  ?? 0;
           const shadowX     = style.textShadowX     ?? 2;
@@ -474,84 +513,44 @@ export default function ZoneEditor({
               <div className="flex items-center justify-between mb-[6px]">
                 <Label>Text Shadow</Label>
                 {shadowBlur > 0 && (
-                  <button
-                    onClick={() => updateTextStyleBulk(slot, { textShadow: "none", textShadowBlur: 0, textShadowX: 2, textShadowY: 2 })}
-                    className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer"
-                  >clear</button>
+                  <button onClick={() => updateTextStyleBulk(slot, { textShadow: "none", textShadowBlur: 0, textShadowX: 2, textShadowY: 2 })}
+                    className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">clear</button>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Slider label="Blur" value={shadowBlur}
-                  onChangeSilent={v => patchShadow({ textShadowBlur: v })}
-                  onCommit={commit} min={0} max={40} unit="px" />
-                <Slider label="Offset X" value={shadowX}
-                  onChangeSilent={v => patchShadow({ textShadowX: v })}
-                  onCommit={commit} min={-30} max={30} unit="px" />
-                <Slider label="Offset Y" value={shadowY}
-                  onChangeSilent={v => patchShadow({ textShadowY: v })}
-                  onCommit={commit} min={-30} max={30} unit="px" />
+                <Slider label="Blur" value={shadowBlur} onChangeSilent={v => patchShadow({ textShadowBlur: v })} onCommit={commit} min={0} max={40} unit="px" />
+                <Slider label="Offset X" value={shadowX} onChangeSilent={v => patchShadow({ textShadowX: v })} onCommit={commit} min={-30} max={30} unit="px" />
+                <Slider label="Offset Y" value={shadowY} onChangeSilent={v => patchShadow({ textShadowY: v })} onCommit={commit} min={-30} max={30} unit="px" />
                 <ColorRow label="Shadow Color" value={shadowColor}
-                  onChange={v => updateTextStyleBulk(slot, {
-                    textShadowColor: v,
-                    textShadow: buildCSS(shadowBlur, shadowX, shadowY, v),
-                  })} />
+                  onChange={v => updateTextStyleBulk(slot, { textShadowColor: v, textShadow: buildCSS(shadowBlur, shadowX, shadowY, v) })} />
               </div>
             </div>
           );
         })()}
       </Section>
 
-      {/* Spacing */}
-      <Section title="Spacing & Shape" icon="⊞" defaultOpen={false}>
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <Slider label="Line Height"
-            value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
-            onChangeSilent={v => setStyleSilent("lineHeight", v)}
-            onCommit={commit} min={0.7} max={3} step={0.05} unit="×" />
-          <Slider label="Letter Spacing"
-            value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
-            onChangeSilent={v => setStyleSilent("letterSpacing", v)}
-            onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Slider label="Border Radius" value={radius}
-            onChangeSilent={v => setStyleSilent("borderRadius", v)}
-            onCommit={commit} min={0} max={200} unit="px" />
-          <Slider label="Padding" value={padding}
-            onChangeSilent={v => setStyleSilent("contentPadding", v)}
-            onCommit={commit} min={0} max={100} unit="px" />
-        </div>
-      </Section>
-
       {/* Transform */}
       <Section title="Transform" icon="⟳" defaultOpen={false}>
-        <div className="mb-3">
-          <RotationControl value={rotation}
-            onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Slider label="Rotation" value={rotation}
+            onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave}
+            min={-180} max={180} step={1} unit="°" />
+          <Slider label="Text Curve" value={style.textCurve ?? 0}
+            onChangeSilent={v => setStyleSilent("textCurve", v)}
+            onCommit={commit} min={-80} max={80} step={5} unit="°" />
         </div>
-        <Slider label="Text Curve" value={style.textCurve ?? 0}
-          onChangeSilent={v => setStyleSilent("textCurve", v)}
-          onCommit={commit} min={-80} max={80} step={5} unit="°" />
-        <div className="mt-3">
+        <div className="grid grid-cols-2 gap-3">
           <Slider label="Skew X" value={skewX}
             onChangeSilent={v => setStyleSilent("transform", buildTransform(v, skewY))}
             onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
-        </div>
-        <div className="mt-3">
           <Slider label="Skew Y" value={skewY}
             onChangeSilent={v => setStyleSilent("transform", buildTransform(skewX, v))}
             onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
         </div>
       </Section>
 
-      {/* Background */}
-      <Section title="Background" icon="⬛" defaultOpen={false}>
-        <ZoneBgRow bg={bg} slot={slot} openPicker={openPicker} clearBackground={clearBackground}
-          padding={padding} setStyleSilent={setStyleSilent} commit={commit} />
-      </Section>
-
-      {/* Effects */}
-      <Section title="Effects" icon="✨" defaultOpen={false}
+      {/* Animation */}
+      <Section title="Animation" icon="✨" defaultOpen={false}
         badge={style.textEffect && style.textEffect !== "none" ? style.textEffect : undefined}>
         <div className="grid grid-cols-2 gap-3">
           <Sel label="Text Effect" value={style.textEffect ?? "none"}
@@ -566,7 +565,7 @@ export default function ZoneEditor({
       </Section>
 
       {/* Transitions + Timing */}
-      <Section title="Transitions & Timing" icon="▶" defaultOpen={false}>
+      <Section title="Transitions" icon="▶" defaultOpen={false}>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Sel label="Enter" value={enter} onChange={v => setZoneLayout(slot, "enterAnimation", v)} options={enters} />
           <Sel label="Exit"  value={exit}  onChange={v => setZoneLayout(slot, "exitAnimation",  v)} options={exits}  />
@@ -594,7 +593,8 @@ export default function ZoneEditor({
         </div>
       </Section>
 
-      <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} />
+      <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
+    </Accordion>
 
       <div className="pt-4">
         <button onClick={onDelete}
@@ -610,6 +610,7 @@ export default function ZoneEditor({
     const BlockEditor = blockEditors[content.block?.type];
     return (
       <div className="pb-6">
+        <Accordion defaultSection="Block">
         <Section title="Block" icon="⬛">
           <div className="flex gap-4 mb-4">
             <div onClick={() => openPicker(slot, "content")}
@@ -629,7 +630,8 @@ export default function ZoneEditor({
             ? <BlockEditor slot={slot} block={content.block} updateBlockProp={updateBlockProp} />
             : <div className="text-[11px] text-[#55556a] font-mono">No editor for: {content.block?.type}</div>}
         </Section>
-        <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} />
+        <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
+        </Accordion>
         <div className="pt-4">
           <button onClick={onDelete}
             className="w-full py-[8px] rounded-[8px] text-[12px] font-bold text-[#ff6060] border border-[rgba(255,60,60,0.15)] hover:bg-[rgba(255,60,60,0.08)] bg-transparent cursor-pointer transition-colors">
@@ -663,6 +665,7 @@ export default function ZoneEditor({
 
     return (
       <div className="pb-6">
+        <Accordion defaultSection={iconId ? "Icon" : "Shape"}>
         <Section title={iconId ? "Icon" : "Shape"} icon={iconId ? "◈" : "⬡"}>
           {/* Preview */}
           {svg && (
@@ -794,6 +797,11 @@ export default function ZoneEditor({
           <div className="mb-3">
             <RotationControl value={rotation} onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
           </div>
+          <div className="mb-3">
+            <Slider label="Opacity" value={Math.round(opacity * 100)}
+              onChangeSilent={v => setStyleSilent("opacity", v / 100)}
+              onCommit={commit} min={0} max={100} unit="%" />
+          </div>
           <Slider label="Skew X" value={skewX}
             onChangeSilent={v => setStyleSilent("transform", buildTransform(v, skewY))}
             onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
@@ -801,11 +809,6 @@ export default function ZoneEditor({
             <Slider label="Skew Y" value={skewY}
               onChangeSilent={v => setStyleSilent("transform", buildTransform(skewX, v))}
               onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
-          </div>
-          <div className="mt-3">
-            <Slider label="Opacity" value={Math.round(opacity * 100)}
-              onChangeSilent={v => setStyleSilent("opacity", v / 100)}
-              onCommit={commit} min={0} max={100} unit="%" />
           </div>
         </Section>
 
@@ -834,8 +837,8 @@ export default function ZoneEditor({
           </Section>
         )}
 
-        <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} />
-
+        <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
+        </Accordion>
         <div className="pt-4">
           <button onClick={onDelete}
             className="w-full py-[8px] rounded-[8px] text-[12px] font-bold text-[#ff6060] border border-[rgba(255,60,60,0.15)] hover:bg-[rgba(255,60,60,0.08)] bg-transparent cursor-pointer transition-colors">
@@ -858,6 +861,7 @@ export default function ZoneEditor({
 
   return (
     <div className="pb-6">
+      <Accordion defaultSection="Content">
 
       {/* Content */}
       <Section title="Content" icon="🖼">
@@ -886,35 +890,31 @@ export default function ZoneEditor({
           </div>
         )}
 
-        {/* Content picker — conditional on avatar vs asset mode */}
-        {isAvatarZone ? (
-          <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-[10px] mb-3"
-            style={{ background: "rgba(124,92,252,0.06)", border: "1px solid rgba(124,92,252,0.2)" }}>
-            {avatarSrc ? (
-              <>
-                <video src={avatarSrc} muted playsInline
-                  style={{ width: 96, height: 120, objectFit: style.objectFit || "cover", borderRadius: 8, display: "block" }} />
-                <div className="text-[11px] font-mono text-[#a78bfa] text-center">
-                  Talking head video will appear in this zone.
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="w-[44px] h-[44px] rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.25)" }}>
-                  <span style={{ fontSize: 20 }}>🎥</span>
-                </div>
-                <div className="text-[11px] font-mono text-[#7070a0] text-center">
-                  No avatar video uploaded yet.<br />
-                  <span className="text-[#7c5cfc]">Upload in the Avatar tab.</span>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="flex gap-4 mb-3">
+        {/* Thumbnail on left, controls on right — same layout for both modes */}
+        <div className="flex gap-4">
+
+          {/* Left: asset thumbnail or avatar preview */}
+          {isAvatarZone ? (
+            <div className="shrink-0 rounded-[10px] overflow-hidden flex flex-col items-center justify-center gap-2"
+              style={{ width: 110, height: 160, background: "rgba(124,92,252,0.06)", border: "1px solid rgba(124,92,252,0.2)" }}>
+              {avatarSrc ? (
+                <>
+                  <video src={avatarSrc} muted playsInline
+                    style={{ width: "100%", height: "100%", objectFit: beat?.zones?.[slot]?.style?.objectFit || "cover", borderRadius: 6, display: "block" }} />
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: 22 }}>🎥</span>
+                  <div className="text-[9px] font-mono text-[#7070a0] text-center leading-tight">
+                    No avatar.<br />
+                    <span className="text-[#7c5cfc]">Upload in Avatar tab.</span>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
             <div className="relative shrink-0 rounded-[10px] overflow-hidden cursor-pointer group border-2 border-[rgba(255,255,255,0.08)] hover:border-[#7c5cfc] transition-colors"
-              style={{ width: 96, height: 120 }} onClick={() => openPicker(slot, "content")}>
+              style={{ width: 110, height: 160 }} onClick={() => openPicker(slot, "content")}>
               {content.asset?.src
                 ? <img src={content.asset.src} className="w-full h-full object-cover" />
                 : <div className="w-full h-full bg-[#0e0e1a] flex flex-col items-center justify-center gap-1 opacity-50">
@@ -929,135 +929,39 @@ export default function ZoneEditor({
                   className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#ff4444] text-white text-[10px] flex items-center justify-center border-0 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity font-bold">✕</button>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Unified zone-level controls — same for asset and avatar mode */}
-        <div className="flex flex-col gap-3">
-          <div>
-            <Label>Object Fit</Label>
-            <BtnGroup
-              fullWidth
-              options={[
-                { label: "Cover",   value: "cover"   },
-                { label: "Contain", value: "contain" },
-                { label: "Fill",    value: "fill"    },
-              ]}
-              value={beat?.zones?.[slot]?.style?.objectFit || content.asset?.objectFit || "cover"}
-              onChange={v => setZoneStyle(slot, "objectFit", v)}
-            />
-          </div>
-          <Slider label="Opacity" value={Math.round(opacity * 100)}
-            onChangeSilent={v => setStyleSilent("opacity", v / 100)}
-            onCommit={commit} min={0} max={100} unit="%" />
-          <Slider label="Shadow" value={shadow}
-            onChangeSilent={v => setStyleSilent("shadowBlur", v)}
-            onCommit={commit} min={0} max={100} unit="px" />
-        </div>
-      </Section>
-
-      {/* Shape */}
-      <Section title="Frame & Mask" icon="⬡" defaultOpen={false}>
-        <div className="mb-3">
-          <Slider label="Border Radius" value={radius}
-            onChangeSilent={v => setStyleSilent("borderRadius", v)}
-            onCommit={commit} min={0} max={300} unit="px" />
-        </div>
-        {/* Clip mask */}
-        <div>
-          <div className="flex items-center justify-between mb-[6px]">
-            <Label>Clip / Mask Shape</Label>
-            {style.clipShape && (
-              <button onClick={() => setZoneStyle(slot, "clipShape", null)}
-                className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">remove</button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-[5px]">
-            {DECORATIVE_SHAPE_OPTIONS.filter(s => s.group !== "line" && s.group !== "gradient" && decorativeShapeRegistry[s.id]?.clipPath).map(opt => {
-              const isActive = style.clipShape === opt.id;
-              const preview  = renderDecorativeSVG(opt.id, { color: "#ffffff", filled: true });
-              return (
-                <button key={opt.id} title={opt.label}
-                  onClick={() => setZoneStyle(slot, "clipShape", isActive ? null : opt.id)}
-                  className="w-[36px] h-[36px] rounded-[8px] border cursor-pointer transition-all flex items-center justify-center"
-                  style={isActive ? ACTIVE_BTN : INACTIVE_BTN}
-                >
-                  {preview
-                    ? <svg viewBox={preview.viewBox} width="22" height="22" dangerouslySetInnerHTML={{ __html: preview.content }} />
-                    : <span className="text-[14px] text-white/50">{opt.icon}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </Section>
-
-      {/* Effects */}
-      <Section title="Effects" icon="✨" defaultOpen={false}
-        badge={(style.animatedBorder || style.shineEffect) ? "on" : undefined}>
-        {/* Animated border */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-[6px]">
-            <Label>Animated Border</Label>
-            {style.animatedBorder && (
-              <button onClick={() => setZoneStyle(slot, "animatedBorder", null)}
-                className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">remove</button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-[5px]">
-            {ANIMATED_BORDER_OPTIONS.map(opt => {
-              const isActive = style.animatedBorder === opt.id;
-              return (
-                <button key={opt.id} onClick={() => setZoneStyle(slot, "animatedBorder", isActive ? null : opt.id)}
-                  title={opt.label}
-                  className="flex items-center gap-[6px] px-3 py-[7px] rounded-[8px] text-[12px] font-bold border cursor-pointer transition-all"
-                  style={isActive ? ACTIVE_BTN : INACTIVE_BTN}>
-                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: opt.swatchColor, flexShrink: 0, boxShadow: isActive ? `0 0 6px ${opt.swatchColor}` : "none" }} />
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          {style.animatedBorder && (
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <Slider label="Width" value={style.animatedBorderWidth ?? 12}
-                onChangeSilent={v => setStyleSilent("animatedBorderWidth", v)}
-                onCommit={commit} min={4} max={60} step={1} unit="px" />
-              <Slider label="Speed" value={Math.round((style.animatedBorderSpeed ?? 0.7) * 10) / 10}
-                onChangeSilent={v => setStyleSilent("animatedBorderSpeed", v)}
-                onCommit={commit} min={0.1} max={4} step={0.1} unit="×" />
-            </div>
           )}
-        </div>
 
-        {/* Shine */}
-        <div>
-          <div className="flex items-center justify-between mb-[6px]">
-            <Label>Shine Effect</Label>
-            {style.shineEffect && (
-              <button onClick={() => setZoneStyle(slot, "shineEffect", null)}
-                className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">remove</button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-[6px]">
-            {ASSET_SHINE_OPTIONS.map(opt => {
-              const isActive = style.shineEffect === opt.value;
-              return (
-                <button key={opt.value} onClick={() => setZoneStyle(slot, "shineEffect", isActive ? null : opt.value)}
-                  className="px-[8px] py-[4px] rounded-[6px] text-[11px] font-bold border cursor-pointer transition-all"
-                  style={isActive ? ACTIVE_BTN : INACTIVE_BTN}>
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          {style.shineEffect && (
-            <div className="mt-3">
-              <Slider label="Speed" value={Math.round((style.shineSpeed ?? 1.0) * 10) / 10}
-                onChangeSilent={v => setStyleSilent("shineSpeed", v)}
-                onCommit={commit} min={0.25} max={4} step={0.25} unit="×" />
+          {/* Right: unified controls */}
+          <div className="flex-1 flex flex-col gap-3">
+            <div>
+              <Label>Fit</Label>
+              <BtnGroup
+                fullWidth
+                options={[
+                  { label: "Cover",   value: "cover"   },
+                  { label: "Contain", value: "contain" },
+                  { label: "Fill",    value: "fill"    },
+                ]}
+                value={beat?.zones?.[slot]?.style?.objectFit || content.asset?.objectFit || "cover"}
+                onChange={v => setZoneStyle(slot, "objectFit", v)}
+              />
             </div>
-          )}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <Slider label="Opacity" value={Math.round(opacity * 100)}
+                  onChangeSilent={v => setStyleSilent("opacity", v / 100)}
+                  onCommit={commit} min={0} max={100} unit="%" />
+              </div>
+              <div className="flex-1">
+                <Slider label="Shadow" value={shadow}
+                  onChangeSilent={v => setStyleSilent("shadowBlur", v)}
+                  onCommit={commit} min={0} max={100} unit="px" />
+              </div>
+            </div>
+            <Slider label="Border Radius" value={radius}
+              onChangeSilent={v => setStyleSilent("borderRadius", v)}
+              onCommit={commit} min={0} max={300} unit="px" />
+          </div>
         </div>
       </Section>
 
@@ -1067,8 +971,8 @@ export default function ZoneEditor({
           padding={padding} setStyleSilent={setStyleSilent} commit={commit} />
       </Section>
 
-      {/* Transitions + Timing */}
-      <Section title="Transitions & Timing" icon="▶" defaultOpen={false}>
+      {/* Transitions */}
+      <Section title="Transitions" icon="▶" defaultOpen={false}>
         <div className="grid grid-cols-3 gap-2 mb-3">
           <Sel label="Enter"  value={enter}                              onChange={v => setZoneLayout(slot, "enterAnimation", v)} options={enters}  />
           <Sel label="Exit"   value={exit}                               onChange={v => setZoneLayout(slot, "exitAnimation",  v)} options={exits}   />
@@ -1097,6 +1001,100 @@ export default function ZoneEditor({
         </div>
       </Section>
 
+      {/* Frame & Mask — clip shapes only */}
+      <Section title="Frame & Mask" icon="⬡" defaultOpen={false}>
+        <div>
+          <div className="flex items-center justify-between mb-[6px]">
+            {style.clipShape && (
+              <button onClick={() => setZoneStyle(slot, "clipShape", null)}
+                className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">remove</button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-[5px]">
+            {DECORATIVE_SHAPE_OPTIONS.filter(s => s.group !== "line" && s.group !== "gradient" && decorativeShapeRegistry[s.id]?.clipPath).map(opt => {
+              const isActive = style.clipShape === opt.id;
+              const preview  = renderDecorativeSVG(opt.id, { color: "#ffffff", filled: true });
+              return (
+                <button key={opt.id} title={opt.label}
+                  onClick={() => setZoneStyle(slot, "clipShape", isActive ? null : opt.id)}
+                  className="w-[36px] h-[36px] rounded-[8px] border cursor-pointer transition-all flex items-center justify-center"
+                  style={isActive ? ACTIVE_BTN : INACTIVE_BTN}
+                >
+                  {preview
+                    ? <svg viewBox={preview.viewBox} width="22" height="22" dangerouslySetInnerHTML={{ __html: preview.content }} />
+                    : <span className="text-[14px] text-white/50">{opt.icon}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Section>
+
+      {/* Animated Border */}
+      <Section title="Animated Border" badge={style.animatedBorder ? "on" : undefined}>
+        <div className="flex items-center justify-between mb-[6px]">
+          <Label>Style</Label>
+          {style.animatedBorder && (
+            <button onClick={() => setZoneStyle(slot, "animatedBorder", null)}
+              className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">remove</button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-[5px]">
+          {ANIMATED_BORDER_OPTIONS.map(opt => {
+            const isActive = style.animatedBorder === opt.id;
+            return (
+              <button key={opt.id} onClick={() => setZoneStyle(slot, "animatedBorder", isActive ? null : opt.id)}
+                title={opt.label}
+                className="flex items-center gap-[6px] px-3 py-[7px] rounded-[8px] text-[12px] font-bold border cursor-pointer transition-all"
+                style={isActive ? ACTIVE_BTN : INACTIVE_BTN}>
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: opt.swatchColor, flexShrink: 0, boxShadow: isActive ? `0 0 6px ${opt.swatchColor}` : "none" }} />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {style.animatedBorder && (
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <Slider label="Width" value={style.animatedBorderWidth ?? 12}
+              onChangeSilent={v => setStyleSilent("animatedBorderWidth", v)}
+              onCommit={commit} min={4} max={60} step={1} unit="px" />
+            <Slider label="Speed" value={Math.round((style.animatedBorderSpeed ?? 0.7) * 10) / 10}
+              onChangeSilent={v => setStyleSilent("animatedBorderSpeed", v)}
+              onCommit={commit} min={0.1} max={4} step={0.1} unit="×" />
+          </div>
+        )}
+      </Section>
+
+      {/* Shine Effect */}
+      <Section title="Shine Effect" badge={style.shineEffect ? "on" : undefined}>
+        <div className="flex items-center justify-between mb-[6px]">
+          <Label>Style</Label>
+          {style.shineEffect && (
+            <button onClick={() => setZoneStyle(slot, "shineEffect", null)}
+              className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">remove</button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-[6px]">
+          {ASSET_SHINE_OPTIONS.map(opt => {
+            const isActive = style.shineEffect === opt.value;
+            return (
+              <button key={opt.value} onClick={() => setZoneStyle(slot, "shineEffect", isActive ? null : opt.value)}
+                className="px-[8px] py-[4px] rounded-[6px] text-[11px] font-bold border cursor-pointer transition-all"
+                style={isActive ? ACTIVE_BTN : INACTIVE_BTN}>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {style.shineEffect && (
+          <div className="mt-3">
+            <Slider label="Speed" value={Math.round((style.shineSpeed ?? 1.0) * 10) / 10}
+              onChangeSilent={v => setStyleSilent("shineSpeed", v)}
+              onCommit={commit} min={0.25} max={4} step={0.25} unit="×" />
+          </div>
+        )}
+      </Section>
+
       {/* Transform */}
       <Section title="Transform" icon="⟳" defaultOpen={false}>
         <div className="mb-3">
@@ -1112,7 +1110,8 @@ export default function ZoneEditor({
         </div>
       </Section>
 
-      <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} />
+      <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
+      </Accordion>
 
       <div className="pt-4">
         <button onClick={onDelete}
@@ -1125,26 +1124,58 @@ export default function ZoneEditor({
 }
 
 /* ── Shared layer section ── */
-function LayerSection({ slot, setZoneLayout, currentZIndex, maxZ, minZ, isAtFront, isAtBack }) {
+function LayerSection({ slot, setZoneLayout, currentZIndex, maxZ, minZ, isAtFront, isAtBack, hidden }) {
+  const isVisible = !hidden;
   return (
     <Section title="Layer" icon="⧉" defaultOpen={false}>
-      <div className="flex items-center gap-3">
-        <span className="text-[11px] font-mono text-[#55556a]">z-index: {currentZIndex}</span>
-        <div className="flex gap-[4px] ml-auto">
-          {[
-            { label: "⤒", title: "Bring to Front", action: () => setZoneLayout(slot, "zIndex", maxZ + 1), disabled: isAtFront },
-            { label: "↑", title: "Move Forward",   action: () => setZoneLayout(slot, "zIndex", currentZIndex + 1), disabled: isAtFront },
-            { label: "↓", title: "Move Backward",  action: () => setZoneLayout(slot, "zIndex", Math.max(1, currentZIndex - 1)), disabled: isAtBack },
-            { label: "⤓", title: "Send to Back",   action: () => setZoneLayout(slot, "zIndex", Math.max(1, minZ - 1)), disabled: isAtBack },
-          ].map(({ label, title, action, disabled }) => (
-            <button key={title} onClick={action} disabled={disabled} title={title}
-              className="w-[32px] h-[32px] rounded-[6px] text-[14px] font-bold border flex items-center justify-center cursor-pointer transition-all"
-              style={disabled
-                ? { background: "transparent", borderColor: "rgba(255,255,255,0.04)", color: "#2e2e45", cursor: "not-allowed" }
-                : { background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)", color: "#9494a8" }}
-            >{label}</button>
-          ))}
+      {/* Visibility + Z-index row */}
+      <div className="flex items-center justify-between mb-3">
+        {/* Visibility toggle */}
+        <div className="flex items-center gap-[8px]">
+          <button
+            title={isVisible ? "Hide zone" : "Show zone"}
+            onClick={() => setZoneLayout(slot, "hidden", isVisible)}
+            className="relative shrink-0 rounded-full border cursor-pointer transition-all"
+            style={{
+              width: 36, height: 20,
+              background: isVisible ? "rgba(124,92,252,0.25)" : "rgba(255,255,255,0.06)",
+              borderColor: isVisible ? "#7c5cfc" : "rgba(255,255,255,0.1)",
+            }}
+          >
+            <span className="absolute top-[3px] rounded-full transition-all"
+              style={{
+                width: 14, height: 14,
+                background: isVisible ? "#a78bfa" : "#3a3a55",
+                left: isVisible ? 18 : 2,
+              }} />
+          </button>
+          <span className="text-[11px] font-mono" style={{ color: isVisible ? "#c4b5fd" : "#55556a" }}>
+            {isVisible ? "Visible" : "Hidden"}
+          </span>
         </div>
+        {/* Z-index badge */}
+        <div className="flex items-center gap-[6px]">
+          <span className="text-[10px] font-mono text-[#55556a] uppercase tracking-wide">Layer</span>
+          <span className="text-[13px] font-bold font-mono text-[#c4b5fd] bg-[rgba(124,92,252,0.12)] px-[8px] py-[2px] rounded-[5px] border border-[rgba(124,92,252,0.2)]">
+            {currentZIndex}
+          </span>
+        </div>
+      </div>
+      {/* Layer order buttons */}
+      <div className="flex gap-[4px] justify-end">
+        {[
+          { label: "⤒", title: "Bring to Front", action: () => setZoneLayout(slot, "zIndex", maxZ + 1), disabled: isAtFront },
+          { label: "↑", title: "Move Forward",   action: () => setZoneLayout(slot, "zIndex", currentZIndex + 1), disabled: isAtFront },
+          { label: "↓", title: "Move Backward",  action: () => setZoneLayout(slot, "zIndex", Math.max(1, currentZIndex - 1)), disabled: isAtBack },
+          { label: "⤓", title: "Send to Back",   action: () => setZoneLayout(slot, "zIndex", Math.max(1, minZ - 1)), disabled: isAtBack },
+        ].map(({ label, title, action, disabled }) => (
+          <button key={title} onClick={action} disabled={disabled} title={title}
+            className="w-[32px] h-[32px] rounded-[6px] text-[14px] font-bold border flex items-center justify-center cursor-pointer transition-all"
+            style={disabled
+              ? { background: "transparent", borderColor: "rgba(255,255,255,0.04)", color: "#2e2e45", cursor: "not-allowed" }
+              : { background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)", color: "#9494a8" }}
+          >{label}</button>
+        ))}
       </div>
     </Section>
   );

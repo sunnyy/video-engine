@@ -172,19 +172,40 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
 
       if (isTyping) return;
 
-      // Zone shortcuts — only when exactly one zone is selected
+      // Zone shortcuts — single or multi-select
       const ids = selectedZoneIdsRef.current;
+      const isMulti = ids instanceof Set && ids.size > 1;
       const selectedZoneId = (ids instanceof Set && ids.size === 1) ? [...ids][0] : null;
-      if (!selectedZoneId) return;
 
       // Read fresh beat directly from store — avoids stale closure completely
       const { project: liveProject, activeBeatId: liveBeatId } = useProjectStore.getState();
       const liveBeat = liveProject?.beats?.find(b => b.id === liveBeatId);
       if (!liveBeat) return;
 
-      const bz       = liveBeat.zones || {};
-      const override = bz[selectedZoneId] || {};
+      const bz        = liveBeat.zones || {};
       const layoutDef = getLayoutDef(liveBeat.layout);
+
+      // Arrow keys — nudge (plain = 1%, Shift = 5%) — works for single AND multi-select
+      if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code) && (selectedZoneId || isMulti)) {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : 1;
+        const dx = e.code === "ArrowLeft" ? -step : e.code === "ArrowRight" ? step : 0;
+        const dy = e.code === "ArrowUp"   ? -step : e.code === "ArrowDown"  ? step : 0;
+        const selectedIds = isMulti ? [...ids] : [selectedZoneId];
+        const newZones = { ...bz };
+        for (const id of selectedIds) {
+          const def = layoutDef?.zones?.find(z => z.id === id) || {};
+          const oz  = bz[id] || {};
+          newZones[id] = { ...oz, x: (oz.x ?? def.x ?? 0) + dx, y: (oz.y ?? def.y ?? 0) + dy };
+        }
+        updateBeatSilent(liveBeat.id, { zones: newZones });
+        return;
+      }
+
+      // Single-zone-only shortcuts below
+      if (!selectedZoneId) return;
+
+      const override = bz[selectedZoneId] || {};
       const defZone  = layoutDef?.zones?.find(z => z.id === selectedZoneId) || {};
 
       // Delete / Backspace — remove zone or video overlay
@@ -222,20 +243,6 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         return;
       }
 
-      // Arrow keys — nudge zone (plain arrow = 1%, Shift+arrow = 5%)
-      // Works with or without Ctrl/Cmd — avoids OS-level interception of Ctrl+Arrow on Windows
-      if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code)) {
-        e.preventDefault();
-        let x = override.x ?? defZone.x ?? 0;
-        let y = override.y ?? defZone.y ?? 0;
-        const step = e.shiftKey ? 5 : 1;
-        if (e.code === "ArrowLeft")  x -= step;
-        if (e.code === "ArrowRight") x += step;
-        if (e.code === "ArrowUp")    y -= step;
-        if (e.code === "ArrowDown")  y += step;
-        updateBeatSilent(liveBeat.id, { zones: { ...bz, [selectedZoneId]: { ...override, x, y } } });
-        return;
-      }
     };
     // capture:true — fires before any child handler, nothing can stopPropagation before us
     window.addEventListener("keydown", onKey, true);

@@ -195,6 +195,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
   const startFrame = Math.round((zone.start ?? 0) * fps);
   const endFrame   = zone.end != null ? Math.round(zone.end * fps) : Math.round(beatDurationSec * fps);
 
+  // Hidden zones are never rendered
+  if (zone.hidden) return null;
+
   // In preview mode: always show every zone at full opacity with no animation
   if (!previewMode && (frame < startFrame || frame >= endFrame)) return null;
 

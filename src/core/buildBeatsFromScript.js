@@ -240,6 +240,9 @@ function fillTextZones(beats, colorOptions = {}) {
     textZones.forEach((zoneDef, order) => {
       const existing = zones[zoneDef.id];
 
+      // User manually applied a preset — skip automation styling entirely so it isn't overridden on regeneration
+      if (existing?.style?._userPreset) return;
+
       // Pick a preset for this zone and extract only typography flair
       const presetId    = pickPresetForZone(zoneDef, order, beat.intent, beat.energy ?? 0.5, colorOptions.niche || null);
       const preset      = textStylePresets.find(p => p.id === presetId);

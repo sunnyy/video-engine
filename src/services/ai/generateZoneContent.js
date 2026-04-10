@@ -13,16 +13,35 @@
 const ZONE_ROLE_GUIDE = `
 ZONE ROLE GUIDE — follow strictly:
 Text roles:
-- headline      : Short, punchy, UPPERCASE-feel. The main message. Respect maxChars.
-- subtext       : Supporting detail in natural language. Sentence case. Respect maxChars.
-- label         : 2-3 word category tag. e.g. "WILD FACT", "PRO TIP", "DID YOU KNOW". ALL CAPS.
-- tagline       : Short punchy phrase — like a brand slogan or hook closer. Respect maxChars.
-- stat          : The key number/metric ONLY. e.g. "73%", "10X", "$2M". Just the number.
-- quote         : Full natural sentence or testimonial. Can be longer.
+- headline      : Short, punchy, UPPERCASE-feel. The main message of this beat. AIM FOR 70-90% of maxChars. Never just 1-2 words unless it's a pure stat. Write a full impactful phrase.
+- subtext       : Supporting detail — write 1-2 complete sentences. Fill the space. This is where you add context, specificity, or drama. AIM FOR 70-90% of maxChars.
+- label         : 2-4 word category tag. ALL CAPS. e.g. "WILD FACT", "PRO TIP", "DID YOU KNOW". Specific and relevant — not generic.
+- tagline       : Short punchy phrase with personality — like a brand slogan. AIM FOR 70-90% of maxChars.
+- stat          : Number + unit ONLY. e.g. "73%", "10X", "$1.2M", "3X faster", "10,000+". Never a sentence.
+- quote         : A full quote with impact. At least 10-15 words. Should feel worth reading. AIM FOR 70-90% of maxChars.
 Asset roles:
 - primary_asset   : Main visual — specific, photographable, cinematic. No abstract concepts.
 - secondary_asset : Secondary visual — complements primary, specific and concrete.
 - asset_1/2/3/4  : Additional asset slots — each a distinct, specific photographable scene.
+`.trim();
+
+const ZONE_FILLING_RULES = `
+ZONE FILLING RULES — critical, the AI is currently too conservative:
+- headline zones (maxChars 20-35): Use ALL the space. Short punchy phrases, capitalize for impact. Never just 1-2 words unless it's a stat.
+- subtext zones (maxChars 45-70): Write 1-2 complete sentences. Fill the space. This is supporting detail, make it count.
+- label zones (maxChars 15-20): 2-4 words max, but make them specific and relevant — not generic tags.
+- tagline zones (maxChars 15-25): A short punchy phrase with personality. Not a description.
+- quote zones (maxChars 75-90): A full quote with impact. At least 10-15 words. Should feel like something worth reading.
+- stat zones (maxChars 8-10): Number + unit only. Examples: '94%', '$1.2M', '3X faster', '10,000+'.
+- Never leave a zone with just 1-2 words when maxChars allows much more.
+- Never truncate mid-sentence — complete every thought.
+- The maxChars is a ceiling, not a target — but content should use the space meaningfully (70-90%).
+- Bad example: subtext with maxChars 65 filled with "Very surprising fact." — 3 words. WRONG.
+- Good example: subtext with maxChars 65 filled with "Nokia once owned 40% of the mobile market before losing it all in just 5 years." CORRECT.
+- Bad example: headline with maxChars 28 filled with "Nokia" — 1 word. WRONG.
+- Good example: headline with maxChars 28 filled with "The Fall of Nokia" — specific, fills space. CORRECT.
+- Match the niche voice and beat intent when writing zone content.
+- For the same beat, all zones should feel like they belong together — consistent voice and message.
 `.trim();
 
 const CRITICAL_RULES = `
@@ -31,8 +50,8 @@ CRITICAL RULES:
 - NEVER split a sentence mid-word or awkwardly — rewrite to fit naturally
 - headline/tagline zones: rewrite spoken text as short punchy headline, NOT a literal split
 - stat zones: extract ONLY the number/metric. If no number, use one impactful word like "NOW" or "—". NEVER put a sentence in a stat zone.
-- label zones: create a short 2-3 word context tag (e.g. "WILD FACT", "THE TRUTH", "DID YOU KNOW")
-- quote zones: write as a natural quote or sentence, not clipped
+- label zones: create a specific 2-4 word context tag (e.g. "WILD FACT", "THE TRUTH", "DID YOU KNOW")
+- quote zones: write as a natural full quote or sentence, never clipped mid-thought
 - asset prompt zones (primary_asset, secondary_asset, asset_1/2/3/4): specific, real-world, photographable scenes. No vague abstractions.
 - Each beat should feel DISTINCT from adjacent beats
 - Preserve the emotional intent of each beat (shock, curiosity, proof, etc.)
@@ -41,14 +60,18 @@ CRITICAL RULES:
 `.trim();
 
 function buildZoneContentPrompt(beatsPayload, videoDNA) {
-  return `You are filling content for short-form vertical video beats (TikTok/Reels style).
+  const niche = videoDNA?.niche || "entertainment";
+  return `You are a creative director filling zone content for short-form vertical video beats (TikTok/Reels style).
+Your job is to write content that feels like a designer + copywriter pair worked on it — not an AI placeholder.
 
 VIDEO CONTEXT:
-- Niche: ${videoDNA?.niche || "entertainment"}
+- Niche: ${niche}
 - Typography: ${videoDNA?.typographySystem || "brutal"}
-- Tone: bold, direct, punchy
+- Tone: bold, direct, punchy — match the ${niche} niche voice throughout
 
 ${ZONE_ROLE_GUIDE}
+
+${ZONE_FILLING_RULES}
 
 ${CRITICAL_RULES}
 
@@ -124,6 +147,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
       intent:     beat.intent,
       energy:     beat.energy,
       topic,
+      niche:      videoDNA?.niche || "entertainment",
       textZones,
       assetZones,
     };
