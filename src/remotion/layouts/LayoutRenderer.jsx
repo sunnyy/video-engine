@@ -13,15 +13,15 @@ import { useCurrentFrame, useVideoConfig, interpolate, Img, OffthreadVideo } fro
 import AssetRenderer from "../elements/AssetRenderer";
 import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 import ElementRenderer from "../elements/ElementRenderer";
-import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
-import textEffectRegistry from "../../core/textEffectRegistry.jsx";
+import { backgroundPatternRegistry } from "../../core/registries/backgroundPatternRegistry";
+import textEffectRegistry from "../../core/registries/textEffectRegistry.jsx";
 import { getTypographyForRole } from "../../core/videoDNA.js";
-import animatedBorderRegistry from "../../core/animatedBorderRegistry.js";
-import assetShineRegistry     from "../../core/assetShineRegistry.jsx";
-import { getClipPathCSS, getSVGClipContent } from "../../core/decorativeShapeRegistry.js";
-import { renderIconSVG } from "../../core/iconRegistry.jsx";
+import animatedBorderRegistry from "../../core/registries/animatedBorderRegistry.js";
+import assetShineRegistry     from "../../core/registries/assetShineRegistry.jsx";
+import { getClipPathCSS, getSVGClipContent } from "../../core/registries/decorativeShapeRegistry.js";
+import { renderIconSVG } from "../../core/registries/iconRegistry.jsx";
 import { IconifyZone }  from "../elements/IconifyZone.jsx";
-import { decorativeById } from "../../core/designLibrary/decorativeRegistry.js";
+import { decorativeById } from "../../core/registries/decorativeRegistry.js";
 
 function resolveEnterStyle(animation, progress, W, H) {
   switch (animation) {

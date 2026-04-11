@@ -5,8 +5,10 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProjectStore } from "../../store/useProjectStore";
 import { getUserProjects, renameProject } from "../../services/projects/projectService";
+import { signOut } from "../../services/auth/authService";
 import validateProject from "../../core/validateProject";
-import SystemMessage from "./SystemMessage";
+import { serverFetch } from "../../services/serverApi";
+import { useCreditsStore } from "../../store/useCreditsStore";
 
 export default function Header() {
   const navigate          = useNavigate();
@@ -25,10 +27,14 @@ export default function Header() {
   const [nameVal,      setNameVal]      = useState("");
   const dropdownRef = useRef(null);
 
+  const { balance, fetchCredits } = useCreditsStore();
+
   // These MUST be above any conditional returns (React hooks rules)
   useEffect(() => {
     getUserProjects().then(setProjectList).catch(() => {});
   }, []);
+
+  useEffect(() => { fetchCredits(); }, []);
 
   useEffect(() => {
     const handler = (e) => {
@@ -75,15 +81,14 @@ export default function Header() {
     setDownloadUrl(null);
 
     try {
-      const res = await fetch("http://localhost:5000/api/render", {
+      const res = await serverFetch("/api/render", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project, resolution }),
       });
       const { jobId } = await res.json();
 
       const interval = setInterval(async () => {
-        const statusRes = await fetch(`http://localhost:5000/api/render-status/${jobId}`);
+        const statusRes = await serverFetch(`/api/render-status/${jobId}`);
         const status    = await statusRes.json();
         setProgress(status.progress);
         if (status.done) {
@@ -177,12 +182,18 @@ export default function Header() {
                   View all projects →
                 </button>
               </div>
+              <div className="px-3 py-2 border-t border-[rgba(255,255,255,0.06)]">
+                <button onClick={async () => { await signOut(); navigate("/"); }}
+                  className="w-full text-left text-[13px] text-[#f87171] hover:text-[#fca5a5] bg-transparent border-0 cursor-pointer py-1">
+                  Sign out
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      <SystemMessage />
+      
 
       {/* Right — controls */}
       <div className="flex items-center gap-3">
@@ -218,6 +229,12 @@ export default function Header() {
           <option value="1080p">1080p</option>
         </select>
 
+        {/* Credit balance */}
+        <div className="flex items-center gap-1 px-3 py-[5px] rounded-[6px] bg-[#16161f] border border-[rgba(255,255,255,0.06)] text-[13px] font-mono"
+          style={{ color: balance !== null && balance < 10 ? "#f97316" : "#7c5cfc" }}>
+          ⚡ {balance ?? "—"}
+        </div>
+
         {/* Export */}
         <button onClick={handleExport} disabled={progress !== null}
           className="flex items-center gap-2 bg-[#f5c518] text-[#0b0b10] font-bold text-[14px] px-4 py-[6px] rounded-[6px] hover:shadow-[0_0_16px_rgba(245,197,24,0.3)] transition disabled:opacity-50 cursor-pointer border-0">
@@ -230,6 +247,12 @@ export default function Header() {
             Download
           </a>
         )}
+
+        {/* Sign out */}
+        <button onClick={async () => { await signOut(); navigate("/"); }}
+          className="text-[13px] text-[#f87171] bg-transparent border-0 cursor-pointer hover:opacity-80 transition-opacity px-1">
+          Sign out
+        </button>
 
       </div>
     </div>

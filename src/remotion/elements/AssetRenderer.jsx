@@ -10,8 +10,8 @@ import {
   Easing
 } from "remotion";
 
-import { transitionsRegistry } from "../../core/transitionsRegistry";
-import { motionsRegistry } from "../../core/motionsRegistry";
+import { transitionsRegistry } from "../../core/registries/transitionsRegistry";
+import { motionsRegistry } from "../../core/registries/motionsRegistry";
 
 export default function AssetRenderer({ zone, beat, slot }) {
 

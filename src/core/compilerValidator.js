@@ -1,4 +1,4 @@
-import { layoutRegistry } from "./layoutRegistry";
+import { layoutRegistry } from "./registries/layoutRegistry";
 
 export function validateBeats(beats) {
 

@@ -3,7 +3,7 @@
  * src/ui/Editor/zones/tabs/BackgroundTab.jsx
  */
 import React from "react";
-import { motionsRegistry } from "../../../../core/motionsRegistry";
+import { motionsRegistry } from "../../../../core/registries/motionsRegistry";
 
 function FieldLabel({ children }) {
   return (

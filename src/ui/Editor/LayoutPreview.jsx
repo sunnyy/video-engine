@@ -7,7 +7,7 @@
  * Accurate positions matching real layout percentages.
  */
 import React from "react";
-import { getLayoutDef } from "../../core/layoutRegistry";
+import { getLayoutDef } from "../../core/registries/layoutRegistry";
 
 // Visual palette for asset zones — cycles through
 const ASSET_GRADIENTS = [

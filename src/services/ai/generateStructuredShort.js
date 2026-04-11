@@ -9,9 +9,10 @@
  */
 
 import { buildBeatsFromScript } from "../../core/buildBeatsFromScript";
-import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/musicRegistry";
+import { serverFetch } from "../serverApi";
+import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/registries/musicRegistry";
 import { generateZoneImage } from "../../server/assets/falService";
-import { getLayoutDef } from "../../core/layoutRegistry";
+import { getLayoutDef } from "../../core/registries/layoutRegistry";
 import { uploadUserAsset } from "../assets/uploadUserAsset";
 import { useAssetsStore }  from "../../store/useAssetsStore";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
@@ -383,10 +384,9 @@ export async function generateStructuredShort({
   const prompt = buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone });
 
   /* ── API call ── */
-  const response = await fetch("http://localhost:5000/api/generate", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ prompt }),
+  const response = await serverFetch("/api/generate", {
+    method: "POST",
+    body:   JSON.stringify({ prompt }),
   });
 
   if (!response.ok) {
@@ -575,10 +575,9 @@ export async function generateStructuredShort({
       if (isEntity) {
         console.log(`[img] Beat ${beatIndex}: entity search — "${hint.search_query}"`);
         try {
-          const searchRes = await fetch("http://localhost:5000/api/search-image", {
-            method:  "POST",
-            headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ query: hint.search_query }),
+          const searchRes = await serverFetch("/api/search-image", {
+            method: "POST",
+            body:   JSON.stringify({ query: hint.search_query }),
           });
           if (searchRes.ok) {
             const searchData = await searchRes.json();
@@ -686,10 +685,9 @@ export async function generateStructuredShort({
   if (generateTTS && script.trim()) {
     report("voiceover");
     try {
-      const ttsRes = await fetch("http://localhost:5000/api/generate-tts", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ script, voice: ttsVoice, speed: 1.0 }),
+      const ttsRes = await serverFetch("/api/generate-tts", {
+        method: "POST",
+        body:   JSON.stringify({ script, voice: ttsVoice, speed: 1.0 }),
       });
       if (ttsRes.ok) {
         const ttsData  = await ttsRes.json();

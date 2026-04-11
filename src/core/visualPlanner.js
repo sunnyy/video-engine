@@ -7,11 +7,11 @@
  * Fills zones by type + order from the layout definition.
  */
 
-import { findLayouts, getLayoutDef } from "./layoutRegistry.js";
-import { getBackgroundForIntent } from "./backgroundPatternRegistry.js";
+import { findLayouts, getLayoutDef } from "./registries/layoutRegistry.js";
+import { getBackgroundForIntent } from "./registries/backgroundPatternRegistry.js";
 import { resolveColors } from "./colorContrastResolver.js";
 import { resolveIconForZone } from "./resolveIconForZone.js";
-import { getNicheColorFamily, getNicheAvoid } from "./nichePaletteRegistry.js";
+import { getNicheColorFamily, getNicheAvoid } from "./registries/nichePaletteRegistry.js";
 import { LOCAL_TO_PHOSPHOR } from "../services/assets/iconifyService.js";
 
 /* ─────────────────────────────────────────────────────────────

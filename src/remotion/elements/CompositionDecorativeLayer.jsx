@@ -13,7 +13,7 @@
 
 import React from "react";
 import DecorativeRenderer from "./DecorativeRenderer";
-import { decorativeById } from "../../core/designLibrary/decorativeRegistry";
+import { decorativeById } from "../../core/registries/decorativeRegistry";
 
 export default function CompositionDecorativeLayer({ decoratives, canvasW, canvasH }) {
   if (!decoratives?.length || !canvasW || !canvasH) return null;

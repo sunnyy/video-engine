@@ -6,9 +6,9 @@ import {
   spring
 } from "remotion";
 
-import { transitionsRegistry } from "../../core/transitionsRegistry";
-import { motionsRegistry } from "../../core/motionsRegistry";
-import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry";
+import { transitionsRegistry } from "../../core/registries/transitionsRegistry";
+import { motionsRegistry } from "../../core/registries/motionsRegistry";
+import { backgroundPatternRegistry } from "../../core/registries/backgroundPatternRegistry";
 
 export default function LayoutBackgroundRenderer({ background, beat }) {
 

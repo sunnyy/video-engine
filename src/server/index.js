@@ -12,8 +12,101 @@ import { renderFrames, stitchFramesToVideo, getCompositions } from "@remotion/re
 import { v4 as uuidv4 } from "uuid";
 import compressVideo from "./compressVideo.cjs";
 import compressAudio from "./compressAudio.cjs";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
+
+/* ── Auth middleware ── */
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+async function requireAuth(req, res, next) {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) return res.status(401).json({ error: "Unauthorized" });
+  req.user = user;
+  next();
+}
+
+async function requireAdmin(req, res, next) {
+  // Re-fetch via admin API to get the authoritative app_metadata
+  const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(req.user.id);
+  if (error || !user) return res.status(401).json({ error: "Unauthorized" });
+  const meta = user.app_metadata ?? (user.raw_app_meta_data ?? {});
+  const role = meta.role;
+  if (role !== "admin") return res.status(403).json({ error: "Forbidden" });
+  req.adminUser = user;
+  next();
+}
+
+/* ── Credit deduction (server-side, atomic) ── */
+async function deductCredits(userId, amount, action, description, projectId = null) {
+  const { data: credits } = await supabaseAdmin
+    .from("user_credits")
+    .select("balance")
+    .eq("user_id", userId)
+    .single();
+
+  if (!credits || credits.balance < amount) {
+    return { success: false, error: "Insufficient credits" };
+  }
+
+  const newBalance = credits.balance - amount;
+
+  await supabaseAdmin
+    .from("user_credits")
+    .update({ balance: newBalance, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+
+  await supabaseAdmin
+    .from("credit_transactions")
+    .insert({
+      user_id:      userId,
+      amount:       -amount,
+      type:         "deduction",
+      action,
+      description,
+      project_id:   projectId || null,
+      balance_after: newBalance,
+    });
+
+  return { success: true, balance: newBalance };
+}
+
+/** Add credits (positive amount) — used by admin and purchase flow. */
+async function addCredits(userId, amount, type, action, description, paymentId = null) {
+  const { data: credits } = await supabaseAdmin
+    .from("user_credits")
+    .select("balance, lifetime_credits")
+    .eq("user_id", userId)
+    .single();
+
+  const current  = credits?.balance          ?? 0;
+  const lifetime = credits?.lifetime_credits ?? 0;
+  const newBalance  = current  + amount;
+  const newLifetime = lifetime + amount;
+
+  await supabaseAdmin
+    .from("user_credits")
+    .upsert({ user_id: userId, balance: newBalance, lifetime_credits: newLifetime, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+
+  await supabaseAdmin
+    .from("credit_transactions")
+    .insert({
+      user_id:      userId,
+      amount,
+      type,
+      action,
+      description,
+      payment_id:   paymentId,
+      balance_after: newBalance,
+    });
+
+  return { success: true, balance: newBalance };
+}
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const app = express();
@@ -26,6 +119,30 @@ const TEMP_DIR     = path.join(PROJECT_ROOT, "src/server/temp");
 const PUBLIC_DIR   = path.join(PROJECT_ROOT, "public");
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 app.use("/renders", express.static(TEMP_DIR));
+
+/* ── Temp directory cleanup ── */
+const MAX_TEMP_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function cleanTempDir() {
+  if (!fs.existsSync(TEMP_DIR)) return;
+  const now = Date.now();
+  const files = fs.readdirSync(TEMP_DIR);
+  let deleted = 0;
+  for (const file of files) {
+    const filePath = path.join(TEMP_DIR, file);
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.isFile() && now - stat.mtimeMs > MAX_TEMP_AGE_MS) {
+        fs.unlinkSync(filePath);
+        deleted++;
+      }
+    } catch { /* file already gone */ }
+  }
+  if (deleted > 0) console.log(`[temp cleanup] Deleted ${deleted} files older than 24h`);
+}
+
+cleanTempDir();
+setInterval(cleanTempDir, 6 * 60 * 60 * 1000);
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -62,9 +179,11 @@ async function cacheExternalImage(url) {
 }
 
 /* ---------------- AI ROUTE ---------------- */
-app.post("/api/generate", async (req, res) => {
+app.post("/api/generate", requireAuth, async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, projectId } = req.body;
+    const deduction = await deductCredits(req.user.id, 8, "base_generation", "Video generation", projectId);
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -110,9 +229,11 @@ function normalizeTTS(inputPath, outputPath) {
   });
 }
 
-app.post("/api/generate-tts", async (req, res) => {
+app.post("/api/generate-tts", requireAuth, async (req, res) => {
   try {
-    const { script, voice = "female_warm", speed = 1.0 } = req.body;
+    const { script, voice = "female_warm", speed = 1.0, projectId } = req.body;
+    const deduction = await deductCredits(req.user.id, 5, "tts_generation", "TTS voiceover", projectId);
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     console.log("[TTS] Request:", { voice, speed, scriptLength: script?.length });
     if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
 
@@ -202,7 +323,7 @@ async function cacheImageStrict(url) {
   }
 }
 
-app.post("/api/search-image", async (req, res) => {
+app.post("/api/search-image", requireAuth, async (req, res) => {
   const { query } = req.body;
   if (!query?.trim()) return res.status(400).json({ error: "No query" });
 
@@ -250,9 +371,11 @@ app.get("/api/test-search", async (req, res) => {
 });
 
 /* ---------------- FAL.AI IMAGE GENERATION ---------------- */
-app.post("/api/generate-image", async (req, res) => {
+app.post("/api/generate-image", requireAuth, async (req, res) => {
   try {
-    const { prompt, orientation } = req.body;
+    const { prompt, orientation, projectId } = req.body;
+    const deduction = await deductCredits(req.user.id, 2, "ai_image", "AI image generation", projectId);
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
 
     const imageSize = orientation === "9:16" ? "portrait_16_9" : "landscape_16_9";
@@ -301,7 +424,7 @@ app.post("/api/generate-image", async (req, res) => {
 });
 
 /* Proxy-download a fal.media URL server-side (avoids browser QUIC/HTTP3 issues) */
-app.post("/api/proxy-image", async (req, res) => {
+app.post("/api/proxy-image", requireAuth, async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: "url required" });
@@ -323,7 +446,7 @@ app.post("/api/proxy-image", async (req, res) => {
 /* ---------------- COMPRESSION VIDEO ---------------- */
 const upload = multer({ dest: TEMP_DIR });
 
-app.post("/api/compress", upload.single("video"), async (req, res) => {
+app.post("/api/compress", requireAuth, upload.single("video"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const inputPath  = req.file.path;
@@ -341,7 +464,7 @@ app.post("/api/compress", upload.single("video"), async (req, res) => {
 });
 
 /* ---------------- COMPRESSION AUDIO ---------------- */
-app.post("/api/compress-audio", upload.single("audio"), async (req, res) => {
+app.post("/api/compress-audio", requireAuth, upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const inputPath  = req.file.path;
@@ -361,7 +484,10 @@ app.post("/api/compress-audio", upload.single("audio"), async (req, res) => {
 /* ---------------- RENDER ---------------- */
 const renderJobs = {};
 
-app.post("/api/render", async (req, res) => {
+app.post("/api/render", requireAuth, async (req, res) => {
+  const deduction = await deductCredits(req.user.id, 2, "export_local", "Local render export", req.body.project?.id);
+  if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
   const jobId = uuidv4();
   renderJobs[jobId] = { progress: 0, done: false, url: null, error: null };
   res.json({ success: true, jobId });
@@ -494,7 +620,7 @@ app.post("/api/render", async (req, res) => {
     renderJobs[jobId] = {
       progress: 100,
       done:     true,
-      url:      `http://localhost:5000/renders/${path.basename(outputPath)}`,
+      url:      `http://localhost:5000/api/render-download/${jobId}`,
       error:    null,
     };
     console.log("[render] Done:", jobId);
@@ -505,10 +631,129 @@ app.post("/api/render", async (req, res) => {
   }
 });
 
-app.get("/api/render-status/:jobId", (req, res) => {
+app.get("/api/render-status/:jobId", requireAuth, (req, res) => {
   const job = renderJobs[req.params.jobId];
   if (!job) return res.status(404).json({ error: "Job not found" });
   res.json(job);
+});
+
+/* Stream render output to client and delete immediately after download */
+app.get("/api/render-download/:jobId", requireAuth, (req, res) => {
+  const { jobId } = req.params;
+  const filePath = path.join(TEMP_DIR, `render-${jobId}.mp4`);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
+  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Content-Disposition", `attachment; filename="video-${jobId}.mp4"`);
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
+  res.on("finish", () => {
+    try { fs.unlinkSync(filePath); } catch {}
+    console.log("[render] Deleted output after download:", `render-${jobId}.mp4`);
+  });
+});
+
+/* ── Admin: list all users with credit balances ── */
+app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    if (error) throw error;
+
+    const ids = users.map(u => u.id);
+    const { data: creditRows } = await supabaseAdmin
+      .from("user_credits")
+      .select("user_id, balance, lifetime_credits")
+      .in("user_id", ids);
+
+    const creditsMap = {};
+    for (const r of creditRows || []) creditsMap[r.user_id] = r;
+
+    const result = users.map(u => ({
+      id:               u.id,
+      email:            u.email,
+      created_at:       u.created_at,
+      last_sign_in_at:  u.last_sign_in_at,
+      role:             u.app_metadata?.role ?? null,
+      balance:          creditsMap[u.id]?.balance          ?? null,
+      lifetime_credits: creditsMap[u.id]?.lifetime_credits ?? null,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("[admin/users]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: add credits to any user ── */
+app.post("/api/admin/add-credits", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, amount, reason } = req.body;
+    if (!userId || !amount || amount <= 0) {
+      return res.status(400).json({ error: "userId and positive amount required" });
+    }
+    const result = await addCredits(userId, amount, "bonus", "admin_grant", reason || "Admin grant");
+    res.json(result);
+  } catch (err) {
+    console.error("[admin/add-credits]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: save layout zones back to source file ── */
+app.post("/api/admin/layout/save", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { layoutId, intent, zones } = req.body;
+    if (!layoutId || !intent || !Array.isArray(zones)) {
+      return res.status(400).json({ error: "layoutId, intent, zones[] required" });
+    }
+
+    const primary  = Array.isArray(intent) ? intent[0] : intent;
+    const filePath = path.join(process.cwd(), "src/core/registries/layouts", primary, "index.js");
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: `File not found: ${primary}/index.js` });
+    }
+
+    let source = fs.readFileSync(filePath, "utf8");
+
+    // Locate the layout by its id string
+    const idMarker    = `"${layoutId}"`;
+    const layoutStart = source.indexOf(idMarker);
+    if (layoutStart === -1) {
+      return res.status(404).json({ error: `Layout "${layoutId}" not found in file` });
+    }
+
+    // Find "zones:" after the layout id
+    const zonesIdx = source.indexOf("zones:", layoutStart);
+    if (zonesIdx === -1) {
+      return res.status(404).json({ error: `No zones field for "${layoutId}"` });
+    }
+
+    // Find opening bracket '['
+    const bracketStart = source.indexOf("[", zonesIdx);
+    if (bracketStart === -1) {
+      return res.status(500).json({ error: "Could not find zones array start" });
+    }
+
+    // Walk forward counting only '[' and ']' to find matching close
+    let depth = 0, bracketEnd = -1;
+    for (let i = bracketStart; i < source.length; i++) {
+      if (source[i] === "[")      depth++;
+      else if (source[i] === "]") { depth--; if (depth === 0) { bracketEnd = i; break; } }
+    }
+    if (bracketEnd === -1) {
+      return res.status(500).json({ error: "Unmatched bracket in zones array" });
+    }
+
+    const zonesStr = JSON.stringify(zones, null, 4);
+    const newSource = source.slice(0, bracketStart) + zonesStr + source.slice(bracketEnd + 1);
+
+    fs.writeFileSync(filePath, newSource, "utf8");
+    res.json({ success: true, saved: zones.length });
+  } catch (err) {
+    console.error("[admin/layout/save]", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));

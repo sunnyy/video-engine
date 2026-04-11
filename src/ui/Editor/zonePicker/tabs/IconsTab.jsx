@@ -7,7 +7,7 @@
  *  - Local icon registry — always visible below as fallback
  */
 import { useState, useEffect, useRef } from "react";
-import { ICON_OPTIONS, ICON_GROUPS, renderIconSVG } from "../../../../core/iconRegistry.jsx";
+import { ICON_OPTIONS, ICON_GROUPS, renderIconSVG } from "../../../../core/registries/iconRegistry.jsx";
 import { searchIcons, fetchIconSVG } from "../../../../services/assets/iconifyService.js";
 
 /* ── Phosphor icon tile — fetches its own SVG ── */

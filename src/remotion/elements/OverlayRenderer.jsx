@@ -7,7 +7,7 @@
  */
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from "remotion";
-import { ANCHOR_POSITIONS } from "../../core/overlayRegistry";
+import { ANCHOR_POSITIONS } from "../../core/registries/overlayRegistry";
 
 /* ── Motion system ── */
 function useMotionStyle(motion, delay, fps, frame) {

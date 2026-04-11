@@ -7,7 +7,7 @@
  * Emits: { kind: "decorative", decorativeId: entry.id }
  */
 import { useState } from "react";
-import { decorativeRegistry } from "../../../../core/designLibrary/decorativeRegistry.js";
+import { decorativeRegistry } from "../../../../core/registries/decorativeRegistry.js";
 
 /* ── User-facing category labels ─────────────────────────────── */
 const CATEGORY_LABELS = {

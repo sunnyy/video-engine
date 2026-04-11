@@ -1,3 +1,5 @@
+import { serverFetch } from "../serverApi";
+
 /**
  * generateZoneContent.js
  * src/services/ai/generateZoneContent.js
@@ -155,10 +157,9 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
 
   const prompt = buildZoneContentPrompt(beatsPayload, videoDNA);
 
-  const response = await fetch("http://localhost:5000/api/generate", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ prompt }),
+  const response = await serverFetch("/api/generate", {
+    method: "POST",
+    body:   JSON.stringify({ prompt }),
   });
 
   if (!response.ok) {

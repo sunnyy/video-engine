@@ -1,3 +1,5 @@
+- .claude
+  - settings.local.json
 - .env
 - .gitignore
 - App.js
@@ -66,8 +68,10 @@
       - beatRoleAnalyzer.js
       - blockPropExtractor.js
       - visualTypeAnalyzer.js
+    - animatedBorderRegistry.js
     - assetAutoMatcher.js
     - assetMatcher.js
+    - assetShineRegistry.jsx
     - assetStrategyEngine.js
     - audioCueEngine.js
     - autoAssignElements.js
@@ -89,6 +93,7 @@
     - compilerValidator.js
     - createEmptyProject.js
     - debugProject.js
+    - decorativeShapeRegistry.js
     - designLibrary
       - decorativePicker.js
       - decorativeRegistry.js
@@ -101,6 +106,7 @@
     - elementsRegistry.jsx
     - getAvailableLayouts.js
     - getLayoutSafeAreas.js
+    - iconRegistry.jsx
     - layoutDefinitions.js
     - layoutRegistry.js
     - layoutResolver.js
@@ -128,13 +134,17 @@
         - index.js
     - motionsRegistry.js
     - musicRegistry.js
+    - nichePaletteRegistry.js
     - overlayPlacementEngine.js
     - overlayRegistry.js
     - pacingProfiles.js
+    - resolveColor.js
+    - resolveIconForZone.js
     - scriptVisualReasoner.js
     - sfxRegistry.js
     - syncBeatsToTTs.js
     - testProject.js
+    - textEffectRegistry.jsx
     - textStylePresets.js
     - transitionsRegistry.js
     - validateProject.js
@@ -162,6 +172,7 @@
     - Auth.jsx
     - Dashboard.jsx
     - Editor.jsx
+    - ResetPassword.jsx
   - remotion
     - BeatRenderer.jsx
     - blocks
@@ -196,6 +207,7 @@
       - CompositionDecorativeLayer.jsx
       - DecorativeRenderer.jsx
       - ElementRenderer.jsx
+      - IconifyZone.jsx
       - OverlayRenderer.jsx
       - SFXRenderer.jsx
     - layouts
@@ -260,6 +272,7 @@
       - music-1775654280867.mp3
       - render-006ce208-b6ba-48bb-9ffa-c83b20817d8b.mp4
       - render-0075123a-6db6-4c6d-b4bc-bd3c813af7a5.mp4
+      - render-0bbb68d2-594f-4005-bb46-bbfebd0e12df.mp4
       - render-0c57f997-dce6-4e9a-af9a-c4e1fe4d0d18.mp4
       - render-1773074276742.mp4
       - render-1774606450659.mp4
@@ -269,13 +282,21 @@
       - render-1774832534754.mp4
       - render-1774985417295.mp4
       - render-1774990639991.mp4
+      - render-3246b210-5012-4af7-bdf7-bcee9d02b006.mp4
+      - render-3391b4e1-5ea7-483f-8668-b20f60b72819.mp4
       - render-34811e89-c18e-4ef0-a7bc-d28a85a883c2.mp4
       - render-375deaf7-67ed-40c7-90ee-608cd7b4d11c.mp4
+      - render-3826fa29-f986-4c9c-bbc7-c28d237b3cf5.mp4
+      - render-52c95aa8-7fdf-4de6-bd1e-d11b41d504a7.mp4
       - render-62473504-ae21-471e-92f2-9356f174299d.mp4
+      - render-687273e4-79bf-4778-a6aa-123127631864.mp4
+      - render-7b4213a5-217a-42d5-ab24-e98962d0d697.mp4
       - render-7ca9d991-7348-4a79-be7b-3cdad49f91f8.mp4
       - render-9230af1e-9d00-4ef0-8823-9365d023c41c.mp4
       - render-9ac1e7fb-93dc-4936-978e-afb0992c0188.mp4
       - render-b09fa3f0-b449-4cdd-aea1-15917a97755a.mp4
+      - render-b33e4b71-c165-45f8-99fb-e883af4224a8.mp4
+      - render-d75478da-ff8c-4914-bfd7-3105aaa8a073.mp4
       - render-f275f1c6-e5b4-4fc2-83fa-854479c87b1b.mp4
       - search-1775478874260-ad2zc8njz3i.png
       - search-1775478875094-rl3nz31bmfm.jpg
@@ -386,6 +407,53 @@
       - tts-1775630024773.mp3
       - tts-1775654175872.mp3
       - tts-1775655487353.mp3
+      - tts-1775657273053.mp3
+      - tts-1775658629153.mp3
+      - tts-1775658860582.mp3
+      - tts-1775660132073.mp3
+      - tts-1775680355463.mp3
+      - tts-1775682300727.mp3
+      - tts-1775690358342.mp3
+      - tts-1775690963036.mp3
+      - tts-1775691189764.mp3
+      - tts-1775696696012.mp3
+      - tts-1775761905198.mp3
+      - tts-1775762328272.mp3
+      - tts-1775767380064.mp3
+      - tts-1775767930624.mp3
+      - tts-1775768667484.mp3
+      - tts-1775769510730.mp3
+      - tts-1775770506028.mp3
+      - tts-1775771853109.mp3
+      - tts-1775772066359.mp3
+      - tts-1775772313957.mp3
+      - tts-1775772442020.mp3
+      - tts-1775776866537.mp3
+      - tts-1775777948332.mp3
+      - tts-1775780542405.mp3
+      - tts-1775781576939.mp3
+      - tts-1775783217196.mp3
+      - tts-1775789294826.mp3
+      - tts-1775789399640.mp3
+      - tts-1775789503225.mp3
+      - tts-1775789595454.mp3
+      - tts-1775789677080.mp3
+      - tts-1775789953654.mp3
+      - tts-1775790302134.mp3
+      - tts-1775790446299.mp3
+      - tts-1775790753328.mp3
+      - tts-1775791058642.mp3
+      - tts-1775792105803.mp3
+      - tts-1775792741829.mp3
+      - tts-1775830481901.mp3
+      - tts-1775832695042.mp3
+      - tts-1775832828620.mp3
+      - tts-1775832842103.mp3
+      - tts-1775832853230.mp3
+      - tts-1775835352171.mp3
+      - tts-1775852673218.mp3
+      - tts-1775857642166.mp3
+      - tts-1775862135192.mp3
   - services
     - ai
       - generateStructuredShort.js
@@ -394,6 +462,7 @@
       - deleteUserAsset.js
       - getAssets.js
       - getGalleryAssets.js
+      - iconifyService.js
       - uploadUserAsset.js
     - auth
       - authService.js
@@ -412,6 +481,7 @@
       - AvatarSection.jsx
       - BeatEditor.jsx
       - BeatList.jsx
+      - BeatSection.jsx
       - BlockPicker.jsx
       - blocks
         - blockEditors.jsx
@@ -450,8 +520,11 @@
           - BlocksTab.jsx
           - blockThumbnails.jsx
           - ColorsTab.jsx
+          - DecorativesTab.jsx
           - GalleryTab.jsx
+          - IconsTab.jsx
           - MyAssetsTab.jsx
+          - ShapesTab.jsx
           - TextTab.jsx
         - ZonePickerModal.jsx
       - zones
@@ -467,4 +540,5 @@
 - Strategy.txt
 - tailwind.config.js
 - Tasks.txt
+- temp.json
 - vite.config.js

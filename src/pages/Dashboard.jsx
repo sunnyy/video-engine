@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserProjects, deleteProject } from "../services/projects/projectService";
+import { signOut } from "../services/auth/authService";
+import { useCreditsStore } from "../store/useCreditsStore";
 
 function ProjectCard({ project, onDelete, onClick }) {
   const [hovering, setHovering] = useState(false);
@@ -138,12 +140,14 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [search,   setSearch]   = useState("");
+  const { balance, fetchCredits } = useCreditsStore();
 
   useEffect(() => {
     getUserProjects()
       .then(setProjects)
       .catch(console.error)
       .finally(() => setLoading(false));
+    fetchCredits();
   }, []);
 
   const handleDelete = async (id) => {
@@ -170,12 +174,23 @@ export default function Dashboard() {
           <span className="text-[16px] font-bold text-[#e8e8f0]"
             style={{ fontFamily: "'Syne', sans-serif" }}>VideoEngine</span>
         </div>
-        <button
-          onClick={() => navigate("/new")}
-          className="flex items-center gap-2 px-4 py-[8px] rounded-[8px] text-[13px] font-bold text-[#0b0b10] border-0 cursor-pointer transition-all hover:opacity-90"
-          style={{ background: "#f5c518" }}>
-          + New Project
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 px-3 py-[6px] rounded-[6px] text-[13px] font-mono border"
+            style={{ background: "#111118", borderColor: "rgba(255,255,255,0.06)", color: balance !== null && balance < 10 ? "#f97316" : "#7c5cfc" }}>
+            ⚡ {balance ?? "—"} credits
+          </div>
+          <button
+            onClick={() => navigate("/new")}
+            className="flex items-center gap-2 px-4 py-[8px] rounded-[8px] text-[13px] font-bold text-[#0b0b10] border-0 cursor-pointer transition-all hover:opacity-90"
+            style={{ background: "#f5c518" }}>
+            + New Project
+          </button>
+          <button
+            onClick={async () => { await signOut(); navigate("/"); }}
+            className="px-3 py-[7px] rounded-[8px] text-[13px] text-[#f87171] border border-[rgba(248,113,113,0.2)] bg-transparent cursor-pointer hover:bg-[rgba(248,113,113,0.08)] transition-all">
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div className="max-w-[1200px] mx-auto px-8 py-8">

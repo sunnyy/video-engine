@@ -46,7 +46,9 @@ export default function Auth() {
           {mode === "login" ? "Welcome back" : mode === "register" ? "Create account" : "Reset password"}
         </h2>
         <p className="mb-6 text-[13px] text-[#55556a]">
-          {mode === "forgot" ? "Enter your email and we'll send a reset link." : "Sign in to continue."}
+          {mode === "forgot"    ? "Enter your email and we'll send a reset link."
+           : mode === "register" ? "Create your account to get started."
+           : "Sign in to continue."}
         </p>
 
         <input

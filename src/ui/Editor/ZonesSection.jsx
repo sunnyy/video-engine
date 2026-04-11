@@ -4,8 +4,8 @@
  */
 import { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { getLayoutDef } from "../../core/layoutRegistry.js";
-import { OVERLAY_TYPES } from "../../core/overlayRegistry";
+import { getLayoutDef } from "../../core/registries/layoutRegistry.js";
+import { OVERLAY_TYPES } from "../../core/registries/overlayRegistry";
 import ZonePickerModal from "./zonePicker/ZonePickerModal";
 import ZoneEditor from "./ZoneEditor";
 import OverlayEditor from "./OverlayEditor";
@@ -577,7 +577,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
         <ZonePickerModal
           orientation={project.meta.orientation}
           mode="content"
-          allowedTabs={["assets","gallery","text","blocks","colors","shapes","icons"]}
+          allowedTabs={["assets","gallery","text","blocks","colors","icons","decoratives"]}
           onSelect={handleAddZoneSelect}
           onClose={() => setAddZonePicker(false)}
         />

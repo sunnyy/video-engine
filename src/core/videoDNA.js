@@ -7,7 +7,7 @@
  * Drives: background color story, typography font stack, motion pacing.
  */
 
-import { resolveColorStory } from "./nichePaletteRegistry.js";
+import { resolveColorStory } from "./registries/nichePaletteRegistry.js";
 
 /* ── Typography systems ─────────────────────────────────────── */
 export const TYPOGRAPHY_SYSTEMS = {

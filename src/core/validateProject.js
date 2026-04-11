@@ -1,4 +1,4 @@
-import { layoutRegistry } from "./layoutRegistry.js";
+import { layoutRegistry } from "./registries/layoutRegistry.js";
 
 export default function validateProject(project) {
 

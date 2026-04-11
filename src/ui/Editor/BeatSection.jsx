@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import { useProjectStore }         from "../../store/useProjectStore";
-import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry.js";
+import { backgroundPatternRegistry } from "../../core/registries/backgroundPatternRegistry.js";
 import ZonePicker from "./zonePicker/ZonePickerModal";
 
 const TRANSITION_OPTIONS = [

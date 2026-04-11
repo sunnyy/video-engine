@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useProjectStore } from "../../store/useProjectStore.js";
-import { layoutRegistry } from "../../core/layoutRegistry.js";
-import { captionStyleRegistry, captionStyleKeys } from "../../core/captionStyleRegistry.jsx";
+import { layoutRegistry } from "../../core/registries/layoutRegistry.js";
+import { captionStyleRegistry, captionStyleKeys } from "../../core/registries/captionStyleRegistry.jsx";
 
 const PREVIEW_TEXT = "This changes everything";
 const FPS = 30;

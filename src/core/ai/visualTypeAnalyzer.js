@@ -1,5 +1,6 @@
 import blockRegistry from "../blockRegistry";
-import { layoutRegistry } from "../layoutRegistry";
+import { layoutRegistry } from "../registries/layoutRegistry";
+import { serverFetch } from "../../services/serverApi";
 
 export async function analyzeVisualTypes(beats = []) {
 
@@ -43,12 +44,11 @@ Return JSON only.
     }))
   };
 
-  const response = await fetch("http://localhost:5000/api/generate", {
+  const response = await serverFetch("/api/generate", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       prompt: prompt + "\n\nINPUT:\n" + JSON.stringify(payload, null, 2)
-    })
+    }),
   });
 
   const visuals = await response.json();

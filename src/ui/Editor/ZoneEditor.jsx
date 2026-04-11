@@ -2,17 +2,17 @@
  * ZoneEditor.jsx — grouped, collapsible zone editor
  */
 import { useState, useEffect, useContext, createContext } from "react";
-import { transitionsRegistry } from "../../../src/core/transitionsRegistry";
-import { motionsRegistry }     from "../../../src/core/motionsRegistry";
+import { transitionsRegistry } from "../../../src/core/registries/transitionsRegistry";
+import { motionsRegistry }     from "../../../src/core/registries/motionsRegistry";
 import { useProjectStore }     from "../../../src/store/useProjectStore";
-import { textStylePresets }    from "../../../src/core/textStylePresets";
-import { backgroundPatternRegistry } from "../../../src/core/backgroundPatternRegistry";
-import { TEXT_EFFECT_OPTIONS } from "../../../src/core/textEffectRegistry.jsx";
-import { ANIMATED_BORDER_OPTIONS } from "../../../src/core/animatedBorderRegistry.js";
-import { ASSET_SHINE_OPTIONS }     from "../../../src/core/assetShineRegistry.jsx";
-import decorativeShapeRegistry, { renderDecorativeSVG, DECORATIVE_SHAPE_OPTIONS } from "../../../src/core/decorativeShapeRegistry.js";
-import iconRegistry, { ICON_OPTIONS, renderIconSVG } from "../../../src/core/iconRegistry.jsx";
-import { decorativeById, decorativeRegistry } from "../../../src/core/designLibrary/decorativeRegistry.js";
+import { textStylePresets }    from "../../../src/core/registries/textStylePresets";
+import { backgroundPatternRegistry } from "../../../src/core/registries/backgroundPatternRegistry";
+import { TEXT_EFFECT_OPTIONS } from "../../../src/core/registries/textEffectRegistry.jsx";
+import { ANIMATED_BORDER_OPTIONS } from "../../../src/core/registries/animatedBorderRegistry.js";
+import { ASSET_SHINE_OPTIONS }     from "../../../src/core/registries/assetShineRegistry.jsx";
+import decorativeShapeRegistry, { renderDecorativeSVG, DECORATIVE_SHAPE_OPTIONS } from "../../../src/core/registries/decorativeShapeRegistry.js";
+import iconRegistry, { ICON_OPTIONS, renderIconSVG } from "../../../src/core/registries/iconRegistry.jsx";
+import { decorativeById, decorativeRegistry } from "../../../src/core/registries/decorativeRegistry.js";
 import blockEditors            from "./blocks/blockEditors";
 
 /* ── Font options ── */
@@ -650,8 +650,8 @@ export default function ZoneEditor({
     const color  = style.color || "#ffffff";
     const sw     = style.strokeWidth ?? 3;
 
-    // Build SVG preview with user color injected
-    const svgPreview = entry
+    // Build SVG preview with user color injected (svg entries only)
+    const svgPreview = entry?.svg
       ? entry.svg.replace(/currentColor/g, color)
       : null;
 
@@ -662,15 +662,21 @@ export default function ZoneEditor({
       <div className="pb-6">
         <Accordion defaultSection="Decorative">
         <Section title="Decorative">
-          {/* SVG Preview */}
-          {svgPreview && (
-            <div className="mb-4 flex justify-center">
-              <div className="w-[80px] h-[60px] flex items-center justify-center rounded-[8px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)]">
-                <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", opacity: style.opacity ?? 1 }}
-                  dangerouslySetInnerHTML={{ __html: svgPreview.replace(/<svg /, '<svg width="56" height="56" preserveAspectRatio="xMidYMid meet" ') }} />
-              </div>
+          {/* Preview */}
+          <div className="mb-4 flex justify-center">
+            <div className="w-[80px] h-[60px] flex items-center justify-center rounded-[8px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)]">
+              {svgPreview
+                ? <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", opacity: style.opacity ?? 1 }}
+                    dangerouslySetInnerHTML={{ __html: svgPreview.replace(/<svg /, '<svg width="56" height="56" preserveAspectRatio="xMidYMid meet" ') }} />
+                : entry?.css
+                  ? (() => {
+                      const c = Object.fromEntries(Object.entries(entry.css).map(([k,v]) => [k, typeof v === "string" ? v.replace(/currentColor/g, color) : v]));
+                      return <div style={{ width: 56, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "100%", ...c }} /></div>;
+                    })()
+                  : <span style={{ color: "#44445a", fontSize: 20 }}>◈</span>
+              }
             </div>
-          )}
+          </div>
 
           {/* Color */}
           <div className="mb-3">
@@ -691,15 +697,20 @@ export default function ZoneEditor({
               <div className="grid grid-cols-6 gap-[4px] mt-[5px]">
                 {siblings.map(s => {
                   const isActive = s.id === decId;
-                  const swapSvg = s.svg.replace(/currentColor/g, "#ffffff");
+                  const swapSvg  = s.svg
+                    ? s.svg.replace(/currentColor/g, "#ffffff").replace(/<svg /, '<svg width="18" height="18" preserveAspectRatio="xMidYMid meet" ')
+                    : null;
                   return (
                     <button key={s.id} title={s.id}
                       onClick={() => setZoneLayout(slot, "content", { decorativeId: s.id })}
                       className="aspect-square rounded-[6px] border cursor-pointer transition-all flex items-center justify-center p-[5px]"
                       style={isActive ? ACTIVE_BTN : INACTIVE_BTN}
                     >
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
-                        dangerouslySetInnerHTML={{ __html: swapSvg.replace(/<svg /, '<svg width="18" height="18" preserveAspectRatio="xMidYMid meet" ') }} />
+                      {swapSvg
+                        ? <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                            dangerouslySetInnerHTML={{ __html: swapSvg }} />
+                        : <div style={{ width: "100%", height: 2, background: "#ffffff", borderRadius: 1 }} />
+                      }
                     </button>
                   );
                 })}
@@ -1047,17 +1058,49 @@ export default function ZoneEditor({
                   onCommit={commit} min={0} max={100} unit="px" />
               </div>
             </div>
-            <Slider label="Border Radius" value={radius}
-              onChangeSilent={v => setStyleSilent("borderRadius", v)}
-              onCommit={commit} min={0} max={300} unit="px" />
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <Slider label="Border Radius" value={radius}
+                  onChangeSilent={v => setStyleSilent("borderRadius", v)}
+                  onCommit={commit} min={0} max={300} unit="px" />
+              </div>
+              <div className="flex-1">
+                <Slider label="Padding" value={padding}
+                  onChangeSilent={v => setStyleSilent("contentPadding", v)}
+                  onCommit={commit} min={0} max={120} unit="px" />
+              </div>
+            </div>
           </div>
         </div>
-      </Section>
 
-      {/* Background */}
-      <Section title="Background" icon="⬛" defaultOpen={false}>
-        <ZoneBgRow bg={bg} slot={slot} openPicker={openPicker} clearBackground={clearBackground}
-          padding={padding} setStyleSilent={setStyleSilent} commit={commit} />
+        {/* Zone Background — below preview */}
+        <div className="mt-3">
+          <Label>Zone Background</Label>
+          <div className="flex items-center gap-2">
+            {(() => {
+              const bgStyle = bg?.kind === "pattern"
+                ? (backgroundPatternRegistry[bg.key]?.style || { background: "#111" })
+                : bg?.kind === "color" ? { background: bg.color } : null;
+              return (
+                <>
+                  <div onClick={() => openPicker(slot, "background")}
+                    className="relative w-[36px] h-[28px] rounded-[6px] border border-[rgba(255,255,255,0.1)] overflow-hidden cursor-pointer shrink-0 bg-[#0b0b10] hover:border-[#7c5cfc] transition-colors">
+                    {bgStyle && <div className="absolute inset-0" style={bgStyle} />}
+                    {!bgStyle && <div className="absolute inset-0 flex items-center justify-center text-[#55556a] text-[14px]">+</div>}
+                  </div>
+                  <button onClick={() => openPicker(slot, "background")}
+                    className="text-[11px] text-[#7c5cfc] hover:text-[#9d7fff] bg-transparent border-0 cursor-pointer">
+                    {bgStyle ? "Change" : "Add Background"}
+                  </button>
+                  {bgStyle && (
+                    <button onClick={() => clearBackground(slot)}
+                      className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer ml-auto">clear</button>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
       </Section>
 
       {/* Transitions */}

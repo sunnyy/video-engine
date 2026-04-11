@@ -4,8 +4,8 @@
  */
 import React, { useState } from "react";
 import { useProjectStore }  from "../../store/useProjectStore";
-import { layoutRegistry, getLayoutDef } from "../../core/layoutRegistry.js";
-import { backgroundPatternRegistry } from "../../core/backgroundPatternRegistry.js";
+import { layoutRegistry, getLayoutDef } from "../../core/registries/layoutRegistry.js";
+import { backgroundPatternRegistry } from "../../core/registries/backgroundPatternRegistry.js";
 import ZonePicker    from "./zonePicker/ZonePickerModal";
 import LayoutPreview from "./LayoutPreview";
 

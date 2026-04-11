@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 
-import { captionStyleRegistry } from "../../core/captionStyleRegistry.jsx";
+import { captionStyleRegistry } from "../../core/registries/captionStyleRegistry.jsx";
 import { getLayoutSafeAreas }   from "../../core/getLayoutSafeAreas";
 
 // Resolve caption.position (number 0-100) with backward compat for old string values

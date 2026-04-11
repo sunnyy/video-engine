@@ -2,7 +2,7 @@
  * normalizeBeat.js
  * src/normalize/normalizeBeat.js
  */
-import { layoutRegistry } from "../core/layoutRegistry.js";
+import { layoutRegistry } from "../core/registries/layoutRegistry.js";
 
 function resolvePositionY(p) {
   if (typeof p === "number") return Math.max(0, Math.min(100, p));

@@ -10,7 +10,7 @@
  *   4. Max 2 overlays per beat (one top, one bottom)
  */
 
-import { LAYOUT_SAFE_ANCHORS, ANCHOR_POSITIONS, OVERLAY_TYPES, INTENT_OVERLAYS, createOverlay } from "./overlayRegistry";
+import { LAYOUT_SAFE_ANCHORS, ANCHOR_POSITIONS, OVERLAY_TYPES, INTENT_OVERLAYS, createOverlay } from "./registries/overlayRegistry";
 
 /* ─────────────────────────────────────────────────────────────
    REGION MAP

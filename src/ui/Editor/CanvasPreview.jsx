@@ -7,7 +7,7 @@ import { Player, Thumbnail } from "@remotion/player";
 import { useProjectStore } from "../../store/useProjectStore";
 import VideoComposition from "../../remotion/VideoComposition";
 import ZoneCanvas from "./ZoneCanvas";
-import { getLayoutDef } from "../../core/layoutRegistry";
+import { getLayoutDef } from "../../core/registries/layoutRegistry";
 
 export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const project           = useProjectStore((s) => s.project);
@@ -19,9 +19,10 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const updateBeatSilent  = useProjectStore((s) => s.updateBeatSilent);
   const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta);
 
-  const [isPlaying,   setIsPlaying]   = useState(false);
-  const [showPlayer,  setShowPlayer]  = useState(false);
-  const [pausedFrame, setPausedFrame] = useState(null);
+  const [isPlaying,      setIsPlaying]      = useState(false);
+  const [showPlayer,     setShowPlayer]     = useState(false);
+  const [pausedFrame,    setPausedFrame]    = useState(null);
+  const [showShortcuts,  setShowShortcuts]  = useState(false);
   const hasPlayedOnce = useRef(false);
   const playerRef     = useRef(null);
   const containerRef  = useRef(null);
@@ -30,8 +31,12 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   // Refs so keyboard handler always reads fresh values without stale closures
   const selectedZoneIdsRef = useRef(selectedZoneIds);
   const onSelectZoneRef    = useRef(onSelectZone);
+  const showPlayerRef      = useRef(showPlayer);
+  const pausedFrameRef     = useRef(pausedFrame);
   useEffect(() => { selectedZoneIdsRef.current = selectedZoneIds; }, [selectedZoneIds]);
   useEffect(() => { onSelectZoneRef.current = onSelectZone; }, [onSelectZone]);
+  useEffect(() => { showPlayerRef.current = showPlayer; }, [showPlayer]);
+  useEffect(() => { pausedFrameRef.current = pausedFrame; }, [pausedFrame]);
 
   if (!project) return null;
 
@@ -58,7 +63,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     if (!containerRef.current) return;
     const ro = new ResizeObserver(entries => {
       const { width, height } = entries[0].contentRect;
-      setContainerSize({ width, height });
+      if (width > 0 && height > 0) setContainerSize({ width, height });
     });
     ro.observe(containerRef.current);
     return () => ro.disconnect();
@@ -185,6 +190,25 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       const bz        = liveBeat.zones || {};
       const layoutDef = getLayoutDef(liveBeat.layout);
 
+      // Arrow keys with NO zone selected → seek ±1 second
+      if ((e.code === "ArrowLeft" || e.code === "ArrowRight") && !selectedZoneId && !isMulti) {
+        e.preventDefault();
+        const { project: lp } = useProjectStore.getState();
+        const liveFps      = lp?.meta?.fps || 25;
+        const liveDuration = Math.max(1, Math.floor((lp?.duration_sec || 1) * liveFps));
+        const currentFrame = showPlayerRef.current
+          ? (playerRef.current?.getCurrentFrame() ?? 0)
+          : (pausedFrameRef.current ?? 0);
+        const delta    = e.code === "ArrowLeft" ? -liveFps : liveFps;
+        const newFrame = Math.max(0, Math.min(liveDuration - 1, currentFrame + delta));
+        if (showPlayerRef.current && playerRef.current) {
+          playerRef.current.seekTo(newFrame);
+        } else {
+          setPausedFrame(newFrame);
+        }
+        return;
+      }
+
       // Arrow keys — nudge (plain = 1%, Shift = 5%) — works for single AND multi-select
       if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code) && (selectedZoneId || isMulti)) {
         e.preventDefault();
@@ -253,23 +277,70 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     <div className="w-full bg-black border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
 
       {/* Toolbar */}
-      <div className="flex items-center px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0">
+      <div className="flex items-center px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0 gap-3">
         <div className="flex items-center gap-2 text-[12px] text-[#777] font-mono">
           <span>Space ▶/⏸</span>
-          <span className="mx-1 opacity-30">·</span>
+          <span className="opacity-30">·</span>
           <span>⌘Z undo</span>
-          <span className="mx-1 opacity-30">·</span>
+          <span className="opacity-30">·</span>
           <span>⌘Y redo</span>
-          <span className="mx-1 opacity-30">·</span>
-          <span>⌘D dup</span>
-          <span className="mx-1 opacity-30">·</span>
-          <span>↑↓←→ move · ⇧drag lock ratio</span>
-          <span className="mx-1 opacity-30">·</span>
-          <span>Del remove</span>
-          <span className="mx-1 opacity-30">·</span>
+          <span className="opacity-30">·</span>
           <span>Esc deselect</span>
         </div>
+        <button
+          onClick={() => setShowShortcuts(true)}
+          className="ml-auto text-[11px] text-[#555] hover:text-[#7c5cfc] transition-colors cursor-pointer bg-transparent border-none font-mono underline underline-offset-2"
+        >
+          All Shortcuts
+        </button>
       </div>
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200]"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div
+            className="bg-[#16161f] border border-white/10 rounded-xl p-6 w-[420px] flex flex-col gap-1"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-[#e8e8f0] tracking-wide uppercase">Keyboard Shortcuts</h3>
+              <button onClick={() => setShowShortcuts(false)}
+                className="text-[#555] hover:text-white text-lg leading-none bg-transparent border-none cursor-pointer">✕</button>
+            </div>
+
+            {[
+              { section: "Playback" },
+              { key: "Space",        desc: "Play / Pause" },
+              { key: "← →",          desc: "Seek ±1 second (no zone selected)" },
+              { section: "History" },
+              { key: "⌘Z",           desc: "Undo" },
+              { key: "⌘Y  /  ⌘⇧Z",  desc: "Redo" },
+              { section: "Zones" },
+              { key: "↑ ↓ ← →",      desc: "Nudge zone 1%" },
+              { key: "⇧ + arrows",   desc: "Nudge zone 5%" },
+              { key: "⌘D",           desc: "Duplicate zone" },
+              { key: "Del / ⌫",      desc: "Remove / hide zone" },
+              { key: "⇧ + drag",     desc: "Lock aspect ratio while resizing" },
+              { section: "Selection" },
+              { key: "Click",        desc: "Select zone" },
+              { key: "⌘ + click",    desc: "Multi-select zones" },
+              { key: "Esc",          desc: "Deselect all" },
+            ].map((row, i) =>
+              row.section ? (
+                <div key={i} className="text-[10px] font-bold text-[#555] uppercase tracking-widest mt-3 mb-1 first:mt-0">{row.section}</div>
+              ) : (
+                <div key={i} className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                  <kbd className="text-[12px] font-mono text-[#7c5cfc] bg-[#7c5cfc]/10 px-2 py-0.5 rounded">{row.key}</kbd>
+                  <span className="text-[13px] text-[#aaa]">{row.desc}</span>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Canvas area */}
       <div ref={containerRef} className={`flex-1 relative flex items-start justify-center p-2 ${is169 ? "overflow-y-auto" : "overflow-hidden"}`}>
@@ -280,7 +351,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
           >
             {/* Canvas */}
-            <div style={{ position: "relative", width: canvasW, height: canvasH }}>
+            <div style={{ position: "relative", width: canvasW, height: canvasH, outline: "2px solid red" }}>
               <Thumbnail
                 key={`thumb-${videoW}x${videoH}`}
                 acknowledgeRemotionLicense
@@ -362,7 +433,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               fps={fps}
               controls={false}
               numberOfSharedAudioTags={16}
-              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden" }}
+              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", outline: "2px solid red" }}
             />
 
             {/* Controls — right side for 9:16, bottom for 16:9 */}

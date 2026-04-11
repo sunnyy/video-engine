@@ -6,12 +6,18 @@ import {
 } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getSession, onAuthStateChange } from "./services/auth/authService";
+import { setInsufficientCreditsHandler } from "./services/serverApi";
 import "./App.css"
-import Auth          from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
-import Dashboard     from "./pages/Dashboard";
-import AIGenerator   from "./pages/AIGenerator";
-import Editor        from "./pages/Editor";
+import Auth             from "./pages/Auth";
+import ResetPassword    from "./pages/ResetPassword";
+import Dashboard        from "./pages/Dashboard";
+import AIGenerator      from "./pages/AIGenerator";
+import Editor           from "./pages/Editor";
+import AdminDashboard   from "./pages/admin/AdminDashboard";
+import UserManager      from "./pages/admin/UserManager";
+import LayoutManager    from "./pages/admin/LayoutManager";
+import LayoutEditor     from "./pages/admin/LayoutEditor";
+import ImageLibrary     from "./pages/admin/ImageLibrary";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -19,6 +25,12 @@ export default function App() {
   const [recovering, setRecovering] = useState(false); // true when user landed via password-reset link
 
   useEffect(() => {
+    // Register global handler for 402 NO_CREDITS responses
+    setInsufficientCreditsHandler(() => {
+      alert("Not enough credits. Purchase more to continue.");
+      // TODO: replace alert with a credits purchase modal / navigate to /pricing
+    });
+
     getSession().then((sess) => {
       setSession(sess);
       setLoading(false);
@@ -45,6 +57,8 @@ export default function App() {
 
   if (loading) return null;
 
+  const isAdmin = session?.user?.app_metadata?.role === "admin";
+
   // Password recovery flow — show reset form regardless of session state
   if (recovering) {
     return (
@@ -69,6 +83,20 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/new" element={<AIGenerator />} />
             <Route path="/editor/:id" element={<Editor />} />
+
+            {/* Admin routes — role-gated: app_metadata.role must equal "admin" */}
+            {isAdmin ? (
+              <>
+                <Route path="/admin"          element={<AdminDashboard />} />
+                <Route path="/admin/users"    element={<UserManager />} />
+                <Route path="/admin/layouts"              element={<LayoutManager />} />
+                <Route path="/admin/layouts/:layoutId"   element={<LayoutEditor />} />
+                <Route path="/admin/library"             element={<ImageLibrary />} />
+              </>
+            ) : (
+              <Route path="/admin/*" element={<Navigate to="/" />} />
+            )}
+
             <Route path="*" element={<Navigate to="/" />} />
           </>
         )}

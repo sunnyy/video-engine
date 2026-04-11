@@ -1,8 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useProjectStore } from "../../store/useProjectStore";
+import { supabase } from "../../lib/supabase";
+
+function useIsAdmin() {
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAdmin(session?.user?.app_metadata?.role === "admin");
+    });
+  }, []);
+  return isAdmin;
+}
 
 
 /* ── Delete beat modal ── */
@@ -183,7 +194,7 @@ function DuplicateWarnModal({ warnings, onConfirm, onCancel }) {
   );
 }
 
-export default function BeatList({ setActiveTab }) {
+export default function BeatList({ setActiveTab, setBeatTab }) {
   const project = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
   const setActiveBeat = useProjectStore((s) => s.setActiveBeat);
@@ -192,6 +203,7 @@ export default function BeatList({ setActiveTab }) {
   const duplicateBeat = useProjectStore((s) => s.duplicateBeat);
   const [dupWarn, setDupWarn]     = useState(null); // { beatId, warnings: [] }
   const [deleteTarget, setDeleteTarget] = useState(null); // { beat, warnings: [] }
+  const isAdmin = useIsAdmin();
 
   if (!project) return null;
 
@@ -241,6 +253,8 @@ export default function BeatList({ setActiveTab }) {
                 setActiveTab={setActiveTab}
                 onDeleteRequest={setDeleteTarget}
                 onDuplicateRequest={setDupWarn}
+                isAdmin={isAdmin}
+                setBeatTab={setBeatTab}
               />
             ))}
           </div>
@@ -270,7 +284,7 @@ export default function BeatList({ setActiveTab }) {
 
 function SortableBeat({
   beat, index, activeBeatId, setActiveBeat, setActiveTab,
-  onDeleteRequest, onDuplicateRequest,
+  onDeleteRequest, onDuplicateRequest, isAdmin, setBeatTab,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: beat.id });
@@ -289,6 +303,7 @@ function SortableBeat({
     if (seekToBeat) seekToBeat(beat.id);
     setActiveBeat(beat.id);
     if (setActiveTab) setActiveTab("beats");
+    if (setBeatTab) setBeatTab("beat");
   };
 
   const handleDelete = () => {
@@ -344,13 +359,33 @@ function SortableBeat({
           {beat.spoken}
         </span>
 
-        <div className="flex items-center gap-[5px]">
+        <div className="flex items-center gap-[5px] flex-wrap">
           <span
             className="text-[12px] px-[5px] py-[1px] rounded-[4px] border border-[rgba(255,255,255,0.06)] bg-[#1c1c28] text-[#ccc]"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             {duration}s
           </span>
+          {isAdmin ? (
+            beat.layout && (
+              <span
+                className="text-[10px] px-[5px] py-[1px] rounded-[4px] border border-[rgba(245,197,24,0.25)] bg-[rgba(245,197,24,0.07)] text-[#f5c518]"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                title={beat.layout}
+              >
+                {beat.layout}
+              </span>
+            )
+          ) : (
+            beat.transition?.type && beat.transition.type !== "cut" && (
+              <span
+                className="text-[10px] px-[5px] py-[1px] rounded-[4px] border border-[rgba(124,92,252,0.2)] bg-[rgba(124,92,252,0.08)] text-[#9d7fff]"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {beat.transition.type}
+              </span>
+            )
+          )}
         </div>
       </div>
 

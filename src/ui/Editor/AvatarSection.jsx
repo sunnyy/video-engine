@@ -8,6 +8,7 @@ import { useState, useRef, useCallback } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
 import { measureVideoDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
+import { serverFetch } from "../../services/serverApi";
 
 function Label({ children }) {
   return (
@@ -95,7 +96,7 @@ export default function AvatarSection() {
     try {
       const formData = new FormData();
       formData.append("video", file);
-      const compressedRes = await fetch("http://localhost:5000/api/compress", {
+      const compressedRes = await serverFetch("/api/compress", {
         method: "POST", body: formData,
       });
       if (!compressedRes.ok) throw new Error("Compression failed");

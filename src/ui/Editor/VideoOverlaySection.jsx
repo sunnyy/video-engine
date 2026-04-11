@@ -7,7 +7,7 @@
  */
 import React, { useState } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { ANCHOR_LABELS, createOverlay } from "../../core/overlayRegistry";
+import { ANCHOR_LABELS, createOverlay } from "../../core/registries/overlayRegistry";
 import ZonePickerModal from "./zonePicker/ZonePickerModal";
 
 function Label({ children }) {

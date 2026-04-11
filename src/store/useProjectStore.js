@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { buildSafeProject } from "../normalize/normalizeProject";
 import { calculateTimeline } from "../core/calculateTimeline";
-import { getPacingProfile } from "../core/pacingProfiles";
+import { getPacingProfile } from "../core/registries/pacingProfiles";
 import { updateProject } from "../services/projects/projectService";
 
 const MAX_HISTORY = 50;

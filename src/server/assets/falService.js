@@ -9,8 +9,7 @@
 import { uploadUserAsset } from "../../services/assets/uploadUserAsset";
 import { useAssetsStore }  from "../../store/useAssetsStore";
 import { supabase }        from "../../lib/supabase";
-
-const SERVER = "http://localhost:5000";
+import { serverFetch }     from "../../services/serverApi";
 
 /* ── AI Image Library — reuse before generating ─────────────*/
 
@@ -369,10 +368,9 @@ export async function generateZoneImage({
 
   console.log(`[fal] Beat ${beatIndex} Zone ${zoneIndex}: "${prompt.slice(0, 80)}..."`);
 
-  const res = await fetch(`${SERVER}/api/generate-image`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ prompt, orientation }),
+  const res = await serverFetch("/api/generate-image", {
+    method: "POST",
+    body:   JSON.stringify({ prompt, orientation }),
   });
 
   if (!res.ok) throw new Error(`Fal.ai proxy failed: ${res.status}`);
@@ -384,10 +382,9 @@ export async function generateZoneImage({
   // Re-upload to Supabase for permanent storage (Fal.ai URLs expire).
   // Fetch via server proxy to avoid browser QUIC/HTTP3 issues with fal.media CDN.
   try {
-    const proxyRes = await fetch(`${SERVER}/api/proxy-image`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ url: falUrl }),
+    const proxyRes = await serverFetch("/api/proxy-image", {
+      method: "POST",
+      body:   JSON.stringify({ url: falUrl }),
     });
     if (!proxyRes.ok) throw new Error(`Proxy returned ${proxyRes.status}`);
     const blob   = await proxyRes.blob();

@@ -7,7 +7,7 @@
  * Never fills text zones.
  */
 
-import { getLayoutDef } from "./layoutRegistry";
+import { getLayoutDef } from "./registries/layoutRegistry";
 import { generateImages } from "../server/assets/falService";
 
 /* ── Get asset-type zones from layout definition ── */

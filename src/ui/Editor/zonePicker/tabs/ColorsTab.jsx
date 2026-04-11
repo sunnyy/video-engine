@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
   backgroundPatternRegistry,
   backgroundCategories,
-} from "../../../../core/backgroundPatternRegistry";
+} from "../../../../core/registries/backgroundPatternRegistry";
 
 const CATEGORY_LABELS = {
   bright:   "Bright",

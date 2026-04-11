@@ -4,9 +4,9 @@
  */
 import { memo, useCallback, useRef, useEffect } from "react";
 import { useProjectStore } from "../../../src/store/useProjectStore";
-import { getLayoutDef } from "../../../src/core/layoutRegistry";
+import { getLayoutDef } from "../../../src/core/registries/layoutRegistry";
 import { elementsRegistry } from "../../../src/core/elementsRegistry";
-import { getClipPathCSS } from "../../../src/core/decorativeShapeRegistry.js";
+import { getClipPathCSS } from "../../../src/core/registries/decorativeShapeRegistry.js";
 import CompositionLayerRenderer from "../../../src/remotion/elements/composition/CompositionLayerRenderer";
 import ZoneHandle from "./ZoneHandle";
 import { getTypographyForRole } from "../../../src/core/videoDNA.js";

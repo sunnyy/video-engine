@@ -11,7 +11,7 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remo
 import LayoutRenderer from "./layouts/LayoutRenderer.jsx";
 import SFXRenderer from "./elements/SFXRenderer.jsx";
 import OverlayRenderer from "./elements/OverlayRenderer";
-import { getLayoutDef } from "../core/layoutRegistry.js";
+import { getLayoutDef } from "../core/registries/layoutRegistry.js";
 
 export default function BeatRenderer({ beat, project, previewMode = false }) {
   const frame = useCurrentFrame();

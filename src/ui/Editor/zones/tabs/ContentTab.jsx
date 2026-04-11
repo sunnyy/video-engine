@@ -6,8 +6,8 @@
  * Full-width sliders below for Padding, Radius, Shadow.
  */
 import React from "react";
-import { transitionsRegistry } from "../../../../core/transitionsRegistry";
-import { motionsRegistry }     from "../../../../core/motionsRegistry";
+import { transitionsRegistry } from "../../../../core/registries/transitionsRegistry";
+import { motionsRegistry }     from "../../../../core/registries/motionsRegistry";
 
 function FieldLabel({ children }) {
   return (

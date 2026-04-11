@@ -10,7 +10,7 @@
  */
 import { useState } from "react";
 import blockRegistry, { getBlockDefaults } from "../../../../core/blockRegistry";
-import { OVERLAY_TYPES, createOverlay }    from "../../../../core/overlayRegistry";
+import { OVERLAY_TYPES, createOverlay }    from "../../../../core/registries/overlayRegistry";
 import { BLOCK_THUMBNAILS, OVERLAY_THUMBNAILS } from "./blockThumbnails";
 
 const BLOCK_META = {

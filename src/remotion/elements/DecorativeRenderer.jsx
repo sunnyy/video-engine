@@ -9,7 +9,7 @@
  */
 
 import React from "react";
-import { decorativeById } from "../../core/designLibrary/decorativeRegistry";
+import { decorativeById } from "../../core/registries/decorativeRegistry";
 
 /* ── Position anchor → CSS transform-origin + offsets ──────── */
 const ANCHOR_STYLES = {

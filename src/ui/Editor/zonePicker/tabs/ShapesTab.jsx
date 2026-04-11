@@ -4,8 +4,8 @@
  *
  * Picker tab for inserting decorative shape zones.
  */
-import { DECORATIVE_SHAPE_OPTIONS } from "../../../../core/decorativeShapeRegistry.js";
-import { renderDecorativeSVG } from "../../../../core/decorativeShapeRegistry.js";
+import { DECORATIVE_SHAPE_OPTIONS } from "../../../../core/registries/decorativeShapeRegistry.js";
+import { renderDecorativeSVG } from "../../../../core/registries/decorativeShapeRegistry.js";
 
 export default function ShapesTab({ onSelect }) {
   return (

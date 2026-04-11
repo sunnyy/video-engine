@@ -5,8 +5,9 @@
 import { useRef, useState } from "react";
 import { useProjectStore }  from "../../store/useProjectStore";
 import { uploadUserAsset }  from "../../services/assets/uploadUserAsset";
-import { MUSIC_LIBRARY, MUSIC_KEYS, MUSIC_PREVIEW_URLS } from "../../core/musicRegistry";
+import { MUSIC_LIBRARY, MUSIC_KEYS, MUSIC_PREVIEW_URLS } from "../../core/registries/musicRegistry";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
+import { serverFetch } from "../../services/serverApi";
 
 const TTS_VOICES = [
   { key: "female_warm",   label: "Female — Warm",     desc: "Nova · Warm & natural"     },
@@ -122,10 +123,9 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
     setGenerating(true);
     try {
       // Step 1 — Generate TTS on server
-      const res = await fetch("http://localhost:5000/api/generate-tts", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ script, voice: selectedVoice, speed }),
+      const res = await serverFetch("/api/generate-tts", {
+        method: "POST",
+        body:   JSON.stringify({ script, voice: selectedVoice, speed }),
       });
       if (!res.ok) throw new Error("TTS generation failed");
       const data = await res.json();
@@ -428,7 +428,7 @@ export default function AudioSection() {
     try {
       const formData = new FormData();
       formData.append("audio", file);
-      const compressedRes = await fetch("http://localhost:5000/api/compress-audio", { method: "POST", body: formData });
+      const compressedRes = await serverFetch("/api/compress-audio", { method: "POST", body: formData });
       const blob = await compressedRes.blob();
       const compressedFile = new File([blob], "compressed.m4a", { type: "audio/mp4" });
       const uploaded = await uploadUserAsset(compressedFile, null, pct => setProgress(p => ({ ...p, [type]: pct })));

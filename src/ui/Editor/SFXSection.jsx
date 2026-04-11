@@ -5,7 +5,7 @@
  */
 import React, { useState, useRef } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { SFX_LIBRARY, SFX_KEYS, pickBeatSFX, getSFXPreviewUrl } from "../../core/sfxRegistry";
+import { SFX_LIBRARY, SFX_KEYS, pickBeatSFX, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 
 function Label({ children }) {
   return (

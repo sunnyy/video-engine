@@ -3,9 +3,9 @@ import { useProjectStore } from "../../store/useProjectStore";
 import {
   OVERLAY_TYPES, OVERLAY_TYPE_KEYS, ANCHOR_LABELS,
   createOverlay,
-} from "../../core/overlayRegistry";
+} from "../../core/registries/overlayRegistry";
 import { getSafePlacementAnchors } from "../../core/overlayPlacementEngine";
-import { SFX_LIBRARY, SFX_KEYS, getSFXPreviewUrl } from "../../core/sfxRegistry";
+import { SFX_LIBRARY, SFX_KEYS, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 
 function Label({ children }) {
   return (

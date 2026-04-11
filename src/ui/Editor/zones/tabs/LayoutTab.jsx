@@ -3,7 +3,7 @@
  * src/ui/Editor/zones/tabs/LayoutTab.jsx
  */
 import React from "react";
-import { transitionsRegistry } from "../../../../core/transitionsRegistry";
+import { transitionsRegistry } from "../../../../core/registries/transitionsRegistry";
 
 function Label({ children }) {
   return (

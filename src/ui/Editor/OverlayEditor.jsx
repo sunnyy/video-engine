@@ -6,7 +6,7 @@
  * Renders common props (anchor, motion, delay) + type-specific props.
  */
 import { useState } from "react";
-import { ANCHOR_LABELS, OVERLAY_TYPES } from "../../core/overlayRegistry";
+import { ANCHOR_LABELS, OVERLAY_TYPES } from "../../core/registries/overlayRegistry";
 
 const MOTION_OPTIONS = ["pop", "slideUp", "slideLeft", "slam", "fade"];
 

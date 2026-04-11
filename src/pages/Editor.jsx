@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useProjectStore } from "../store/useProjectStore";
 import { getProjectById } from "../services/projects/projectService";
 
 import Header from "../ui/Editor/Header";
+import SystemMessage from "../ui/Editor/SystemMessage";
 import Sidebar from "../ui/Editor/Sidebar";
 import BeatList from "../ui/Editor/BeatList";
 import EditorPanel from "../ui/Editor/EditorPanel";
@@ -73,36 +74,36 @@ export default function Editor() {
     }
   };
 
-  const is169 = project.meta?.orientation === "16:9";
-
-  // 16:9 needs a wider canvas column so the landscape canvas fills more height.
-  // 9:16 stays narrower — portrait fills height naturally.
-  const cols = is169
-    ? { sidebar: "7%", beatList: "18%", canvas: "45%", panel: "30%" }
-    : { sidebar: "7%", beatList: "18%", canvas: "45%", panel: "30%" };
 
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div style={{ width: cols.sidebar }}>
-          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <div className="flex flex-1 flex-col" style={{ width: "70%" }}>
+          <div style={{ width: "100%" }}>
+            <SystemMessage />
+          </div>
+          <div className="flex flex-1 min-h-0 overflow-hidden" style={{ width: "100%" }}>
+            <div style={{ width: "10%", height: "100%" }}>
+              <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+            </div>
+
+            <div style={{ width: "25%", height: "100%" }}>
+              <BeatList setActiveTab={setActiveTab} setBeatTab={setBeatTab} />
+            </div>
+
+            <div style={{ width: "65%", minWidth: "65%", height: "100%" }}>
+              <CanvasPreview
+                selectedZoneIds={selectedZoneIds}
+                onSelectZone={handleSelectZone}
+                onDeleteZone={handleDeleteZone}
+              />
+            </div>
+          </div>
         </div>
 
-        <div style={{ width: cols.beatList }}>
-          <BeatList setActiveTab={setActiveTab} />
-        </div>
-
-        <div style={{ width: cols.canvas }}>
-          <CanvasPreview
-            selectedZoneIds={selectedZoneIds}
-            onSelectZone={handleSelectZone}
-            onDeleteZone={handleDeleteZone}
-          />
-        </div>
-
-        <div style={{ width: cols.panel }}>
+        <div style={{ width: "30%" }}>
           <EditorPanel
             activeTab={activeTab}
             setActiveTab={setActiveTab}

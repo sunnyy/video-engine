@@ -6,7 +6,7 @@
  * Clicking one creates a text zone with that preset applied.
  */
 import React from "react";
-import { textStylePresets } from "../../../../core/textStylePresets";
+import { textStylePresets } from "../../../../core/registries/textStylePresets";
 
 const ENERGY_COLOR = {
   explosive: "#f87171",

@@ -1,3 +1,5 @@
+import { serverFetch } from "../../services/serverApi";
+
 export async function analyzeBeatRoles(beats = []) {
 
   const prompt = `
@@ -30,12 +32,11 @@ Return ONLY JSON.
     }))
   };
 
-  const response = await fetch("http://localhost:5000/api/generate", {
+  const response = await serverFetch("/api/generate", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       prompt: prompt + "\n\nINPUT:\n" + JSON.stringify(payload, null, 2)
-    })
+    }),
   });
 
   const roles = await response.json();

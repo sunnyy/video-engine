@@ -14,9 +14,9 @@ import {
 import BeatRenderer from "./BeatRenderer";
 import Caption from "./elements/Caption";
 import OverlayRenderer from "./elements/OverlayRenderer";
-import { transitionsRegistry } from "../core/transitionsRegistry";
+import { transitionsRegistry } from "../core/registries/transitionsRegistry";
 import { buildVisualIdentity } from "../core/visualIdentityEngine";
-import { getLayoutDef } from "../core/layoutRegistry.js";
+import { getLayoutDef } from "../core/registries/layoutRegistry.js";
 
 /* FONT LOADER */
 
@@ -286,9 +286,11 @@ export default function VideoComposition({ project, previewMode = false }) {
           switch (nextTransition.type) {
             case "fade":
             case "dissolve":
-              outStyle.opacity = interpolate(outProgress,[0,1],[1,0]);
+              // Stay fully opaque — incoming beat fades in on top.
+              // Fading both simultaneously causes a black flash (combined opacity < 1).
               break;
             case "zoom":
+              // Shrink back as incoming punches in
               outStyle.transform = `scale(${interpolate(outProgress,[0,1],[1,0.82])})`;
               outStyle.opacity   = interpolate(outProgress,[0.5,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
@@ -298,11 +300,17 @@ export default function VideoComposition({ project, previewMode = false }) {
             case "dipWhite":
               dipOverlay = `rgba(255,255,255,${outProgress})`;
               break;
+            case "slideLeft":
+            case "slideRight":
+            case "slideUp":
+            case "slideDown":
+              // Stay fully opaque — incoming slides in on top, no gap needed
+              break;
             case "whipPan":
               outStyle.opacity = interpolate(outProgress,[0.7,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
             case "spin":
-              outStyle.opacity = interpolate(outProgress,[0,1],[1,0]);
+              // Stay opaque — incoming spins in on top
               break;
             case "glitch":
               outStyle.opacity = interpolate(outProgress,[0,0.2,0.4,0.6,0.8,1],[1,0.6,1,0.6,0.8,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
