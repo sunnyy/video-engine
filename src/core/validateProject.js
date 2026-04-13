@@ -66,7 +66,11 @@ export default function validateProject(project) {
 
       if (contentKind === "asset") {
         const src = zone?.content?.asset?.src || zone?.content?.asset?.url || zone?.content?.src;
-        if (!src) {
+        // Avatar zones have src=null intentionally — the avatar video is supplied at runtime.
+        const isAvatarZone = beat.avatarZone === key
+          || zone?.type === "avatar"
+          || zone?.content?.kind === "avatar";
+        if (!src && !isAvatarZone) {
           errors.push(`Beat ${index + 1} Zone ${key}: Asset missing src`);
         }
       }

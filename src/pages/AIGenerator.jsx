@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { generateStructuredShort } from "../services/ai/generateStructuredShort";
 import { buildSafeProject } from "../normalize/normalizeProject";
 import { createProject, updateProject, deleteProject } from "../services/projects/projectService";
+import { getCredits } from "../services/credits/creditService";
+import { estimateCreditCost, CREDIT_COSTS } from "../core/utils/creditCosts";
+import { serverFetch } from "../services/serverApi";
+import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 
 /* ── Options ──────────────────────────────────────────────── */
 
@@ -113,11 +117,10 @@ function Toggle({ value, onChange }) {
 }
 
 /* ── Advanced summary line ────────────────────────────────── */
-function buildAdvancedSummary({ tone, videoType, mode, audience, brandColor }) {
+function buildAdvancedSummary({ tone, videoType, audience, brandColor }) {
   const parts = [];
   if (videoType !== "auto") parts.push(VIDEO_TYPES.find((o) => o.value === videoType)?.label || videoType);
   if (tone !== "auto") parts.push(TONES.find((o) => o.value === tone)?.label || tone);
-  if (mode !== "faceless") parts.push("Talking Head");
   if (audience !== "general") parts.push(AUDIENCES.find((o) => o.value === audience)?.label || audience);
   if (brandColor) parts.push("Brand color set");
   return parts.length ? parts.join(" · ") : "All defaults — AI decides";
@@ -145,8 +148,17 @@ export default function AIGenerator() {
   const [generateTTS, setGenerateTTS] = useState(true);
   const [ttsVoice, setTtsVoice] = useState("female_warm");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // Talking head mode state
+  const [thVideoFile, setThVideoFile] = useState(null);
+  const [thVideoUrl,  setThVideoUrl]  = useState(null);  // local blob preview
+  const videoInputRef = useRef(null);
+
+  const [loading,     setLoading]     = useState(false);
+  const [loadingStep, setLoadingStep] = useState(null); // null | 'transcribing' | 'uploading' | 'script' | 'voice'
+  const [error,       setError]       = useState("");
+
+  // Credit pre-flight
+  const [creditModal, setCreditModal] = useState(null); // null | { estimate, balance, canAfford }
 
   const handleScratch = async () => {
     setLoading(true);
@@ -184,46 +196,101 @@ export default function AIGenerator() {
     setLoading(false);
   };
 
-  const handleGenerate = async () => {
-    if (!topic.trim()) {
-      setError("Please enter a topic.");
-      return;
+  // Step 1 — validate inputs and show cost estimate before starting
+  const handlePreFlight = async () => {
+    setError("");
+
+    if (mode === "talking_head") {
+      if (!thVideoFile) { setError("Please upload your talking head video."); return; }
+    } else {
+      if (!topic.trim()) { setError("Please enter a topic."); return; }
     }
+
+    let estimate;
+    if (mode === "talking_head") {
+      const C = CREDIT_COSTS;
+      const beatCount = durationCategory === "short" ? 5 : durationCategory === "medium" ? 10 : 18;
+      const images    = generateImages ? beatCount * C.ai_image : 0;
+      const total = C.base_generation + C.transcription + images + C.export_local;
+      estimate = { total, breakdown: { base: C.base_generation, transcription: C.transcription, images, export: C.export_local, beatCount } };
+    } else {
+      estimate = estimateCreditCost(durationCategory, { tts: generateTTS, aiImages: generateImages });
+    }
+
+    const credits = await getCredits();
+    const balance = credits?.balance ?? 0;
+    setCreditModal({ estimate, balance, canAfford: balance >= estimate.total });
+  };
+
+  // Step 2 — user confirmed, run the fully-automated generation pipeline
+  const handleGenerate = async () => {
+    setCreditModal(null);
     setError("");
     setLoading(true);
+    setLoadingStep("script");
 
-    // "auto" values get passed as-is — the prompt instructs AI to infer them
     const effectiveBrandColor = brandColor.trim() || null;
+    let talkingHead      = null;
+    let effectiveTopic   = topic.trim();
+    let avatarSrc        = null; // final avatar video URL, set by end of each TH path
+
+    /* ─────────────────────────── Upload Video path ─────────────────────── */
+    if (mode === "talking_head") {
+      try {
+        // 1. Transcribe
+        setLoadingStep("transcribing");
+        const formData = new FormData();
+        formData.append("video", thVideoFile);
+        const transRes  = await serverFetch("/api/transcribe", { method: "POST", body: formData });
+        const transText = await transRes.text();
+        if (!transRes.ok) throw new Error(JSON.parse(transText)?.error || "Transcription failed");
+        const transData = JSON.parse(transText);
+        if (!effectiveTopic) effectiveTopic = transData.transcript.slice(0, 80);
+        talkingHead = { type: "upload", transcript: transData.transcript, segments: transData.segments };
+
+        // 2. Compress + upload video via server (bypasses Supabase client-side bucket size limit)
+        setLoadingStep("uploading");
+        const uploadForm = new FormData();
+        uploadForm.append("video", thVideoFile);
+        const uploadRes  = await serverFetch("/api/upload-avatar", { method: "POST", body: uploadForm });
+        const uploadText = await uploadRes.text();
+        if (!uploadRes.ok) throw new Error(JSON.parse(uploadText)?.error || "Video upload failed");
+        avatarSrc = JSON.parse(uploadText).url;
+      } catch (err) {
+        setError(err.message || "Video processing failed. Please try again.");
+        setLoading(false); setLoadingStep(null);
+        return;
+      }
+    }
 
     let projectId;
     try {
+      const projectName = (effectiveTopic || "Talking Head Video").slice(0, 60);
       const placeholder = buildSafeProject({
         meta: { orientation, mode, videoType, language, brand_color: effectiveBrandColor, audience, tone },
         script: { text: "", emotionalArc: [] },
-        dna: null,
-        audio: { tts: null, music: null },
-        beats: [],
+        dna: null, audio: { tts: null, music: null }, beats: [],
         workflow: { script_completed: false, avatar_completed: false, beats_initialized: false },
       });
-      const saved = await createProject({ name: topic.slice(0, 60), rawAI: {}, safeProject: placeholder });
+      const saved = await createProject({ name: projectName, rawAI: {}, safeProject: placeholder });
       projectId = saved.id;
 
+      /* Script + images (no TTS for talking head — audio comes from uploaded video) */
+      setLoadingStep("script");
+      const needsTTS = mode !== "talking_head" && generateTTS;
       const aiResult = await generateStructuredShort({
-        topic,
+        topic: effectiveTopic,
         context: "",
-        videoType,
-        mode,
-        language,
-        orientation,
-        durationCategory,
+        videoType, mode, language, orientation, durationCategory,
         generateImages,
-        generateTTS,
+        generateTTS: needsTTS,
         ttsVoice,
         brandColor: effectiveBrandColor,
-        audience,
-        tone,
-        projectId,
-        onProgress: () => {},
+        audience, tone, projectId,
+        talkingHead,
+        onProgress: (step) => {
+          if (step === "voiceover") setLoadingStep("voice");
+        },
       });
 
       const safeProject = buildSafeProject({
@@ -232,7 +299,9 @@ export default function AIGenerator() {
         dna: aiResult.meta?.dna || null,
         audio: aiResult.audio || { tts: null, music: null },
         beats: aiResult.beats,
-        workflow: { script_completed: true, avatar_completed: false, beats_initialized: true },
+        workflow: { script_completed: true, avatar_completed: !!avatarSrc, beats_initialized: true },
+        talkingHead: talkingHead ? { type: talkingHead.type } : null,
+        avatar: avatarSrc ? { src: avatarSrc, type: "video" } : null,
       });
 
       await updateProject(projectId, safeProject);
@@ -243,36 +312,20 @@ export default function AIGenerator() {
       if (projectId) deleteProject(projectId).catch(() => {});
     }
     setLoading(false);
+    setLoadingStep(null);
   };
 
-  const LOADING_MESSAGES = [
-    "Crafting your story…",
-    "Building your vision…",
-    "Bringing ideas to life…",
-    "Designing your moments…",
-    "Weaving it all together…",
-    "Shaping something great…",
-    "Putting the pieces in place…",
-    "Making it cinematic…",
-  ];
-
-  const [msgIdx, setMsgIdx] = useState(0);
-  const msgTimer = useRef(null);
-
-  useEffect(() => {
-    if (loading) {
-      setMsgIdx(0);
-      msgTimer.current = setInterval(() => setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length), 2600);
-    } else {
-      clearInterval(msgTimer.current);
-    }
-    return () => clearInterval(msgTimer.current);
-  }, [loading]);
+  const STEP_MESSAGES = {
+    transcribing: "Transcribing your video…",
+    uploading:    "Uploading to storage…",
+    script:       "Writing the script…",
+    voice:        "Generating voice…",
+  };
+  const currentLoadingMessage = STEP_MESSAGES[loadingStep] || "Generating your video…";
 
   const advancedSummary = buildAdvancedSummary({
     tone,
     videoType,
-    mode,
     audience,
     brandColor: brandColor.trim(),
   });
@@ -351,17 +404,17 @@ export default function AIGenerator() {
 
           <div style={{ textAlign: "center", minHeight: 72 }}>
             <div
-              key={msgIdx}
+              key={currentLoadingMessage}
               style={{
                 fontSize: 30,
                 fontWeight: 700,
                 color: "#e8e8f0",
                 fontFamily: "'Syne', sans-serif",
                 marginBottom: 10,
-                animation: "ai-fade-msg 2.6s ease forwards",
+                animation: "ai-fade-msg 0.5s ease forwards",
               }}
             >
-              {LOADING_MESSAGES[msgIdx]}
+              {currentLoadingMessage}
             </div>
             <div
               style={{
@@ -393,7 +446,7 @@ export default function AIGenerator() {
       )}
 
       <div
-        className="w-full max-w-[520px] rounded-[20px] border border-[rgba(255,255,255,0.12)] p-8 flex flex-col gap-5"
+        className="w-full max-w-[520px] rounded-[20px] border border-[rgba(255,255,255,0.12)] p-8 flex flex-col gap-6"
         style={{ background: "#13132a" }}
       >
         {/* Header */}
@@ -406,127 +459,162 @@ export default function AIGenerator() {
           </p>
         </div>
 
-        {/* ── Visible fields ── */}
-
-        {/* Topic */}
-        <div>
-          <Label>Topic</Label>
-          <textarea
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="What is this video about? Be specific."
-            rows={3}
-            className="w-[95%] bg-[#11111a] border border-[rgba(255,255,255,0.12)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none transition-colors"
-          />
+        {/* ── Step 1: Mode selection ── */}
+        <div className="flex flex-col gap-2">
+          <Label>Video Type</Label>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { value: "faceless",     icon: "🎬", title: "Faceless",      sub: "AI builds visuals automatically" },
+              { value: "talking_head", icon: "🎤", title: "Talking Head",  sub: "Upload your video, we build around it" },
+            ].map(({ value, icon, title, sub }) => (
+              <button
+                key={value}
+                onClick={() => setMode(value)}
+                className="flex flex-col items-start gap-1.5 px-4 py-4 rounded-[12px] border cursor-pointer transition-all text-left"
+                style={mode === value
+                  ? { background: "rgba(124,92,252,0.14)", borderColor: "#7c5cfc" }
+                  : { background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.08)" }}
+              >
+                <span className="text-[22px] leading-none">{icon}</span>
+                <span className="text-[14px] font-bold leading-tight" style={{ color: mode === value ? "#e8e8f0" : "#aaaacc" }}>{title}</span>
+                <span className="text-[11px] leading-snug" style={{ color: mode === value ? "#9b8ff0" : "#666688" }}>{sub}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Orientation + Duration + Language */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* ── Step 2: Content input ── */}
+        {mode === "faceless" ? (
+          <div>
+            <Label>Topic</Label>
+            <textarea
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="What is this video about? Be specific."
+              rows={3}
+              className="w-[95%] bg-[#11111a] border border-[rgba(255,255,255,0.12)] rounded-[8px] px-3 py-[8px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none transition-colors"
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Label>Avatar Video</Label>
+            <p className="text-[12px] text-[#8888a8] leading-relaxed -mt-1">
+              We'll extract your script automatically and build a produced video around it. Self-recorded or AI-generated (HeyGen, D-ID, Synthesia, etc.) both work.
+            </p>
+            <input ref={videoInputRef} type="file" accept="video/*" className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setThVideoFile(f);
+                setThVideoUrl(URL.createObjectURL(f));
+              }}
+            />
+            {!thVideoUrl ? (
+              <button
+                onClick={() => videoInputRef.current?.click()}
+                className="w-full py-8 rounded-[10px] border-2 border-dashed border-[rgba(124,92,252,0.3)] text-[13px] text-[#8888a8] hover:border-[rgba(124,92,252,0.6)] hover:text-[#a89bfa] transition-all cursor-pointer bg-transparent"
+              >
+                Click to select video
+              </button>
+            ) : (
+              <div className="relative rounded-[10px] overflow-hidden border border-[rgba(255,255,255,0.1)]">
+                <video src={thVideoUrl} className="w-full max-h-[160px] object-cover" controls />
+                <button
+                  onClick={() => { setThVideoFile(null); setThVideoUrl(null); }}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[rgba(0,0,0,0.7)] text-white text-xs flex items-center justify-center border border-white/20 cursor-pointer"
+                >×</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 3: Basic settings ── */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Orientation</Label>
             <Select value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
           </div>
-          <div>
-            <Label>Duration</Label>
-            <Select value={durationCategory} onChange={setDurationCategory} options={DURATIONS} />
-          </div>
+          {mode === "faceless" && (
+            <div>
+              <Label>Duration</Label>
+              <Select value={durationCategory} onChange={setDurationCategory} options={DURATIONS} />
+            </div>
+          )}
           <div>
             <Label>Language</Label>
             <Select value={language} onChange={setLanguage} options={LANGUAGES} />
           </div>
         </div>
 
-        {/* ── AI Generation toggles ── */}
-        <div className="flex flex-col gap-3 p-4 rounded-[12px] border bg-[#0E0D22]">
-          {/* Auto-generate images */}
-          <div className="flex items-start justify-between gap-3">
+        {/* ── Step 4: AI Options (faceless only) ── */}
+        {mode === "faceless" && (
+          <div className="flex flex-col gap-3 p-4 rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#0E0D22]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <div className="text-[14px] font-semibold text-[#e8e8f0]">Auto-generate images</div>
+                <span className="text-[12px] text-[#aaaaae]">Uses credits.</span>
+              </div>
+              <Toggle value={generateImages} onChange={setGenerateImages} />
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <div className="text-[14px] font-semibold text-[#e8e8f0]">Generate AI voice (TTS)</div>
+                <span className="text-[12px] text-[#aaaaae]">Uses credits.</span>
+              </div>
+              <Toggle value={generateTTS} onChange={setGenerateTTS} />
+            </div>
+            {generateTTS && (
+              <div className="grid grid-cols-2 gap-[6px]">
+                {[
+                  { key: "female_warm",  label: "Female — Warm",  sub: "Nova"    },
+                  { key: "female_clear", label: "Female — Clear", sub: "Shimmer" },
+                  { key: "male_deep",    label: "Male — Deep",    sub: "Onyx"    },
+                  { key: "male_neutral", label: "Male — Neutral", sub: "Echo"    },
+                ].map(({ key, label, sub }) => (
+                  <button key={key} onClick={() => setTtsVoice(key)}
+                    className="flex flex-col items-start px-3 py-[7px] rounded-[8px] border cursor-pointer transition-all text-left"
+                    style={ttsVoice === key
+                      ? { background: "rgba(124,92,252,0.12)", borderColor: "#7c5cfc" }
+                      : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}
+                  >
+                    <span className="text-[12px] font-semibold" style={{ color: ttsVoice === key ? "#a78bfa" : "#d8d8f0" }}>{label}</span>
+                    <span className="text-[10px] font-mono"     style={{ color: ttsVoice === key ? "#7c5cfc" : "#8888a8" }}>{sub}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Talking head: images toggle — still useful for non-avatar beats */}
+        {mode === "talking_head" && (
+          <div className="flex items-start justify-between gap-3 px-4 py-3 rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#0E0D22]">
             <div className="flex-1">
               <div className="text-[14px] font-semibold text-[#e8e8f0]">Auto-generate images</div>
-              <span className="text-[12px] text-[#aaaaae]">Uses credits.</span>
+              <span className="text-[12px] text-[#aaaaae]">For non-avatar beats. Uses credits.</span>
             </div>
             <Toggle value={generateImages} onChange={setGenerateImages} />
           </div>
+        )}
 
-          {/* Generate TTS */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <div className="text-[14px] font-semibold text-[#e8e8f0]">Generate AI voice (TTS)</div>
-              <span className="text-[12px] text-[#aaaaae]">Uses credits.</span>
-            </div>
-            <Toggle value={generateTTS} onChange={setGenerateTTS} />
-          </div>
-
-          {/* Voice picker */}
-          {generateTTS && (
-            <div className="grid grid-cols-2 gap-[6px]">
-              {[
-                { key: "female_warm", label: "Female — Warm", sub: "Nova" },
-                { key: "female_clear", label: "Female — Clear", sub: "Shimmer" },
-                { key: "male_deep", label: "Male — Deep", sub: "Onyx" },
-                { key: "male_neutral", label: "Male — Neutral", sub: "Echo" },
-              ].map(({ key, label, sub }) => (
-                <button
-                  key={key}
-                  onClick={() => setTtsVoice(key)}
-                  className="flex flex-col items-start px-3 py-[7px] rounded-[8px] border cursor-pointer transition-all text-left"
-                  style={
-                    ttsVoice === key
-                      ? { background: "rgba(124,92,252,0.12)", borderColor: "#7c5cfc" }
-                      : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }
-                  }
-                >
-                  <span
-                    className="text-[12px] font-semibold"
-                    style={{ color: ttsVoice === key ? "#a78bfa" : "#d8d8f0" }}
-                  >
-                    {label}
-                  </span>
-                  <span className="text-[10px] font-mono" style={{ color: ttsVoice === key ? "#7c5cfc" : "#8888a8" }}>
-                    {sub}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Advanced Options collapsible ── */}
+        {/* ── Step 5: Advanced Options (collapsed) ── */}
         <div className="rounded-[12px] border border-[rgba(255,255,255,0.12)] overflow-hidden">
-          {/* Toggle header */}
           <button
             onClick={() => setAdvancedOpen((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-3 bg-[#16162a] cursor-pointer border-0 text-left transition-colors hover:bg-[#1c1c32]"
           >
-            <span
-              className="text-[11px] font-bold tracking-widest uppercase text-[#8888a8]"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
+            <span className="text-[11px] font-bold tracking-widest uppercase text-[#8888a8]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
               Advanced Options
             </span>
-            <span
-              style={{
-                color: "#8888a8",
-                fontSize: 12,
-                transition: "transform 0.2s",
-                display: "inline-block",
-                transform: advancedOpen ? "rotate(180deg)" : "none",
-              }}
-            >
-              ▾
-            </span>
+            <span style={{ color: "#8888a8", fontSize: 12, display: "inline-block", transition: "transform 0.2s", transform: advancedOpen ? "rotate(180deg)" : "none" }}>▾</span>
           </button>
-
-          {/* Summary line when collapsed */}
           {!advancedOpen && (
             <div className="px-4 py-[10px] bg-[#13132a] border-t border-[rgba(255,255,255,0.08)]">
               <span className="text-[12px] text-[#8888a8]">{advancedSummary}</span>
             </div>
           )}
-
-          {/* Expanded content */}
           {advancedOpen && (
             <div className="px-4 pb-4 pt-3 bg-[#13132a] border-t border-[rgba(255,255,255,0.08)] flex flex-col gap-4">
-              {/* Row: Audience + Tone */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Audience</Label>
@@ -537,47 +625,22 @@ export default function AIGenerator() {
                   <Select value={tone} onChange={setTone} options={TONES} />
                 </div>
               </div>
-
-              {/* Row: Video Type */}
               <div>
                 <Label>Video Type</Label>
                 <Select value={videoType} onChange={setVideoType} options={VIDEO_TYPES} />
               </div>
-
-              {/* Row: Mode + Brand Color */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Mode</Label>
-                  <Select value={mode} onChange={setMode} options={MODES} />
-                </div>
-                <div>
-                  <Label>
-                    Brand Color{" "}
-                    <span className="text-[#8888a8] normal-case tracking-normal font-normal">(optional)</span>
-                  </Label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="color"
-                      value={brandColor || "#7c5cfc"}
-                      onChange={(e) => setBrandColor(e.target.value)}
-                      className="w-[36px] h-[36px] rounded-[6px] border border-[rgba(255,255,255,0.12)] cursor-pointer bg-[#21213a] p-[2px]"
-                    />
-                    <input
-                      value={brandColor}
-                      onChange={(e) => setBrandColor(e.target.value)}
-                      placeholder="#optional"
-                      className="flex-1 bg-[#21213a] border border-[rgba(255,255,255,0.12)] rounded-[8px] px-3 py-[8px] text-[14px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none transition-colors font-mono"
-                    />
-                    {brandColor && (
-                      <button
-                        onClick={() => setBrandColor("")}
-                        className="text-[#8888a8] hover:text-[#e8e8f0] text-[16px] leading-none border-0 bg-transparent cursor-pointer"
-                        title="Clear"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
+              <div>
+                <Label>
+                  Brand Color <span className="text-[#8888a8] normal-case tracking-normal font-normal">(optional)</span>
+                </Label>
+                <div className="flex gap-2 items-center">
+                  <input type="color" value={brandColor || "#7c5cfc"} onChange={(e) => setBrandColor(e.target.value)}
+                    className="w-[36px] h-[36px] rounded-[6px] border border-[rgba(255,255,255,0.12)] cursor-pointer bg-[#21213a] p-[2px]" />
+                  <input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} placeholder="#optional"
+                    className="flex-1 bg-[#21213a] border border-[rgba(255,255,255,0.12)] rounded-[8px] px-3 py-[8px] text-[14px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none transition-colors font-mono" />
+                  {brandColor && (
+                    <button onClick={() => setBrandColor("")} className="text-[#8888a8] hover:text-[#e8e8f0] text-[16px] leading-none border-0 bg-transparent cursor-pointer">×</button>
+                  )}
                 </div>
               </div>
             </div>
@@ -592,19 +655,24 @@ export default function AIGenerator() {
         )}
 
         {/* Generate button */}
-        <button
-          onClick={handleGenerate}
-          disabled={loading || !topic.trim()}
-          className="w-full rounded-[10px] py-[13px] text-[14px] font-bold transition-all"
-          style={{
-            fontFamily: "'Syne', sans-serif",
-            background: loading || !topic.trim() ? "#252540" : "#f0e040",
-            color: loading || !topic.trim() ? "#8888a8" : "#0f0f18",
-            cursor: loading || !topic.trim() ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Generating…" : "Generate Video"}
-        </button>
+        {(() => {
+          const disabled = loading
+            || (mode === "faceless"     && !topic.trim())
+            || (mode === "talking_head" && !thVideoFile);
+          return (
+            <button onClick={handlePreFlight} disabled={disabled}
+              className="w-full rounded-[10px] py-[13px] text-[14px] font-bold transition-all"
+              style={{
+                fontFamily: "'Syne', sans-serif",
+                background: disabled ? "#252540" : "#f0e040",
+                color:      disabled ? "#8888a8" : "#0f0f18",
+                cursor:     disabled ? "not-allowed" : "pointer",
+              }}
+            >
+              {loading ? "Generating…" : "Generate Video"}
+            </button>
+          );
+        })()}
 
         <div className="flex items-center gap-3">
           <div className="flex-1 h-[1px] bg-[rgba(255,255,255,0.09)]" />
@@ -612,15 +680,126 @@ export default function AIGenerator() {
           <div className="flex-1 h-[1px] bg-[rgba(255,255,255,0.09)]" />
         </div>
 
-        {/* Start from scratch */}
-        <button
-          onClick={handleScratch}
-          disabled={loading}
+        <button onClick={handleScratch} disabled={loading}
           className="w-full py-[9px] rounded-[8px] text-[13px] font-bold border border-[rgba(255,255,255,0.14)] text-[#b0b0cc] hover:text-[#e8e8f0] hover:border-[rgba(255,255,255,0.2)] bg-transparent cursor-pointer transition-all"
         >
           Start from Scratch — Empty Project
         </button>
       </div>
+
+      {/* ── Credit pre-flight modal ── */}
+      {creditModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(6,6,14,0.88)", backdropFilter: "blur(12px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}>
+          <div style={{
+            background: "#13132a", border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 18, padding: 32, width: "100%", maxWidth: 420,
+            display: "flex", flexDirection: "column", gap: 20,
+          }}>
+            {/* Header */}
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#7c5cfc", marginBottom: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                Credit Estimate
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0" }}>
+                {creditModal.canAfford ? "Ready to generate" : "Insufficient credits"}
+              </div>
+            </div>
+
+            {/* Breakdown table */}
+            <div style={{ background: "#0e0e1e", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)" }}>
+              {[
+                ["Base generation", creditModal.estimate.breakdown.base],
+                ...(creditModal.estimate.breakdown.tts > 0           ? [["AI voice (TTS)",       creditModal.estimate.breakdown.tts]]           : []),
+                ...(creditModal.estimate.breakdown.images > 0        ? [[`AI images (${creditModal.estimate.breakdown.beatCount} beats × 2)`, creditModal.estimate.breakdown.images]] : []),
+                ...(creditModal.estimate.breakdown.transcription > 0 ? [["Video transcription",   creditModal.estimate.breakdown.transcription]] : []),
+                ["Export", creditModal.estimate.breakdown.export],
+              ].map(([label, cost], i, arr) => (
+                <div key={label} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "11px 16px",
+                  borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                  fontSize: 14, color: "rgba(255,255,255,0.65)",
+                }}>
+                  <span>{label}</span>
+                  <span style={{ color: cost === "—" ? "#666" : "#a78bfa", fontWeight: 600 }}>{cost === "—" ? "—" : `⚡ ${cost}`}</span>
+                </div>
+              ))}
+              {/* Total */}
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "13px 16px", borderTop: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(124,92,252,0.07)",
+              }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#e8e8f0" }}>Estimated Total</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#7c5cfc" }}>⚡ {creditModal.estimate.total}</span>
+              </div>
+            </div>
+
+            {/* Balance row */}
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "12px 16px", borderRadius: 10,
+              background: creditModal.canAfford ? "rgba(34,197,94,0.08)" : "rgba(249,115,22,0.08)",
+              border: `1px solid ${creditModal.canAfford ? "rgba(34,197,94,0.2)" : "rgba(249,115,22,0.25)"}`,
+            }}>
+              <span style={{ fontSize: 14, color: "rgba(255,255,255,0.6)" }}>Your balance</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: creditModal.canAfford ? "#22c55e" : "#f97316" }}>
+                ⚡ {creditModal.balance}
+              </span>
+            </div>
+
+            {/* Insufficient warning */}
+            {!creditModal.canAfford && (
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.6 }}>
+                You need <strong style={{ color: "#f97316" }}>⚡ {creditModal.estimate.total - creditModal.balance} more credits</strong> to generate this video.
+                Disable AI images or TTS above to reduce cost, or purchase more credits.
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setCreditModal(null)}
+                style={{
+                  flex: 1, padding: "11px 0", borderRadius: 9, fontSize: 14, fontWeight: 600,
+                  background: "transparent", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#8888a8", cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+
+              {creditModal.canAfford ? (
+                <button
+                  onClick={handleGenerate}
+                  style={{
+                    flex: 2, padding: "11px 0", borderRadius: 9, fontSize: 14, fontWeight: 700,
+                    background: "#f0e040", border: "none", color: "#0f0f18", cursor: "pointer",
+                    fontFamily: "'Syne', sans-serif",
+                  }}
+                >
+                  Generate — ⚡ {creditModal.estimate.total}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setCreditModal(null)}
+                  style={{
+                    flex: 2, padding: "11px 0", borderRadius: 9, fontSize: 14, fontWeight: 700,
+                    background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.35)",
+                    color: "#f97316", cursor: "pointer",
+                  }}
+                >
+                  Purchase Credits
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

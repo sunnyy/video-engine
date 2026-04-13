@@ -152,6 +152,15 @@ export const useProjectStore = create((set, get) => ({
   },
 
   /* ── Commit — push ONE snapshot + save DB, call on slider mouseUp ── */
+  setAvatar: async ({ src, type = "video" }) => {
+    const current    = get().project;
+    const databaseId = get().databaseId;
+    if (!current) return;
+    const updatedProject = { ...current, avatar: { src, type } };
+    set({ project: updatedProject });
+    if (databaseId) await updateProject(databaseId, updatedProject);
+  },
+
   commitBeat: async (beatId) => {
     get()._pushHistory();
     const current    = get().project;
@@ -165,7 +174,8 @@ export const useProjectStore = create((set, get) => ({
     const current = get().project;
     if (!current) return;
     const newBeat = createRawBeat(current.beats.length, current.meta.mode);
-    const updatedProject = calculateTimeline({ ...current, beats: [...current.beats, newBeat] });
+    const reordered = [...current.beats, newBeat].map((beat, index) => ({ ...beat, order: index }));
+    const updatedProject = calculateTimeline({ ...current, beats: reordered });
     set({ project: updatedProject, activeBeatId: newBeat.id });
   },
 
@@ -180,10 +190,12 @@ export const useProjectStore = create((set, get) => ({
 
     const cloned   = JSON.parse(JSON.stringify(current.beats[index]));
     cloned.id      = crypto.randomUUID();
+    cloned.order   = index + 1;
     const newBeats = [...current.beats];
     newBeats.splice(index + 1, 0, cloned);
+    const reordered = newBeats.map((beat, i) => ({ ...beat, order: i }));
 
-    const updatedProject = calculateTimeline({ ...current, beats: newBeats });
+    const updatedProject = calculateTimeline({ ...current, beats: reordered });
     set({ project: updatedProject, activeBeatId: cloned.id });
     if (databaseId) await updateProject(databaseId, updatedProject);
   },
@@ -193,7 +205,8 @@ export const useProjectStore = create((set, get) => ({
     const current    = get().project;
     const databaseId = get().databaseId;
     if (!current) return;
-    const updatedProject = calculateTimeline({ ...current, beats: newBeats });
+    const reordered = newBeats.map((beat, index) => ({ ...beat, order: index }));
+    const updatedProject = calculateTimeline({ ...current, beats: reordered });
     set({ project: updatedProject });
     if (databaseId) await updateProject(databaseId, updatedProject);
   },
@@ -207,7 +220,8 @@ export const useProjectStore = create((set, get) => ({
     const filtered = current.beats.filter(b => b.id !== beatId);
     if (!filtered.length) return;
 
-    const updatedProject = calculateTimeline({ ...current, beats: filtered });
+    const reordered = filtered.map((beat, index) => ({ ...beat, order: index }));
+    const updatedProject = calculateTimeline({ ...current, beats: reordered });
     set({ project: updatedProject, activeBeatId: filtered[0].id });
     if (databaseId) await updateProject(databaseId, updatedProject);
   },

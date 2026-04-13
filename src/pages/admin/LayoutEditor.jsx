@@ -271,9 +271,8 @@ export default function LayoutEditor() {
           </div>
 
           {/* Zones panel */}
-          <div style={{ width:360, flexShrink:0, borderLeft:"1px solid rgba(255,255,255,0.07)",
-            overflowY:"auto", background:"#13131f" }}
-            className="flex flex-col">
+          <div style={{ width:560, flexShrink:0, borderLeft:"1px solid rgba(255,255,255,0.07)", overflowY:"auto", background:"#13131f" }}
+            className="flex flex-col p-10">
             <ZonesSection
               beat={activeBeat}
               project={project}

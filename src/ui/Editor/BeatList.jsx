@@ -15,10 +15,9 @@ function useIsAdmin() {
   return isAdmin;
 }
 
-
 /* ── Delete beat modal ── */
 function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
-  const isTts    = warnings.includes("tts");
+  const isTts = warnings.includes("tts");
   const isAvatar = warnings.includes("avatar");
   return (
     <div
@@ -33,12 +32,14 @@ function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
           borderColor: "rgba(248,113,113,0.3)",
           boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(248,113,113,0.1)",
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Icon + title */}
         <div className="flex items-center gap-3">
-          <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center shrink-0"
-            style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)" }}>
+          <div
+            className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center shrink-0"
+            style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)" }}
+          >
             <span style={{ fontSize: 18 }}>🗑️</span>
           </div>
           <div>
@@ -48,12 +49,12 @@ function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
         </div>
 
         {/* Beat info */}
-        <div className="px-3 py-[10px] rounded-[10px] flex flex-col gap-[4px]"
-          style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.12)" }}>
+        <div
+          className="px-3 py-[10px] rounded-[10px] flex flex-col gap-[4px]"
+          style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.12)" }}
+        >
           {beat.spoken && (
-            <div className="text-[12px] text-[#c0c0d8] leading-relaxed line-clamp-2">
-              "{beat.spoken}"
-            </div>
+            <div className="text-[12px] text-[#c0c0d8] leading-relaxed line-clamp-2">"{beat.spoken}"</div>
           )}
           <div className="flex items-center gap-2 mt-[2px]">
             <span className="text-[10px] font-mono text-[#55556a]">{Number(beat.duration_sec || 0).toFixed(1)}s</span>
@@ -64,8 +65,10 @@ function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
         {(isTts || isAvatar) && (
           <div className="flex flex-col gap-2">
             {isTts && (
-              <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
-                style={{ background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.15)" }}>
+              <div
+                className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+                style={{ background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.15)" }}
+              >
                 <span className="text-[15px] shrink-0 mt-[1px]">🎙️</span>
                 <div>
                   <div className="text-[12px] font-bold text-[#fbbf80] mb-[2px]">Voiceover will desync</div>
@@ -76,8 +79,10 @@ function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
               </div>
             )}
             {isAvatar && (
-              <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
-                style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.15)" }}>
+              <div
+                className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+                style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.15)" }}
+              >
                 <span className="text-[15px] shrink-0 mt-[1px]">🎥</span>
                 <div>
                   <div className="text-[12px] font-bold text-[#c4b5fd] mb-[2px]">Avatar video will break</div>
@@ -114,7 +119,7 @@ function DeleteBeatModal({ beat, warnings = [], onConfirm, onCancel }) {
 
 /* ── Duplicate warning modal ── */
 function DuplicateWarnModal({ warnings, onConfirm, onCancel }) {
-  const isTts    = warnings.includes("tts");
+  const isTts = warnings.includes("tts");
   const isAvatar = warnings.includes("avatar");
 
   return (
@@ -130,12 +135,14 @@ function DuplicateWarnModal({ warnings, onConfirm, onCancel }) {
           borderColor: "rgba(251,146,60,0.3)",
           boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(251,146,60,0.1)",
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Icon + title */}
         <div className="flex items-center gap-3">
-          <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center shrink-0"
-            style={{ background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.25)" }}>
+          <div
+            className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center shrink-0"
+            style={{ background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.25)" }}
+          >
             <span style={{ fontSize: 18 }}>⚠️</span>
           </div>
           <div>
@@ -147,20 +154,25 @@ function DuplicateWarnModal({ warnings, onConfirm, onCancel }) {
         {/* Warning items */}
         <div className="flex flex-col gap-2">
           {isTts && (
-            <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
-              style={{ background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.15)" }}>
+            <div
+              className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+              style={{ background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.15)" }}
+            >
               <span className="text-[16px] shrink-0 mt-[1px]">🎙️</span>
               <div>
                 <div className="text-[12px] font-bold text-[#fbbf80] mb-[2px]">Voiceover will desync</div>
                 <div className="text-[11px] text-[#9090b0] leading-relaxed">
-                  Your TTS audio was generated for the current beat order. After duplicating, regenerate voiceover to restore sync.
+                  Your TTS audio was generated for the current beat order. After duplicating, regenerate voiceover to
+                  restore sync.
                 </div>
               </div>
             </div>
           )}
           {isAvatar && (
-            <div className="flex gap-3 px-3 py-[10px] rounded-[10px]"
-              style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.15)" }}>
+            <div
+              className="flex gap-3 px-3 py-[10px] rounded-[10px]"
+              style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.15)" }}
+            >
               <span className="text-[16px] shrink-0 mt-[1px]">🎥</span>
               <div>
                 <div className="text-[12px] font-bold text-[#c4b5fd] mb-[2px]">Avatar video will break</div>
@@ -201,7 +213,7 @@ export default function BeatList({ setActiveTab, setBeatTab }) {
   const reorderBeats = useProjectStore((s) => s.reorderBeats);
   const deleteBeat = useProjectStore((s) => s.deleteBeat);
   const duplicateBeat = useProjectStore((s) => s.duplicateBeat);
-  const [dupWarn, setDupWarn]     = useState(null); // { beatId, warnings: [] }
+  const [dupWarn, setDupWarn] = useState(null); // { beatId, warnings: [] }
   const [deleteTarget, setDeleteTarget] = useState(null); // { beat, warnings: [] }
   const isAdmin = useIsAdmin();
 
@@ -219,7 +231,6 @@ export default function BeatList({ setActiveTab, setBeatTab }) {
 
   return (
     <div className="h-full overflow-y-auto bg-[#111118] border-r border-[rgba(255,255,255,0.06)] px-2 py-4 flex flex-col">
-
       {/* Header */}
       <div className="flex items-center justify-between px-2 mb-3">
         <h3
@@ -238,10 +249,7 @@ export default function BeatList({ setActiveTab, setBeatTab }) {
       </div>
 
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext
-          items={project.beats.map((b) => b.id)}
-          strategy={verticalListSortingStrategy}
-        >
+        <SortableContext items={project.beats.map((b) => b.id)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-[3px]">
             {project.beats.map((beat, index) => (
               <SortableBeat
@@ -265,7 +273,10 @@ export default function BeatList({ setActiveTab, setBeatTab }) {
         <DeleteBeatModal
           beat={deleteTarget.beat}
           warnings={deleteTarget.warnings}
-          onConfirm={() => { deleteBeat(deleteTarget.beat.id); setDeleteTarget(null); }}
+          onConfirm={() => {
+            deleteBeat(deleteTarget.beat.id);
+            setDeleteTarget(null);
+          }}
           onCancel={() => setDeleteTarget(null)}
         />
       )}
@@ -273,21 +284,29 @@ export default function BeatList({ setActiveTab, setBeatTab }) {
       {dupWarn && (
         <DuplicateWarnModal
           warnings={dupWarn.warnings}
-          onConfirm={() => { duplicateBeat(dupWarn.beatId); setDupWarn(null); }}
+          onConfirm={() => {
+            duplicateBeat(dupWarn.beatId);
+            setDupWarn(null);
+          }}
           onCancel={() => setDupWarn(null)}
         />
       )}
-
     </div>
   );
 }
 
 function SortableBeat({
-  beat, index, activeBeatId, setActiveBeat, setActiveTab,
-  onDeleteRequest, onDuplicateRequest, isAdmin, setBeatTab,
+  beat,
+  index,
+  activeBeatId,
+  setActiveBeat,
+  setActiveTab,
+  onDeleteRequest,
+  onDuplicateRequest,
+  isAdmin,
+  setBeatTab,
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: beat.id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: beat.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -355,7 +374,9 @@ function SortableBeat({
 
       {/* Info */}
       <div onClick={handleClick} className="flex flex-1 flex-col gap-[5px] min-w-0">
-        <span className={`text-[13px] font-medium ${isActive ? "text-[#BEBAD3]" : "text-[#514E5A]"} line-clamp-2 leading-[1.3]`}>
+        <span
+          className={`text-[13px] font-medium ${isActive ? "text-[#BEBAD3]" : "text-[#514E5A]"} line-clamp-2 leading-[1.3]`}
+        >
           {beat.spoken}
         </span>
 
@@ -366,32 +387,30 @@ function SortableBeat({
           >
             {duration}s
           </span>
-          {isAdmin ? (
-            beat.layout && (
-              <span
-                className="text-[10px] px-[5px] py-[1px] rounded-[4px] border border-[rgba(245,197,24,0.25)] bg-[rgba(245,197,24,0.07)] text-[#f5c518]"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                title={beat.layout}
-              >
-                {beat.layout}
-              </span>
-            )
-          ) : (
-            beat.transition?.type && beat.transition.type !== "cut" && (
-              <span
-                className="text-[10px] px-[5px] py-[1px] rounded-[4px] border border-[rgba(124,92,252,0.2)] bg-[rgba(124,92,252,0.08)] text-[#9d7fff]"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-              >
-                {beat.transition.type}
-              </span>
-            )
+
+          {beat.transition?.type && beat.transition.type !== "cut" && (
+            <span
+              className="text-[10px] px-[5px] py-[1px] rounded-[4px] border border-[rgba(124,92,252,0.2)] bg-[rgba(124,92,252,0.08)] text-[#9d7fff]"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {beat.transition.type}
+            </span>
+          )}
+
+          {isAdmin && beat.layout && (
+            <span
+              className="text-[10px] px-[5px] py-[1px] rounded-[4px] border border-[rgba(245,197,24,0.25)] bg-[rgba(245,197,24,0.07)] text-[#f5c518]"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              title={beat.layout}
+            >
+              {beat.layout}
+            </span>
           )}
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -422,7 +441,6 @@ function SortableBeat({
         >
           ✕
         </button>
-
       </div>
     </div>
   );
@@ -439,7 +457,7 @@ function Thumbnail({ beat }) {
 
   for (const zone of Object.values(zones)) {
     const content = zone.content || {};
-    const bg      = zone.background || {};
+    const bg = zone.background || {};
 
     if (content.kind === "asset" && content.asset?.src) {
       src = content.asset.src;
@@ -468,9 +486,7 @@ function Thumbnail({ beat }) {
     // Show layout label as colored block
     return (
       <div className="h-full w-full flex items-center justify-center bg-[#1c1c28]">
-        <span style={{ fontSize: 8, color: "#55556a", fontFamily: "monospace" }}>
-          {beat?.layout?.slice(0, 6)}
-        </span>
+        <span style={{ fontSize: 8, color: "#55556a", fontFamily: "monospace" }}>{beat?.layout?.slice(0, 6)}</span>
       </div>
     );
   }
@@ -478,9 +494,14 @@ function Thumbnail({ beat }) {
   if (isVideo) {
     return (
       <video
-        src={src} muted playsInline preload="metadata"
+        src={src}
+        muted
+        playsInline
+        preload="metadata"
         className="h-full w-full object-cover"
-        onLoadedMetadata={e => { e.target.currentTime = 0.5; }}
+        onLoadedMetadata={(e) => {
+          e.target.currentTime = 0.5;
+        }}
       />
     );
   }

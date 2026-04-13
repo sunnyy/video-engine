@@ -717,14 +717,67 @@ export default [
     intent: ["hook"], energy: ["high", "medium"], orientation: ["9:16"],
     assetCount: 2, textCount: 1, captionStrategy: "never",
     zones: [
-      { id:"z1", type:"asset", role:"hero_image", order:1, x:0, y:0, width:100, height:47, zIndex:1, start:0, end:null,
-        enterAnimation:"slideDownIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z2", type:"asset", role:"supporting_image", order:2, x:0, y:53, width:100, height:47, zIndex:1, start:0.2, end:null,
-        enterAnimation:"slideUpIn", exitAnimation:"none", style:{ objectFit:"cover" } },
-      { id:"z3", type:"text", role:"headline", maxChars:25, order:1, x:5, y:42, width:90, height:14, zIndex:3, start:0.3, end:null,
-        enterAnimation:"popIn", exitAnimation:"none",
-        style:{ fontSize:100, fontWeight:900, color:"#ffffff", textAlign:"center", textShadow:"0 2px 16px rgba(0,0,0,0.9)", letterSpacing:"-1px" } },
-    ],
+    {
+        "id": "z1",
+        "type": "asset",
+        "role": "hero_image",
+        "order": 1,
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 47,
+        "zIndex": 1,
+        "start": 0,
+        "end": null,
+        "enterAnimation": "slideDownIn",
+        "exitAnimation": "none",
+        "style": {
+            "objectFit": "cover"
+        }
+    },
+    {
+        "id": "z2",
+        "type": "asset",
+        "role": "supporting_image",
+        "order": 2,
+        "x": 0,
+        "y": 53,
+        "width": 100,
+        "height": 47,
+        "zIndex": 1,
+        "start": 0.2,
+        "end": null,
+        "enterAnimation": "slideUpIn",
+        "exitAnimation": "none",
+        "style": {
+            "objectFit": "cover"
+        }
+    },
+    {
+        "id": "z3",
+        "type": "text",
+        "role": "headline",
+        "maxChars": 25,
+        "order": 1,
+        "x": 5.8,
+        "y": 46.6,
+        "width": 90,
+        "height": 6,
+        "zIndex": 3,
+        "start": 0.3,
+        "end": null,
+        "enterAnimation": "popIn",
+        "exitAnimation": "none",
+        "style": {
+            "fontSize": 100,
+            "fontWeight": 900,
+            "color": "#ffffff",
+            "textAlign": "center",
+            "textShadow": "0 2px 16px rgba(0,0,0,0.9)",
+            "letterSpacing": "-1px"
+        }
+    }
+],
   },
 
 ];

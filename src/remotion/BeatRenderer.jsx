@@ -13,7 +13,7 @@ import SFXRenderer from "./elements/SFXRenderer.jsx";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { getLayoutDef } from "../core/registries/layoutRegistry.js";
 
-export default function BeatRenderer({ beat, project, previewMode = false }) {
+export default function BeatRenderer({ beat, project, previewMode = false, sequenceStartFrame = 0 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -22,8 +22,8 @@ export default function BeatRenderer({ beat, project, previewMode = false }) {
 
   const overlays = Array.isArray(beat.overlays) ? beat.overlays : [];
 
-  const beatStart = Math.floor((beat.start_sec || 0) * fps);
-  const beatEnd = Math.floor((beat.end_sec || 0) * fps);
+  const beatStart  = Math.floor((beat.start_sec || 0) * fps);
+  const beatEnd    = Math.floor((beat.end_sec   || 0) * fps);
   const localFrame = frame - beatStart;
   const beatFrames = beatEnd - beatStart;
 
@@ -60,6 +60,7 @@ export default function BeatRenderer({ beat, project, previewMode = false }) {
         project={project}
         layoutDef={layoutDef}
         previewMode={previewMode}
+        sequenceStartFrame={sequenceStartFrame}
       />
 
       <OverlayRenderer overlays={overlays} />

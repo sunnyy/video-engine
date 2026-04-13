@@ -16,6 +16,7 @@
     "@ffmpeg/util": "^0.12.2",
     "@remotion/bundler": "^4.0.431",
     "@remotion/player": "^4.0.427",
+    "@remotion/preload": "^4.0.448",
     "@remotion/renderer": "^4.0.431",
     "@supabase/supabase-js": "^2.97.0",
     "axios": "^1.13.6",

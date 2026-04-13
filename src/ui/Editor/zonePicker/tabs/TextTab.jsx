@@ -34,7 +34,7 @@ export default function TextTab({ onSelect }) {
         Pick a style — you can edit the text and tweak any setting after adding.
       </div>
 
-      <div className="grid grid-cols-2 gap-3 overflow-y-auto content-start">
+      <div className="grid grid-cols-2 gap-3 overflow-y-auto content-start ">
         {textStylePresets.map(preset => {
           const bg       = preset.preview?.bg || "#0d0d18";
           const st       = preset.style;
@@ -46,33 +46,33 @@ export default function TextTab({ onSelect }) {
             <div
               key={preset.id}
               onClick={() => handleSelect(preset)}
-              className="cursor-pointer rounded-[12px] overflow-hidden border border-[rgba(255,255,255,0.07)] hover:border-[#7c5cfc] transition-all group"
+              className="cursor-pointer rounded-[12px] overflow-hidden border border-[rgba(255,255,255,0.07)] hover:border-[#7c5cfc] transition-all group h-[90px]"
               style={{ background: bg }}
             >
               {/* Preview */}
-              <div className="h-[100px] flex items-center justify-center px-4 overflow-hidden">
-                <span style={{
-                  fontSize:      Math.max(14, fontSize * 0.55),
-                  fontWeight:    st.fontWeight || 700,
-                  fontFamily:    st.fontFamily || "inherit",
-                  color:         st.color || (isLight ? "#1a1a1a" : "#ffffff"),
-                  textAlign:     st.textAlign || "center",
-                  textShadow:    st.textShadow || "none",
-                  letterSpacing: st.letterSpacing || "normal",
-                  lineHeight:    st.lineHeight || 1.1,
-                  background:    st.background || "transparent",
-                  borderRadius:  st.borderRadius
-                    ? Math.round(st.borderRadius * 0.5) : 0,
-                  padding:       st.background && st.background !== "transparent"
-                    ? "4px 10px" : 0,
-                  display:       "block",
-                  maxWidth:      "100%",
-                  overflow:      "hidden",
-                  whiteSpace:    "nowrap",
-                  textOverflow:  "ellipsis",
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 12px", overflow: "hidden" }}>
+                <div style={{
+                  fontSize:         Math.max(13, fontSize * 0.52),
+                  fontWeight:       st.fontWeight || 700,
+                  fontFamily:       st.fontFamily || "inherit",
+                  color:            st.color === "transparent" ? "#ffffff" : (st.color || (isLight ? "#1a1a1a" : "#ffffff")),
+                  WebkitTextStroke: st.color === "transparent" && st.WebkitTextStroke ? st.WebkitTextStroke : undefined,
+                  textAlign:        "center",
+                  textShadow:       st.textShadow && st.textShadow !== "none" ? st.textShadow : undefined,
+                  textTransform:    st.textTransform || undefined,
+                  fontStyle:        st.fontStyle || undefined,
+                  letterSpacing:    st.letterSpacing || undefined,
+                  lineHeight:       st.lineHeight || 1.2,
+                  background:       st.background && st.background !== "transparent" ? st.background : undefined,
+                  borderRadius:     st.borderRadius ? Math.round(st.borderRadius * 0.5) : undefined,
+                  padding:          st.background && st.background !== "transparent" ? "3px 10px" : undefined,
+                  width:            "100%",
+                  overflow:         "hidden",
+                  whiteSpace:       "nowrap",
+                  textOverflow:     "ellipsis",
                 }}>
                   {preset.preview?.text || "Sample Text"}
-                </span>
+                </div>
               </div>
 
               {/* Label + metadata */}

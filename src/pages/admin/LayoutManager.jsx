@@ -272,7 +272,7 @@ export default function LayoutManager() {
               padding:"4px 10px", borderRadius:20, fontSize:10, cursor:"pointer",
               background: filterIntent===i ? `${IC[i]??"rgba(255,255,255,0.15)"}22` : "rgba(255,255,255,0.04)",
               border: `1px solid ${filterIntent===i ? (IC[i]??"rgba(255,255,255,0.3)") : "rgba(255,255,255,0.07)"}`,
-              color: filterIntent===i ? (IC[i]??"#e8e8f0") : "#555",
+              color: filterIntent===i ? (IC[i]??"#000") : "#555",
               fontWeight: filterIntent===i ? 700 : 400,
             }}>
             {i === "all" ? `all (${ALL.length})` : `${i} (${intentCounts[i]??0})`}

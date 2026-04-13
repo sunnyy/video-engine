@@ -375,29 +375,117 @@ export async function generateStructuredShort({
   audience         = "general",
   tone             = "bold",
   projectId        = null,
+  talkingHead      = null,
   onProgress       = null,
 }) {
   const report = (step) => { if (onProgress) onProgress(step); };
 
-  report("script");
+  let parsedScript;
 
-  const prompt = buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone });
+  /* ── Transcript path (Upload Video option) — focused Claude call for beat splitting + intent ── */
+  if (talkingHead?.type === "upload" && talkingHead.segments?.length) {
+    report("transcript");
 
-  /* ── API call ── */
-  const response = await serverFetch("/api/generate", {
-    method: "POST",
-    body:   JSON.stringify({ prompt }),
-  });
+    const rawSegments = talkingHead.segments;
 
-  if (!response.ok) {
-    throw new Error(`AI generation failed: ${response.status}`);
+    // Single focused OpenAI call — processes transcript into beats with intent + energy
+    const segmentsForPrompt = rawSegments.map(s => ({
+      start: s.start,
+      end:   s.end,
+      text:  s.text?.trim() || "",
+    }));
+
+    let aiBeats = null;
+    try {
+      const beatRes = await serverFetch("/api/process-beats", {
+        method: "POST",
+        body:   JSON.stringify({ segments: segmentsForPrompt }),
+      });
+      if (beatRes.ok) {
+        const beatData = await beatRes.json();
+        if (Array.isArray(beatData.beats) && beatData.beats.length > 0) {
+          aiBeats = beatData.beats;
+        }
+      }
+    } catch (e) {
+      console.warn("[transcript beats] OpenAI call failed, using raw segments:", e.message);
+    }
+
+    // Fallback: if Claude call failed, do a simple 2s merge pass
+    if (!aiBeats) {
+      const merged = [];
+      let pending  = null;
+      for (const seg of rawSegments) {
+        if (!pending) {
+          pending = { ...seg };
+        } else {
+          pending.text = (pending.text || "") + " " + (seg.text || "");
+          pending.end  = seg.end;
+        }
+        const dur = (pending.end ?? 0) - (pending.start ?? 0);
+        if (dur >= 2.0) { merged.push(pending); pending = null; }
+      }
+      if (pending) merged.push(pending);
+
+      const total = merged.length;
+      aiBeats = merged.map((seg, i) => {
+        const pos = total <= 1 ? 0.5 : i / (total - 1);
+        let intent, energy;
+        if      (i === 0)      { intent = "curiosity"; energy = 0.8; }
+        else if (i === total - 1) { intent = "urgency"; energy = 0.75; }
+        else if (pos < 0.35)   { intent = "shock";       energy = 0.7; }
+        else if (pos < 0.65)   { intent = "explanation"; energy = 0.5; }
+        else                   { intent = "reveal";       energy = 0.6; }
+        return { spoken: seg.text?.trim() || "", start_sec: seg.start ?? null, end_sec: seg.end ?? null, intent, energy, showAvatar: true, asset_hint: null };
+      });
+    }
+
+    const validIntentsSet = new Set(["shock","curiosity","proof","irony","reveal","empathy","urgency","explanation","contrast","punchline"]);
+    parsedScript = {
+      videoType,
+      language,
+      niche:        null,
+      emotionalArc: "Viewer follows the spoken content",
+      beats: aiBeats
+        .filter(b => b.spoken?.trim())
+        .map((b, i) => ({
+          order:          i,
+          spoken:         b.spoken.trim(),
+          intent:         validIntentsSet.has(b.intent) ? b.intent : "explanation",
+          energy:         typeof b.energy === "number" ? Math.min(1, Math.max(0, b.energy)) : 0.5,
+          visual_hint:    b.showAvatar === false ? "product" : "faces",
+          emphasis_words: [],
+          // Pass showAvatar and asset_hint through to buildBeatsFromScript
+          showAvatar:     b.showAvatar !== false, // default true
+          asset_hint:     b.showAvatar === false && b.asset_hint ? {
+            keywords:     Array.isArray(b.asset_hint.keywords) ? b.asset_hint.keywords : [],
+            prompt:       b.asset_hint.prompt || null,
+            visual_type:  ["entity","abstract","scene"].includes(b.asset_hint.visual_type) ? b.asset_hint.visual_type : "abstract",
+            search_query: b.asset_hint.search_query || null,
+          } : null,
+          start_sec:      b.start_sec ?? null,
+          end_sec:        b.end_sec   ?? null,
+        })),
+    };
+  } else {
+    /* ── Standard path — Claude script generation ── */
+    report("script");
+
+    const prompt = buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone });
+
+    const response = await serverFetch("/api/generate", {
+      method: "POST",
+      body:   JSON.stringify({ prompt }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI generation failed: ${response.status}`);
+    }
+
+    const data    = await response.json();
+    const rawText = data.text || data.content || JSON.stringify(data);
+    parsedScript  = parseAIResponse(rawText);
   }
-
-  const data = await response.json();
-
-  /* ── Parse AI output ── */
-  const rawText      = data.text || data.content || JSON.stringify(data);
-  const parsedScript = parseAIResponse(rawText);
 
   // Compute average energy across beats for palette selection
   const avgEnergy = parsedScript.beats.length
@@ -410,6 +498,7 @@ export async function generateStructuredShort({
     niche:      parsedScript.niche || null,
     energy:     avgEnergy,
     brandColor: brandColor || null,
+    language,
   });
 
   let beats = await buildBeatsFromScript({
@@ -549,7 +638,8 @@ export async function generateStructuredShort({
     let defAssetZones = (def?.zones || [])
       .filter(z => z.type === "asset")
       .filter(z => beat.zones[z.id]?.content?.kind !== "block")
-      .filter(z => !beat.zones[z.id]?.content?.asset?.src);
+      .filter(z => !beat.zones[z.id]?.content?.asset?.src)
+      .filter(z => z.id !== beat.avatarZone); // skip avatar zone — filled by talking head video
 
     // For text-only layouts, add a real full-bleed asset zone for the background image
     let injectedBgZoneId = null;
@@ -713,5 +803,7 @@ export async function generateStructuredShort({
     script, beats,
     meta: { videoType: parsedScript.videoType, language: parsedScript.language, emotionalArc: parsedScript.emotionalArc, brandColor, audience, tone, dna },
     audio: { tts: ttsAudio, music: autoMusicKey ? { musicKey: autoMusicKey, src: MUSIC_PREVIEW_URLS[autoMusicKey], volume: 0.12 } : null },
+    // Pass through talking head metadata so the project can store it
+    talkingHead: talkingHead ? { type: talkingHead.type, videoFileName: talkingHead.videoFileName || null } : null,
   };
 }

@@ -9,7 +9,8 @@
       "Bash(node -e ':*)",
       "Bash(node -e \"const r = require\\('./node_modules/remotion/package.json'\\); console.log\\(r.version\\)\")",
       "Bash(node -e \"const r = require\\('remotion'\\); console.log\\(Object.keys\\(r\\).filter\\(k => /video|audio/i.test\\(k\\)\\)\\)\")",
-      "Bash(node -e \"const r = require\\('remotion'\\); console.log\\(Object.keys\\(r\\).filter\\(k => /environ|render|player/i.test\\(k\\)\\)\\)\")"
+      "Bash(node -e \"const r = require\\('remotion'\\); console.log\\(Object.keys\\(r\\).filter\\(k => /environ|render|player/i.test\\(k\\)\\)\\)\")",
+      "Bash(node -e \"const d = JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/Sunny/Desktop/video-engine/temp.json','utf8'\\)\\); const b = d.beats?.[0] || d.project?.beats?.[0]; console.log\\(JSON.stringify\\(b, null, 2\\)\\);\")"
     ]
   }
 }

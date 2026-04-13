@@ -109,10 +109,15 @@ function assignBeatRole(index, total) {
 
 /* ── Transition ── */
 function chooseTransition(_layoutId, index, energy = 0.5, isLast = false) {
-  if (index === 0) return { type: "cut",     duration: 0.25 };
-  if (isLast)      return { type: "blurFade", duration: 0.3  };
+  if (index === 0) {
+    // Beat 0: transition IS the opening animation — pick based on energy
+    if (energy >= 0.75) return { type: "zoom",    duration: 12 };
+    if (energy >= 0.45) return { type: "fade",    duration: 12 };
+    return                     { type: "dissolve", duration: 14 };
+  }
+  if (isLast) return { type: "fade",     duration: 12 };
   const high = energy >= 0.75;
-  return { type: high ? "zoomCut" : "blurFade", duration: high ? 0.2 : 0.3 };
+  return { type: high ? "zoom" : "dissolve", duration: high ? 12 : 14 };
 }
 
 /* ── Enforce layout zones — respects new zone type schema ── */
@@ -388,19 +393,30 @@ export async function buildBeatsFromScript({
     const visual_hint = item.visual_hint || "none";
     const isLast      = index === total - 1;
 
-    const duration  = calculateDuration(spoken, intent, energy);
-    const start_sec = currentStart;
-    const end_sec   = start_sec + duration;
-    currentStart    = end_sec;
+    // Use Whisper timestamps if provided (talking head mode) — exact speech timing
+    // Otherwise fall back to WPM-based calculation
+    let start_sec, end_sec;
+    if (item.start_sec != null && item.end_sec != null) {
+      start_sec    = item.start_sec;
+      end_sec      = item.end_sec;
+      currentStart = end_sec;
+    } else {
+      const duration = calculateDuration(spoken, intent, energy);
+      start_sec    = currentStart;
+      end_sec      = start_sec + duration;
+      currentStart = end_sec;
+    }
 
     /* Visual plan */
-    const role         = assignBeatRole(index, total);
-    const hasImageHint = !!(item.asset_hint?.search_query || item.asset_hint?.prompt);
+    const role            = assignBeatRole(index, total);
+    const hasImageHint    = !!(item.asset_hint?.search_query || item.asset_hint?.prompt);
+    // Talking head + showAvatar: layout MUST have an asset zone so the avatar can be placed
+    const requireAssetZone = mode === "talking_head" && item.showAvatar !== false;
     const visual = planBeatVisual({
       mode, intent, energy, orientation,
       usedLayoutIds, lastMotion,
       brandColor, beatIndex: index,
-      hasImageHint, role,
+      hasImageHint, requireAssetZone, role,
       colorStory:  dna?.colorStory  || null,
       motionStyle: dna?.motionStyle || null,
       niche:       dna?.niche       || null,
@@ -420,24 +436,21 @@ export async function buildBeatsFromScript({
       const retry = pickBeatSFX(intent, energy, 0.4);
       if (retry?.key !== lastSFXKey) sfxCue = retry;
     }
-    if (sfxCue) lastSFXKey = sfxCue.key;
+    if (sfxCue) { lastSFXKey = sfxCue.key; sfxCue = { ...sfxCue, volume: 0.2 }; }
 
     const finalLayout = visual.layout;
     const zones = enforceLayoutZones(finalLayout, visual.zones || {});
 
-    // Talking head: decide which zone (if any) shows the avatar video for this beat.
-    // Rules: high-energy beats and data/visual beats use content; conversational/hook beats use face.
+    // Talking head: avatarZone determines which zone shows the talking head video.
+    // showAvatar=false → avatarZone=null (beat shows an image instead of the face).
+    // showAvatar=true (or unset) → avatarZone = first asset zone in the layout.
     let avatarZone = null;
-    if (mode === "talking_head") {
-      const FACE_INTENTS = new Set(["hook", "shock", "empathy", "reveal", "punchline", "urgency", "curiosity"]);
-      const DATA_INTENTS = new Set(["proof", "stat", "explanation", "contrast", "irony", "list", "visual_rest"]);
-      const wantsFace = FACE_INTENTS.has(intent) && energy < 0.8;
-      if (wantsFace && !DATA_INTENTS.has(intent)) {
-        // Pick the first primary_asset zone from the layout def
-        const layoutDef = getLayoutDef(finalLayout);
-        const firstAsset = layoutDef?.zones?.find(z => z.type === "asset");
-        avatarZone = firstAsset?.id ?? null;
-      }
+    if (mode === "talking_head" && item.showAvatar !== false) {
+      const layoutDef = getLayoutDef(finalLayout);
+      const avatarZoneDef = layoutDef?.zones?.find(z => z.type === "asset");
+      // Only assign avatarZone if the layout actually has an asset zone.
+      // null means no avatar shown this beat (e.g. text-only layouts like CenterHook).
+      avatarZone = avatarZoneDef?.id ?? null;
     }
 
     return {
@@ -469,7 +482,7 @@ export async function buildBeatsFromScript({
 
       spoken, intent, energy, visual_hint, language, role,
       asset_hint: item.asset_hint || null,
-      duration_sec: duration,
+      duration_sec: end_sec - start_sec,
       start_sec, end_sec,
     };
   });

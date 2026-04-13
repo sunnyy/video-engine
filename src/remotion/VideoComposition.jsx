@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import {
   AbsoluteFill,
   Sequence,
@@ -7,16 +7,15 @@ import {
   interpolate,
   Easing,
   Audio,
-  Html5Video,
-  useRemotionEnvironment,
 } from "remotion";
 
+import { preloadVideo, preloadImage } from "@remotion/preload";
 import BeatRenderer from "./BeatRenderer";
 import Caption from "./elements/Caption";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { transitionsRegistry } from "../core/registries/transitionsRegistry";
 import { buildVisualIdentity } from "../core/visualIdentityEngine";
-import { getLayoutDef } from "../core/registries/layoutRegistry.js";
+import { syncAvatarVideoFrame } from "./avatarVideoSingleton.js";
 
 /* FONT LOADER */
 
@@ -69,7 +68,6 @@ export default function VideoComposition({ project, previewMode = false }) {
 
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const { isRendering } = useRemotionEnvironment();
 
   const { beats, meta, audio, overlays } = project;
 
@@ -86,48 +84,45 @@ export default function VideoComposition({ project, previewMode = false }) {
   const avatar   = project.avatar;
   const talkMode = meta?.mode === "talking_head";
 
+  // Keep the singleton avatar video in sync with the Remotion timeline.
+  // Track whether frames are advancing to distinguish play vs pause.
+  const prevFrameRef = useRef(null);
+  useEffect(() => {
+    if (!talkMode || !avatar?.src) return;
+    const isPlaying = prevFrameRef.current !== null && frame !== prevFrameRef.current;
+    prevFrameRef.current = frame;
+    syncAvatarVideoFrame(frame, fps, isPlaying);
+  }, [frame, fps, talkMode, avatar?.src]);
 
-  // ── Avatar visual positioning ──────────────────────────────────────────────
-  // Resolve which zone in the current beat is the avatar zone, and compute its
-  // absolute pixel geometry so the global Html5Video can sit there.
-  const avatarInfo = useMemo(() => {
-    if (!talkMode || !avatar?.src || !currentBeat) return null;
+  // Preload all video assets up-front so the browser has them decoded before
+  // any beat Sequence tries to display them — eliminates the black-frame gap
+  // at beat transitions during preview playback.
+  // preloadVideo() returns a cleanup function; we collect and call them on unmount.
+  useEffect(() => {
+    const cleanups = [];
 
-    let zoneId = currentBeat.avatarZone;
-    if (zoneId === null) return null;  // user explicitly switched to Asset mode
-
-    const layoutDef = getLayoutDef(currentBeat.layout);
-
-    if (!zoneId) {
-      // auto-detect: first zone the layout marks as "avatar" type
-      zoneId = layoutDef?.zones?.find(z => z.type === "avatar")?.id ?? null;
+    // Avatar video (talking head mode)
+    if (talkMode && avatar?.src) {
+      cleanups.push(preloadVideo(avatar.src));
     }
-    if (!zoneId) return null;
 
-    const defZone  = layoutDef?.zones?.find(z => z.id === zoneId) || {};
-    const beatZone = (currentBeat.zones || {})[zoneId] || {};
-    const pad      = currentBeat.layoutPadding || 0;
+    // All unique assets across every beat
+    const seen = new Set();
+    beats.forEach(beat => {
+      Object.values(beat.zones || {}).forEach(zone => {
+        const src = zone.content?.asset?.src;
+        if (!src || seen.has(src)) return;
+        seen.add(src);
+        if (/\.(mp4|webm|mov)$/i.test(src)) {
+          cleanups.push(preloadVideo(src));
+        } else if (/\.(jpe?g|png|gif|webp|avif|svg)$/i.test(src)) {
+          cleanups.push(preloadImage(src));
+        }
+      });
+    });
 
-    const x    = beatZone.x      ?? defZone.x      ?? 0;
-    const y    = beatZone.y      ?? defZone.y      ?? 0;
-    const w    = beatZone.width  ?? defZone.width  ?? 100;
-    const h    = beatZone.height ?? defZone.height ?? 100;
-    const zIdx = beatZone.zIndex ?? defZone.zIndex ?? 2;
-
-    return {
-      style: {
-        position:     "absolute",
-        left:         pad > 0 ? `calc(${x}% + ${pad}px)` : `${x}%`,
-        top:          pad > 0 ? `calc(${y}% + ${pad}px)` : `${y}%`,
-        width:        pad > 0 ? `calc(${w}% - ${pad * 2}px)` : `${w}%`,
-        height:       pad > 0 ? `calc(${h}% - ${pad * 2}px)` : `${h}%`,
-        zIndex:       zIdx,
-        overflow:     "hidden",
-        borderRadius: beatZone.style?.borderRadius ?? defZone.style?.borderRadius ?? 0,
-      },
-      objectFit: beatZone.style?.objectFit ?? defZone.style?.objectFit ?? "cover",
-    };
-  }, [talkMode, avatar, currentBeat]);
+    return () => cleanups.forEach(fn => { try { fn(); } catch {} });
+  }, []);
 
   let musicVolume = audio?.music?.volume ?? 0.8;
 
@@ -158,221 +153,117 @@ export default function VideoComposition({ project, previewMode = false }) {
       {beats.map((beat, index) => {
 
         const baseStart    = Math.floor(beat.start_sec * fps);
-        const baseDuration = Math.floor((beat.end_sec - beat.start_sec) * fps);
+        const baseEnd      = Math.floor(beat.end_sec   * fps);
+        const baseDuration = baseEnd - baseStart; // avoids float subtraction rounding gaps
 
-        // This beat's own incoming transition
         const transitionKey = beat.transition?.type || "cut";
         const transition    = transitionsRegistry.beat[transitionKey]?.() || transitionsRegistry.beat.cut();
-        const inOverlap     = transition.duration || 0;
+        const intensity     = Math.min(5.0, Math.max(0.3, beat.transition?.intensity ?? 1.0));
+        const speed         = Math.min(5.0, Math.max(0.2, beat.transition?.speed     ?? 1.0));
+        // Minimum 5-frame overlap on every non-first beat: old beat stays visible while
+        // new beat mounts, preventing any black flash from React/asset first-paint delay.
+        const inOverlap     = index === 0 ? 0 : Math.max(5, Math.round((transition.duration || 0) * intensity / speed));
 
-        // Next beat's incoming transition — used to extend THIS beat so it stays rendered during the crossfade
         const nextBeat       = beats[index + 1];
         const nextTransKey   = nextBeat?.transition?.type || "cut";
         const nextTransition = nextBeat ? (transitionsRegistry.beat[nextTransKey]?.() || transitionsRegistry.beat.cut()) : null;
-        const outOverlap     = nextTransition?.duration || 0;
+        const nextIntensity  = Math.min(5.0, Math.max(0.3, nextBeat?.transition?.intensity ?? 1.0));
+        const nextSpeed      = Math.min(3.0, Math.max(0.2, nextBeat?.transition?.speed     ?? 1.0));
+        const outOverlap     = nextBeat ? Math.round((nextTransition?.duration || 0) * nextIntensity / nextSpeed) : 0;
 
-        // Start earlier if this beat has an incoming overlap; stay longer if next beat crossfades over us
         const startFrame     = index === 0 ? baseStart : baseStart - inOverlap;
         const durationFrames = baseDuration + (index === 0 ? 0 : inOverlap) + outOverlap;
+        const localFrame     = frame - startFrame;
 
-        const localFrame = frame - startFrame;
-
-        // ── INCOMING transition style (applied to this beat as it enters) ──
         let inStyle = {};
         let inTransformParts = [];
+        let inDipOverlay = null;
 
         if (inOverlap > 0) {
           const progress = interpolate(localFrame, [0, inOverlap], [0, 1], {
             extrapolateLeft: "clamp", extrapolateRight: "clamp",
             easing: Easing.out(Easing.cubic),
           });
-
           switch (transition.type) {
-            case "fade":
-            case "dissolve":
-              inStyle.opacity = progress;
-              break;
-            case "slideLeft":
-              inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width,0])}px)`);
-              break;
-            case "slideRight":
-              inTransformParts.push(`translateX(${interpolate(progress,[0,1],[-meta.width,0])}px)`);
-              break;
-            case "slideUp":
-              inTransformParts.push(`translateY(${interpolate(progress,[0,1],[meta.height,0])}px)`);
-              break;
-            case "slideDown":
-              inTransformParts.push(`translateY(${interpolate(progress,[0,1],[-meta.height,0])}px)`);
-              break;
+            case "fade": case "dissolve": inStyle.opacity = progress; break;
+            case "slideLeft":  inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width,0])}px)`); break;
+            case "slideRight": inTransformParts.push(`translateX(${interpolate(progress,[0,1],[-meta.width,0])}px)`); break;
+            case "slideUp":    inTransformParts.push(`translateY(${interpolate(progress,[0,1],[meta.height,0])}px)`); break;
+            case "slideDown":  inTransformParts.push(`translateY(${interpolate(progress,[0,1],[-meta.height,0])}px)`); break;
             case "zoom":
-              inTransformParts.push(`scale(${interpolate(progress,[0,1],[1.55,1])})`);
+              inTransformParts.push(`scale(${interpolate(progress,[0,1],[1 + 0.55 * intensity, 1])})`);
               inStyle.opacity = interpolate(progress,[0,0.4,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
-            case "dipBlack":
-            case "dipWhite":
-              inStyle.opacity = progress;
-              break;
+            case "dipBlack": inDipOverlay = `rgba(0,0,0,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
+            case "dipWhite": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
             case "whipPan":
-              inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width * 0.4, 0])}px)`);
+              inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width * 0.4 * intensity, 0])}px)`);
               inStyle.opacity = interpolate(progress,[0,0.3,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
             case "spin":
-              inTransformParts.push(`rotate(${interpolate(progress,[0,1],[180,0])}deg)`);
+              inTransformParts.push(`rotate(${interpolate(progress,[0,1],[180 * intensity, 0])}deg)`);
               inStyle.opacity = progress;
               break;
             case "glitch":
               inTransformParts.push(`scale(${interpolate(progress,[0,0.5,1],[1.08,1.02,1])})`);
               inStyle.opacity = interpolate(progress,[0,0.2,0.4,0.6,0.8,1],[0,1,0.6,1,0.8,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
-            case "flash":
-              inStyle.opacity = interpolate(progress,[0,0.15,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
-              break;
-            default:
-              break;
+            case "flash": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,0.25,1],[1,0,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
+            default: inStyle.opacity = progress; break; // crossfade for cut/unknown: new beat fades in so old beat shows through
           }
         }
-
         if (inTransformParts.length) inStyle.transform = inTransformParts.join(" ");
 
-        // ── INTRO transition (first beat only — how the video opens) ──
-        if (index === 0) {
-          const introKey = beat.introTransition || "none";
-          const INTRO_FRAMES = Math.round(fps * 0.5); // 0.5s opening
-          if (introKey !== "none" && introKey !== "cut" && localFrame < INTRO_FRAMES) {
-            const introProgress = interpolate(localFrame, [0, INTRO_FRAMES], [0, 1], {
-              extrapolateLeft: "clamp", extrapolateRight: "clamp",
-              easing: Easing.out(Easing.cubic),
-            });
-            const introParts = [];
-            switch (introKey) {
-              case "fadeIn":
-                inStyle.opacity = introProgress;
-                break;
-              case "zoomIn":
-                introParts.push(`scale(${interpolate(introProgress, [0, 1], [1.45, 1])})`);
-                inStyle.opacity = interpolate(introProgress,[0,0.4,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
-                break;
-              case "slideUp":
-                introParts.push(`translateY(${interpolate(introProgress, [0, 1], [meta.height * 0.06, 0])}px)`);
-                inStyle.opacity = introProgress;
-                break;
-              case "slideDown":
-                introParts.push(`translateY(${interpolate(introProgress, [0, 1], [-meta.height * 0.06, 0])}px)`);
-                inStyle.opacity = introProgress;
-                break;
-              case "flash":
-                inStyle.opacity = interpolate(introProgress, [0, 0.15, 1], [0, 1, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-                break;
-              default:
-                break;
-            }
-            if (introParts.length) {
-              inStyle.transform = introParts.join(" ") + (inStyle.transform ? ` ${inStyle.transform}` : "");
-            }
-          }
-        }
-
-        // ── OUTGOING transition style (applied to this beat as the next one enters over it) ──
         let outStyle = {};
         let dipOverlay = null;
-        const outStart = durationFrames - outOverlap; // local frame when outgoing starts
+        const outStart = durationFrames - outOverlap;
 
         if (outOverlap > 0 && nextTransition) {
           const outProgress = interpolate(localFrame, [outStart, durationFrames], [0, 1], {
             extrapolateLeft: "clamp", extrapolateRight: "clamp",
             easing: Easing.out(Easing.cubic),
           });
-
           switch (nextTransition.type) {
-            case "fade":
-            case "dissolve":
-              // Stay fully opaque — incoming beat fades in on top.
-              // Fading both simultaneously causes a black flash (combined opacity < 1).
-              break;
+            case "fade": case "dissolve": break;
             case "zoom":
-              // Shrink back as incoming punches in
               outStyle.transform = `scale(${interpolate(outProgress,[0,1],[1,0.82])})`;
               outStyle.opacity   = interpolate(outProgress,[0.5,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
-            case "dipBlack":
-              dipOverlay = `rgba(0,0,0,${outProgress})`;
-              break;
-            case "dipWhite":
-              dipOverlay = `rgba(255,255,255,${outProgress})`;
-              break;
-            case "slideLeft":
-            case "slideRight":
-            case "slideUp":
-            case "slideDown":
-              // Stay fully opaque — incoming slides in on top, no gap needed
-              break;
-            case "whipPan":
-              outStyle.opacity = interpolate(outProgress,[0.7,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
-              break;
-            case "spin":
-              // Stay opaque — incoming spins in on top
-              break;
-            case "glitch":
-              outStyle.opacity = interpolate(outProgress,[0,0.2,0.4,0.6,0.8,1],[1,0.6,1,0.6,0.8,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
-              break;
-            case "flash":
-              dipOverlay = `rgba(255,255,255,${interpolate(outProgress,[0,0.3,1],[0,1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`;
-              break;
-            default:
-              break;
+            case "dipBlack": dipOverlay = `rgba(0,0,0,${outProgress})`; break;
+            case "dipWhite": dipOverlay = `rgba(255,255,255,${outProgress})`; break;
+            case "slideLeft": case "slideRight": case "slideUp": case "slideDown": break;
+            case "whipPan": outStyle.opacity = interpolate(outProgress,[0.7,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" }); break;
+            case "spin": break;
+            case "glitch": outStyle.opacity = interpolate(outProgress,[0,0.2,0.4,0.6,0.8,1],[1,0.6,1,0.6,0.8,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" }); break;
+            case "flash": dipOverlay = `rgba(255,255,255,${interpolate(outProgress,[0,0.3,1],[0,1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
+            default: break;
           }
         }
 
-        // No zIndex on the beat wrapper — this is intentional.
-        // Without an explicit zIndex, the beat AbsoluteFill creates no stacking context
-        // during normal (cut) transitions, so zone zIndexes (assets z=1-2, text z=3-4)
-        // float up and compete directly with the global avatar video (z = avatarZone.zIndex).
-        // During animated transitions (fade/slide), opacity/transform naturally create a
-        // stacking context but with z-order "auto" (≈ 0), so the global avatar (explicit z)
-        // remains visible above the transitioning beat — the person keeps talking through cuts.
         const isInOutgoing = localFrame >= outStart && outOverlap > 0;
-        const finalStyle = isInOutgoing
-          ? { ...inStyle, ...outStyle }
-          : { ...inStyle };
+        const finalStyle = isInOutgoing ? { ...inStyle, ...outStyle } : { ...inStyle };
+
+        const dipNode = dipOverlay && (
+          <AbsoluteFill style={{ background: dipOverlay, pointerEvents: "none", zIndex: 99 }} />
+        );
+        const inDipNode = inDipOverlay && (
+          <AbsoluteFill style={{ background: inDipOverlay, pointerEvents: "none", zIndex: 99 }} />
+        );
 
         return (
           <Sequence key={beat.id} from={startFrame} durationInFrames={durationFrames}>
-            <AbsoluteFill style={finalStyle}>
-              <BeatRenderer beat={beat} project={project} previewMode={previewMode} />
-              {dipOverlay && (
-                <AbsoluteFill style={{ background: dipOverlay, pointerEvents: "none", zIndex: 99 }} />
-              )}
+            <AbsoluteFill style={{ ...finalStyle, zIndex: index + 1 }}>
+              <BeatRenderer beat={beat} project={project} previewMode={previewMode} sequenceStartFrame={startFrame} />
+              {dipNode}
+              {inDipNode}
             </AbsoluteFill>
           </Sequence>
         );
-
       })}
 
-      {/* ── Global avatar visual ────────────────────────────────────────────
-          Single Html5Video (muted) positioned at the current beat's avatar zone.
-          Never remounts across beat transitions → the nativeAudioRef audio element
-          plays uninterrupted alongside it.
-          Hidden (0×0) when no beat has an avatar zone active. */}
-      {/* Global avatar — always mounted so the video element never remounts and audio
-          plays continuously. Positioned at the avatar zone when active; 0×0 hidden
-          otherwise so the audio track keeps running without any visual presence. */}
+      {/* Avatar audio — single persistent Audio element so audio never restarts on beat change. */}
       {talkMode && avatar?.src && (
-        <div style={avatarInfo?.style ?? {
-          position: "absolute", width: 0, height: 0,
-          overflow: "hidden", pointerEvents: "none",
-        }}>
-          <Html5Video
-            src={avatar.src}
-            muted={isRendering}
-            style={{ width: "100%", height: "100%", objectFit: avatarInfo?.objectFit ?? "cover" }}
-          />
-        </div>
-      )}
-
-      {/* Render-mode audio — Remotion extracts the avatar audio track here.
-          Not rendered in preview (nativeAudioRef handles that instead). */}
-      {isRendering && talkMode && avatar?.src && (
-        <Audio key={`avatar-render-${avatar.src}`} src={avatar.src} volume={1} />
+        <Audio key={`avatar-audio-${avatar.src}`} src={avatar.src} volume={1} />
       )}
 
       {videoOverlays.length > 0 && (

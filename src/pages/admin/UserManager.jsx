@@ -1,83 +1,289 @@
 /**
  * UserManager.jsx
+ * Users list with search, sort, edit user modal, credit history.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import AdminLayout from "./AdminLayout";
 import { serverFetch } from "../../services/serverApi";
 
-function CreditModal({ userId, onClose, onSuccess }) {
-  const [amount,  setAmount]  = useState("");
-  const [reason,  setReason]  = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
+/* ── helpers ── */
+function fmtDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+}
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const n = parseInt(amount, 10);
-    if (!n || n <= 0) { setError("Enter a positive number."); return; }
-    setLoading(true);
-    setError("");
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/* ── Edit User Modal ── */
+function EditUserModal({ user, onClose, onUpdated }) {
+  const [tab, setTab]           = useState("profile"); // "profile" | "credits" | "history"
+  const [role, setRole]         = useState(user.role || "user");
+  const [addAmt, setAddAmt]     = useState("");
+  const [setAmt, setSetAmt]     = useState("");
+  const [reason, setReason]     = useState("");
+  const [history, setHistory]   = useState([]);
+  const [histLoading, setHistLoading] = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState("");
+
+  // Load transaction history when tab switches to history
+  useEffect(() => {
+    if (tab !== "history") return;
+    setHistLoading(true);
+    serverFetch(`/api/admin/user-transactions/${user.id}`)
+      .then(async r => {
+        const text = await r.text();
+        if (!r.ok) throw new Error(`Server error ${r.status}: ${text.slice(0, 120)}`);
+        try { return JSON.parse(text); } catch { throw new Error("Invalid response from server"); }
+      })
+      .then(data => setHistory(Array.isArray(data) ? data : []))
+      .catch(e => setError(e.message))
+      .finally(() => setHistLoading(false));
+  }, [tab, user.id]);
+
+  function clearMessages() { setError(""); setSuccess(""); }
+
+  async function handleSaveProfile() {
+    clearMessages();
+    setSaving(true);
     try {
-      const res = await serverFetch("/api/admin/add-credits", {
+      const res = await serverFetch("/api/admin/update-user", {
         method: "POST",
-        body: JSON.stringify({ userId, amount: n, reason }),
+        body: JSON.stringify({ userId: user.id, role }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed"); }
-      onSuccess(userId, n);
-      onClose();
-    } catch (err) {
-      setError(err.message);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed");
+      setSuccess("Role updated.");
+      onUpdated({ ...user, role });
+    } catch (e) {
+      setError(e.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
+  async function handleAddCredits() {
+    clearMessages();
+    const n = parseInt(addAmt, 10);
+    if (!n || n <= 0) { setError("Enter a positive number."); return; }
+    setSaving(true);
+    try {
+      const res = await serverFetch("/api/admin/add-credits", {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id, amount: n, reason: reason || undefined }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed");
+      setSuccess(`+${n} credits added.`);
+      setAddAmt(""); setReason("");
+      onUpdated({ ...user, balance: (user.balance ?? 0) + n, lifetime_credits: (user.lifetime_credits ?? 0) + n });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSetBalance() {
+    clearMessages();
+    const n = parseInt(setAmt, 10);
+    if (isNaN(n) || n < 0) { setError("Enter a non-negative number."); return; }
+    setSaving(true);
+    try {
+      const res = await serverFetch("/api/admin/set-balance", {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id, balance: n, reason: reason || undefined }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed");
+      setSuccess(`Balance set to ${n}.`);
+      setSetAmt(""); setReason("");
+      onUpdated({ ...user, balance: n, lifetime_credits: d.lifetime_credits ?? user.lifetime_credits });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const txColor = (type) => {
+    if (type === "debit" || type === "deduction") return "#f97316";
+    if (type?.includes("admin")) return "#e879f9";
+    return "#22c55e";
+  };
+
+  const TABS = [
+    { id: "profile", label: "Profile" },
+    { id: "credits", label: "Credits" },
+    { id: "history", label: "History" },
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000]">
-      <form onSubmit={handleSubmit}
-        className="bg-[#16161f] border border-white/10 rounded-xl p-7 w-[360px] flex flex-col gap-4">
-        <h3 className="text-xl font-bold m-0">Add Credits</h3>
-        <div className="text-sm text-[#888] font-mono break-all">{userId}</div>
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[1000]" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-[#16161f] border border-white/10 rounded-2xl w-[480px] max-h-[85vh] flex flex-col overflow-hidden">
 
-        <label className="text-base text-[#ccc]">Amount
-          <input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)}
-            className="block w-full mt-1.5 px-3 py-2 bg-[#0d0d14] border border-white/10 rounded-lg text-white text-base outline-none focus:border-[#7c5cfc]" />
-        </label>
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-white/[0.06]">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xl font-bold text-white">{user.email}</div>
+              <div className="text-sm text-[#666] font-mono mt-0.5">{user.id}</div>
+            </div>
+            <button onClick={onClose} className="text-[#555] hover:text-white text-xl leading-none mt-0.5 cursor-pointer">✕</button>
+          </div>
 
-        <label className="text-base text-[#ccc]">Reason (optional)
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. support refund"
-            className="block w-full mt-1.5 px-3 py-2 bg-[#0d0d14] border border-white/10 rounded-lg text-white text-base outline-none focus:border-[#7c5cfc]" />
-        </label>
-
-        {error && <div className="text-[#f97316] text-base">{error}</div>}
-
-        <div className="flex gap-2.5 justify-end">
-          <button type="button" onClick={onClose}
-            className="px-4 py-2 bg-transparent border border-white/10 rounded-lg text-[#aaa] text-base cursor-pointer hover:bg-white/5">
-            Cancel
-          </button>
-          <button type="submit" disabled={loading}
-            className="px-4 py-2 bg-[#7c5cfc] border-none rounded-lg text-white font-semibold text-base cursor-pointer disabled:opacity-60">
-            {loading ? "Adding…" : "Add Credits"}
-          </button>
+          {/* Tab bar */}
+          <div className="flex gap-1 mt-4">
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => { setTab(t.id); clearMessages(); }}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-colors
+                  ${tab === t.id ? "bg-[#7c5cfc]/20 text-[#a78bfa] border border-[#7c5cfc]/40" : "text-[#666] hover:text-[#aaa]"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </form>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+
+          {/* Messages */}
+          {error   && <div className="bg-[#f97316]/10 border border-[#f97316]/30 rounded-lg px-4 py-2.5 text-[#f97316] text-sm mb-4">{error}</div>}
+          {success && <div className="bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-lg px-4 py-2.5 text-[#22c55e] text-sm mb-4">{success}</div>}
+
+          {/* Profile tab */}
+          {tab === "profile" && (
+            <div className="flex flex-col gap-5">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-white/[0.03] rounded-xl p-3">
+                  <div className="text-[#666] mb-1">Joined</div>
+                  <div className="text-[#ccc]">{fmtDate(user.created_at)}</div>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-3">
+                  <div className="text-[#666] mb-1">Last Sign In</div>
+                  <div className="text-[#ccc]">{fmtDate(user.last_sign_in_at)}</div>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-3">
+                  <div className="text-[#666] mb-1">Balance</div>
+                  <div className="text-[#7c5cfc] font-bold text-base">⚡ {user.balance ?? "—"}</div>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl p-3">
+                  <div className="text-[#666] mb-1">Lifetime Credits</div>
+                  <div className="text-[#aaa] font-semibold text-base">{user.lifetime_credits ?? "—"}</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-[#ccc] block mb-2">Role</label>
+                <select value={role} onChange={e => setRole(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#0d0d14] border border-white/10 rounded-lg text-white text-sm outline-none focus:border-[#7c5cfc] cursor-pointer">
+                  <option value="user">user</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+
+              <button onClick={handleSaveProfile} disabled={saving || role === user.role}
+                className="w-full py-2.5 bg-[#7c5cfc] rounded-lg text-white font-semibold text-sm cursor-pointer disabled:opacity-50 hover:bg-[#6d4de8] transition-colors">
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          )}
+
+          {/* Credits tab */}
+          {tab === "credits" && (
+            <div className="flex flex-col gap-6">
+              {/* Current balance display */}
+              <div className="bg-white/[0.03] rounded-xl p-4 flex items-center justify-between">
+                <div className="text-sm text-[#888]">Current Balance</div>
+                <div className="text-2xl font-bold text-[#7c5cfc]">⚡ {user.balance ?? 0}</div>
+              </div>
+
+              {/* Add credits */}
+              <div className="flex flex-col gap-3">
+                <div className="text-sm font-semibold text-[#ccc]">Add Credits</div>
+                <input type="number" min="1" placeholder="Amount to add" value={addAmt}
+                  onChange={e => setAddAmt(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#0d0d14] border border-white/10 rounded-lg text-white text-sm outline-none focus:border-[#22c55e]" />
+                <input type="text" placeholder="Reason (optional)" value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#0d0d14] border border-white/10 rounded-lg text-white text-sm outline-none focus:border-[#22c55e]" />
+                <button onClick={handleAddCredits} disabled={saving}
+                  className="py-2.5 bg-[#22c55e]/20 border border-[#22c55e]/40 rounded-lg text-[#22c55e] font-semibold text-sm cursor-pointer disabled:opacity-50 hover:bg-[#22c55e]/30 transition-colors">
+                  {saving ? "…" : "+ Add Credits"}
+                </button>
+              </div>
+
+              <div className="border-t border-white/[0.06]" />
+
+              {/* Set balance */}
+              <div className="flex flex-col gap-3">
+                <div className="text-sm font-semibold text-[#ccc]">Override Balance</div>
+                <div className="text-xs text-[#555]">Directly sets the balance to an exact value and logs the change.</div>
+                <input type="number" min="0" placeholder="New balance" value={setAmt}
+                  onChange={e => setSetAmt(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#0d0d14] border border-white/10 rounded-lg text-white text-sm outline-none focus:border-[#e879f9]" />
+                <button onClick={handleSetBalance} disabled={saving}
+                  className="py-2.5 bg-[#e879f9]/15 border border-[#e879f9]/30 rounded-lg text-[#e879f9] font-semibold text-sm cursor-pointer disabled:opacity-50 hover:bg-[#e879f9]/25 transition-colors">
+                  {saving ? "…" : "Set Balance"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* History tab */}
+          {tab === "history" && (
+            <div>
+              {histLoading ? (
+                <div className="text-[#555] text-sm animate-pulse py-4">Loading transactions…</div>
+              ) : history.length === 0 ? (
+                <div className="text-[#444] text-sm py-4">No transactions found.</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {history.map((tx, i) => (
+                    <div key={tx.id || i} className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3 flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-[#aaa] truncate">{tx.description || tx.action || tx.type}</div>
+                        <div className="text-xs text-[#555] mt-0.5">{fmtDateTime(tx.created_at)}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-base font-semibold" style={{ color: txColor(tx.type) }}>
+                          {tx.amount > 0 ? "+" : ""}{tx.amount}
+                        </div>
+                        {tx.balance_after !== null && tx.balance_after !== undefined && (
+                          <div className="text-xs text-[#444]">→ {tx.balance_after}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
+/* ── Main ── */
 export default function UserManager() {
   const [users,   setUsers]   = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState(null);
+  const [search,  setSearch]  = useState("");
+  const [sortBy,  setSortBy]  = useState("created_at");
+  const [sortDir, setSortDir] = useState("desc");
+  const [editUser, setEditUser] = useState(null);
 
   useEffect(() => {
     async function load() {
       try {
         const res = await serverFetch("/api/admin/users");
         if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        setUsers(data);
+        setUsers(await res.json());
       } catch (e) {
         console.error("[admin] UserManager load failed:", e.message);
       } finally {
@@ -87,74 +293,125 @@ export default function UserManager() {
     load();
   }, []);
 
-  function handleCreditSuccess(userId, amount) {
-    setUsers(prev => prev.map(u =>
-      u.id === userId
-        ? { ...u, balance: (u.balance ?? 0) + amount, lifetime_credits: (u.lifetime_credits ?? 0) + amount }
-        : u
-    ));
+  function handleUpdated(updated) {
+    setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
+    if (editUser?.id === updated.id) setEditUser(u => ({ ...u, ...updated }));
+  }
+
+  /* Sort + filter */
+  const filtered = users
+    .filter(u => !search || u.email?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      let va = a[sortBy] ?? "";
+      let vb = b[sortBy] ?? "";
+      if (sortBy === "balance" || sortBy === "lifetime_credits") {
+        va = va ?? -1; vb = vb ?? -1;
+        return sortDir === "asc" ? va - vb : vb - va;
+      }
+      return sortDir === "asc"
+        ? String(va).localeCompare(String(vb))
+        : String(vb).localeCompare(String(va));
+    });
+
+  function toggleSort(col) {
+    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortBy(col); setSortDir("desc"); }
+  }
+
+  function SortTh({ col, children }) {
+    const active = sortBy === col;
+    return (
+      <th onClick={() => toggleSort(col)}
+        className={`px-3 py-2 cursor-pointer select-none whitespace-nowrap font-medium hover:text-white transition-colors
+          ${active ? "text-[#a78bfa]" : "text-[#555]"}`}>
+        {children} {active ? (sortDir === "asc" ? "↑" : "↓") : ""}
+      </th>
+    );
   }
 
   return (
     <AdminLayout>
-      <h1 className="text-4xl font-bold mb-2">Users</h1>
-      <p className="text-[#aaa] text-lg mb-10">
-        {users.length} user{users.length !== 1 ? "s" : ""} from{" "}
-        <code className="text-[#7c5cfc]">auth.users</code>
+      <div className="flex items-center justify-between mb-2 gap-4 flex-wrap">
+        <h1 className="text-4xl font-bold">Users</h1>
+        <div className="text-sm text-[#666]">{filtered.length} / {users.length} users</div>
+      </div>
+      <p className="text-[#888] text-lg mb-6">
+        Manage roles, credits, and view transaction history.
       </p>
 
+      {/* Search bar */}
+      <div className="flex gap-3 mb-6 flex-wrap">
+        <input
+          type="text"
+          placeholder="Search by email…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-[220px] px-4 py-2.5 bg-[#111118] border border-white/[0.08] rounded-xl text-white text-base outline-none focus:border-[#7c5cfc] placeholder-[#444]"
+        />
+        {search && (
+          <button onClick={() => setSearch("")}
+            className="px-4 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl text-[#888] text-sm cursor-pointer hover:text-white transition-colors">
+            Clear
+          </button>
+        )}
+      </div>
+
       {loading ? (
-        <div className="text-[#888] text-lg">Loading...</div>
+        <div className="text-[#666] text-xl animate-pulse">Loading…</div>
       ) : (
-        <table className="w-full border-collapse text-base">
-          <thead>
-            <tr className="border-b border-white/[0.08] text-[#888] text-left">
-              <th className="px-3 py-2">Email</th>
-              <th className="px-3 py-2">Role</th>
-              <th className="px-3 py-2">Balance</th>
-              <th className="px-3 py-2">Lifetime</th>
-              <th className="px-3 py-2">Last Sign In</th>
-              <th className="px-3 py-2">Joined</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.id} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
-                <td className="px-3 py-3 text-[#e8e8f0]">{u.email}</td>
-                <td className="px-3 py-3">
-                  {u.role === "admin"
-                    ? <span className="text-[#f5c518] text-sm font-bold bg-[#f5c518]/10 px-1.5 py-0.5 rounded">admin</span>
-                    : <span className="text-[#666] text-sm">user</span>}
-                </td>
-                <td className="px-3 py-3">
-                  <span className={`font-semibold ${u.balance !== null ? (u.balance < 10 ? "text-[#f97316]" : "text-[#7c5cfc]") : "text-[#555]"}`}>
-                    {u.balance !== null ? `⚡ ${u.balance}` : "—"}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-[#888]">{u.lifetime_credits ?? "—"}</td>
-                <td className="px-3 py-3 text-[#888]">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "—"}</td>
-                <td className="px-3 py-3 text-[#888]">{new Date(u.created_at).toLocaleDateString()}</td>
-                <td className="px-3 py-3">
-                  <button onClick={() => setModal(u.id)}
-                    className="px-3 py-1.5 bg-[#7c5cfc]/15 border border-[#7c5cfc]/30 rounded-lg text-[#7c5cfc] text-sm cursor-pointer hover:bg-[#7c5cfc]/25 transition-colors">
-                    + Credits
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-base min-w-[700px]">
+            <thead>
+              <tr className="border-b border-white/[0.08] text-left text-sm">
+                <SortTh col="email">Email</SortTh>
+                <SortTh col="role">Role</SortTh>
+                <SortTh col="balance">Balance</SortTh>
+                <SortTh col="lifetime_credits">Lifetime</SortTh>
+                <SortTh col="last_sign_in_at">Last Sign In</SortTh>
+                <SortTh col="created_at">Joined</SortTh>
+                <th className="px-3 py-2 text-[#555] font-medium"></th>
               </tr>
-            ))}
-            {users.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-6 text-[#555]">No users found.</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map(u => (
+                <tr key={u.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                  <td className="px-3 py-3 text-[#e8e8f0] max-w-[220px] truncate">{u.email}</td>
+                  <td className="px-3 py-3">
+                    {u.role === "admin"
+                      ? <span className="text-[#f5c518] text-xs font-bold bg-[#f5c518]/10 px-2 py-0.5 rounded-full">admin</span>
+                      : <span className="text-[#555] text-xs">user</span>}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`font-semibold text-sm ${u.balance === null ? "text-[#444]" : u.balance < 10 ? "text-[#f97316]" : "text-[#7c5cfc]"}`}>
+                      {u.balance !== null ? `⚡ ${u.balance}` : "—"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-[#666] text-sm">{u.lifetime_credits ?? "—"}</td>
+                  <td className="px-3 py-3 text-[#666] text-sm whitespace-nowrap">{fmtDate(u.last_sign_in_at)}</td>
+                  <td className="px-3 py-3 text-[#666] text-sm whitespace-nowrap">{fmtDate(u.created_at)}</td>
+                  <td className="px-3 py-3">
+                    <button onClick={() => setEditUser(u)}
+                      className="px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-lg text-[#aaa] text-xs cursor-pointer hover:bg-[#7c5cfc]/20 hover:text-[#a78bfa] hover:border-[#7c5cfc]/40 transition-colors opacity-0 group-hover:opacity-100">
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-3 py-8 text-[#444] text-center">
+                  {search ? `No users matching "${search}"` : "No users found."}
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {modal && (
-        <CreditModal
-          userId={modal}
-          onClose={() => setModal(null)}
-          onSuccess={handleCreditSuccess}
+      {editUser && (
+        <EditUserModal
+          user={editUser}
+          onClose={() => setEditUser(null)}
+          onUpdated={handleUpdated}
         />
       )}
     </AdminLayout>

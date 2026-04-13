@@ -35,7 +35,7 @@ async function requireAdmin(req, res, next) {
   // Re-fetch via admin API to get the authoritative app_metadata
   const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(req.user.id);
   if (error || !user) return res.status(401).json({ error: "Unauthorized" });
-  const meta = user.app_metadata ?? (user.raw_app_meta_data ?? {});
+  const meta = user.app_metadata ?? {};
   const role = meta.role;
   if (role !== "admin") return res.status(403).json({ error: "Forbidden" });
   req.adminUser = user;
@@ -202,6 +202,93 @@ app.post("/api/generate", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("[generate]", err.message);
     res.status(500).json({ error: "AI generation failed" });
+  }
+});
+
+/* ---------------- TRANSCRIPT BEAT PROCESSING ---------------- */
+app.post("/api/process-beats", requireAuth, async (req, res) => {
+  try {
+    const { segments } = req.body;
+    if (!Array.isArray(segments) || !segments.length) {
+      return res.status(400).json({ error: "segments array required" });
+    }
+    const deduction = await deductCredits(req.user.id, 2, "transcript_beats", "Transcript beat processing");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+    const prompt = `You are processing a speech transcript from a talking-head video into beats for a short-form video editor.
+
+RAW WHISPER SEGMENTS (with timestamps):
+${JSON.stringify(segments, null, 2)}
+
+TASK: Split these segments into short punchy beats. Classify each beat with intent, energy, avatar visibility, and asset hints.
+
+BEAT SPLITTING RULES — critical, follow exactly:
+- Target beat duration: 2-4 seconds. This is talking head mode — short beats, fast cuts.
+- Minimum beat duration: 1.5 seconds. Never go below.
+- Maximum beat duration: 5 seconds. If a segment exceeds 5s, split at a sentence boundary.
+- DO NOT merge short punchy sentences just to hit a minimum. "Bas open karo." is one beat. "Edit karo." is one beat.
+- If there is a gap of 0.5+ seconds between segments, ALWAYS treat as a beat boundary.
+- Keep start_sec from the first merged segment and end_sec from the last merged segment.
+- First beat: intent must be "curiosity" or "shock". showAvatar: true.
+- Last beat: intent must be "urgency" or "reveal". showAvatar: true.
+
+INTENT OPTIONS: shock, curiosity, proof, irony, reveal, empathy, urgency, explanation, contrast, punchline
+ENERGY (0.0 calm to 1.0 explosive):
+- High (0.7-1.0): exclamations, surprising claims, calls to action
+- Medium (0.4-0.7): explanations, questions, proofs
+- Low (0.1-0.4): emotional/reflective, slow build-up
+
+showAvatar FIELD — boolean, determines if talking head video is visible:
+- true: speaker making direct personal statement, CTA, greeting, reaction, emotional moment
+- true: first beat, last beat, any beat under 2 seconds
+- false: speaker references specific tool, product, website, app, statistic, place, brand name, scheme name
+- false: speaker says "look at this", "here is", "this is how", "go to [website]", describing something visual
+
+asset_hint FIELD:
+- When showAvatar is true: set asset_hint to null (avatar fills the frame, no image needed)
+- When showAvatar is false: MUST provide asset_hint:
+  - If speaker mentions specific brand/product/website/scheme name → visual_type: "entity", search_query: "<the exact name>", prompt: null, keywords: []
+  - Otherwise → visual_type: "abstract", search_query: null, prompt: "<specific photographable scene that illustrates what speaker is saying>", keywords: ["keyword1","keyword2"]
+
+Return ONLY valid JSON:
+{
+  "beats": [
+    {
+      "spoken": "beat text",
+      "start_sec": 0.0,
+      "end_sec": 2.5,
+      "intent": "curiosity",
+      "energy": 0.8,
+      "showAvatar": true,
+      "asset_hint": null
+    },
+    {
+      "spoken": "Canva open karo",
+      "start_sec": 2.5,
+      "end_sec": 4.8,
+      "intent": "explanation",
+      "energy": 0.6,
+      "showAvatar": false,
+      "asset_hint": { "visual_type": "entity", "search_query": "Canva", "prompt": null, "keywords": [] }
+    }
+  ]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a strict JSON generator. Output only valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.4,
+    });
+    const raw     = completion.choices[0].message.content;
+    const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
+    const parsed  = JSON.parse(cleaned);
+    res.json(parsed);
+  } catch (err) {
+    console.error("[process-beats]", err.message);
+    res.status(500).json({ error: "Beat processing failed" });
   }
 });
 
@@ -446,6 +533,38 @@ app.post("/api/proxy-image", requireAuth, async (req, res) => {
 /* ---------------- COMPRESSION VIDEO ---------------- */
 const upload = multer({ dest: TEMP_DIR });
 
+/* ── Upload + compress avatar video → Supabase (bypasses client bucket size limit) ── */
+app.post("/api/upload-avatar", requireAuth, upload.single("video"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const inputPath  = req.file.path;
+    const outputPath = path.join(TEMP_DIR, `avatar-${Date.now()}.mp4`);
+
+    await compressVideo(inputPath, outputPath);
+    fs.unlinkSync(inputPath);
+
+    const buffer      = fs.readFileSync(outputPath);
+    fs.unlinkSync(outputPath);
+
+    const filePath = `${req.user.id}/avatar-${Date.now()}.mp4`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from("user-assets")
+      .upload(filePath, buffer, { contentType: "video/mp4", upsert: true });
+
+    if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from("user-assets")
+      .getPublicUrl(filePath);
+
+    res.json({ url: publicUrl, filePath });
+  } catch (err) {
+    console.error("[upload-avatar]", err.message);
+    res.status(500).json({ error: err.message || "Avatar upload failed" });
+  }
+});
+
 app.post("/api/compress", requireAuth, upload.single("video"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -653,7 +772,7 @@ app.get("/api/render-download/:jobId", requireAuth, (req, res) => {
 });
 
 /* ── Admin: list all users with credit balances ── */
-app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
+app.get("/api/admin/users", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
     if (error) throw error;
@@ -695,6 +814,180 @@ app.post("/api/admin/add-credits", requireAuth, requireAdmin, async (req, res) =
     res.json(result);
   } catch (err) {
     console.error("[admin/add-credits]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: update user role / email ── */
+app.post("/api/admin/update-user", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, role, email } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId required" });
+
+    const updates = {};
+    if (email) updates.email = email;
+    if (role !== undefined) updates.app_metadata = { role };
+
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, updates);
+    if (error) throw error;
+    res.json({ success: true, user: data.user });
+  } catch (err) {
+    console.error("[admin/update-user]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: set a user's credit balance directly ── */
+app.post("/api/admin/set-balance", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, balance, reason } = req.body;
+    if (!userId || balance === undefined || balance < 0) {
+      return res.status(400).json({ error: "userId and non-negative balance required" });
+    }
+
+    const { data: current } = await supabaseAdmin
+      .from("user_credits")
+      .select("balance, lifetime_credits")
+      .eq("user_id", userId)
+      .single();
+
+    const oldBalance  = current?.balance          ?? 0;
+    const lifetime    = current?.lifetime_credits ?? 0;
+    const diff        = balance - oldBalance;
+    const newLifetime = diff > 0 ? lifetime + diff : lifetime;
+
+    await supabaseAdmin
+      .from("user_credits")
+      .upsert({ user_id: userId, balance, lifetime_credits: newLifetime, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+
+    await supabaseAdmin.from("credit_transactions").insert({
+      user_id:       userId,
+      amount:        diff,
+      type:          diff >= 0 ? "admin_set" : "admin_set",
+      action:        "admin_set_balance",
+      description:   reason || `Admin set balance to ${balance}`,
+      balance_after: balance,
+    });
+
+    res.json({ success: true, balance, lifetime_credits: newLifetime });
+  } catch (err) {
+    console.error("[admin/set-balance]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: get transaction history for a user ── */
+app.get("/api/admin/user-transactions/:userId", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { data, error } = await supabaseAdmin
+      .from("credit_transactions")
+      .select("id, amount, type, action, description, balance_after, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    console.error("[admin/user-transactions]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: credits overview (global stats + top consumers + recent txns) ── */
+app.get("/api/admin/credits-overview", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const [
+      { data: allCredits },
+      { data: recentTxns },
+      { data: typeCounts },
+    ] = await Promise.all([
+      supabaseAdmin.from("user_credits").select("user_id, balance, lifetime_credits"),
+      supabaseAdmin.from("credit_transactions")
+        .select("user_id, amount, type, action, description, balance_after, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabaseAdmin.from("credit_transactions").select("type"),
+    ]);
+
+    const totalBalance  = (allCredits || []).reduce((s, r) => s + (r.balance || 0), 0);
+    const totalLifetime = (allCredits || []).reduce((s, r) => s + (r.lifetime_credits || 0), 0);
+    const totalUsers    = (allCredits || []).length;
+    const lowBalance    = (allCredits || []).filter(r => r.balance < 10).length;
+
+    // Top 10 by lifetime_credits
+    const topConsumers = [...(allCredits || [])]
+      .sort((a, b) => (b.lifetime_credits || 0) - (a.lifetime_credits || 0))
+      .slice(0, 10);
+
+    // Transaction type breakdown
+    const typeBreakdown = {};
+    (typeCounts || []).forEach(r => {
+      typeBreakdown[r.type] = (typeBreakdown[r.type] || 0) + 1;
+    });
+
+    res.json({
+      stats: { totalBalance, totalLifetime, totalUsers, lowBalance },
+      topConsumers,
+      recentTransactions: recentTxns || [],
+      typeBreakdown,
+    });
+  } catch (err) {
+    console.error("[admin/credits-overview]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: assign a plan to a user (adds plan credits, logs plan_assign) ── */
+app.post("/api/admin/assign-plan", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, planId, planLabel, credits, price } = req.body;
+    if (!userId || !planId || !credits || credits <= 0) {
+      return res.status(400).json({ error: "userId, planId, and credits required" });
+    }
+    const result = await addCredits(
+      userId,
+      credits,
+      "plan_assign",
+      "plan_assign",
+      `Plan assigned: ${planLabel || planId} (${credits} credits, $${price ?? "?"})`
+    );
+    res.json({ success: true, planId, credits, balance: result.balance });
+  } catch (err) {
+    console.error("[admin/assign-plan]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: get plan assignment history ── */
+app.get("/api/admin/plan-assignments", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("credit_transactions")
+      .select("user_id, amount, description, created_at")
+      .eq("action", "plan_assign")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    console.error("[admin/plan-assignments]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: deduct credits from a user (admin action) ── */
+app.post("/api/admin/deduct-credits", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, amount, reason } = req.body;
+    if (!userId || !amount || amount <= 0) {
+      return res.status(400).json({ error: "userId and positive amount required" });
+    }
+    const result = await deductCredits(userId, amount, "admin_deduct", reason || "Admin deduction");
+    if (!result.success) return res.status(400).json({ error: result.error });
+    res.json(result);
+  } catch (err) {
+    console.error("[admin/deduct-credits]", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -753,6 +1046,233 @@ app.post("/api/admin/layout/save", requireAuth, requireAdmin, async (req, res) =
   } catch (err) {
     console.error("[admin/layout/save]", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── AI Image Library: save a generated image (service role bypasses RLS) ── */
+app.post("/api/ai-image-library/save", requireAuth, async (req, res) => {
+  try {
+    const record = req.body;
+    if (!record?.src) return res.status(400).json({ error: "src required" });
+    const { error } = await supabaseAdmin.from("ai_image_library").insert(record);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[ai_image_library/save]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── AI Image Library: increment reuse count ── */
+app.post("/api/ai-image-library/increment-reuse", requireAuth, async (req, res) => {
+  try {
+    const { id, reuse_count } = req.body;
+    if (!id) return res.status(400).json({ error: "id required" });
+    await supabaseAdmin.from("ai_image_library").update({ reuse_count: (reuse_count || 0) + 1 }).eq("id", id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: user_assets (bypasses RLS) ── */
+app.get("/api/admin/user-assets", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const page     = parseInt(req.query.page || "0", 10);
+    const type     = req.query.type || "all";
+    const pageSize = 48;
+
+    let query = supabaseAdmin
+      .from("user_assets")
+      .select("id, url, type, name, size, created_at, user_id", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    if (type !== "all") query = query.eq("type", type);
+
+    const { data, count, error } = await query;
+    if (error) throw error;
+    res.json({ assets: data || [], total: count ?? 0, page, pageSize });
+  } catch (err) {
+    console.error("[admin/user-assets]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: delete a user asset ── */
+app.delete("/api/admin/user-assets/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin.from("user_assets").delete().eq("id", req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: AI image library (bypasses RLS) ── */
+app.get("/api/admin/ai-images", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const page        = parseInt(req.query.page || "0", 10);
+    const niche       = req.query.niche       || "all";
+    const visualType  = req.query.visual_type || "all";
+    const orientation = req.query.orientation || "all";
+    const pageSize    = 48;
+
+    let query = supabaseAdmin
+      .from("ai_image_library")
+      .select("id, src, prompt, subject, niche, visual_type, mood, energy, orientation, reuse_count, tags, width, height, generator, created_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    if (niche       !== "all") query = query.eq("niche", niche);
+    if (visualType  !== "all") query = query.eq("visual_type", visualType);
+    if (orientation !== "all") query = query.eq("orientation", orientation);
+
+    const { data, count, error } = await query;
+    if (error) throw error;
+    res.json({ images: data || [], total: count ?? 0, page, pageSize });
+  } catch (err) {
+    console.error("[admin/ai-images]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: AI image library filter options ── */
+app.get("/api/admin/ai-images/filters", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("ai_image_library")
+      .select("niche, visual_type, orientation");
+    if (error) throw error;
+
+    const niches       = [...new Set((data || []).map(r => r.niche).filter(Boolean))].sort();
+    const visualTypes  = [...new Set((data || []).map(r => r.visual_type).filter(Boolean))].sort();
+    const orientations = [...new Set((data || []).map(r => r.orientation).filter(Boolean))].sort();
+    res.json({ niches, visualTypes, orientations });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: delete an AI image ── */
+app.delete("/api/admin/ai-images/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin.from("ai_image_library").delete().eq("id", req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[admin/ai-images/delete]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: system health ── */
+app.get("/api/admin/system-health", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const startTime = process.hrtime.bigint();
+
+    // Temp dir stats
+    let tempFiles = 0, tempBytes = 0;
+    if (fs.existsSync(TEMP_DIR)) {
+      const entries = fs.readdirSync(TEMP_DIR);
+      tempFiles = entries.length;
+      for (const f of entries) {
+        try {
+          const stat = fs.statSync(path.join(TEMP_DIR, f));
+          if (stat.isFile()) tempBytes += stat.size;
+        } catch {}
+      }
+    }
+
+    // Supabase ping
+    const dbStart = Date.now();
+    let dbOk = false, dbMs = null;
+    try {
+      const { error } = await supabaseAdmin.from("projects").select("id").limit(1);
+      dbOk = !error;
+      dbMs = Date.now() - dbStart;
+    } catch {}
+
+    // API key presence checks (never expose actual keys)
+    const apiKeys = {
+      openai:   !!process.env.OPENAI_API_KEY,
+      supabase: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      fal:      !!process.env.FAL_KEY || !!process.env.FAL_API_KEY,
+    };
+
+    // Memory
+    const mem = process.memoryUsage();
+
+    const pingNs = process.hrtime.bigint() - startTime;
+
+    res.json({
+      uptime:    Math.floor(process.uptime()),
+      node:      process.version,
+      platform:  process.platform,
+      memMb: {
+        rss:      (mem.rss / 1024 / 1024).toFixed(1),
+        heap:     (mem.heapUsed / 1024 / 1024).toFixed(1),
+        heapTotal:(mem.heapTotal / 1024 / 1024).toFixed(1),
+      },
+      temp: { files: tempFiles, sizeMb: (tempBytes / 1024 / 1024).toFixed(2) },
+      db:  { ok: dbOk, latencyMs: dbMs },
+      apiKeys,
+      serverPingMs: Number(pingNs / 1_000_000n),
+    });
+  } catch (err) {
+    console.error("[admin/system-health]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Talking Head: Transcription via Fal.ai Whisper ── */
+app.post("/api/transcribe", requireAuth, upload.single("video"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No video file uploaded" });
+
+    const deduction = await deductCredits(req.user.id, 3, "transcription", "Video transcription (Whisper)", null);
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+    // Extract audio only — Whisper only needs audio, not the full video.
+    // A 65 MB video becomes ~3–5 MB mp3, well within OpenAI Whisper's 25 MB limit.
+    const audioPath = req.file.path + ".mp3";
+    await new Promise((resolve, reject) => {
+      ffmpeg(req.file.path)
+        .noVideo()
+        .audioCodec("libmp3lame")
+        .audioBitrate("64k")
+        .audioChannels(1)
+        .on("end", resolve)
+        .on("error", reject)
+        .save(audioPath);
+    });
+    fs.unlinkSync(req.file.path); // original video no longer needed
+
+    // Transcribe via OpenAI Whisper — reads directly from disk, no external storage needed
+    let transcription;
+    try {
+      transcription = await openai.audio.transcriptions.create({
+        file:             fs.createReadStream(audioPath),
+        model:            "whisper-1",
+        response_format:  "verbose_json",
+        timestamp_granularities: ["segment"],
+      });
+    } finally {
+      fs.unlink(audioPath, () => {}); // clean up regardless of success/failure
+    }
+
+    const transcript = transcription.text || "";
+    const segments   = (transcription.segments || []).map(s => ({
+      text:  s.text?.trim() || "",
+      start: s.start ?? 0,
+      end:   s.end   ?? 0,
+    })).filter(s => s.text);
+
+    res.json({ transcript, segments });
+  } catch (err) {
+    console.error("[transcribe]", err.message);
+    res.status(500).json({ error: err.message || "Transcription failed" });
   }
 });
 

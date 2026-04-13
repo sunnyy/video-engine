@@ -9,7 +9,8 @@
  */
 
 import React from "react"; // eslint-disable-line
-import { useCurrentFrame, useVideoConfig, interpolate, Img, OffthreadVideo } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate, Img, OffthreadVideo, useRemotionEnvironment } from "remotion";
+import { getAvatarVideoSingleton } from "../avatarVideoSingleton.js";
 import AssetRenderer from "../elements/AssetRenderer";
 import LayoutBackgroundRenderer from "./LayoutBackgroundRenderer";
 import ElementRenderer from "../elements/ElementRenderer";
@@ -189,9 +190,49 @@ function AnimatedBorderFrame({ borderKey, borderRadius, frame, fps, overrideWidt
 const ENTER_DUR = { fadeIn:18, slideUpIn:16, slideDownIn:16, slideLeftIn:16, slideRightIn:16, popIn:14, scaleIn:18, none:0 };
 const EXIT_DUR  = { fadeOut:14, slideUpOut:14, slideDownOut:14, scaleOut:14, none:0 };
 
-function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = false }) {
+/* ── Avatar video zone ─────────────────────────────────────────────────────
+   In render mode (headless Chromium): OffthreadVideo with delayRender so
+   frame capture waits for the correct video frame.
+   In preview mode: the module-level singleton <video> element is moved into
+   this zone's container via appendChild. The singleton never unmounts between
+   beats, so there is zero seeking and zero A/V sync break on beat change.
+   VideoComposition drives the singleton's currentTime via syncAvatarVideoFrame. */
+function AvatarVideoZone({ src, trimBefore, objectFit, isRendering, style }) {
+  const { useEffect, useRef } = React;
+
+  const containerRef = useRef(null);
+
+  // Preview path: move the singleton <video> into this zone's container.
+  // The singleton is never recreated between beats — just re-parented — so
+  // currentTime keeps advancing with no seek and no A/V sync break.
+  useEffect(() => {
+    if (isRendering) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const video = getAvatarVideoSingleton(src);
+    video.style.width     = "100%";
+    video.style.height    = "100%";
+    video.style.objectFit = objectFit || "cover";
+    video.style.position  = "absolute";
+    video.style.inset     = "0";
+    container.appendChild(video);
+    // No cleanup: the container div is removed by React when the Sequence unmounts,
+    // which detaches the video from DOM. The JS object survives in the module singleton
+    // and is re-attached to the next beat's zone via appendChild — no seek required.
+  }, [isRendering, src, objectFit]);
+
+  // Render path: OffthreadVideo handles its own frame-sync internally during
+  // headless render — no external delayRender needed.
+  if (isRendering) {
+    return <OffthreadVideo src={src} muted trimBefore={trimBefore} style={style} />;
+  }
+  return <div ref={containerRef} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
+}
+
+function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = false, sequenceStartFrame = 0 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const { isRendering } = useRemotionEnvironment();
 
   const startFrame = Math.round((zone.start ?? 0) * fps);
   const endFrame   = zone.end != null ? Math.round(zone.end * fps) : Math.round(beatDurationSec * fps);
@@ -257,6 +298,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
     opacity:         (animStyle.opacity ?? 1) * (isTextZone ? 1 : (st.opacity ?? 1)),
     transform:       containerTransform,
     transformOrigin: "center center",
+    // Force GPU compositing on every zone so that <video> elements (which Chrome normally
+    // promotes to a GPU overlay plane above everything) respect z-index ordering with siblings.
+    willChange:      "transform",
     // Vertical centering for text zones
     display:         isTextZone ? "flex"   : undefined,
     flexDirection:   isTextZone ? "column" : undefined,
@@ -307,8 +351,20 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
       {/* Content wrapper with rotation */}
       <div style={{ ...contentWrapperStyle, zIndex: 1 }}>
 
-        {/* Avatar zone — visual is handled by the single global Html5Video in VideoComposition.
-            Nothing is rendered here; the global video is positioned over this zone's area. */}
+        {/* Avatar zone — singleton <video> is appended to this container in preview
+            mode; OffthreadVideo used for render. The singleton never remounts between
+            beats so there is no seek and no A/V sync break on beat change. */}
+        {isAvatarZone && project?.avatar?.src && (
+          <div style={insetBoxStyle}>
+            <AvatarVideoZone
+              src={project.avatar.src}
+              trimBefore={sequenceStartFrame}
+              objectFit={zone._userObjectFit || "cover"}
+              isRendering={isRendering}
+              style={{ width: "100%", height: "100%", objectFit: zone._userObjectFit || "cover" }}
+            />
+          </div>
+        )}
 
         {/* Asset — with optional animated border + one-shot shine */}
         {effectiveType === "asset" && content.kind !== "block" && content.asset?.src && !isAvatarZone && (() => {
@@ -627,7 +683,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
   );
 }
 
-export default function LayoutRenderer({ beat, project, layoutDef, previewMode = false }) {
+export default function LayoutRenderer({ beat, project, layoutDef, previewMode = false, sequenceStartFrame = 0 }) {
   const { width: W, height: H } = useVideoConfig();
   if (!layoutDef) return null;
 
@@ -642,7 +698,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
     const o = beatZones[d.id] || {};
     return [{
       ...d,
-      type:            d.type,                    // layout def is authoritative; beat zone type is ignored for layout zones
+      type:            d.type,
       x:               o.x              ?? d.x,
       y:               o.y              ?? d.y,
       width:           o.width          ?? d.width,
@@ -686,9 +742,14 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
   const hasExplicitBg = !!beat?.layoutBackground;
   const talkMode      = project?.meta?.mode === "talking_head";
   const avatarHasSrc  = !!project?.avatar?.src;
-  // Resolve which zone id is the active avatar zone (explicit beat override or layout-def default)
+  // Resolve which zone id is the active avatar zone.
+  // Priority: 1) explicit beat.avatarZone  2) layout-def zone typed "avatar"  3) beat zone typed "avatar"
   const activeAvatarZoneId = (talkMode && avatarHasSrc)
-    ? (beat?.avatarZone !== undefined ? beat.avatarZone : (layoutDef.zones.find(z => z.type === "avatar")?.id ?? null))
+    ? (beat?.avatarZone !== undefined
+        ? beat.avatarZone
+        : (layoutDef.zones.find(z => z.type === "avatar")?.id
+           ?? Object.entries(beatZones).find(([, z]) => z?.type === "avatar")?.[0]
+           ?? null))
     : null;
   const blurSrc = !hasExplicitBg
     ? contentZones.find(z => z.type === "asset" && z.content?.asset?.src && z.id !== activeAvatarZoneId)?.content?.asset?.src ?? null
@@ -705,7 +766,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
       {/* Zone content — inset by layoutPadding */}
       <div style={{ position:"absolute", inset: pad, overflow:"hidden" }}>
         {contentZones.map(zone => (
-          <ZoneLayer key={zone.id} zone={zone} beat={beat} project={project} W={W - pad * 2} H={H - pad * 2} beatDurationSec={beatDurationSec} previewMode={previewMode} />
+          <ZoneLayer key={zone.id} zone={zone} beat={beat} project={project} W={W - pad * 2} H={H - pad * 2} beatDurationSec={beatDurationSec} previewMode={previewMode} sequenceStartFrame={sequenceStartFrame} />
         ))}
       </div>
       {elementZones.map(zone => (

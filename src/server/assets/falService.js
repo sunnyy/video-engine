@@ -32,12 +32,11 @@ async function findExistingImage(assetHint, dna) {
     const match = data[Math.floor(Math.random() * data.length)];
     console.log(`[ai_image_library] Reusing existing image (niche=${niche}, visual_type=${visual_type}): ${match.src}`);
 
-    // Fire-and-forget reuse count increment
-    supabase
-      .from("ai_image_library")
-      .update({ reuse_count: (match.reuse_count || 0) + 1 })
-      .eq("id", match.id)
-      .then(() => {});
+    // Fire-and-forget reuse count increment (via server to bypass RLS)
+    serverFetch("/api/ai-image-library/increment-reuse", {
+      method: "POST",
+      body: JSON.stringify({ id: match.id, reuse_count: match.reuse_count }),
+    }).catch(() => {});
 
     return match;
   } catch (e) {
@@ -72,9 +71,16 @@ async function saveToImageLibrary({ src, prompt, assetHint, beat, dna, orientati
       reuse_count:   0,
     };
 
-    const { error } = await supabase.from("ai_image_library").insert(record);
-    if (error) console.warn("[ai_image_library] Save failed:", error.message);
-    else console.log(`[ai_image_library] Saved — niche=${record.niche} intent=${record.intent} subject=${record.subject}`);
+    const res = await serverFetch("/api/ai-image-library/save", {
+      method: "POST",
+      body: JSON.stringify(record),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      console.warn("[ai_image_library] Save failed:", d.error || res.status);
+    } else {
+      console.log(`[ai_image_library] Saved — niche=${record.niche} intent=${record.intent} subject=${record.subject}`);
+    }
   } catch (e) {
     console.warn("[ai_image_library] saveToImageLibrary error:", e.message);
   }

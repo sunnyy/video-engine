@@ -249,6 +249,7 @@ export function generateVideoDNA({
   niche      = null,
   energy     = 0.7,
   brandColor = null,
+  language   = null,
 }) {
   const effectiveType = (!videoType || videoType === "auto") ? "viral" : videoType;
   const effectiveTone = (!tone     || tone     === "auto") ? "bold"  : tone;
@@ -257,7 +258,16 @@ export function generateVideoDNA({
 
   const resolvedNiche    = niche || detectNiche(effectiveType);
   const nicheTypography  = resolvedNiche ? NICHE_TYPOGRAPHY_MAP[resolvedNiche] : null;
-  const typographySystem = nicheTypography ?? preset.typography;
+  let   typographySystem = nicheTypography ?? preset.typography;
+
+  // Hindi/Hinglish: override to warm or brutal — thin fonts (minimal, fashion, clean)
+  // render poorly with mixed Devanagari + Roman text
+  const lang = (language || "").toLowerCase();
+  if (lang === "hindi" || lang === "hinglish") {
+    if (["minimal", "fashion", "clean", "editorial"].includes(typographySystem)) {
+      typographySystem = effectiveTone === "bold" ? "brutal" : "warm";
+    }
+  }
 
   const colorStory = resolveColorStory(
     resolvedNiche,

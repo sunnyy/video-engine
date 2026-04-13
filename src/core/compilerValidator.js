@@ -140,6 +140,9 @@ export function validateBeats(beats) {
     if (beat.block_candidate) cleanBeat.block_candidate = beat.block_candidate;
     if (beat.layoutPadding != null) cleanBeat.layoutPadding = beat.layoutPadding;
     if (beat.resolvedColors) cleanBeat.resolvedColors = beat.resolvedColors;
+    // avatarZone must survive validation — undefined = not set, null = explicitly none, string = zone id
+    if (beat.avatarZone !== undefined) cleanBeat.avatarZone = beat.avatarZone;
+    if (beat.deletedZones) cleanBeat.deletedZones = beat.deletedZones;
 
     return cleanBeat;
 

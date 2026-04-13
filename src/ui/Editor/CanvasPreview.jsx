@@ -50,22 +50,33 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   // Compute canvas dimensions to fit container maintaining aspect ratio.
   // For 16:9 (landscape): scale to full available width — container scrolls vertically.
   // For 9:16 (portrait):  fit within both dimensions so it never overflows.
-  const availW    = containerSize.width  - 16;
-  const availH    = containerSize.height - 16;
+  const availW    = Math.max(0, containerSize.width  - 16);
+  const availH    = Math.max(0, containerSize.height - 16);
+  // For portrait: scale by width only — height constraint caused invisible canvas
+  // when containerSize.height was measured incorrectly. Overflow clips the bottom.
   const scale     = is169
     ? Math.min(availW / videoW, 1)
-    : Math.min(availW / videoW, availH / videoH, 1);
-  const canvasW   = Math.floor(videoW * scale);
-  const canvasH   = Math.floor(videoH * scale);
+    : Math.min(availW / videoW, availH > 0 ? availH / videoH : 1, 1);
+  const canvasW   = Math.max(0, Math.floor(videoW * scale));
+  const canvasH   = Math.max(0, Math.floor(videoH * scale));
 
   /* ── Measure container ── */
   useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      if (width > 0 && height > 0) setContainerSize({ width, height });
-    });
-    ro.observe(containerRef.current);
+    const el = containerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      setContainerSize(prev => ({
+        width:  w > 50 ? w : prev.width,
+        height: h > 50 ? h : prev.height,
+      }));
+    };
+
+    measure(); // immediate sync read before first paint
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
@@ -127,7 +138,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     setIsPlaying(true);
     setTimeout(() => {
       if (!playerRef.current) return;
-      if (!hasPlayedOnce.current && activeBeat) {
+      // Only seek to active beat start on very first play (player at frame 0 and never played)
+      if (!hasPlayedOnce.current && activeBeat && playerRef.current.getCurrentFrame() === 0) {
         playerRef.current.seekTo(Math.floor(activeBeat.start_sec * fps));
       }
       hasPlayedOnce.current = true;
@@ -201,11 +213,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           : (pausedFrameRef.current ?? 0);
         const delta    = e.code === "ArrowLeft" ? -liveFps : liveFps;
         const newFrame = Math.max(0, Math.min(liveDuration - 1, currentFrame + delta));
-        if (showPlayerRef.current && playerRef.current) {
-          playerRef.current.seekTo(newFrame);
-        } else {
-          setPausedFrame(newFrame);
-        }
+        if (playerRef.current) playerRef.current.seekTo(newFrame);
+        if (!showPlayerRef.current) setPausedFrame(newFrame);
         return;
       }
 
@@ -351,7 +360,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
           >
             {/* Canvas */}
-            <div style={{ position: "relative", width: canvasW, height: canvasH, outline: "2px solid red" }}>
+            <div style={{ position: "relative", width: canvasW, height: canvasH, outline: "2px solid rgba(255,255,255,0.18)" }}>
               <Thumbnail
                 key={`thumb-${videoW}x${videoH}`}
                 acknowledgeRemotionLicense
@@ -410,17 +419,12 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           <div className="text-[#55556a] text-[13px]">Select a beat to edit</div>
         )}
 
-        {/* Remotion Player — overlays when playing */}
-        <div style={{
-          display:  showPlayer ? "flex" : "none",
-          position: is169 ? "relative" : "absolute",
-          ...(is169 ? {} : { inset: 0 }),
-          alignItems: "flex-start", justifyContent: "center",
-          background: "black", zIndex: 50,
-          padding: 8,
-          width: "100%",
-        }}>
-          <div className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}>
+        {/* Remotion Player — same flow position as Thumbnail so alignment matches exactly */}
+        {/* Always mounted (display toggle) so Player preserves its frame position on pause/play */}
+        <div
+          className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
+          style={{ display: showPlayer ? "flex" : "none" }}
+        >
             <Player
               key={`player-${videoW}x${videoH}`}
               ref={playerRef}
@@ -433,7 +437,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               fps={fps}
               controls={false}
               numberOfSharedAudioTags={16}
-              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", outline: "2px solid red" }}
+              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", outline: "2px solid rgba(255,255,255,0.18)" }}
             />
 
             {/* Controls — right side for 9:16, bottom for 16:9 */}
@@ -451,7 +455,6 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
                 ↺
               </button>
             </div>
-          </div>
         </div>
 
       </div>

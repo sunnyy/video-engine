@@ -136,6 +136,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
 
     const assetZones = (layoutDef.zones || [])
       .filter(z => z.type === "asset")
+      .filter(z => z.id !== beat.avatarZone) // skip avatar zone — filled by talking head video
       .map(z => ({
         id:   z.id,
         role: z.role || "primary_asset",

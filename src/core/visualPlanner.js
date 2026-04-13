@@ -113,6 +113,7 @@ function pickLayout({
   orientation,
   usedLayoutIds = [],   // all layouts used so far in this video
   hasImageHint = false,
+  requireAssetZone = false, // hard requirement — talking head avatar must have an asset zone
   role = null,
   niche = null,
 }) {
@@ -142,8 +143,20 @@ function pickLayout({
     candidates = findLayouts({});
   }
 
-  // If beat has an image, prefer layouts that have at least one asset zone
-  if (hasImageHint) {
+  // Talking head mode: HARD filter — only layouts with at least one asset zone (for avatar).
+  // Unlike hasImageHint this is never relaxed — a text-only layout can't show the avatar.
+  if (requireAssetZone) {
+    const withAsset = candidates.filter(l => (l.def?.assetCount ?? 0) >= 1);
+    if (withAsset.length) candidates = withAsset;
+    // If no intent-matched layout has an asset zone, fall back to all asset-zone layouts
+    else {
+      const allAsset = findLayouts({}).filter(l => (l.def?.assetCount ?? 0) >= 1);
+      if (allAsset.length) candidates = allAsset;
+    }
+  }
+
+  // If beat has an image hint, prefer layouts that have at least one asset zone (soft)
+  if (hasImageHint && !requireAssetZone) {
     const withAsset = candidates.filter(l => (l.def?.assetCount ?? 0) >= 1);
     if (withAsset.length) candidates = withAsset;
   }
@@ -350,6 +363,7 @@ export function planBeatVisual({
   brandColor:  _brandColor = null,
   beatIndex              = 0,
   hasImageHint           = false,
+  requireAssetZone       = false,
   role                   = null,
   colorStory             = null,
   motionStyle            = null,
@@ -361,6 +375,7 @@ export function planBeatVisual({
     orientation,
     usedLayoutIds,
     hasImageHint,
+    requireAssetZone,
     role,
     niche,
   });

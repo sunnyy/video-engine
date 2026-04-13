@@ -14,15 +14,7 @@ function resolvePositionY(p) {
 export function normalizeBeat(raw = {}, index = 0, meta = {}) {
   const mode = meta?.mode || "faceless";
 
-  // Strip any legacy hidden flag from zone objects (old data cleanup).
-  const rawZones = raw.zones
-    ? Object.fromEntries(
-        Object.entries(raw.zones).map(([id, z]) => {
-          const { hidden: _hidden, ...rest } = z;
-          return [id, rest];
-        })
-      )
-    : null;
+  const rawZones = raw.zones || null;
 
   const zones = rawZones || {
     z1: {
