@@ -198,14 +198,15 @@ const EXIT_DUR  = { fadeOut:14, slideUpOut:14, slideDownOut:14, scaleOut:14, non
    beats, so there is zero seeking and zero A/V sync break on beat change.
    VideoComposition drives the singleton's currentTime via syncAvatarVideoFrame. */
 function AvatarVideoZone({ src, trimBefore, objectFit, isRendering, style }) {
-  const { useEffect, useRef } = React;
+  const { useLayoutEffect, useRef } = React;
 
   const containerRef = useRef(null);
 
   // Preview path: move the singleton <video> into this zone's container.
-  // The singleton is never recreated between beats — just re-parented — so
-  // currentTime keeps advancing with no seek and no A/V sync break.
-  useEffect(() => {
+  // useLayoutEffect fires synchronously before the browser paints, so the video
+  // is always inside a container before any frame is drawn — eliminating the
+  // 1-frame blank that useEffect caused (it fires after paint).
+  useLayoutEffect(() => {
     if (isRendering) return;
     const container = containerRef.current;
     if (!container) return;

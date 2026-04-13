@@ -13,13 +13,24 @@
  */
 
 let _video = null;
-let _currentSrc = null;
+let _currentSrc  = null; // current src on the element (may be a blob URL after upgrade)
+let _originalSrc = null; // original URL before any blob upgrade
 
-/** Returns the singleton <video>, creating or replacing it when src changes. */
+/**
+ * Returns the singleton <video>, creating or replacing it when the source
+ * actually changes.
+ *
+ * IMPORTANT: after upgradeAvatarToBlobUrl() runs, _currentSrc is the blob URL
+ * but callers always pass the original URL (project.avatar.src). Without the
+ * _originalSrc check below, every call after an upgrade would see a mismatch,
+ * destroy the singleton, and create a new <video> that has to re-load and
+ * re-seek — causing the 1-2 second blank and lip-sync delay on beat changes.
+ */
 export function getAvatarVideoSingleton(src) {
-  if (_video && _currentSrc === src) return _video;
+  // Reuse if src matches either the live src OR the pre-upgrade original URL.
+  if (_video && (_currentSrc === src || _originalSrc === src)) return _video;
 
-  // Clean up previous element if src changed
+  // Truly different source — tear down and recreate.
   if (_video) {
     _video.pause();
     _video.removeAttribute("src");
@@ -33,9 +44,29 @@ export function getAvatarVideoSingleton(src) {
   v.preload = "auto";
   v.src = src;
 
-  _video = v;
-  _currentSrc = src;
+  _video       = v;
+  _currentSrc  = src;
+  _originalSrc = src;
   return v;
+}
+
+/**
+ * Swap the singleton's src to a blob URL once prefetch completes.
+ * Preserves currentTime and play state so playback continues seamlessly.
+ * With a blob URL all data is in RAM — seeks are decode-only (~5ms vs 500ms+).
+ */
+export function upgradeAvatarToBlobUrl(blobUrl) {
+  if (!_video || _currentSrc === blobUrl) return;
+  const savedTime  = _video.currentTime;
+  const wasPlaying = !_video.paused;
+  _video.src = blobUrl;
+  _currentSrc = blobUrl;
+  _video.preload = "auto";
+  // Restore position once the blob is loaded (in-memory so this is near-instant)
+  _video.addEventListener("loadedmetadata", () => {
+    _video.currentTime = savedTime;
+    if (wasPlaying) _video.play().catch(() => {});
+  }, { once: true });
 }
 
 /**
