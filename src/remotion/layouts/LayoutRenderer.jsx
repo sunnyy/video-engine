@@ -24,6 +24,70 @@ import { renderIconSVG } from "../../core/registries/iconRegistry.jsx";
 import { IconifyZone }  from "../elements/IconifyZone.jsx";
 import { decorativeById } from "../../core/registries/decorativeRegistry.js";
 
+/* ── Shape border helpers ─────────────────────────────────────────────────────
+   Convert clip-path geometry → SVG shape elements in PIXEL coordinate space
+   (viewBox matches the actual element pixel dimensions), so strokeWidth is
+   exact in pixels with no vectorEffect or preserveAspectRatio trickery needed.
+
+   W, H = actual pixel dimensions of the SVG element (zone minus contentPadding)
+─────────────────────────────────────────────────────────────────────────── */
+function cssClipToSVGStroke(clipPath, W, H) {
+  if (!clipPath) return null;
+
+  // polygon(x1% y1%, x2% y2%, ...)
+  const polyM = clipPath.match(/^polygon\((.+)\)$/);
+  if (polyM) {
+    const pts = polyM[1]
+      .split(",")
+      .map(pair => {
+        const [x, y] = pair.trim().split(/\s+/).map(v => parseFloat(v));
+        return `${(x * W / 100).toFixed(2)},${(y * H / 100).toFixed(2)}`;
+      })
+      .join(" ");
+    return `<polygon points="${pts}"/>`;
+  }
+
+  // circle(r% at cx% cy%)  — CSS ref-length = sqrt((W²+H²)/2)
+  const circM = clipPath.match(/^circle\(([\d.]+)%\s+at\s+([\d.]+)%\s+([\d.]+)%\)$/);
+  if (circM) {
+    const rPct = parseFloat(circM[1]);
+    const cx   = parseFloat(circM[2]) * W / 100;
+    const cy   = parseFloat(circM[3]) * H / 100;
+    const ref  = Math.sqrt((W * W + H * H) / 2);
+    const r    = rPct * ref / 100;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}"/>`;
+  }
+
+  // ellipse(rx% ry% at cx% cy%)
+  const ellM = clipPath.match(/^ellipse\(([\d.]+)%\s+([\d.]+)%\s+at\s+([\d.]+)%\s+([\d.]+)%\)$/);
+  if (ellM) {
+    const [, rxP, ryP, cxP, cyP] = ellM.map(Number);
+    return `<ellipse cx="${(cxP*W/100).toFixed(2)}" cy="${(cyP*H/100).toFixed(2)}" rx="${(rxP*W/100).toFixed(2)}" ry="${(ryP*H/100).toFixed(2)}"/>`;
+  }
+
+  return null;
+}
+
+// SVG shapes for complex masks (ring, heart, etc.) in pixel coordinates
+function getSVGStrokeContent(shapeId, W, H) {
+  const px = (v) => (v * W).toFixed(2);
+  const py = (v) => (v * H).toFixed(2);
+  switch (shapeId) {
+    case "heart":
+      return `<path d="M ${px(0.5)},${py(0.8)} C ${px(0.2)},${py(0.65)} ${px(0.03)},${py(0.5)} ${px(0.03)},${py(0.33)} C ${px(0.03)},${py(0.14)} ${px(0.18)},${py(0.05)} ${px(0.35)},${py(0.1)} C ${px(0.41)},${py(0.12)} ${px(0.46)},${py(0.17)} ${px(0.5)},${py(0.23)} C ${px(0.54)},${py(0.17)} ${px(0.59)},${py(0.12)} ${px(0.65)},${py(0.1)} C ${px(0.82)},${py(0.05)} ${px(0.97)},${py(0.14)} ${px(0.97)},${py(0.33)} C ${px(0.97)},${py(0.5)} ${px(0.8)},${py(0.65)} ${px(0.5)},${py(0.8)} Z"/>`;
+    case "ring":
+      return `<ellipse cx="${px(0.5)}" cy="${py(0.5)}" rx="${px(0.46)}" ry="${py(0.46)}"/><ellipse cx="${px(0.5)}" cy="${py(0.5)}" rx="${px(0.24)}" ry="${py(0.24)}"/>`;
+    case "crescent":
+      return `<ellipse cx="${px(0.5)}" cy="${py(0.5)}" rx="${px(0.45)}" ry="${py(0.45)}"/>`;
+    case "trefoil":
+      return `<ellipse cx="${px(0.5)}" cy="${py(0.28)}" rx="${px(0.28)}" ry="${py(0.28)}"/><ellipse cx="${px(0.69)}" cy="${py(0.61)}" rx="${px(0.28)}" ry="${py(0.28)}"/><ellipse cx="${px(0.31)}" cy="${py(0.61)}" rx="${px(0.28)}" ry="${py(0.28)}"/>`;
+    case "quatrefoil":
+      return `<ellipse cx="${px(0.5)}" cy="${py(0.22)}" rx="${px(0.28)}" ry="${py(0.28)}"/><ellipse cx="${px(0.78)}" cy="${py(0.5)}" rx="${px(0.28)}" ry="${py(0.28)}"/><ellipse cx="${px(0.5)}" cy="${py(0.78)}" rx="${px(0.28)}" ry="${py(0.28)}"/><ellipse cx="${px(0.22)}" cy="${py(0.5)}" rx="${px(0.28)}" ry="${py(0.28)}"/>`;
+    default:
+      return null;
+  }
+}
+
 function resolveEnterStyle(animation, progress, W, H) {
   switch (animation) {
     case "fadeIn":      return { opacity: interpolate(progress,[0,1],[0,1],{extrapolateRight:"clamp"}) };
@@ -266,6 +330,20 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
   const contentPadding = st.contentPadding ?? 0;
   const finalInset     = contentPadding > 0 ? `${contentPadding}px` : "0px";
 
+  // Returns border-radius CSS props, supporting per-corner values (TL/TR/BR/BL)
+  const brStyle = (extra = 0) => {
+    const base   = st.borderRadius || 0;
+    const hasPer = st.borderRadiusTL !== undefined || st.borderRadiusTR !== undefined ||
+                   st.borderRadiusBR !== undefined || st.borderRadiusBL !== undefined;
+    if (!hasPer) return { borderRadius: base + extra };
+    return {
+      borderTopLeftRadius:     (st.borderRadiusTL ?? base) + extra,
+      borderTopRightRadius:    (st.borderRadiusTR ?? base) + extra,
+      borderBottomRightRadius: (st.borderRadiusBR ?? base) + extra,
+      borderBottomLeftRadius:  (st.borderRadiusBL ?? base) + extra,
+    };
+  };
+
   // Zones typed "avatar" by the pipeline are asset zones designated for the talking-head video.
   // Treat them as asset zones throughout.
   const effectiveType = zone.type === "avatar" ? "asset" : zone.type;
@@ -287,10 +365,10 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
 
   const zoneContainerStyle = {
     position:        "absolute",
-    left:            `${zone.x     ?? 0}%`,
-    top:             `${zone.y     ?? 0}%`,
-    width:           `${zone.width ?? 100}%`,
-    height:          isTextZone ? "auto" : `${zone.height ?? 100}%`,
+    left:            `${Number.isFinite(zone.x)      ? zone.x      : 0}%`,
+    top:             `${Number.isFinite(zone.y)      ? zone.y      : 0}%`,
+    width:           `${Number.isFinite(zone.width)  ? zone.width  : 100}%`,
+    height:          isTextZone ? "auto" : `${Number.isFinite(zone.height) ? zone.height : 100}%`,
     zIndex:          zone.zIndex ?? 1,
     // overflow:visible lets rotated/skewed corners show outside the original bounding rect
     overflow:        rotation || hasStaticTransform || isTextZone || isDecorativeZone ? "visible" : "hidden",
@@ -327,9 +405,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
     bottom:       finalInset,
     left:         finalInset,
     overflow:     "hidden",
-    borderRadius: st.borderRadius || 0,
+    ...brStyle(),
     boxShadow:    st.shadowBlur > 0
-      ? `0 ${Math.round(st.shadowBlur * 0.4)}px ${st.shadowBlur}px rgba(0,0,0,0.65)`
+      ? `0 ${Math.round(st.shadowBlur * 0.4)}px ${st.shadowBlur}px ${st.shadowColor ?? "rgba(0,0,0,0.65)"}`
       : undefined,
   };
 
@@ -355,17 +433,52 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
         {/* Avatar zone — singleton <video> is appended to this container in preview
             mode; OffthreadVideo used for render. The singleton never remounts between
             beats so there is no seek and no A/V sync break on beat change. */}
-        {isAvatarZone && project?.avatar?.src && (
-          <div style={insetBoxStyle}>
-            <AvatarVideoZone
-              src={project.avatar.src}
-              trimBefore={sequenceStartFrame}
-              objectFit={zone._userObjectFit || "cover"}
-              isRendering={isRendering}
-              style={{ width: "100%", height: "100%", objectFit: zone._userObjectFit || "cover" }}
-            />
-          </div>
-        )}
+        {isAvatarZone && project?.avatar?.src && (() => {
+          // Auto-detect objectFit when the user hasn't explicitly set one.
+          // Compares the zone's pixel aspect ratio to the avatar video's aspect ratio.
+          // A portrait video (9:16) in a wide/short zone needs 'contain' to avoid
+          // being cropped to a sliver; 'cover' is fine when ARs are similar.
+          let resolvedObjectFit = zone._userObjectFit || null;
+          let avatarBgColor = null;
+
+          if (!resolvedObjectFit) {
+            const zonePixW = ((zone.width  ?? 100) / 100) * W;
+            const zonePixH = ((zone.height ?? 100) / 100) * H;
+            const zoneAR   = zonePixW / Math.max(zonePixH, 1);
+
+            // In preview read actual video dimensions; in render assume 9:16 (portrait TH)
+            let vidAR = 9 / 16;
+            if (!isRendering) {
+              const vid = getAvatarVideoSingleton(project.avatar.src);
+              if (vid && vid.videoWidth > 0) vidAR = vid.videoWidth / vid.videoHeight;
+            }
+
+            const ratio = vidAR / zoneAR;
+            if (ratio < 0.65 || ratio > 1.55) {
+              // Significant mismatch — contain so the full avatar is always visible
+              resolvedObjectFit = "contain";
+              avatarBgColor     = "#0d0d0d";
+            } else {
+              resolvedObjectFit = "cover";
+            }
+          }
+
+          const avatarInsetStyle = avatarBgColor
+            ? { ...insetBoxStyle, background: avatarBgColor }
+            : insetBoxStyle;
+
+          return (
+            <div style={avatarInsetStyle}>
+              <AvatarVideoZone
+                src={project.avatar.src}
+                trimBefore={sequenceStartFrame}
+                objectFit={resolvedObjectFit}
+                isRendering={isRendering}
+                style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit }}
+              />
+            </div>
+          );
+        })()}
 
         {/* Asset — with optional animated border + one-shot shine */}
         {effectiveType === "asset" && content.kind !== "block" && content.asset?.src && !isAvatarZone && (() => {
@@ -443,6 +556,67 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           return <div style={insetBoxStyle}>{inner}</div>;
         })()}
 
+        {/* Static border overlay — shape-aware when clipShape is active */}
+        {effectiveType === "asset" && (st.borderWidth ?? 0) > 0 && (() => {
+          const bw          = st.borderWidth;
+          const bAlign      = st.borderAlign ?? "inside";
+          const borderColor = st.borderColor ?? "#ffffff";
+          const borderStyle = st.borderStyle ?? "solid";
+
+          // ── Shaped border: SVG stroke following the clip-path outline ──
+          if (st.clipShape) {
+            // Pixel dimensions of the inset box (matches what the clip-path is applied to)
+            const zoneW = (zone.width  ?? 100) / 100 * W;
+            const zoneH = (zone.height ?? 100) / 100 * H;
+            const svgW  = Math.max(1, zoneW - 2 * contentPadding);
+            const svgH  = Math.max(1, zoneH - 2 * contentPadding);
+
+            const cssClip    = getClipPathCSS(st.clipShape);
+            const svgContent = cssClip
+              ? cssClipToSVGStroke(cssClip, svgW, svgH)
+              : getSVGStrokeContent(st.clipShape, svgW, svgH);
+
+            if (svgContent) {
+              const dashArray = borderStyle === "dashed" ? `${bw * 3} ${bw * 2}`
+                              : borderStyle === "dotted" ? `0 ${bw * 1.5}`
+                              : undefined;
+              return (
+                <svg
+                  style={{ position:"absolute", top:finalInset, right:finalInset, bottom:finalInset, left:finalInset,
+                    overflow:"visible", pointerEvents:"none", zIndex:10 }}
+                  viewBox={`0 0 ${svgW} ${svgH}`}
+                  width={svgW} height={svgH}
+                >
+                  <g
+                    fill="none"
+                    stroke={borderColor}
+                    strokeWidth={bw}
+                    strokeDasharray={dashArray}
+                    strokeLinecap={borderStyle === "dotted" ? "round" : "square"}
+                    dangerouslySetInnerHTML={{ __html: svgContent }}
+                  />
+                </svg>
+              );
+            }
+          }
+
+          // ── Normal rectangular border (no clip shape) ──
+          const inset  = bAlign === "inside"  ? finalInset
+                       : bAlign === "center"  ? `calc(${finalInset} - ${bw / 2}px)`
+                       :                        `calc(${finalInset} - ${bw}px)`;
+          const extraR = bAlign === "inside"  ? 0
+                       : bAlign === "center"  ? bw / 2
+                       :                        bw;
+          return (
+            <div style={{
+              position:"absolute", top:inset, right:inset, bottom:inset, left:inset,
+              border:`${bw}px ${borderStyle} ${borderColor}`,
+              ...brStyle(extraR),
+              pointerEvents:"none", zIndex:10, boxSizing:"border-box",
+            }} />
+          );
+        })()}
+
         {/* Asset placeholder — no src yet and not an avatar zone */}
         {effectiveType === "asset" && !content.asset?.src && !isAvatarZone && content.kind !== "block" && (() => {
           const hint = beat?.asset_hint;
@@ -499,7 +673,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             position:        "relative",
             display:         "block",
             width:           "100%",
-            padding:         st.padding       || "0 8px",
+            padding:         st.contentPadding > 0 ? `${st.contentPadding}px` : (st.padding || "0 8px"),
             boxSizing:       "border-box",
             fontSize:        st.fontSize      || 32,
             fontWeight:      dnaTypo?.fontWeight ?? st.fontWeight ?? 700,
@@ -513,7 +687,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             letterSpacing:   st.letterSpacing || "normal",
             opacity:         1,
             background:      st.background    || "transparent",
-            borderRadius:    st.borderRadius  || 0,
+            ...brStyle(),
             whiteSpace:      "normal",
             overflowWrap:    "break-word",
             wordBreak:       "break-word",
@@ -593,7 +767,61 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
 
             // SVG decoratives
             if (entry.svg) {
-              const svgStr = entry.svg.replace(/currentColor/g, color);
+              const filled = st.filled ?? false;
+              const gradType  = st.gradientType ?? "none";
+              const gradAngle = st.gradientAngle ?? 90;
+              const useGrad   = gradType !== "none";
+              const gradId    = `dg_${String(zone.id).replace(/[^a-z0-9]/gi, "_")}`;
+
+              // Resolve stops — new array model, falling back to legacy two-color fields
+              const gradStops = st.gradientStops?.length >= 2
+                ? st.gradientStops
+                : [
+                    { pos: 0,   color: st.gradientColor1 || color,      opacity: st.gradientOpacity1 ?? 100 },
+                    { pos: 100, color: st.gradientColor2 || "#000000",   opacity: st.gradientOpacity2 ?? 100 },
+                  ];
+              const stopsSVG = [...gradStops]
+                .sort((a, b) => a.pos - b.pos)
+                .map(s => `<stop offset="${s.pos}%" stop-color="${s.color}" stop-opacity="${(s.opacity ?? 100) / 100}"/>`)
+                .join("");
+
+              // Build SVG <defs> with gradient when requested
+              let gradDefs = "";
+              if (useGrad) {
+                if (gradType === "linear") {
+                  const rad = (gradAngle * Math.PI) / 180;
+                  const x1  = (0.5 - 0.5 * Math.sin(rad)).toFixed(4);
+                  const y1  = (0.5 + 0.5 * Math.cos(rad)).toFixed(4);
+                  const x2  = (0.5 + 0.5 * Math.sin(rad)).toFixed(4);
+                  const y2  = (0.5 - 0.5 * Math.cos(rad)).toFixed(4);
+                  gradDefs = `<defs><linearGradient id="${gradId}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" gradientUnits="objectBoundingBox">${stopsSVG}</linearGradient></defs>`;
+                } else {
+                  gradDefs = `<defs><radialGradient id="${gradId}" cx="50%" cy="50%" r="50%">${stopsSVG}</radialGradient></defs>`;
+                }
+              }
+
+              const paintRef = useGrad ? `url(#${gradId})` : color;
+
+              let svgStr;
+              if (filled) {
+                svgStr = entry.svg
+                  .replace(/fill="none"/g, `fill="${paintRef}"`)
+                  .replace(/stroke="currentColor"/g, 'stroke="none"')
+                  .replace(/currentColor/g, paintRef);
+              } else {
+                svgStr = entry.svg
+                  .replace(/fill="currentColor"/g, 'fill="none"')
+                  .replace(/currentColor/g, paintRef);
+              }
+              const sw = st.strokeWidth ?? 3;
+              // Apply stroke-width to all stroke elements when in outline mode
+              if (!filled) {
+                svgStr = svgStr.replace(/stroke-width="[^"]*"/g, `stroke-width="${sw}"`);
+                // If no stroke-width attribute exists, add it to the svg tag
+                if (!svgStr.includes('stroke-width=')) {
+                  svgStr = svgStr.replace(/<svg /, `<svg stroke-width="${sw}" `);
+                }
+              }
               return (
                 <div style={{
                   position:     "absolute",
@@ -604,10 +832,16 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
                   pointerEvents: "none",
                   overflow:     "visible",
                 }}
-                  dangerouslySetInnerHTML={{ __html: svgStr.replace(
-                    /<svg /,
-                    '<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible" '
-                  ) }}
+                  dangerouslySetInnerHTML={{ __html: (() => {
+                    const hasAR = svgStr.includes('preserveAspectRatio=');
+                    const inject = hasAR
+                      ? '<svg width="100%" height="100%" style="overflow:visible" '
+                      : '<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible" ';
+                    // Inject defs right after the opening <svg ...> tag
+                    return svgStr
+                      .replace(/<svg /, inject)
+                      .replace(/(<svg[^>]*>)/, `$1${gradDefs}`);
+                  })() }}
                 />
               );
             }
@@ -621,7 +855,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
                 inset:        0,
                 background:   st.background,
                 opacity:      st.opacity ?? 1,
-                borderRadius: st.borderRadius || 0,
+                ...brStyle(),
                 pointerEvents:"none",
               }} />
             );
@@ -631,14 +865,28 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
 
         {/* Icon zones — Iconify (Phosphor) first, local registry fallback */}
         {effectiveType === "icon" && (() => {
-          const iconifyDef     = zone.iconify;           // baked into layout def
-          const contentIconify = zone.content?.iconify;  // user-picked
+          const iconifyDef      = zone.iconify;
+          const contentIconify  = zone.content?.iconify;
           const resolvedIconify = contentIconify ?? iconifyDef;
-          const iconColor = st.color ?? "#ffffff";
+          const iconColor       = st.color ?? "#ffffff";
+          const iconSize        = st.iconSize ?? 100;
+
+          // Wrapper: full zone when 100%, else centered box at iconSize%
+          const iconWrap = iconSize === 100
+            ? { position: "absolute", inset: 0, overflow: "visible" }
+            : {
+                position:  "absolute",
+                width:     `${iconSize}%`,
+                height:    `${iconSize}%`,
+                top:       "50%",
+                left:      "50%",
+                transform: `translate(-50%, -50%)${st.rotation ? ` rotate(${st.rotation}deg)` : ""}`,
+                overflow:  "visible",
+              };
 
           if (resolvedIconify?.set && resolvedIconify?.icon) {
             return (
-              <div style={{ position: "absolute", inset: 0 }}>
+              <div style={iconWrap}>
                 <IconifyZone
                   set={resolvedIconify.set}
                   icon={resolvedIconify.icon}
@@ -655,10 +903,10 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           const svg = renderIconSVG(iconId, { ...st, color: iconColor });
           if (!svg) return null;
           return (
-            <div style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+            <div style={iconWrap}>
               <svg
                 viewBox={svg.viewBox}
-                preserveAspectRatio="none"
+                preserveAspectRatio="xMidYMid meet"
                 width="100%" height="100%"
                 style={{ display: "block", overflow: "visible", opacity: st.opacity ?? 1 }}
                 dangerouslySetInnerHTML={{ __html: svg.content }}
@@ -674,7 +922,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
         <div style={{
           position: "absolute", inset: 0,
           border: "1.5px dashed rgba(255,255,255,0.3)",
-          borderRadius: st.borderRadius || 0,
+          ...brStyle(),
           pointerEvents: "none",
           zIndex: 99,
         }} />
@@ -694,7 +942,11 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
 
   const deletedZones = new Set(beat.deletedZones || []);
 
+  const _seenLRDefIds = new Set();
   const defZones = layoutDef.zones.flatMap(d => {
+    if (!d.id) return [];                          // skip legacy zones without an id
+    if (_seenLRDefIds.has(d.id)) return [];        // deduplicate — bad saves may store same id twice
+    _seenLRDefIds.add(d.id);
     if (deletedZones.has(d.id)) return [];
     const o = beatZones[d.id] || {};
     return [{
@@ -709,7 +961,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
       end:             o.end            !== undefined ? o.end : d.end,
       enterAnimation:  o.enterAnimation ?? d.enterAnimation,
       exitAnimation:   o.exitAnimation  ?? d.exitAnimation,
-      content:         o.content        || {},
+      content:         { ...(d.content || {}), ...(o.content || {}) },
       style:           { ...d.style, ...(o.style || {}) },
       background:      o.background     || {},
       hidden:          o.hidden         || false,

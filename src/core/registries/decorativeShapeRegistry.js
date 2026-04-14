@@ -320,18 +320,26 @@ export function renderDecorativeSVG(shapeId, style = {}, instanceId = "x") {
   let   fillAttr  = useFill   ? color  : "none";
   let   strokeAttr= useFill   ? "none" : color;
 
-  if (gradType === "linear") {
-    const angle  = st.gradientAngle || 0;
-    const rad    = (angle * Math.PI) / 180;
-    const c1     = st.gradientColor1 || color;
-    const c2     = st.gradientColor2 || "#000000";
-    gradDefs = `<defs><linearGradient id="${gradId}" x1="${(0.5 - 0.5*Math.sin(rad)).toFixed(3)}" y1="${(0.5 + 0.5*Math.cos(rad)).toFixed(3)}" x2="${(0.5 + 0.5*Math.sin(rad)).toFixed(3)}" y2="${(0.5 - 0.5*Math.cos(rad)).toFixed(3)}" gradientUnits="objectBoundingBox"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs>`;
-    fillAttr   = `url(#${gradId})`;
-    strokeAttr = "none";
-  } else if (gradType === "radial") {
-    const c1   = st.gradientColor1 || color;
-    const c2   = st.gradientColor2 || "#000000";
-    gradDefs   = `<defs><radialGradient id="${gradId}" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></radialGradient></defs>`;
+  if (gradType === "linear" || gradType === "radial") {
+    // Resolve stops — new array model, falling back to legacy two-color fields
+    const rawStops = st.gradientStops?.length >= 2
+      ? st.gradientStops
+      : [
+          { pos: 0,   color: st.gradientColor1 || color,    opacity: st.gradientOpacity1 ?? 100 },
+          { pos: 100, color: st.gradientColor2 || "#000000", opacity: st.gradientOpacity2 ?? 100 },
+        ];
+    const stopsSVG = [...rawStops]
+      .sort((a, b) => a.pos - b.pos)
+      .map(s => `<stop offset="${s.pos}%" stop-color="${s.color}" stop-opacity="${(s.opacity ?? 100) / 100}"/>`)
+      .join("");
+
+    if (gradType === "linear") {
+      const angle = st.gradientAngle || 0;
+      const rad   = (angle * Math.PI) / 180;
+      gradDefs = `<defs><linearGradient id="${gradId}" x1="${(0.5 - 0.5*Math.sin(rad)).toFixed(3)}" y1="${(0.5 + 0.5*Math.cos(rad)).toFixed(3)}" x2="${(0.5 + 0.5*Math.sin(rad)).toFixed(3)}" y2="${(0.5 - 0.5*Math.cos(rad)).toFixed(3)}" gradientUnits="objectBoundingBox">${stopsSVG}</linearGradient></defs>`;
+    } else {
+      gradDefs = `<defs><radialGradient id="${gradId}" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">${stopsSVG}</radialGradient></defs>`;
+    }
     fillAttr   = `url(#${gradId})`;
     strokeAttr = "none";
   }

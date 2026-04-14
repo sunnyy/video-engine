@@ -68,7 +68,7 @@ async function searchPixabay(query, mediaType, page) {
 
 export default function GalleryTab({ onSelect }) {
   const [query,      setQuery]      = useState("");
-  const [inputVal,   setInputVal]   = useState("");
+  const [inputVal,   setInputVal]   = useState("Travel");
   const [mediaType,  setMediaType]  = useState("all");
   const [results,    setResults]    = useState([]);
   const [loading,    setLoading]    = useState(false);

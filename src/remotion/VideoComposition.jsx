@@ -251,7 +251,7 @@ export default function VideoComposition({ project, previewMode = false }) {
         );
 
         return (
-          <Sequence key={beat.id} from={startFrame} durationInFrames={durationFrames}>
+          <Sequence key={beat.id} from={startFrame} durationInFrames={durationFrames} premountFor={fps}>
             <AbsoluteFill style={{ ...finalStyle, zIndex: index + 1 }}>
               <BeatRenderer beat={beat} project={project} previewMode={previewMode} sequenceStartFrame={startFrame} />
               {dipNode}

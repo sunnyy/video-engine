@@ -4,6 +4,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 import { useProjectStore } from "../../store/useProjectStore";
 import { supabase } from "../../lib/supabase";
+import { getLayoutDef } from "../../core/registries/layoutRegistry";
 
 function useIsAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -403,7 +404,7 @@ function SortableBeat({
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
               title={beat.layout}
             >
-              {beat.layout}
+              {getLayoutDef(beat.layout)?.label ?? beat.layout.slice(0, 8)}
             </span>
           )}
         </div>

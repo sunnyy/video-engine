@@ -9,6 +9,19 @@ import VideoComposition from "../../remotion/VideoComposition";
 import ZoneCanvas from "./ZoneCanvas";
 import { getLayoutDef } from "../../core/registries/layoutRegistry";
 
+function nextZoneId(layoutDef, beatZones) {
+  const allIds = [
+    ...(layoutDef?.zones || []).map(z => z.id),
+    ...Object.keys(beatZones || {}),
+  ];
+  let max = 0;
+  for (const id of allIds) {
+    const m = id?.match(/^z(\d+)$/);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `z${max + 1}`;
+}
+
 export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const project           = useProjectStore((s) => s.project);
   const activeBeatId      = useProjectStore((s) => s.activeBeatId);
@@ -180,9 +193,10 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       // Prevent browser defaults for shortcuts we handle (Ctrl+D = bookmark, etc.)
       if (!isTyping && (e.metaKey || e.ctrlKey) && e.code === "KeyD") { e.preventDefault(); }
 
-      // ESC — always deselect zone (even when typing), unless a modal is open
+      // ESC — deselect zone unless a modal or inline text editor is open
       if (e.code === "Escape") {
         if (document.querySelector("[data-modal]")) return;
+        if (document.querySelector("[data-inline-editor]")) return; // editor handles its own Escape
         onSelectZoneRef.current(null);
         return;
       }
@@ -200,7 +214,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       if (!liveBeat) return;
 
       const bz        = liveBeat.zones || {};
-      const layoutDef = getLayoutDef(liveBeat.layout);
+      const layoutDef = getLayoutDef(liveBeat.layout)
+        ?? useProjectStore.getState().project?.meta?.inlineLayoutDef;
 
       // Arrow keys with NO zone selected → seek ±1 second
       if ((e.code === "ArrowLeft" || e.code === "ArrowRight") && !selectedZoneId && !isMulti) {
@@ -252,14 +267,17 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           onSelectZoneRef.current(null);
           return;
         }
+        // Always track in deletedZones (matches ZonesSection.deleteZone logic).
+        // This prevents the auto-save race condition where a freshly-saved custom
+        // zone becomes a layout zone but only got removed from beat.zones here.
+        const prev = liveBeat.deletedZones || [];
+        const newDeletedZones = prev.includes(selectedZoneId) ? prev : [...prev, selectedZoneId];
         const isLayoutZone = layoutDef?.zones?.some(z => z.id === selectedZoneId);
         if (isLayoutZone) {
-          updateBeat(liveBeat.id, {
-            zones: { ...bz, [selectedZoneId]: { ...override, hidden: true } },
-          });
+          updateBeat(liveBeat.id, { deletedZones: newDeletedZones });
         } else {
           const { [selectedZoneId]: _removed, ...rest } = bz;
-          updateBeat(liveBeat.id, { zones: rest });
+          updateBeat(liveBeat.id, { zones: rest, deletedZones: newDeletedZones });
         }
         onSelectZoneRef.current(null);
         return;
@@ -270,8 +288,10 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         e.preventDefault();
         const x = override.x ?? defZone.x ?? 0;
         const y = override.y ?? defZone.y ?? 0;
-        const newId = `z_dup_${Date.now()}`;
-        updateBeat(liveBeat.id, { zones: { ...bz, [newId]: { ...defZone, ...override, x: x + 2, y: y + 2 } } });
+        const newId = nextZoneId(layoutDef, bz);
+        // Omit `id` from the merged data — the dict key is the zone's identity
+        const { id: _ignored, ...defRest } = defZone;
+        updateBeat(liveBeat.id, { zones: { ...bz, [newId]: { ...defRest, ...override, x: x + 2, y: y + 2 } } });
         onSelectZoneRef.current(newId);
         return;
       }
@@ -352,7 +372,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       )}
 
       {/* Canvas area */}
-      <div ref={containerRef} className={`flex-1 relative flex items-start justify-center p-2 ${is169 ? "overflow-y-auto" : "overflow-hidden"}`}>
+      <div ref={containerRef} className={`flex-1 mb-5 relative flex items-start justify-center p-2 pb-2 ${is169 ? "" : " overflow-x-hidden"}`}
+        onClick={() => onSelectZoneRef.current(null)}>
 
         {/* Static edit canvas — Thumbnail + ZoneCanvas + controls */}
         {activeBeat && !showPlayer && (
@@ -360,7 +381,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
           >
             {/* Canvas */}
-            <div style={{ position: "relative", width: canvasW, height: canvasH, outline: "2px solid rgba(255,255,255,0.18)" }}>
+            <div style={{ position: "relative", width: canvasW, height: canvasH, outline: "2px solid rgba(255,255,255,0.18)" }} onClick={e => e.stopPropagation()}>
               <Thumbnail
                 key={`thumb-${videoW}x${videoH}`}
                 acknowledgeRemotionLicense

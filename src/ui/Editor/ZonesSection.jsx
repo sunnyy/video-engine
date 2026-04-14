@@ -10,6 +10,20 @@ import ZonePickerModal from "./zonePicker/ZonePickerModal";
 import ZoneEditor from "./ZoneEditor";
 import OverlayEditor from "./OverlayEditor";
 
+/* ── Generate the next sequential zone id (z1, z2, …) ── */
+function nextZoneId(layoutDef, beatZones) {
+  const allIds = [
+    ...(layoutDef?.zones || []).map(z => z.id),
+    ...Object.keys(beatZones || {}),
+  ];
+  let max = 0;
+  for (const id of allIds) {
+    const m = id?.match(/^z(\d+)$/);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `z${max + 1}`;
+}
+
 /* ── Multi-zone alignment panel ── */
 function MultiAlignPanel({ selectedZoneIds, beat, zoneDefs, zones, updateBeat }) {
   const ids = [...selectedZoneIds];
@@ -152,7 +166,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
   const [addZonePicker,    setAddZonePicker]   = useState(false);
   const [selectedOverlay,  setSelectedOverlay] = useState(null);        // overlay id
 
-  const layoutDef = getLayoutDef(beat.layout);
+  const layoutDef = getLayoutDef(beat.layout) ?? project?.meta?.inlineLayoutDef ?? null;
   const zones     = beat.zones || {};
   const zoneDefs  = layoutDef?.zones || [];
 
@@ -201,7 +215,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     }
 
     // ── Zone-based content ──
-    const id = `custom_${Date.now()}`;
+    const id = nextZoneId(layoutDef, zones);
     let zoneData;
     if (data?.kind === "text") {
       zoneData = {
@@ -252,18 +266,21 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
   };
 
   const deleteZone = (slot) => {
+    // Always track in deletedZones — this prevents a race condition where
+    // a just-added zone auto-saves (adding it to the layout def), then the user
+    // deletes it; without this, the zone would be removed from beat.zones but
+    // not from deletedZones, so the next save would pull it back from defZones.
+    const prev = beat.deletedZones || [];
+    const newDeletedZones = prev.includes(slot) ? prev : [...prev, slot];
+
     const isLayoutZone = zoneDefs.some(z => z.id === slot);
     if (isLayoutZone) {
-      // Layout zone — can't remove from def, track in deletedZones
-      const prev = beat.deletedZones || [];
-      if (!prev.includes(slot)) {
-        updateBeat(beat.id, { deletedZones: [...prev, slot] });
-      }
+      updateBeat(beat.id, { deletedZones: newDeletedZones });
     } else {
-      // Custom zone — remove from zones dict entirely
+      // Custom zone — also remove from zones dict
       const newZones = { ...zones };
       delete newZones[slot];
-      updateBeat(beat.id, { zones: newZones });
+      updateBeat(beat.id, { zones: newZones, deletedZones: newDeletedZones });
     }
     if (selectedZoneId === slot) onSelectZone(null);
   };
@@ -393,8 +410,8 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
   const deletedZonesSet = new Set(beat.deletedZones || []);
 
   const allRows = [
-    // Layout-defined zones (excluding ones the user has deleted or hidden)
-    ...zoneDefs.filter(z => !deletedZonesSet.has(z.id) && !zones[z.id]?.hidden).map(z => {
+    // Layout-defined zones (excluding ones without ids, deleted, or hidden)
+    ...zoneDefs.filter(z => z.id && !deletedZonesSet.has(z.id) && !zones[z.id]?.hidden).map(z => {
       const zData = zones[z.id] || {};
       const type  = zData.type || z.type || "asset";
       return { id: z.id, name: z.label || z.id, type, isCustom: false, isOverlay: false };
@@ -516,6 +533,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
       {!!selectedZoneId && (
         <div className="flex-1 overflow-y-auto">
           <ZoneEditor
+            key={selectedZoneId}
             beatId={beat.id}
             beat={beat}
             project={project}

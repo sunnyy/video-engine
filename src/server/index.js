@@ -992,59 +992,111 @@ app.post("/api/admin/deduct-credits", requireAuth, requireAdmin, async (req, res
   }
 });
 
-/* ── Admin: save layout zones back to source file ── */
-app.post("/api/admin/layout/save", requireAuth, requireAdmin, async (req, res) => {
+/* ── Admin: Layout CRUD (Supabase-backed) ───────────────────── */
+
+// GET all layouts
+app.get("/api/admin/layouts", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { layoutId, intent, zones } = req.body;
-    if (!layoutId || !intent || !Array.isArray(zones)) {
-      return res.status(400).json({ error: "layoutId, intent, zones[] required" });
-    }
-
-    const primary  = Array.isArray(intent) ? intent[0] : intent;
-    const filePath = path.join(process.cwd(), "src/core/registries/layouts", primary, "index.js");
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: `File not found: ${primary}/index.js` });
-    }
-
-    let source = fs.readFileSync(filePath, "utf8");
-
-    // Locate the layout by its id string
-    const idMarker    = `"${layoutId}"`;
-    const layoutStart = source.indexOf(idMarker);
-    if (layoutStart === -1) {
-      return res.status(404).json({ error: `Layout "${layoutId}" not found in file` });
-    }
-
-    // Find "zones:" after the layout id
-    const zonesIdx = source.indexOf("zones:", layoutStart);
-    if (zonesIdx === -1) {
-      return res.status(404).json({ error: `No zones field for "${layoutId}"` });
-    }
-
-    // Find opening bracket '['
-    const bracketStart = source.indexOf("[", zonesIdx);
-    if (bracketStart === -1) {
-      return res.status(500).json({ error: "Could not find zones array start" });
-    }
-
-    // Walk forward counting only '[' and ']' to find matching close
-    let depth = 0, bracketEnd = -1;
-    for (let i = bracketStart; i < source.length; i++) {
-      if (source[i] === "[")      depth++;
-      else if (source[i] === "]") { depth--; if (depth === 0) { bracketEnd = i; break; } }
-    }
-    if (bracketEnd === -1) {
-      return res.status(500).json({ error: "Unmatched bracket in zones array" });
-    }
-
-    const zonesStr = JSON.stringify(zones, null, 4);
-    const newSource = source.slice(0, bracketStart) + zonesStr + source.slice(bracketEnd + 1);
-
-    fs.writeFileSync(filePath, newSource, "utf8");
-    res.json({ success: true, saved: zones.length });
+    const { data, error } = await supabaseAdmin.from("layouts").select("*").eq("is_active", true).order("created_at", { ascending: true });
+    if (error) throw error;
+    res.json(data);
   } catch (err) {
-    console.error("[admin/layout/save]", err.message);
+    console.error("[admin/layouts GET]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST create new layout
+app.post("/api/admin/layouts", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { name, label, intent, energy, niche, orientation, visibility,
+            show_caption, default_transition, zones, tags, asset_count, text_count } = req.body;
+    if (!name || !label || !intent || !Array.isArray(zones)) {
+      return res.status(400).json({ error: "name, label, intent, zones[] required" });
+    }
+    const { data, error } = await supabaseAdmin
+      .from("layouts")
+      .insert({
+        name, label, intent,
+        energy:       energy       ?? ["high", "medium", "low"],
+        niche:        niche        ?? [],
+        orientation:  orientation  ?? "9:16",
+        visibility:   visibility   ?? "internal",
+        show_caption:        show_caption ?? true,
+        default_transition:  default_transition ?? null,
+        zones:               zones,
+        tags:             tags             ?? [],
+        asset_count:      asset_count      ?? zones.filter(z => z.type === "asset").length,
+        text_count:       text_count       ?? zones.filter(z => z.type === "text").length,
+        is_active:        true,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("[admin/layouts POST]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT update existing layout
+app.put("/api/admin/layouts/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    // Auto-compute counts if zones were provided
+    if (Array.isArray(updates.zones)) {
+      updates.asset_count = updates.asset_count ?? updates.zones.filter(z => z.type === "asset").length;
+      updates.text_count  = updates.text_count  ?? updates.zones.filter(z => z.type === "text").length;
+    }
+    const { data, error } = await supabaseAdmin
+      .from("layouts")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("[admin/layouts PUT]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE a layout (soft-delete via is_active=false)
+app.delete("/api/admin/layouts/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabaseAdmin
+      .from("layouts")
+      .delete()
+      .eq("id", id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[admin/layouts DELETE]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST duplicate a layout
+app.post("/api/admin/layouts/:id/duplicate", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: src, error: fetchErr } = await supabaseAdmin
+      .from("layouts").select("*").eq("id", id).single();
+    if (fetchErr) throw fetchErr;
+    const { id: _id, created_at, updated_at, ...rest } = src;
+    const { data, error } = await supabaseAdmin
+      .from("layouts")
+      .insert({ ...rest, name: `${rest.name}_copy`, label: `${rest.label} (copy)`, is_active: true })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("[admin/layouts duplicate]", err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -23,6 +23,7 @@ const HANDLES = [
 export default function ZoneHandle({
   zone,
   isSelected,
+  isEditing,
   canvasWidth,
   canvasHeight,
   onSelect,
@@ -30,6 +31,7 @@ export default function ZoneHandle({
   onUpdateMulti,
   onPushHistory,
   onSave,
+  onEditText,
   selectedZoneIds,
   allZones,
 }) {
@@ -119,6 +121,8 @@ export default function ZoneHandle({
           onSelect(zone.id, additive);
         }
       } else {
+        // Drag completed — select the zone that was dragged (if not already selected)
+        if (!isSelected && !isMulti) onSelect(zone.id, false);
         onSave(zone.id);
       }
       dragStart.current = null;
@@ -154,25 +158,47 @@ export default function ZoneHandle({
 
       let x = origX, y = origY, w = origW, h = origH;
 
-      const isCorner  = handle.length === 2; // "nw","ne","se","sw"
-      const lockRatio = me.shiftKey && isCorner;
+      const isCorner   = handle.length === 2; // "nw","ne","se","sw"
+      const fromCenter = me.altKey;           // Alt = resize from center (Figma-style)
+      const lockRatio  = me.shiftKey && isCorner;
       const aspectRatio = origW / origH;
 
-      if (handle.includes("e")) w = Math.max(2, origW + dx);
-      if (handle.includes("s")) h = Math.max(2, origH + dy);
-      if (handle.includes("w")) { x = origX + dx; w = Math.max(2, origW - dx); }
-      if (handle.includes("n")) { y = origY + dy; h = Math.max(2, origH - dy); }
+      if (fromCenter) {
+        // Both opposite edges expand equally; center stays fixed.
+        // e.g. dragging east by dx → w grows by 2*dx, x shrinks by dx.
+        const cx = origX + origW / 2;
+        const cy = origY + origH / 2;
+        if (handle.includes("e") || handle.includes("w")) {
+          const halfW = handle.includes("e") ? (origW / 2 + dx) : (origW / 2 - dx);
+          w = Math.max(1, halfW * 2);
+          x = cx - w / 2;
+        }
+        if (handle.includes("s") || handle.includes("n")) {
+          const halfH = handle.includes("s") ? (origH / 2 + dy) : (origH / 2 - dy);
+          h = Math.max(1, halfH * 2);
+          y = cy - h / 2;
+        }
+      } else {
+        if (handle.includes("e")) w = Math.max(2, origW + dx);
+        if (handle.includes("s")) h = Math.max(2, origH + dy);
+        if (handle.includes("w")) { x = origX + dx; w = Math.max(2, origW - dx); }
+        if (handle.includes("n")) { y = origY + dy; h = Math.max(2, origH - dy); }
+      }
 
       // Shift on a corner handle: lock aspect ratio by using whichever axis moved more
       if (lockRatio) {
         const absDx = Math.abs(me.clientX - mouseX);
         const absDy = Math.abs(me.clientY - mouseY);
+        const cx = origX + origW / 2;
+        const cy = origY + origH / 2;
         if (absDx >= absDy) {
           h = w / aspectRatio;
-          if (handle.includes("n")) y = origY + (origH - h);
+          if (fromCenter) y = cy - h / 2;
+          else if (handle.includes("n")) y = origY + (origH - h);
         } else {
           w = h * aspectRatio;
-          if (handle.includes("w")) x = origX + (origW - w);
+          if (fromCenter) x = cx - w / 2;
+          else if (handle.includes("w")) x = origX + (origW - w);
         }
       }
 
@@ -272,7 +298,7 @@ export default function ZoneHandle({
       style={{
         position:      "absolute",
         left: pxX, top: pxY, width: pxW, height: pxH,
-        zIndex:        (zone.zIndex ?? 1) + (isSelected ? 2 : 0),
+        zIndex:        isSelected ? 9999 : (zone.zIndex ?? 1),
         boxSizing:     "border-box",
         overflow:      "visible",
         pointerEvents: "none", // pass clicks through — only children with explicit pointerEvents capture
@@ -291,9 +317,22 @@ export default function ZoneHandle({
       }} />
 
       {/* Hit area — always full zone, behind handles (zIndex: 1).
-          Drag  → moves the zone.
-          Click (no drag) → selects if unselected; deselects if already selected. */}
-      <div onMouseDown={onMouseDown} style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "auto", cursor: isSelected ? "grab" : "default" }} />
+          Drag        → moves the zone.
+          Click       → selects if unselected; deselects if already selected.
+          Double-click (text zones) → enter inline edit mode. */}
+      <div
+        onMouseDown={onMouseDown}
+        onDoubleClick={(e) => {
+          if (zone.type === "text" && onEditText && !isEditing) {
+            e.stopPropagation();
+            onEditText(zone.id);
+          }
+        }}
+        style={{
+          position: "absolute", inset: 0, zIndex: 1, pointerEvents: "auto",
+          cursor: isEditing ? "text" : (zone.type === "text" && isSelected ? "text" : isSelected ? "grab" : "default"),
+        }}
+      />
 
       {/* Label */}
       {isVisible && (
@@ -305,13 +344,16 @@ export default function ZoneHandle({
           padding: "1px 4px", borderRadius: 3,
           whiteSpace: "nowrap", pointerEvents: "none", userSelect: "none", lineHeight: "14px",
         }}>
-          {getLabel()}
-          {rotation !== 0 && !isMulti && ` · ${rotation}°`}
+          {isEditing ? "editing…" : getLabel()}
+          {!isEditing && rotation !== 0 && !isMulti && ` · ${rotation}°`}
+          {!isEditing && zone.type === "text" && isSelected && !isMulti && (
+            <span style={{ opacity: 0.45, marginLeft: 4 }}>dbl-click to edit</span>
+          )}
         </div>
       )}
 
-      {/* Resize handles — single select only */}
-      {isSelected && !isMulti && HANDLES.map(h => (
+      {/* Resize handles — single select only, hidden while inline-editing */}
+      {isSelected && !isMulti && !isEditing && HANDLES.map(h => (
         <div key={h.id} data-handle={h.id} onMouseDown={e => onResizeDown(e, h.id)}
           style={{
             position: "absolute",
@@ -324,8 +366,8 @@ export default function ZoneHandle({
         />
       ))}
 
-      {/* Rotation handle — single select only */}
-      {isSelected && !isMulti && (
+      {/* Rotation handle — single select only, hidden while inline-editing */}
+      {isSelected && !isMulti && !isEditing && (
         <div
           data-rotate="true"
           onMouseDown={onRotateDown}

@@ -491,6 +491,40 @@ export const decorativeRegistry = [
     quantity: [1],
   },
 
+  {
+    id: "shape_square",
+    category: "accent", subtype: "shape", render: "svg",
+    // preserveAspectRatio="none" so the border stretches to fill the zone edge-to-edge
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" preserveAspectRatio="none" fill="none">
+      <rect x="0" y="0" width="48" height="48" stroke="currentColor" stroke-width="3" vector-effect="non-scaling-stroke"/>
+    </svg>`,
+    colorize: true,
+    positions: ["center"],
+    mirroring: false,
+    scale: ["sm", "md", "lg"],
+    energy_range: [0.0, 1.0],
+    style_tags: ["geometric", "clean", "minimal"],
+    niche_tags: ["all"],
+    quantity: [1],
+  },
+
+  {
+    id: "shape_rectangle",
+    category: "accent", subtype: "shape", render: "svg",
+    // preserveAspectRatio="none" so the border stretches to fill the zone edge-to-edge
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" preserveAspectRatio="none" fill="none">
+      <rect x="0" y="0" width="48" height="48" stroke="currentColor" stroke-width="3" vector-effect="non-scaling-stroke"/>
+    </svg>`,
+    colorize: true,
+    positions: ["center"],
+    mirroring: false,
+    scale: ["sm", "md", "lg"],
+    energy_range: [0.0, 1.0],
+    style_tags: ["geometric", "clean", "minimal"],
+    niche_tags: ["all"],
+    quantity: [1],
+  },
+
   /* ══════════════════════════════════════════════════════════
      ACCENT — ARROWS (6)
   ══════════════════════════════════════════════════════════ */

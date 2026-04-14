@@ -12,7 +12,7 @@ import { buildBeatsFromScript } from "../../core/buildBeatsFromScript";
 import { serverFetch } from "../serverApi";
 import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/registries/musicRegistry";
 import { generateZoneImage } from "../../server/assets/falService";
-import { getLayoutDef } from "../../core/registries/layoutRegistry";
+import { getLayoutDef, refreshCache } from "../../core/registries/layoutRegistry";
 import { uploadUserAsset } from "../assets/uploadUserAsset";
 import { useAssetsStore }  from "../../store/useAssetsStore";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
@@ -379,6 +379,9 @@ export async function generateStructuredShort({
   onProgress       = null,
 }) {
   const report = (step) => { if (onProgress) onProgress(step); };
+
+  // Always refresh layout registry before generation so newly-added Supabase layouts are visible
+  await refreshCache();
 
   let parsedScript;
 

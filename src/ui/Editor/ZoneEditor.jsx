@@ -2,6 +2,9 @@
  * ZoneEditor.jsx — grouped, collapsible zone editor
  */
 import { useState, useEffect, useContext, createContext } from "react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { transitionsRegistry } from "../../../src/core/registries/transitionsRegistry";
 import { motionsRegistry }     from "../../../src/core/registries/motionsRegistry";
 import { useProjectStore }     from "../../../src/store/useProjectStore";
@@ -234,6 +237,150 @@ function ZoneBgRow({ bg, slot, openPicker, clearBackground, padding, setStyleSil
   );
 }
 
+/* ── Gradient background helpers (for decorative overlay zones) ── */
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return alpha >= 1 ? hex : `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
+}
+function gradToCSS({ type, angle, stops }) {
+  const s = stops.map(st => `${hexToRgba(st.hex, st.alpha)} ${st.pos}%`).join(", ");
+  return type === "radial" ? `radial-gradient(circle, ${s})` : `linear-gradient(${angle}deg, ${s})`;
+}
+function parseGrad(bg) {
+  const def = { type: "linear", angle: 180, stops: [
+    { hex: "#ffffff", alpha: 0.9, pos: 0 },
+    { hex: "#ffffff", alpha: 0,   pos: 100 },
+  ]};
+  if (!bg) return def;
+  const isLinear = bg.startsWith("linear-gradient");
+  const isRadial  = bg.startsWith("radial-gradient");
+  if (!isLinear && !isRadial) return def;
+  const type  = isLinear ? "linear" : "radial";
+  const inner = bg.match(/^(?:linear|radial)-gradient\((.+)\)$/)?.[1];
+  if (!inner) return def;
+  let angle = 180, rest = inner;
+  if (isLinear) {
+    const dM = rest.match(/^(\d+(?:\.\d+)?)deg\s*,\s*/);
+    if (dM) { angle = parseFloat(dM[1]); rest = rest.slice(dM[0].length); }
+    else {
+      const tM = rest.match(/^to\s+(top|bottom|left|right|top right|top left|bottom right|bottom left)\s*,\s*/i);
+      if (tM) {
+        angle = { top:0, right:90, bottom:180, left:270, "top right":45, "top left":315, "bottom right":135, "bottom left":225 }[tM[1].toLowerCase()] ?? 180;
+        rest = rest.slice(tM[0].length);
+      }
+    }
+  }
+  const re = /(rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+)?\s*\)|#[0-9a-fA-F]{3,8})\s+([\d.]+)%/g;
+  const stops = []; let m;
+  while ((m = re.exec(rest)) !== null) {
+    const c = m[1].trim(); let hex = "#ffffff", alpha = 1;
+    if (c.startsWith("#")) { hex = c.slice(0, 7); }
+    else {
+      const rgba = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
+      if (rgba) {
+        hex = `#${(+rgba[1]).toString(16).padStart(2,"0")}${(+rgba[2]).toString(16).padStart(2,"0")}${(+rgba[3]).toString(16).padStart(2,"0")}`;
+        alpha = parseFloat(rgba[4] ?? 1);
+      }
+    }
+    stops.push({ hex, alpha, pos: parseFloat(m[2]) });
+  }
+  return stops.length >= 2 ? { type, angle, stops } : def;
+}
+
+const GRAD_DIR_PRESETS = [
+  { label:"↓", angle:180, title:"Top → Bottom" },
+  { label:"↑", angle:0,   title:"Bottom → Top" },
+  { label:"→", angle:90,  title:"Left → Right"  },
+  { label:"←", angle:270, title:"Right → Left"  },
+  { label:"↗", angle:45,  title:"↙ → ↗" },
+  { label:"↘", angle:135, title:"↖ → ↘" },
+];
+
+/* ── Sortable gradient stop row ─────────────────────────────────────────── */
+function SortableGradientStop({ stop, index, total, onPatch, onRemove, onCommit }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: index });
+
+  // Alpha hex suffix for swatch preview (0-255)
+  const alphaSuffix = Math.round(((stop.opacity ?? 100) / 100) * 255)
+    .toString(16).padStart(2, "0");
+
+  return (
+    <div ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+      className="flex items-center gap-2 px-2 py-[6px] rounded-[8px]">
+
+      {/* Drag handle */}
+      <span {...attributes} {...listeners}
+        className="text-[#44445a] cursor-grab active:cursor-grabbing shrink-0 select-none"
+        style={{ fontSize: 13, lineHeight: 1 }}>⠿</span>
+
+      {/* Native color picker — no library, no popover, no conversion bugs */}
+      <div className="relative shrink-0" style={{ width: 22, height: 22 }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: 4,
+          background: `${stop.color}${alphaSuffix}`,
+          border: "1px solid rgba(255,255,255,0.2)",
+          pointerEvents: "none", position: "absolute", inset: 0,
+        }} />
+        <input type="color" value={stop.color}
+          onChange={e => onPatch("color", e.target.value, true)}
+          onBlur={onCommit}
+          style={{ opacity: 0, position: "absolute", inset: 0, width: "100%", height: "100%", cursor: "pointer", padding: 0, border: 0 }} />
+      </div>
+
+      {/* Position */}
+      <div className="flex items-center gap-1 flex-1 min-w-0">
+        <span className="text-[10px] text-[#7070a0] shrink-0">Pos</span>
+        <input type="range" min={-20} max={120} step={1} value={stop.pos}
+          onChange={e => onPatch("pos", Number(e.target.value), true)}
+          onMouseUp={onCommit} onTouchEnd={onCommit}
+          className="flex-1 min-w-0 accent-[#7c5cfc] cursor-pointer" style={{ height: 4 }} />
+        <span className="text-[10px] font-mono text-[#c0c0d8] shrink-0 w-6 text-right">{stop.pos}%</span>
+      </div>
+
+      {/* Opacity */}
+      <div className="flex items-center gap-1" style={{ width: 80 }}>
+        <span className="text-[10px] text-[#7070a0] shrink-0">A</span>
+        <input type="range" min={0} max={100} step={1} value={stop.opacity ?? 100}
+          onChange={e => onPatch("opacity", Number(e.target.value), true)}
+          onMouseUp={onCommit} onTouchEnd={onCommit}
+          className="flex-1 min-w-0 accent-[#7c5cfc] cursor-pointer" style={{ height: 4 }} />
+        <span className="text-[10px] font-mono text-[#c0c0d8] shrink-0 w-6 text-right">{stop.opacity ?? 100}%</span>
+      </div>
+
+      {/* Remove */}
+      {total > 2
+        ? <button onClick={onRemove}
+            className="text-[15px] leading-none text-[#7070a0] hover:text-[#f87171] bg-transparent border-0 cursor-pointer shrink-0">×</button>
+        : <div className="w-[15px] shrink-0" />
+      }
+    </div>
+  );
+}
+
+function GradientStopList({ gStops, setStops, patchStop, commit }) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter}
+      onDragEnd={({ active, over }) => {
+        if (over && active.id !== over.id)
+          setStops(arrayMove(gStops, active.id, over.id), false);
+      }}>
+      <SortableContext items={gStops.map((_, i) => i)} strategy={verticalListSortingStrategy}>
+        {gStops.map((stop, i) => (
+          <SortableGradientStop key={i} stop={stop} index={i} total={gStops.length}
+            onPatch={(key, val, silent) => patchStop(i, key, val, silent)}
+            onRemove={() => setStops(gStops.filter((_, idx) => idx !== i), false)}
+            onCommit={commit} />
+        ))}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 /* ══════════════════════════════════════════════════ */
 export default function ZoneEditor({
   beatId, beat, project, slot, zone, zoneDef, zoneType,
@@ -256,6 +403,12 @@ export default function ZoneEditor({
   const isText       = zoneType === "text";
   const isDecorative = zoneType === "decorative" || zoneType === "icon";
   const isBlock      = content.kind === "block";
+  const isGradientOverlay = zoneType === "decorative" && !content.decorativeId && !content.iconId && !content.shape;
+
+  // Gradient state for decorative overlay zones (key={slot} on ZoneEditor ensures fresh state per zone)
+  const [gradState, setGradState] = useState(() =>
+    isGradientOverlay ? parseGrad(style.background) : null
+  );
 
   const enters  = Object.keys(transitionsRegistry.enter || {});
   const exits   = Object.keys(transitionsRegistry.exit  || {});
@@ -268,6 +421,9 @@ export default function ZoneEditor({
   const radius  = style.borderRadius  ?? 0;
   const shadow  = style.shadowBlur    ?? 0;
   const padding = style.contentPadding ?? 0;
+  const cornersUnlocked = style.borderRadiusTL !== undefined || style.borderRadiusTR !== undefined ||
+    style.borderRadiusBR !== undefined || style.borderRadiusBL !== undefined;
+  const cornerVal = (key) => style[key] ?? radius;
   const bg      = safeZone.background || {};
   const opacity = style.opacity ?? 1;
   const rotation = style.rotation ?? 0;
@@ -298,13 +454,45 @@ export default function ZoneEditor({
   const setStyleSilent  = (key, val) => setZoneStyleSilent(slot, key, val);
   const setLayoutSilent = (key, val) => setZoneLayoutSilent(slot, key, val);
 
+  const unlockCorners = () => {
+    patchZoneSilent(slot, {}, {
+      borderRadiusTL: radius, borderRadiusTR: radius,
+      borderRadiusBR: radius, borderRadiusBL: radius,
+    });
+    commit();
+  };
+  const lockCorners = () => {
+    const st8 = useProjectStore.getState();
+    const b   = st8.project?.beats?.find(b => b.id === beatId);
+    if (!b) return;
+    const zones = { ...b.zones };
+    const z     = { ...(zones[slot] ?? {}) };
+    const ns    = { ...z.style };
+    delete ns.borderRadiusTL; delete ns.borderRadiusTR;
+    delete ns.borderRadiusBR; delete ns.borderRadiusBL;
+    zones[slot] = { ...z, style: ns };
+    st8.updateBeatSilent(beatId, { zones });
+    commit();
+  };
+  const setAllCorners = (v) => {
+    const patch = { borderRadius: v };
+    if (cornersUnlocked) {
+      patch.borderRadiusTL = v; patch.borderRadiusTR = v;
+      patch.borderRadiusBR = v; patch.borderRadiusBL = v;
+    }
+    patchZoneSilent(slot, {}, patch);
+  };
+
   /* Layer z-index helpers — use effective z-indices (layout def merged) passed from ZonesSection */
   const otherZIndices = allZoneZIndices || [];
   const currentZIndex = safeZone.zIndex ?? zoneDef?.zIndex ?? 1;
   const maxZ = otherZIndices.length ? Math.max(...otherZIndices) : currentZIndex;
   const minZ = otherZIndices.length ? Math.min(...otherZIndices) : currentZIndex;
-  const isAtFront = otherZIndices.length > 0 && currentZIndex >= maxZ;
-  const isAtBack  = otherZIndices.length === 0 || currentZIndex <= minZ;
+  // Strict comparisons: disabled only when STRICTLY past the boundary.
+  // With >=/>= all same z-index → both true → all buttons disabled (bug).
+  // With strict >/<, tied zones still allow reordering in either direction.
+  const isAtFront = otherZIndices.length > 0 && currentZIndex > maxZ;
+  const isAtBack  = otherZIndices.length === 0 || currentZIndex < minZ;
 
   useEffect(() => {
     const onKey = (e) => {
@@ -462,19 +650,18 @@ export default function ZoneEditor({
             onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
         </div>
 
-        <ColorRow label="Text Color" value={style.color ?? "#ffffff"}
-          onChange={v => updateTextStyle(slot, "color", v)} />
-      </Section>
-
-      {/* Decoration */}
-      <Section title="Decoration" icon="🎨" defaultOpen={false}>
-        <div className="mb-3">
-          <ColorRow label="Background Color"
+        <div className="grid grid-cols-2 gap-3">
+          <ColorRow label="Text Color" value={style.color ?? "#ffffff"}
+            onChange={v => updateTextStyle(slot, "color", v)} />
+          <ColorRow label="Background"
             value={!style.background || style.background === "transparent" ? "#000000" : style.background}
             onChange={v => updateTextStyle(slot, "background", v)}
             onClear={() => updateTextStyle(slot, "background", "transparent")} />
         </div>
+      </Section>
 
+      {/* Decoration */}
+      <Section title="Decoration" icon="🎨" defaultOpen={false}>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Slider label="Border Radius" value={radius}
             onChangeSilent={v => setStyleSilent("borderRadius", v)}
@@ -649,14 +836,34 @@ export default function ZoneEditor({
     const entry  = decorativeById[decId];
     const color  = style.color || "#ffffff";
     const sw     = style.strokeWidth ?? 3;
+    const filled = style.filled ?? false;
+
+    // Build SVG preview respecting filled/outline mode
+    const buildDecorativeSvg = (svgStr, col) => {
+      if (!svgStr) return null;
+      if (filled) {
+        // filled: set fill to color, remove stroke
+        return svgStr
+          .replace(/fill="none"/g, `fill="${col}"`)
+          .replace(/stroke="currentColor"/g, 'stroke="none"')
+          .replace(/currentColor/g, col);
+      } else {
+        // outline: fill=none, stroke=color, apply stroke-width
+        let s = svgStr
+          .replace(/fill="currentColor"/g, 'fill="none"')
+          .replace(/currentColor/g, col);
+        s = s.replace(/stroke-width="[^"]*"/g, `stroke-width="${sw}"`);
+        if (!s.includes('stroke-width=')) {
+          s = s.replace(/<svg /, `<svg stroke-width="${sw}" `);
+        }
+        return s;
+      }
+    };
 
     // Build SVG preview with user color injected (svg entries only)
     const svgPreview = entry?.svg
-      ? entry.svg.replace(/currentColor/g, color)
+      ? buildDecorativeSvg(entry.svg, color)
       : null;
-
-    // Group siblings for "similar" picker — same category
-    const siblings = decorativeRegistry.filter(d => d.category === entry?.category);
 
     return (
       <div className="pb-6">
@@ -667,7 +874,7 @@ export default function ZoneEditor({
             <div className="w-[80px] h-[60px] flex items-center justify-center rounded-[8px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)]">
               {svgPreview
                 ? <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", opacity: style.opacity ?? 1 }}
-                    dangerouslySetInnerHTML={{ __html: svgPreview.replace(/<svg /, '<svg width="56" height="56" preserveAspectRatio="xMidYMid meet" ') }} />
+                    dangerouslySetInnerHTML={{ __html: svgPreview.replace(/<svg /, svgPreview.includes('preserveAspectRatio=') ? '<svg width="56" height="56" ' : '<svg width="56" height="56" preserveAspectRatio="xMidYMid meet" ') }} />
                 : entry?.css
                   ? (() => {
                       const c = Object.fromEntries(Object.entries(entry.css).map(([k,v]) => [k, typeof v === "string" ? v.replace(/currentColor/g, color) : v]));
@@ -683,40 +890,24 @@ export default function ZoneEditor({
             <ColorRow label="Color" value={color} onChange={v => setZoneStyle(slot, "color", v)} />
           </div>
 
-          {/* Stroke width — useful for stroke-based SVGs */}
+          {/* Filled / Outline toggle */}
           <div className="mb-3">
-            <Slider label="Stroke Width" value={sw}
-              onChangeSilent={v => setStyleSilent("strokeWidth", v)}
-              onCommit={commit} min={1} max={20} step={1} unit="px" />
+            <BtnGroup
+              options={[{ label: "Outline", value: "false" }, { label: "Filled", value: "true" }]}
+              value={String(filled)}
+              onChange={v => setZoneStyle(slot, "filled", v === "true")}
+            />
           </div>
 
-          {/* Swap — pick another from same category */}
-          {siblings.length > 1 && (
-            <div className="mb-1">
-              <Label>Swap</Label>
-              <div className="grid grid-cols-6 gap-[4px] mt-[5px]">
-                {siblings.map(s => {
-                  const isActive = s.id === decId;
-                  const swapSvg  = s.svg
-                    ? s.svg.replace(/currentColor/g, "#ffffff").replace(/<svg /, '<svg width="18" height="18" preserveAspectRatio="xMidYMid meet" ')
-                    : null;
-                  return (
-                    <button key={s.id} title={s.id}
-                      onClick={() => setZoneLayout(slot, "content", { decorativeId: s.id })}
-                      className="aspect-square rounded-[6px] border cursor-pointer transition-all flex items-center justify-center p-[5px]"
-                      style={isActive ? ACTIVE_BTN : INACTIVE_BTN}
-                    >
-                      {swapSvg
-                        ? <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
-                            dangerouslySetInnerHTML={{ __html: swapSvg }} />
-                        : <div style={{ width: "100%", height: 2, background: "#ffffff", borderRadius: 1 }} />
-                      }
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Stroke width — only relevant in outline mode */}
+          {!filled && (
+            <div className="mb-3">
+              <Slider label="Stroke Width" value={sw}
+                onChangeSilent={v => setStyleSilent("strokeWidth", v)}
+                onCommit={commit} min={1} max={20} step={1} unit="px" />
             </div>
           )}
+
         </Section>
 
         <Section title="Transform" defaultOpen={false}>
@@ -729,6 +920,58 @@ export default function ZoneEditor({
               onCommit={commit} min={0} max={100} unit="%" />
           </div>
         </Section>
+
+        {/* Gradient (SVG decoratives only — CSS-repeat types have no fill to gradient) */}
+        {entry?.svg && (
+          <Section title="Gradient" icon="◐" defaultOpen={false}
+            badge={(style.gradientType && style.gradientType !== "none") ? style.gradientType : undefined}>
+            <div className="flex items-center gap-2 mb-3">
+              <BtnGroup fullWidth
+                options={[{ label: "Off", value: "none" }, { label: "Linear", value: "linear" }, { label: "Radial", value: "radial" }]}
+                value={style.gradientType || "none"} onChange={v => setZoneStyle(slot, "gradientType", v)} />
+            </div>
+            {(style.gradientType && style.gradientType !== "none") && (() => {
+              const gStops = style.gradientStops?.length >= 2
+                ? style.gradientStops
+                : [
+                    { pos: 0,   color: style.gradientColor1 || color,      opacity: style.gradientOpacity1 ?? 100 },
+                    { pos: 100, color: style.gradientColor2 || "#000000",   opacity: style.gradientOpacity2 ?? 100 },
+                  ];
+              const setStops = (next, silent) =>
+                silent
+                  ? setStyleSilent("gradientStops", next)
+                  : setZoneStyle(slot, "gradientStops", next);
+              const patchStop = (i, key, val, silent) =>
+                setStops(gStops.map((s, idx) => idx === i ? { ...s, [key]: val } : s), silent);
+              const addStop = () => {
+                const sorted = [...gStops].sort((a, b) => a.pos - b.pos);
+                let maxGap = -1, insertPos = 50;
+                for (let i = 0; i < sorted.length - 1; i++) {
+                  const gap = sorted[i + 1].pos - sorted[i].pos;
+                  if (gap > maxGap) { maxGap = gap; insertPos = Math.round((sorted[i].pos + sorted[i + 1].pos) / 2); }
+                }
+                setStops([...gStops, { pos: insertPos, color: "#ffffff", opacity: 100 }], false);
+              };
+              return (
+                <div className="flex flex-col gap-3">
+                  <GradientStopList gStops={gStops} setStops={setStops} patchStop={patchStop} commit={commit} />
+                  {gStops.length < 6 && (
+                    <button onClick={addStop}
+                      className="w-full py-[7px] rounded-[8px] text-[12px] bg-transparent cursor-pointer transition-colors"
+                      style={{ color: "#7c5cfc", border: "1px solid rgba(124,92,252,0.3)" }}>
+                      + Add Stop
+                    </button>
+                  )}
+                  {style.gradientType === "linear" && (
+                    <Slider label="Angle" value={style.gradientAngle ?? 90}
+                      onChangeSilent={v => setStyleSilent("gradientAngle", v)}
+                      onCommit={commit} min={0} max={360} step={5} unit="°" />
+                  )}
+                </div>
+              );
+            })()}
+          </Section>
+        )}
 
         <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
         </Accordion>
@@ -744,6 +987,139 @@ export default function ZoneEditor({
 
   /* ── DECORATIVE / ICON ── */
   if (isDecorative) {
+
+    /* ── Gradient Overlay (no shape / icon — pure CSS background zone) ── */
+    if (isGradientOverlay) {
+      const gs = gradState || parseGrad(style.background);
+      const { type, angle, stops } = gs;
+
+      const applyGrad = (newGs, commit = false) => {
+        setGradState(newGs);
+        const css = gradToCSS(newGs);
+        if (commit) setZoneStyle(slot, "background", css);
+        else setZoneStyleSilent(slot, "background", css);
+      };
+
+      const setStopField = (i, field, val, commit = false) => {
+        const newStops = stops.map((s, j) => j === i ? { ...s, [field]: val } : s);
+        applyGrad({ ...gs, stops: newStops }, commit);
+      };
+
+      return (
+        <div className="pb-6">
+          <Accordion defaultSection="Gradient">
+          <Section title="Gradient Background" icon="◐">
+
+            {/* Live preview strip */}
+            <div className="mb-4 rounded-[8px] overflow-hidden" style={{ height: 40, background: gradToCSS(gs) }} />
+
+            {/* Type */}
+            <div className="mb-3">
+              <Label>Type</Label>
+              <BtnGroup fullWidth
+                options={[{ label:"Linear", value:"linear" }, { label:"Radial", value:"radial" }]}
+                value={type}
+                onChange={v => applyGrad({ ...gs, type: v }, true)} />
+            </div>
+
+            {/* Direction — linear only */}
+            {type === "linear" && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-[5px]">
+                  <Label>Direction</Label>
+                  <span className="text-[11px] font-mono text-[#7c5cfc]">{angle}°</span>
+                </div>
+                <div className="flex gap-1 mb-2">
+                  {GRAD_DIR_PRESETS.map(p => (
+                    <button key={p.angle} title={p.title}
+                      onClick={() => applyGrad({ ...gs, angle: p.angle }, true)}
+                      className="flex-1 py-[5px] rounded-[5px] text-[13px] border cursor-pointer transition-all"
+                      style={angle === p.angle ? ACTIVE_BTN : INACTIVE_BTN}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <input type="range" min={0} max={360} step={5} value={angle}
+                  onChange={e => applyGrad({ ...gs, angle: Number(e.target.value) })}
+                  onMouseUp={e => applyGrad({ ...gs, angle: Number(e.target.value) }, true)}
+                  className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 3 }} />
+              </div>
+            )}
+
+            {/* Color stops */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label>Color Stops</Label>
+                {stops.length < 5 && (
+                  <button onClick={() => {
+                    const last = stops[stops.length - 1];
+                    const prev = stops[stops.length - 2];
+                    const midPos = Math.round((prev.pos + last.pos) / 2);
+                    applyGrad({ ...gs, stops: [...stops.slice(0, -1), { hex:"#ffffff", alpha:0.5, pos:midPos }, last] }, true);
+                  }} className="text-[11px] text-[#7c5cfc] bg-transparent border-0 cursor-pointer">
+                    + Add Stop
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-3">
+                {stops.map((s, i) => (
+                  <div key={i} className="p-2 rounded-[7px]" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)" }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input type="color" value={s.hex}
+                        onChange={e => setStopField(i, "hex", e.target.value, true)}
+                        className="w-7 h-7 rounded cursor-pointer border-0 shrink-0" />
+                      <span className="text-[11px] font-mono text-[#7070a0] flex-1">{s.hex} · {Math.round(s.alpha * 100)}%</span>
+                      {stops.length > 2 && (
+                        <button onClick={() => applyGrad({ ...gs, stops: stops.filter((_, j) => j !== i) }, true)}
+                          className="text-[10px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">✕</button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="flex justify-between mb-[3px]">
+                          <span className="text-[10px] font-mono text-[#555] uppercase">Opacity</span>
+                          <span className="text-[10px] font-mono text-[#7c5cfc]">{Math.round(s.alpha * 100)}%</span>
+                        </div>
+                        <input type="range" min={0} max={100} step={1} value={Math.round(s.alpha * 100)}
+                          onChange={e => setStopField(i, "alpha", Number(e.target.value) / 100)}
+                          onMouseUp={e => setStopField(i, "alpha", Number(e.target.value) / 100, true)}
+                          className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 3 }} />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-[3px]">
+                          <span className="text-[10px] font-mono text-[#555] uppercase">Position</span>
+                          <span className="text-[10px] font-mono text-[#7c5cfc]">{s.pos}%</span>
+                        </div>
+                        <input type="range" min={-20} max={120} step={1} value={s.pos}
+                          onChange={e => setStopField(i, "pos", Number(e.target.value))}
+                          onMouseUp={e => setStopField(i, "pos", Number(e.target.value), true)}
+                          className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 3 }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Transform" icon="⟳" defaultOpen={false}>
+            <Slider label="Opacity" value={Math.round(opacity * 100)}
+              onChangeSilent={v => setStyleSilent("opacity", v / 100)}
+              onCommit={commit} min={0} max={100} unit="%" />
+          </Section>
+
+          <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
+          </Accordion>
+          <div className="pt-4">
+            <button onClick={onDelete}
+              className="w-full py-[8px] rounded-[8px] text-[12px] font-bold text-[#ff6060] border border-[rgba(255,60,60,0.15)] hover:bg-[rgba(255,60,60,0.08)] bg-transparent cursor-pointer transition-colors">
+              Delete Zone <span className="opacity-30 text-[10px] ml-1">Del</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     const iconId   = content.iconId || null;
     const shapeId  = content.shape || "circle";
     const reg      = iconId ? iconRegistry[iconId] : decorativeShapeRegistry[shapeId];
@@ -894,6 +1270,13 @@ export default function ZoneEditor({
 
         {/* Transform */}
         <Section title="Transform" icon="⟳" defaultOpen={false}>
+          {iconId && (
+            <div className="mb-3">
+              <Slider label="Size" value={style.iconSize ?? 100}
+                onChangeSilent={v => setStyleSilent("iconSize", v)}
+                onCommit={commit} min={10} max={200} step={1} unit="%" />
+            </div>
+          )}
           <div className="mb-3">
             <RotationControl value={rotation} onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
           </div>
@@ -921,19 +1304,46 @@ export default function ZoneEditor({
                 options={[{ label: "Off", value: "none" }, { label: "Linear", value: "linear" }, { label: "Radial", value: "radial" }]}
                 value={gradType} onChange={v => setZoneStyle(slot, "gradientType", v)} />
             </div>
-            {gradType !== "none" && (
-              <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <ColorRow label="Color 1" value={style.gradientColor1 || color} onChange={v => setZoneStyle(slot, "gradientColor1", v)} />
-                  <ColorRow label="Color 2" value={style.gradientColor2 || "#000000"} onChange={v => setZoneStyle(slot, "gradientColor2", v)} />
+            {gradType !== "none" && (() => {
+              const gStops = style.gradientStops?.length >= 2
+                ? style.gradientStops
+                : [
+                    { pos: 0,   color: style.gradientColor1 || color,      opacity: style.gradientOpacity1 ?? 100 },
+                    { pos: 100, color: style.gradientColor2 || "#000000",   opacity: style.gradientOpacity2 ?? 100 },
+                  ];
+              const setStops = (next, silent) =>
+                silent
+                  ? setStyleSilent("gradientStops", next)
+                  : setZoneStyle(slot, "gradientStops", next);
+              const patchStop = (i, key, val, silent) =>
+                setStops(gStops.map((s, idx) => idx === i ? { ...s, [key]: val } : s), silent);
+              const addStop = () => {
+                const sorted = [...gStops].sort((a, b) => a.pos - b.pos);
+                let maxGap = -1, insertPos = 50;
+                for (let i = 0; i < sorted.length - 1; i++) {
+                  const gap = sorted[i + 1].pos - sorted[i].pos;
+                  if (gap > maxGap) { maxGap = gap; insertPos = Math.round((sorted[i].pos + sorted[i + 1].pos) / 2); }
+                }
+                setStops([...gStops, { pos: insertPos, color: "#ffffff", opacity: 100 }], false);
+              };
+              return (
+                <div className="flex flex-col gap-3">
+                  <GradientStopList gStops={gStops} setStops={setStops} patchStop={patchStop} commit={commit} />
+                  {gStops.length < 6 && (
+                    <button onClick={addStop}
+                      className="w-full py-[7px] rounded-[8px] text-[12px] bg-transparent cursor-pointer transition-colors"
+                      style={{ color: "#7c5cfc", border: "1px solid rgba(124,92,252,0.3)" }}>
+                      + Add Stop
+                    </button>
+                  )}
+                  {gradType === "linear" && (
+                    <Slider label="Angle" value={style.gradientAngle ?? 90}
+                      onChangeSilent={v => setStyleSilent("gradientAngle", v)}
+                      onCommit={commit} min={0} max={360} step={5} unit="°" />
+                  )}
                 </div>
-                {gradType === "linear" && (
-                  <Slider label="Angle" value={style.gradientAngle ?? 90}
-                    onChangeSilent={v => setStyleSilent("gradientAngle", v)}
-                    onCommit={commit} min={0} max={360} step={5} unit="°" />
-                )}
-              </div>
-            )}
+              );
+            })()}
           </Section>
         )}
 
@@ -1058,18 +1468,15 @@ export default function ZoneEditor({
                   onCommit={commit} min={0} max={100} unit="px" />
               </div>
             </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <Slider label="Border Radius" value={radius}
-                  onChangeSilent={v => setStyleSilent("borderRadius", v)}
-                  onCommit={commit} min={0} max={300} unit="px" />
+            {shadow > 0 && (
+              <div className="mt-3">
+                <ColorRow label="Shadow Color" value={style.shadowColor ?? "#000000"}
+                  onChange={v => { setStyleSilent("shadowColor", v); commit(); }} />
               </div>
-              <div className="flex-1">
-                <Slider label="Padding" value={padding}
-                  onChangeSilent={v => setStyleSilent("contentPadding", v)}
-                  onCommit={commit} min={0} max={120} unit="px" />
-              </div>
-            </div>
+            )}
+            <Slider label="Padding" value={padding}
+              onChangeSilent={v => setStyleSilent("contentPadding", v)}
+              onCommit={commit} min={0} max={120} unit="px" />
           </div>
         </div>
 
@@ -1159,6 +1566,94 @@ export default function ZoneEditor({
               );
             })}
           </div>
+        </div>
+      </Section>
+
+      {/* Static Border */}
+      <Section title="Border" badge={style.borderWidth > 0 ? "on" : undefined}>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Slider label="Width" value={style.borderWidth ?? 0}
+            onChangeSilent={v => setStyleSilent("borderWidth", v)}
+            onCommit={commit} min={0} max={40} step={1} unit="px" />
+          <div>
+            <Label>Style</Label>
+            <BtnGroup
+              options={[
+                { label: "—",  value: "solid"  },
+                { label: "- -", value: "dashed" },
+                { label: "···", value: "dotted" },
+                { label: "══", value: "double" },
+              ]}
+              value={style.borderStyle ?? "solid"}
+              onChange={v => { setStyleSilent("borderStyle", v); commit(); }}
+            />
+          </div>
+        </div>
+        {(style.borderWidth ?? 0) > 0 && (
+          <>
+            <div className="mb-3">
+              <ColorRow label="Color" value={style.borderColor ?? "#ffffff"}
+                onChange={v => { setZoneStyle(slot, "borderColor", v); }} />
+            </div>
+            <div>
+              <Label>Position</Label>
+              <BtnGroup fullWidth
+                options={[
+                  { label: "Inside",  value: "inside"  },
+                  { label: "Center",  value: "center"  },
+                  { label: "Outside", value: "outside" },
+                ]}
+                value={style.borderAlign ?? "inside"}
+                onChange={v => { setStyleSilent("borderAlign", v); commit(); }}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Corner Radius */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-[5px]">
+            <Label>Corner Radius</Label>
+            <button
+              onClick={cornersUnlocked ? lockCorners : unlockCorners}
+              title={cornersUnlocked ? "Reset to uniform radius" : "Edit each corner separately"}
+              className="text-[10px] bg-transparent border-0 cursor-pointer px-[6px] py-[2px] rounded transition-colors"
+              style={{ color: cornersUnlocked ? "#7c5cfc" : "#555",
+                background: cornersUnlocked ? "rgba(124,92,252,0.12)" : "transparent" }}>
+              {cornersUnlocked ? "⛓ uniform" : "⛓ per corner"}
+            </button>
+          </div>
+
+          {/* All-corners slider */}
+          <Slider value={radius}
+            onChangeSilent={v => setAllCorners(v)}
+            onCommit={commit} min={0} max={300} unit="px" />
+
+          {/* Per-corner grid */}
+          {cornersUnlocked && (
+            <div className="mt-2 p-2 rounded-[6px]" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)" }}>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {[
+                  { key:"borderRadiusTL", label:"↖ Top Left"    },
+                  { key:"borderRadiusTR", label:"Top Right ↗"  },
+                  { key:"borderRadiusBL", label:"↙ Bot Left"    },
+                  { key:"borderRadiusBR", label:"Bot Right ↘"  },
+                ].map(({ key, label }) => (
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-[3px]">
+                      <span className="text-[10px] font-mono" style={{ color:"#666" }}>{label}</span>
+                      <span className="text-[10px] font-mono" style={{ color:"#7c5cfc" }}>{cornerVal(key)}px</span>
+                    </div>
+                    <input type="range" min={0} max={300} step={1}
+                      value={cornerVal(key)}
+                      onChange={e => setZoneStyleSilent(slot, key, Number(e.target.value))}
+                      onMouseUp={commit} onTouchEnd={commit}
+                      className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height:3 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Section>
 

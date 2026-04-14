@@ -1,1 +1,269 @@
-{"id":"0bf59d7b-5b72-465c-96c4-0c51e4c4d00d","dna":{"niche":"entertainment","colorStory":{"bg":"#0f0500","mood":"fire","text":"#ffffff","accent":"#ffffff","primary":"#ff6b00","colorFamily":"electric"},"motionStyle":"kinetic","typographySystem":"brutal"},"meta":{"fps":25,"mode":"talking_head","name":"","tone":"auto","brand":{},"width":1080,"height":1920,"audience":"general","language":"english","videoType":"auto","brand_color":null,"orientation":"9:16"},"audio":{"tts":null,"music":{"src":"/music/eliveta491224.mp3","volume":0.12}},"beats":[{"id":"8d27bec6-db14-46cc-89a0-492f2ab955e5","text":null,"order":0,"zones":{"z1":{"x":6.8,"y":4.5,"style":{"color":"#ffffff","fontSize":142,"_presetId":"hero","textAlign":"center","fontFamily":"'Bebas Neue', sans-serif","fontWeight":900,"lineHeight":1,"textEffect":"typewriter","textShadow":"0 4px 24px rgba(0,0,0,0.8)","letterSpacing":"-2px","textEffectSpeed":0.5},"width":88,"height":14.8,"hidden":true,"zIndex":12,"content":{"kind":"text","text":"STOP STRUGGLING WITH TOPICS!"}},"custom_1776015343251":{"x":10.5,"y":17,"end":null,"type":"asset","start":0,"style":{"objectFit":"cover","borderRadius":102},"width":80,"height":67.5,"zIndex":15,"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/a2f70e20-6b5c-467a-bc9c-b62239cd6033.jpg","type":"image"}},"background":{},"exitAnimation":"none","enterAnimation":"fadeIn"},"custom_1776089973584":{"x":5.4,"y":12.9,"end":null,"type":"text","start":0,"style":{"color":"#ffffff","fontSize":124,"textAlign":"center","fontFamily":"'Oswald', sans-serif","fontWeight":700,"lineHeight":1,"textShadow":"4px 4px 0px rgba(0,0,0,0.8)","letterSpacing":"4px","textTransform":"uppercase"},"width":90,"height":13,"zIndex":16,"content":{"kind":"text","text":"DARE TO BE BOLD"},"background":{},"exitAnimation":"none","enterAnimation":"none"},"custom_1776091248015":{"x":5,"y":88.6,"end":null,"type":"text","start":0,"style":{"color":"#ffffff","fontSize":92,"fontStyle":"normal","textAlign":"center","fontFamily":"'Playfair Display', serif","fontWeight":700,"lineHeight":1.15,"textShadow":"0 2px 16px rgba(0,0,0,0.6)","letterSpacing":"-0.5px"},"width":90,"height":5.6,"zIndex":10,"content":{"kind":"text","text":"The Story Behind"},"background":{},"exitAnimation":"none","enterAnimation":"fadeIn"},"custom_1776091280055":{"x":5,"y":83.4,"end":null,"type":"text","start":0,"style":{"color":"#f5c518","fontSize":105,"fontStyle":"italic","textAlign":"center","fontFamily":"'Cormorant Garamond', serif","fontWeight":700,"lineHeight":1.1,"textShadow":"0 2px 20px rgba(245,197,24,0.3)","letterSpacing":"2px"},"width":90,"height":12,"zIndex":14,"content":{"kind":"text","text":"BEAUTIFUL SUNSET"},"background":{},"exitAnimation":"none","enterAnimation":"fadeIn"}},"blocks":[],"energy":0.8,"intent":"curiosity","layout":"CenterHook","spoken":"भाई एक चीज़ मिली है, अगर आपको कभी समझ नहीं आता किसी भी टॉपिक को कैसे स्टार्ट करें, तो ये वेबसाइट आपको कमप्लीट रोडमैप दिखा देती है।","caption":{"show":false,"text":"भाई एक चीज़ मिली है, अगर आपको कभी समझ नहीं आता किसी भी टॉपिक को कैसे स्टार्ट करें, तो ये वेबसाइट आपको कमप्लीट रोडमैप दिखा देती है।","style":"karaokeFill","position":84,"animation":"fade","emphasis_words":[]},"end_sec":7.7,"heading":null,"language":"english","overlays":[],"start_sec":0,"asset_hint":null,"audio_cues":[{"id":"sfx_1776014813939","key":"soft_hit","label":"Soft Hit","source":"beat","volume":0.2,"position":0}],"avatarZone":"custom_1776015343251","components":{},"transition":{"type":"zoom"},"visual_hint":"faces","deletedZones":[],"duration_sec":7.7,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"dotsColor"}},{"id":"b89873df-5818-4d2b-9530-3df494acaadf","text":null,"order":1,"zones":{"z1":{"x":0,"y":7,"style":{"scale":1,"objectFit":"contain","shadowBlur":0,"shineEffect":"streak","borderRadius":0},"width":100,"height":60.7,"content":{"kind":"asset","asset":{"src":null,"type":"image","motion":"cinematicPush","objectFit":"cover","exitTransition":"none","enterTransition":"none"}},"background":{"key":"emerald","kind":"pattern"}},"z2":{"style":{"color":"#ffffff","filled":false,"opacity":1,"background":"linear-gradient(0deg, rgba(0,0,0,1) 0%, transparent 100%)","borderRadius":0},"content":{"shape":"square"}},"z3":{"x":5,"y":2.1,"style":{"color":"#ffffff","opacity":0.6,"fontSize":89,"_presetId":"rotated-label","textAlign":"center","fontFamily":"'Bebas Neue', sans-serif","fontWeight":700,"lineHeight":1,"paddingTop":14,"textEffect":"fadeWords","textShadow":"0 2px 18px rgba(0,0,0,0.9)","writingMode":"vertical-rl","borderRadius":40,"letterSpacing":"3px","paddingBottom":14,"textTransform":"uppercase","textOrientation":"mixed"},"width":92,"height":4.6,"content":{"kind":"text","text":"LEARNING UNLOCKED"}},"z4":{"x":4,"y":70,"style":{"color":"#ffffff","fontSize":95,"_presetId":"editorial-serif","fontStyle":"normal","textAlign":"center","background":"transparent","fontFamily":"'Playfair Display', serif","fontWeight":700,"lineHeight":0.9,"textEffect":"popIn","textShadow":"0 2px 16px rgba(0,0,0,0.6)","_userPreset":true,"borderRadius":0,"letterSpacing":"-0.5px","textDecoration":"none"},"width":92,"height":8.8,"content":{"kind":"text","text":"Structured Learning Paths for ALL!"}},"z5":{"x":4.8,"y":81.7,"style":{"color":"#ffffff","opacity":0.85,"fontSize":52,"_presetId":"headline","fontStyle":"normal","textAlign":"center","fontFamily":"'Outfit', sans-serif","fontWeight":400,"lineHeight":1.5,"textEffect":"typewriter","textShadow":"0 2px 18px rgba(0,0,0,0.9)","letterSpacing":"-1px"},"height":12.1,"content":{"kind":"text","text":"From programming to psychology, discover a clear learning path for nearly every subject you can think of."}}},"blocks":[],"energy":0.6,"intent":"explanation","layout":"CinematicExplain","spoken":"प्रोग्रामिंग, डिजाइन, बिजनिस, साइकोलोजी, मैथ्स, अल्मोस्ट किसी भी सबजेट का स्ट्रॉक्चर्ड लेर्निंग पाथ मिल जाता है।","caption":{"show":false,"text":"प्रोग्रामिंग, डिजाइन, बिजनिस, साइकोलोजी, मैथ्स, अल्मोस्ट किसी भी सबजेट का स्ट्रॉक्चर्ड लेर्निंग पाथ मिल जाता है।","style":"wordBlaze","position":80,"animation":"word_pop","emphasis_words":[]},"end_sec":12.8,"heading":null,"language":"english","overlays":[],"start_sec":7.7,"asset_hint":null,"audio_cues":[{"id":"sfx_1776014813940","key":"tick_digital","label":"Tick Digital","source":"beat","volume":0.2,"position":0}],"avatarZone":"z1","components":{},"transition":{"type":"slideLeft","intensity":1},"visual_hint":"faces","deletedZones":[],"duration_sec":5.1,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"gradientDeepPurple"}},{"id":"d386144e-c72d-4972-80ca-0d80a098c4d3","text":null,"order":2,"zones":{"z1":{"x":7.1,"y":4.7,"type":"asset","style":{"scale":1,"shadowBlur":0,"borderRadius":70,"animatedBorder":"arctic"},"width":88.6,"height":53.2,"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/a2f70e20-6b5c-467a-bc9c-b62239cd6033.jpg","type":"image","motion":"none","objectFit":"cover","exitTransition":"none","enterTransition":"none"}},"enterAnimation":"none"},"z2":{"style":{"color":"#ffffff","filled":false,"opacity":1,"background":"linear-gradient(0deg, rgba(0,0,0,1) 0%, transparent 100%)","borderRadius":0},"content":{"shape":"square"}},"z3":{"x":4,"y":62,"style":{"color":"#ffffff","opacity":0.6,"fontSize":48,"_presetId":"rotated-label","textAlign":"center","fontFamily":"'Bebas Neue', sans-serif","fontWeight":700,"lineHeight":1,"paddingTop":14,"textEffect":"none","textShadow":"0 2px 18px rgba(0,0,0,0.9)","writingMode":"vertical-rl","borderRadius":40,"letterSpacing":"3px","paddingBottom":14,"textTransform":"uppercase","textOrientation":"mixed"},"height":2.6,"content":{"kind":"text","text":"EASY LEARNING"},"enterAnimation":"none"},"z4":{"style":{"color":"#ffffff","fontSize":112,"_presetId":"kinetic-outline","textAlign":"center","fontFamily":"'Bebas Neue', sans-serif","fontWeight":900,"lineHeight":1,"textEffect":"none","textShadow":"0 2px 18px rgba(0,0,0,0.9)","letterSpacing":"4px","WebkitTextStroke":"2px #ffffff"},"height":11.7,"content":{"kind":"text","text":"SEARCH AND LEARN STEP BY STEP!"},"enterAnimation":"none"},"z5":{"style":{"color":"#ffffff","opacity":0.85,"fontSize":52,"_presetId":"headline","fontStyle":"italic","textAlign":"center","fontFamily":"'Outfit', sans-serif","fontWeight":800,"lineHeight":1.1,"textEffect":"none","textShadow":"0 2px 18px rgba(0,0,0,0.9)","letterSpacing":"-1px"},"height":9,"content":{"kind":"text","text":"Simply search your topic, and it lays out exactly what to learn and the direction to go. It's that simple!"},"enterAnimation":"none"}},"blocks":[],"energy":0.6,"intent":"explanation","layout":"CinematicExplain","spoken":"बस टॉपिक सेर्च करो, और स्टेब बाइ स्टेब क्या सीखना है, किस दिरेक्शन में जाना है, सब क्लियर हो जाता है।","caption":{"show":false,"text":"बस टॉपिक सेर्च करो, और स्टेब बाइ स्टेब क्या सीखना है, किस दिरेक्शन में जाना है, सब क्लियर हो जाता है।","style":"wordBlaze","position":80,"animation":"word_reveal","emphasis_words":[]},"end_sec":19.5,"heading":null,"language":"english","overlays":[],"start_sec":12.8,"asset_hint":null,"audio_cues":[{"id":"sfx_1776014813941","key":"soft_hit","label":"Soft Hit","source":"beat","volume":0.2,"position":0}],"avatarZone":"z1","components":{},"transition":{"type":"slideDown","intensity":0.3},"visual_hint":"faces","deletedZones":[],"duration_sec":6.7,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"crimson"}},{"id":"32dd0a17-f259-4933-9ecc-319cd9f87063","text":null,"order":3,"zones":{"z1":{"style":{"color":"#ffffff","fontSize":100,"_presetId":"hero","textAlign":"center","fontFamily":"'Bebas Neue', sans-serif","fontWeight":900,"lineHeight":1,"textEffect":"wordReveal","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","letterSpacing":"-2px"},"content":{"kind":"text","text":"NO MORE RANDOM COURSES!"}},"z2":{"style":{"scale":1,"objectFit":"cover","shadowBlur":0,"borderRadius":999},"content":{"kind":"asset","asset":{"src":null,"type":"image","motion":"cinematicPush","objectFit":"cover","exitTransition":"none","enterTransition":"none"}}},"z3":{"style":{"color":"#ffffff","fontSize":56,"_presetId":"quote-highlight","fontStyle":"italic","textAlign":"center","background":"rgba(255,255,255,0.07)","borderLeft":"4px solid #7c5cfc","fontFamily":"'Outfit', sans-serif","fontWeight":700,"lineHeight":1.35,"textEffect":"typewriter","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","paddingLeft":16,"borderRadius":8,"letterSpacing":"0px"},"height":11.8,"content":{"kind":"text","text":"You don't need to wander through endless YouTube videos."}},"z4":{"style":{"scale":1,"shadowBlur":0,"shineEffect":"streak","borderRadius":999,"animatedBorder":"fireGlow"},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/2e3cc470-abc3-4da6-8e9d-3bbac9ee519b.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z5":{"style":{"color":"#ffffff","fontSize":56,"_presetId":"quote-highlight","fontStyle":"italic","textAlign":"center","background":"rgba(255,255,255,0.07)","borderLeft":"4px solid #7c5cfc","fontFamily":"'Outfit', sans-serif","fontWeight":700,"lineHeight":1.35,"textEffect":"popIn","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","paddingLeft":16,"borderRadius":8,"letterSpacing":"0px"},"height":7.8,"content":{"kind":"text","text":"Comment for the link, and I'll send it directly to your DMs!"}},"z6":{"style":{"scale":1,"shadowBlur":0,"borderRadius":999},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/a2f70e20-6b5c-467a-bc9c-b62239cd6033.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z7":{"style":{"color":"#ffffff","fontSize":56,"_presetId":"quote-highlight","fontStyle":"italic","textAlign":"center","background":"rgba(255,255,255,0.07)","borderLeft":"4px solid #7c5cfc","fontFamily":"'Outfit', sans-serif","fontWeight":700,"lineHeight":1.35,"textEffect":"slideUp","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","paddingLeft":16,"borderRadius":8,"letterSpacing":"0px"},"content":{"kind":"text","text":"Stop wasting time buying random courses that don’t work!"}},"z8":{"style":{"color":"#ffffff","fontSize":64,"_presetId":"headline","textAlign":"center","fontFamily":"'Outfit', sans-serif","fontWeight":800,"lineHeight":1.1,"textEffect":"wordReveal","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","letterSpacing":"-1px"},"height":7.3,"content":{"kind":"text","text":"Get the roadmap you need to succeed in any subject now!"}}},"blocks":[],"energy":0.9,"intent":"urgency","layout":"StackedMiniTestimonials","spoken":"यूट्यूब वीडियोस में भटकने की ज़रूरत नहीं, रांडम कोर्सेस खरीदने की ज़रूरत नहीं, अगर लिंक चाहिए तो फॉलो करके, लिंक कॉमेंट कर दो, में लिंक आपके डियम में भेज़ दूँगा।","caption":{"show":false,"text":"यूट्यूब वीडियोस में भटकने की ज़रूरत नहीं, रांडम कोर्सेस खरीदने की ज़रूरत नहीं, अगर लिंक चाहिए तो फॉलो करके, लिंक कॉमेंट कर दो, में लिंक आपके डियम में भेज़ दूँगा।","style":"wordBlaze","position":50,"animation":"pop","emphasis_words":[]},"end_sec":29,"heading":null,"language":"english","overlays":[],"start_sec":19.5,"asset_hint":null,"audio_cues":[{"id":"sfx_1776014813942","key":"ground_impact","label":"Ground Impact","source":"beat","volume":0.2,"position":0}],"avatarZone":"z2","components":{},"transition":{"type":"zoomCut","duration":0.2},"visual_hint":"faces","deletedZones":[],"duration_sec":9.5,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"orange"}},{"id":"87d811f1-98c3-474e-96b6-ea0885906c99","text":null,"order":4,"zones":{"z1":{"style":{"scale":1,"shadowBlur":0,"borderRadius":"999px 999px 20px 20px"},"content":{"kind":"asset","asset":{"src":null,"type":"image","motion":"cinematicPush","objectFit":"cover","exitTransition":"none","enterTransition":"none"}}},"z2":{"style":{"opacity":1},"content":{"iconify":{"set":"ph","icon":"sparkle-fill"}}},"z3":{"style":{"color":"#ffffff","fontSize":120,"_presetId":"condensed-impact","textAlign":"center","fontFamily":"'Barlow Condensed', sans-serif","fontWeight":900,"lineHeight":0.95,"textEffect":"typewriter","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","letterSpacing":"-1px"},"height":6,"content":{"kind":"text","text":"THE BIG REVEAL!"}},"z4":{"style":{"color":"#ffffff","opacity":0.8,"fontSize":56,"_presetId":"bold-subtext","textAlign":"center","fontFamily":"'Barlow Condensed', sans-serif","fontWeight":700,"lineHeight":1.2,"textEffect":"slideUp","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","letterSpacing":"0.5px"},"height":3.6,"content":{"kind":"text","text":"THE WEBSITE IS LEARNANYTHING.XYZ!"}}},"blocks":[],"energy":0.8,"intent":"reveal","layout":"ArchReveal","spoken":"और अब नाम सुन लो, इस वेबसाइट का नाम है learnanything.xyz और हाँ सेव करके फॉलो कर लो, क्योंकि ऐसी अमेजिंग वेबसाइट्स मैं डेली पोस्ट करता हूँ।","caption":{"show":false,"text":"और अब नाम सुन लो, इस वेबसाइट का नाम है learnanything.xyz और हाँ सेव करके फॉलो कर लो, क्योंकि ऐसी अमेजिंग वेबसाइट्स मैं डेली पोस्ट करता हूँ।","style":"wordBlaze","position":80,"animation":"wave","emphasis_words":[]},"end_sec":37.6,"heading":null,"language":"english","overlays":[],"start_sec":29,"asset_hint":null,"audio_cues":[{"id":"sfx_1776014813942","key":"cinematic_boom","label":"Cinematic Boom","source":"beat","volume":0.2,"position":0}],"avatarZone":"z1","components":{},"transition":{"type":"blurFade","duration":0.3},"visual_hint":"faces","deletedZones":[],"duration_sec":8.6,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"gradientDusk"}}],"avatar":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/avatar-1776014800685.mp4","type":"video"},"script":{"text":"भाई एक चीज़ मिली है, अगर आपको कभी समझ नहीं आता किसी भी टॉपिक को कैसे स्टार्ट करें, तो ये वेबसाइट आपको कमप्लीट रोडमैप दिखा देती है। प्रोग्रामिंग, डिजाइन, बिजनिस, साइकोलोजी, मैथ्स, अल्मोस्ट किसी भी सबजेट का स्ट्रॉक्चर्ड लेर्निंग पाथ मिल जाता है। बस टॉपिक सेर्च करो, और स्टेब बाइ स्टेब क्या सीखना है, किस दिरेक्शन में जाना है, सब क्लियर हो जाता है। यूट्यूब वीडियोस में भटकने की ज़रूरत नहीं, रांडम कोर्सेस खरीदने की ज़रूरत नहीं, अगर लिंक चाहिए तो फॉलो करके, लिंक कॉमेंट कर दो, में लिंक आपके डियम में भेज़ दूँगा। और अब नाम सुन लो, इस वेबसाइट का नाम है learnanything.xyz और हाँ सेव करके फॉलो कर लो, क्योंकि ऐसी अमेजिंग वेबसाइट्स मैं डेली पोस्ट करता हूँ।","emotionalArc":"Viewer follows the spoken content"},"overlays":[],"workflow":{"avatar_completed":true,"script_completed":true,"beats_initialized":true},"duration_sec":37.6}
+[
+  {
+    "x": 0,
+    "y": 0,
+    "id": "z1",
+    "end": null,
+    "role": "primary_asset",
+    "type": "asset",
+    "start": 0,
+    "style": {
+      "opacity": 1,
+      "objectFit": "cover"
+    },
+    "width": 100,
+    "height": 100,
+    "zIndex": 1,
+    "background": {
+      "kind": "color",
+      "color": "#1a1e40"
+    },
+    "exitAnimation": "none",
+    "enterAnimation": "fadeIn"
+  },
+  {
+    "x": 3,
+    "y": 4,
+    "id": "z3",
+    "end": null,
+    "role": "label",
+    "type": "text",
+    "start": 0,
+    "style": {
+      "color": "#ffffff",
+      "opacity": 0.9,
+      "fontSize": 28,
+      "textAlign": "center",
+      "fontFamily": "Outfit, sans-serif",
+      "fontWeight": 700,
+      "lineHeight": 1,
+      "letterSpacing": "3px",
+      "textTransform": "uppercase"
+    },
+    "width": 22,
+    "height": 5,
+    "zIndex": 4,
+    "content": {
+      "kind": "text",
+      "text": "LABEL"
+    },
+    "maxChars": 5,
+    "exitAnimation": "none",
+    "enterAnimation": "fadeIn"
+  },
+  {
+    "x": 39,
+    "y": 4,
+    "id": "z4",
+    "end": null,
+    "role": "label",
+    "type": "text",
+    "start": 0,
+    "style": {
+      "color": "#ffffff",
+      "opacity": 0.9,
+      "fontSize": 28,
+      "textAlign": "center",
+      "fontFamily": "Outfit, sans-serif",
+      "fontWeight": 700,
+      "lineHeight": 1,
+      "letterSpacing": "3px",
+      "textTransform": "uppercase"
+    },
+    "width": 22,
+    "height": 1.5,
+    "zIndex": 4,
+    "content": {
+      "kind": "text",
+      "text": "LABEL"
+    },
+    "maxChars": 8,
+    "exitAnimation": "none",
+    "enterAnimation": "fadeIn"
+  },
+  {
+    "x": 75,
+    "y": 4,
+    "id": "z5",
+    "end": null,
+    "role": "label",
+    "type": "text",
+    "start": 0,
+    "style": {
+      "color": "#ffffff",
+      "opacity": 0.9,
+      "fontSize": 28,
+      "textAlign": "center",
+      "fontFamily": "Outfit, sans-serif",
+      "fontWeight": 700,
+      "lineHeight": 1,
+      "letterSpacing": "3px",
+      "textTransform": "uppercase"
+    },
+    "width": 22,
+    "height": 1.4,
+    "zIndex": 4,
+    "content": {
+      "kind": "text",
+      "text": "LABEL"
+    },
+    "maxChars": 8,
+    "exitAnimation": "none",
+    "enterAnimation": "fadeIn"
+  },
+  {
+    "x": -0.3,
+    "y": -0.2,
+    "id": "z6",
+    "end": null,
+    "role": "secondary_asset",
+    "type": "asset",
+    "start": 0.1,
+    "style": {
+      "opacity": 1,
+      "clipPath": "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+      "objectFit": "cover"
+    },
+    "width": 100.3,
+    "height": 60.1,
+    "zIndex": 3,
+    "background": {
+      "kind": "color",
+      "color": "#1a1e40"
+    },
+    "exitAnimation": "none",
+    "enterAnimation": "popIn"
+  },
+  {
+    "x": 4,
+    "y": 38,
+    "id": "z7",
+    "end": null,
+    "role": "headline",
+    "type": "text",
+    "start": 0.2,
+    "style": {
+      "color": "#ffffff",
+      "fontSize": 96,
+      "textAlign": "center",
+      "fontFamily": "Bebas Neue, sans-serif",
+      "fontWeight": 900,
+      "lineHeight": 0.92,
+      "textShadow": "0 4px 20px rgba(0,0,0,0.5)",
+      "letterSpacing": "2px"
+    },
+    "width": 92,
+    "height": 4.5,
+    "zIndex": 4,
+    "content": {
+      "kind": "text",
+      "text": "THIS IS THE HOOK"
+    },
+    "maxChars": 16,
+    "exitAnimation": "none",
+    "enterAnimation": "slideUpIn"
+  },
+  {
+    "x": -0.5,
+    "y": 59.9,
+    "id": "z8",
+    "end": null,
+    "role": "background_asset",
+    "type": "asset",
+    "start": 0.3,
+    "style": {
+      "opacity": 1,
+      "clipPath": "polygon(50% 85%, 10% 40%, 0% 25%, 10% 10%, 25% 5%, 50% 20%, 75% 5%, 90% 10%, 100% 25%, 90% 40%)",
+      "objectFit": "cover"
+    },
+    "width": 100.7,
+    "height": 40.1,
+    "zIndex": 3,
+    "background": {
+      "kind": "color",
+      "color": "#301a1a"
+    },
+    "exitAnimation": "none",
+    "enterAnimation": "popIn"
+  },
+  {
+    "x": 15,
+    "y": 92,
+    "id": "z9",
+    "end": null,
+    "role": "label",
+    "type": "text",
+    "start": 0.4,
+    "style": {
+      "color": "rgba(255,255,255,0.85)",
+      "fontSize": 34,
+      "textAlign": "center",
+      "fontFamily": "Outfit, sans-serif",
+      "fontWeight": 600,
+      "lineHeight": 1,
+      "letterSpacing": "2px"
+    },
+    "width": 70,
+    "height": 1.8,
+    "zIndex": 4,
+    "content": {
+      "kind": "text",
+      "text": "LABEL"
+    },
+    "maxChars": 5,
+    "exitAnimation": "none",
+    "enterAnimation": "fadeIn"
+  },
+  {
+    "x": 84,
+    "y": 92,
+    "id": "z10",
+    "end": null,
+    "role": "icon",
+    "type": "icon",
+    "start": 0,
+    "style": {
+      "color": "#f5c518",
+      "opacity": 0.9
+    },
+    "width": 10,
+    "height": 6,
+    "zIndex": 5,
+    "iconify": {
+      "set": "ph",
+      "icon": "crown-fill"
+    },
+    "exitAnimation": "none",
+    "enterAnimation": "fadeIn"
+  },
+  {
+    "x": 6,
+    "y": 40,
+    "id": "z7",
+    "end": null,
+    "role": "headline",
+    "type": "text",
+    "start": 0.2,
+    "style": {
+      "color": "#ffffff",
+      "fontSize": 96,
+      "textAlign": "center",
+      "fontFamily": "Bebas Neue, sans-serif",
+      "fontWeight": 900,
+      "lineHeight": 0.92,
+      "textShadow": "0 4px 20px rgba(0,0,0,0.5)",
+      "letterSpacing": "2px"
+    },
+    "width": 92,
+    "height": 4.5,
+    "zIndex": 4,
+    "content": {
+      "kind": "text",
+      "text": "THIS IS THE HOOK"
+    },
+    "maxChars": 16,
+    "background": {},
+    "exitAnimation": "none",
+    "enterAnimation": "slideUpIn"
+  }
+]

@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from "react";
 import { getSession, onAuthStateChange } from "./services/auth/authService";
 import { setInsufficientCreditsHandler } from "./services/serverApi";
+import { initLayoutRegistry } from "./core/registries/layoutRegistry";
 import "./App.css"
 import LandingPage     from "./pages/LandingPage";
 import TermsOfService  from "./pages/legal/TermsOfService";
@@ -33,6 +34,9 @@ export default function App() {
   const [recovering, setRecovering] = useState(false); // true when user landed via password-reset link
 
   useEffect(() => {
+    // Pre-warm the layout registry cache so sync getters work before generation
+    initLayoutRegistry().catch(() => {});
+
     // Register global handler for 402 NO_CREDITS responses
     setInsufficientCreditsHandler(() => {
       alert("Not enough credits. Purchase more to continue.");

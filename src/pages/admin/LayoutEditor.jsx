@@ -1,87 +1,86 @@
 /**
- * LayoutEditor.jsx  — full-screen layout editor
- * Route: /admin/layouts/:layoutId
+ * LayoutEditor.jsx — create / edit a layout
+ * Route: /admin/layouts/:layoutId   (layoutId === "new" → create mode)
  *
- * Injects a fake single-beat project into useProjectStore so the
- * real CanvasPreview + ZonesSection work without any changes.
- * Save writes updated zone defs back to the source file via the server.
+ * Injects a fake single-beat project into useProjectStore so CanvasPreview
+ * and ZonesSection work without modification.
+ * Save writes zones + metadata to Supabase via the admin API.
  */
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useNavigate }  from "react-router-dom";
 
 import { useProjectStore }      from "../../store/useProjectStore";
-import { layoutRegistry }       from "../../core/registries/layoutRegistry";
+import { layoutRegistry, refreshCache, initLayoutRegistry } from "../../core/registries/layoutRegistry";
 import { nichePaletteRegistry } from "../../core/registries/nichePaletteRegistry";
 import { generateVideoDNA }     from "../../core/videoDNA";
 import { serverFetch }          from "../../services/serverApi";
 import CanvasPreview            from "../../ui/Editor/CanvasPreview";
 import ZonesSection             from "../../ui/Editor/ZonesSection";
 
-/* ── Constants ─────────────────────────────────────────────── */
-const NICHES = Object.keys(nichePaletteRegistry).sort();
-
+/* ── Constants ────────────────────────────────────────────────── */
+const NICHES   = Object.keys(nichePaletteRegistry).sort();
+const INTENTS  = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
+const ENERGIES = ["high","medium","low"];
 const IC = {
   hook:"#f97316", proof:"#22c55e", visual_rest:"#38bdf8", escalate:"#f87171",
   reveal:"#a78bfa", cta:"#f5c518", stat:"#fb923c", explanation:"#818cf8",
   testimonial:"#34d399", contrast:"#f472b6",
 };
-
 const PLACEHOLDER = {
-  headline:"THIS IS THE HOOK",
-  subtext: "Here's what you need to know about this",
-  label:   "LABEL",
-  caption: "Caption text example that wraps",
-  cta:     "TAP NOW →",
-  stat:    "94%",
-  metric:  "10X",
-  quote:   '"This is a testimonial quote right here"',
-  default: "Text Zone",
+  headline:"THIS IS THE HOOK", subtext:"Here's what you need to know",
+  label:"LABEL", cta:"TAP NOW →", stat:"94%", metric:"10X",
+  quote:'"This is a testimonial quote"', default:"Text Zone",
 };
+const ASSET_BG = ["#1a1e40","#1a3020","#301a1a","#1a2a35","#2a1a35"];
 
-const ASSET_BG = ["#1a1e40", "#1a3020", "#301a1a", "#1a2a35", "#2a1a35"];
-
-/* ── Fake project builder ───────────────────────────────────── */
+/* ── Helpers ──────────────────────────────────────────────────── */
 function buildFakeBeat(layoutDef, dna) {
   const zones = {};
-  (layoutDef.zones ?? []).forEach((z, i) => {
+  (layoutDef?.zones ?? []).forEach((z, i) => {
     if (z.type === "text") {
       zones[z.id] = {
-        content:    { kind: "text", text: PLACEHOLDER[z.role] ?? PLACEHOLDER.default },
-        background: {},
-        style:      {},
+        type:       "text",
+        content:    z.content?.text
+          ? z.content
+          : { kind:"text", text: PLACEHOLDER[z.role] ?? PLACEHOLDER.default },
+        background: z.background ?? {},
+        style:      z.style ?? {},
       };
     } else if (z.type === "asset") {
       zones[z.id] = {
-        background: { kind: "color", color: ASSET_BG[i % ASSET_BG.length] },
-        style:      {},
+        type:       "asset",
+        content:    z.content?.asset?.src ? z.content : undefined,
+        background: z.content?.asset?.src
+          ? (z.background ?? {})
+          : { kind:"color", color: ASSET_BG[i % ASSET_BG.length] },
+        style:      z.style ?? {},
       };
     } else {
-      zones[z.id] = { background: {}, style: {} };
+      zones[z.id] = { type: z.type, content: z.content ?? {}, background: z.background ?? {}, style: z.style ?? {} };
     }
   });
 
   return {
-    id:               `lm_${layoutDef.id}`,
-    layout:           layoutDef.id,
+    id:           `lm_${layoutDef?.id ?? "new"}`,
+    layout:       layoutDef?.id ?? "new",
     zones,
-    intent:           Array.isArray(layoutDef.intent) ? layoutDef.intent[0] : layoutDef.intent,
-    energy:           0.7,
-    start_sec:        0,
-    end_sec:          5,
-    duration_sec:     5,
-    caption:          { show: false, text: "", style: "wordBlaze", position: 80 },
-    transition:       { type: "cut", duration: 0 },
-    overlays:         [],
-    spoken:           "",
-    layoutBackground: { type: "color", value: dna?.colorStory?.bg ?? "#111118" },
+    intent:       layoutDef?.intent ?? "hook",
+    energy:       0.7,
+    start_sec:    0, end_sec: 5, duration_sec: 5,
+    caption:      { show:false, text:"", style:"wordBlaze", position:80 },
+    transition:   { type:"cut", duration:0 },
+    overlays:     [],
+    spoken:       "",
+    beatBackground: { type:"color", value: dna?.colorStory?.bg ?? "#111118" },
     dna,
   };
 }
 
-function buildFakeProject(beat, dna) {
+function buildFakeProject(beat, dna, layoutDef) {
   return {
     id:           "layout-editor-preview",
-    meta:         { width: 1080, height: 1920, fps: 25, orientation: "9:16", mode: "faceless" },
+    meta:         { width:1080, height:1920, fps:25, orientation:"9:16", mode:"faceless",
+                    inlineLayoutDef: layoutDef ?? null },
     beats:        [beat],
     duration_sec: 5,
     dna,
@@ -90,63 +89,186 @@ function buildFakeProject(beat, dna) {
   };
 }
 
-/* ── Save utility ───────────────────────────────────────────── */
-const DEF_FIELDS = ["x","y","width","height","zIndex","start","end",
-  "enterAnimation","exitAnimation","maxChars","order"];
+/* Starter layout definition for brand-new layouts */
+const NEW_LAYOUT_DEF = {
+  id: "new",
+  intent: "hook",
+  zones: [
+    {
+      id: "z1", type: "text", role: "headline",
+      x: 5, y: 38, width: 90, height: 8, zIndex: 2,
+      style: { fontSize: 80, fontWeight: 900, textAlign: "center", color: "#ffffff", lineHeight: 1.1 },
+      enterAnimation: "fadeIn", maxChars: 40,
+    },
+  ],
+};
 
-function buildSaveZones(layoutDef, beatZones) {
-  return (layoutDef.zones ?? []).map(defZone => {
-    const bz     = beatZones?.[defZone.id] ?? {};
-    const merged = { ...defZone };
-    for (const f of DEF_FIELDS) {
-      if (bz[f] !== undefined) merged[f] = bz[f];
-    }
-    if (bz.style && Object.keys(bz.style).length > 0) {
-      merged.style = { ...(defZone.style ?? {}), ...bz.style };
-    }
-    delete merged.content;
-    delete merged.background;
-    return merged;
+/* Collect edited zone definitions from the store beat, merging back into def zones */
+const DEF_FIELDS = ["x","y","width","height","zIndex","start","end",
+  "enterAnimation","exitAnimation","maxChars","order","role"];
+
+function buildSaveZones(defZones, beatZones, deletedZones = []) {
+  const deletedSet  = new Set(deletedZones);
+  // Only count zones with real string ids in the def set — undefined/"undefined" ghost
+  // zones must not pollute defZoneIds or be re-saved.
+  // Deduplicate by id — bad data from earlier saves may have duplicate zone ids
+  const seen = new Set();
+  const validDefZones = (defZones ?? []).filter(z => {
+    if (!z.id || typeof z.id !== "string" || z.id === "undefined") return false;
+    if (seen.has(z.id)) return false;
+    seen.add(z.id);
+    return true;
   });
+  const defZoneIds  = new Set(validDefZones.map(z => z.id));
+
+  // 1. Layout-defined zones — merge beat overrides, skip deleted ones
+  const layoutZones = validDefZones
+    .filter(defZone => !deletedSet.has(defZone.id))
+    .map(defZone => {
+      const bz     = beatZones?.[defZone.id] ?? {};
+      const merged = { ...defZone };
+      for (const f of DEF_FIELDS) {
+        if (bz[f] !== undefined) merged[f] = bz[f];
+      }
+      if (bz.style && Object.keys(bz.style).length > 0) {
+        merged.style = { ...(defZone.style ?? {}), ...bz.style };
+      }
+      if (bz.content && Object.keys(bz.content).length > 0) {
+        merged.content = bz.content;
+      }
+      if (bz.background && Object.keys(bz.background).length > 0) {
+        merged.background = bz.background;
+      }
+      return merged;
+    });
+
+  // 2. Custom zones (added during editing) — stored whole in beat.zones, not in defZones.
+  //    The id is the dict key, not inside zoneData, so inject it explicitly.
+  //    Also exclude explicitly-deleted zones: after a save+refreshCache the def no longer
+  //    contains the deleted zone, so without this check it would be re-saved as a "custom" zone.
+  const customZones = Object.entries(beatZones ?? {})
+    .filter(([id]) => id && id !== "undefined" && !defZoneIds.has(id) && !deletedSet.has(id))
+    .map(([id, zoneData]) => {
+      // Strip any nested `id` field from the zone data — the dict key is authoritative.
+      // Without this, a duplicated zone carries the original def zone's id and overwrites
+      // the unique custom id, causing it to be silently deduped away on save+reload.
+      const { id: _ignored, ...rest } = zoneData;
+      return { id, ...rest };
+    });
+
+  return [...layoutZones, ...customZones];
 }
 
-/* ── Main ───────────────────────────────────────────────────── */
+/* ── Main ──────────────────────────────────────────────────────── */
 export default function LayoutEditor() {
   const { layoutId } = useParams();
   const navigate     = useNavigate();
-  const layout       = layoutRegistry[layoutId];
+  const isNew        = layoutId === "new";
 
-  /* Store */
+  // Load from registry proxy (cache-backed); new layouts start from the starter def
+  const layout     = isNew ? null : layoutRegistry[layoutId];
+  const layoutDef  = layout?.def ?? (isNew ? NEW_LAYOUT_DEF : null);
+
+  /* Project store */
   const setProject    = useProjectStore(s => s.setProject);
   const setDatabaseId = useProjectStore(s => s.setDatabaseId);
   const project       = useProjectStore(s => s.project);
   const activeBeat    = project?.beats?.[0] ?? null;
 
-  /* State */
-  const [niche,          setNiche]          = useState("entertainment");
-  const [energy,         setEnergy]         = useState("high");
-  const [selectedZoneIds,setSelectedZoneIds]= useState(new Set());
-  const [saving,         setSaving]         = useState(false);
-  const [saveMsg,        setSaveMsg]        = useState(null);
+  /* Preview DNA — derived from meta so there's only one source of truth */
+
+  /* Metadata state — pre-filled from existing layout or blank for new */
+  const [metaName,       setMetaName]       = useState(layout?.name            ?? "");
+  const [metaLabel,      setMetaLabel]      = useState(layout?.label           ?? "");
+  const [metaIntent,     setMetaIntent]     = useState(layout?.intent          ?? "hook");
+  const [metaEnergy,     setMetaEnergy]     = useState(layout?.energy          ?? ["high","medium","low"]);
+  const [metaNiche,      setMetaNiche]      = useState(layout?.niche           ?? []);
+  const [metaVisibility,   setMetaVisibility]   = useState(layout?.visibility  ?? "internal");
+  const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? true);
+  const [metaTransitionType, setMetaTransitionType] = useState(layout?.defaultTransition?.type ?? "");
+  const [metaTransitionDur,  setMetaTransitionDur]  = useState(layout?.defaultTransition?.duration ?? 12);
+
+  /* UI state */
+  const [registryReady,   setRegistryReady]   = useState(false);
+  const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
+  const [saving,          setSaving]          = useState(false);
+  const [saveMsg,         setSaveMsg]         = useState(null);
+  const [metaOpen,        setMetaOpen]        = useState(isNew);
+
+  /* Auto-save refs */
+  const autoSaveTimer   = useRef(null);
+  const skipAutoSave    = useRef(true);   // true until first project load settles
+  const handleSaveRef   = useRef(null);  // always points to latest handleSave closure
 
   const selectedZoneId = selectedZoneIds.size === 1 ? [...selectedZoneIds][0] : null;
 
-  const primaryIntent = layout
-    ? (Array.isArray(layout.intent) ? layout.intent[0] : layout.intent)
-    : null;
-
-  /* Inject fake project into store on mount / niche / energy change */
+  /* Auto-update maxChars when text content changes for the selected zone */
   useEffect(() => {
-    if (!layout?.def) return;
-    const energyNum = energy === "high" ? 0.9 : energy === "medium" ? 0.6 : 0.3;
-    const dna       = generateVideoDNA({ videoType: "viral", tone: "bold", niche, energy: energyNum });
-    const beat      = buildFakeBeat(layout.def, dna);
-    const proj      = buildFakeProject(beat, dna);
+    if (!selectedZoneId || !activeBeat) return;
+    const defZone = (layoutDef?.zones ?? []).find(z => z.id === selectedZoneId);
+    if (defZone?.type !== "text") return;
+    const text = activeBeat.zones?.[selectedZoneId]?.content?.text ?? "";
+    if (!text) return;
+    const zones = { ...(activeBeat.zones ?? {}) };
+    zones[selectedZoneId] = { ...(zones[selectedZoneId] ?? {}), maxChars: text.length };
+    useProjectStore.getState().updateBeatSilent(activeBeat.id, { zones });
+  }, [activeBeat?.zones?.[selectedZoneId]?.content?.text]);
+
+  /* Wait for registry on mount — resolves the "not found in cache" flash on refresh.
+     Once ready, also re-populate metadata state (useState initial values are computed
+     before the registry loads, so they're all empty strings on first render). */
+  useEffect(() => {
+    initLayoutRegistry().then(() => {
+      setRegistryReady(true);
+      if (!isNew) {
+        const entry = layoutRegistry[layoutId];
+        if (!entry) return;
+        setMetaName(entry.name            ?? "");
+        setMetaLabel(entry.label          ?? "");
+        setMetaIntent(entry.intent        ?? "hook");
+        setMetaEnergy(entry.energy        ?? ["high","medium","low"]);
+        setMetaNiche(entry.niche          ?? []);
+        setMetaVisibility(entry.visibility ?? "internal");
+        setMetaShowCaption(entry.showCaption ?? true);
+        setMetaTransitionType(entry.defaultTransition?.type ?? "");
+        setMetaTransitionDur(entry.defaultTransition?.duration ?? 12);
+      }
+    });
+  }, []);
+
+  /* Keep handleSaveRef current so auto-save always calls the latest closure */
+  useEffect(() => { handleSaveRef.current = handleSave; });
+
+  /* Inject fake project into store on mount / niche / energy / layout change.
+     registryReady in deps ensures we rebuild with the correct layoutDef once
+     the cache loads — fixes the stale-closure bug that showed wrong zones. */
+  useEffect(() => {
+    if (!isNew && !registryReady) return; // wait for cache before loading existing layouts
+    const previewNiche  = metaNiche[0] ?? "entertainment";
+    const previewEnergy = metaEnergy[0] ?? "high";
+    const energyNum = previewEnergy === "high" ? 0.9 : previewEnergy === "medium" ? 0.6 : 0.3;
+    const dna       = generateVideoDNA({ videoType:"viral", tone:"bold", niche: previewNiche, energy:energyNum });
+    const beat      = buildFakeBeat(layoutDef, dna);
+    const proj      = buildFakeProject(beat, dna, layoutDef);
     setDatabaseId(null);
     setProject(proj);
     setSelectedZoneIds(new Set());
     setSaveMsg(null);
-  }, [layoutId, niche, energy]);
+    // Give the store one tick to settle before auto-save watches for changes
+    skipAutoSave.current = true;
+    setTimeout(() => { skipAutoSave.current = false; }, 500);
+  }, [layoutId, metaNiche, metaEnergy, registryReady]);
+
+  /* Auto-save — debounced 3 s after any zone/style change, existing layouts only */
+  useEffect(() => {
+    if (isNew || !activeBeat) return;
+    if (skipAutoSave.current) return;
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      handleSaveRef.current?.();
+    }, 3000);
+    return () => clearTimeout(autoSaveTimer.current);
+  }, [activeBeat]);
 
   const handleSelectZone = useCallback((id, mod = false) => {
     if (!id) { setSelectedZoneIds(new Set()); return; }
@@ -161,38 +283,92 @@ export default function LayoutEditor() {
     }
   }, []);
 
+  const toggleEnergy = (e) => {
+    setMetaEnergy(prev =>
+      prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]
+    );
+  };
+
+  const toggleNiche = (n) => {
+    setMetaNiche(prev =>
+      prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n]
+    );
+  };
+
   const handleSave = async () => {
-    if (!layout) return;
+    if (!metaName.trim() || !metaLabel.trim()) {
+      setSaveMsg({ ok:false, text:"Name and label are required" });
+      return;
+    }
     const beat = useProjectStore.getState().project?.beats?.[0];
     if (!beat) return;
-    const zones = buildSaveZones(layout.def, beat.zones);
+
+    // Build zone objects from current canvas state
+    const defZones  = layoutDef?.zones ?? [];
+    const saveZones = buildSaveZones(defZones, beat?.zones, beat?.deletedZones);
+
+
+    const payload = {
+      name:             metaName.trim(),
+      label:            metaLabel.trim(),
+      intent:           metaIntent,
+      energy:           metaEnergy,
+      niche:            metaNiche,
+      orientation:      "9:16",
+      visibility:       metaVisibility,
+      show_caption:       metaShowCaption,
+      default_transition: metaTransitionType ? { type: metaTransitionType, duration: metaTransitionDur } : null,
+      zones:              saveZones,
+    };
+
     setSaving(true);
     setSaveMsg(null);
     try {
-      const res  = await serverFetch("/api/admin/layout/save", {
-        method: "POST",
-        body:   JSON.stringify({ layoutId, intent: layout.intent, zones }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Save failed");
-      setSaveMsg({ ok: true, text: `Saved ${data.saved} zones` });
+      let res, data;
+      if (isNew) {
+        res  = await serverFetch("/api/admin/layouts", { method:"POST", body:JSON.stringify(payload) });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Create failed");
+        await refreshCache();
+        setSaveMsg({ ok:true, text:"Created!" });
+        // Navigate to the new layout's editor
+        navigate(`/admin/layouts/${data.id}`, { replace:true });
+      } else {
+        res  = await serverFetch(`/api/admin/layouts/${layoutId}`, { method:"PUT", body:JSON.stringify(payload) });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Save failed");
+        await refreshCache();
+        clearTimeout(autoSaveTimer.current); // cancel pending auto-save — we just saved
+        setSaveMsg({ ok:true, text:`Saved ${saveZones.length} zones` });
+      }
     } catch (err) {
-      setSaveMsg({ ok: false, text: err.message });
+      setSaveMsg({ ok:false, text:err.message });
     } finally {
       setSaving(false);
     }
   };
 
-  if (!layout) {
+  /* Show loading spinner until registry resolves */
+  if (!isNew && !registryReady) {
+    return (
+      <div style={{ height:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
+        background:"#0d0d14", color:"#555", fontSize:13 }}>
+        Loading…
+      </div>
+    );
+  }
+
+  /* Not-found state — only shown after registry has loaded */
+  if (!isNew && !layout) {
     return (
       <div style={{ height:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
         background:"#0d0d14", color:"#555", flexDirection:"column", gap:12 }}>
         <div style={{ fontSize:32 }}>⚠</div>
-        <div>Layout "{layoutId}" not found</div>
+        <div>Layout "{layoutId}" not found in cache</div>
         <button onClick={() => navigate("/admin/layouts")}
           style={{ padding:"6px 14px", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)",
             borderRadius:6, color:"#888", cursor:"pointer", fontSize:12 }}>
-          ← Back to Layout Manager
+          ← Back
         </button>
       </div>
     );
@@ -202,7 +378,7 @@ export default function LayoutEditor() {
     <div style={{ height:"100vh", display:"flex", flexDirection:"column", overflow:"hidden",
       background:"#0d0d14", color:"#e8e8f0", fontFamily:"system-ui" }}>
 
-      {/* ── Top bar ── */}
+      {/* ── Top bar ─────────────────────────────────────────────── */}
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 16px",
         borderBottom:"1px solid rgba(255,255,255,0.07)", flexShrink:0, background:"#111118" }}>
 
@@ -215,33 +391,23 @@ export default function LayoutEditor() {
         <div style={{ width:1, height:16, background:"rgba(255,255,255,0.1)" }} />
 
         <span style={{ fontFamily:"monospace", fontSize:13, fontWeight:700, color:"#e8e8f0" }}>
-          {layoutId}
+          {isNew ? "New Layout" : (layout?.name ?? layoutId)}
         </span>
-        {primaryIntent && (
-          <span style={{ padding:"2px 7px", borderRadius:4, fontSize:10, fontWeight:700,
-            background:`${IC[primaryIntent]??"#888"}22`, color:IC[primaryIntent]??"#aaa" }}>
-            {primaryIntent}
+        {!isNew && (
+          <span style={{ padding:"2px 7px", borderRadius:4, fontSize:14, fontWeight:700,
+            background:`${IC[layout?.intent]??"#888"}22`, color:IC[layout?.intent]??"#aaa" }}>
+            {layout?.intent}
           </span>
         )}
 
-        <span style={{ fontSize:10, color:"#444", fontFamily:"monospace" }}>
-          {layout.def?.zones?.length ?? 0} zones · {layout.assetCount}a · {layout.textCount}t · cap:{layout.captionStrategy}
-        </span>
-
         <div style={{ marginLeft:"auto", display:"flex", gap:8, alignItems:"center" }}>
-          {/* Niche */}
-          <select value={niche} onChange={e => setNiche(e.target.value)}
-            style={{ padding:"4px 8px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
-              borderRadius:6, color:"#aaa", fontSize:11, outline:"none" }}>
-            {NICHES.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          {/* Metadata toggle */}
+          <button onClick={() => setMetaOpen(o => !o)}
+            style={{ padding:"4px 10px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
+              borderRadius:6, color:"#9494a8", fontSize:11, cursor:"pointer" }}>
+            {metaOpen ? "Hide Meta ▲" : "Edit Meta ▼"}
+          </button>
 
-          {/* Energy */}
-          <select value={energy} onChange={e => setEnergy(e.target.value)}
-            style={{ padding:"4px 8px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
-              borderRadius:6, color:"#aaa", fontSize:11, outline:"none" }}>
-            {["high","medium","low"].map(e => <option key={e} value={e}>{e}</option>)}
-          </select>
 
           {saveMsg && (
             <span style={{ fontSize:11, color:saveMsg.ok ? "#22c55e" : "#f87171" }}>
@@ -251,28 +417,148 @@ export default function LayoutEditor() {
 
           <button onClick={handleSave} disabled={saving}
             style={{ padding:"6px 16px", borderRadius:6, fontSize:12, fontWeight:700,
-              background:"#f5c518", color:"#0b0b10", border:"none",
+              background:isNew ? "#22c55e" : "#f5c518",
+              color:"#0b0b10", border:"none",
               cursor:saving ? "not-allowed" : "pointer", opacity:saving ? 0.6 : 1 }}>
-            {saving ? "Saving…" : "Save Layout"}
+            {saving ? "Saving…" : isNew ? "Create Layout" : "Save Layout"}
           </button>
         </div>
       </div>
 
-      {/* ── Canvas + Zone Editor ── */}
+      {/* ── Metadata panel (collapsible) ─────────────────────────── */}
+      {metaOpen && (
+        <div style={{ background:"#13131f", borderBottom:"1px solid rgba(255,255,255,0.07)",
+          padding:"12px 20px", flexShrink:0 }}>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:16, alignItems:"flex-start" }}>
+
+            {/* Name + Label */}
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>NAME (slug)</label>
+              <input value={metaName} onChange={e => setMetaName(e.target.value)}
+                placeholder="e.g. CenterHook"
+                style={{ padding:"5px 8px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
+                  borderRadius:5, color:"#e8e8f0", fontSize:12, outline:"none", width:160 }} />
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>LABEL</label>
+              <input value={metaLabel} onChange={e => setMetaLabel(e.target.value)}
+                placeholder="e.g. Center Hook"
+                style={{ padding:"5px 8px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
+                  borderRadius:5, color:"#e8e8f0", fontSize:12, outline:"none", width:160 }} />
+            </div>
+
+            {/* Intent */}
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>INTENT</label>
+              <select value={metaIntent} onChange={e => setMetaIntent(e.target.value)}
+                style={{ padding:"5px 8px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
+                  borderRadius:5, color:"#e8e8f0", fontSize:12, outline:"none" }}>
+                {INTENTS.map(i => <option key={i} value={i}>{i}</option>)}
+              </select>
+            </div>
+
+            {/* Visibility */}
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>VISIBILITY</label>
+              <div style={{ display:"flex", background:"#0d0d18", borderRadius:5, overflow:"hidden",
+                border:"1px solid rgba(255,255,255,0.1)" }}>
+                {["internal","external"].map(v => (
+                  <button key={v} onClick={() => setMetaVisibility(v)}
+                    style={{ padding:"5px 10px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                      background: metaVisibility === v ? "#7c5cfc" : "transparent",
+                      color: metaVisibility === v ? "#fff" : "#666" }}>
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Show captions by default */}
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>CAPTIONS</label>
+              <button
+                onClick={() => setMetaShowCaption(v => !v)}
+                style={{ padding:"5px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                  borderRadius:5, background: metaShowCaption ? "#f5c518" : "#1c1c28",
+                  color: metaShowCaption ? "#0b0b10" : "#555" }}>
+                {metaShowCaption ? "Show by default" : "Hidden by default"}
+              </button>
+            </div>
+
+            {/* Default transition */}
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>DEFAULT TRANSITION</label>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+                {["", "cut","fade","dissolve","zoom","slideLeft","slideRight","slideUp","slideDown","dipBlack","dipWhite","whipPan","spin","glitch","flash"].map(t => (
+                  <button key={t} onClick={() => setMetaTransitionType(t)}
+                    style={{ padding:"4px 9px", borderRadius:4, border:"none", cursor:"pointer", fontSize:12, fontWeight:600,
+                      background: metaTransitionType === t ? "#7c5cfc" : "#1c1c28",
+                      color: metaTransitionType === t ? "#fff" : "#666" }}>
+                    {t === "" ? "auto" : t}
+                  </button>
+                ))}
+              </div>
+              {metaTransitionType && (
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:2 }}>
+                  <label style={{ fontSize:12, color:"#555", fontFamily:"monospace", whiteSpace:"nowrap" }}>DURATION (frames)</label>
+                  <input type="range" min={4} max={30} step={1} value={metaTransitionDur}
+                    onChange={e => setMetaTransitionDur(Number(e.target.value))}
+                    style={{ flex:1, accentColor:"#7c5cfc" }} />
+                  <span style={{ fontSize:12, color:"#7c5cfc", fontFamily:"monospace", minWidth:24 }}>{metaTransitionDur}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Energy multi-select */}
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>ENERGY</label>
+              <div style={{ display:"flex", gap:4 }}>
+                {ENERGIES.map(e => (
+                  <button key={e} onClick={() => toggleEnergy(e)}
+                    style={{ padding:"4px 8px", borderRadius:4, border:"none", cursor:"pointer", fontSize:14, fontWeight:700,
+                      background: metaEnergy.includes(e) ? "#7c5cfc" : "#1c1c28",
+                      color: metaEnergy.includes(e) ? "#fff" : "#555" }}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Niche multi-select */}
+            <div style={{ display:"flex", flexDirection:"column", gap:4, maxWidth:400 }}>
+              <label style={{ fontSize:12, color:"#555", fontFamily:"monospace" }}>
+                NICHE <span style={{ color:"#777" }}>(empty = all niches)</span>
+              </label>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
+                {NICHES.map(n => (
+                  <button key={n} onClick={() => toggleNiche(n)}
+                    style={{ padding:"3px 7px", borderRadius:4, border:"none", cursor:"pointer", fontSize:12, fontWeight:600,
+                      background: metaNiche.includes(n) ? "#f5c518" : "#1c1c28",
+                      color: metaNiche.includes(n) ? "#0b0b10" : "#777" }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Canvas + Zone Editor ─────────────────────────────────── */}
       {activeBeat ? (
         <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
-
-          {/* Canvas */}
-          <div style={{ flex:1, minWidth:0, overflow:"hidden" }}>
+          <div style={{ flex:1, minWidth:0, overflow:"hidden", paddingBottom: 24 }}>
             <CanvasPreview
               selectedZoneIds={selectedZoneIds}
               onSelectZone={handleSelectZone}
             />
           </div>
-
-          {/* Zones panel */}
-          <div style={{ width:560, flexShrink:0, borderLeft:"1px solid rgba(255,255,255,0.07)", overflowY:"auto", background:"#13131f" }}
+          <div style={{ width:560, flexShrink:0, borderLeft:"1px solid rgba(255,255,255,0.07)",
+            overflowY:"auto", background:"#13131f" }}
             className="flex flex-col p-10">
+
+
             <ZonesSection
               beat={activeBeat}
               project={project}
@@ -284,7 +570,7 @@ export default function LayoutEditor() {
         </div>
       ) : (
         <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"#333" }}>
-          Loading…
+          Loading canvas…
         </div>
       )}
     </div>

@@ -6,54 +6,36 @@
  * Looks up layout definition from layoutRegistry and passes to LayoutRenderer.
  */
 
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { AbsoluteFill } from "remotion";
 
 import LayoutRenderer from "./layouts/LayoutRenderer.jsx";
 import SFXRenderer from "./elements/SFXRenderer.jsx";
 import OverlayRenderer from "./elements/OverlayRenderer";
-import { getLayoutDef } from "../core/registries/layoutRegistry.js";
+import { getLayoutDef, getAllLayouts } from "../core/registries/layoutRegistry.js";
 
 export default function BeatRenderer({ beat, project, previewMode = false, sequenceStartFrame = 0 }) {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
   const layoutId = beat?.layout || "FullBleed";
-  const layoutDef = getLayoutDef(layoutId);
+  // project.meta.inlineLayoutDef is injected by the admin LayoutEditor for unsaved/"new" layouts
+  // so the canvas shows the correct zones without needing a registry entry.
+  // Only fall back to first layout as last resort when DB is empty.
+  const layoutDef = getLayoutDef(layoutId)
+    ?? project?.meta?.inlineLayoutDef
+    ?? getAllLayouts()[0]?.def
+    ?? null;
 
   const overlays = Array.isArray(beat.overlays) ? beat.overlays : [];
-
-  const beatStart  = Math.floor((beat.start_sec || 0) * fps);
-  const beatEnd    = Math.floor((beat.end_sec   || 0) * fps);
-  const localFrame = frame - beatStart;
-  const beatFrames = beatEnd - beatStart;
-
-  let style = {};
-
-  /* PATTERN INTERRUPT */
-  const interruptPoints = [0.4, 0.75];
-  interruptPoints.forEach((p) => {
-    const interruptFrame = beatFrames * p;
-    const progress = interpolate(
-      localFrame,
-      [interruptFrame - 4, interruptFrame],
-      [1.08, 1],
-      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-    );
-    if (localFrame >= interruptFrame - 4 && localFrame <= interruptFrame) {
-      style.transform = `scale(${progress})`;
-    }
-  });
 
   if (!layoutDef) {
     return (
       <AbsoluteFill style={{ background: "#111", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#fff", fontSize: 18 }}>Layout not found: {layoutId}</div>
+        <div style={{ color: "#555", fontSize: 14 }}>No layouts in database yet</div>
       </AbsoluteFill>
     );
   }
 
   return (
-    <AbsoluteFill style={style}>
+    <AbsoluteFill>
 
       <LayoutRenderer
         beat={beat}

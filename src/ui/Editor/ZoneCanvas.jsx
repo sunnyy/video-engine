@@ -2,7 +2,7 @@
  * ZoneCanvas.jsx
  * src/ui/Editor/canvas/ZoneCanvas.jsx
  */
-import { memo, useCallback, useRef, useEffect } from "react";
+import { memo, useCallback, useRef, useEffect, useState } from "react";
 import { useProjectStore } from "../../../src/store/useProjectStore";
 import { getLayoutDef } from "../../../src/core/registries/layoutRegistry";
 import { elementsRegistry } from "../../../src/core/elementsRegistry";
@@ -16,10 +16,14 @@ import { getTypographyForRole } from "../../../src/core/videoDNA.js";
  * and uses ResizeObserver to keep zone.height in sync with actual text height.
  */
 function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typographySystem }) {
-  const ref         = useRef(null);
-  const onUpdateRef = useRef(onUpdate);
-  onUpdateRef.current = onUpdate;
-  const lastPct     = useRef(null);
+  const ref            = useRef(null);
+  const onUpdateRef    = useRef(onUpdate);
+  onUpdateRef.current  = onUpdate;
+  const lastPct        = useRef(null);
+  // Track the currently-stored zone.height so we can skip updates that are
+  // already correct — this prevents a Zustand→re-render→ResizeObserver feedback loop.
+  const zoneHeightRef  = useRef(zone.height);
+  zoneHeightRef.current = zone.height;
 
   const st   = zone.style   || {};
   const text = zone.content?.text || "\u200B"; // zero-width space keeps 1-line height
@@ -35,6 +39,8 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typogra
       const h = el.offsetHeight;
       if (h <= 0) return;
       const pct = Math.round((h / canvasH) * 1000) / 10; // 1 decimal place
+      // Already stored correctly — skip to avoid feedback loop
+      if (zoneHeightRef.current != null && Math.abs(pct - zoneHeightRef.current) < 0.3) return;
       if (lastPct.current !== null && Math.abs(pct - lastPct.current) < 0.3) return;
       lastPct.current = pct;
       onUpdateRef.current({ height: pct });
@@ -65,6 +71,102 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typogra
     }}>
       {text}
     </div>
+  );
+}
+
+/**
+ * Inline text editor — overlays a contenteditable div exactly over a text zone.
+ * Styles mirror LayoutRenderer as closely as possible at the current canvas scale.
+ */
+function InlineTextEditor({ zone, canvasScale, typographySystem, onCommit, onCancel }) {
+  const ref       = useRef(null);
+  const cancelled = useRef(false);
+
+  const st      = zone.style || {};
+  const dnaTypo = (!st._userFontFamily && typographySystem && zone.role)
+    ? getTypographyForRole(typographySystem, zone.role)
+    : null;
+
+  // Set initial text and focus cursor at end on mount
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.innerText = zone.content?.text || "";
+    el.focus();
+    try {
+      const range = document.createRange();
+      const sel   = window.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(false); // collapse to end
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation(); // don't let canvas Escape handler deselect the zone
+      cancelled.current = true;
+      onCancel();
+    }
+    // Prevent contenteditable from inserting <div>/<br> on Enter — insert \n instead
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.execCommand("insertText", false, "\n");
+    }
+  };
+
+  const handleBlur = () => {
+    if (cancelled.current) return;
+    onCommit(ref.current?.innerText ?? "");
+  };
+
+  // Scale a "0 8px"-style padding string by canvasScale
+  const scaledPadding = (() => {
+    const raw = st.padding || "0 8px";
+    return raw.replace(/(\d+(\.\d+)?)px/g, (_, n) => `${parseFloat(n) * canvasScale}px`);
+  })();
+
+  return (
+    <div
+      ref={ref}
+      data-inline-editor="true"
+      contentEditable
+      suppressContentEditableWarning
+      onKeyDown={handleKeyDown}
+      onBlur={handleBlur}
+      style={{
+        position:      "absolute",
+        left:          `${zone.x}%`,
+        top:           `${zone.y}%`,
+        width:         `${zone.width}%`,
+        minHeight:     `${zone.height}%`,
+        zIndex:        (zone.zIndex ?? 10) + 200,
+        // Mirror LayoutRenderer text styles
+        fontSize:      `${(st.fontSize || 32) * canvasScale}px`,
+        fontWeight:    dnaTypo?.fontWeight ?? st.fontWeight ?? 700,
+        fontFamily:    dnaTypo?.fontFamily ?? st.fontFamily ?? "inherit",
+        color:         st.color || "#fff",
+        textAlign:     st.textAlign || "left",
+        lineHeight:    st.lineHeight || 1.15,
+        letterSpacing: st.letterSpacing || "normal",
+        padding:       scaledPadding,
+        boxSizing:     "border-box",
+        wordBreak:     "break-word",
+        whiteSpace:    "pre-wrap",
+        overflowWrap:  "break-word",
+        // Edit-mode chrome
+        outline:       "none",
+        caretColor:    "#7c5cfc",
+        background:    "rgba(13,13,20,0.72)",
+        border:        "1.5px solid rgba(124,92,252,0.8)",
+        borderRadius:  3,
+        cursor:        "text",
+        userSelect:    "text",
+        backdropFilter:"blur(2px)",
+      }}
+    />
   );
 }
 
@@ -120,7 +222,9 @@ export default function ZoneCanvas({
   const updateBeatSilent   = useProjectStore((s) => s.updateBeatSilent);
   const _pushHistory       = useProjectStore((s) => s._pushHistory);
   const typographySystem   = useProjectStore((s) => s.project?.meta?.dna?.typographySystem);
-  const layoutDef        = getLayoutDef(beat?.layout);
+  const inlineLayoutDef    = useProjectStore((s) => s.project?.meta?.inlineLayoutDef);
+  const [editingZoneId, setEditingZoneId] = useState(null);
+  const layoutDef        = getLayoutDef(beat?.layout) ?? inlineLayoutDef;
   const beatZones        = beat?.zones || {};
 
   const selectedZoneId = selectedZoneIds instanceof Set
@@ -136,7 +240,11 @@ export default function ZoneCanvas({
 
   const deletedZones = new Set(beat?.deletedZones || []);
 
+  const _seenDefIds = new Set();
   const defZones = (layoutDef?.zones || []).flatMap(d => {
+    if (!d.id) return [];                       // skip legacy zones saved without an id
+    if (_seenDefIds.has(d.id)) return [];       // deduplicate — bad saves may store same id twice
+    _seenDefIds.add(d.id);
     if (deletedZones.has(d.id)) return [];
     const o = beatZones[d.id] || {};
     if (o.hidden) return [];
@@ -145,7 +253,7 @@ export default function ZoneCanvas({
       x: o.x ?? d.x, y: o.y ?? d.y,
       width: o.width ?? d.width, height: o.height ?? d.height,
       zIndex: o.zIndex ?? d.zIndex, start: o.start ?? d.start ?? 0,
-      content: o.content || {}, style: { ...d.style, ...(o.style || {}) }, background: o.background || {},
+      content: { ...(d.content || {}), ...(o.content || {}) }, style: { ...d.style, ...(o.style || {}) }, background: o.background || {},
     }];
   });
 
@@ -258,12 +366,30 @@ export default function ZoneCanvas({
             );
           }
 
-          if (zone.type === "decorative" || zone.type === "icon") {
-            // Don't render decorative/icon SVGs in the canvas overlay — the Remotion Thumbnail
-            // already shows them correctly with proper z-ordering. Rendering here would put
-            // the SVG in a separate DOM layer above the Thumbnail, covering text that should
-            // be on top. ZoneHandle handles click-selection, so interactivity is unaffected.
+          if (zone.type === "decorative") {
+            // Decorative zones are background overlays — the Thumbnail renders them correctly.
             return null;
+          }
+
+          if (zone.type === "icon") {
+            // The icon SVG is rendered by the Remotion Thumbnail at the correct z-order.
+            // We still need a canvas-overlay div so resize feedback is immediate: the div's
+            // percentage-based dimensions update every time the store changes during a drag.
+            // pointer-events:none keeps interactivity with ZoneHandle (rendered separately).
+            return (
+              <div
+                key={`content_${zone.id}`}
+                className="absolute"
+                style={{
+                  left: `${zone.x}%`, top: `${zone.y}%`,
+                  width: `${zone.width}%`, height: `${zone.height}%`,
+                  zIndex: zone.zIndex ?? 1,
+                  pointerEvents: "none",
+                  boxSizing: "border-box",
+                  border: "1px dashed rgba(255,255,255,0.15)",
+                }}
+              />
+            );
           }
 
           const content  = zone.content || {};
@@ -318,6 +444,7 @@ export default function ZoneCanvas({
           .map(zone => (
             <ZoneHandle key={`handle_${zone.id}`} zone={zone}
               isSelected={selectedZoneIds instanceof Set ? selectedZoneIds.has(zone.id) : selectedZoneId === zone.id}
+              isEditing={editingZoneId === zone.id}
               canvasWidth={canvasW - (beat?.layoutPadding || 0) * canvasScale * 2}
               canvasHeight={canvasH - (beat?.layoutPadding || 0) * canvasScale * 2}
               onSelect={onSelectZone}
@@ -325,10 +452,31 @@ export default function ZoneCanvas({
               onUpdateMulti={handleUpdateMulti}
               onPushHistory={handlePushHistory}
               onSave={handleSave}
+              onEditText={(id) => { onSelectZone(id); setEditingZoneId(id); }}
               selectedZoneIds={selectedZoneIds instanceof Set ? selectedZoneIds : null}
               allZones={allZones}
             />
           ))}
+
+        {/* Inline text editor — shown on double-click of a text zone */}
+        {editingZoneId && (() => {
+          const zone = allZones.find(z => z.id === editingZoneId);
+          if (!zone || zone.type !== "text") return null;
+          return (
+            <InlineTextEditor
+              key={editingZoneId}
+              zone={zone}
+              canvasScale={canvasScale}
+              typographySystem={typographySystem}
+              onCommit={(text) => {
+                handleUpdate(zone.id, { content: { ...(zone.content || {}), kind: "text", text } });
+                handleSave();
+                setEditingZoneId(null);
+              }}
+              onCancel={() => setEditingZoneId(null)}
+            />
+          );
+        })()}
 
         {allZones.filter(z => (z.start || 0) > 0).map(zone => (
           <div key={`delay_${zone.id}`}

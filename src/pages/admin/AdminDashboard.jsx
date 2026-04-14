@@ -3,13 +3,8 @@
  * Overview — key metrics, daily project chart, recent activity.
  */
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase as sb } from "../../lib/supabase";
 import AdminLayout from "./AdminLayout";
-
-const sb = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
 /* ── helpers ── */
 function daysAgo(n) {

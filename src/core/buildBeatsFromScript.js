@@ -108,7 +108,11 @@ function assignBeatRole(index, total) {
 }
 
 /* ── Transition ── */
-function chooseTransition(_layoutId, index, energy = 0.5, isLast = false) {
+function chooseTransition(layoutId, index, energy = 0.5, isLast = false) {
+  // If the layout has a default transition set by admin, always use it
+  const layoutDef = getLayoutDef(layoutId);
+  if (layoutDef?.defaultTransition) return layoutDef.defaultTransition;
+
   if (index === 0) {
     // Beat 0: transition IS the opening animation — pick based on energy
     if (energy >= 0.75) return { type: "zoom",    duration: 12 };
@@ -426,8 +430,7 @@ export async function buildBeatsFromScript({
     const z1Motion = visual.zones?.z1?.content?.asset?.motion;
     if (z1Motion) lastMotion = z1Motion;
 
-    const captionStrategy  = layoutRegistry[visual.layout]?.captionStrategy ?? "always";
-    const captionShowDefault = captionStrategy === "never" ? false : true;
+    const captionShowDefault = layoutRegistry[visual.layout]?.showCaption ?? true;
     const captionPosition  = chooseCaptionPosition(visual.layout, index, total, energy);
 
 

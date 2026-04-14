@@ -42,10 +42,9 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
   const start = raw.start_sec ?? 0;
   const end   = start + duration;
 
-  // Caption show default — driven by layout's captionStrategy
-  const layoutDef       = layoutRegistry[raw.layout || "FullBleed"];
-  const captionStrategy = layoutDef?.captionStrategy ?? "always";
-  const captionShowDefault = captionStrategy === "never" ? false : true;
+  // Caption show default — driven by layout's show_caption boolean
+  const layoutDef          = layoutRegistry[raw.layout || "FullBleed"];
+  const captionShowDefault = layoutDef?.showCaption ?? true;
   const captionShow = captionRaw.show !== undefined ? captionRaw.show : captionShowDefault;
 
   return {

@@ -91,7 +91,7 @@ const AI_TO_LAYOUT_INTENT = {
   irony:       "contrast",
   reveal:      "reveal",
   empathy:     "testimonial", // empathy → testimonial pool
-  urgency:     "cta",
+  urgency:     "escalate",   // urgency → escalate pool
   explanation: "explanation",
   contrast:    "contrast",
   punchline:   "cta",
@@ -99,7 +99,7 @@ const AI_TO_LAYOUT_INTENT = {
   hook:        "hook",
   cta:         "cta",
   list:        "explanation", // list → explanation pool (has list layouts)
-  visual_rest: "scene",
+  visual_rest: "visual_rest",
 };
 
 /* ─────────────────────────────────────────────────────────────
