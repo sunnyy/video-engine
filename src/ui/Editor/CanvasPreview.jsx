@@ -36,10 +36,18 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const [showPlayer,     setShowPlayer]     = useState(false);
   const [pausedFrame,    setPausedFrame]    = useState(null);
   const [showShortcuts,  setShowShortcuts]  = useState(false);
+  const [userZoom,       setUserZoom]       = useState(1.0);
   const hasPlayedOnce = useRef(false);
   const playerRef     = useRef(null);
   const containerRef  = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 400, height: 700 });
+
+  const MIN_ZOOM  = 0.25;
+  const MAX_ZOOM  = 3.0;
+  const ZOOM_STEP = 0.25;
+  const clampZoom = (z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100));
+  const userZoomRef = useRef(userZoom);
+  useEffect(() => { userZoomRef.current = userZoom; }, [userZoom]);
 
   // Refs so keyboard handler always reads fresh values without stale closures
   const selectedZoneIdsRef = useRef(selectedZoneIds);
@@ -72,6 +80,11 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     : Math.min(availW / videoW, availH > 0 ? availH / videoH : 1, 1);
   const canvasW   = Math.max(0, Math.floor(videoW * scale));
   const canvasH   = Math.max(0, Math.floor(videoH * scale));
+
+  // User-controlled zoom applied on top of the fit scale
+  const effectiveCanvasW = Math.max(0, Math.floor(canvasW * userZoom));
+  const effectiveCanvasH = Math.max(0, Math.floor(canvasH * userZoom));
+  const effectiveScale   = scale * userZoom;
 
   /* ── Measure container ── */
   useEffect(() => {
@@ -193,6 +206,25 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       // Prevent browser defaults for shortcuts we handle (Ctrl+D = bookmark, etc.)
       if (!isTyping && (e.metaKey || e.ctrlKey) && e.code === "KeyD") { e.preventDefault(); }
 
+      // Zoom shortcuts — Ctrl+= / Ctrl++ / Ctrl+- / Ctrl+0
+      if (e.metaKey || e.ctrlKey) {
+        if (e.code === "Equal" || e.code === "NumpadAdd") {
+          e.preventDefault();
+          setUserZoom(z => clampZoom(z + ZOOM_STEP));
+          return;
+        }
+        if (e.code === "Minus" || e.code === "NumpadSubtract") {
+          e.preventDefault();
+          setUserZoom(z => clampZoom(z - ZOOM_STEP));
+          return;
+        }
+        if (e.code === "Digit0" || e.code === "Numpad0") {
+          e.preventDefault();
+          setUserZoom(1.0);
+          return;
+        }
+      }
+
       // ESC — deselect zone unless a modal or inline text editor is open
       if (e.code === "Escape") {
         if (document.querySelector("[data-modal]")) return;
@@ -236,7 +268,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       // Arrow keys — nudge (plain = 1%, Shift = 5%) — works for single AND multi-select
       if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code) && (selectedZoneId || isMulti)) {
         e.preventDefault();
-        const step = e.shiftKey ? 5 : 1;
+        const step = e.shiftKey ? 1 : 0.2;
         const dx = e.code === "ArrowLeft" ? -step : e.code === "ArrowRight" ? step : 0;
         const dy = e.code === "ArrowUp"   ? -step : e.code === "ArrowDown"  ? step : 0;
         const selectedIds = isMulti ? [...ids] : [selectedZoneId];
@@ -348,11 +380,16 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               { key: "⌘Z",           desc: "Undo" },
               { key: "⌘Y  /  ⌘⇧Z",  desc: "Redo" },
               { section: "Zones" },
-              { key: "↑ ↓ ← →",      desc: "Nudge zone 1%" },
-              { key: "⇧ + arrows",   desc: "Nudge zone 5%" },
+              { key: "↑ ↓ ← →",      desc: "Nudge zone 0.2%" },
+              { key: "⇧ + arrows",   desc: "Nudge zone 1%" },
               { key: "⌘D",           desc: "Duplicate zone" },
               { key: "Del / ⌫",      desc: "Remove / hide zone" },
               { key: "⇧ + drag",     desc: "Lock aspect ratio while resizing" },
+              { section: "Zoom" },
+              { key: "⌘=  /  ⌘+",   desc: "Zoom in" },
+              { key: "⌘-",           desc: "Zoom out" },
+              { key: "⌘0",           desc: "Reset to fit" },
+              { key: "Ctrl + scroll", desc: "Zoom in / out" },
               { section: "Selection" },
               { key: "Click",        desc: "Select zone" },
               { key: "⌘ + click",    desc: "Multi-select zones" },
@@ -372,8 +409,18 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       )}
 
       {/* Canvas area */}
-      <div ref={containerRef} className={`flex-1 mb-5 relative flex items-start justify-center p-2 pb-2 ${is169 ? "" : " overflow-x-hidden"}`}
-        onClick={() => onSelectZoneRef.current(null)}>
+      <div ref={containerRef}
+        className="flex-1 relative overflow-auto"
+        style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.1) transparent" }}
+        onClick={() => onSelectZoneRef.current(null)}
+        onWheel={(e) => {
+          if (!e.ctrlKey && !e.metaKey) return;
+          e.preventDefault();
+          setUserZoom(z => clampZoom(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
+        }}
+      >
+      {/* Inner wrapper — sized to the effective canvas so scrollbar tracks correctly */}
+      <div className="flex items-start justify-center p-2 pb-6" style={{ minWidth: effectiveCanvasW + 32, minHeight: effectiveCanvasH + 32 }}>
 
         {/* Static edit canvas — Thumbnail + ZoneCanvas + controls */}
         {activeBeat && !showPlayer && (
@@ -381,7 +428,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
           >
             {/* Canvas */}
-            <div style={{ position: "relative", width: canvasW, height: canvasH, outline: "2px solid rgba(255,255,255,0.18)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ position: "relative", width: effectiveCanvasW, height: effectiveCanvasH, outline: "2px solid rgba(255,255,255,0.18)", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
               <Thumbnail
                 key={`thumb-${videoW}x${videoH}`}
                 acknowledgeRemotionLicense
@@ -402,16 +449,16 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
                 compositionHeight={videoH}
                 fps={fps}
                 durationInFrames={durationFrames}
-                style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", display: "block" }}
+                style={{ width: effectiveCanvasW, height: effectiveCanvasH, borderRadius: 8, overflow: "hidden", display: "block" }}
               />
               <div style={{ position: "absolute", inset: 0 }}>
                 <ZoneCanvas
                   beat={activeBeat}
                   selectedZoneIds={selectedZoneIds}
                   onSelectZone={handleSelectZone}
-                  canvasW={canvasW}
-                  canvasH={canvasH}
-                  canvasScale={scale}
+                  canvasW={effectiveCanvasW}
+                  canvasH={effectiveCanvasH}
+                  canvasScale={effectiveScale}
                   videoOverlays={project.overlays || []}
                   onUpdateVideoOverlay={handleUpdateVideoOverlay}
                 />
@@ -458,7 +505,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               fps={fps}
               controls={false}
               numberOfSharedAudioTags={16}
-              style={{ width: canvasW, height: canvasH, borderRadius: 8, overflow: "hidden", outline: "2px solid rgba(255,255,255,0.18)" }}
+              style={{ width: effectiveCanvasW, height: effectiveCanvasH, borderRadius: 8, overflow: "hidden", outline: "2px solid rgba(255,255,255,0.18)", flexShrink: 0 }}
             />
 
             {/* Controls — right side for 9:16, bottom for 16:9 */}
@@ -478,7 +525,62 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             </div>
         </div>
 
+      </div>{/* end inner wrapper */}
+
+      {/* Zoom bar — sticky at the bottom of the scroll viewport */}
+      <div style={{
+        position: "sticky", bottom: 8, left: 0, right: 0,
+        display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 50,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 4,
+          background: "rgba(15,15,24,0.9)", backdropFilter: "blur(8px)",
+          border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+          padding: "4px 8px", pointerEvents: "auto",
+        }}>
+          <button
+            onClick={() => setUserZoom(z => clampZoom(z - ZOOM_STEP))}
+            disabled={userZoom <= MIN_ZOOM}
+            title="Zoom out (Ctrl+-)"
+            style={{ width: 26, height: 26, borderRadius: 5, border: "none", cursor: "pointer",
+              background: "rgba(255,255,255,0.06)", color: "#ccc", fontSize: 16,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: userZoom <= MIN_ZOOM ? 0.3 : 1 }}>
+            −
+          </button>
+          <button
+            onClick={() => setUserZoom(1.0)}
+            title="Reset to fit (Ctrl+0)"
+            style={{ minWidth: 48, height: 26, borderRadius: 5, border: "none", cursor: "pointer",
+              background: userZoom === 1.0 ? "rgba(124,92,252,0.15)" : "rgba(255,255,255,0.06)",
+              color: userZoom === 1.0 ? "#a78bfa" : "#ccc",
+              fontSize: 11, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+            {Math.round(userZoom * 100)}%
+          </button>
+          <button
+            onClick={() => setUserZoom(z => clampZoom(z + ZOOM_STEP))}
+            disabled={userZoom >= MAX_ZOOM}
+            title="Zoom in (Ctrl+=)"
+            style={{ width: 26, height: 26, borderRadius: 5, border: "none", cursor: "pointer",
+              background: "rgba(255,255,255,0.06)", color: "#ccc", fontSize: 16,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: userZoom >= MAX_ZOOM ? 0.3 : 1 }}>
+            +
+          </button>
+          {userZoom !== 1.0 && (
+            <button
+              onClick={() => setUserZoom(1.0)}
+              title="Fit"
+              style={{ height: 26, padding: "0 8px", borderRadius: 5, border: "none", cursor: "pointer",
+                background: "rgba(255,255,255,0.06)", color: "#888",
+                fontSize: 10, fontFamily: "'JetBrains Mono', monospace",
+                borderLeft: "1px solid rgba(255,255,255,0.08)", marginLeft: 2 }}>
+              Fit
+            </button>
+          )}
+        </div>
       </div>
+      </div>{/* end canvas area outer */}
     </div>
   );
 }
