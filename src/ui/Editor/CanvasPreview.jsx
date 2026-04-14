@@ -37,16 +37,24 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const [pausedFrame,    setPausedFrame]    = useState(null);
   const [showShortcuts,  setShowShortcuts]  = useState(false);
   const [userZoom,       setUserZoom]       = useState(1.0);
-  const hasPlayedOnce = useRef(false);
-  const playerRef     = useRef(null);
-  const containerRef  = useRef(null);
+  const [isSpaceDown,    setIsSpaceDown]    = useState(false);
+  const [isPanning,      setIsPanning]      = useState(false);
+  const [panOffset,      setPanOffset]      = useState({ x: 0, y: 0 });
+  const hasPlayedOnce  = useRef(false);
+  const playerRef      = useRef(null);
+  const containerRef   = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 400, height: 700 });
 
   const MIN_ZOOM  = 0.25;
   const MAX_ZOOM  = 3.0;
   const ZOOM_STEP = 0.25;
   const clampZoom = (z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100));
-  const userZoomRef = useRef(userZoom);
+  const userZoomRef    = useRef(userZoom);
+  const isSpaceDownRef = useRef(false);
+  const isPanningRef   = useRef(false);
+  const panOffsetRef   = useRef({ x: 0, y: 0 });
+  const panStartRef    = useRef({ x: 0, y: 0 });
+  const hasPannedRef   = useRef(false);
   useEffect(() => { userZoomRef.current = userZoom; }, [userZoom]);
 
   // Refs so keyboard handler always reads fresh values without stale closures
@@ -199,7 +207,16 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         || e.target.isContentEditable;
 
       // Global shortcuts — always work
-      if (e.code === "Space" && !isTyping) { e.preventDefault(); togglePlayPause(); return; }
+      // Space: enter pan-ready mode; play/pause fires on keyup only if no drag happened
+      if (e.code === "Space" && !isTyping) {
+        e.preventDefault();
+        if (!isSpaceDownRef.current) {
+          isSpaceDownRef.current = true;
+          setIsSpaceDown(true);
+          hasPannedRef.current = false;
+        }
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.code === "KeyZ" && !e.shiftKey && !isTyping) { e.preventDefault(); undo(); return; }
       if (!isTyping && ((e.metaKey || e.ctrlKey) && e.code === "KeyY")) { e.preventDefault(); redo(); return; }
       if (!isTyping && (e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "KeyZ") { e.preventDefault(); redo(); return; }
@@ -221,6 +238,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         if (e.code === "Digit0" || e.code === "Numpad0") {
           e.preventDefault();
           setUserZoom(1.0);
+          setPanOffset({ x: 0, y: 0 });
+          panOffsetRef.current = { x: 0, y: 0 };
           return;
         }
       }
@@ -334,13 +353,34 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [togglePlayPause, undo, redo, updateBeatSilent]);
 
+  /* ── Space keyup: exit pan mode; if no drag happened, toggle play/pause ── */
+  useEffect(() => {
+    const onKeyUp = (e) => {
+      if (e.code !== "Space") return;
+      const tag = e.target.tagName;
+      const isTyping = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.target.isContentEditable;
+      if (isTyping) return;
+      isSpaceDownRef.current = false;
+      setIsSpaceDown(false);
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        setIsPanning(false);
+      } else if (!hasPannedRef.current) {
+        togglePlayPause();
+      }
+      hasPannedRef.current = false;
+    };
+    window.addEventListener("keyup", onKeyUp, true);
+    return () => window.removeEventListener("keyup", onKeyUp, true);
+  }, [togglePlayPause]);
+
   return (
     <div className="w-full bg-black border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
 
       {/* Toolbar */}
       <div className="flex items-center px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0 gap-3">
         <div className="flex items-center gap-2 text-[12px] text-[#777] font-mono">
-          <span>Space ▶/⏸</span>
+          <span>Space ▶/⏸ · hold+drag pan</span>
           <span className="opacity-30">·</span>
           <span>⌘Z undo</span>
           <span className="opacity-30">·</span>
@@ -348,12 +388,50 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           <span className="opacity-30">·</span>
           <span>Esc deselect</span>
         </div>
-        <button
-          onClick={() => setShowShortcuts(true)}
-          className="ml-auto text-[11px] text-[#555] hover:text-[#7c5cfc] transition-colors cursor-pointer bg-transparent border-none font-mono underline underline-offset-2"
-        >
-          All Shortcuts
-        </button>
+        <div className="ml-auto flex items-center gap-3">
+          {/* Zoom controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <button
+              onClick={() => setUserZoom(z => clampZoom(z - ZOOM_STEP))}
+              disabled={userZoom <= MIN_ZOOM}
+              title="Zoom out (Ctrl+-)"
+              style={{ width: 22, height: 22, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
+                background: "rgba(255,255,255,0.05)", color: "#999", fontSize: 14,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: userZoom <= MIN_ZOOM ? 0.3 : 1 }}>
+              −
+            </button>
+            <span className="text-[11px] font-mono font-bold" style={{ color: userZoom === 1.0 ? "#555" : "#a78bfa", minWidth: 30, textAlign: "center" }}>
+              {Math.round(userZoom * 100)}%
+            </span>
+            <button
+              onClick={() => setUserZoom(z => clampZoom(z + ZOOM_STEP))}
+              disabled={userZoom >= MAX_ZOOM}
+              title="Zoom in (Ctrl+=)"
+              style={{ width: 22, height: 22, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
+                background: "rgba(255,255,255,0.05)", color: "#999", fontSize: 14,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: userZoom >= MAX_ZOOM ? 0.3 : 1 }}>
+              +
+            </button>
+            {userZoom !== 1.0 && (
+              <button
+                onClick={() => setUserZoom(1.0)}
+                title="Reset zoom (Ctrl+0)"
+                style={{ height: 22, padding: "0 7px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
+                  background: "rgba(255,255,255,0.05)", color: "#888",
+                  fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>
+                Fit
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className="text-[11px] text-[#555] hover:text-[#7c5cfc] transition-colors cursor-pointer bg-transparent border-none font-mono underline underline-offset-2"
+          >
+            All Shortcuts
+          </button>
+        </div>
       </div>
 
       {/* Keyboard shortcuts modal */}
@@ -388,8 +466,10 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               { section: "Zoom" },
               { key: "⌘=  /  ⌘+",   desc: "Zoom in" },
               { key: "⌘-",           desc: "Zoom out" },
-              { key: "⌘0",           desc: "Reset to fit" },
+              { key: "⌘0",           desc: "Reset zoom + pan" },
               { key: "Ctrl + scroll", desc: "Zoom in / out" },
+              { key: "Space + drag",  desc: "Pan canvas" },
+              { key: "Double-click",  desc: "Reset zoom + pan" },
               { section: "Selection" },
               { key: "Click",        desc: "Select zone" },
               { key: "⌘ + click",    desc: "Multi-select zones" },
@@ -410,17 +490,64 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
 
       {/* Canvas area */}
       <div ref={containerRef}
-        className="flex-1 relative overflow-auto"
-        style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.1) transparent" }}
-        onClick={() => onSelectZoneRef.current(null)}
+        className="flex-1 relative overflow-hidden"
+        style={{ cursor: isPanning ? "grabbing" : isSpaceDown ? "grab" : "default" }}
+        onClick={(e) => {
+          if (hasPannedRef.current) { hasPannedRef.current = false; return; }
+          onSelectZoneRef.current(null);
+        }}
+        onMouseDown={(e) => {
+          if (!isSpaceDownRef.current) return;
+          e.preventDefault();
+          isPanningRef.current = true;
+          setIsPanning(true);
+          panStartRef.current = {
+            x: e.clientX - panOffsetRef.current.x,
+            y: e.clientY - panOffsetRef.current.y,
+          };
+        }}
+        onMouseMove={(e) => {
+          if (!isPanningRef.current) return;
+          hasPannedRef.current = true;
+          const newOffset = {
+            x: e.clientX - panStartRef.current.x,
+            y: e.clientY - panStartRef.current.y,
+          };
+          panOffsetRef.current = newOffset;
+          setPanOffset(newOffset);
+        }}
+        onMouseUp={() => {
+          if (isPanningRef.current) { isPanningRef.current = false; setIsPanning(false); }
+        }}
+        onMouseLeave={() => {
+          if (isPanningRef.current) { isPanningRef.current = false; setIsPanning(false); }
+        }}
+        onDoubleClick={(e) => {
+          // Double-click on canvas background (not a zone) → reset pan + zoom to fit
+          if (e.target === e.currentTarget) {
+            setUserZoom(1.0);
+            setPanOffset({ x: 0, y: 0 });
+            panOffsetRef.current = { x: 0, y: 0 };
+          }
+        }}
         onWheel={(e) => {
           if (!e.ctrlKey && !e.metaKey) return;
           e.preventDefault();
           setUserZoom(z => clampZoom(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
         }}
       >
-      {/* Inner wrapper — sized to the effective canvas so scrollbar tracks correctly */}
-      <div className="flex items-start justify-center p-2 pb-6" style={{ minWidth: effectiveCanvasW + 32, minHeight: effectiveCanvasH + 32 }}>
+        {/* Pan overlay — sits above zones when space is held, lets pan mousedown bubble to container */}
+        {isSpaceDown && (
+          <div style={{ position: "absolute", inset: 0, zIndex: 100, cursor: isPanning ? "grabbing" : "grab" }} />
+        )}
+      {/* Inner wrapper — translated for panning */}
+      <div className="flex items-start justify-center p-2"
+        style={{
+          width: "100%", height: "100%",
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+          transition: isPanning ? "none" : "transform 0.08s ease",
+          willChange: "transform",
+        }}>
 
         {/* Static edit canvas — Thumbnail + ZoneCanvas + controls */}
         {activeBeat && !showPlayer && (
@@ -506,6 +633,12 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               controls={false}
               numberOfSharedAudioTags={16}
               style={{ width: effectiveCanvasW, height: effectiveCanvasH, borderRadius: 8, overflow: "hidden", outline: "2px solid rgba(255,255,255,0.18)", flexShrink: 0 }}
+              onEnded={() => {
+                setIsPlaying(false);
+                setShowPlayer(false);
+                setPausedFrame(null);
+                hasPlayedOnce.current = false;
+              }}
             />
 
             {/* Controls — right side for 9:16, bottom for 16:9 */}
@@ -525,61 +658,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             </div>
         </div>
 
-      </div>{/* end inner wrapper */}
+      </div>{/* end pan-transform inner wrapper */}
 
-      {/* Zoom bar — sticky at the bottom of the scroll viewport */}
-      <div style={{
-        position: "sticky", bottom: 8, left: 0, right: 0,
-        display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 50,
-      }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 4,
-          background: "rgba(15,15,24,0.9)", backdropFilter: "blur(8px)",
-          border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
-          padding: "4px 8px", pointerEvents: "auto",
-        }}>
-          <button
-            onClick={() => setUserZoom(z => clampZoom(z - ZOOM_STEP))}
-            disabled={userZoom <= MIN_ZOOM}
-            title="Zoom out (Ctrl+-)"
-            style={{ width: 26, height: 26, borderRadius: 5, border: "none", cursor: "pointer",
-              background: "rgba(255,255,255,0.06)", color: "#ccc", fontSize: 16,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: userZoom <= MIN_ZOOM ? 0.3 : 1 }}>
-            −
-          </button>
-          <button
-            onClick={() => setUserZoom(1.0)}
-            title="Reset to fit (Ctrl+0)"
-            style={{ minWidth: 48, height: 26, borderRadius: 5, border: "none", cursor: "pointer",
-              background: userZoom === 1.0 ? "rgba(124,92,252,0.15)" : "rgba(255,255,255,0.06)",
-              color: userZoom === 1.0 ? "#a78bfa" : "#ccc",
-              fontSize: 11, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
-            {Math.round(userZoom * 100)}%
-          </button>
-          <button
-            onClick={() => setUserZoom(z => clampZoom(z + ZOOM_STEP))}
-            disabled={userZoom >= MAX_ZOOM}
-            title="Zoom in (Ctrl+=)"
-            style={{ width: 26, height: 26, borderRadius: 5, border: "none", cursor: "pointer",
-              background: "rgba(255,255,255,0.06)", color: "#ccc", fontSize: 16,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: userZoom >= MAX_ZOOM ? 0.3 : 1 }}>
-            +
-          </button>
-          {userZoom !== 1.0 && (
-            <button
-              onClick={() => setUserZoom(1.0)}
-              title="Fit"
-              style={{ height: 26, padding: "0 8px", borderRadius: 5, border: "none", cursor: "pointer",
-                background: "rgba(255,255,255,0.06)", color: "#888",
-                fontSize: 10, fontFamily: "'JetBrains Mono', monospace",
-                borderLeft: "1px solid rgba(255,255,255,0.08)", marginLeft: 2 }}>
-              Fit
-            </button>
-          )}
-        </div>
-      </div>
       </div>{/* end canvas area outer */}
     </div>
   );

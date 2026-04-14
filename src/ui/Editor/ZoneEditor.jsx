@@ -997,16 +997,85 @@ export default function ZoneEditor({
             </div>
           )}
 
+          {/* Corner Radius */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-[5px]">
+              <Label>Corner Radius</Label>
+              <button
+                onClick={cornersUnlocked ? lockCorners : unlockCorners}
+                title={cornersUnlocked ? "Reset to uniform radius" : "Edit each corner separately"}
+                className="text-[10px] bg-transparent border-0 cursor-pointer px-[6px] py-[2px] rounded transition-colors"
+                style={{ color: cornersUnlocked ? "#7c5cfc" : "#555", background: cornersUnlocked ? "rgba(124,92,252,0.12)" : "transparent" }}>
+                {cornersUnlocked ? "⛓ uniform" : "⛓ per corner"}
+              </button>
+            </div>
+            <Slider value={radius} onChangeSilent={v => setAllCorners(v)} onCommit={commit} min={0} max={300} unit="px" />
+            {cornersUnlocked && (
+              <div className="mt-1 p-2 rounded-[6px]" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)" }}>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {[
+                    { key:"borderRadiusTL", label:"↖ Top Left"   },
+                    { key:"borderRadiusTR", label:"Top Right ↗"  },
+                    { key:"borderRadiusBL", label:"↙ Bot Left"   },
+                    { key:"borderRadiusBR", label:"Bot Right ↘"  },
+                  ].map(({ key, label }) => (
+                    <div key={key}>
+                      <div className="flex items-center justify-between mb-[3px]">
+                        <span className="text-[10px] font-mono" style={{ color:"#666" }}>{label}</span>
+                        <span className="text-[10px] font-mono" style={{ color:"#7c5cfc" }}>{cornerVal(key)}px</span>
+                      </div>
+                      <input type="range" min={0} max={300} step={1}
+                        value={cornerVal(key)}
+                        onChange={e => setZoneStyleSilent(slot, key, Number(e.target.value))}
+                        onMouseUp={commit} onTouchEnd={commit}
+                        className="w-full accent-[#7c5cfc]" style={{ height: 4 }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </Section>
 
         <Section title="Transform" defaultOpen={false}>
           <div className="mb-3">
             <RotationControl value={rotation} onChangeSilent={v => setStyleSilent("rotation", v)} onStart={pushHistory} onCommit={commitSave} />
           </div>
+          {/* Flip H / V */}
+          <div className="mb-3">
+            <Label className="mb-[6px]">Flip</Label>
+            <div className="flex gap-2 mt-[6px]">
+              {[
+                { key: "flipH", label: "↔ Horizontal" },
+                { key: "flipV", label: "↕ Vertical" },
+              ].map(({ key, label }) => {
+                const active = !!style[key];
+                return (
+                  <button key={key}
+                    onClick={() => setZoneStyle(slot, key, !active)}
+                    className="flex-1 py-[6px] rounded-[7px] text-[11px] font-bold border cursor-pointer transition-all"
+                    style={{
+                      background: active ? "rgba(124,92,252,0.18)" : "rgba(255,255,255,0.04)",
+                      color:      active ? "#a78bfa" : "#666",
+                      border:     active ? "1px solid rgba(124,92,252,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                    }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="mb-3">
             <Slider label="Opacity" value={Math.round(opacity * 100)}
               onChangeSilent={v => setStyleSilent("opacity", v / 100)}
               onCommit={commit} min={0} max={100} unit="%" />
+          </div>
+        </Section>
+
+        <Section title="Transitions" icon="▶" defaultOpen={false}>
+          <div className="grid grid-cols-2 gap-3">
+            <Sel label="Enter" value={enter} onChange={v => setZoneLayout(slot, "enterAnimation", v)} options={enters} />
+            <Sel label="Exit"  value={exit}  onChange={v => setZoneLayout(slot, "exitAnimation",  v)} options={exits}  />
           </div>
         </Section>
 

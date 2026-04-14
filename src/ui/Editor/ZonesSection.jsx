@@ -227,8 +227,14 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
         background: {},
       };
     } else if (data?.kind === "decorative") {
+      // Make the initial zone a square in pixel terms.
+      // width% * videoW = height% * videoH  →  height% = width% * (videoW / videoH)
+      const vW = project.meta.width  || 1080;
+      const vH = project.meta.height || 1920;
+      const wPct = 30;
+      const hPct = Math.round((wPct * vW / vH) * 10) / 10;
       zoneData = {
-        type: "decorative", x: 10, y: 10, width: 30, height: 30,
+        type: "decorative", x: 10, y: 10, width: wPct, height: hPct,
         zIndex: 10, start: 0, end: null,
         enterAnimation: "fadeIn", exitAnimation: "none",
         content: { decorativeId: data.decorativeId || null },

@@ -747,6 +747,11 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             if (!entry) return null;
             const color = st.color || "#ffffff";
 
+            // Flip transform
+            const flipX = st.flipH ? -1 : 1;
+            const flipY = st.flipV ? -1 : 1;
+            const flipTransform = (flipX !== 1 || flipY !== 1) ? `scale(${flipX}, ${flipY})` : undefined;
+
             // CSS-only decoratives (lines, dividers, dashes)
             if (entry.render === "css_repeat" && entry.css) {
               const injectColor = (val) =>
@@ -754,11 +759,14 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
               const cssStyle = Object.fromEntries(
                 Object.entries(entry.css).map(([k, v]) => [k, injectColor(v)])
               );
+              const hasRadius = (st.borderRadius || 0) > 0 || st.borderRadiusTL !== undefined;
               return (
                 <div style={{
                   position: "absolute", inset: 0,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   pointerEvents: "none",
+                  ...(flipTransform ? { transform: flipTransform } : {}),
+                  ...(hasRadius ? { ...brStyle(), overflow: "hidden" } : {}),
                 }}>
                   <div style={{ width: "100%", ...cssStyle }} />
                 </div>
@@ -822,6 +830,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
                   svgStr = svgStr.replace(/<svg /, `<svg stroke-width="${sw}" `);
                 }
               }
+              const hasRadius = (st.borderRadius || 0) > 0 || st.borderRadiusTL !== undefined;
               return (
                 <div style={{
                   position:     "absolute",
@@ -830,17 +839,23 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
                   alignItems:   "center",
                   justifyContent: "center",
                   pointerEvents: "none",
-                  overflow:     "visible",
+                  overflow:     hasRadius ? "hidden" : "visible",
+                  ...(hasRadius ? brStyle() : {}),
+                  ...(flipTransform ? { transform: flipTransform } : {}),
                 }}
                   dangerouslySetInnerHTML={{ __html: (() => {
-                    const hasAR = svgStr.includes('preserveAspectRatio=');
-                    const inject = hasAR
-                      ? '<svg width="100%" height="100%" style="overflow:visible" '
-                      : '<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible" ';
-                    // Inject defs right after the opening <svg ...> tag
-                    return svgStr
-                      .replace(/<svg /, inject)
-                      .replace(/(<svg[^>]*>)/, `$1${gradDefs}`);
+                    // Rewrite the opening <svg> tag: keep all original attrs (especially viewBox)
+                    // but force width/height/preserveAspectRatio so shape fills the zone freely.
+                    let result = svgStr.replace(/<svg([^>]*)>/, (_, attrs) => {
+                      const cleaned = attrs
+                        .replace(/\s*width="[^"]*"/g, '')
+                        .replace(/\s*height="[^"]*"/g, '')
+                        .replace(/\s*preserveAspectRatio="[^"]*"/g, '');
+                      return `<svg width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible"${cleaned}>`;
+                    });
+                    // Inject gradient defs right after the opening tag
+                    result = result.replace(/(<svg[^>]*>)/, `$1${gradDefs}`);
+                    return result;
                   })() }}
                 />
               );
