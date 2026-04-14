@@ -885,11 +885,6 @@ export default function ZoneEditor({
             </div>
           </div>
 
-          {/* Color */}
-          <div className="mb-3">
-            <ColorRow label="Color" value={color} onChange={v => setZoneStyle(slot, "color", v)} />
-          </div>
-
           {/* Filled / Outline toggle */}
           <div className="mb-3">
             <BtnGroup
@@ -908,6 +903,100 @@ export default function ZoneEditor({
             </div>
           )}
 
+          {/* Color / Gradient — unified for SVG types */}
+          {entry?.svg ? (() => {
+            const isGrad = style.gradientType && style.gradientType !== "none";
+            const gradType = style.gradientType || "linear";
+            const gStops = style.gradientStops?.length >= 2
+              ? style.gradientStops
+              : [
+                  { pos: 0,   color: style.gradientColor1 || color,     opacity: style.gradientOpacity1 ?? 100 },
+                  { pos: 100, color: style.gradientColor2 || "#000000",  opacity: style.gradientOpacity2 ?? 100 },
+                ];
+            const setStops = (next, silent) =>
+              silent ? setStyleSilent("gradientStops", next) : setZoneStyle(slot, "gradientStops", next);
+            const patchStop = (i, key, val, silent) =>
+              setStops(gStops.map((s, idx) => idx === i ? { ...s, [key]: val } : s), silent);
+            const addStop = () => {
+              const sorted = [...gStops].sort((a, b) => a.pos - b.pos);
+              let maxGap = -1, insertPos = 50;
+              for (let i = 0; i < sorted.length - 1; i++) {
+                const gap = sorted[i + 1].pos - sorted[i].pos;
+                if (gap > maxGap) { maxGap = gap; insertPos = Math.round((sorted[i].pos + sorted[i + 1].pos) / 2); }
+              }
+              setStops([...gStops, { pos: insertPos, color: "#ffffff", opacity: 100 }], false);
+            };
+            // Build live gradient preview CSS
+            const gradPreviewCss = (() => {
+              const s = gStops.map(st => {
+                const hex = st.color || "#ffffff";
+                const a   = (st.opacity ?? 100) / 100;
+                const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+                const c = a >= 1 ? hex : `rgba(${r},${g},${b},${a.toFixed(2)})`;
+                return `${c} ${st.pos}%`;
+              }).join(", ");
+              return gradType === "radial"
+                ? `radial-gradient(circle, ${s})`
+                : `linear-gradient(${style.gradientAngle ?? 90}deg, ${s})`;
+            })();
+
+            return (
+              <div className="flex flex-col gap-3 mb-3">
+                {/* Solid / Gradient mode toggle */}
+                <BtnGroup fullWidth
+                  options={[{ label: "Solid Color", value: "solid" }, { label: "Gradient", value: "gradient" }]}
+                  value={isGrad ? "gradient" : "solid"}
+                  onChange={v => {
+                    if (v === "solid") setZoneStyle(slot, "gradientType", "none");
+                    else setZoneStyle(slot, "gradientType", "linear");
+                  }}
+                />
+
+                {/* Solid color picker */}
+                {!isGrad && (
+                  <ColorRow label="Color" value={color} onChange={v => setZoneStyle(slot, "color", v)} />
+                )}
+
+                {/* Gradient controls */}
+                {isGrad && (
+                  <div className="flex flex-col gap-3">
+                    {/* Live gradient preview strip */}
+                    <div className="rounded-[8px] overflow-hidden" style={{ height: 36, background: gradPreviewCss }} />
+
+                    {/* Linear / Radial */}
+                    <BtnGroup fullWidth
+                      options={[{ label: "Linear", value: "linear" }, { label: "Radial", value: "radial" }]}
+                      value={gradType}
+                      onChange={v => setZoneStyle(slot, "gradientType", v)}
+                    />
+
+                    {/* Angle — linear only */}
+                    {gradType === "linear" && (
+                      <Slider label="Angle" value={style.gradientAngle ?? 90}
+                        onChangeSilent={v => setStyleSilent("gradientAngle", v)}
+                        onCommit={commit} min={0} max={360} step={5} unit="°" />
+                    )}
+
+                    {/* Stops */}
+                    <GradientStopList gStops={gStops} setStops={setStops} patchStop={patchStop} commit={commit} />
+                    {gStops.length < 6 && (
+                      <button onClick={addStop}
+                        className="w-full py-[7px] rounded-[8px] text-[12px] bg-transparent cursor-pointer transition-colors"
+                        style={{ color: "#7c5cfc", border: "1px solid rgba(124,92,252,0.3)" }}>
+                        + Add Stop
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })() : (
+            /* CSS decoratives — solid color only */
+            <div className="mb-3">
+              <ColorRow label="Color" value={color} onChange={v => setZoneStyle(slot, "color", v)} />
+            </div>
+          )}
+
         </Section>
 
         <Section title="Transform" defaultOpen={false}>
@@ -920,58 +1009,6 @@ export default function ZoneEditor({
               onCommit={commit} min={0} max={100} unit="%" />
           </div>
         </Section>
-
-        {/* Gradient (SVG decoratives only — CSS-repeat types have no fill to gradient) */}
-        {entry?.svg && (
-          <Section title="Gradient" icon="◐" defaultOpen={false}
-            badge={(style.gradientType && style.gradientType !== "none") ? style.gradientType : undefined}>
-            <div className="flex items-center gap-2 mb-3">
-              <BtnGroup fullWidth
-                options={[{ label: "Off", value: "none" }, { label: "Linear", value: "linear" }, { label: "Radial", value: "radial" }]}
-                value={style.gradientType || "none"} onChange={v => setZoneStyle(slot, "gradientType", v)} />
-            </div>
-            {(style.gradientType && style.gradientType !== "none") && (() => {
-              const gStops = style.gradientStops?.length >= 2
-                ? style.gradientStops
-                : [
-                    { pos: 0,   color: style.gradientColor1 || color,      opacity: style.gradientOpacity1 ?? 100 },
-                    { pos: 100, color: style.gradientColor2 || "#000000",   opacity: style.gradientOpacity2 ?? 100 },
-                  ];
-              const setStops = (next, silent) =>
-                silent
-                  ? setStyleSilent("gradientStops", next)
-                  : setZoneStyle(slot, "gradientStops", next);
-              const patchStop = (i, key, val, silent) =>
-                setStops(gStops.map((s, idx) => idx === i ? { ...s, [key]: val } : s), silent);
-              const addStop = () => {
-                const sorted = [...gStops].sort((a, b) => a.pos - b.pos);
-                let maxGap = -1, insertPos = 50;
-                for (let i = 0; i < sorted.length - 1; i++) {
-                  const gap = sorted[i + 1].pos - sorted[i].pos;
-                  if (gap > maxGap) { maxGap = gap; insertPos = Math.round((sorted[i].pos + sorted[i + 1].pos) / 2); }
-                }
-                setStops([...gStops, { pos: insertPos, color: "#ffffff", opacity: 100 }], false);
-              };
-              return (
-                <div className="flex flex-col gap-3">
-                  <GradientStopList gStops={gStops} setStops={setStops} patchStop={patchStop} commit={commit} />
-                  {gStops.length < 6 && (
-                    <button onClick={addStop}
-                      className="w-full py-[7px] rounded-[8px] text-[12px] bg-transparent cursor-pointer transition-colors"
-                      style={{ color: "#7c5cfc", border: "1px solid rgba(124,92,252,0.3)" }}>
-                      + Add Stop
-                    </button>
-                  )}
-                  {style.gradientType === "linear" && (
-                    <Slider label="Angle" value={style.gradientAngle ?? 90}
-                      onChangeSilent={v => setStyleSilent("gradientAngle", v)}
-                      onCommit={commit} min={0} max={360} step={5} unit="°" />
-                  )}
-                </div>
-              );
-            })()}
-          </Section>
-        )}
 
         <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
         </Accordion>
@@ -1474,9 +1511,53 @@ export default function ZoneEditor({
                   onChange={v => { setStyleSilent("shadowColor", v); commit(); }} />
               </div>
             )}
-            <Slider label="Padding" value={padding}
-              onChangeSilent={v => setStyleSilent("contentPadding", v)}
-              onCommit={commit} min={0} max={120} unit="px" />
+            <div className="grid grid-cols-2 gap-3">
+              <Slider label="Padding" value={padding}
+                onChangeSilent={v => setStyleSilent("contentPadding", v)}
+                onCommit={commit} min={0} max={120} unit="px" />
+              <div>
+                <div className="flex items-center justify-between mb-[5px]">
+                  <Label>Corner Radius</Label>
+                  <button
+                    onClick={cornersUnlocked ? lockCorners : unlockCorners}
+                    title={cornersUnlocked ? "Reset to uniform radius" : "Edit each corner separately"}
+                    className="text-[10px] bg-transparent border-0 cursor-pointer px-[6px] py-[2px] rounded transition-colors"
+                    style={{ color: cornersUnlocked ? "#7c5cfc" : "#555",
+                      background: cornersUnlocked ? "rgba(124,92,252,0.12)" : "transparent" }}>
+                    {cornersUnlocked ? "⛓ uniform" : "⛓ per corner"}
+                  </button>
+                </div>
+                <Slider value={radius}
+                  onChangeSilent={v => setAllCorners(v)}
+                  onCommit={commit} min={0} max={300} unit="px" />
+              </div>
+            </div>
+
+            {/* Per-corner grid — shown below when unlocked */}
+            {cornersUnlocked && (
+              <div className="mt-1 p-2 rounded-[6px]" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)" }}>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {[
+                    { key:"borderRadiusTL", label:"↖ Top Left"   },
+                    { key:"borderRadiusTR", label:"Top Right ↗"  },
+                    { key:"borderRadiusBL", label:"↙ Bot Left"   },
+                    { key:"borderRadiusBR", label:"Bot Right ↘"  },
+                  ].map(({ key, label }) => (
+                    <div key={key}>
+                      <div className="flex items-center justify-between mb-[3px]">
+                        <span className="text-[10px] font-mono" style={{ color:"#666" }}>{label}</span>
+                        <span className="text-[10px] font-mono" style={{ color:"#7c5cfc" }}>{cornerVal(key)}px</span>
+                      </div>
+                      <input type="range" min={0} max={300} step={1}
+                        value={cornerVal(key)}
+                        onChange={e => setZoneStyleSilent(slot, key, Number(e.target.value))}
+                        onMouseUp={commit} onTouchEnd={commit}
+                        className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height:3 }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1610,51 +1691,6 @@ export default function ZoneEditor({
           </>
         )}
 
-        {/* Corner Radius */}
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-[5px]">
-            <Label>Corner Radius</Label>
-            <button
-              onClick={cornersUnlocked ? lockCorners : unlockCorners}
-              title={cornersUnlocked ? "Reset to uniform radius" : "Edit each corner separately"}
-              className="text-[10px] bg-transparent border-0 cursor-pointer px-[6px] py-[2px] rounded transition-colors"
-              style={{ color: cornersUnlocked ? "#7c5cfc" : "#555",
-                background: cornersUnlocked ? "rgba(124,92,252,0.12)" : "transparent" }}>
-              {cornersUnlocked ? "⛓ uniform" : "⛓ per corner"}
-            </button>
-          </div>
-
-          {/* All-corners slider */}
-          <Slider value={radius}
-            onChangeSilent={v => setAllCorners(v)}
-            onCommit={commit} min={0} max={300} unit="px" />
-
-          {/* Per-corner grid */}
-          {cornersUnlocked && (
-            <div className="mt-2 p-2 rounded-[6px]" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)" }}>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                {[
-                  { key:"borderRadiusTL", label:"↖ Top Left"    },
-                  { key:"borderRadiusTR", label:"Top Right ↗"  },
-                  { key:"borderRadiusBL", label:"↙ Bot Left"    },
-                  { key:"borderRadiusBR", label:"Bot Right ↘"  },
-                ].map(({ key, label }) => (
-                  <div key={key}>
-                    <div className="flex items-center justify-between mb-[3px]">
-                      <span className="text-[10px] font-mono" style={{ color:"#666" }}>{label}</span>
-                      <span className="text-[10px] font-mono" style={{ color:"#7c5cfc" }}>{cornerVal(key)}px</span>
-                    </div>
-                    <input type="range" min={0} max={300} step={1}
-                      value={cornerVal(key)}
-                      onChange={e => setZoneStyleSilent(slot, key, Number(e.target.value))}
-                      onMouseUp={commit} onTouchEnd={commit}
-                      className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height:3 }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
       </Section>
 
       {/* Animated Border */}

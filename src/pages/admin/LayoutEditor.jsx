@@ -136,7 +136,7 @@ function buildSaveZones(defZones, beatZones, deletedZones = []) {
       if (bz.content && Object.keys(bz.content).length > 0) {
         merged.content = bz.content;
       }
-      if (bz.background && Object.keys(bz.background).length > 0) {
+      if (bz.background !== undefined) {
         merged.background = bz.background;
       }
       return merged;
