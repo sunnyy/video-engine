@@ -152,9 +152,11 @@ export default function AssetRenderer({ zone, beat, slot }) {
     }}>
       <div style={{ width: "100%", height: "100%", ...style }}>
         {isVideo ? (
-          <Video src={source} muted loop style={mediaStyle} />
+          <Video src={source} muted loop style={mediaStyle}
+            onError={(e) => console.warn("[AssetRenderer] video error", source, e)} />
         ) : (
-          <Img src={source} style={mediaStyle} />
+          <Img src={source} style={mediaStyle}
+            onError={(e) => console.warn("[AssetRenderer] image error", source, e)} />
         )}
       </div>
     </AbsoluteFill>

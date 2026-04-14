@@ -10,7 +10,9 @@
       "Bash(node -e \"const r = require\\('./node_modules/remotion/package.json'\\); console.log\\(r.version\\)\")",
       "Bash(node -e \"const r = require\\('remotion'\\); console.log\\(Object.keys\\(r\\).filter\\(k => /video|audio/i.test\\(k\\)\\)\\)\")",
       "Bash(node -e \"const r = require\\('remotion'\\); console.log\\(Object.keys\\(r\\).filter\\(k => /environ|render|player/i.test\\(k\\)\\)\\)\")",
-      "Bash(node -e \"const d = JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/Sunny/Desktop/video-engine/temp.json','utf8'\\)\\); const b = d.beats?.[0] || d.project?.beats?.[0]; console.log\\(JSON.stringify\\(b, null, 2\\)\\);\")"
+      "Bash(node -e \"const d = JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/Sunny/Desktop/video-engine/temp.json','utf8'\\)\\); const b = d.beats?.[0] || d.project?.beats?.[0]; console.log\\(JSON.stringify\\(b, null, 2\\)\\);\")",
+      "Bash(curl -v -I -H \"Referer: https://pixabay.com/\" -H \"User-Agent: Mozilla/5.0\" \"https://cdn.pixabay.com/video/2025/05/06/277097_medium.mp4\")",
+      "Bash(node -e \"const https = require\\('https'\\); const req = https.request\\({hostname:'cdn.pixabay.com',path:'/video/2025/05/06/277097_medium.mp4',method:'HEAD',headers:{'Referer':'https://pixabay.com/','User-Agent':'Mozilla/5.0'}}, r => { console.log\\('STATUS:', r.statusCode\\); console.log\\('HEADERS:', JSON.stringify\\(r.headers, null, 2\\)\\); req.destroy\\(\\); }\\); req.on\\('error', e => console.error\\('ERR:', e.message\\)\\); req.end\\(\\);\")"
     ]
   }
 }

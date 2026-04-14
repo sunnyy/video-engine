@@ -13,6 +13,7 @@ export default function AvatarLayer({ zone }) {
         height:     "100%",
         objectFit:  zone.objectFit ?? "cover",
       }}
+      onError={(e) => console.warn("[AvatarLayer] video error", zone.src, e)}
     />
   );
 }

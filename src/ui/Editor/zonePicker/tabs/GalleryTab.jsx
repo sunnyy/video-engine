@@ -43,10 +43,13 @@ async function searchPixabay(query, mediaType, page) {
     if (isVideo) {
       // Pick medium quality video
       const video = hit.videos?.medium || hit.videos?.small || hit.videos?.large;
+      // Route through server proxy to avoid CORS/referrer restrictions on Pixabay CDN
+      const rawUrl = video?.url;
+      const proxiedUrl = rawUrl ? `/api/proxy-video?url=${encodeURIComponent(rawUrl)}` : null;
       return {
         id:        hit.id,
         type:      "video",
-        src:       video?.url,
+        src:       proxiedUrl,
         thumb:     hit.picture_id
           ? `https://i.vimeocdn.com/video/${hit.picture_id}_295x166.jpg`
           : null,

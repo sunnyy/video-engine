@@ -126,8 +126,8 @@ function BlurredAssetBackground({ src }) {
   return (
     <>
       {isVideo
-        ? <OffthreadVideo src={src} muted style={mediaStyle} />
-        : <Img            src={src}        style={mediaStyle} />
+        ? <OffthreadVideo src={src} muted style={mediaStyle} onError={(e) => console.warn("[LayoutRenderer] bg video error", src, e)} />
+        : <Img            src={src}        style={mediaStyle} onError={(e) => console.warn("[LayoutRenderer] bg image error", src, e)} />
       }
       {/* Dark scrim so text stays readable */}
       <div style={{
@@ -289,7 +289,7 @@ function AvatarVideoZone({ src, trimBefore, objectFit, isRendering, style }) {
   // Render path: OffthreadVideo handles its own frame-sync internally during
   // headless render — no external delayRender needed.
   if (isRendering) {
-    return <OffthreadVideo src={src} muted trimBefore={trimBefore} style={style} />;
+    return <OffthreadVideo src={src} muted trimBefore={trimBefore} style={style} onError={(e) => console.warn("[LayoutRenderer] zone video render error", src, e)} />;
   }
   return <div ref={containerRef} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
 }

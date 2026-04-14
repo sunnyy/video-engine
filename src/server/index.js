@@ -13,6 +13,9 @@ import { v4 as uuidv4 } from "uuid";
 import compressVideo from "./compressVideo.cjs";
 import compressAudio from "./compressAudio.cjs";
 import { createClient } from "@supabase/supabase-js";
+import axios from "axios";
+import https from "node:https";
+import http  from "node:http";
 
 dotenv.config();
 
@@ -528,6 +531,49 @@ app.post("/api/proxy-image", requireAuth, async (req, res) => {
     console.error("[proxy-image]", err);
     res.status(500).json({ error: "Proxy failed" });
   }
+});
+
+/* Proxy-stream a remote video URL server-side (avoids CORS/referrer restrictions on CDNs like Pixabay).
+   No auth required — this only proxies publicly accessible CDN URLs. */
+app.get("/api/proxy-video", (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: "url required" });
+
+  let parsedUrl;
+  try { parsedUrl = new URL(url); } catch {
+    return res.status(400).json({ error: "invalid url" });
+  }
+
+  const lib     = parsedUrl.protocol === "https:" ? https : http;
+  const options = {
+    hostname: parsedUrl.hostname,
+    port:     parsedUrl.port || (parsedUrl.protocol === "https:" ? 443 : 80),
+    path:     parsedUrl.pathname + parsedUrl.search,
+    method:   "GET",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Referer":    "https://pixabay.com/",
+      ...(req.headers.range ? { "Range": req.headers.range } : {}),
+    },
+  };
+
+  const upstream = lib.request(options, (upRes) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", upRes.headers["content-type"] || "video/mp4");
+    if (upRes.headers["content-length"]) res.setHeader("Content-Length",  upRes.headers["content-length"]);
+    if (upRes.headers["content-range"])  res.setHeader("Content-Range",   upRes.headers["content-range"]);
+    if (upRes.headers["accept-ranges"])  res.setHeader("Accept-Ranges",   upRes.headers["accept-ranges"]);
+    res.writeHead(upRes.statusCode || 200);
+    upRes.pipe(res);
+  });
+
+  upstream.on("error", (err) => {
+    console.error("[proxy-video]", err.message);
+    if (!res.headersSent) res.status(500).json({ error: "Proxy failed" });
+  });
+
+  req.on("close", () => upstream.destroy());
+  upstream.end();
 });
 
 /* ---------------- COMPRESSION VIDEO ---------------- */
