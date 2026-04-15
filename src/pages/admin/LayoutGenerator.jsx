@@ -98,7 +98,7 @@ function PromptCard({ prompt, approved, onApprove, onReject, onRegenerate, rerol
 
 /* ── ImageCard (Step 3) ──────────────────────────────────────── */
 function ImageCard({ prompt, image, onGenerate }) {
-  const W = 120, H = Math.round(120 * 1920 / 1080);
+  const W = 220, H = Math.round(220 * 1920 / 1080);
   return (
     <div style={{ ...C.card, width:W + 16 }}>
       <div style={{ width:W, height:H, margin:8, borderRadius:6, overflow:"hidden", background:"#0b0b10", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
@@ -124,9 +124,9 @@ function ImageCard({ prompt, image, onGenerate }) {
         )}
       </div>
       <div style={{ padding:"0 8px 8px" }}>
-        <div style={{ fontSize:9, fontWeight:700, color:"#aaa", marginBottom:6, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{prompt.title}</div>
+        <div style={{ fontSize:11, fontWeight:700, color:"#aaa", marginBottom:6, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{prompt.title}</div>
         <button onClick={onGenerate} disabled={image?.loading}
-          style={{ width:"100%", padding:"4px 0", borderRadius:5, fontSize:10, fontWeight:700, cursor:"pointer", background:"rgba(124,92,252,0.15)", border:"1px solid rgba(124,92,252,0.3)", color:"#a78bfa", opacity:image?.loading?0.4:1 }}>
+          style={{ width:"100%", padding:"4px 0", borderRadius:5, fontSize:15, fontWeight:700, cursor:"pointer", background:"rgba(124,92,252,0.15)", border:"1px solid rgba(124,92,252,0.3)", color:"#a78bfa", opacity:image?.loading?0.4:1 }}>
           {image?.imageUrl ? "↺" : "Gen"}
         </button>
       </div>
@@ -137,9 +137,9 @@ function ImageCard({ prompt, image, onGenerate }) {
 /* ── ConvertCard (Step 4) ─────────────────────────────────────── */
 function ConvertCard({ prompt, image, conversion, onConvert }) {
   const [expanded, setExpanded] = useState(false);
-  const W = 60, H = Math.round(W * 1920 / 1080);
-  const bgType = conversion?.background_type;
-  const bgColor = bgType === "environmental" ? "#06b6d4" : bgType === "subject" ? "#f59e0b" : "#22c55e";
+  const W = 120, H = Math.round(W * 1920 / 1080);
+  const bgType = conversion?.background_category;
+  const bgColor = bgType === "abstract" ? "#f59e0b" : bgType === "pattern" ? "#06b6d4" : "#22c55e";
 
   return (
     <div style={{ ...C.card, padding:"12px 14px" }}>
@@ -149,10 +149,10 @@ function ConvertCard({ prompt, image, conversion, onConvert }) {
             style={{ width:W, height:H, objectFit:"cover", borderRadius:5, flexShrink:0, border:"1px solid rgba(255,255,255,0.1)" }} />
         )}
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:"#e8e8f0", marginBottom:4 }}>{prompt.title}</div>
-          <div style={{ fontSize:10, color:"#555", marginBottom:8, lineHeight:1.4 }}>{prompt.visual_direction}</div>
-          {conversion?.loading && <div style={{ fontSize:10, color:"#666" }}>⏳ Converting with GPT-4o Vision…</div>}
-          {conversion?.error   && <div style={{ fontSize:10, color:"#f87171" }}>✕ {conversion.error}</div>}
+          <div style={{ fontSize:15, fontWeight:700, color:"#e8e8f0", marginBottom:4 }}>{prompt.title}</div>
+          <div style={{ fontSize:12, color:"#555", marginBottom:8, lineHeight:1.4 }}>{prompt.visual_direction}</div>
+          {conversion?.loading && <div style={{ fontSize:12, color:"#666" }}>⏳ Converting with GPT-4o Vision…</div>}
+          {conversion?.error   && <div style={{ fontSize:12, color:"#f87171" }}>✕ {conversion.error}</div>}
           {conversion?.zones   && !conversion?.loading && (
             <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
               <span style={C.badge("#22c55e")}>{conversion.zones.length} zones</span>
@@ -165,7 +165,7 @@ function ConvertCard({ prompt, image, conversion, onConvert }) {
           )}
           {!conversion?.zones && !conversion?.loading && !conversion?.error && (
             <button onClick={onConvert} disabled={!image?.imageUrl}
-              style={{ ...C.btnP, padding:"6px 14px", fontSize:11, opacity:!image?.imageUrl?0.4:1 }}>
+              style={{ ...C.btnP, padding:"6px 14px", fontSize:12, opacity:!image?.imageUrl?0.4:1 }}>
               Convert →
             </button>
           )}
@@ -205,32 +205,32 @@ function ValidationBadges({ zones }) {
 function MetaForm({ prompt, meta, onChange }) {
   return (
     <div style={{ ...C.card, padding:"14px" }}>
-      <div style={{ fontSize:12, fontWeight:700, color:"#e8e8f0", marginBottom:12 }}>{prompt.title}</div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
-        <div>
-          <span style={C.lbl}>Name (snake_case)</span>
+      <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+        <div style={{ fontSize:12, fontWeight:700, color:"#e8e8f0", minWidth:120, flexShrink:0 }}>{prompt.title}</div>
+        <div style={{ flex:"2 1 160px", minWidth:0 }}>
+          <span style={C.lbl}>Name</span>
           <input style={C.inp} value={meta.name ?? ""} placeholder="layout_name"
             onChange={e => onChange("name", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))} />
         </div>
-        <div>
+        <div style={{ flex:"2 1 160px", minWidth:0 }}>
           <span style={C.lbl}>Label</span>
           <input style={C.inp} value={meta.label ?? ""} placeholder="Human Readable Label"
             onChange={e => onChange("label", e.target.value)} />
         </div>
-        <div>
+        <div style={{ flex:"1 1 90px", minWidth:0 }}>
           <span style={C.lbl}>Energy</span>
           <select style={C.inp} value={meta.energy ?? "high"} onChange={e => onChange("energy", e.target.value)}>
             {ENERGIES.map(en => <option key={en} value={en}>{en}</option>)}
           </select>
         </div>
-        <div>
+        <div style={{ flex:"1 1 90px", minWidth:0 }}>
           <span style={C.lbl}>Visibility</span>
           <select style={C.inp} value={meta.visibility ?? "internal"} onChange={e => onChange("visibility", e.target.value)}>
             <option value="internal">Internal</option>
             <option value="external">External</option>
           </select>
         </div>
-        <div>
+        <div style={{ flex:"1 1 80px", minWidth:0 }}>
           <span style={C.lbl}>Caption</span>
           <select style={C.inp} value={String(meta.show_caption ?? true)} onChange={e => onChange("show_caption", e.target.value === "true")}>
             <option value="true">Show</option>
@@ -354,7 +354,10 @@ export default function LayoutGenerator() {
   const generateAllImages = useCallback(async () => {
     if (imgStarted.current) return;
     imgStarted.current = true;
-    await Promise.all(approvedPrompts.map(p => generateImage(p)));
+    // Stagger starts by 3s so Fal.ai doesn't queue/drop concurrent flux/dev requests
+    await Promise.all(approvedPrompts.map((p, i) =>
+      new Promise(r => setTimeout(r, i * 3000)).then(() => generateImage(p))
+    ));
   }, [approvedPrompts, generateImage]);
 
   /* ── Step 4: Convert images to zones ─────────────────────── */
@@ -369,8 +372,8 @@ export default function LayoutGenerator() {
       });
       if (!r.ok) throw new Error((await r.json()).error || r.status);
       const data = await r.json();
-      const { zones, background_type, background_colors, background_gradient_direction, background_shapes, background_needs_image, color_family } = data;
-      setConversions(prev => ({ ...prev, [p.id]:{ zones, background_type, background_colors, background_gradient_direction, background_shapes, background_needs_image, color_family, loading:false } }));
+      const { zones, background_category, background_colors, background_gradient_direction, background_needs_image, background_image_prompt, color_family } = data;
+      setConversions(prev => ({ ...prev, [p.id]:{ zones, background_category, background_colors, background_gradient_direction, background_needs_image, background_image_prompt, color_family, loading:false } }));
       // Pre-populate metadata
       setMetas(prev => ({
         ...prev,
@@ -406,8 +409,8 @@ export default function LayoutGenerator() {
 
     let zones = [...conv.zones];
 
-    // solid_gradient: swap in a matching backgroundPatternRegistry CSS
-    if (conv.background_type === "solid_gradient") {
+    // solid/pattern backgrounds: swap in a matching backgroundPatternRegistry CSS
+    if (conv.background_category === "solid" || conv.background_category === "pattern") {
       const targetCategory = conv.color_family;
       const entries = Object.values(backgroundPatternRegistry);
       const nicheMatch = entries.filter(e => e.category === targetCategory && e.niche?.includes(config.niche));
@@ -422,37 +425,46 @@ export default function LayoutGenerator() {
       }
     }
 
-    // Collect asset zones that need image generation
+    // Collect primary/secondary asset zones that need image generation
     const assetZones = zones.filter(z =>
-      z.role === "background_asset" || z.role === "primary_asset" || z.role === "secondary_asset"
+      z.role === "primary_asset" || z.role === "secondary_asset"
     );
+    const hasBgAsset = zones.some(z => z.role === "background_asset");
+    const needsBgImage = conv.background_category === "abstract" && conv.background_needs_image;
 
-    if (assetZones.length === 0) {
+    if (assetZones.length === 0 && !needsBgImage) {
       setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones } }));
       setAssets(prev => ({ ...prev, [p.id]: { results:[], loading:false, done:true } }));
       return;
     }
 
     try {
-      const r = await serverFetch("/api/admin/generate-zone-assets", {
+      const r = await serverFetch("/api/admin/generate-layout-assets", {
         method:"POST",
         body:JSON.stringify({
+          promptId: p.id,
           zones: assetZones,
-          visual_direction: p.visual_direction,
-          prompt: p.prompt,
           niche: config.niche,
           intent: config.intent,
-          energy: config.energy,
-          background_type: conv.background_type,
-          background_colors: conv.background_colors,
+          imagePrompt: p.prompt,
+          background_needs_image: conv.background_needs_image,
+          background_image_prompt: conv.background_image_prompt,
+          color_family: conv.color_family,
         }),
       });
       if (!r.ok) throw new Error((await r.json()).error || r.status);
-      const { results } = await r.json();
+      const { results, backgroundImageUrl } = await r.json();
 
-      // Merge imageUrls back into zones at content.asset.src
+      // Merge asset imageUrls into zones at content.asset.src
       const urlMap = {};
       results.forEach(res => { urlMap[res.zoneId] = res.imageUrl; });
+
+      // Merge background image into background_asset zone if present
+      if (backgroundImageUrl && hasBgAsset) {
+        const bgZone = zones.find(z => z.role === "background_asset");
+        if (bgZone) urlMap[bgZone.id] = backgroundImageUrl;
+      }
+
       const mergedZones = zones.map(z =>
         urlMap[z.id]
           ? { ...z, content: { ...z.content, asset: { ...(z.content?.asset ?? {}), src: urlMap[z.id] } } }
@@ -460,7 +472,7 @@ export default function LayoutGenerator() {
       );
 
       setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones: mergedZones } }));
-      setAssets(prev => ({ ...prev, [p.id]: { results, loading:false, done:true } }));
+      setAssets(prev => ({ ...prev, [p.id]: { results, backgroundImageUrl, loading:false, done:true } }));
     } catch (e) {
       setAssets(prev => ({ ...prev, [p.id]: { results:[], loading:false, error:e.message, done:false } }));
     }
@@ -501,9 +513,10 @@ export default function LayoutGenerator() {
             generation_meta: {
               title:                      p.title,
               visual_direction:           p.visual_direction,
-              background_type:            conversions[p.id]?.background_type,
+              background_category:        conversions[p.id]?.background_category,
               background_colors:          conversions[p.id]?.background_colors,
               background_gradient_direction: conversions[p.id]?.background_gradient_direction,
+              background_image_prompt:    conversions[p.id]?.background_image_prompt,
               color_family:               conversions[p.id]?.color_family,
               generated_at:               new Date().toISOString(),
             },
@@ -732,7 +745,7 @@ export default function LayoutGenerator() {
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
                       <div style={{ fontSize:12, fontWeight:700, color:"#e8e8f0" }}>{p.title}</div>
                       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                        {conv?.background_type && <span style={C.badge("#6366f1")}>{conv.background_type}</span>}
+                        {conv?.background_category && <span style={C.badge("#6366f1")}>{conv.background_category}</span>}
                         {conv?.color_family    && <span style={C.badge("#a78bfa")}>{conv.color_family}</span>}
                         {asset?.loading && <span style={{ fontSize:10, color:"#888" }}>⏳ Generating…</span>}
                         {asset?.done   && <span style={C.badge("#22c55e")}>✓ Done</span>}
@@ -745,7 +758,7 @@ export default function LayoutGenerator() {
                         {assetZones.map(z => {
                           const result = asset?.results?.find(r => r.zoneId === z.id);
                           const src = result?.imageUrl || z.content?.asset?.src;
-                          const W = 56, H = Math.round(W * 1920 / 1080);
+                          const W = 120, H = Math.round(W * 1920 / 1080);
                           return (
                             <div key={z.id} style={{ textAlign:"center" }}>
                               <div style={{
@@ -810,7 +823,7 @@ export default function LayoutGenerator() {
                 <p style={{ color:"#555", fontSize:12, margin:0 }}>{readyToSave.length} layout{readyToSave.length!==1?"s":""} ready to save</p>
               </div>
               <div style={{ display:"flex", gap:10 }}>
-                <button onClick={() => setStep(4)} style={C.btnG}>← Back</button>
+                <button onClick={() => setStep(5)} style={C.btnG}>← Back</button>
                 <button onClick={handleSaveAll} disabled={saving || readyToSave.length === 0}
                   style={{ ...C.btnP, opacity:saving||readyToSave.length===0?0.6:1 }}>
                   {saving ? "Saving…" : `Save ${readyToSave.length} Layout${readyToSave.length!==1?"s":""} →`}
@@ -857,8 +870,8 @@ export default function LayoutGenerator() {
           </div>
         )}
 
-        {/* ═══ STEP 6: Done ════════════════════════════════════ */}
-        {step === 6 && (
+        {/* ═══ STEP 7: Done ════════════════════════════════════ */}
+        {step === 7 && (
           <div>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
               <div>

@@ -1450,8 +1450,8 @@ app.post("/api/admin/generate-layout-preview", requireAuth, requireAdmin, async 
     // ── Generate via Fal.ai flux/dev ──
     let falUrl = null;
     let lastErr = "";
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
       try {
         const falRes = await fetch("https://fal.run/fal-ai/flux/dev", {
           method: "POST",
@@ -1662,61 +1662,53 @@ app.post("/api/admin/generate-zone-assets", requireAuth, requireAdmin, async (re
 
 // POST /api/admin/convert-layout-image — GPT-4o Vision → zone JSON + background metadata
 // Body: { imageUrl, niche, intent, energy }
-app.post("/api/admin/convert-layout-image", requireAuth, requireAdmin, async (req, res) => {
+app.post('/api/admin/convert-layout-image', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { imageUrl, niche, intent, energy } = req.body;
-    if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
+    if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
 
-    const visionPrompt = `You are a precision layout extraction engine. Analyze this marketing layout image and extract EVERY visible element into a structured zone JSON.
+    const decorativeShapeKeys = ['circle','square','triangle','hexagon','star','diamond','cross','pill','arc','ring','dot','line','chevron','arrow','wave','spiral','grid','mesh','bars','blob'];
+    const iconKeys = ['arrow','arrowCircle','star','starOutline','check','checkCircle','close','heart','fire','lightning','crown','diamond','shield','trophy','rocket','flag','bell','eye','play','pause'];
+
+    const visionPrompt = `You are a precision layout extraction engine. Analyze this marketing layout image and extract every visible element into structured zone JSON that maps to a design system.
 
 CANVAS: 1080x1920px vertical (9:16). All coordinates as percentages (0-100).
 
-═══════════════════════════════════════
-STEP 1 — BACKGROUND ANALYSIS
-═══════════════════════════════════════
-Classify the background into ONE of these types:
-
-A) solid_gradient — solid color, gradient, or simple color wash
-B) multi_shape — background built from geometric shapes (rectangles, triangles, diagonal bands, circles, polygons)
-C) image_based — photographic or illustrated scene, texture, abstract art
+───────────────────────────────────────
+STEP 1 — BACKGROUND CLASSIFICATION
+───────────────────────────────────────
+Classify background as ONE of:
+- "solid" — solid color or simple gradient (no texture, no shapes, no photo)
+- "pattern" — repeating geometric texture, grid, dots, lines, noise, subtle pattern
+- "abstract" — photographic scene, illustrated scene, complex graphic, gradient mesh with multiple color stops
 
 Output:
 {
-  "background_type": "solid_gradient" | "multi_shape" | "image_based",
+  "background_category": "solid" | "pattern" | "abstract",
   "background_colors": ["#hex1", "#hex2"],
-  "background_gradient_direction": "to bottom" | "to right" | "135deg" | etc,
-  "background_shapes": [
-    {
-      "shape": "rectangle" | "triangle" | "circle" | "diagonal_band",
-      "color": "#hex",
-      "opacity": 0.0-1.0,
-      "x": 0-100,
-      "y": 0-100,
-      "width": 0-100,
-      "height": 0-100,
-      "rotation": degrees
-    }
-  ],
-  "background_needs_image": true | false
+  "background_gradient_direction": "to bottom" | "to right" | "135deg" | null,
+  "color_family": "blue"|"green"|"red"|"yellow"|"purple"|"orange"|"teal"|"pink"|"dark"|"light"|"neutral",
+  "background_needs_image": true (only if abstract, else false),
+  "background_image_prompt": "detailed Fal.ai generation prompt describing the background only, no text, no people" (only if abstract, else null)
 }
 
-═══════════════════════════════════════
+───────────────────────────────────────
 STEP 2 — ZONE EXTRACTION
-═══════════════════════════════════════
-Extract EVERY visible element. Assign sequential IDs: z1, z2, z3...
+───────────────────────────────────────
+Extract EVERY visible element. Sequential IDs: z1, z2, z3...
 
-For EACH zone output:
+ZONE SCHEMA:
 {
   "id": "z1",
   "type": "text" | "asset" | "decorative" | "icon",
   "role": see roles below,
-  "x": percentage from left,
-  "y": percentage from top,
-  "width": percentage of canvas width,
-  "height": percentage of canvas height,
-  "content": visible text (for text zones) or null,
+  "x": 0-100,
+  "y": 0-100,
+  "width": 0-100,
+  "height": 0-100,
+  "content": visible text string (text zones only) | null,
   "style": {
-    "fontSize": number,
+    "fontSize": pixel size on a 1920px tall canvas (headline: 80-160, subtext: 30-55, label: 22-32, cta: 28-44, stat: 60-110),
     "fontWeight": "400"|"600"|"700"|"800"|"900",
     "fontFamily": "Bebas Neue"|"Outfit"|"Barlow Condensed"|"Playfair Display"|"Dancing Script"|"JetBrains Mono"|"Unbounded"|"Anton"|"Oswald"|"Montserrat"|"Inter"|"Poppins"|"Raleway"|"Lato"|"Roboto"|"Nunito"|"Syne",
     "color": "#hex",
@@ -1725,257 +1717,218 @@ For EACH zone output:
     "borderRadius": number or null,
     "padding": number or null,
     "rotation": degrees or 0,
-    "shape": "rectangle"|"circle"|"pill"|"star"|"diamond",
-    "opacity": 0.0-1.0
+    "opacity": 0.0-1.0,
+    "shapeKey": one of [${decorativeShapeKeys.join(',')}] (decorative zones only),
+    "iconKey": one of [${iconKeys.join(',')}] (icon zones only),
+    "fillColor": "#hex" (decorative/icon zones — the shape fill color)
   },
   "animation": "fadeIn"|"slideUpIn"|"popIn"|"scaleIn"|"none",
   "animationDelay": 0.1-1.0
 }
 
 ROLES:
-- text types: headline, subtext, label, tagline, stat, metric, quote, cta
-- asset types: primary_asset, secondary_asset, background_asset
-- decorative types: decorative
-- icon types: icon
+- text: headline | subtext | label | tagline | stat | metric | quote | cta
+- asset: primary_asset | secondary_asset | background_asset
+- decorative: decorative
+- icon: icon
 
 EXTRACTION RULES:
-1. Label pill at top → type: text, role: label
-2. Main headline → type: text, role: headline
-3. Supporting text → type: text, role: subtext
-4. CTA button/text → type: text, role: cta
-5. Product/person area → type: asset, role: primary_asset (content: null)
-6. Stat badge overlay → type: text, role: stat
-7. Background shapes from step 1 — DO NOT duplicate as zones UNLESS they are foreground overlays
-8. Star/sparkle icons → type: decorative, role: decorative
-9. Divider lines → type: decorative, role: decorative
-10. Arrow icons → type: icon, role: icon
-11. Every text zone MUST have content (the actual text visible in the image)
-12. Asset zones: content null, coordinates = bounding box of where the image/person sits
+1. Category label pill (e.g. "EDUCATION", "BUSINESS") — type:text, role:label
+2. Main headline — type:text, role:headline. IMPORTANT: if the headline is split into multiple visually distinct parts (different font size, different color, highlight, gradient, or outline vs filled), create a SEPARATE zone for EACH part. Example: "LAUNCH" (white, 120px) on one line and "YOUR LEGACY" (yellow, 160px, bold) on the next → two separate headline zones with their individual x/y/width/height/fontSize/color. Do NOT merge them into one zone.
+3. Supporting body text — type:text, role:subtext
+4. Bottom CTA text or button text — type:text, role:cta
+5. Price, percentage, stat badge (e.g. "60% OFF", "100K+") — type:text, role:stat
+6. Main product/person image area — type:asset, role:primary_asset, content:null, coordinates = bounding box of the image/subject area
+7. Small overlapping image or secondary visual — type:asset, role:secondary_asset, content:null
+8. Decorative shape (circle, hexagon, dot, ring, ribbon, diagonal band, sparkle, star shape) — type:decorative, role:decorative, pick closest shapeKey from the list
+9. Small icon (arrow, check, play button) — type:icon, role:icon, pick closest iconKey from the list
+10. Divider line — type:decorative, role:decorative, shapeKey:line
+11. Text zones MUST have content. If the text is clearly readable use EXACT text. If the font is stylized/decorative and text is unclear, use a clean role-based placeholder: headline→"YOUR HEADLINE HERE", subtext→"Supporting detail goes here", label→"CATEGORY", stat→"30% OFF", cta→"GET STARTED"
+12. Asset zones MUST have content:null — do NOT put text in asset zones
+13. Do NOT create a zone for the background itself
+14. COORDINATES: measure carefully. A centered element on a 1080px canvas has x = (1080 - width_px) / 1080 * 50. Verify x+width ≤ 100 and y+height ≤ 100
+15. textAlign: if element appears horizontally centered on canvas → "center". Left-aligned → "left". Right-aligned → "right"
 
-ANIMATION TIMING:
-- First element: animationDelay 0.1
-- Each subsequent: +0.1 to +0.2
-- CTA: always last, animationDelay 0.6-0.8
+ANIMATION TIMING (top to bottom, by visual reading order):
+- First element (label): 0.1
+- Each subsequent zone: +0.1 to +0.15 from previous
+- Split headline parts: stagger each part +0.08 apart (e.g. 0.2, 0.28, 0.36)
+- CTA: always last, animationDelay 0.7-0.9
 
-═══════════════════════════════════════
-STEP 3 — COLOR FAMILY DETECTION
-═══════════════════════════════════════
-Detect the dominant color family: "blue"|"green"|"red"|"yellow"|"purple"|"orange"|"teal"|"pink"|"dark"|"light"|"neutral"
-
-═══════════════════════════════════════
-OUTPUT FORMAT — STRICT JSON ONLY
-═══════════════════════════════════════
-Return ONLY this JSON, no markdown, no explanation:
-
+───────────────────────────────────────
+OUTPUT — STRICT JSON ONLY, NO MARKDOWN
+───────────────────────────────────────
 {
-  "background_type": "solid_gradient"|"multi_shape"|"image_based",
+  "background_category": "solid"|"pattern"|"abstract",
   "background_colors": ["#hex"],
-  "background_gradient_direction": "string or null",
-  "background_shapes": [],
-  "background_needs_image": false,
+  "background_gradient_direction": null,
   "color_family": "string",
+  "background_needs_image": false,
+  "background_image_prompt": null,
   "zones": []
 }
 
 Context: niche=${niche}, intent=${intent}, energy=${energy}`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: 'gpt-4o',
       max_tokens: 4000,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: imageUrl, detail: "high" } },
-            { type: "text", text: visionPrompt },
-          ],
-        },
-      ],
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+          { type: 'text', text: visionPrompt }
+        ]
+      }]
     });
 
     let raw = response.choices[0].message.content.trim();
-    raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    raw = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(raw);
 
-    const bgType        = parsed.background_type || "solid_gradient";
-    const bgColors      = parsed.background_colors || ["#000000"];
-    const bgDirection   = parsed.background_gradient_direction || null;
-    const bgNeedsImage  = parsed.background_needs_image || false;
-    const colorFamily   = parsed.color_family || "dark";
+    const bgCategory  = parsed.background_category || 'solid';
+    const bgColors    = parsed.background_colors || ['#1a1a2e'];
+    const bgDirection = parsed.background_gradient_direction || null;
+    const bgNeedsImg  = !!parsed.background_needs_image;
+    const bgImgPrompt = parsed.background_image_prompt || null;
+    const colorFamily = parsed.color_family || 'dark';
 
-    // ── Normalize background shapes ────────────────────────────
-    const backgroundShapes = (parsed.background_shapes || []).map(s => ({
-      shape:    s.shape    || "rectangle",
-      color:    s.color    || "#000000",
-      opacity:  s.opacity  ?? 1,
-      x:        s.x        || 0,
-      y:        s.y        || 0,
-      width:    s.width    || 100,
-      height:   s.height   || 100,
-      rotation: s.rotation || 0,
-    }));
-
-    // ── Transform GPT zones → internal zone schema ─────────────
-    // GPT outputs: animation/animationDelay/content(string)/style.backgroundColor/style.rotation
-    // Internal:    enterAnimation/start/content(object)/style.background/style.transform
+    // ── Transform GPT schema → LayoutRenderer internal schema ────
     function toInternalZone(z, i) {
-      const type = z.type || "text";
-      const role = z.role || "subtext";
+      const type = z.type || 'text';
+      const role = z.role || 'subtext';
+      const raw  = z.style || {};
 
       // zIndex by layer
       let zIndex = 4;
-      if (role === "background_asset" || (type === "decorative" && z.x <= 1 && z.y <= 1 && (z.width ?? 0) >= 90)) zIndex = 1;
-      else if (type === "asset") zIndex = 2;
-      else if (type === "decorative") zIndex = 3;
-      else if (type === "text") zIndex = 4;
-      else if (type === "icon") zIndex = 5;
+      if (role === 'background_asset') zIndex = 1;
+      else if (type === 'asset')       zIndex = 2;
+      else if (type === 'decorative')  zIndex = 3;
+      else if (type === 'icon')        zIndex = 5;
 
-      // Style — map GPT field names to internal names
-      const rawStyle = z.style || {};
+      // Build internal style
       const style = {};
-      if (rawStyle.color)       style.color      = rawStyle.color;
-      if (rawStyle.fontSize)    style.fontSize   = rawStyle.fontSize;
-      if (rawStyle.fontWeight)  style.fontWeight = String(rawStyle.fontWeight);
-      if (rawStyle.fontFamily)  style.fontFamily = rawStyle.fontFamily;
-      if (rawStyle.textAlign)   style.textAlign  = rawStyle.textAlign;
-      if (rawStyle.opacity !== undefined) style.opacity = rawStyle.opacity;
-      if (rawStyle.borderRadius) style.borderRadius = rawStyle.borderRadius;
-      if (rawStyle.rotation && rawStyle.rotation !== 0) style.transform = `rotate(${rawStyle.rotation}deg)`;
-
-      // backgroundColor → background (used for text bg pills and decorative fills)
-      if (rawStyle.backgroundColor) style.background = rawStyle.backgroundColor;
-
-      // Decorative and icon zones: use color as background fill
-      if ((type === "decorative" || type === "icon") && rawStyle.color && !style.background) {
-        style.background = rawStyle.color;
+      if (raw.color)       style.color       = raw.color;
+      if (raw.fontSize)    style.fontSize    = Math.max(18, Number(raw.fontSize));
+      if (raw.fontWeight)  style.fontWeight  = String(raw.fontWeight);
+      if (raw.fontFamily)  style.fontFamily  = raw.fontFamily;
+      if (raw.textAlign)   style.textAlign   = raw.textAlign;
+      if (raw.borderRadius != null) style.borderRadius = raw.borderRadius;
+      if (raw.opacity      != null) style.opacity      = raw.opacity;
+      // rotation → CSS transform
+      if (raw.rotation && raw.rotation !== 0) style.transform = `rotate(${raw.rotation}deg)`;
+      // backgroundColor → background (pill bg for text, fill for decoratives)
+      if (raw.backgroundColor) style.background = raw.backgroundColor;
+      // decorative/icon: use fillColor or color as background fill
+      if ((type === 'decorative' || type === 'icon') && !style.background) {
+        style.background = raw.fillColor || raw.color || '#ffffff';
       }
-
-      // Shape-specific CSS for decorative zones
-      if (type === "decorative" || type === "icon") {
-        const shape = rawStyle.shape;
-        if (shape === "circle")    style.borderRadius = "50%";
-        else if (shape === "pill") style.borderRadius = 999;
-        style.opacity = rawStyle.opacity ?? 1;
+      // shapeKey → borderRadius shorthand
+      if (type === 'decorative' || type === 'icon') {
+        const sk = raw.shapeKey;
+        if (sk === 'circle' || sk === 'ring' || sk === 'dot') style.borderRadius = '50%';
+        else if (sk === 'pill')                               style.borderRadius = 999;
       }
-
-      // Asset zones always get objectFit
-      if (type === "asset") {
-        style.objectFit = "cover";
-        style.opacity   = rawStyle.opacity ?? 1;
-      }
-
-      // Text padding: spread single padding value
-      if (rawStyle.padding) {
-        style.paddingTop    = rawStyle.padding;
-        style.paddingBottom = rawStyle.padding;
-        style.paddingLeft   = rawStyle.padding * 2;
-        style.paddingRight  = rawStyle.padding * 2;
+      // asset objectFit
+      if (type === 'asset') style.objectFit = 'cover';
+      // text padding
+      if (raw.padding) {
+        style.paddingTop    = raw.padding;
+        style.paddingBottom = raw.padding;
+        style.paddingLeft   = raw.padding * 2;
+        style.paddingRight  = raw.padding * 2;
       }
 
       // Content object
       let content;
-      if (type === "text") {
-        content = { kind: "text", text: z.content || "Text Zone" };
-      } else if (type === "asset") {
-        content = { kind: "asset", asset: { src: null, type: "image", motion: "none", objectFit: "cover", enterTransition: "none", exitTransition: "none" } };
+      if (type === 'text') {
+        // Garble filter: reject content that looks like OCR noise
+        // (too many consonant clusters, no vowels, or suspiciously short non-word)
+        const rawText = (z.content || '').trim();
+        const isGarbled = rawText.length > 0 && rawText.length < 20
+          && !/[aeiouAEIOU]/.test(rawText.replace(/\s/g, ''))
+          && /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}/.test(rawText.replace(/\s/g, ''));
+        const rolePlaceholders = {
+          headline: 'YOUR HEADLINE HERE', subtext: 'Supporting detail goes here',
+          label: 'CATEGORY', stat: '30% OFF', cta: 'GET STARTED',
+          tagline: 'Your tagline', metric: '10K+', quote: '"Quote goes here"',
+        };
+        const cleanText = isGarbled
+          ? (rolePlaceholders[role] || rawText)
+          : (rawText || rolePlaceholders[role] || '');
+        content = { kind: 'text', text: cleanText };
+      } else if (type === 'asset') {
+        content = { kind: 'asset', asset: { src: null, type: 'image', objectFit: 'cover', motion: 'none', enterTransition: 'none', exitTransition: 'none' } };
       }
-      // decorative/icon: no content
+      // decorative/icon: no content object needed
 
-      // maxChars estimate for text zones
-      const maxChars = type === "text"
-        ? Math.max(5, Math.round(((z.width || 80) / 100) * (1000 / Math.max(rawStyle.fontSize || 60, 20))))
+      const maxChars = type === 'text'
+        ? Math.max(5, Math.round(((z.width || 80) / 100) * (1000 / Math.max(raw.fontSize || 60, 20))))
         : undefined;
 
       return {
         id:             z.id || `z${i + 1}`,
-        type,
-        role,
-        x:              typeof z.x      === "number" ? z.x      : 5,
-        y:              typeof z.y      === "number" ? z.y      : 5,
-        width:          typeof z.width  === "number" ? z.width  : 90,
-        height:         typeof z.height === "number" ? z.height : 10,
+        type, role,
+        x:              typeof z.x      === 'number' ? z.x      : 5,
+        y:              typeof z.y      === 'number' ? z.y      : 5,
+        width:          typeof z.width  === 'number' ? z.width  : 90,
+        height:         typeof z.height === 'number' ? z.height : 10,
         zIndex,
-        start:          z.animationDelay || (i * 0.1),
+        start:          z.animationDelay ?? (i * 0.1),
         end:            null,
-        enterAnimation: z.animation || (type === "asset" ? "slideUpIn" : type === "icon" ? "popIn" : "fadeIn"),
-        exitAnimation:  "none",
+        enterAnimation: z.animation || (type === 'asset' ? 'fadeIn' : type === 'icon' ? 'popIn' : 'fadeIn'),
+        exitAnimation:  'none',
         style,
-        ...(content  !== undefined ? { content }  : {}),
-        ...(maxChars !== undefined ? { maxChars } : {}),
+        ...(content   !== undefined ? { content }   : {}),
+        ...(maxChars  !== undefined ? { maxChars }  : {}),
       };
     }
 
     let zones = (parsed.zones || []).map(toInternalZone);
 
-    // ── For multi_shape: prepend background shape decorative zones ─
-    // Shapes from STEP 1 background analysis become real decorative zones
-    if (bgType === "multi_shape" && backgroundShapes.length > 0) {
-      const shapeZones = backgroundShapes.map((s, i) => {
-        const shapeStyle = {
-          background:   s.color,
-          opacity:      s.opacity,
-          ...(s.shape === "circle"          ? { borderRadius: "50%" }  : {}),
-          ...(s.shape === "pill"            ? { borderRadius: 999 }    : {}),
-          ...(s.rotation && s.rotation !== 0 ? { transform: `rotate(${s.rotation}deg)` } : {}),
-        };
-        return {
-          id: `z_shape${i + 1}`,
-          type: "decorative", role: "decorative",
-          x: s.x, y: s.y, width: s.width, height: s.height,
-          zIndex: 1, start: 0, end: null,
-          enterAnimation: "none", exitAnimation: "none",
-          style: shapeStyle,
-        };
-      });
-      zones = [...shapeZones, ...zones];
-    }
-
-    // ── For solid_gradient: build a CSS background zone if missing ─
-    if (bgType === "solid_gradient") {
-      const hasBg = zones.some(z => z.x <= 1 && z.y <= 1 && (z.width ?? 0) >= 90 && (z.height ?? 0) >= 90 && z.zIndex === 1);
+    // ── Ensure full-bleed background zone ─────────────────────────
+    if (bgCategory === 'solid' || bgCategory === 'pattern') {
+      const hasBg = zones.some(z => z.zIndex === 1 && (z.width ?? 0) >= 90 && (z.height ?? 0) >= 90);
       if (!hasBg) {
-        const cssBackground = bgColors.length >= 2
-          ? `linear-gradient(${bgDirection || "to bottom"}, ${bgColors.join(", ")})`
-          : (bgColors[0] || "#0a0a0a");
+        const css = bgColors.length >= 2
+          ? `linear-gradient(${bgDirection || 'to bottom'}, ${bgColors.join(', ')})`
+          : (bgColors[0] || '#0a0a0a');
         zones.unshift({
-          id: "z_bg", type: "decorative", role: "decorative",
+          id: 'z_bg', type: 'decorative', role: 'decorative',
           x: 0, y: 0, width: 100, height: 100,
           zIndex: 1, start: 0, end: null,
-          enterAnimation: "none", exitAnimation: "none",
-          style: { background: cssBackground, opacity: 1 },
+          enterAnimation: 'none', exitAnimation: 'none',
+          style: { background: css, opacity: 1 },
         });
       }
-    }
-
-    // ── For image_based: ensure background_asset zone exists ──────
-    if (bgType === "image_based") {
-      const hasBgAsset = zones.some(z => z.role === "background_asset");
+    } else if (bgCategory === 'abstract') {
+      const hasBgAsset = zones.some(z => z.role === 'background_asset');
       if (!hasBgAsset) {
         zones.unshift({
-          id: "z_bgimg", type: "asset", role: "background_asset",
+          id: 'z_bgimg', type: 'asset', role: 'background_asset',
           x: 0, y: 0, width: 100, height: 100,
           zIndex: 1, start: 0, end: null,
-          enterAnimation: "fadeIn", exitAnimation: "none",
-          style: { objectFit: "cover", opacity: 1 },
-          content: { kind: "asset", asset: { src: null, type: "image", motion: "none", objectFit: "cover", enterTransition: "none", exitTransition: "none" } },
+          enterAnimation: 'fadeIn', exitAnimation: 'none',
+          style: { objectFit: 'cover', opacity: 1 },
+          content: { kind: 'asset', asset: { src: null, type: 'image', objectFit: 'cover', motion: 'none', enterTransition: 'none', exitTransition: 'none' } },
         });
       }
     }
 
-    // ── Re-sequence IDs ────────────────────────────────────────────
+    // ── Re-index IDs ──────────────────────────────────────────────
     zones = zones.map((z, i) => ({ ...z, id: `z${i + 1}` }));
 
-    res.json({
+    return res.json({
       zones,
-      background_type:               bgType,
-      background_colors:             bgColors,
+      background_category: bgCategory,
+      background_colors:   bgColors,
       background_gradient_direction: bgDirection,
-      background_shapes:             backgroundShapes,
-      background_needs_image:        bgNeedsImage,
-      color_family:                  colorFamily,
+      color_family:        colorFamily,
+      background_needs_image:  bgNeedsImg,
+      background_image_prompt: bgImgPrompt,
     });
   } catch (err) {
-    console.error("[admin/convert-layout-image]", err.message);
+    console.error('[admin/convert-layout-image]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2102,140 +2055,118 @@ Return only valid JSON, no explanation.`;
   }
 });
 
-// POST /api/admin/generate-layout-assets — Fal.ai placeholder images for saved layout asset zones
-// Body: { layoutId, zones, niche, intent, energy, visual_direction, background_type }
-app.post("/api/admin/generate-layout-assets", requireAuth, requireAdmin, async (req, res) => {
+// POST /api/admin/generate-layout-assets
+// Body: { promptId, zones, niche, intent, imagePrompt, background_needs_image, background_image_prompt, color_family }
+app.post('/api/admin/generate-layout-assets', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { layoutId, zones, niche = "entertainment", intent = "hook", energy = "high", visual_direction, background_type, original_prompt } = req.body;
-    const subjectHints = original_prompt ? original_prompt.substring(0, 200) : "";
-    if (!layoutId || !Array.isArray(zones)) return res.status(400).json({ error: "layoutId and zones[] required" });
-    if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
+    const { promptId, zones, niche, intent, imagePrompt, background_needs_image, background_image_prompt, color_family } = req.body;
+    if (!zones || !Array.isArray(zones)) return res.status(400).json({ error: 'zones required' });
 
-    const assetZones = zones.filter(z => z.type === "asset");
-    if (assetZones.length === 0) return res.json({ success: true, results: [], generated: 0, failed: 0 });
-
+    const assetZones = zones.filter(z => z.type === 'asset' && ['primary_asset','secondary_asset'].includes(z.role));
     const results = [];
 
+    // Generate subject/asset images
     for (const zone of assetZones) {
-      let assetPrompt;
-
-      if (zone.role === "background_asset") {
-        if (background_type === "environmental") {
-          assetPrompt = `${niche} atmospheric cinematic background environment. ${visual_direction || ""}. ${subjectHints ? "Context: " + subjectHints.substring(0, 100) + "." : ""} Absolutely no people. No text. No UI elements. No logos. Pure environment only — lighting, atmosphere, textures, colors, particles, architectural elements. Photorealistic. Full bleed. Vertical 9:16 portrait composition.`;
-        } else if (background_type === "subject") {
-          assetPrompt = `${niche} ${intent} full frame subject photo. Person or main character as primary visual filling the frame. ${visual_direction || ""}. ${subjectHints ? "Subject context: " + subjectHints.substring(0, 150) + "." : ""} Professional photography. Cinematic lighting. No text overlays. Vertical 9:16 portrait.`;
-        } else {
-          assetPrompt = `${niche} atmospheric background. ${visual_direction || ""}. No text. No people. Environmental. Vertical 9:16.`;
-        }
-      } else if (zone.role === "primary_asset") {
-        assetPrompt = `${niche} ${intent} visual. ${subjectHints ? "Subject context: " + subjectHints + "." : "Main subject centered and prominent."} ${visual_direction || ""}. Professional quality photography or illustration. No text. No logos. Vertical 9:16 portrait composition. Focus on the main subject described. Photorealistic or high quality illustration.`;
-      } else if (zone.role === "secondary_asset") {
-        assetPrompt = `${niche} ${intent} secondary supporting visual. Different scene or angle from primary. ${subjectHints ? "Context: " + subjectHints.substring(0, 100) + "." : ""} ${visual_direction || ""}. Professional quality. No text. Vertical 9:16 portrait composition.`;
-      } else {
-        assetPrompt = `${niche} supporting visual for ${intent} content. ${visual_direction || ""}. No text. Professional. Vertical 9:16.`;
-      }
-
-      console.log(`[generate-layout-assets] Zone ${zone.id} (${zone.role}):`, assetPrompt.substring(0, 80));
-
       try {
-        // Generate via Fal.ai flux/schnell
-        const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+        const subjectPrompt = `${imagePrompt || ''}, ${niche} niche, ${intent} intent, isolated subject on transparent or clean background, no text, no overlays, professional marketing asset, ultra high quality`;
+
+        const falRes = await fetch("https://fal.run/fal-ai/flux/dev", {
           method: "POST",
           headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: assetPrompt,
-            image_size: { width: 608, height: 1080 },
-            num_images: 1, num_inference_steps: 4, enable_safety_checker: false,
+            prompt: subjectPrompt,
+            image_size: "portrait_4_3",
+            num_inference_steps: 28,
+            guidance_scale: 3.5,
+            num_images: 1,
+            enable_safety_checker: true,
           }),
         });
-        if (!falRes.ok) {
-          const msg = `Fal.ai HTTP ${falRes.status}`;
-          console.error(`[generate-layout-assets] Zone ${zone.id} fal error:`, msg);
-          results.push({ zoneId: zone.id, role: zone.role, src: null, error: msg });
-          continue;
-        }
+        if (!falRes.ok) throw new Error(`Fal.ai HTTP ${falRes.status}`);
         const falData = await falRes.json();
-        const falUrl = falData?.images?.[0]?.url;
-        if (!falUrl) {
-          results.push({ zoneId: zone.id, role: zone.role, src: null, error: "No image returned from Fal.ai" });
-          continue;
-        }
+        const imageUrl = falData?.images?.[0]?.url;
+        if (!imageUrl) continue;
 
-        // Upload to Supabase storage (permanent URL)
-        let assetUrl = falUrl;
-        try {
-          const imgRes = await fetch(falUrl);
-          if (imgRes.ok) {
-            const buffer = Buffer.from(await imgRes.arrayBuffer());
-            const assetPath = `assets/${niche.replace(/[^a-z0-9_-]/gi, "_").toLowerCase()}/${uuidv4()}.jpg`;
-            const { error: upErr } = await supabaseAdmin.storage
-              .from("layout-previews")
-              .upload(assetPath, buffer, { contentType: "image/jpeg", upsert: false });
-            if (!upErr) {
-              const { data: { publicUrl } } = supabaseAdmin.storage.from("layout-previews").getPublicUrl(assetPath);
-              assetUrl = publicUrl;
-              console.log(`[generate-layout-assets] Zone ${zone.id} saved:`, publicUrl);
-            } else {
-              console.warn(`[generate-layout-assets] Zone ${zone.id} storage upload failed:`, upErr.message);
-            }
-          }
-        } catch (upEx) {
-          console.warn(`[generate-layout-assets] Zone ${zone.id} storage exception:`, upEx.message);
-        }
+        // Upload to Supabase storage
+        const imageResp = await fetch(imageUrl);
+        const imageBuffer = Buffer.from(await imageResp.arrayBuffer());
+        const fileName = `zone-assets/${niche}/${promptId}-${zone.id}-${Date.now()}.jpg`;
 
-        // Save to ai_image_library (fire-and-forget)
-        supabaseAdmin.from("ai_image_library").insert({
-          src: assetUrl, prompt: assetPrompt, niche, intent, energy,
-          visual_type: zone.role === "background_asset" ? "background" : zone.role || "asset",
-          orientation: "9:16", width: 608, height: 1080,
-          generator: "fal", reuse_count: 0, tags: [niche, intent],
-        }).then(() => {}).catch(() => {});
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from('layout-previews')
+          .upload(fileName, imageBuffer, { contentType: 'image/jpeg', upsert: true });
 
-        results.push({ zoneId: zone.id, role: zone.role, src: assetUrl });
+        if (uploadError) throw uploadError;
 
-      } catch (e) {
-        console.error(`[generate-layout-assets] Zone ${zone.id} failed:`, e.message);
-        results.push({ zoneId: zone.id, role: zone.role, src: null, error: e.message });
+        const { data: { publicUrl } } = supabaseAdmin.storage
+          .from('layout-previews')
+          .getPublicUrl(fileName);
+
+        results.push({ zoneId: zone.id, role: zone.role, imageUrl: publicUrl });
+      } catch (zoneErr) {
+        console.error(`[generate-layout-assets] Zone ${zone.id} failed:`, zoneErr.message);
       }
     }
 
-    // Write generated image URLs back to layout zones in Supabase
-    const successful = results.filter(r => r.src);
-    if (successful.length > 0) {
-      // Fetch current zones from DB (source of truth after save step)
-      const { data: layoutData, error: fetchErr } = await supabaseAdmin
-        .from("layouts").select("zones").eq("id", layoutId).single();
+    // Generate background image if abstract
+    let backgroundImageUrl = null;
+    if (background_needs_image && background_image_prompt) {
+      try {
+        const bgPrompt = `${background_image_prompt}, no text, no people, no UI elements, seamless background, ultra high quality, ${niche} aesthetic`;
 
-      if (fetchErr) {
-        console.warn("[generate-layout-assets] DB fetch failed:", fetchErr.message);
-      } else if (layoutData?.zones) {
-        const updatedZones = layoutData.zones.map(z => {
-          const result = successful.find(r => r.zoneId === z.id);
-          if (result) {
-            return {
-              ...z,
-              content: {
-                kind: "asset",
-                asset: { src: result.src, type: "image", motion: "none", objectFit: "cover", enterTransition: "none", exitTransition: "none" },
-              },
-            };
-          }
-          return z;
+        const falRes = await fetch("https://fal.run/fal-ai/flux/dev", {
+          method: "POST",
+          headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: bgPrompt,
+            image_size: "portrait_4_3",
+            num_inference_steps: 28,
+            guidance_scale: 3.5,
+            num_images: 1,
+            enable_safety_checker: true,
+          }),
         });
-        const { error: updateErr } = await supabaseAdmin
-          .from("layouts").update({ zones: updatedZones }).eq("id", layoutId);
-        if (updateErr) {
-          console.warn("[generate-layout-assets] DB update failed:", updateErr.message);
-        } else {
-          console.log(`[generate-layout-assets] Updated ${successful.length} zones in layout ${layoutId}`);
+        if (!falRes.ok) throw new Error(`Fal.ai bg HTTP ${falRes.status}`);
+        const falData = await falRes.json();
+        const imageUrl = falData?.images?.[0]?.url;
+
+        if (imageUrl) {
+          const imageResp = await fetch(imageUrl);
+          const imageBuffer = Buffer.from(await imageResp.arrayBuffer());
+          const fileName = `background-presets/${niche}/${promptId}-bg-${Date.now()}.jpg`;
+
+          const { error: uploadError } = await supabaseAdmin.storage
+            .from('layout-previews')
+            .upload(fileName, imageBuffer, { contentType: 'image/jpeg', upsert: true });
+
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabaseAdmin.storage
+              .from('layout-previews')
+              .getPublicUrl(fileName);
+
+            backgroundImageUrl = publicUrl;
+
+            // Save to background_presets table (fire-and-forget)
+            supabaseAdmin.from('background_presets').insert({
+              url: publicUrl,
+              niche,
+              color_family: color_family || 'dark',
+              tags: [intent],
+              prompt: background_image_prompt,
+              created_at: new Date().toISOString()
+            }).then(() => {}).catch(() => {});
+          }
         }
+      } catch (bgErr) {
+        console.error('[generate-layout-assets] Background image gen failed:', bgErr.message);
       }
     }
 
-    res.json({ success: true, results, generated: successful.length, failed: results.filter(r => !r.src).length });
+    return res.json({ results, backgroundImageUrl });
+
   } catch (err) {
-    console.error("[admin/generate-layout-assets]", err.message);
-    res.status(500).json({ error: "Asset generation failed", details: err.message });
+    console.error('[generate-layout-assets] error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
