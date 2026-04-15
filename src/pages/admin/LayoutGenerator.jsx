@@ -397,7 +397,87 @@ export default function LayoutGenerator() {
     if (step === 4) convertAllImages();
   }, [step]);
 
-  /* ── Step 6: Save ─────────────────────────────────────────── */
+  /* ── Step 5: Generate zone assets ────────────────────────── */
+  const generateZoneAssets = useCallback(async (p) => {
+    const conv = conversions[p.id];
+    if (!conv?.zones) return;
+
+    setAssets(prev => ({ ...prev, [p.id]: { loading:true, error:null, done:false, results:[] } }));
+
+    let zones = [...conv.zones];
+
+    // solid_gradient: swap in a matching backgroundPatternRegistry CSS
+    if (conv.background_type === "solid_gradient") {
+      const targetCategory = conv.color_family;
+      const entries = Object.values(backgroundPatternRegistry);
+      const nicheMatch = entries.filter(e => e.category === targetCategory && e.niche?.includes(config.niche));
+      const anyMatch   = entries.filter(e => e.category === targetCategory);
+      const pool = nicheMatch.length > 0 ? nicheMatch : anyMatch;
+      if (pool.length > 0) {
+        const picked = pool[Math.floor(Math.random() * pool.length)];
+        zones = zones.map(z => {
+          const isBg = z.x === 0 && z.y === 0 && (z.width ?? 0) >= 95 && (z.height ?? 0) >= 95 && z.type !== "asset";
+          return isBg ? { ...z, style: { ...z.style, background: picked.style.background } } : z;
+        });
+      }
+    }
+
+    // Collect asset zones that need image generation
+    const assetZones = zones.filter(z =>
+      z.role === "background_asset" || z.role === "primary_asset" || z.role === "secondary_asset"
+    );
+
+    if (assetZones.length === 0) {
+      setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones } }));
+      setAssets(prev => ({ ...prev, [p.id]: { results:[], loading:false, done:true } }));
+      return;
+    }
+
+    try {
+      const r = await serverFetch("/api/admin/generate-zone-assets", {
+        method:"POST",
+        body:JSON.stringify({
+          zones: assetZones,
+          visual_direction: p.visual_direction,
+          prompt: p.prompt,
+          niche: config.niche,
+          intent: config.intent,
+          energy: config.energy,
+          background_type: conv.background_type,
+          background_colors: conv.background_colors,
+        }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || r.status);
+      const { results } = await r.json();
+
+      // Merge imageUrls back into zones at content.asset.src
+      const urlMap = {};
+      results.forEach(res => { urlMap[res.zoneId] = res.imageUrl; });
+      const mergedZones = zones.map(z =>
+        urlMap[z.id]
+          ? { ...z, content: { ...z.content, asset: { ...(z.content?.asset ?? {}), src: urlMap[z.id] } } }
+          : z
+      );
+
+      setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones: mergedZones } }));
+      setAssets(prev => ({ ...prev, [p.id]: { results, loading:false, done:true } }));
+    } catch (e) {
+      setAssets(prev => ({ ...prev, [p.id]: { results:[], loading:false, error:e.message, done:false } }));
+    }
+  }, [conversions, config]);
+
+  const generateAllZoneAssets = useCallback(async () => {
+    if (assetsStarted.current) return;
+    assetsStarted.current = true;
+    await Promise.all(approvedPrompts.filter(p => conversions[p.id]?.zones).map(p => generateZoneAssets(p)));
+  }, [approvedPrompts, conversions, generateZoneAssets]);
+
+  // Auto-start asset generation when entering step 5
+  useEffect(() => {
+    if (step === 5) generateAllZoneAssets();
+  }, [step]);
+
+  /* ── Step 7: Save ─────────────────────────────────────────── */
   const handleSaveAll = useCallback(async () => {
     setSaving(true); setSaveError(null);
     for (const p of readyToSave) {
@@ -419,10 +499,13 @@ export default function LayoutGenerator() {
             zones,
             thumbnail_url: thumbnailUrl,
             generation_meta: {
-              title:            p.title,
-              visual_direction: p.visual_direction,
-              background_type:  conversions[p.id]?.background_type,
-              generated_at:     new Date().toISOString(),
+              title:                      p.title,
+              visual_direction:           p.visual_direction,
+              background_type:            conversions[p.id]?.background_type,
+              background_colors:          conversions[p.id]?.background_colors,
+              background_gradient_direction: conversions[p.id]?.background_gradient_direction,
+              color_family:               conversions[p.id]?.color_family,
+              generated_at:               new Date().toISOString(),
             },
           }),
         });
@@ -434,14 +517,14 @@ export default function LayoutGenerator() {
       }
     }
     setSaving(false);
-    if (readyToSave.length > 0) setStep(6);
+    if (readyToSave.length > 0) setStep(7);
   }, [readyToSave, metas, conversions, images, config]);
 
   /* ── Reset ────────────────────────────────────────────────── */
   const reset = () => {
-    setStep(1); setPrompts([]); setApprovals({}); setImages({}); setConversions({}); setMetas({});
+    setStep(1); setPrompts([]); setApprovals({}); setImages({}); setConversions({}); setAssets({}); setMetas({});
     setSavedLayouts([]); setSaveError(null);
-    imgStarted.current = false; convertStarted.current = false;
+    imgStarted.current = false; convertStarted.current = false; assetsStarted.current = false;
   };
 
   /* ── Render ─────────────────────────────────────────────── */
@@ -620,8 +703,106 @@ export default function LayoutGenerator() {
           </div>
         )}
 
-        {/* ═══ STEP 5: Review + Metadata ═══════════════════════ */}
+        {/* ═══ STEP 5: Assets ══════════════════════════════════ */}
         {step === 5 && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div>
+                <h2 style={{ fontSize:15, fontWeight:700, margin:"0 0 4px" }}>Generating Zone Assets</h2>
+                <p style={{ color:"#555", fontSize:12, margin:0 }}>Background registry matching + flux/schnell image generation per asset zone</p>
+              </div>
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={() => setStep(4)} style={C.btnG}>← Back</button>
+                <button onClick={() => setStep(6)} disabled={!allAssetsDone}
+                  style={{ ...C.btnP, opacity:!allAssetsDone?0.5:1 }}>
+                  Review & Metadata →
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {approvedPrompts.map(p => {
+                const conv  = conversions[p.id];
+                const asset = assets[p.id];
+                const assetZones = (conv?.zones ?? []).filter(z =>
+                  z.role === "background_asset" || z.role === "primary_asset" || z.role === "secondary_asset"
+                );
+                return (
+                  <div key={p.id} style={{ ...C.card, padding:"12px 14px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:"#e8e8f0" }}>{p.title}</div>
+                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        {conv?.background_type && <span style={C.badge("#6366f1")}>{conv.background_type}</span>}
+                        {conv?.color_family    && <span style={C.badge("#a78bfa")}>{conv.color_family}</span>}
+                        {asset?.loading && <span style={{ fontSize:10, color:"#888" }}>⏳ Generating…</span>}
+                        {asset?.done   && <span style={C.badge("#22c55e")}>✓ Done</span>}
+                        {asset?.error  && <span style={C.badge("#f87171")}>✕ Error</span>}
+                      </div>
+                    </div>
+
+                    {assetZones.length > 0 ? (
+                      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                        {assetZones.map(z => {
+                          const result = asset?.results?.find(r => r.zoneId === z.id);
+                          const src = result?.imageUrl || z.content?.asset?.src;
+                          const W = 56, H = Math.round(W * 1920 / 1080);
+                          return (
+                            <div key={z.id} style={{ textAlign:"center" }}>
+                              <div style={{
+                                width:W, height:H, borderRadius:5, overflow:"hidden",
+                                border:"1px solid rgba(255,255,255,0.08)",
+                                display:"flex", alignItems:"center", justifyContent:"center",
+                                background: src ? "transparent"
+                                  : "repeating-conic-gradient(#222 0% 25%, #1a1a1a 0% 50%) 0 0 / 8px 8px",
+                              }}>
+                                {src ? (
+                                  <img src={src} alt={z.role} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                                ) : asset?.loading ? (
+                                  <span style={{ fontSize:16 }}>⏳</span>
+                                ) : (
+                                  <span style={{ fontSize:16, color:"#333" }}>🖼</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize:8, color:"#555", marginTop:3, maxWidth:W, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                {z.role}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize:10, color:"#555" }}>No asset zones — background handled by registry or shapes</div>
+                    )}
+
+                    {asset?.error && (
+                      <div style={{ fontSize:10, color:"#f87171", marginTop:6 }}>{asset.error}</div>
+                    )}
+                    {(asset?.error || (!asset?.loading && !asset?.done)) && (
+                      <button
+                        onClick={() => {
+                          setAssets(prev => { const n = {...prev}; delete n[p.id]; return n; });
+                          assetsStarted.current = false;
+                          setTimeout(() => generateZoneAssets(p), 0);
+                        }}
+                        style={{ ...C.btnG, padding:"4px 12px", fontSize:10, marginTop:8 }}>
+                        ↺ Retry
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {allAssetsDone && (
+              <div style={{ marginTop:20, display:"flex", justifyContent:"flex-end" }}>
+                <button onClick={() => setStep(6)} style={C.btnP}>Review & Metadata →</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ STEP 6: Review + Metadata ═══════════════════════ */}
+        {step === 6 && (
           <div>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
               <div>
