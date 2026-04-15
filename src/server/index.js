@@ -1564,6 +1564,102 @@ app.post("/api/admin/remove-background", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/admin/generate-zone-assets — Generate images for asset zones (no DB write)
+// Body: { zones, visual_direction, prompt, niche, intent, energy, background_type, background_colors }
+// Returns: { results: [{ zoneId, role, imageUrl }] }
+app.post("/api/admin/generate-zone-assets", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const {
+      zones = [], visual_direction = "", prompt: originalPrompt = "",
+      niche = "entertainment", intent = "hook", energy = "high",
+      background_type = "solid_gradient", background_colors = [],
+    } = req.body;
+    if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
+
+    const assetZones = zones.filter(z => z.type === "asset");
+    if (assetZones.length === 0) return res.json({ results: [] });
+
+    // Context snippets
+    const ctxShort  = (originalPrompt || visual_direction).slice(0, 150);
+    const ctxMedium = (originalPrompt || visual_direction).slice(0, 300);
+
+    const results = [];
+
+    for (const zone of assetZones) {
+      let falPrompt;
+
+      if (zone.role === "background_asset" || background_type === "image_based") {
+        // Atmospheric/environmental background — no people, no text
+        const bgColorHint = background_colors.length ? `Dominant colors: ${background_colors.join(", ")}.` : "";
+        const energyMood  = energy === "high" ? "dramatic, high contrast" : energy === "low" ? "calm, soft, minimal" : "balanced, professional";
+        falPrompt = `${niche} atmospheric background scene. ${visual_direction}. ${bgColorHint} ${energyMood} mood. ${ctxShort}. No people. No text. No logos. No UI elements. Pure environment: lighting, atmosphere, textures, depth, color. Cinematic. Full bleed. Vertical 9:16 portrait.`;
+      } else if (zone.role === "primary_asset") {
+        // Isolated subject — product/person/object on clean background
+        falPrompt = `${niche} ${intent} product or subject. ${ctxMedium}. Isolated subject on pure white or transparent background. Professional studio photography. Clean lighting. No background clutter. Subject fills 70% of frame. Sharp. High quality. Vertical 9:16.`;
+      } else if (zone.role === "secondary_asset") {
+        // Supporting image — different angle or supporting element
+        falPrompt = `${niche} ${intent} supporting visual. Different angle or variation. ${ctxShort}. Professional quality. Clean background. No text. Vertical 9:16.`;
+      } else {
+        falPrompt = `${niche} ${intent} visual element. ${visual_direction}. Professional. No text. Vertical 9:16.`;
+      }
+
+      console.log(`[generate-zone-assets] Zone ${zone.id} (${zone.role}): ${falPrompt.slice(0, 80)}`);
+
+      try {
+        const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+          method: "POST",
+          headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: falPrompt,
+            image_size: { width: 608, height: 1080 },
+            num_images: 1,
+            num_inference_steps: 4,
+            enable_safety_checker: false,
+          }),
+        });
+
+        if (!falRes.ok) {
+          results.push({ zoneId: zone.id, role: zone.role, imageUrl: null, error: `Fal HTTP ${falRes.status}` });
+          continue;
+        }
+        const falData = await falRes.json();
+        const falUrl = falData?.images?.[0]?.url;
+        if (!falUrl) {
+          results.push({ zoneId: zone.id, role: zone.role, imageUrl: null, error: "No image from Fal.ai" });
+          continue;
+        }
+
+        // Upload to Supabase for a permanent URL
+        let imageUrl = falUrl;
+        try {
+          const imgRes = await fetch(falUrl);
+          if (imgRes.ok) {
+            const buf = Buffer.from(await imgRes.arrayBuffer());
+            const safeNiche = niche.replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+            const path = `zone-assets/${safeNiche}/${uuidv4()}.jpg`;
+            const { error: upErr } = await supabaseAdmin.storage
+              .from("layout-previews")
+              .upload(path, buf, { contentType: "image/jpeg", upsert: false });
+            if (!upErr) {
+              const { data: { publicUrl } } = supabaseAdmin.storage.from("layout-previews").getPublicUrl(path);
+              imageUrl = publicUrl;
+            }
+          }
+        } catch (_) { /* use falUrl as fallback */ }
+
+        results.push({ zoneId: zone.id, role: zone.role, imageUrl });
+      } catch (e) {
+        results.push({ zoneId: zone.id, role: zone.role, imageUrl: null, error: e.message });
+      }
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error("[generate-zone-assets]", err.message);
+    res.status(500).json({ error: "Zone asset generation failed", details: err.message });
+  }
+});
+
 // POST /api/admin/convert-layout-image — GPT-4o Vision → zone JSON + background metadata
 // Body: { imageUrl, niche, intent, energy }
 app.post("/api/admin/convert-layout-image", requireAuth, requireAdmin, async (req, res) => {
@@ -1701,34 +1797,13 @@ Context: niche=${niche}, intent=${intent}, energy=${energy}`;
     raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const parsed = JSON.parse(raw);
 
-    // Normalize zones
-    const zones = (parsed.zones || []).map((z, i) => ({
-      id: z.id || `z${i + 1}`,
-      type: z.type || "text",
-      role: z.role || "subtext",
-      x: typeof z.x === "number" ? z.x : 5,
-      y: typeof z.y === "number" ? z.y : 5,
-      width:  typeof z.width  === "number" ? z.width  : 90,
-      height: typeof z.height === "number" ? z.height : 10,
-      content: z.content || null,
-      style: {
-        fontSize:        z.style?.fontSize        || 4,
-        fontWeight:      z.style?.fontWeight      || "700",
-        fontFamily:      z.style?.fontFamily      || "Outfit",
-        color:           z.style?.color           || "#ffffff",
-        textAlign:       z.style?.textAlign       || "center",
-        backgroundColor: z.style?.backgroundColor || null,
-        borderRadius:    z.style?.borderRadius    || null,
-        padding:         z.style?.padding         || null,
-        rotation:        z.style?.rotation        || 0,
-        shape:           z.style?.shape           || null,
-        opacity:         z.style?.opacity         ?? 1,
-      },
-      animation:      z.animation      || "fadeIn",
-      animationDelay: z.animationDelay || (0.1 + i * 0.1),
-    }));
+    const bgType        = parsed.background_type || "solid_gradient";
+    const bgColors      = parsed.background_colors || ["#000000"];
+    const bgDirection   = parsed.background_gradient_direction || null;
+    const bgNeedsImage  = parsed.background_needs_image || false;
+    const colorFamily   = parsed.color_family || "dark";
 
-    // Normalize background_shapes
+    // ── Normalize background shapes ────────────────────────────
     const backgroundShapes = (parsed.background_shapes || []).map(s => ({
       shape:    s.shape    || "rectangle",
       color:    s.color    || "#000000",
@@ -1740,14 +1815,164 @@ Context: niche=${niche}, intent=${intent}, energy=${energy}`;
       rotation: s.rotation || 0,
     }));
 
+    // ── Transform GPT zones → internal zone schema ─────────────
+    // GPT outputs: animation/animationDelay/content(string)/style.backgroundColor/style.rotation
+    // Internal:    enterAnimation/start/content(object)/style.background/style.transform
+    function toInternalZone(z, i) {
+      const type = z.type || "text";
+      const role = z.role || "subtext";
+
+      // zIndex by layer
+      let zIndex = 4;
+      if (role === "background_asset" || (type === "decorative" && z.x <= 1 && z.y <= 1 && (z.width ?? 0) >= 90)) zIndex = 1;
+      else if (type === "asset") zIndex = 2;
+      else if (type === "decorative") zIndex = 3;
+      else if (type === "text") zIndex = 4;
+      else if (type === "icon") zIndex = 5;
+
+      // Style — map GPT field names to internal names
+      const rawStyle = z.style || {};
+      const style = {};
+      if (rawStyle.color)       style.color      = rawStyle.color;
+      if (rawStyle.fontSize)    style.fontSize   = rawStyle.fontSize;
+      if (rawStyle.fontWeight)  style.fontWeight = String(rawStyle.fontWeight);
+      if (rawStyle.fontFamily)  style.fontFamily = rawStyle.fontFamily;
+      if (rawStyle.textAlign)   style.textAlign  = rawStyle.textAlign;
+      if (rawStyle.opacity !== undefined) style.opacity = rawStyle.opacity;
+      if (rawStyle.borderRadius) style.borderRadius = rawStyle.borderRadius;
+      if (rawStyle.rotation && rawStyle.rotation !== 0) style.transform = `rotate(${rawStyle.rotation}deg)`;
+
+      // backgroundColor → background (used for text bg pills and decorative fills)
+      if (rawStyle.backgroundColor) style.background = rawStyle.backgroundColor;
+
+      // Decorative and icon zones: use color as background fill
+      if ((type === "decorative" || type === "icon") && rawStyle.color && !style.background) {
+        style.background = rawStyle.color;
+      }
+
+      // Shape-specific CSS for decorative zones
+      if (type === "decorative" || type === "icon") {
+        const shape = rawStyle.shape;
+        if (shape === "circle")    style.borderRadius = "50%";
+        else if (shape === "pill") style.borderRadius = 999;
+        style.opacity = rawStyle.opacity ?? 1;
+      }
+
+      // Asset zones always get objectFit
+      if (type === "asset") {
+        style.objectFit = "cover";
+        style.opacity   = rawStyle.opacity ?? 1;
+      }
+
+      // Text padding: spread single padding value
+      if (rawStyle.padding) {
+        style.paddingTop    = rawStyle.padding;
+        style.paddingBottom = rawStyle.padding;
+        style.paddingLeft   = rawStyle.padding * 2;
+        style.paddingRight  = rawStyle.padding * 2;
+      }
+
+      // Content object
+      let content;
+      if (type === "text") {
+        content = { kind: "text", text: z.content || "Text Zone" };
+      } else if (type === "asset") {
+        content = { kind: "asset", asset: { src: null, type: "image", motion: "none", objectFit: "cover", enterTransition: "none", exitTransition: "none" } };
+      }
+      // decorative/icon: no content
+
+      // maxChars estimate for text zones
+      const maxChars = type === "text"
+        ? Math.max(5, Math.round(((z.width || 80) / 100) * (1000 / Math.max(rawStyle.fontSize || 60, 20))))
+        : undefined;
+
+      return {
+        id:             z.id || `z${i + 1}`,
+        type,
+        role,
+        x:              typeof z.x      === "number" ? z.x      : 5,
+        y:              typeof z.y      === "number" ? z.y      : 5,
+        width:          typeof z.width  === "number" ? z.width  : 90,
+        height:         typeof z.height === "number" ? z.height : 10,
+        zIndex,
+        start:          z.animationDelay || (i * 0.1),
+        end:            null,
+        enterAnimation: z.animation || (type === "asset" ? "slideUpIn" : type === "icon" ? "popIn" : "fadeIn"),
+        exitAnimation:  "none",
+        style,
+        ...(content  !== undefined ? { content }  : {}),
+        ...(maxChars !== undefined ? { maxChars } : {}),
+      };
+    }
+
+    let zones = (parsed.zones || []).map(toInternalZone);
+
+    // ── For multi_shape: prepend background shape decorative zones ─
+    // Shapes from STEP 1 background analysis become real decorative zones
+    if (bgType === "multi_shape" && backgroundShapes.length > 0) {
+      const shapeZones = backgroundShapes.map((s, i) => {
+        const shapeStyle = {
+          background:   s.color,
+          opacity:      s.opacity,
+          ...(s.shape === "circle"          ? { borderRadius: "50%" }  : {}),
+          ...(s.shape === "pill"            ? { borderRadius: 999 }    : {}),
+          ...(s.rotation && s.rotation !== 0 ? { transform: `rotate(${s.rotation}deg)` } : {}),
+        };
+        return {
+          id: `z_shape${i + 1}`,
+          type: "decorative", role: "decorative",
+          x: s.x, y: s.y, width: s.width, height: s.height,
+          zIndex: 1, start: 0, end: null,
+          enterAnimation: "none", exitAnimation: "none",
+          style: shapeStyle,
+        };
+      });
+      zones = [...shapeZones, ...zones];
+    }
+
+    // ── For solid_gradient: build a CSS background zone if missing ─
+    if (bgType === "solid_gradient") {
+      const hasBg = zones.some(z => z.x <= 1 && z.y <= 1 && (z.width ?? 0) >= 90 && (z.height ?? 0) >= 90 && z.zIndex === 1);
+      if (!hasBg) {
+        const cssBackground = bgColors.length >= 2
+          ? `linear-gradient(${bgDirection || "to bottom"}, ${bgColors.join(", ")})`
+          : (bgColors[0] || "#0a0a0a");
+        zones.unshift({
+          id: "z_bg", type: "decorative", role: "decorative",
+          x: 0, y: 0, width: 100, height: 100,
+          zIndex: 1, start: 0, end: null,
+          enterAnimation: "none", exitAnimation: "none",
+          style: { background: cssBackground, opacity: 1 },
+        });
+      }
+    }
+
+    // ── For image_based: ensure background_asset zone exists ──────
+    if (bgType === "image_based") {
+      const hasBgAsset = zones.some(z => z.role === "background_asset");
+      if (!hasBgAsset) {
+        zones.unshift({
+          id: "z_bgimg", type: "asset", role: "background_asset",
+          x: 0, y: 0, width: 100, height: 100,
+          zIndex: 1, start: 0, end: null,
+          enterAnimation: "fadeIn", exitAnimation: "none",
+          style: { objectFit: "cover", opacity: 1 },
+          content: { kind: "asset", asset: { src: null, type: "image", motion: "none", objectFit: "cover", enterTransition: "none", exitTransition: "none" } },
+        });
+      }
+    }
+
+    // ── Re-sequence IDs ────────────────────────────────────────────
+    zones = zones.map((z, i) => ({ ...z, id: `z${i + 1}` }));
+
     res.json({
       zones,
-      background_type:             parsed.background_type             || "solid_gradient",
-      background_colors:           parsed.background_colors           || ["#000000"],
-      background_gradient_direction: parsed.background_gradient_direction || null,
-      background_shapes:           backgroundShapes,
-      background_needs_image:      parsed.background_needs_image      || false,
-      color_family:                parsed.color_family                || "dark",
+      background_type:               bgType,
+      background_colors:             bgColors,
+      background_gradient_direction: bgDirection,
+      background_shapes:             backgroundShapes,
+      background_needs_image:        bgNeedsImage,
+      color_family:                  colorFamily,
     });
   } catch (err) {
     console.error("[admin/convert-layout-image]", err.message);

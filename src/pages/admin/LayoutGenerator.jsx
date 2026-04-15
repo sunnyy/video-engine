@@ -13,12 +13,13 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../../services/serverApi";
 import { nichePaletteRegistry } from "../../core/registries/nichePaletteRegistry";
+import { backgroundPatternRegistry } from "../../core/registries/backgroundPatternRegistry";
 import AdminLayout from "./AdminLayout";
 
 const INTENTS  = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
 const NICHES   = Object.keys(nichePaletteRegistry).sort();
 const ENERGIES = ["high","medium","low"];
-const STEP_LABELS = ["Configure","Prompts","Images","Convert","Review","Save"];
+const STEP_LABELS = ["Configure","Prompts","Images","Convert","Assets","Review","Save"];
 
 /* ── Styles ─────────────────────────────────────────────────── */
 const C = {
@@ -277,14 +278,18 @@ export default function LayoutGenerator() {
   const [images,      setImages]      = useState({});
   const imgStarted = useRef(false);
 
-  // Step 4 — conversions[promptId]: { zones, background_type, loading, error }
+  // Step 4 — conversions[promptId]: { zones, background_type, background_colors, background_gradient_direction, background_shapes, background_needs_image, color_family, loading, error }
   const [conversions,      setConversions]      = useState({});
   const convertStarted = useRef(false);
 
-  // Step 5 — metas[promptId]
+  // Step 5 — assets[promptId]: { results:[{zoneId, role, imageUrl}], loading, error, done }
+  const [assets,      setAssets]      = useState({});
+  const assetsStarted = useRef(false);
+
+  // Step 6 — metas[promptId]
   const [metas, setMetas] = useState({});
 
-  // Step 6 — save
+  // Step 7 — save
   const [saving,       setSaving]       = useState(false);
   const [saveError,    setSaveError]    = useState(null);
   const [savedLayouts, setSavedLayouts] = useState([]);
@@ -294,13 +299,14 @@ export default function LayoutGenerator() {
   const imagesDone       = approvedPrompts.filter(p => images[p.id]?.imageUrl || images[p.id]?.error).length;
   const allImagesDone    = approvedPrompts.length > 0 && imagesDone >= approvedPrompts.length;
   const allConvertsDone  = approvedPrompts.length > 0 && approvedPrompts.every(p => conversions[p.id]?.zones || conversions[p.id]?.error);
+  const allAssetsDone    = approvedPrompts.length > 0 && approvedPrompts.every(p => assets[p.id]?.done || assets[p.id]?.error);
   const readyToSave      = approvedPrompts.filter(p => conversions[p.id]?.zones?.length > 0);
 
   /* ── Step 2: Generate prompts ─────────────────────────────── */
   const handleGeneratePrompts = useCallback(async () => {
     setPromptsLoading(true); setPromptsError(null); setPrompts([]);
-    setApprovals({}); setImages({}); setConversions({}); setMetas({}); setSavedLayouts([]); setSaveError(null);
-    imgStarted.current = false; convertStarted.current = false;
+    setApprovals({}); setImages({}); setConversions({}); setAssets({}); setMetas({}); setSavedLayouts([]); setSaveError(null);
+    imgStarted.current = false; convertStarted.current = false; assetsStarted.current = false;
     try {
       const r = await serverFetch("/api/admin/generate-layout-prompts", { method:"POST", body:JSON.stringify(config) });
       if (!r.ok) throw new Error((await r.json()).error || r.status);
@@ -362,8 +368,9 @@ export default function LayoutGenerator() {
         body:JSON.stringify({ imageUrl, niche: config.niche, intent: config.intent, energy: config.energy }),
       });
       if (!r.ok) throw new Error((await r.json()).error || r.status);
-      const { zones, background_type } = await r.json();
-      setConversions(prev => ({ ...prev, [p.id]:{ zones, background_type, loading:false } }));
+      const data = await r.json();
+      const { zones, background_type, background_colors, background_gradient_direction, background_shapes, background_needs_image, color_family } = data;
+      setConversions(prev => ({ ...prev, [p.id]:{ zones, background_type, background_colors, background_gradient_direction, background_shapes, background_needs_image, color_family, loading:false } }));
       // Pre-populate metadata
       setMetas(prev => ({
         ...prev,
