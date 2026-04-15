@@ -185,6 +185,14 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
 
   const handleSelectZone = useCallback((id, modifierHeld = false) => {
     if (id !== null && isPlaying) handlePause();
+    // Blur any focused input/textarea so keyboard shortcuts (Delete, arrows, etc.) work immediately
+    // without the user having to click outside the panel first.
+    if (id !== null) {
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT" || ae.isContentEditable)) {
+        ae.blur();
+      }
+    }
     onSelectZone(id, modifierHeld);
   }, [isPlaying, handlePause, onSelectZone]);
 
@@ -347,6 +355,16 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         return;
       }
 
+      // Ctrl+] — bring forward (zIndex +1)
+      // Ctrl+[ — send backward (zIndex -1)
+      if ((e.metaKey || e.ctrlKey) && (e.code === "BracketRight" || e.code === "BracketLeft")) {
+        e.preventDefault();
+        const currentZ = override.zIndex ?? defZone.zIndex ?? 0;
+        const newZ = e.code === "BracketRight" ? currentZ + 1 : currentZ - 1;
+        updateBeatSilent(liveBeat.id, { zones: { ...bz, [selectedZoneId]: { ...override, zIndex: newZ } } });
+        return;
+      }
+
     };
     // capture:true — fires before any child handler, nothing can stopPropagation before us
     window.addEventListener("keydown", onKey, true);
@@ -492,7 +510,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       <div ref={containerRef}
         className="flex-1 relative overflow-hidden"
         style={{ cursor: isPanning ? "grabbing" : isSpaceDown ? "grab" : "default" }}
-        onClick={(e) => {
+        onClick={() => {
           if (hasPannedRef.current) { hasPannedRef.current = false; return; }
           onSelectZoneRef.current(null);
         }}

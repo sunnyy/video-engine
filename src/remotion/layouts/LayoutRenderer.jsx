@@ -685,6 +685,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             textShadow:      st.textShadow    || "none",
             lineHeight:      st.lineHeight    || 1.15,
             letterSpacing:   st.letterSpacing || "normal",
+            writingMode:     st.writingMode   || undefined,
             opacity:         1,
             background:      st.background    || "transparent",
             ...brStyle(),
@@ -976,7 +977,15 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
       end:             o.end            !== undefined ? o.end : d.end,
       enterAnimation:  o.enterAnimation ?? d.enterAnimation,
       exitAnimation:   o.exitAnimation  ?? d.exitAnimation,
-      content:         { ...(d.content || {}), ...(o.content || {}) },
+      content:         (() => {
+                         const merged = { ...(d.content || {}), ...(o.content || {}) };
+                         // For asset zones: the def may store an admin preview/example image.
+                         // That src must NEVER render in production — only the beat zone's src counts.
+                         if (d.type === "asset") {
+                           merged.asset = { ...(merged.asset || {}), src: o.content?.asset?.src ?? null };
+                         }
+                         return merged;
+                       })(),
       style:           { ...d.style, ...(o.style || {}) },
       background:      o.background     || {},
       hidden:          o.hidden         || false,

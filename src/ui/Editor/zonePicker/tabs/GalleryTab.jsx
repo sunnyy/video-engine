@@ -14,24 +14,35 @@ const TYPE_FILTERS = [
   { key: "video", label: "Videos" },
 ];
 
-const QUICK_SEARCHES = [
-  "nature", "business", "city", "technology",
-  "people", "abstract", "food", "travel", "sport", "fashion",
+const ORIENTATION_FILTERS = [
+  { key: "all",        label: "All"       },
+  { key: "vertical",   label: "↕ Portrait"  },
+  { key: "horizontal", label: "↔ Landscape" },
 ];
 
-async function searchPixabay(query, mediaType, page) {
+const QUICK_SEARCHES = [
+  "nature", "business", "city", "technology",
+  "people", "abstract", "food", "travel", "sport",
+  "fashion", "music", "fitness", "luxury", "minimal",
+];
+
+async function searchPixabay(query, mediaType, orientation, page) {
   const isVideo = mediaType === "video";
   const base    = isVideo
     ? "https://pixabay.com/api/videos/"
     : "https://pixabay.com/api/";
 
   const params = new URLSearchParams({
-    key:      API_KEY,
-    q:        encodeURIComponent(query),
-    per_page: PER_PAGE,
+    key:        API_KEY,
+    q:          encodeURIComponent(query),
+    per_page:   PER_PAGE,
     page,
     safesearch: true,
-    ...(isVideo ? {} : { image_type: "photo", orientation: "vertical" }),
+    // orientation only applies to images; videos API ignores it
+    ...(isVideo ? {} : {
+      image_type:  "photo",
+      orientation: orientation === "all" ? "all" : orientation,
+    }),
   });
 
   const res  = await fetch(`${base}?${params}`);
@@ -41,57 +52,53 @@ async function searchPixabay(query, mediaType, page) {
 
   return data.hits.map(hit => {
     if (isVideo) {
-      // Pick medium quality video
       const video = hit.videos?.medium || hit.videos?.small || hit.videos?.large;
-      // Route through server proxy to avoid CORS/referrer restrictions on Pixabay CDN
       const rawUrl = video?.url;
       const proxiedUrl = rawUrl ? `/api/proxy-video?url=${encodeURIComponent(rawUrl)}` : null;
       return {
-        id:        hit.id,
-        type:      "video",
-        src:       proxiedUrl,
-        thumb:     hit.picture_id
+        id:     hit.id,
+        type:   "video",
+        src:    proxiedUrl,
+        thumb:  hit.picture_id
           ? `https://i.vimeocdn.com/video/${hit.picture_id}_295x166.jpg`
           : null,
-        width:     video?.width,
-        height:    video?.height,
+        width:  video?.width,
+        height: video?.height,
       };
     } else {
       return {
-        id:        hit.id,
-        type:      "image",
-        src:       hit.largeImageURL || hit.webformatURL,
-        thumb:     hit.previewURL,
-        width:     hit.imageWidth,
-        height:    hit.imageHeight,
+        id:     hit.id,
+        type:   "image",
+        src:    hit.largeImageURL || hit.webformatURL,
+        thumb:  hit.previewURL,
+        width:  hit.imageWidth,
+        height: hit.imageHeight,
       };
     }
   }).filter(a => a.src);
 }
 
 export default function GalleryTab({ onSelect }) {
-  const [query,      setQuery]      = useState("");
-  const [inputVal,   setInputVal]   = useState("Travel");
-  const [mediaType,  setMediaType]  = useState("all");
-  const [results,    setResults]    = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [page,       setPage]       = useState(1);
-  const [hasMore,    setHasMore]    = useState(false);
-  const [error,      setError]      = useState(null);
+  const [query,       setQuery]       = useState("");
+  const [inputVal,    setInputVal]    = useState("Travel");
+  const [mediaType,   setMediaType]   = useState("all");
+  const [orientation, setOrientation] = useState("all");
+  const [results,     setResults]     = useState([]);
+  const [loading,     setLoading]     = useState(false);
+  const [page,        setPage]        = useState(1);
+  const [hasMore,     setHasMore]     = useState(false);
+  const [error,       setError]       = useState(null);
   const searchTimeout = useRef(null);
 
-  const doSearch = useCallback(async (q, type, pg) => {
+  const doSearch = useCallback(async (q, type, orient, pg) => {
     if (!q.trim()) return;
     setLoading(true);
     setError(null);
     try {
       const types = type === "all" ? ["photo", "video"] : [type];
-      const all   = await Promise.all(types.map(t => searchPixabay(q, t, pg)));
+      const all   = await Promise.all(types.map(t => searchPixabay(q, t, orient, pg)));
       const flat  = all.flat();
-      // Interleave if both types
-      const merged = type === "all"
-        ? flat.sort(() => Math.random() - 0.5)
-        : flat;
+      const merged = type === "all" ? flat.sort(() => Math.random() - 0.5) : flat;
       if (pg === 1) setResults(merged);
       else setResults(prev => [...prev, ...merged]);
       setHasMore(merged.length >= PER_PAGE * types.length * 0.5);
@@ -114,8 +121,8 @@ export default function GalleryTab({ onSelect }) {
   }, [inputVal]);
 
   useEffect(() => {
-    if (query) doSearch(query, mediaType, page);
-  }, [query, mediaType, page]);
+    if (query) doSearch(query, mediaType, orientation, page);
+  }, [query, mediaType, orientation, page]);
 
   const handleQuick = (q) => {
     setInputVal(q);
@@ -126,19 +133,26 @@ export default function GalleryTab({ onSelect }) {
   const handleTypeChange = (t) => {
     setMediaType(t);
     setPage(1);
-    if (query) doSearch(query, t, 1);
+  };
+
+  const handleOrientChange = (o) => {
+    setOrientation(o);
+    setPage(1);
   };
 
   const handleSelect = (asset) => {
     onSelect({
       kind:  "asset",
       asset: {
-        src:      asset.src,
-        type:     asset.type,
+        src:       asset.src,
+        type:      asset.type,
         objectFit: "cover",
       },
     });
   };
+
+  // Aspect ratio for result cards — landscape vs portrait
+  const cardRatio = orientation === "horizontal" ? "16/9" : "9/16";
 
   return (
     <div className="flex flex-col h-full gap-3">
@@ -151,7 +165,7 @@ export default function GalleryTab({ onSelect }) {
           onChange={e => setInputVal(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") { setPage(1); setQuery(inputVal); } }}
           placeholder="Search images and videos..."
-          className="flex-1 bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[12px] text-[15px] text-[#e8e8f0] placeholder-[#55556a] focus:border-[#7c5cfc] focus:outline-none"
+          className="flex-1 bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[10px] text-[14px] text-[#e8e8f0] placeholder-[#55556a] focus:border-[#7c5cfc] focus:outline-none"
         />
         <button
           onClick={() => { setPage(1); setQuery(inputVal); }}
@@ -161,31 +175,60 @@ export default function GalleryTab({ onSelect }) {
         </button>
       </div>
 
-      {/* Type filter */}
-      <div className="flex gap-2">
-        {TYPE_FILTERS.map(f => (
-          <button key={f.key} onClick={() => handleTypeChange(f.key)}
-            className="px-3 py-[5px] rounded-[6px] text-[12px] font-bold border-0 cursor-pointer transition-colors"
-            style={{
-              background: mediaType === f.key ? "#7c5cfc" : "rgba(255,255,255,0.06)",
-              color:      mediaType === f.key ? "#fff" : "#9494a8",
-            }}>
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {/* Type filter + quick keywords inline */}
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Type pills — fixed left */}
+        <div className="flex gap-1 shrink-0">
+          {TYPE_FILTERS.map(f => (
+            <button key={f.key} onClick={() => handleTypeChange(f.key)}
+              className="px-3 py-[5px] rounded-[6px] text-[12px] font-bold border-0 cursor-pointer transition-colors whitespace-nowrap"
+              style={{
+                background: mediaType === f.key ? "#7c5cfc" : "rgba(255,255,255,0.06)",
+                color:      mediaType === f.key ? "#fff"    : "#9494a8",
+              }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Quick search pills */}
-      {!query && (
-        <div className="flex flex-wrap gap-2">
+        {/* Divider */}
+        <div className="w-px h-4 shrink-0" style={{ background: "rgba(255,255,255,0.1)" }} />
+
+        {/* Quick keyword chips — scrollable */}
+        <div className="flex gap-1 overflow-x-auto min-w-0" style={{ scrollbarWidth: "none" }}>
           {QUICK_SEARCHES.map(q => (
             <button key={q} onClick={() => handleQuick(q)}
-              className="px-3 py-[4px] rounded-full text-[11px] font-medium border border-[rgba(255,255,255,0.1)] text-[#9494a8] hover:text-white hover:border-[#7c5cfc] bg-transparent cursor-pointer transition-colors capitalize">
+              className="px-[9px] py-[4px] rounded-full text-[11px] font-medium border cursor-pointer transition-colors capitalize whitespace-nowrap shrink-0"
+              style={{
+                background:  inputVal.toLowerCase() === q ? "rgba(124,92,252,0.18)" : "transparent",
+                color:       inputVal.toLowerCase() === q ? "#a78bfa" : "#7070a0",
+                borderColor: inputVal.toLowerCase() === q ? "rgba(124,92,252,0.5)" : "rgba(255,255,255,0.08)",
+              }}>
               {q}
             </button>
           ))}
         </div>
-      )}
+      </div>
+
+      {/* Orientation filter */}
+      <div className="flex gap-1">
+        {ORIENTATION_FILTERS.map(o => (
+          <button key={o.key} onClick={() => handleOrientChange(o.key)}
+            className="px-3 py-[4px] rounded-[6px] text-[11px] font-medium border-0 cursor-pointer transition-colors"
+            style={{
+              background: orientation === o.key ? "rgba(124,92,252,0.18)" : "rgba(255,255,255,0.04)",
+              color:      orientation === o.key ? "#a78bfa"                : "#666",
+              outline:    orientation === o.key ? "1px solid rgba(124,92,252,0.35)" : "1px solid transparent",
+            }}>
+            {o.label}
+          </button>
+        ))}
+        {mediaType === "video" && orientation !== "all" && (
+          <span className="ml-1 text-[10px] self-center" style={{ color: "#44445a" }}>
+            (orientation applies to images only)
+          </span>
+        )}
+      </div>
 
       {/* Error */}
       {error && <div className="text-[#f87171] text-[12px]">{error}</div>}
@@ -201,12 +244,12 @@ export default function GalleryTab({ onSelect }) {
 
         {results.length > 0 && (
           <>
-            <div className="grid grid-cols-6 gap-3 content-start">
+            <div className={`grid gap-2 content-start ${orientation === "horizontal" ? "grid-cols-3" : "grid-cols-6"}`}>
               {results.map(asset => (
                 <div key={`${asset.type}_${asset.id}`}
                   onClick={() => handleSelect(asset)}
-                  className="cursor-pointer rounded-[10px] overflow-hidden border border-[rgba(255,255,255,0.06)] hover:border-[#7c5cfc] transition-colors relative group"
-                  style={{ aspectRatio: "9/16", background: "#0e0e1a" }}
+                  className="cursor-pointer rounded-[8px] overflow-hidden border border-[rgba(255,255,255,0.06)] hover:border-[#7c5cfc] transition-colors relative group"
+                  style={{ aspectRatio: cardRatio, background: "#0e0e1a" }}
                 >
                   {asset.type === "video" ? (
                     <video
@@ -219,8 +262,7 @@ export default function GalleryTab({ onSelect }) {
                   ) : (
                     <img src={asset.thumb || asset.src} className="w-full h-full object-cover" />
                   )}
-                  {/* Type badge */}
-                  <div className="absolute top-2 left-2 px-[5px] py-[2px] rounded-[4px] text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  <div className="absolute top-1.5 left-1.5 px-[5px] py-[2px] rounded-[4px] text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ background: asset.type === "video" ? "#f59e0b" : "#7c5cfc" }}>
                     {asset.type === "video" ? "▶ VIDEO" : "IMG"}
                   </div>
@@ -228,7 +270,6 @@ export default function GalleryTab({ onSelect }) {
               ))}
             </div>
 
-            {/* Load more */}
             {hasMore && (
               <div className="flex justify-center mt-4">
                 <button

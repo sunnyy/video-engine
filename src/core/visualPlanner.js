@@ -13,6 +13,7 @@ import { resolveColors } from "./colorContrastResolver.js";
 import { resolveIconForZone } from "./resolveIconForZone.js";
 import { getNicheColorFamily, getNicheAvoid } from "./registries/nichePaletteRegistry.js";
 import { LOCAL_TO_PHOSPHOR } from "../services/assets/iconifyService.js";
+import { resolvePresetColor } from "./resolveColor.js";
 
 /* ─────────────────────────────────────────────────────────────
    ENERGY LEVEL
@@ -111,11 +112,12 @@ function pickLayout({
   intent,
   energy,
   orientation,
-  usedLayoutIds = [],   // all layouts used so far in this video
-  hasImageHint = false,
+  usedLayoutIds    = [],   // all layouts used so far in this video
+  hasImageHint     = false,
   requireAssetZone = false, // hard requirement — talking head avatar must have an asset zone
-  role = null,
-  niche = null,
+  role             = null,
+  niche            = null,
+  spokenWordCount  = 0,    // word count of the beat's spoken text
 }) {
   const level = energyLevel(energy);
   const layoutIntent = AI_TO_LAYOUT_INTENT[intent] || intent;
@@ -167,6 +169,14 @@ function pickLayout({
     if (preferred.length >= 2) candidates = preferred;
   }
 
+  // Word count guard: short spoken text cannot meaningfully fill many text zones.
+  // Hard filter — if the beat has fewer than 10 words, remove layouts with >2 text zones.
+  // This prevents 5-zone layouts being assigned to single-line beats.
+  if (spokenWordCount > 0 && spokenWordCount < 10) {
+    const simple = candidates.filter(l => l.textCount <= 2);
+    if (simple.length >= 1) candidates = simple;
+  }
+
   // Exclude ALL layouts already used in this video for maximum variety
   // Relax progressively: first exclude all used, then just recent, then nothing
   const usedSet = new Set(usedLayoutIds);
@@ -178,6 +188,16 @@ function pickLayout({
     const recentTwo = new Set(usedLayoutIds.slice(-2));
     const recentFiltered = candidates.filter(l => !recentTwo.has(l.id));
     if (recentFiltered.length) candidates = recentFiltered;
+  }
+
+  // Hard guard: never use the same layout as the immediately preceding beat.
+  // Applied last — after all other filters — so it overrides every relaxation path.
+  const lastLayoutId = usedLayoutIds.length ? usedLayoutIds[usedLayoutIds.length - 1] : null;
+  if (lastLayoutId) {
+    const withoutLast = candidates.filter(l => l.id !== lastLayoutId);
+    if (withoutLast.length) candidates = withoutLast;
+    // If no alternative exists in the matched pool, leave candidates as-is rather than
+    // repeat — caller can relax further on next beat.
   }
 
   return candidates[Math.floor(Math.random() * candidates.length)]?.id || "DuoStackHook";
@@ -220,9 +240,11 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle, inte
     }
 
     if (zone.type === "text") {
+      const dnaContext = { dna: colorStory ? { colorStory, niche } : null, brand: brandColor ? { color: brandColor } : null };
+      const resolvedColor = resolvePresetColor(zone, dnaContext);
       zones[zone.id] = {
         content: { kind: "text", text: "" }, // AI fills this via generateZoneContent
-        style: { ...zone.style },
+        style: { ...zone.style, ...(resolvedColor ? { color: resolvedColor } : {}) },
       };
     }
 
@@ -233,11 +255,18 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle, inte
     }
 
     if (zone.type === "icon") {
-      // If the layout def already bakes in an iconify reference, honour it — no need to resolve
-      if (zone.iconify?.set && zone.iconify?.icon) {
+      // Phosphor icons set in the Layout Editor are stored at zone.content.iconify.
+      // Legacy layouts may store them directly at zone.iconify. Check both.
+      const bakedIconify = zone.iconify ?? zone.content?.iconify;
+
+      if (bakedIconify?.set && bakedIconify?.icon) {
+        // Honour the baked-in icon — apply DNA color override so it matches the video feel
+        const fakeBeat = { intent, energy, layoutBackground: null };
+        const dna = colorStory ? { colorStory, niche } : null;
+        const { color } = resolveIconForZone(fakeBeat, zone, dna, brandColor);
         zones[zone.id] = {
-          content: { iconify: zone.iconify },
-          style: { ...zone.style },
+          content: { ...zone.content, iconify: bakedIconify },
+          style: { ...zone.style, ...(color ? { color } : {}), filled: true },
         };
       } else {
         const fakeBeat = { intent, energy, layoutBackground: null };
@@ -354,20 +383,21 @@ function buildChoreography(_energy) {
    MAIN EXPORT
 ───────────────────────────────────────────────────────────── */
 export function planBeatVisual({
-  mode:        _mode      = "faceless",
-  intent                 = "explanation",
-  energy                 = 0.5,
-  orientation            = "9:16",
-  usedLayoutIds          = [],
-  lastMotion             = null,
-  brandColor:  _brandColor = null,
-  beatIndex              = 0,
-  hasImageHint           = false,
-  requireAssetZone       = false,
-  role                   = null,
-  colorStory             = null,
-  motionStyle            = null,
-  niche                  = null,
+  mode:        _mode        = "faceless",
+  intent                   = "explanation",
+  energy                   = 0.5,
+  orientation              = "9:16",
+  usedLayoutIds            = [],
+  lastMotion               = null,
+  brandColor:  _brandColor  = null,
+  beatIndex                = 0,
+  hasImageHint             = false,
+  requireAssetZone         = false,
+  role                     = null,
+  colorStory               = null,
+  motionStyle              = null,
+  niche                    = null,
+  spokenWordCount          = 0,
 }) {
   const layout = pickLayout({
     intent,
@@ -378,6 +408,7 @@ export function planBeatVisual({
     requireAssetZone,
     role,
     niche,
+    spokenWordCount,
   });
 
   const zones = buildZones({

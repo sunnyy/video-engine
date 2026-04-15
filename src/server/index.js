@@ -184,11 +184,11 @@ async function cacheExternalImage(url) {
 /* ---------------- AI ROUTE ---------------- */
 app.post("/api/generate", requireAuth, async (req, res) => {
   try {
-    const { prompt, projectId } = req.body;
+    const { prompt, projectId, model: reqModel } = req.body;
     const deduction = await deductCredits(req.user.id, 8, "base_generation", "Video generation", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: reqModel || "gpt-4o",
       messages: [
         { role: "system", content: "You are a strict JSON generator. Output only valid JSON." },
         { role: "user", content: prompt },
@@ -278,7 +278,7 @@ Return ONLY valid JSON:
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: "You are a strict JSON generator. Output only valid JSON." },
         { role: "user", content: prompt },
@@ -1056,7 +1056,8 @@ app.get("/api/admin/layouts", requireAuth, requireAdmin, async (req, res) => {
 app.post("/api/admin/layouts", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, label, intent, energy, niche, orientation, visibility,
-            show_caption, default_transition, zones, tags, asset_count, text_count } = req.body;
+            show_caption, default_transition, zones, tags, asset_count, text_count,
+            thumbnail_url, generation_meta } = req.body;
     if (!name || !label || !intent || !Array.isArray(zones)) {
       return res.status(400).json({ error: "name, label, intent, zones[] required" });
     }
@@ -1075,6 +1076,8 @@ app.post("/api/admin/layouts", requireAuth, requireAdmin, async (req, res) => {
         asset_count:      asset_count      ?? zones.filter(z => z.type === "asset").length,
         text_count:       text_count       ?? zones.filter(z => z.type === "text").length,
         is_active:        true,
+        thumbnail_url:    thumbnail_url    ?? null,
+        generation_meta:  generation_meta  ?? null,
       })
       .select()
       .single();
@@ -1371,6 +1374,643 @@ app.post("/api/transcribe", requireAuth, upload.single("video"), async (req, res
   } catch (err) {
     console.error("[transcribe]", err.message);
     res.status(500).json({ error: err.message || "Transcription failed" });
+  }
+});
+
+/* ── Admin: AI Layout Generation ─────────────────────────────────── */
+
+// POST /api/admin/generate-concepts — GPT-4o generates layout concept sketches
+app.post("/api/admin/generate-concepts", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { niche = "entertainment", intent = "hook", energy = "high", count = 4, description = "" } = req.body;
+
+    const systemPrompt = `You are an expert short-form vertical video layout designer. Generate creative layout concepts for a 9:16 mobile video canvas (1080x1920 pixels). Zones are positioned with percentage-based coordinates (x, y, width, height each 0–100). Return only valid JSON.`;
+
+    const userPrompt = `Generate ${count} distinct layout concepts for short-form video.
+Niche: ${niche}
+Intent: ${intent}
+Energy: ${energy}
+${description ? `Extra requirements: ${description}` : ""}
+
+Return a JSON object: { "concepts": [ ...array of ${count} objects... ] }
+
+Each concept object must have exactly these fields:
+{
+  "id": "c1",
+  "title": "Bold Stat Hero",
+  "description": "Short 1-2 sentence description of the layout design.",
+  "pattern": "stat-hero | text-heavy | split-screen | full-bleed | overlay-minimal | caption-focused | icon-stat",
+  "zones_sketch": [
+    { "type": "text|asset|decorative", "role": "headline|subtext|label|stat|metric|cta|background|accent", "x": 0, "y": 0, "w": 100, "h": 100, "zIndex": 1, "notes": "brief note" }
+  ],
+  "visual_style": "short description of look and feel"
+}
+
+Critical rules:
+- Make ALL ${count} concepts distinctly different from each other
+- At least 1 text zone per layout
+- Asset or decorative zone for visual interest
+- x + w ≤ 100, y + h ≤ 100 for every zone
+- Background asset zIndex=1, overlaid text zIndex=2-4
+- Vary structure, zone count, and composition significantly
+- Return ONLY the JSON object, no markdown fences`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+      temperature: 0.95,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = completion.choices[0].message.content;
+    const parsed = JSON.parse(raw);
+    const concepts = Array.isArray(parsed)
+      ? parsed
+      : parsed.concepts || parsed.layouts || Object.values(parsed)[0] || [];
+
+    // Ensure IDs
+    const withIds = concepts.map((c, i) => ({ ...c, id: c.id || `c${i + 1}` }));
+    res.json({ concepts: withIds });
+  } catch (err) {
+    console.error("[admin/generate-concepts]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/generate-layout-preview — Generate a full composite layout mockup image
+// Body: { prompt, niche, intent }
+app.post("/api/admin/generate-layout-preview", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { prompt, niche = "entertainment", intent = "hook" } = req.body;
+    if (!prompt) return res.status(400).json({ error: "prompt required" });
+    if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
+
+    console.log(`[layout-preview] Generating mockup for: ${prompt.substring(0, 80)}`);
+
+    // ── Generate via Fal.ai flux/dev ──
+    let falUrl = null;
+    let lastErr = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+      try {
+        const falRes = await fetch("https://fal.run/fal-ai/flux/dev", {
+          method: "POST",
+          headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            image_size: { width: 608, height: 1080 },
+            num_inference_steps: 28,
+            guidance_scale: 3.5,
+            num_images: 1,
+            enable_safety_checker: true,
+          }),
+        });
+        if (!falRes.ok) { lastErr = await falRes.text(); continue; }
+        const data = await falRes.json();
+        falUrl = data?.images?.[0]?.url || null;
+        if (falUrl) break;
+        lastErr = "No image URL in response";
+      } catch (e) { lastErr = e.message; }
+    }
+
+    if (!falUrl) return res.status(500).json({ error: `Image generation failed: ${lastErr.slice(0, 120)}` });
+
+    // ── Upload to Supabase storage ──
+    let imageUrl = falUrl;
+    try {
+      const imgRes = await fetch(falUrl);
+      if (imgRes.ok) {
+        const buffer = Buffer.from(await imgRes.arrayBuffer());
+        const safeNiche = (niche || "general").replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+        const fname = `previews/${safeNiche}/${uuidv4()}.jpg`;
+        const { error: uploadErr } = await supabaseAdmin.storage
+          .from("layout-previews")
+          .upload(fname, buffer, { contentType: "image/jpeg", upsert: false });
+        if (!uploadErr) {
+          const { data: { publicUrl } } = supabaseAdmin.storage.from("layout-previews").getPublicUrl(fname);
+          imageUrl = publicUrl;
+          console.log("[layout-preview] Mockup saved:", imageUrl);
+        } else {
+          console.warn("[layout-preview] Upload error:", uploadErr.message);
+        }
+      }
+    } catch (uploadEx) {
+      console.warn("[layout-preview] Upload failed:", uploadEx.message);
+    }
+
+    res.json({ imageUrl, falUrl });
+  } catch (err) {
+    console.error("[admin/generate-layout-preview]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// POST /api/admin/remove-background — On-demand background removal via Fal.ai birefnet
+// Body: { imageUrl }
+app.post("/api/admin/remove-background", requireAuth, async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
+    if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
+
+    console.log("[rembg] Removing background from:", imageUrl.substring(0, 80));
+
+    const falRes = await fetch("https://fal.run/fal-ai/birefnet", {
+      method: "POST",
+      headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image_url: imageUrl,
+        model: "General Use (Light)",
+        operating_resolution: "1024x1024",
+        output_format: "png",
+      }),
+    });
+
+    if (!falRes.ok) {
+      const errText = await falRes.text();
+      throw new Error(`Fal.ai birefnet HTTP ${falRes.status}: ${errText.slice(0, 120)}`);
+    }
+    const falData = await falRes.json();
+    const transparentFalUrl = falData?.image?.url;
+    if (!transparentFalUrl) throw new Error("No result URL from birefnet");
+
+    // Download and upload transparent PNG to Supabase
+    let transparentUrl = transparentFalUrl;
+    try {
+      const pngRes = await fetch(transparentFalUrl);
+      if (pngRes.ok) {
+        const buffer = Buffer.from(await pngRes.arrayBuffer());
+        const fileName = `layouts/transparent/${Date.now()}_${uuidv4().slice(0, 8)}.png`;
+        const { error: upErr } = await supabaseAdmin.storage
+          .from("user-assets")
+          .upload(fileName, buffer, { contentType: "image/png", upsert: true });
+        if (!upErr) {
+          const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(fileName);
+          transparentUrl = publicUrl;
+          console.log("[rembg] Transparent PNG saved:", transparentUrl);
+        } else {
+          console.warn("[rembg] Upload failed:", upErr.message);
+        }
+      }
+    } catch (upEx) {
+      console.warn("[rembg] Upload exception:", upEx.message);
+    }
+
+    res.json({ transparentUrl });
+  } catch (err) {
+    console.error("[rembg]", err.message);
+    res.status(500).json({ error: "Background removal failed", details: err.message });
+  }
+});
+
+// POST /api/admin/convert-layout-image — GPT-4o Vision → zone JSON + background metadata
+// Body: { imageUrl, niche, intent, energy }
+app.post("/api/admin/convert-layout-image", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { imageUrl, niche, intent, energy } = req.body;
+    if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
+
+    const visionPrompt = `You are a precision layout extraction engine. Analyze this marketing layout image and extract EVERY visible element into a structured zone JSON.
+
+CANVAS: 1080x1920px vertical (9:16). All coordinates as percentages (0-100).
+
+═══════════════════════════════════════
+STEP 1 — BACKGROUND ANALYSIS
+═══════════════════════════════════════
+Classify the background into ONE of these types:
+
+A) solid_gradient — solid color, gradient, or simple color wash
+B) multi_shape — background built from geometric shapes (rectangles, triangles, diagonal bands, circles, polygons)
+C) image_based — photographic or illustrated scene, texture, abstract art
+
+Output:
+{
+  "background_type": "solid_gradient" | "multi_shape" | "image_based",
+  "background_colors": ["#hex1", "#hex2"],
+  "background_gradient_direction": "to bottom" | "to right" | "135deg" | etc,
+  "background_shapes": [
+    {
+      "shape": "rectangle" | "triangle" | "circle" | "diagonal_band",
+      "color": "#hex",
+      "opacity": 0.0-1.0,
+      "x": 0-100,
+      "y": 0-100,
+      "width": 0-100,
+      "height": 0-100,
+      "rotation": degrees
+    }
+  ],
+  "background_needs_image": true | false
+}
+
+═══════════════════════════════════════
+STEP 2 — ZONE EXTRACTION
+═══════════════════════════════════════
+Extract EVERY visible element. Assign sequential IDs: z1, z2, z3...
+
+For EACH zone output:
+{
+  "id": "z1",
+  "type": "text" | "asset" | "decorative" | "icon",
+  "role": see roles below,
+  "x": percentage from left,
+  "y": percentage from top,
+  "width": percentage of canvas width,
+  "height": percentage of canvas height,
+  "content": visible text (for text zones) or null,
+  "style": {
+    "fontSize": number,
+    "fontWeight": "400"|"600"|"700"|"800"|"900",
+    "fontFamily": "Bebas Neue"|"Outfit"|"Barlow Condensed"|"Playfair Display"|"Dancing Script"|"JetBrains Mono"|"Unbounded"|"Anton"|"Oswald"|"Montserrat"|"Inter"|"Poppins"|"Raleway"|"Lato"|"Roboto"|"Nunito"|"Syne",
+    "color": "#hex",
+    "textAlign": "left"|"center"|"right",
+    "backgroundColor": "#hex or null",
+    "borderRadius": number or null,
+    "padding": number or null,
+    "rotation": degrees or 0,
+    "shape": "rectangle"|"circle"|"pill"|"star"|"diamond",
+    "opacity": 0.0-1.0
+  },
+  "animation": "fadeIn"|"slideUpIn"|"popIn"|"scaleIn"|"none",
+  "animationDelay": 0.1-1.0
+}
+
+ROLES:
+- text types: headline, subtext, label, tagline, stat, metric, quote, cta
+- asset types: primary_asset, secondary_asset, background_asset
+- decorative types: decorative
+- icon types: icon
+
+EXTRACTION RULES:
+1. Label pill at top → type: text, role: label
+2. Main headline → type: text, role: headline
+3. Supporting text → type: text, role: subtext
+4. CTA button/text → type: text, role: cta
+5. Product/person area → type: asset, role: primary_asset (content: null)
+6. Stat badge overlay → type: text, role: stat
+7. Background shapes from step 1 — DO NOT duplicate as zones UNLESS they are foreground overlays
+8. Star/sparkle icons → type: decorative, role: decorative
+9. Divider lines → type: decorative, role: decorative
+10. Arrow icons → type: icon, role: icon
+11. Every text zone MUST have content (the actual text visible in the image)
+12. Asset zones: content null, coordinates = bounding box of where the image/person sits
+
+ANIMATION TIMING:
+- First element: animationDelay 0.1
+- Each subsequent: +0.1 to +0.2
+- CTA: always last, animationDelay 0.6-0.8
+
+═══════════════════════════════════════
+STEP 3 — COLOR FAMILY DETECTION
+═══════════════════════════════════════
+Detect the dominant color family: "blue"|"green"|"red"|"yellow"|"purple"|"orange"|"teal"|"pink"|"dark"|"light"|"neutral"
+
+═══════════════════════════════════════
+OUTPUT FORMAT — STRICT JSON ONLY
+═══════════════════════════════════════
+Return ONLY this JSON, no markdown, no explanation:
+
+{
+  "background_type": "solid_gradient"|"multi_shape"|"image_based",
+  "background_colors": ["#hex"],
+  "background_gradient_direction": "string or null",
+  "background_shapes": [],
+  "background_needs_image": false,
+  "color_family": "string",
+  "zones": []
+}
+
+Context: niche=${niche}, intent=${intent}, energy=${energy}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 4000,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: imageUrl, detail: "high" } },
+            { type: "text", text: visionPrompt },
+          ],
+        },
+      ],
+    });
+
+    let raw = response.choices[0].message.content.trim();
+    raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(raw);
+
+    // Normalize zones
+    const zones = (parsed.zones || []).map((z, i) => ({
+      id: z.id || `z${i + 1}`,
+      type: z.type || "text",
+      role: z.role || "subtext",
+      x: typeof z.x === "number" ? z.x : 5,
+      y: typeof z.y === "number" ? z.y : 5,
+      width:  typeof z.width  === "number" ? z.width  : 90,
+      height: typeof z.height === "number" ? z.height : 10,
+      content: z.content || null,
+      style: {
+        fontSize:        z.style?.fontSize        || 4,
+        fontWeight:      z.style?.fontWeight      || "700",
+        fontFamily:      z.style?.fontFamily      || "Outfit",
+        color:           z.style?.color           || "#ffffff",
+        textAlign:       z.style?.textAlign       || "center",
+        backgroundColor: z.style?.backgroundColor || null,
+        borderRadius:    z.style?.borderRadius    || null,
+        padding:         z.style?.padding         || null,
+        rotation:        z.style?.rotation        || 0,
+        shape:           z.style?.shape           || null,
+        opacity:         z.style?.opacity         ?? 1,
+      },
+      animation:      z.animation      || "fadeIn",
+      animationDelay: z.animationDelay || (0.1 + i * 0.1),
+    }));
+
+    // Normalize background_shapes
+    const backgroundShapes = (parsed.background_shapes || []).map(s => ({
+      shape:    s.shape    || "rectangle",
+      color:    s.color    || "#000000",
+      opacity:  s.opacity  ?? 1,
+      x:        s.x        || 0,
+      y:        s.y        || 0,
+      width:    s.width    || 100,
+      height:   s.height   || 100,
+      rotation: s.rotation || 0,
+    }));
+
+    res.json({
+      zones,
+      background_type:             parsed.background_type             || "solid_gradient",
+      background_colors:           parsed.background_colors           || ["#000000"],
+      background_gradient_direction: parsed.background_gradient_direction || null,
+      background_shapes:           backgroundShapes,
+      background_needs_image:      parsed.background_needs_image      || false,
+      color_family:                parsed.color_family                || "dark",
+    });
+  } catch (err) {
+    console.error("[admin/convert-layout-image]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/generate-layout-prompts — Generate image-generation prompts for layout mockups
+// Body: { niche, intent, energy, count }
+app.post("/api/admin/generate-layout-prompts", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { niche = "entertainment", intent = "hook", energy = "high", count = 4 } = req.body;
+
+    const systemPrompt = `You are a creative director generating image-generation prompts for 9:16 vertical social media layout mockups.
+
+Each prompt describes a COMPLETE, DENSE layout scene — background, subject, text, decorative accents, and CTA all composed together — to be rendered by an AI image generator (Flux). The output will be used as a visual reference for decomposing into editable zones.
+
+Think like a professional art director describing a premium magazine ad or Instagram story template. Every square centimeter of the canvas should feel purposeful. Target 80% canvas utilization — no empty unused areas.
+
+NICHE aesthetic guide:
+- finance: dark, professional, gold accents, authoritative typography
+- skincare: light, cream, minimal, delicate, soft gradients
+- food: warm, appetizing, vibrant or clean, food-forward
+- fitness: dark or vibrant, energetic, bold typography, muscular subjects
+- tech: dark, cool blue/grey, clean edges, device-focused
+- lifestyle: light, airy, modern, aspirational subjects
+- education: light, bright, readable, structured layouts
+- entertainment: vibrant, bold, dramatic lighting
+- motivational: dark or vibrant, powerful, oversized typography
+- spiritual: warm, golden, soft glow, ornate accents
+- travel: vibrant, scenic, wanderlust-inducing
+- business: dark or light, professional, clean hierarchy
+
+INTENT guide:
+- hook: immediate attention-grabbing, bold contrast, striking visual
+- proof: results, statistics, before/after, credibility signals
+- visual_rest: calm, minimal, breathing room, soft palette
+- escalate: urgency, countdown energy, dramatic
+- reveal: surprise reveal composition, dramatic unveil
+- cta: action-driving, button-like elements, directive text
+- stat: number-dominant, large typography, supporting context
+- explanation: structured, clear hierarchy, educational feel
+- testimonial: person-forward, quote-driven, trust signals
+- contrast: side-by-side comparison, before/after split
+
+ENERGY guide:
+- high: bold colors, large type, dynamic subject angles, high contrast
+- medium: balanced composition, clean type, professional subject
+- low: minimal, lots of negative space, quiet palette, refined
+
+LAYOUT DESIGN CONSTRAINTS — CRITICAL FOR EDITABILITY:
+The generated layout image will be broken down into editable zones by our system.
+- Text must always be a SEPARATE typographic layer — never embedded in illustrations or artwork
+- Subject must sit cleanly ON the background — not blended into it
+- Maximum 3 asset zones total, maximum 5 text zones total
+- NOT allowed: gradient text, metallic text, 3D extruded text, text baked into artwork
+
+MANDATORY LAYOUT ELEMENTS — every prompt MUST include ALL 8 of these:
+
+1. BACKGROUND — solid color or simple 2-3 color gradient. Specify exact hex colors or color names.
+
+2. CATEGORY LABEL — small pill or tag at the very top of the canvas (top 15%). Example: 'FITNESS', 'SKINCARE', 'FINANCE'. Small uppercase text inside a colored pill or rectangle. Contrasting color to background.
+
+3. HEADLINE — large ultra-bold text, 2-4 words maximum. Specific placeholder text (e.g. 'FEEL THE BURN', 'GLOW UP NOW'). Positioned in upper third (15-40%). Specify font weight (ultra-bold, condensed, heavy) and color.
+
+4. SUBTEXT — smaller supporting line directly below headline. 5-8 words. Lighter weight, different color or opacity. Example: 'Gear Up For Greatness' or 'Your skin transformation starts today'.
+
+5. SUBJECT — one clearly isolated product, person, or object. Positioned center or lower half (40-75%). Fills 40-65% of canvas width. Has drop shadow or subtle glow to separate from background.
+
+6. DECORATIVE ACCENTS — include minimum 2 of these elements:
+   - Thin horizontal divider line (accent color, below headline or above CTA)
+   - Geometric background shape (large faint circle or rectangle behind subject, slightly lighter/darker than bg)
+   - Corner accent element (small geometric shape or star in one corner)
+   - Stat/price badge (circle or pill with bold number — '50% OFF', '$29', '10K+')
+   - Icon element (small relevant icon — star ★, arrow →, checkmark ✓, lightning bolt)
+   - Side accent strip (thin vertical colored bar on left or right edge)
+
+7. CTA ELEMENT — one of these at the bottom (90-100% of canvas):
+   - Full-width bottom bar (solid colored strip spanning entire width, with CTA text like 'SHOP NOW →' or 'LEARN MORE')
+   - Rounded CTA button (centered, pill-shaped, contrasting color)
+   - Bottom label with arrow (small bold text + directional arrow)
+
+8. SPACING GUIDE — explicitly describe element positions using these bands:
+   - Top 15%: category label/tag
+   - 15-40%: headline + subtext stack
+   - 40-75%: main subject/product
+   - 75-90%: decorative accent, stat badge, or secondary info
+   - 90-100%: CTA bar or bottom element
+
+EXAMPLE OF A COMPLETE, DENSE PROMPT (fitness/hook):
+'Bold fitness hook layout on burnt orange to deep crimson gradient background. TOP: small white pill badge with text FITNESS in black at top-center. Upper third: ultra-bold condensed headline FEEL THE BURN in white, stacked 2 lines, with a thin bright yellow horizontal line accent below it. Below headline in lighter weight: Gear Up For Greatness in off-white. CENTER: red dumbbells and black weight plate product shot with subtle drop shadow, filling 55% of canvas width, sitting in the middle band. Behind the product: large faint circle shape in slightly lighter orange, giving depth. Left edge: thin vertical yellow accent strip. Lower area: small circular badge bottom-right with 50% OFF in bold white on dark red pill. BOTTOM: full-width dark charcoal strip spanning entire canvas width with SHOP NOW in white bold uppercase and right arrow icon. Vertical 9:16 social media template. Professional. Sharp. No UI chrome. No device frames.'
+
+Every prompt you write must be this detailed and this dense.`;
+
+    const userPrompt = `Generate ${count} unique image-generation prompts for:
+Niche: ${niche}
+Intent: ${intent}
+Energy: ${energy}
+
+Each prompt must describe a DIFFERENT layout composition style with ALL 8 mandatory elements. Make each one structurally distinct — vary the subject type, background color story, headline placement, and decorative accent choices.
+
+Return as JSON: { "prompts": [
+  {
+    "id": "p1",
+    "title": "short descriptive title",
+    "visual_direction": "one sentence summary of the aesthetic",
+    "prompt": "Full detailed image-generation prompt following all mandatory element rules above. Must include: background colors, category label, headline text + style, subtext, subject description + position, minimum 2 decorative accents, CTA element, and spacing guide positions. End with: Vertical 9:16 social media template. Professional. Sharp. No UI chrome. No device frames."
+  }
+] }
+Return only valid JSON, no explanation.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+      temperature: 0.9,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = completion.choices[0].message.content;
+    const parsed = JSON.parse(raw);
+    const rawPrompts = Array.isArray(parsed) ? parsed : (parsed.prompts || Object.values(parsed)[0] || []);
+    const prompts = rawPrompts.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
+    res.json({ prompts });
+  } catch (err) {
+    console.error("[admin/generate-layout-prompts]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/generate-layout-assets — Fal.ai placeholder images for saved layout asset zones
+// Body: { layoutId, zones, niche, intent, energy, visual_direction, background_type }
+app.post("/api/admin/generate-layout-assets", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { layoutId, zones, niche = "entertainment", intent = "hook", energy = "high", visual_direction, background_type, original_prompt } = req.body;
+    const subjectHints = original_prompt ? original_prompt.substring(0, 200) : "";
+    if (!layoutId || !Array.isArray(zones)) return res.status(400).json({ error: "layoutId and zones[] required" });
+    if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
+
+    const assetZones = zones.filter(z => z.type === "asset");
+    if (assetZones.length === 0) return res.json({ success: true, results: [], generated: 0, failed: 0 });
+
+    const results = [];
+
+    for (const zone of assetZones) {
+      let assetPrompt;
+
+      if (zone.role === "background_asset") {
+        if (background_type === "environmental") {
+          assetPrompt = `${niche} atmospheric cinematic background environment. ${visual_direction || ""}. ${subjectHints ? "Context: " + subjectHints.substring(0, 100) + "." : ""} Absolutely no people. No text. No UI elements. No logos. Pure environment only — lighting, atmosphere, textures, colors, particles, architectural elements. Photorealistic. Full bleed. Vertical 9:16 portrait composition.`;
+        } else if (background_type === "subject") {
+          assetPrompt = `${niche} ${intent} full frame subject photo. Person or main character as primary visual filling the frame. ${visual_direction || ""}. ${subjectHints ? "Subject context: " + subjectHints.substring(0, 150) + "." : ""} Professional photography. Cinematic lighting. No text overlays. Vertical 9:16 portrait.`;
+        } else {
+          assetPrompt = `${niche} atmospheric background. ${visual_direction || ""}. No text. No people. Environmental. Vertical 9:16.`;
+        }
+      } else if (zone.role === "primary_asset") {
+        assetPrompt = `${niche} ${intent} visual. ${subjectHints ? "Subject context: " + subjectHints + "." : "Main subject centered and prominent."} ${visual_direction || ""}. Professional quality photography or illustration. No text. No logos. Vertical 9:16 portrait composition. Focus on the main subject described. Photorealistic or high quality illustration.`;
+      } else if (zone.role === "secondary_asset") {
+        assetPrompt = `${niche} ${intent} secondary supporting visual. Different scene or angle from primary. ${subjectHints ? "Context: " + subjectHints.substring(0, 100) + "." : ""} ${visual_direction || ""}. Professional quality. No text. Vertical 9:16 portrait composition.`;
+      } else {
+        assetPrompt = `${niche} supporting visual for ${intent} content. ${visual_direction || ""}. No text. Professional. Vertical 9:16.`;
+      }
+
+      console.log(`[generate-layout-assets] Zone ${zone.id} (${zone.role}):`, assetPrompt.substring(0, 80));
+
+      try {
+        // Generate via Fal.ai flux/schnell
+        const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+          method: "POST",
+          headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: assetPrompt,
+            image_size: { width: 608, height: 1080 },
+            num_images: 1, num_inference_steps: 4, enable_safety_checker: false,
+          }),
+        });
+        if (!falRes.ok) {
+          const msg = `Fal.ai HTTP ${falRes.status}`;
+          console.error(`[generate-layout-assets] Zone ${zone.id} fal error:`, msg);
+          results.push({ zoneId: zone.id, role: zone.role, src: null, error: msg });
+          continue;
+        }
+        const falData = await falRes.json();
+        const falUrl = falData?.images?.[0]?.url;
+        if (!falUrl) {
+          results.push({ zoneId: zone.id, role: zone.role, src: null, error: "No image returned from Fal.ai" });
+          continue;
+        }
+
+        // Upload to Supabase storage (permanent URL)
+        let assetUrl = falUrl;
+        try {
+          const imgRes = await fetch(falUrl);
+          if (imgRes.ok) {
+            const buffer = Buffer.from(await imgRes.arrayBuffer());
+            const assetPath = `assets/${niche.replace(/[^a-z0-9_-]/gi, "_").toLowerCase()}/${uuidv4()}.jpg`;
+            const { error: upErr } = await supabaseAdmin.storage
+              .from("layout-previews")
+              .upload(assetPath, buffer, { contentType: "image/jpeg", upsert: false });
+            if (!upErr) {
+              const { data: { publicUrl } } = supabaseAdmin.storage.from("layout-previews").getPublicUrl(assetPath);
+              assetUrl = publicUrl;
+              console.log(`[generate-layout-assets] Zone ${zone.id} saved:`, publicUrl);
+            } else {
+              console.warn(`[generate-layout-assets] Zone ${zone.id} storage upload failed:`, upErr.message);
+            }
+          }
+        } catch (upEx) {
+          console.warn(`[generate-layout-assets] Zone ${zone.id} storage exception:`, upEx.message);
+        }
+
+        // Save to ai_image_library (fire-and-forget)
+        supabaseAdmin.from("ai_image_library").insert({
+          src: assetUrl, prompt: assetPrompt, niche, intent, energy,
+          visual_type: zone.role === "background_asset" ? "background" : zone.role || "asset",
+          orientation: "9:16", width: 608, height: 1080,
+          generator: "fal", reuse_count: 0, tags: [niche, intent],
+        }).then(() => {}).catch(() => {});
+
+        results.push({ zoneId: zone.id, role: zone.role, src: assetUrl });
+
+      } catch (e) {
+        console.error(`[generate-layout-assets] Zone ${zone.id} failed:`, e.message);
+        results.push({ zoneId: zone.id, role: zone.role, src: null, error: e.message });
+      }
+    }
+
+    // Write generated image URLs back to layout zones in Supabase
+    const successful = results.filter(r => r.src);
+    if (successful.length > 0) {
+      // Fetch current zones from DB (source of truth after save step)
+      const { data: layoutData, error: fetchErr } = await supabaseAdmin
+        .from("layouts").select("zones").eq("id", layoutId).single();
+
+      if (fetchErr) {
+        console.warn("[generate-layout-assets] DB fetch failed:", fetchErr.message);
+      } else if (layoutData?.zones) {
+        const updatedZones = layoutData.zones.map(z => {
+          const result = successful.find(r => r.zoneId === z.id);
+          if (result) {
+            return {
+              ...z,
+              content: {
+                kind: "asset",
+                asset: { src: result.src, type: "image", motion: "none", objectFit: "cover", enterTransition: "none", exitTransition: "none" },
+              },
+            };
+          }
+          return z;
+        });
+        const { error: updateErr } = await supabaseAdmin
+          .from("layouts").update({ zones: updatedZones }).eq("id", layoutId);
+        if (updateErr) {
+          console.warn("[generate-layout-assets] DB update failed:", updateErr.message);
+        } else {
+          console.log(`[generate-layout-assets] Updated ${successful.length} zones in layout ${layoutId}`);
+        }
+      }
+    }
+
+    res.json({ success: true, results, generated: successful.length, failed: results.filter(r => !r.src).length });
+  } catch (err) {
+    console.error("[admin/generate-layout-assets]", err.message);
+    res.status(500).json({ error: "Asset generation failed", details: err.message });
   }
 });
 

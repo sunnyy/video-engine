@@ -238,7 +238,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
         zIndex: 10, start: 0, end: null,
         enterAnimation: "fadeIn", exitAnimation: "none",
         content: { decorativeId: data.decorativeId || null },
-        style: { color: "#ffffff", opacity: 1, strokeWidth: 3 },
+        style: { color: "#ffffff", opacity: 1, strokeWidth: 3, filled: true },
         background: {},
       };
     } else if (data?.kind === "icon") {
@@ -525,7 +525,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
       )}
 
       {selectedZoneIds?.size > 1 && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <MultiAlignPanel
             selectedZoneIds={selectedZoneIds}
             beat={beat}
@@ -537,7 +537,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
       )}
 
       {!!selectedZoneId && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <ZoneEditor
             key={selectedZoneId}
             beatId={beat.id}
@@ -577,7 +577,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
       )}
 
       {!selectedZoneId && activeOverlay && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <OverlayEditor
             overlay={activeOverlay}
             onUpdate={updateOverlay}

@@ -55,12 +55,10 @@ export default function ZoneHandle({
     if (e.target.dataset.rotate) return;
     e.stopPropagation();
     e.preventDefault();
-    // Return focus to canvas so Ctrl+Z fires our undo, not a native input undo
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 
     dragMoved.current = false;
 
-    // Capture original positions of all selected zones for multi-drag
     const origPositions = {};
     if (isMulti && allZones) {
       for (const z of allZones) {
@@ -89,6 +87,10 @@ export default function ZoneHandle({
         dragStart.current.historyPushed = true;
       }
 
+      // Raw screen-space delta → canvas % delta.
+      // No rotation compensation needed: x,y define the zone center in canvas space,
+      // and rotation is purely visual around that center, so moving (x,y) by the
+      // raw mouse delta always moves the visual zone in the drag direction.
       const dxPct = (dx / canvasWidth)  * 100;
       const dyPct = (dy / canvasHeight) * 100;
 
@@ -113,15 +115,12 @@ export default function ZoneHandle({
       ue.stopPropagation();
       if (!dragMoved.current) {
         const additive = ue.shiftKey || ue.metaKey || ue.ctrlKey;
-        // Pure click on an already-selected zone (no modifier) → deselect,
-        // so the next click can reach a zone underneath.
         if (isSelected && !additive && !isMulti) {
           onSelect(null, false);
         } else {
           onSelect(zone.id, additive);
         }
       } else {
-        // Drag completed — select the zone that was dragged (if not already selected)
         if (!isSelected && !isMulti) onSelect(zone.id, false);
         onSave(zone.id);
       }
@@ -158,14 +157,12 @@ export default function ZoneHandle({
 
       let x = origX, y = origY, w = origW, h = origH;
 
-      const isCorner   = handle.length === 2; // "nw","ne","se","sw"
-      const fromCenter = me.altKey;           // Alt = resize from center (Figma-style)
+      const isCorner   = handle.length === 2;
+      const fromCenter = me.altKey;
       const lockRatio  = me.shiftKey && isCorner;
       const aspectRatio = origW / origH;
 
       if (fromCenter) {
-        // Both opposite edges expand equally; center stays fixed.
-        // e.g. dragging east by dx → w grows by 2*dx, x shrinks by dx.
         const cx = origX + origW / 2;
         const cy = origY + origH / 2;
         if (handle.includes("e") || handle.includes("w")) {
@@ -185,7 +182,6 @@ export default function ZoneHandle({
         if (handle.includes("n")) { y = origY + dy; h = Math.max(2, origH - dy); }
       }
 
-      // Shift on a corner handle: lock aspect ratio by using whichever axis moved more
       if (lockRatio) {
         const absDx = Math.abs(me.clientX - mouseX);
         const absDy = Math.abs(me.clientY - mouseY);
@@ -206,25 +202,17 @@ export default function ZoneHandle({
         x: Math.round(x*10)/10, y: Math.round(y*10)/10,
         width: Math.round(w*10)/10, height: Math.round(h*10)/10,
       };
-      // Text zone resize logic:
-      // - Width changed (e/w/corner): always drop height so TextAutoHeight recomputes
-      //   the correct wrap height. Shift = no font scaling (just stretch the container).
-      // - Height only (n/s): keep dragged height. Shift = no font scaling.
       if (zone.type === "text" && origFontSize > 0) {
         const isVertOnly = !handle.includes("e") && !handle.includes("w");
         if (isVertOnly) {
-          // Pure vertical: height from drag, optionally scale font
           if (!me.shiftKey) {
             update.style = { fontSize: Math.max(8, Math.round(origFontSize * (h / origH))) };
           }
         } else {
-          // Width involved: let TextAutoHeight govern height (avoids flicker)
           delete update.height;
           if (!me.shiftKey) {
-            // Scale font by width ratio — text grows/shrinks with the zone
             update.style = { fontSize: Math.max(8, Math.round(origFontSize * (w / origW))) };
           }
-          // Shift held: font stays, zone just gets wider/narrower → text reflows/wraps
         }
       }
       onUpdate(zone.id, update);
@@ -291,6 +279,12 @@ export default function ZoneHandle({
 
   const isVisible = isSelected || hovered;
 
+  // Combined transform for the rotated wrapper
+  const rotateTransform = [
+    rotation ? `rotate(${rotation}deg)` : "",
+    staticTransform,
+  ].filter(Boolean).join(" ") || undefined;
+
   return (
     <div
       onMouseEnter={() => setHovered(true)}
@@ -301,40 +295,10 @@ export default function ZoneHandle({
         zIndex:        isSelected ? 9999 : (zone.zIndex ?? 1),
         boxSizing:     "border-box",
         overflow:      "visible",
-        pointerEvents: "none", // pass clicks through — only children with explicit pointerEvents capture
+        pointerEvents: "none",
       }}
     >
-      {/* Visual outline — no pointer events, purely decorative */}
-      <div style={{
-        position:        "absolute", inset: 0,
-        transform:       [rotation ? `rotate(${rotation}deg)` : "", staticTransform].filter(Boolean).join(" ") || undefined,
-        transformOrigin: "center center",
-        outline:         `1.5px solid ${outlineColor}`,
-        outlineOffset:   "-1px",
-        borderRadius:    2,
-        background:      isSelected ? (isMulti ? "rgba(45,212,191,0.04)" : "rgba(124,92,252,0.04)") : "transparent",
-        pointerEvents:   "none",
-      }} />
-
-      {/* Hit area — always full zone, behind handles (zIndex: 1).
-          Drag        → moves the zone.
-          Click       → selects if unselected; deselects if already selected.
-          Double-click (text zones) → enter inline edit mode. */}
-      <div
-        onMouseDown={onMouseDown}
-        onDoubleClick={(e) => {
-          if (zone.type === "text" && onEditText && !isEditing) {
-            e.stopPropagation();
-            onEditText(zone.id);
-          }
-        }}
-        style={{
-          position: "absolute", inset: 0, zIndex: 1, pointerEvents: "auto",
-          cursor: isEditing ? "text" : (zone.type === "text" && isSelected ? "text" : isSelected ? "grab" : "default"),
-        }}
-      />
-
-      {/* Label */}
+      {/* Label — outside rotation so it stays upright and readable */}
       {isVisible && (
         <div style={{
           position: "absolute", top: -18, left: 0,
@@ -343,6 +307,7 @@ export default function ZoneHandle({
           background: "rgba(0,0,0,0.65)",
           padding: "1px 4px", borderRadius: 3,
           whiteSpace: "nowrap", pointerEvents: "none", userSelect: "none", lineHeight: "14px",
+          zIndex: 10001,
         }}>
           {isEditing ? "editing…" : getLabel()}
           {!isEditing && rotation !== 0 && !isMulti && ` · ${rotation}°`}
@@ -352,41 +317,76 @@ export default function ZoneHandle({
         </div>
       )}
 
-      {/* Resize handles — single select only, hidden while inline-editing */}
-      {isSelected && !isMulti && !isEditing && HANDLES.map(h => (
-        <div key={h.id} data-handle={h.id} onMouseDown={e => onResizeDown(e, h.id)}
+      {/* Rotated wrapper — outline + hit area + handles all rotate together with the zone */}
+      <div style={{
+        position:        "absolute",
+        inset:           0,
+        transform:       rotateTransform,
+        transformOrigin: "center center",
+        overflow:        "visible",
+        pointerEvents:   "none",
+      }}>
+        {/* Visual outline */}
+        <div style={{
+          position:      "absolute", inset: 0,
+          outline:       `1.5px solid ${outlineColor}`,
+          outlineOffset: "-1px",
+          borderRadius:  2,
+          background:    isSelected ? (isMulti ? "rgba(45,212,191,0.04)" : "rgba(124,92,252,0.04)") : "transparent",
+          pointerEvents: "none",
+        }} />
+
+        {/* Hit area — drag to move / click to select / dbl-click to edit text */}
+        <div
+          onMouseDown={onMouseDown}
+          onDoubleClick={(e) => {
+            if (zone.type === "text" && onEditText && !isEditing) {
+              e.stopPropagation();
+              onEditText(zone.id);
+            }
+          }}
           style={{
-            position: "absolute",
-            width: HANDLE_SIZE, height: HANDLE_SIZE,
-            left: `calc(${h.x * 100}% - ${HANDLE_SIZE / 2}px)`,
-            top:  `calc(${h.y * 100}% - ${HANDLE_SIZE / 2}px)`,
-            background: "#7c5cfc", border: "1.5px solid #fff",
-            borderRadius: 2, cursor: h.cursor, zIndex: 9999, pointerEvents: "auto",
+            position: "absolute", inset: 0, zIndex: 1, pointerEvents: "auto",
+            cursor: isEditing ? "text" : (zone.type === "text" && isSelected ? "text" : isSelected ? "grab" : "default"),
           }}
         />
-      ))}
 
-      {/* Rotation handle — single select only, hidden while inline-editing */}
-      {isSelected && !isMulti && !isEditing && (
-        <div
-          data-rotate="true"
-          onMouseDown={onRotateDown}
-          title="Drag to rotate"
-          style={{
-            position: "absolute", right: -18, bottom: -18,
-            width: 20, height: 20, borderRadius: "50%",
-            background: "#1a1a2e", border: "1.5px solid #7c5cfc",
-            cursor: "crosshair", zIndex: 9999, pointerEvents: "auto",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            userSelect: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
-          }}
-        >
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-            <path d="M9 2.5A4.5 4.5 0 1 0 9.5 7" stroke="#7c5cfc" strokeWidth="1.5" strokeLinecap="round"/>
-            <path d="M9.5 2L9 4.5L7 2.5" stroke="#7c5cfc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-      )}
+        {/* Resize handles — single select only */}
+        {isSelected && !isMulti && !isEditing && HANDLES.map(h => (
+          <div key={h.id} data-handle={h.id} onMouseDown={e => onResizeDown(e, h.id)}
+            style={{
+              position: "absolute",
+              width: HANDLE_SIZE, height: HANDLE_SIZE,
+              left: `calc(${h.x * 100}% - ${HANDLE_SIZE / 2}px)`,
+              top:  `calc(${h.y * 100}% - ${HANDLE_SIZE / 2}px)`,
+              background: "#7c5cfc", border: "1.5px solid #fff",
+              borderRadius: 2, cursor: h.cursor, zIndex: 9999, pointerEvents: "auto",
+            }}
+          />
+        ))}
+
+        {/* Rotation handle — single select only */}
+        {isSelected && !isMulti && !isEditing && (
+          <div
+            data-rotate="true"
+            onMouseDown={onRotateDown}
+            title="Drag to rotate"
+            style={{
+              position: "absolute", right: -18, bottom: -18,
+              width: 20, height: 20, borderRadius: "50%",
+              background: "#1a1a2e", border: "1.5px solid #7c5cfc",
+              cursor: "crosshair", zIndex: 9999, pointerEvents: "auto",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              userSelect: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <path d="M9 2.5A4.5 4.5 0 1 0 9.5 7" stroke="#7c5cfc" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M9.5 2L9 4.5L7 2.5" stroke="#7c5cfc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

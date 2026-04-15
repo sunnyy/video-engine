@@ -22,6 +22,7 @@ import AdminDashboard  from "./pages/admin/AdminDashboard";
 import UserManager     from "./pages/admin/UserManager";
 import LayoutManager   from "./pages/admin/LayoutManager";
 import LayoutEditor    from "./pages/admin/LayoutEditor";
+import LayoutGenerator from "./pages/admin/LayoutGenerator";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
@@ -114,6 +115,7 @@ export default function App() {
                 <Route path="/admin/plans"        element={<PlansSales />} />
                 <Route path="/admin/system"       element={<System />} />
                 <Route path="/admin/layouts"              element={<LayoutManager />} />
+                <Route path="/admin/ai-generator"         element={<LayoutGenerator />} />
                 <Route path="/admin/layouts/:layoutId"   element={<LayoutEditor />} />
                 <Route path="/admin/library"             element={<ImageLibrary />} />
               </>

@@ -8,9 +8,10 @@ const NAV = [
   { to: "/admin",            label: "Dashboard",     icon: "▦" },
   { to: "/admin/analytics",  label: "Analytics",     icon: "◈" },
   { to: "/admin/users",      label: "Users",         icon: "◎" },
-  { to: "/admin/credits",    label: "Credits",        icon: "⚡" },
+  { to: "/admin/credits",    label: "Credits",        icon: "⊕" },
   { to: "/admin/plans",      label: "Plans & Sales",  icon: "◇" },
   { to: "/admin/layouts",    label: "Layout Manager", icon: "⊞" },
+  { to: "/admin/ai-generator",     label: "Layout Generator", icon: "✦" },
   { to: "/admin/library",    label: "Image Library", icon: "⊟" },
   { to: "/admin/system",     label: "System",        icon: "◉" },
 ];

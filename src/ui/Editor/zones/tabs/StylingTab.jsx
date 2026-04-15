@@ -63,7 +63,7 @@ export default function StylingTab({ slot, zone, setPadding, setZoneStyle }) {
       />
 
       <SliderRow
-        label="Corner Radius"
+        label="Border Radius"
         value={borderRadius}
         onChange={v => setZoneStyle && setZoneStyle(slot, "borderRadius", v)}
         min={0}

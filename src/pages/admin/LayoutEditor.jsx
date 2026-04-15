@@ -16,6 +16,7 @@ import { generateVideoDNA }     from "../../core/videoDNA";
 import { serverFetch }          from "../../services/serverApi";
 import CanvasPreview            from "../../ui/Editor/CanvasPreview";
 import ZonesSection             from "../../ui/Editor/ZonesSection";
+import BeatSection              from "../../ui/Editor/BeatSection";
 
 /* ── Constants ────────────────────────────────────────────────── */
 const NICHES   = Object.keys(nichePaletteRegistry).sort();
@@ -71,7 +72,7 @@ function buildFakeBeat(layoutDef, dna) {
     transition:   { type:"cut", duration:0 },
     overlays:     [],
     spoken:       "",
-    beatBackground: { type:"color", value: dna?.colorStory?.bg ?? "#111118" },
+    layoutBackground: layoutDef?.default_background ?? null,
     dna,
   };
 }
@@ -105,7 +106,7 @@ const NEW_LAYOUT_DEF = {
 
 /* Collect edited zone definitions from the store beat, merging back into def zones */
 const DEF_FIELDS = ["x","y","width","height","zIndex","start","end",
-  "enterAnimation","exitAnimation","maxChars","order","role"];
+  "enterAnimation","exitAnimation","maxChars","order","role","visual_type"];
 
 function buildSaveZones(defZones, beatZones, deletedZones = []) {
   const deletedSet  = new Set(deletedZones);
@@ -194,6 +195,10 @@ export default function LayoutEditor() {
   const [saving,          setSaving]          = useState(false);
   const [saveMsg,         setSaveMsg]         = useState(null);
   const [metaOpen,        setMetaOpen]        = useState(isNew);
+  const [rightTab,        setRightTab]        = useState("beat"); // "beat" | "zones" | "assets"
+
+  /* Asset background-removal state: { [zoneId]: { loading, error } } */
+  const [rembgState, setRembgState] = useState({});
 
   /* Auto-save refs */
   const autoSaveTimer   = useRef(null);
@@ -272,6 +277,7 @@ export default function LayoutEditor() {
 
   const handleSelectZone = useCallback((id, mod = false) => {
     if (!id) { setSelectedZoneIds(new Set()); return; }
+    setRightTab("zones");
     if (mod) {
       setSelectedZoneIds(prev => {
         const n = new Set(prev);
@@ -555,17 +561,159 @@ export default function LayoutEditor() {
             />
           </div>
           <div style={{ width:560, flexShrink:0, borderLeft:"1px solid rgba(255,255,255,0.07)",
-            overflowY:"auto", background:"#13131f" }}
-            className="flex flex-col p-10">
+            display:"flex", flexDirection:"column", background:"#13131f" }}>
 
+            {/* Tab bar */}
+            <div style={{ display:"flex", borderBottom:"1px solid rgba(255,255,255,0.07)", flexShrink:0 }}>
+              {[{ id:"beat", label:"Beat" }, { id:"zones", label:"Zones" }, { id:"assets", label:"Assets" }].map(t => (
+                <button key={t.id} onClick={() => setRightTab(t.id)}
+                  style={{
+                    flex:1, padding:"10px 0", border:"none", cursor:"pointer", fontSize:12,
+                    fontWeight:700, letterSpacing:"0.05em", textTransform:"uppercase",
+                    background: rightTab === t.id ? "#13131f" : "#0f0f1a",
+                    color:      rightTab === t.id ? "#e8e8f0" : "#55556a",
+                    borderBottom: rightTab === t.id ? "2px solid #7c5cfc" : "2px solid transparent",
+                    transition:"all 0.15s",
+                  }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-            <ZonesSection
-              beat={activeBeat}
-              project={project}
-              selectedZoneId={selectedZoneId}
-              selectedZoneIds={selectedZoneIds}
-              onSelectZone={handleSelectZone}
-            />
+            {/* Tab content */}
+            <div style={{ flex:1, overflowY:"auto", overflowX:"hidden", padding:"16px 20px", minWidth:0 }}>
+              {rightTab === "beat" && (
+                <BeatSection beat={activeBeat} />
+              )}
+              {rightTab === "zones" && (
+                <ZonesSection
+                  beat={activeBeat}
+                  project={project}
+                  selectedZoneId={selectedZoneId}
+                  selectedZoneIds={selectedZoneIds}
+                  onSelectZone={handleSelectZone}
+                />
+              )}
+              {rightTab === "assets" && (() => {
+                // Collect all asset zones that have a src image set
+                const assetZones = (layoutDef?.zones ?? []).filter(z => {
+                  if (z.type !== "asset") return false;
+                  const beatZone = activeBeat?.zones?.[z.id];
+                  const src = beatZone?.content?.asset?.src ?? z.content?.asset?.src;
+                  return !!src;
+                });
+
+                const handleRemoveBg = async (zoneId, currentSrc) => {
+                  setRembgState(s => ({ ...s, [zoneId]:{ loading:true, error:null } }));
+                  try {
+                    const r = await serverFetch("/api/admin/remove-background", {
+                      method:"POST",
+                      body:JSON.stringify({ imageUrl: currentSrc }),
+                    });
+                    if (!r.ok) throw new Error((await r.json()).error || r.status);
+                    const { transparentUrl } = await r.json();
+
+                    // Update the zone in the project store
+                    const currentBeatZones = { ...(activeBeat?.zones ?? {}) };
+                    const existing = currentBeatZones[zoneId] ?? {};
+                    currentBeatZones[zoneId] = {
+                      ...existing,
+                      type: "asset",
+                      content: {
+                        kind: "asset",
+                        asset: {
+                          ...(existing.content?.asset ?? {}),
+                          src: transparentUrl,
+                          type: "image",
+                          objectFit: existing.content?.asset?.objectFit ?? "contain",
+                          motion: "none",
+                          enterTransition: "none",
+                          exitTransition: "none",
+                        },
+                      },
+                    };
+                    useProjectStore.getState().updateBeatSilent(activeBeat.id, { zones: currentBeatZones });
+                    setRembgState(s => ({ ...s, [zoneId]:{ loading:false, done:true } }));
+
+                    // Trigger auto-save
+                    if (handleSaveRef.current) handleSaveRef.current();
+                  } catch (e) {
+                    setRembgState(s => ({ ...s, [zoneId]:{ loading:false, error:e.message } }));
+                  }
+                };
+
+                if (assetZones.length === 0) {
+                  return (
+                    <div style={{ textAlign:"center", color:"#333", padding:"40px 20px" }}>
+                      <div style={{ fontSize:28, marginBottom:8 }}>🖼</div>
+                      <div style={{ fontSize:12 }}>No asset zones with images</div>
+                      <div style={{ fontSize:11, color:"#222", marginTop:4 }}>Add images to asset zones first</div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                    <div style={{ fontSize:11, color:"#444", marginBottom:4 }}>
+                      Remove background from any asset zone image using AI (birefnet).
+                    </div>
+                    {assetZones.map(defZone => {
+                      const beatZone = activeBeat?.zones?.[defZone.id];
+                      const src = beatZone?.content?.asset?.src ?? defZone.content?.asset?.src;
+                      const state = rembgState[defZone.id] ?? {};
+                      const H = Math.round(72 * 1920 / 1080);
+
+                      return (
+                        <div key={defZone.id} style={{
+                          display:"flex", gap:10, alignItems:"center",
+                          padding:"10px 12px", background:"rgba(255,255,255,0.03)",
+                          borderRadius:8, border:"1px solid rgba(255,255,255,0.06)",
+                        }}>
+                          {/* Thumbnail */}
+                          <div style={{ width:40, height:H, borderRadius:4, overflow:"hidden", flexShrink:0, border:"1px solid rgba(255,255,255,0.08)",
+                            background:"repeating-conic-gradient(#2a2a35 0% 25%, #1c1c28 0% 50%) 0 0 / 8px 8px" }}>
+                            <img src={src} alt={defZone.role}
+                              style={{ width:"100%", height:"100%", objectFit:"contain", display:"block" }} />
+                          </div>
+
+                          {/* Info */}
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:11, fontWeight:700, color:"#aaa", marginBottom:2 }}>
+                              {defZone.id} · {defZone.role}
+                            </div>
+                            <div style={{ fontSize:9, color:"#444", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {src?.split("/").pop()?.slice(0, 40) ?? ""}
+                            </div>
+                            {state.error && (
+                              <div style={{ fontSize:9, color:"#f87171", marginTop:3 }}>{state.error.slice(0, 60)}</div>
+                            )}
+                            {state.done && (
+                              <div style={{ fontSize:9, color:"#22c55e", marginTop:3 }}>✓ Background removed</div>
+                            )}
+                          </div>
+
+                          {/* Button */}
+                          <button
+                            onClick={() => handleRemoveBg(defZone.id, src)}
+                            disabled={state.loading}
+                            style={{
+                              padding:"5px 10px", borderRadius:5, fontSize:10, fontWeight:700,
+                              cursor:state.loading ? "not-allowed" : "pointer",
+                              background: state.done ? "rgba(34,197,94,0.15)" : "rgba(124,92,252,0.15)",
+                              border: state.done ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(124,92,252,0.3)",
+                              color: state.done ? "#22c55e" : "#a78bfa",
+                              opacity: state.loading ? 0.5 : 1,
+                              flexShrink: 0,
+                            }}>
+                            {state.loading ? "…" : state.done ? "↺ Redo" : "Remove BG"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
       ) : (

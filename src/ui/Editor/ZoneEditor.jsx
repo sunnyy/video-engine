@@ -525,6 +525,25 @@ export default function ZoneEditor({
             className="flex-1 bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-2 text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none placeholder-[#55556a]"
           />
         </div>
+        {/* AI Role */}
+        <div className="mb-4">
+          <Label>AI Role</Label>
+          <div className="flex gap-[4px] flex-wrap">
+            {["headline","subtext","label","stat","tagline","quote","cta","display","metric"].map(r => {
+              const active = (zone.role || zoneDef?.role) === r;
+              return (
+                <button key={r}
+                  onClick={() => setZoneLayout(slot, "role", r)}
+                  className="px-[8px] py-[5px] rounded-[6px] text-[11px] font-bold border cursor-pointer transition-all"
+                  style={active
+                    ? { background: "rgba(251,146,60,0.18)", borderColor: "#fb923c", color: "#fed7aa" }
+                    : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "#7070a0" }}
+                >{r}</button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Style Presets */}
         <Label>Presets</Label>
         <div className="flex gap-[5px] flex-wrap mt-[5px]">
@@ -735,6 +754,12 @@ export default function ZoneEditor({
             onChangeSilent={v => setStyleSilent("transform", buildTransform(skewX, v))}
             onStart={pushHistory} onCommit={commitSave} min={-45} max={45} step={1} unit="°" />
         </div>
+        {Math.abs(rotation) >= 80 && Math.abs(rotation) <= 100 && (
+          <div className="mt-2 px-3 py-2 rounded-[6px] text-[11px] leading-[1.5]"
+            style={{ background: "rgba(124,92,252,0.08)", color: "#a78bfa", border: "1px solid rgba(124,92,252,0.2)" }}>
+            Tip: at 90° the zone's width becomes its visual height and vice versa — resize accordingly when positioning vertical text.
+          </div>
+        )}
       </Section>
 
       {/* Animation */}
@@ -888,7 +913,7 @@ export default function ZoneEditor({
           {/* Filled / Outline toggle */}
           <div className="mb-3">
             <BtnGroup
-              options={[{ label: "Outline", value: "false" }, { label: "Filled", value: "true" }]}
+              options={[{ label: "Filled", value: "true" }, { label: "Outline", value: "false" }]}
               value={String(filled)}
               onChange={v => setZoneStyle(slot, "filled", v === "true")}
             />
@@ -997,10 +1022,10 @@ export default function ZoneEditor({
             </div>
           )}
 
-          {/* Corner Radius */}
+          {/* Border Radius */}
           <div className="mt-3">
             <div className="flex items-center justify-between mb-[5px]">
-              <Label>Corner Radius</Label>
+              <Label>Border Radius</Label>
               <button
                 onClick={cornersUnlocked ? lockCorners : unlockCorners}
                 title={cornersUnlocked ? "Reset to uniform radius" : "Edit each corner separately"}
@@ -1096,7 +1121,11 @@ export default function ZoneEditor({
 
     /* ── Gradient Overlay (no shape / icon — pure CSS background zone) ── */
     if (isGradientOverlay) {
-      const gs = gradState || parseGrad(style.background);
+      const bg = style.background || "";
+      const isSolidBg = bg.startsWith("#") || bg.startsWith("rgb");
+      const solidColor = isSolidBg ? bg : "#000000";
+
+      const gs = gradState || parseGrad(bg);
       const { type, angle, stops } = gs;
 
       const applyGrad = (newGs, commit = false) => {
@@ -1113,8 +1142,30 @@ export default function ZoneEditor({
 
       return (
         <div className="pb-6">
-          <Accordion defaultSection="Gradient">
-          <Section title="Gradient Background" icon="◐">
+          <Accordion defaultSection="Background">
+          <Section title="Background" icon="◐">
+
+            {/* Solid / Gradient mode */}
+            <div className="mb-3">
+              <BtnGroup fullWidth
+                options={[{ label: "Solid Color", value: "solid" }, { label: "Gradient", value: "gradient" }]}
+                value={isSolidBg ? "solid" : "gradient"}
+                onChange={v => {
+                  if (v === "solid") setZoneStyle(slot, "background", solidColor);
+                  else applyGrad(gs, true);
+                }} />
+            </div>
+
+            {/* Solid color picker */}
+            {isSolidBg && (
+              <div className="mb-3">
+                <ColorRow label="Color" value={solidColor}
+                  onChange={v => setZoneStyle(slot, "background", v)} />
+              </div>
+            )}
+
+            {/* Gradient controls */}
+            {!isSolidBg && (<>
 
             {/* Live preview strip */}
             <div className="mb-4 rounded-[8px] overflow-hidden" style={{ height: 40, background: gradToCSS(gs) }} />
@@ -1206,6 +1257,8 @@ export default function ZoneEditor({
                 ))}
               </div>
             </div>
+
+            </>)}
           </Section>
 
           <Section title="Transform" icon="⟳" defaultOpen={false}>
@@ -1323,7 +1376,7 @@ export default function ZoneEditor({
             <div className="mb-3">
               <Label>Mode</Label>
               <BtnGroup fullWidth
-                options={[{ label: "Outline", value: "false" }, { label: "Filled", value: "true" }]}
+                options={[{ label: "Filled", value: "true" }, { label: "Outline", value: "false" }]}
                 value={String(filled)}
                 onChange={v => setZoneStyle(slot, "filled", v === "true")} />
             </div>
@@ -1370,7 +1423,7 @@ export default function ZoneEditor({
             <Slider label="Count" value={style.count ?? 5} onChangeSilent={v => setStyleSilent("count", v)} onCommit={commit} min={2} max={12} step={1} />
           )}
           {!iconId && shapeId === "square" && (
-            <Slider label="Corner Radius" value={style.borderRadius ?? 0} onChangeSilent={v => setStyleSilent("borderRadius", v)} onCommit={commit} min={0} max={50} unit="px" />
+            <Slider label="Border Radius" value={style.borderRadius ?? 0} onChangeSilent={v => setStyleSilent("borderRadius", v)} onCommit={commit} min={0} max={50} unit="px" />
           )}
         </Section>
 
@@ -1506,6 +1559,31 @@ export default function ZoneEditor({
           </div>
         )}
 
+        {/* AI Image Type */}
+        {!isAvatarZone && (
+          <div className="mb-4">
+            <Label>AI Image Type</Label>
+            <div className="flex gap-[4px]">
+              {[
+                { value: "entity",   label: "Entity",   title: "Real photo — searched by name or product" },
+                { value: "abstract", label: "Abstract", title: "AI generated — concept, scene, or environment" },
+              ].map(({ value: v, label: l, title }) => {
+                const cur = zone.visual_type || zoneDef?.visual_type;
+                const active = cur === v;
+                return (
+                  <button key={v} title={title}
+                    onClick={() => setZoneLayout(slot, "visual_type", active ? null : v)}
+                    className="flex-1 py-[7px] rounded-[7px] text-[11px] font-bold border cursor-pointer transition-all"
+                    style={active
+                      ? { background: "rgba(124,92,252,0.18)", borderColor: "#7c5cfc", color: "#c4b5fd" }
+                      : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "#7070a0" }}
+                  >{l}</button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Thumbnail on left, controls on right — same layout for both modes */}
         <div className="flex gap-4">
 
@@ -1586,7 +1664,7 @@ export default function ZoneEditor({
                 onCommit={commit} min={0} max={120} unit="px" />
               <div>
                 <div className="flex items-center justify-between mb-[5px]">
-                  <Label>Corner Radius</Label>
+                  <Label>Border Radius</Label>
                   <button
                     onClick={cornersUnlocked ? lockCorners : unlockCorners}
                     title={cornersUnlocked ? "Reset to uniform radius" : "Edit each corner separately"}

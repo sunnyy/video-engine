@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-const FILTERS = ["All", "Image", "Video"];
+const FILTERS   = ["All", "Image", "Video"];
+const PAGE_SIZE = 12;
 
 function ScopeBadge({ scope }) {
   if (!scope) return null;
@@ -18,7 +19,8 @@ function ScopeBadge({ scope }) {
 }
 
 export default function MyAssetsTab({ assets, onSelect, onDelete, deletingId, renderPreview }) {
-  const [filter, setFilter] = useState("All");
+  const [filter,      setFilter]      = useState("All");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const filtered = assets.filter(a => {
     // exclude audio from this tab (audio is only in FilesSection)
@@ -31,13 +33,21 @@ export default function MyAssetsTab({ assets, onSelect, onDelete, deletingId, re
     return true;
   });
 
+  const visible   = filtered.slice(0, visibleCount);
+  const hasMore   = filtered.length > visibleCount;
+
+  function handleFilterChange(f) {
+    setFilter(f);
+    setVisibleCount(PAGE_SIZE); // reset to first page on filter change
+  }
+
   return (
     <>
       <div className="mb-4 flex gap-2">
         {FILTERS.map(f => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => handleFilterChange(f)}
             className={`px-3 py-1 text-sm rounded border ${filter === f ? "bg-purple-700 text-white border-purple-700" : "bg-white text-gray-700"}`}
           >
             {f}
@@ -48,33 +58,46 @@ export default function MyAssetsTab({ assets, onSelect, onDelete, deletingId, re
       {filtered.length === 0 ? (
         <div className="text-sm text-gray-400 py-8 text-center">No assets yet. Upload one above.</div>
       ) : (
-        <div className="grid grid-cols-3 gap-4 content-start">
-          {filtered.map(asset => (
-            <div
-              key={asset.id}
-              className="relative bg-black cursor-pointer overflow-hidden rounded-xl border border-transparent hover:border-indigo-500 min-h-[120px]"
-            >
+        <>
+          <div className="grid grid-cols-3 gap-4 content-start">
+            {visible.map(asset => (
               <div
-                onClick={() => onSelect({ kind: "asset", asset: { type: asset.type, src: asset.url } })}
-                className="aspect-video"
+                key={asset.id}
+                className="relative bg-black cursor-pointer overflow-hidden rounded-xl border border-transparent hover:border-indigo-500 min-h-[120px]"
               >
-                {renderPreview(asset)}
-              </div>
-              <ScopeBadge scope={asset.scope} />
-              <button
-                onClick={e => { e.stopPropagation(); onDelete(asset); }}
-                className="absolute top-1 right-1 bg-black/70 text-white text-xs px-2 py-1 rounded"
-              >
-                {deletingId === asset.id ? "…" : "✕"}
-              </button>
-              {asset.name && (
-                <div className="px-2 py-1 text-[10px] text-gray-400 truncate bg-black/40">
-                  {asset.name}
+                <div
+                  onClick={() => onSelect({ kind: "asset", asset: { type: asset.type, src: asset.url } })}
+                  className="aspect-video"
+                >
+                  {renderPreview(asset)}
                 </div>
-              )}
+                <ScopeBadge scope={asset.scope} />
+                <button
+                  onClick={e => { e.stopPropagation(); onDelete(asset); }}
+                  className="absolute top-1 right-1 bg-black/70 text-white text-xs px-2 py-1 rounded"
+                >
+                  {deletingId === asset.id ? "…" : "✕"}
+                </button>
+                {asset.name && (
+                  <div className="px-2 py-1 text-[10px] text-gray-400 truncate bg-black/40">
+                    {asset.name}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                className="px-4 py-2 text-[13px] rounded-[8px] border border-[rgba(255,255,255,0.12)] text-[#a0a0b8] hover:text-black hover:border-[rgba(124,92,252,0.5)] transition-colors cursor-pointer"
+              >
+                Load more ({filtered.length - visibleCount} remaining)
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </>
   );

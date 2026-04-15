@@ -159,8 +159,8 @@ SPOKEN TEXT QUALITY RULES — non-negotiable:
 ───────────────────────────────────────────────────────────── */
 const BEAT_COUNTS = {
   short:  { min: 4, max: 6  },  // ~15–25 seconds
-  medium: { min: 6, max: 9  },  // ~25–45 seconds
-  long:   { min: 9, max: 13 },  // ~45–60 seconds
+  medium: { min: 7, max: 10 },  // ~25–45 seconds
+  long:   { min: 12, max: 18 }, // ~45–60 seconds
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -208,7 +208,9 @@ function buildPrompt({ topic, videoType, language, durationCategory, context, au
   const toneLabel      = (!tone || tone === "auto")           ? "auto (infer from topic)" : tone;
 
   return `
-You are a viral short-form video scriptwriter and creative director with a distinct creative voice for every niche.
+You are a viral short-form video director with 15+ years of experience.
+Your videos have generated billions of views across YouTube Shorts, Instagram Reels, and TikTok.
+You think like a filmmaker, not a writer. Every beat is a scene. Every scene has a purpose.
 
 LANGUAGE: ${langInstr}
 
@@ -222,36 +224,62 @@ AUDIENCE: ${audienceInstr}
 TOPIC: ${topic}
 ${context ? `\nCONTEXT / FACTS TO USE:\n${context}` : ""}
 ${userRules}
-${NICHE_VOICE_RULES}
-${SPOKEN_PERSONALITY_RULES}
-${INTENT_GUIDE}
+YOUR PHILOSOPHY:
+- First 3 seconds = life or death. Open with the most shocking, curious, or emotional moment.
+- Never explain what you're about to say. Just say it.
+- Sentences are maximum 10 words. Short. Punchy. Like a punch to the face.
+- Every beat must make the viewer think "wait... what?" or "no way" or "I need to know more"
+- Concrete specifics beat vague generalities every time. Numbers, names, quotes, moments.
+- Open loops constantly — never close an idea fully until the last beat.
+- Pattern interrupt every 3-5 seconds. New angle, new energy, new perspective.
+- Write exactly how a human talks on camera. Contractions, incomplete sentences, pauses.
+- The CTA beat must feel earned, not forced. Never say "follow for more" — make them WANT to.
 
+BEAT ENERGY RULES:
+- Hook beat: Maximum shock, curiosity, or disbelief. Drop the viewer into the deep end.
+- Escalate beat: Build tension. Raise the stakes. "But wait, it gets worse."
+- Proof beat: One specific fact, number, or example. Not three. One.
+- Reveal beat: The payoff. Make it worth the wait. Mic drop energy.
+- Explanation beat: Calm, clear, but never boring. One idea only.
+- Contrast beat: Set up the opposition sharply. "Everyone thinks X. Reality is Y."
+- Stat beat: Lead with the number. Never bury it.
+- Testimonial beat: Real, human, specific. Not polished.
+- Visual rest beat: Let the visuals breathe. Minimal text. Atmospheric.
+- CTA beat: Conversational, direct, personal. "You" not "viewers".
+
+SCRIPT QUALITY RULES:
+- You MUST generate exactly ${beatCount.max} beats. Never fewer. short=6, medium=10, long=16. If the topic runs short, add explanation beats, proof beats, or expand existing beats. Do not end early.
+- Write ${beatCount.min}–${beatCount.max} beats total
+- Never start two consecutive beats with the same word
+- Never use: "In conclusion", "As we can see", "It's important to note", "In today's video"
+- Never be vague: not "some people" but "37% of creators", not "a lot of money" but "₹10 lakh"
+- First beat must not start with "Did you know" — find a more original hook
+- Each beat's spoken text must work as a standalone line — remove context and it still hits
+- Write in the niche voice — finance sounds authoritative, food sounds sensory, gaming sounds hype
+- Hinglish topics get Hinglish scripts — mix naturally, don't force English
+- Match energy to beat type — high energy beats get short punchy sentences, low energy gets rhythm
+${NICHE_VOICE_RULES}
+${INTENT_GUIDE}
 ${VISUAL_HINT_GUIDE}
 
-YOUR JOB:
-Write a script for a short-form vertical video (TikTok / Instagram Reels / YouTube Shorts style).
-The script is split into beats. Each beat is ONE spoken sentence — short, punchy, and natural.
-The video should feel like a real creator made it, not like a template was filled in.
+ASSET DIRECTION RULES:
+- asset_hint.prompt must describe a specific visual scene, not a concept
+- Good: "a person's hands counting cash on a wooden desk, warm lighting, close-up"
+- Bad: "a person with money showing success"
+- visual_type entity = specific named person, product, landmark only
+- visual_type abstract = emotion, action, concept, scene
+- Never use platform logos as entity search — YouTube, Instagram, TikTok logos are not useful assets
+- image_count_needed must match actual visual content in the beat — if beat is pure text, set to 0
 
-RULES:
-- Write ${beatCount.min}–${beatCount.max} beats total
-- Each beat = exactly ONE sentence, naturally spoken
-- First beat MUST stop the scroll immediately — no slow starts
-- Vary sentence length and energy across beats
-- Use real numbers and specific details when relevant to the topic
-- Do NOT use generic filler like "In today's video" or "Don't forget to like"
-- Do NOT follow a rigid formula — follow emotional logic instead
-- The last beat should feel like a satisfying end, not an abrupt stop
-
-STORYTELLING APPROACHES (pick what fits the topic, don't force a pattern):
-- The confession: admit something uncomfortable, then why it matters
-- The reframe: show something familiar, completely change what it means
-- The contrast: two things that shouldn't coexist, but do
-- The journey: I was here, something happened, now I'm here
-- The secret: everyone thinks X, but actually Y
-- The demonstration: don't tell me, show me
-- The challenge: you probably can't do this, here's why
-- The revelation: slow build to one shocking truth
+CONTENT DENSITY RULES:
+- text_density "simple" = spoken text under 10 words, one idea only
+- text_density "medium" = 10–20 words, main point plus one supporting detail
+- text_density "rich" = 20+ words, multiple ideas that can fill multiple zones
+- Be honest about density — do not mark everything as "rich"
+- image_count_needed 0 = pure text beat, no image needed
+- image_count_needed 1 = one strong hero image
+- image_count_needed 2 = two contrasting or complementary images
+- Never exceed 2 for short-form vertical video
 
 NICHE — Pick exactly one from this list based on the topic:
 entertainment | gaming | sports | finance | education | health | lifestyle | food | travel | tech | spiritual | skincare | business | music | comedy | news | motivational
@@ -270,12 +298,21 @@ OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no explanation:
       "energy": 0.0,
       "visual_hint": "faces | text_only | stat | comparison | list | scene | product | none",
       "emphasis_words": ["word1", "word2"],
+      "text_density": "simple | medium | rich",
+      "image_count_needed": 1,
       "asset_hint": {
         "keywords": ["keyword1", "keyword2", "keyword3"],
-        "prompt": "Specific photographable scene for image generation, e.g. 'fresh lemon and ginger on wooden surface, soft morning light, close-up'",
+        "prompt": "Specific photographable scene for image generation, e.g. 'a person's hands counting cash on a wooden desk, warm lighting, close-up'",
         "visual_type": "entity | abstract",
-        "search_query": "exact search query if entity, else null"
-      }
+        "search_query": "exact search query if entity (real person / physical product only), else null"
+      },
+      "headline": "MAX 28 CHARS — single most powerful line",
+      "subtext": "Max 55 chars — supporting detail, complete sentence, different from headline",
+      "label": "MAX 12 CHARS",
+      "stat": "₹10L or 94% or null",
+      "tagline": "Max 20 chars — short memorable phrase",
+      "quote": "Max 90 chars — a quotable, personality-filled line from this beat",
+      "cta": "MAX 16 CHARS"
     }
   ]
 }
@@ -286,16 +323,24 @@ FIELD NOTES:
 - energy: 0.0 (calm) to 1.0 (explosive) — vary this across beats
 - visual_hint: what kind of visual would best serve this beat
 - emphasis_words: 1–3 words from spoken text to highlight in captions
+- text_density: honest assessment of how many ideas are in this beat
+- image_count_needed: how many images this beat actually needs (0, 1, or 2)
 - asset_hint.keywords: 2–4 concrete nouns describing what image to show
-- asset_hint.prompt: specific photographable scene for AI image gen — no abstractions, describe exactly what's in frame. CRITICAL: describe only the visual scene, never include text, numbers, statistics, charts, graphs, or any written content in the description
-- asset_hint.visual_type: "entity" if the beat shows a real named thing (brand, app, tool, company, product, movie, show, person, team) — use image search for these. "abstract" for generic concepts (growth, motivation, technology, lifestyle) — use AI generation.
-- asset_hint.search_query: ONLY set if visual_type is "entity". Write a precise image search query that will return the LOGO or OFFICIAL IMAGE of that entity. Rules:
-  * For apps/tools/software: "<Name> logo" e.g. "ChatGPT logo", "Notion logo", "Midjourney logo"
-  * For companies/brands: "<Brand> logo official" e.g. "OpenAI logo official", "Nike logo"
-  * For movies/shows: "<Title> official movie poster" e.g. "Dune 2 official movie poster"
-  * For people: "<Full Name> official photo" e.g. "Elon Musk official photo"
-  * Always target the logo/poster/official image — NOT a random scene or article about them.
-  * Set to null for abstract visual_type.
+- asset_hint.prompt: specific photographable scene — describe exactly what's in frame. NEVER include text, numbers, statistics, charts, or written content in the description
+- asset_hint.visual_type: "entity" = specific named real person / product / landmark; "abstract" = everything else
+- asset_hint.search_query: only for entity type — "<Full Name> official photo" or "<Product> product photo". NEVER a platform name (YouTube, Instagram, TikTok, Google…). Null for abstract.
+
+ZONE CONTENT RULES — these fields fill layout zones independently:
+- headline: the single most powerful restatement of this beat. ALL CAPS optional. Max 28 chars.
+- subtext: supporting detail that ADDS to the headline, never repeats it. Complete sentence. Max 55 chars.
+- label: a short category tag like BREAKING, FACT CHECK, PRO TIP, WILD STAT. Max 12 chars. ALL CAPS.
+- stat: the key number from this beat formatted short (₹10L, 94%, 3X). Null if no number exists.
+- tagline: a short memorable phrase, different from both headline and subtext. Max 20 chars.
+- quote: a quotable line with personality — something a real person would screenshot. Max 90 chars.
+- cta: a short action directive for CTA-intent beats. Max 16 chars. e.g. FOLLOW NOW, TRY THIS.
+- headline and subtext must NOT share the same opening words
+- label must be a category tag, never a sentence fragment
+- All zone fields must be INDEPENDENT — no zone should repeat another zone's content
 `.trim();
 }
 
@@ -338,20 +383,66 @@ function parseAIResponse(raw) {
   ];
 
   parsed.beats = parsed.beats.map((beat, i) => ({
-    order:          beat.order          ?? i,
-    spoken:         String(beat.spoken  || "").trim(),
-    intent:         validIntents.includes(beat.intent) ? beat.intent : "explanation",
-    energy:         typeof beat.energy === "number"
-                      ? Math.min(1, Math.max(0, beat.energy))
-                      : 0.5,
-    visual_hint:    validHints.includes(beat.visual_hint) ? beat.visual_hint : "none",
-    emphasis_words: Array.isArray(beat.emphasis_words) ? beat.emphasis_words : [],
-    asset_hint: beat.asset_hint ? {
-      keywords:     Array.isArray(beat.asset_hint.keywords) ? beat.asset_hint.keywords : [],
-      prompt:       String(beat.asset_hint.prompt || "").trim(),
-      visual_type:  beat.asset_hint.visual_type === "entity" ? "entity" : "abstract",
-      search_query: beat.asset_hint.search_query ? String(beat.asset_hint.search_query).trim() : null,
-    } : null,
+    order:             beat.order          ?? i,
+    spoken:            String(beat.spoken  || "").trim(),
+    intent:            validIntents.includes(beat.intent) ? beat.intent : "explanation",
+    energy:            typeof beat.energy === "number"
+                         ? Math.min(1, Math.max(0, beat.energy))
+                         : 0.5,
+    visual_hint:       validHints.includes(beat.visual_hint) ? beat.visual_hint : "none",
+    emphasis_words:    Array.isArray(beat.emphasis_words) ? beat.emphasis_words : [],
+    text_density:      ["simple","medium","rich"].includes(beat.text_density) ? beat.text_density : null,
+    image_count_needed: typeof beat.image_count_needed === "number"
+                         ? Math.min(2, Math.max(0, Math.round(beat.image_count_needed)))
+                         : null,
+    // Zone content pre-generated by the director — used by generateZoneContent as hints
+    headline: beat.headline ? String(beat.headline).trim().slice(0, 40)  : null,
+    subtext:  beat.subtext  ? String(beat.subtext).trim().slice(0, 80)   : null,
+    label:    beat.label    ? String(beat.label).trim().slice(0, 20)     : null,
+    stat:     beat.stat     ? String(beat.stat).trim().slice(0, 20)      : null,
+    tagline:  beat.tagline  ? String(beat.tagline).trim().slice(0, 30)   : null,
+    quote:    beat.quote    ? String(beat.quote).trim().slice(0, 120)    : null,
+    cta:      beat.cta      ? String(beat.cta).trim().slice(0, 24)       : null,
+    asset_hint: (() => {
+      const ah = beat.asset_hint || {};
+      // Fallback for empty asset hints — derive from spoken text
+      const spokenWords = String(beat.spoken || "").trim().split(/\s+/).filter(Boolean);
+      const keywords = Array.isArray(ah.keywords) && ah.keywords.length > 0
+        ? ah.keywords
+        : spokenWords.slice(0, 4);
+      // Fallback prompt: use keywords to form a scene description (NOT raw spoken text —
+      // the echo-clearing guard below would strip it if it matched spoken verbatim).
+      const rawPrompt = String(ah.prompt || "").trim();
+      const prompt = rawPrompt
+        || (keywords.length > 0 ? `${keywords.slice(0, 3).join(", ")}, photorealistic scene` : spokenWords.slice(0, 6).join(" "));
+
+      const validTypes = ["entity", "abstract", "scene"];
+      let visual_type  = validTypes.includes(ah.visual_type) ? ah.visual_type : "abstract";
+      let search_query = ah.search_query ? String(ah.search_query).trim() : null;
+
+      // Fix 1: Platform name guard — platform logos are never useful as beat assets.
+      // If AI set visual_type=entity with a platform name in search_query, demote to abstract.
+      const PLATFORM_RE = /\b(youtube|instagram|tiktok|facebook|twitter|x\.com|google|snapchat|pinterest|linkedin|reddit|whatsapp|telegram|discord)\b/i;
+      if (visual_type === "entity" && search_query && PLATFORM_RE.test(search_query)) {
+        visual_type  = "abstract";
+        search_query = null;
+      }
+      // Also reject entity with no search_query — it would just do a blank image search
+      if (visual_type === "entity" && !search_query) {
+        visual_type = "abstract";
+      }
+
+      // Fix: detect prompts that are just spoken-text keywords joined with commas/spaces.
+      // If more than 2 of the prompt's words are in the spoken text, replace with a proper scene description.
+      const spokenWordSet = new Set(spokenWords.map(w => w.toLowerCase().replace(/[^\w]/g, "")));
+      const promptWords   = prompt.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean);
+      const spokenOverlap = promptWords.filter(w => w.length > 3 && spokenWordSet.has(w)).length;
+      const cleanedPrompt = spokenOverlap > 2
+        ? `A photorealistic scene showing ${visual_type === "entity" ? "a specific subject" : (beat.intent || "visual") + " energy"}, ${(keywords.filter(k => !spokenWordSet.has(k.toLowerCase())).slice(0, 2).join(", ") || keywords.slice(0, 2).join(", "))}, dramatic lighting, vertical 9:16`
+        : prompt;
+
+      return { keywords, prompt: cleanedPrompt, visual_type, search_query };
+    })(),
   }));
 
   return parsed;
@@ -488,6 +579,32 @@ export async function generateStructuredShort({
     const data    = await response.json();
     const rawText = data.text || data.content || JSON.stringify(data);
     parsedScript  = parseAIResponse(rawText);
+
+    // Enforce minimum beat count — retry once if AI returned too few beats
+    const beatCount = BEAT_COUNTS[durationCategory] || BEAT_COUNTS.short;
+    if (parsedScript.beats.length < beatCount.min) {
+      console.warn(`[generateStructuredShort] Only ${parsedScript.beats.length} beats returned (min ${beatCount.min} for "${durationCategory}") — retrying`);
+      const retryPrompt = prompt + `\n\nCRITICAL: Your previous response returned only ${parsedScript.beats.length} beats. You MUST return at least ${beatCount.min} beats for "${durationCategory}" duration. Target is ${beatCount.max} beats. Add more distinct beats to meet the minimum.`;
+      try {
+        const retryRes = await serverFetch("/api/generate", {
+          method: "POST",
+          body:   JSON.stringify({ prompt: retryPrompt }),
+        });
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          const retryRaw  = retryData.text || retryData.content || JSON.stringify(retryData);
+          const retryParsed = parseAIResponse(retryRaw);
+          if (retryParsed.beats.length >= beatCount.min) {
+            parsedScript = retryParsed;
+            console.log(`[generateStructuredShort] Retry succeeded: ${retryParsed.beats.length} beats`);
+          } else {
+            console.warn(`[generateStructuredShort] Retry still short (${retryParsed.beats.length}) — keeping original`);
+          }
+        }
+      } catch (e) {
+        console.warn("[generateStructuredShort] Beat count retry failed:", e.message);
+      }
+    }
   }
 
   // Compute average energy across beats for palette selection
@@ -514,116 +631,61 @@ export async function generateStructuredShort({
     dna,
   });
 
-  // Attach asset_hint to each beat for editor display
+  // Attach asset_hint to each beat for editor display.
+  // If the AI echoed spoken text verbatim as the prompt, clear it — image gen will use keywords instead.
   parsedScript.beats.forEach((src, i) => {
-    if (beats[i] && src.asset_hint) beats[i].asset_hint = src.asset_hint;
+    if (!beats[i] || !src.asset_hint) return;
+    const hint = { ...src.asset_hint };
+    const spoken = (beats[i].spoken || "").trim().toLowerCase();
+    if (hint.prompt && hint.prompt.trim().toLowerCase() === spoken) {
+      hint.prompt = null;
+    }
+    beats[i].asset_hint = hint;
   });
 
   /* ── Phase 3: AI zone content — fills text zones intelligently ── */
   report("content");
   try {
     const layoutDefs = beats.map(b => getLayoutDef(b.layout));
+    console.log("[pipeline] calling generateZoneContent for", beats.length, "beats; layoutDefs resolved:", layoutDefs.map((d, i) => `beat${i}:${d ? d.id || "ok" : "NULL"}`).join(", "));
     const zoneContentArr = await generateZoneContent({ beats, layoutDefs, topic, videoDNA: dna });
 
     zoneContentArr.forEach(({ beatIndex, zones: zc }) => {
       if (!beats[beatIndex]) return;
-      const beat      = beats[beatIndex];
-      const layoutDef = layoutDefs[beatIndex];
-      // Build a map of zoneId → zone type from the layout def for validation
-      const defZoneTypes = {};
-      (layoutDef?.zones || []).forEach(z => { defZoneTypes[z.id] = z.type; });
+      const beat    = beats[beatIndex];
+      const beatDef = getLayoutDef(beat.layout);
 
-      Object.entries(zc).forEach(([zoneId, content]) => {
-        if (!beat.zones[zoneId]) return;
-        const defType = defZoneTypes[zoneId];
+      for (const [zoneId, filled] of Object.entries(zc)) {
+        if (!filled?.text || filled.text.trim() === "") continue;
 
-        // Only write text into text zones — never clobber asset zones with text content
-        if (content.text !== undefined && defType === "text") {
-          beat.zones[zoneId] = {
-            ...beat.zones[zoneId],
-            content: { kind: "text", text: content.text },
-          };
+        // Fix 1: Only write text to zones the layout def declares as type "text".
+        // Never overwrite decorative, asset, icon, or avatar zones with text content.
+        const defZoneType = beatDef?.zones?.find(z => z.id === zoneId)?.type;
+        if (defZoneType && defZoneType !== "text") {
+          console.warn(`[zoneContent] beat ${beatIndex} zone ${zoneId}: skipping write — def type is "${defZoneType}", not "text"`);
+          continue;
         }
-        // Only store asset prompts for asset zones — never for text zones
-        if (content.prompt !== undefined && defType === "asset") {
-          beat.zones[zoneId] = {
-            ...beat.zones[zoneId],
-            _assetPrompt: content.prompt,
-          };
-        }
-      });
+
+        if (!beat.zones[zoneId]) beat.zones[zoneId] = {};
+        beat.zones[zoneId] = {
+          ...beat.zones[zoneId],
+          content: { kind: "text", text: filled.text },
+        };
+      }
+    });
+    // Fix 4: Debug empty zones for known problematic layout
+    beats.forEach((beat, beatIndex) => {
+      if (beat.layout !== "f46f2091-91d9-4718-bef9-99b65cef32d9") return;
+      const emptyZones = ["z6","z9"].filter(id => !beat.zones[id]?.content?.text?.trim());
+      if (emptyZones.length > 0) {
+        const returned = zoneContentArr.find(b => b.beatIndex === beatIndex);
+        console.warn(`[f46f2091 debug] beat ${beatIndex} empty zones: [${emptyZones.join(",")}] | AI returned:`, JSON.stringify(returned?.zones || {}));
+      }
     });
   } catch (e) {
     console.warn("[generateZoneContent] failed, using spoken text fallback:", e.message);
   }
 
-  // Always run: fill any text zones still empty after AI call (or if AI call failed).
-  // Uses spoken text split by role so every zone has readable content.
-  beats.forEach(beat => {
-    const def = getLayoutDef(beat.layout);
-    if (!def) return;
-
-    const spoken = beat.spoken || "";
-    const wordList = spoken.trim().split(/\s+/).filter(Boolean);
-    const midpoint   = Math.ceil(wordList.length * 0.55);
-    const secondHalf = wordList.slice(midpoint).join(" ") || spoken;
-
-    // Intent-based label tag
-    const INTENT_LABELS = {
-      shock: "WILD FACT", curiosity: "DID YOU KNOW", proof: "PROOF",
-      reveal: "REVEALED", urgency: "ACT NOW", empathy: "REAL TALK",
-      explanation: "HOW IT WORKS", contrast: "THE TRUTH", irony: "IRONY",
-      punchline: "PLOT TWIST", stat: "THE STAT", hook: "WAIT FOR IT",
-    };
-    const labelTag = INTENT_LABELS[beat.intent] || "FACT";
-
-    // Extract first number from spoken, or fallback symbol
-    const numMatch = spoken.match(/[\d,.]+%?[kKmMbB]?/);
-    const statText = numMatch ? numMatch[0] : "—";
-
-    const textZones = def.zones
-      .filter(z => z.type === "text")
-      .sort((a, b) => (a.order ?? 1) - (b.order ?? 1));
-
-    textZones.forEach((zoneDef, idx) => {
-      const zone = beat.zones[zoneDef.id];
-      if (!zone) return;
-      if (zone.content?.text?.trim()) return; // already filled — skip
-
-      let fallbackText = spoken; // default
-      const role = zoneDef.role || "subtext";
-
-      if (role === "headline") {
-        // Short and punchy — first 4–5 words only, never the full sentence
-        const headlineWords = wordList.slice(0, Math.min(5, Math.ceil(wordList.length * 0.38)));
-        fallbackText = headlineWords.join(" ");
-      } else if (role === "label") {
-        fallbackText = labelTag;
-      } else if (role === "stat") {
-        fallbackText = statText;
-      } else {
-        // subtext / quote / other — full sentence for first zone, second half for subsequent
-        fallbackText = idx === 0 ? spoken : secondHalf;
-      }
-
-      // Clip at word boundary if over maxChars — no ellipsis, never cut mid-word
-      if (zoneDef.maxChars && fallbackText.length > zoneDef.maxChars) {
-        const words = fallbackText.split(/\s+/);
-        let clipped = "";
-        for (const w of words) {
-          const next = clipped ? `${clipped} ${w}` : w;
-          if (next.length > zoneDef.maxChars) break;
-          clipped = next;
-        }
-        fallbackText = clipped || words[0];
-      }
-
-      beat.zones[zoneDef.id] = {
-        ...zone,
-        content: { kind: "text", text: fallbackText },
-      };
-    });
-  });
 
   // Image processing:
   // - Entity image search ALWAYS runs (free, deterministic, no AI cost)
@@ -634,10 +696,16 @@ export async function generateStructuredShort({
     const hint     = parsedScript.beats[beatIndex]?.asset_hint || null;
     const isEntity = hint?.visual_type === "entity" && !!hint.search_query;
 
-    // Skip if no entity to search AND image gen is off
-    if (!isEntity && !generateImages) return;
-
+    // Check if any asset zone in the layout has a visual_type override that forces entity search
     const def = getLayoutDef(beat.layout);
+    const hasZoneEntityOverride = (def?.zones || []).some(
+      z => z.type === "asset" && z.visual_type === "entity"
+    );
+
+    // Skip if no entity to search AND image gen is off
+    // (still run if any zone has entity override — entity search doesn't need generateImages)
+    if (!isEntity && !hasZoneEntityOverride && !generateImages) return;
+
     let defAssetZones = (def?.zones || [])
       .filter(z => z.type === "asset")
       .filter(z => beat.zones[z.id]?.content?.kind !== "block")
@@ -663,8 +731,8 @@ export async function generateStructuredShort({
     const motion    = "none";
 
     try {
-      // Tier 1 — entity beats: search for the official image (always runs)
-      let sharedEntityImgUrl = null;
+      // Tier 1 — entity beats: search for the official image (always runs, used for zone 0 only)
+      let entityImgUrl = null;
       if (isEntity) {
         console.log(`[img] Beat ${beatIndex}: entity search — "${hint.search_query}"`);
         try {
@@ -682,15 +750,15 @@ export async function generateStructuredShort({
                 const ext      = blob.type.includes("png") ? "png" : "jpg";
                 const file     = new File([blob], `entity-${Date.now()}.${ext}`, { type: blob.type });
                 const uploaded = await uploadUserAsset(file, "image", null, "project", projectId);
-                sharedEntityImgUrl = uploaded.url;
-                console.log(`[img] Beat ${beatIndex}: entity → Supabase — ${sharedEntityImgUrl}`);
+                entityImgUrl = uploaded.url;
+                console.log(`[img] Beat ${beatIndex}: entity → Supabase — ${entityImgUrl}`);
                 useAssetsStore.getState().addMyAsset({
                   id: uploaded.id, url: uploaded.url, file_path: uploaded.file_path,
                   type: "image", name: uploaded.name || file.name, size: uploaded.size || file.size,
                   scope: "project", project_id: projectId || null, source: "user",
                 });
               } catch {
-                sharedEntityImgUrl = tempUrl; // fallback: use temp URL directly
+                entityImgUrl = tempUrl; // fallback: use temp URL directly
               }
             }
           }
@@ -699,16 +767,36 @@ export async function generateStructuredShort({
         }
       }
 
-      // Tier 2 — per-zone image placement
-      await Promise.allSettled(defAssetZones.map(async (assetZone, zoneIdx) => {
-        let imgUrl = sharedEntityImgUrl; // entity beats share the found image
+      // Tier 2 — per-zone image placement.
+      // Fix 2: Each zone in a beat MUST get a different image.
+      // - Entity beats: zone 0 gets the entity image; zones 1+ get AI-generated variations.
+      // - Abstract beats: each zone uses its own _assetPrompt; zone 1+ get a variation suffix.
+      // - Track assigned URLs per beat — never reuse the same URL in two zones.
+      const usedUrlsInBeat = new Set();
 
-        // Abstract AI generation — only when generateImages=true and no entity image found
-        if (!imgUrl && generateImages) {
+      await Promise.allSettled(defAssetZones.map(async (assetZone, zoneIdx) => {
+        // Zone-level visual_type from layout def overrides beat-level hint.
+        // "entity"  → use real photo search (requires search_query from beat hint)
+        // "abstract" or unset → AI generation (default)
+        const zoneVisualType = assetZone.visual_type || "abstract";
+        const zoneIsEntity   = zoneVisualType === "entity" && !!hint?.search_query;
+
+        // Entity image only goes to the first entity zone — subsequent zones get distinct visuals
+        let imgUrl = (zoneIsEntity && zoneIdx === 0) ? entityImgUrl : null;
+
+        // AI generation — for abstract/scene zones OR entity beats with 2+ zones
+        const needsAI = !zoneIsEntity || (zoneIsEntity && zoneIdx > 0);
+        if (!imgUrl && needsAI && generateImages) {
           const zonePrompt = injectedBgZoneId
             ? null
             : beat.zones[assetZone.id]?._assetPrompt || null;
-          const genPrompt = zonePrompt || hint?.prompt || null;
+          const basePrompt = zonePrompt || hint?.prompt || null;
+
+          // Add a variation directive for zone 1+ so AI produces a distinct image
+          const variationSuffix = zoneIdx > 0
+            ? `, different scene, different angle, variation ${zoneIdx + 1}`
+            : "";
+          const genPrompt = basePrompt ? basePrompt + variationSuffix : null;
 
           if (genPrompt) {
             console.log(`[img] Beat ${beatIndex} zone ${zoneIdx}: AI gen — "${genPrompt.slice(0, 60)}..."`);
@@ -733,6 +821,13 @@ export async function generateStructuredShort({
             imgUrl = img?.url || null;
           }
         }
+
+        // Dedup: if this exact URL was already assigned to another zone in this beat, skip it
+        if (imgUrl && usedUrlsInBeat.has(imgUrl)) {
+          console.warn(`[img] Beat ${beatIndex} zone ${zoneIdx}: duplicate URL skipped — ${imgUrl.slice(-40)}`);
+          imgUrl = null;
+        }
+        if (imgUrl) usedUrlsInBeat.add(imgUrl);
 
         if (!imgUrl) return;
 

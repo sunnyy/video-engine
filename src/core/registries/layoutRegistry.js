@@ -72,6 +72,7 @@ function normalize(row) {
     is_active:       row.is_active ?? true,
     showCaption:        row.show_caption ?? true,
     defaultTransition:  row.default_transition ?? null,
+    defaultBackground:  row.default_background ?? null,
     assetCount:      row.asset_count  ?? zones.filter(z => z.type === "asset").length,
     textCount:       row.text_count   ?? zones.filter(z => z.type === "text").length,
     // Old code reads layoutRegistry[id].zones as an array of zone-ID strings

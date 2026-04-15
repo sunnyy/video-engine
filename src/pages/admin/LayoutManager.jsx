@@ -64,7 +64,7 @@ function PreviewComp({ zones, bg, primary, accent, textColor }) {
 }
 
 /* ── Lazy wireframe / Remotion thumbnail ─────────────────────── */
-function CardThumb({ zones, palette, width }) {
+function CardThumb({ zones, palette, width, thumbnailUrl }) {
   const ref = useRef(null);
   const [vis, setVis] = useState(false);
   const h = Math.round(width * 1920 / 1080);
@@ -77,6 +77,23 @@ function CardThumb({ zones, palette, width }) {
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
+
+  // AI-generated layouts have a saved thumbnail image — use it directly (no Remotion needed)
+  if (thumbnailUrl) {
+    return (
+      <div ref={ref} style={{ width, height:h, borderRadius:"6px 6px 0 0", overflow:"hidden", background:"#0b0b10" }}>
+        {vis ? (
+          <img
+            src={thumbnailUrl}
+            alt="layout preview"
+            style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
+          />
+        ) : (
+          <div style={{ width:"100%", height:"100%", background:"#0b0b10" }} />
+        )}
+      </div>
+    );
+  }
 
   const wireframe = (
     <div style={{ position:"relative", width, height:h, background:"#0b0b10" }}>
@@ -133,7 +150,7 @@ function LayoutCard({ layout, palette, onEdit, onDuplicate, onDelete }) {
     >
       {/* Thumbnail area */}
       <div style={{ position:"relative" }}>
-        <CardThumb zones={zones} palette={palette} width={220} />
+        <CardThumb zones={zones} palette={palette} width={220} thumbnailUrl={layout.thumbnail_url ?? null} />
 
         {/* Intent + visibility badges */}
         <div style={{ position:"absolute", top:6, left:6, display:"flex", gap:4, flexWrap:"wrap" }}>
@@ -271,12 +288,20 @@ export default function LayoutManager() {
             {loading ? "Loading…" : `${layouts.length} layouts · ${filtered.length} shown`}
           </p>
         </div>
-        <button
-          onClick={() => navigate("/admin/layouts/new")}
-          style={{ padding:"8px 18px", background:"#7c5cfc", color:"#fff", border:"none",
-            borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>
-          + New Layout
-        </button>
+        <div style={{ display:"flex", gap:10 }}>
+          <button
+            onClick={() => navigate("/admin/ai-generator")}
+            style={{ padding:"8px 18px", background:"#1c1c28", color:"#a78bfa", border:"1px solid rgba(124,92,252,0.3)",
+              borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+            ✦ Generate Layouts
+          </button>
+          <button
+            onClick={() => navigate("/admin/layouts/new")}
+            style={{ padding:"8px 18px", background:"#7c5cfc", color:"#fff", border:"none",
+              borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+            + New Layout
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

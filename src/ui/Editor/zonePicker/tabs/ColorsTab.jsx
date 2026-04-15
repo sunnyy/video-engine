@@ -45,7 +45,7 @@ export default function ColorsTab({ onSelect, onClose }) {
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {keys.map(key => {
             const entry = backgroundPatternRegistry[key];
             if (!entry) return null;

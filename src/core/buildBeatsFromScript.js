@@ -10,7 +10,7 @@ import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
 import { applyBeatVariation }     from "./beatVariationEngine";
 import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
 import { planBeatVisual }         from "./visualPlanner";
-import { getLayoutDef, layoutRegistry } from "./registries/layoutRegistry";
+import { getLayoutDef, layoutRegistry, initLayoutRegistry } from "./registries/layoutRegistry";
 import { resolveColors }          from "./colorContrastResolver";
 import { resolvePresetColor, resolvePresetBackground } from "./resolveColor.js";
 import { resolveBeatColors }      from "./elements/colorContrastResolver";
@@ -28,6 +28,14 @@ import { validateAIOutputs }  from "./ai/aiOutputValidator";
 /* ── Helpers ── */
 function words(text) {
   return text.trim().split(/\s+/).filter(Boolean);
+}
+
+function isLightColor(hex) {
+  if (!hex || !hex.startsWith('#')) return false;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
 }
 
 function splitIntoDurationBeats(text) {
@@ -246,35 +254,39 @@ function fillTextZones(beats, colorOptions = {}) {
     const zones = { ...beat.zones };
     const hasAssetZones = def.zones.some(z => z.type === "asset");
 
+    // Hoist bgIsLight — constant per beat, needed by both the main forEach and the _userPreset pass.
+    const nicheBg   = colorOptions.colorStory?.bg || colorOptions.dna?.colorStory?.bg || "#0b0b10";
+    const bgIsLight = isLightColor(nicheBg);
+
     textZones.forEach((zoneDef, order) => {
       const existing = zones[zoneDef.id];
 
-      // User manually applied a preset — skip automation styling entirely so it isn't overridden on regeneration
+      // User manually applied a preset — skip automation styling entirely so it isn't overridden on regeneration.
+      // NOTE: textShadow correction for _userPreset zones is handled in the separate pass below.
       if (existing?.style?._userPreset) return;
 
-      // Pick a preset for this zone and extract only typography flair
-      const presetId    = pickPresetForZone(zoneDef, order, beat.intent, beat.energy ?? 0.5, colorOptions.niche || null);
-      const preset      = textStylePresets.find(p => p.id === presetId);
-      const presetFlair = preset ? (() => {
-        // Strip fontSize/opacity — keep fontFamily, fontWeight, textAlign, color, etc.
-        const { fontSize, opacity, ...flair } = preset.style;
-        return flair;
-      })() : {};
+      // Pick a preset for this zone
+      const presetId = pickPresetForZone(zoneDef, order, beat.intent, beat.energy ?? 0.5, colorOptions.niche || null);
+      const preset   = textStylePresets.find(p => p.id === presetId);
 
-      // Build inject: preset flair is the base, then contextual overrides on top.
+      // Fix 6: Presets are TYPOGRAPHY HINTS only in automation.
+      // Only carry fontFamily/fontWeight/fontStyle/lineHeight/textAlign from the preset.
+      // Visual properties (color, shadow, transforms, spacing, borders, background)
+      // come from DNA/colorStory and layout zone defaults — NOT from presets.
+      // Fix 1: textShadow stripped here — background-aware logic sets it below.
+      // Fix 3: textTransform stripped here — layout zone definition controls casing.
+      // Fix 4: color/background/border/padding stripped — never from preset directly.
+      const PRESET_TYPOGRAPHY_KEYS = new Set([
+        'fontFamily', 'fontWeight', 'fontStyle', 'lineHeight', 'textAlign',
+      ]);
+      const presetFlair = preset
+        ? Object.fromEntries(Object.entries(preset.style).filter(([k]) => PRESET_TYPOGRAPHY_KEYS.has(k)))
+        : {};
+
+      // Build inject: typography flair as base, DNA color + shadow layered on top.
       const inject = { ...presetFlair };
 
-      // Determine if niche bg is light — drives contrast decisions everywhere
-      const nicheBg     = colorOptions.colorStory?.bg || colorOptions.dna?.colorStory?.bg || "#0b0b10";
-      const bgIsLight   = (() => {
-        try {
-          const h = nicheBg.replace("#","");
-          const full = h.length===3 ? h.split("").map(c=>c+c).join("") : h;
-          const r=parseInt(full.slice(0,2),16)/255, g=parseInt(full.slice(2,4),16)/255, b=parseInt(full.slice(4,6),16)/255;
-          const toL = c => c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4);
-          return (0.2126*toL(r)+0.7152*toL(g)+0.0722*toL(b)) >= 0.18;
-        } catch { return false; }
-      })();
+      // bgIsLight is hoisted above the forEach — computed once per beat from colorOptions.
       const paletteText = colorOptions.colorStory?.text || colorOptions.dna?.colorStory?.text || "#ffffff";
       const primary     = colorOptions.colorStory?.primary || colorOptions.dna?.colorStory?.primary || "#7c5cfc";
 
@@ -321,12 +333,56 @@ function fillTextZones(beats, colorOptions = {}) {
 
       const existingContent = existing?.content || { kind: "text", text: "" };
 
+      // Separate visual style from pipeline metadata so metadata doesn't get wiped
+      // by zoneDef.style spreading over it.
+      const { _presetId, textEffect, ...injectVisualStyle } = inject;
+
+      // Merge order (lowest → highest priority):
+      //   injectVisualStyle  — preset flair + DNA colors as the baseline
+      //   zoneDef.style      — layout definition WINS over preset (font, size, color set by designer)
+      //   existing?.style    — user edits in the editor win over both
+      const mergedVisual = {
+        ...injectVisualStyle,
+        ...zoneDef.style,
+        ...(existing?.style || {}),
+      };
+
+      // Final textShadow pass — strip on light backgrounds regardless of what any layer set.
+      // Check 1: niche/colorStory bg is light → strip textShadow on ALL text zones.
+      // Check 2: zone's own background is a light solid color → strip on that zone specifically.
+      const zoneBg = mergedVisual.background;
+      const zoneBgIsLight = typeof zoneBg === "string" && isLightColor(zoneBg);
+      if (bgIsLight || zoneBgIsLight) {
+        mergedVisual.textShadow = "none";
+      }
+
       zones[zoneDef.id] = {
         ...existing,
         content: existingContent,
-        // Layout def wins on size/weight/alignment; preset flair + DNA color inject layered on top
-        style: { ...zoneDef.style, ...(existing?.style || {}), ...inject },
+        style: {
+          ...mergedVisual,
+          // Metadata always from pipeline — not subject to layout/user override
+          _presetId,
+          // Only apply pipeline textEffect if user hasn't set their own
+          ...(existing?.style?.textEffect ? {} : { textEffect }),
+        },
       };
+    });
+
+    // Fix 2: textShadow removal applies to ALL zones regardless of _userPreset.
+    // _userPreset preserves the user's typography choice, but background-aware contrast
+    // corrections must still run — presets are assigned by automation, not deliberately chosen
+    // by the user with the intent to keep a text shadow on a light background.
+    textZones.forEach(zoneDef => {
+      const existing = zones[zoneDef.id];
+      if (!existing?.style?._userPreset) return; // already corrected in the main pass above
+      const zoneBgIsLight = typeof existing.style.background === "string" && isLightColor(existing.style.background);
+      if (bgIsLight || zoneBgIsLight) {
+        zones[zoneDef.id] = {
+          ...existing,
+          style: { ...existing.style, textShadow: "none" },
+        };
+      }
     });
 
     return { ...beat, zones };
@@ -351,6 +407,9 @@ export async function buildBeatsFromScript({
   tone:             _tone             = "bold",
   dna              = null,
 }) {
+
+  /* ── Ensure layout registry is loaded before picking layouts ── */
+  await initLayoutRegistry();
 
   /* ── Source beats ── */
   const isRich = Array.isArray(structuredBeats) &&
@@ -412,8 +471,8 @@ export async function buildBeatsFromScript({
     }
 
     /* Visual plan */
-    const role            = assignBeatRole(index, total);
-    const hasImageHint    = !!(item.asset_hint?.search_query || item.asset_hint?.prompt);
+    const role             = assignBeatRole(index, total);
+    const hasImageHint     = !!(item.asset_hint?.search_query || item.asset_hint?.prompt);
     // Talking head + showAvatar: layout MUST have an asset zone so the avatar can be placed
     const requireAssetZone = mode === "talking_head" && item.showAvatar !== false;
     const visual = planBeatVisual({
@@ -421,6 +480,7 @@ export async function buildBeatsFromScript({
       usedLayoutIds, lastMotion,
       brandColor, beatIndex: index,
       hasImageHint, requireAssetZone, role,
+      spokenWordCount: spoken.split(/\s+/).filter(Boolean).length,
       colorStory:  dna?.colorStory  || null,
       motionStyle: dna?.motionStyle || null,
       niche:       dna?.niche       || null,
