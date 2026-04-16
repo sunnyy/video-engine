@@ -689,9 +689,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             opacity:         1,
             background:      st.background    || "transparent",
             ...brStyle(),
-            whiteSpace:      "normal",
+            whiteSpace:      st.whiteSpace    || "normal",
             overflowWrap:    "break-word",
-            wordBreak:       "break-word",
+            wordBreak:       st.whiteSpace === "nowrap" ? "normal" : "break-word",
             WebkitTextStroke: st.textStrokeWidth > 0
               ? `${st.textStrokeWidth}px ${st.textStrokeColor || "#000000"}`
               : undefined,
@@ -1014,9 +1014,14 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
   const contentZones = allZones.filter(z => z.type !== "element");
   const elementZones = allZones.filter(z => z.type === "element");
 
-  // Background: layoutBackground is always set by pipeline (pattern or image).
-  // If no layoutBackground, blur the first non-avatar asset zone as an ambient background.
-  const hasExplicitBg = !!beat?.layoutBackground;
+  // Background priority:
+  //   1. beat.layoutBackground (set by the AI pipeline or user in editor)
+  //   2. layoutDef.generation_meta.default_background (set during layout generation)
+  //   3. Blur the first asset zone as an ambient background fallback
+  const effectiveBackground = beat?.layoutBackground
+    ?? layoutDef?.generation_meta?.default_background
+    ?? null;
+  const hasExplicitBg = !!effectiveBackground;
   const talkMode      = project?.meta?.mode === "talking_head";
   const avatarHasSrc  = !!project?.avatar?.src;
   // Resolve which zone id is the active avatar zone.
@@ -1038,7 +1043,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
     <div style={{ position:"absolute", inset:0, width:"100%", height:"100%", overflow:"hidden" }}>
       {blurSrc
         ? <BlurredAssetBackground src={blurSrc} />
-        : <LayoutBackgroundRenderer background={beat?.layoutBackground} beat={beat} />
+        : <LayoutBackgroundRenderer background={effectiveBackground} beat={beat} />
       }
       {/* Zone content — inset by layoutPadding */}
       <div style={{ position:"absolute", inset: pad, overflow:"hidden" }}>

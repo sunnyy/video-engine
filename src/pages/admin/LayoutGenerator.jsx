@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../../services/serverApi";
 import { nichePaletteRegistry } from "../../core/registries/nichePaletteRegistry";
 import { backgroundPatternRegistry } from "../../core/registries/backgroundPatternRegistry";
+import { refreshCache } from "../../core/registries/layoutRegistry";
 import AdminLayout from "./AdminLayout";
 
 const INTENTS  = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
@@ -372,8 +373,13 @@ export default function LayoutGenerator() {
       });
       if (!r.ok) throw new Error((await r.json()).error || r.status);
       const data = await r.json();
-      const { zones, background_category, background_colors, background_gradient_direction, background_needs_image, background_image_prompt, color_family } = data;
-      setConversions(prev => ({ ...prev, [p.id]:{ zones, background_category, background_colors, background_gradient_direction, background_needs_image, background_image_prompt, color_family, loading:false } }));
+      const { zones, background_category, background_colors, background_gradient_direction,
+               background_needs_image, background_image_prompt, color_family, default_background } = data;
+      setConversions(prev => ({ ...prev, [p.id]:{
+        zones, background_category, background_colors, background_gradient_direction,
+        background_needs_image, background_image_prompt, color_family,
+        default_background, loading:false,
+      } }));
       // Pre-populate metadata
       setMetas(prev => ({
         ...prev,
@@ -409,19 +415,17 @@ export default function LayoutGenerator() {
 
     let zones = [...conv.zones];
 
-    // solid/pattern backgrounds: swap in a matching backgroundPatternRegistry CSS
+    // solid/pattern: optionally swap in a matching backgroundPatternRegistry entry for variety
+    let updatedDefaultBg = conv.default_background ? { ...conv.default_background } : null;
     if (conv.background_category === "solid" || conv.background_category === "pattern") {
-      const targetCategory = conv.color_family;
       const entries = Object.values(backgroundPatternRegistry);
-      const nicheMatch = entries.filter(e => e.category === targetCategory && e.niche?.includes(config.niche));
-      const anyMatch   = entries.filter(e => e.category === targetCategory);
+      const nicheMatch = entries.filter(e => e.category === conv.color_family && e.niche?.includes(config.niche));
+      const anyMatch   = entries.filter(e => e.category === conv.color_family);
       const pool = nicheMatch.length > 0 ? nicheMatch : anyMatch;
       if (pool.length > 0) {
         const picked = pool[Math.floor(Math.random() * pool.length)];
-        zones = zones.map(z => {
-          const isBg = z.x === 0 && z.y === 0 && (z.width ?? 0) >= 95 && (z.height ?? 0) >= 95 && z.type !== "asset";
-          return isBg ? { ...z, style: { ...z.style, background: picked.style.background } } : z;
-        });
+        // Use pattern key for LayoutBackgroundRenderer (type:"pattern")
+        updatedDefaultBg = { type: "pattern", value: Object.keys(backgroundPatternRegistry).find(k => backgroundPatternRegistry[k] === picked) ?? updatedDefaultBg?.value };
       }
     }
 
@@ -429,11 +433,12 @@ export default function LayoutGenerator() {
     const assetZones = zones.filter(z =>
       z.role === "primary_asset" || z.role === "secondary_asset"
     );
-    const hasBgAsset = zones.some(z => z.role === "background_asset");
     const needsBgImage = conv.background_category === "abstract" && conv.background_needs_image;
 
     if (assetZones.length === 0 && !needsBgImage) {
-      setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones } }));
+      if (updatedDefaultBg) {
+        setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones, default_background: updatedDefaultBg } }));
+      }
       setAssets(prev => ({ ...prev, [p.id]: { results:[], loading:false, done:true } }));
       return;
     }
@@ -446,7 +451,6 @@ export default function LayoutGenerator() {
           zones: assetZones,
           niche: config.niche,
           intent: config.intent,
-          imagePrompt: p.prompt,
           background_needs_image: conv.background_needs_image,
           background_image_prompt: conv.background_image_prompt,
           color_family: conv.color_family,
@@ -459,10 +463,9 @@ export default function LayoutGenerator() {
       const urlMap = {};
       results.forEach(res => { urlMap[res.zoneId] = res.imageUrl; });
 
-      // Merge background image into background_asset zone if present
-      if (backgroundImageUrl && hasBgAsset) {
-        const bgZone = zones.find(z => z.role === "background_asset");
-        if (bgZone) urlMap[bgZone.id] = backgroundImageUrl;
+      // For abstract backgrounds: store image URL in default_background (not as a zone)
+      if (backgroundImageUrl && conv.background_category === "abstract") {
+        updatedDefaultBg = { type: "image", value: backgroundImageUrl };
       }
 
       const mergedZones = zones.map(z =>
@@ -471,7 +474,7 @@ export default function LayoutGenerator() {
           : z
       );
 
-      setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones: mergedZones } }));
+      setConversions(prev => ({ ...prev, [p.id]: { ...prev[p.id], zones: mergedZones, default_background: updatedDefaultBg } }));
       setAssets(prev => ({ ...prev, [p.id]: { results, backgroundImageUrl, loading:false, done:true } }));
     } catch (e) {
       setAssets(prev => ({ ...prev, [p.id]: { results:[], loading:false, error:e.message, done:false } }));
@@ -518,6 +521,7 @@ export default function LayoutGenerator() {
               background_gradient_direction: conversions[p.id]?.background_gradient_direction,
               background_image_prompt:    conversions[p.id]?.background_image_prompt,
               color_family:               conversions[p.id]?.color_family,
+              default_background:         conversions[p.id]?.default_background,
               generated_at:               new Date().toISOString(),
             },
           }),
@@ -530,7 +534,12 @@ export default function LayoutGenerator() {
       }
     }
     setSaving(false);
-    if (readyToSave.length > 0) setStep(7);
+    if (readyToSave.length > 0) {
+      // Refresh the layout registry so newly saved layouts are available immediately
+      // in the video creation pipeline (registry otherwise caches for 60 min).
+      refreshCache().catch(() => {});
+      setStep(7);
+    }
   }, [readyToSave, metas, conversions, images, config]);
 
   /* ── Reset ────────────────────────────────────────────────── */

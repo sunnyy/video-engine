@@ -72,7 +72,7 @@ function buildFakeBeat(layoutDef, dna) {
     transition:   { type:"cut", duration:0 },
     overlays:     [],
     spoken:       "",
-    layoutBackground: layoutDef?.default_background ?? null,
+    layoutBackground: layoutDef?.generation_meta?.default_background ?? layoutDef?.default_background ?? null,
     dna,
   };
 }

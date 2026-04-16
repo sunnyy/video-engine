@@ -1668,96 +1668,145 @@ app.post('/api/admin/convert-layout-image', requireAuth, requireAdmin, async (re
     if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
 
     const decorativeShapeKeys = ['circle','square','triangle','hexagon','star','diamond','cross','pill','arc','ring','dot','line','chevron','arrow','wave','spiral','grid','mesh','bars','blob'];
-    const iconKeys = ['arrow','arrowCircle','star','starOutline','check','checkCircle','close','heart','fire','lightning','crown','diamond','shield','trophy','rocket','flag','bell','eye','play','pause'];
+    const iconKeys = ['arrow','arrowCircle','star','starOutline','check','checkCircle','close','heart','fire','lightning','crown','diamond','shield','trophy','rocket','flag','bell','eye','play','pause','plus','bolt','thumbsup','smile','medal','chart','briefcase','globe','leaf','sun','moon','lock','key','percent','dollar','target'];
 
-    const visionPrompt = `You are a precision layout extraction engine. Analyze this marketing layout image and extract every visible element into structured zone JSON that maps to a design system.
+    const visionPrompt = `You are a precision layout extraction engine for short-form video design. Your job is to analyze a marketing image and output accurate zone coordinates + metadata.
 
-CANVAS: 1080x1920px vertical (9:16). All coordinates as percentages (0-100).
+CANVAS: 1080 wide × 1920 tall (9:16 vertical). All output coordinates are PERCENTAGES of canvas dimensions (0–100).
 
-───────────────────────────────────────
-STEP 1 — BACKGROUND CLASSIFICATION
-───────────────────────────────────────
-Classify background as ONE of:
-- "solid" — solid color or simple gradient (no texture, no shapes, no photo)
-- "pattern" — repeating geometric texture, grid, dots, lines, noise, subtle pattern
-- "abstract" — photographic scene, illustrated scene, complex graphic, gradient mesh with multiple color stops
+══════════════════════════════════════
+PHASE 1 — LAYOUT ANALYSIS (think first)
+══════════════════════════════════════
+Before writing any JSON, mentally do this:
 
-Output:
-{
-  "background_category": "solid" | "pattern" | "abstract",
-  "background_colors": ["#hex1", "#hex2"],
-  "background_gradient_direction": "to bottom" | "to right" | "135deg" | null,
-  "color_family": "blue"|"green"|"red"|"yellow"|"purple"|"orange"|"teal"|"pink"|"dark"|"light"|"neutral",
-  "background_needs_image": true (only if abstract, else false),
-  "background_image_prompt": "detailed Fal.ai generation prompt describing the background only, no text, no people" (only if abstract, else null)
-}
+A) Divide the image into horizontal bands:
+   - Band T (top 0-20%): headers, labels, badges
+   - Band U (upper 20-45%): titles, hero elements
+   - Band M (mid 45-65%): main image/character
+   - Band L (lower 65-80%): supporting text, stats
+   - Band B (bottom 80-100%): CTA, footer
 
-───────────────────────────────────────
-STEP 2 — ZONE EXTRACTION
-───────────────────────────────────────
-Extract EVERY visible element. Sequential IDs: z1, z2, z3...
+B) List every visible element and which band it's in.
 
-ZONE SCHEMA:
+C) For each element, estimate its LEFT EDGE, TOP EDGE, WIDTH, HEIGHT as % of canvas.
+   Use this formula to self-check:
+   - Element covers pixels X1 to X2 horizontally on a 1080px canvas → x = X1/1080*100, width = (X2-X1)/1080*100
+   - Element covers pixels Y1 to Y2 vertically on a 1920px canvas → y = Y1/1920*100, height = (Y2-Y1)/1920*100
+   - CENTERED element of width W%: x = (100-W)/2
+   - VERIFY: x+width ≤ 100, y+height ≤ 100
+
+══════════════════════════════════════
+PHASE 2 — BACKGROUND
+══════════════════════════════════════
+Classify the canvas background (ignoring all text, icons, and assets):
+- "solid" — flat color or simple 2-stop gradient, no repeating textures
+- "pattern" — repeating geometric shapes, grid, dots, lines, subtle texture
+- "abstract" — photo, illustration, complex scene, organic gradient mesh
+
+Output fields:
+  background_category: "solid"|"pattern"|"abstract"
+  background_colors: [primary_hex, secondary_hex_or_same]   — dominant background colors
+  background_gradient_direction: "to bottom"|"to right"|"135deg"|null
+  color_family: "blue"|"green"|"red"|"yellow"|"purple"|"orange"|"teal"|"pink"|"dark"|"light"|"neutral"
+  background_needs_image: true ONLY if abstract
+  background_image_prompt: detailed Fal.ai prompt for background generation (abstract only, else null)
+
+══════════════════════════════════════
+PHASE 3 — ZONE EXTRACTION
+══════════════════════════════════════
+Extract EVERY visible element as a zone. Use sequential IDs: z1, z2…
+
+ZONE SCHEMA (all fields required):
 {
   "id": "z1",
-  "type": "text" | "asset" | "decorative" | "icon",
-  "role": see roles below,
-  "x": 0-100,
-  "y": 0-100,
-  "width": 0-100,
-  "height": 0-100,
-  "content": visible text string (text zones only) | null,
-  "style": {
-    "fontSize": pixel size on a 1920px tall canvas (headline: 80-160, subtext: 30-55, label: 22-32, cta: 28-44, stat: 60-110),
-    "fontWeight": "400"|"600"|"700"|"800"|"900",
-    "fontFamily": "Bebas Neue"|"Outfit"|"Barlow Condensed"|"Playfair Display"|"Dancing Script"|"JetBrains Mono"|"Unbounded"|"Anton"|"Oswald"|"Montserrat"|"Inter"|"Poppins"|"Raleway"|"Lato"|"Roboto"|"Nunito"|"Syne",
-    "color": "#hex",
-    "textAlign": "left"|"center"|"right",
-    "backgroundColor": "#hex or null",
-    "borderRadius": number or null,
-    "padding": number or null,
-    "rotation": degrees or 0,
-    "opacity": 0.0-1.0,
-    "shapeKey": one of [${decorativeShapeKeys.join(',')}] (decorative zones only),
-    "iconKey": one of [${iconKeys.join(',')}] (icon zones only),
-    "fillColor": "#hex" (decorative/icon zones — the shape fill color)
-  },
+  "type": "text"|"asset"|"decorative"|"icon",
+  "role": [see roles],
+  "x": [left edge %],
+  "y": [top edge %],
+  "width": [%],
+  "height": [%],
+  "content": "exact text" (text zones) | null (all others),
+  "assetDescription": "subject description for AI image gen" (asset zones ONLY — omit for all other types),
+  "style": { ... see style rules ... },
   "animation": "fadeIn"|"slideUpIn"|"popIn"|"scaleIn"|"none",
-  "animationDelay": 0.1-1.0
+  "animationDelay": 0.1–0.9
 }
 
 ROLES:
-- text: headline | subtext | label | tagline | stat | metric | quote | cta
-- asset: primary_asset | secondary_asset | background_asset
-- decorative: decorative
-- icon: icon
+  text:       headline | subtext | label | tagline | stat | metric | quote | cta
+  asset:      primary_asset | secondary_asset
+  decorative: decorative
+  icon:       icon
+
+STYLE RULES by type:
+  TEXT zones:
+    fontSize:   pixels on 1920px canvas — be bold: headline 130–220, subtext 50–80, label 30–50, cta 48–70, stat 100–170
+    fontWeight: "400"|"600"|"700"|"800"|"900"
+    fontFamily: "Bebas Neue"|"Anton"|"Unbounded"|"Oswald"|"Montserrat"|"Outfit"|"Barlow Condensed"|"Poppins"|"Inter"|"Raleway"|"Lato"|"Playfair Display"|"Dancing Script"|"Syne"|"JetBrains Mono"|"Nunito"|"Roboto"
+    color:      "#hex"
+    textAlign:  "center" if element appears centered on canvas, "left" if left-aligned, "right" if right-aligned
+    backgroundColor: "#hex" (only if text has a visible pill/badge background, else null)
+    borderRadius: number (only if rounded pill/badge background, else null)
+    rotation:   number in degrees — ONLY if text is visually rotated (e.g. -90 for vertical text running upward along left edge, 90 for downward). Omit if not rotated.
+
+  DECORATIVE zones:
+    shapeKey:  one of [${decorativeShapeKeys.join(',')}]
+    fillColor: "#hex"
+    opacity:   0.0–1.0
+
+  ICON zones:
+    iconKey:   one of [${iconKeys.join(',')}]
+    fillColor: "#hex"
+    iconSize:  70–100 (fill percentage of zone)
+    Minimum zone size: width ≥ 8, height ≥ 8
+
+  ASSET zones:
+    assetDescription: "one-sentence visual description of the subject for AI image generation — e.g. 'fit woman jogging in athletic wear, energetic pose' or 'sleek laptop with stock charts on screen'. Describe the SUBJECT ONLY, not the background or layout."
+    content: null (always)
+    No other style fields needed
 
 EXTRACTION RULES:
-1. Category label pill (e.g. "EDUCATION", "BUSINESS") — type:text, role:label
-2. Main headline — type:text, role:headline. IMPORTANT: if the headline is split into multiple visually distinct parts (different font size, different color, highlight, gradient, or outline vs filled), create a SEPARATE zone for EACH part. Example: "LAUNCH" (white, 120px) on one line and "YOUR LEGACY" (yellow, 160px, bold) on the next → two separate headline zones with their individual x/y/width/height/fontSize/color. Do NOT merge them into one zone.
-3. Supporting body text — type:text, role:subtext
-4. Bottom CTA text or button text — type:text, role:cta
-5. Price, percentage, stat badge (e.g. "60% OFF", "100K+") — type:text, role:stat
-6. Main product/person image area — type:asset, role:primary_asset, content:null, coordinates = bounding box of the image/subject area
-7. Small overlapping image or secondary visual — type:asset, role:secondary_asset, content:null
-8. Decorative shape (circle, hexagon, dot, ring, ribbon, diagonal band, sparkle, star shape) — type:decorative, role:decorative, pick closest shapeKey from the list
-9. Small icon (arrow, check, play button) — type:icon, role:icon, pick closest iconKey from the list
-10. Divider line — type:decorative, role:decorative, shapeKey:line
-11. Text zones MUST have content. If the text is clearly readable use EXACT text. If the font is stylized/decorative and text is unclear, use a clean role-based placeholder: headline→"YOUR HEADLINE HERE", subtext→"Supporting detail goes here", label→"CATEGORY", stat→"30% OFF", cta→"GET STARTED"
-12. Asset zones MUST have content:null — do NOT put text in asset zones
-13. Do NOT create a zone for the background itself
-14. COORDINATES: measure carefully. A centered element on a 1080px canvas has x = (1080 - width_px) / 1080 * 50. Verify x+width ≤ 100 and y+height ≤ 100
-15. textAlign: if element appears horizontally centered on canvas → "center". Left-aligned → "left". Right-aligned → "right"
+1. CATEGORY LABEL (e.g. "HEALTH", "COMEDY", "EDUCATION") → text, role:label
+   Width must fit the FULL word on ONE line without wrapping. Min width = 12%.
+   E.g. "HEALTH" badge 5 letters at 36px → width ≈ 20%, height ≈ 6%.
+2. HEADLINE — if visually split across lines with different styles (color/size/font):
+   create ONE zone per line. Each gets its own x/y/width/height/fontSize/color.
+   Do NOT merge lines into one zone.
+   CRITICAL: headline lines must NOT overlap. If line 1 is at y=10, height=10, then line 2 must start at y ≥ 21.
+   Stack them: each zone's y = previous zone's y + previous zone's height + small gap.
+   Check: zone A y=10 h=10 → zone B y≥21. Zone B y=21 h=10 → zone C y≥32.
+3. SUPPORTING TEXT → text, role:subtext
+4. CTA / BUTTON TEXT → text, role:cta
+5. PRICE / STAT / BADGE numbers → text, role:stat (include badge background color if present)
+   Width must be wide enough to fit all text on ONE line. Stat zones: min width 18%.
+6. PRIMARY IMAGE (main person, character, product, emoji, mascot, illustration) →
+   asset, role:primary_asset, content:null
+   REQUIRED: assetDescription field — describe the visual subject as a Fal.ai generation prompt
+   Bounding box = tight crop around the subject, NOT the full canvas
+7. SECONDARY IMAGE → asset, role:secondary_asset, content:null
+   REQUIRED: assetDescription field — describe what this secondary subject visually is
+8. DECORATIVE SHAPES (circles, hexagons, ribbons, blobs, colored bands/bars, diagonal strips, dots) → decorative
+   Colored diagonal strips, bottom bars, side accent strips → decorative, shapeKey:rectangle or shapeKey:pill
+9. SIMPLE ICONS (star, sparkle, arrow, check, fire, crown, heart, etc.) → icon
+10. DIVIDER LINE → decorative, shapeKey:line
+11. If text is unreadable, blurry, too small, stylized, or produces garbled output — ALWAYS use placeholder.
+    When in doubt, use the placeholder. NEVER guess at text content.
+    headline→"YOUR HEADLINE" | subtext→"Supporting detail goes here" | label→niche category name | stat→"30% OFF" | cta→"GET STARTED"
+    For subtext/body text: if the text is smaller than ~30px or spans more than 1 line of small type,
+    use placeholder "Supporting detail goes here" rather than attempting to OCR-read it.
+12. Do NOT create a background zone — background is handled separately
+13. TEXT ZONE HEIGHT: use fontSize to estimate: height = (fontSize/1920)*100*1.5
+    Example: 160px font → height ≈ 12.5%. Do not make text zones taller than needed.
+14. ASSET ZONE: draw a generous bounding box — include the full figure/object plus a small margin.
+    Primary asset should typically be width 50–85%, height 30–50% of canvas.
+    Do NOT draw a tiny box; the asset fills its zone at objectFit:cover, so give it room to breathe.
 
-ANIMATION TIMING (top to bottom, by visual reading order):
-- First element (label): 0.1
-- Each subsequent zone: +0.1 to +0.15 from previous
-- Split headline parts: stagger each part +0.08 apart (e.g. 0.2, 0.28, 0.36)
-- CTA: always last, animationDelay 0.7-0.9
+ANIMATION TIMING (reading order, top→bottom):
+  First element: 0.1s | Each next: +0.1s | Split headline parts: +0.08s each | CTA: 0.7–0.9s
 
-───────────────────────────────────────
-OUTPUT — STRICT JSON ONLY, NO MARKDOWN
-───────────────────────────────────────
+══════════════════════════════════════
+OUTPUT FORMAT — VALID JSON ONLY, NO MARKDOWN, NO EXTRA TEXT
+══════════════════════════════════════
 {
   "background_category": "solid"|"pattern"|"abstract",
   "background_colors": ["#hex"],
@@ -1768,7 +1817,32 @@ OUTPUT — STRICT JSON ONLY, NO MARKDOWN
   "zones": []
 }
 
-Context: niche=${niche}, intent=${intent}, energy=${energy}`;
+Context: niche=${niche}, intent=${intent}, energy=${energy}
+
+${intent === 'visual_rest' ? `══════════════════════════════════════
+SPECIAL OVERRIDE — visual_rest INTENT
+══════════════════════════════════════
+This image is a full-bleed atmospheric photo. The entire image IS an asset zone.
+You MUST return EXACTLY 3 zones — no more, no fewer:
+  z1: type=asset, role=primary_asset, x=0, y=0, width=100, height=100
+      assetDescription: one-sentence description of the scene/subject in the image
+  z2: type=text, role=label, small category label text at top (y=3–7%)
+      content: the niche category name in uppercase (e.g. "${(niche||'TRAVEL').toUpperCase()}")
+      style: small fontSize (28–40), light fontWeight "300" or "400", white or soft color
+  z3: type=text, role=subtext, short atmospheric caption at bottom (y=82–88%)
+      content: 3–6 word poetic caption (e.g. "The world is waiting." or "Find your calm.")
+      style: italic-style, light fontWeight, white or soft color, textAlign:center
+Return ONLY these 3 zones. Do NOT add headline, CTA, decorative, or icon zones.` : ''}
+${intent === 'escalate' ? `══════════════════════════════════════
+SPECIAL OVERRIDE — escalate INTENT
+══════════════════════════════════════
+This layout uses stacked escalating text. Return a MAXIMUM of 4 zones total.
+  z1: type=text, role=label — urgency pill at top (e.g. "⚡ LIMITED TIME")
+  z2: type=text, role=headline — upper text line (larger, bold)
+  z3: type=text, role=headline — the big payoff line (the largest/boldest text on canvas)
+  z4 (optional): type=asset or decorative — only if a strong visual element exists
+If you see more than 3 text elements in the image, MERGE the smaller/weaker lines into z2.
+Do NOT create separate zones for every line of text. Max 4 zones total. No CTA zone.` : ''}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -1785,6 +1859,15 @@ Context: niche=${niche}, intent=${intent}, energy=${energy}`;
     let raw = response.choices[0].message.content.trim();
     raw = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(raw);
+
+    console.log('\n[convert-layout-image] ── RAW VISION OUTPUT ─────────────────────');
+    console.log('bg_category:', parsed.background_category, '| colors:', parsed.background_colors, '| color_family:', parsed.color_family);
+    console.log('zones count:', (parsed.zones || []).length);
+    (parsed.zones || []).forEach((z, i) => {
+      const s = z.style || {};
+      console.log(`  z${i+1} [${z.type}/${z.role}] x:${z.x} y:${z.y} w:${z.width} h:${z.height} | content:"${z.content || ''}" | fontSize:${s.fontSize} iconKey:${s.iconKey||z.iconKey||'-'} shapeKey:${s.shapeKey||'-'}${z.assetDescription ? ` | asset:"${z.assetDescription}"` : ''}`);
+    });
+    console.log('──────────────────────────────────────────────────────────────────\n');
 
     const bgCategory  = parsed.background_category || 'solid';
     const bgColors    = parsed.background_colors || ['#1a1a2e'];
@@ -1819,16 +1902,122 @@ Context: niche=${niche}, intent=${intent}, energy=${energy}`;
       if (raw.rotation && raw.rotation !== 0) style.transform = `rotate(${raw.rotation}deg)`;
       // backgroundColor → background (pill bg for text, fill for decoratives)
       if (raw.backgroundColor) style.background = raw.backgroundColor;
-      // decorative/icon: use fillColor or color as background fill
-      if ((type === 'decorative' || type === 'icon') && !style.background) {
-        style.background = raw.fillColor || raw.color || '#ffffff';
+      // whiteSpace is passed through from Vision AI style if explicitly set
+      if (raw.whiteSpace) style.whiteSpace = raw.whiteSpace;
+
+      // ── Icon/decorative registry mappings ────────────────────────────────
+      // iconKey → Phosphor icon name (set:"ph")
+      const ICON_KEY_TO_PH = {
+        // snake_case keys
+        star: 'star-fill', star_outline: 'star', sparkle: 'sparkle',
+        heart: 'heart-fill', heart_outline: 'heart',
+        thumbsup: 'thumbs-up-fill', thumbsdown: 'thumbs-down-fill',
+        handshake: 'handshake-fill', crown: 'crown-fill', trophy: 'trophy-fill',
+        arrow: 'arrow-right-bold', arrow_right: 'arrow-right-bold',
+        arrow_left: 'arrow-left-bold', arrow_up: 'arrow-up-bold', arrow_down: 'arrow-down-bold',
+        chevron: 'caret-right-fill', chevron_right: 'caret-right-fill',
+        bolt: 'lightning-fill', lightning: 'lightning-fill', fire: 'fire-fill',
+        check: 'check-bold', check_circle: 'check-circle-fill',
+        close: 'x-bold', plus: 'plus-bold',
+        clock: 'clock-fill', alarm: 'bell-fill', bell: 'bell-fill',
+        play: 'play-fill', pause: 'pause-fill', camera: 'camera-fill', music: 'music-note-fill',
+        phone: 'phone-fill', location: 'map-pin-fill', pin: 'map-pin-fill',
+        info: 'info-fill', warning: 'warning-fill', wifi: 'wifi-high-fill',
+        dollar: 'currency-dollar-bold', percent: 'percent-bold',
+        rocket: 'rocket-fill', globe: 'globe-fill',
+        smile: 'smiley-fill', wink: 'smiley-wink-fill', laugh: 'smiley-wink-fill',
+        diamond: 'diamond-four-corners-fill', confetti: 'confetti-fill',
+        briefcase: 'briefcase-fill', chart: 'chart-bar-fill', medal: 'medal-fill',
+        target: 'target-fill', flag: 'flag-fill', gem: 'diamond-fill',
+        shield: 'shield-check-fill', lock: 'lock-fill', key: 'key-fill',
+        leaf: 'leaf-fill', sun: 'sun-fill', moon: 'moon-fill', cloud: 'cloud-fill',
+        snowflake: 'snowflake-fill', wave: 'waves', eye: 'eye-fill',
+        // camelCase variants (Vision AI often outputs these)
+        arrowCircle: 'arrow-circle-right-fill', arrowRight: 'arrow-right-bold',
+        arrowLeft: 'arrow-left-bold', arrowUp: 'arrow-up-bold', arrowDown: 'arrow-down-bold',
+        starOutline: 'star', checkCircle: 'check-circle-fill',
+        thumbsUp: 'thumbs-up-fill', thumbsDown: 'thumbs-down-fill',
+        mapPin: 'map-pin-fill', chartBar: 'chart-bar-fill',
+        shieldCheck: 'shield-check-fill', currencyDollar: 'currency-dollar-bold',
+        musicNote: 'music-note-fill', smiley: 'smiley-fill',
+      };
+      // shapeKey/iconKey → decorativeRegistry ID (for shapes not in Phosphor)
+      const SHAPE_TO_DEC = {
+        star_burst: 'star_burst_6pt', star_4pt: 'star_burst_4pt',
+        star_8pt: 'star_burst_8pt', star_12pt: 'star_burst_12pt',
+        sparkle_sm: 'sparkle_4pt_sm', sparkle_lg: 'sparkle_4pt_lg',
+        sparkle_6pt: 'sparkle_6pt', sparkle_cluster: 'sparkle_cluster',
+        flower: 'flower_simple', daisy: 'flower_daisy',
+        blob: 'blob_organic_a', blob_soft: 'blob_circle_soft',
+        blob_long: 'blob_elongated', blob_corner: 'blob_corner_fill',
+        speech_bubble: 'speech_bubble_round', speech_bubble_sharp: 'speech_bubble_sharp',
+        badge: 'badge_circle', badge_pill: 'badge_pill', badge_burst: 'badge_burst',
+        badge_shield: 'badge_shield', badge_tag: 'badge_tag', badge_ribbon: 'badge_ribbon',
+        square: 'shape_square', rectangle: 'shape_rectangle',
+        arrow_curved: 'arrow_curved_right', arrow_swoosh: 'arrow_swoosh',
+        arrow_bounce: 'arrow_bounce', arrow_double: 'arrow_double_right',
+      };
+      // Pure CSS shapes — keep borderRadius approach, no registry lookup
+      const CSS_SHAPES = new Set(['circle', 'ring', 'dot', 'pill', 'rounded', 'oval']);
+
+      const sk = raw.shapeKey;
+      const ik = raw.iconKey;
+      const fillColor = raw.fillColor || raw.color || '#ffffff';
+
+      let iconifyOut   = undefined; // set for Phosphor icon zones
+      let decorativeId = undefined; // set for decorativeRegistry shapes
+      let typeOut      = type;      // may be overridden (e.g. icon→decorative when using dec registry)
+
+      if (type === 'icon') {
+        const phName = ik && ICON_KEY_TO_PH[ik];
+        if (phName) {
+          // Map to Phosphor via Iconify API
+          iconifyOut = { set: 'ph', icon: phName };
+          style.color = fillColor;
+        } else {
+          const decId = ik && SHAPE_TO_DEC[ik];
+          if (decId) {
+            // LayoutRenderer reads content.decorativeId only under effectiveType==="decorative"
+            decorativeId = decId;
+            typeOut = 'decorative';
+            style.color = fillColor;
+          } else {
+            // Unknown/missing iconKey → infer from text content or default to a sensible icon
+            const contentStr = (z.content || '').trim();
+            const inferredKey =
+              (contentStr === '+' || contentStr.toLowerCase() === 'plus') ? 'plus' :
+              (contentStr === '★' || contentStr === '*') ? 'star' :
+              (contentStr === '✓' || contentStr === '✔') ? 'check' :
+              (contentStr === '→' || contentStr === '▶' || contentStr === '>') ? 'arrow' :
+              (contentStr === '♥' || contentStr === '❤') ? 'heart' :
+              (contentStr === '⚡' || contentStr === '⚡️') ? 'bolt' :
+              (contentStr === '🔥') ? 'fire' :
+              (contentStr === '👑') ? 'crown' :
+              (role === 'cta' ? 'arrow' : 'star');
+            const infPh = ICON_KEY_TO_PH[inferredKey];
+            if (infPh) { iconifyOut = { set: 'ph', icon: infPh }; }
+            style.color = fillColor;
+          }
+        }
+      } else if (type === 'decorative') {
+        if (sk && !CSS_SHAPES.has(sk)) {
+          const decId = SHAPE_TO_DEC[sk];
+          if (decId) {
+            decorativeId = decId;
+            style.color = fillColor;
+          } else {
+            // Unknown shape key → CSS colored box
+            if (!style.background) style.background = fillColor;
+          }
+        } else {
+          // CSS shapes or no shapeKey → use background color
+          if (!style.background) style.background = fillColor;
+          if (sk === 'circle' || sk === 'ring' || sk === 'dot') style.borderRadius = '50%';
+          else if (sk === 'pill') style.borderRadius = 999;
+        }
       }
-      // shapeKey → borderRadius shorthand
-      if (type === 'decorative' || type === 'icon') {
-        const sk = raw.shapeKey;
-        if (sk === 'circle' || sk === 'ring' || sk === 'dot') style.borderRadius = '50%';
-        else if (sk === 'pill')                               style.borderRadius = 999;
-      }
+      // icon zone size (how much of the zone the icon fills, 0-100)
+      if (type === 'icon') style.iconSize = raw.iconSize ?? 80;
       // asset objectFit
       if (type === 'asset') style.objectFit = 'cover';
       // text padding
@@ -1843,14 +2032,44 @@ Context: niche=${niche}, intent=${intent}, energy=${energy}`;
       let content;
       if (type === 'text') {
         // Garble filter: reject content that looks like OCR noise
-        // (too many consonant clusters, no vowels, or suspiciously short non-word)
         const rawText = (z.content || '').trim();
-        const isGarbled = rawText.length > 0 && rawText.length < 20
-          && !/[aeiouAEIOU]/.test(rawText.replace(/\s/g, ''))
-          && /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}/.test(rawText.replace(/\s/g, ''));
+        const stripped = rawText.replace(/\s+/g, '');
+
+        // Helper: is a single word likely garbled?
+        const COMMON_CONSONANT_STARTS = /^(str|spr|scr|shr|spl|squ|thr|chr|sch|wh|kn|gn|ps|ph)/i;
+        const isWordGarbled = (word) => {
+          if (word.length < 4) return false;
+          const vowels  = (word.match(/[aeiou]/gi) || []).length;
+          const conRatio = (word.length - vowels) / word.length;
+          // 80%+ consonants for words 5+ chars (e.g. "jmilt" = 4/5 = 0.8)
+          if (word.length >= 5 && conRatio >= 0.8) return true;
+          // 3+ consecutive vowels (e.g. EDUCAEIGNY → AEI)
+          if (/[aeiouAEIOU]{3,}/.test(word)) return true;
+          // Unusual 3+ consonant cluster at word start (not common English prefixes)
+          const startCluster = word.match(/^[bcdfghjklmnpqrstvwxyz]{3,}/i);
+          if (startCluster && !COMMON_CONSONANT_STARTS.test(word)) return true;
+          return false;
+        };
+
+        // Single-token garble (short text, < 28 chars)
+        const shortGarble = rawText.length > 0 && rawText.length < 28 && (
+          (!/[aeiouAEIOU]/.test(stripped) && /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}/.test(stripped)) ||
+          /[aeiouAEIOU]{3,}/.test(stripped) ||
+          (rawText === rawText.toUpperCase() && !rawText.includes(' ') && stripped.length > 6 && /[BCDFGHJKLMNPQRSTVWXYZ]{5,}/.test(stripped))
+        );
+
+        // Multi-word garble: check word-level patterns for longer texts
+        const alphaWords = rawText.split(/\s+/).filter(w => /^[a-zA-Z]{4,}$/.test(w));
+        const garbledWordCount = alphaWords.filter(isWordGarbled).length;
+        const longGarble = rawText.length >= 20 && alphaWords.length >= 3
+          && garbledWordCount / alphaWords.length >= 0.33;
+
+        const isGarbled = shortGarble || longGarble;
         const rolePlaceholders = {
           headline: 'YOUR HEADLINE HERE', subtext: 'Supporting detail goes here',
-          label: 'CATEGORY', stat: '30% OFF', cta: 'GET STARTED',
+          // Label fallback uses niche name so it reads naturally (e.g. "EDUCATION" not "CATEGORY")
+          label: niche ? niche.toUpperCase() : 'CATEGORY',
+          stat: '30% OFF', cta: 'GET STARTED',
           tagline: 'Your tagline', metric: '10K+', quote: '"Quote goes here"',
         };
         const cleanText = isGarbled
@@ -1859,64 +2078,195 @@ Context: niche=${niche}, intent=${intent}, energy=${energy}`;
         content = { kind: 'text', text: cleanText };
       } else if (type === 'asset') {
         content = { kind: 'asset', asset: { src: null, type: 'image', objectFit: 'cover', motion: 'none', enterTransition: 'none', exitTransition: 'none' } };
+      } else if (decorativeId) {
+        // decorativeRegistry shape (star burst, sparkle, flower, blob, badge, etc.)
+        content = { decorativeId };
+      } else if (type === 'icon' && ik && !iconifyOut) {
+        // Local iconRegistry fallback (heart, star SVG paths, etc.)
+        content = { iconId: ik };
       }
-      // decorative/icon: no content object needed
+      // pure CSS decorative (circle, pill, etc.): no content needed
 
+      // maxChars: generous limit so content is never truncated — based on actual content + role defaults
+      const ROLE_MAX_CHARS = { headline: 40, subtext: 100, tagline: 80, cta: 40, stat: 20, metric: 20, label: 30, quote: 150 };
+      const contentText = type === 'text' ? (z.content || '') : '';
       const maxChars = type === 'text'
-        ? Math.max(5, Math.round(((z.width || 80) / 100) * (1000 / Math.max(raw.fontSize || 60, 20))))
+        ? Math.max(contentText.length + 20, ROLE_MAX_CHARS[role] || 60)
         : undefined;
+
+      // ── Width enforcement ────────────────────────────────────────────────────
+      const MIN_WIDTHS_BY_ROLE = { headline: 80, subtext: 75, tagline: 70, cta: 60, stat: 28, metric: 28, label: 22, quote: 70 };
+      const rawW = typeof z.width === 'number' ? z.width : 90;
+      const rawX = typeof z.x     === 'number' ? z.x     : 5;
+      const minW = type === 'text' ? (MIN_WIDTHS_BY_ROLE[role] ?? 50) : rawW;
+      let finalW = Math.min(Math.max(rawW, minW), 99);
+      let finalX = Math.max(0, Math.min(rawX, 99 - finalW));
+
+      // Stat/label/metric: auto-widen zone to fit content at its fontSize (prevents clipping on nowrap)
+      if (type === 'text' && (role === 'stat' || role === 'metric' || role === 'label') && style.fontSize && z.content) {
+        const statText = (z.content || '').trim();
+        const neededW = Math.min(Math.ceil((statText.length * style.fontSize * 0.62 / 1080) * 100) + 8, 95);
+        if (neededW > finalW) {
+          finalW = neededW;
+          finalX = Math.max(0, Math.min(rawX, 99 - finalW));
+        }
+      }
+
+      // Headline / CTA / subtext with textAlign:center → force x = (100-width)/2
+      // This corrects Vision AI placing centered zones off-center
+      if (type === 'text' && style.textAlign === 'center' && ['headline', 'subtext', 'tagline', 'cta', 'quote'].includes(role)) {
+        finalX = Math.round((100 - finalW) / 2 * 10) / 10;
+      }
+
+      // CTA: if font is too large for the zone width, scale it down to prevent clipping
+      if (type === 'text' && role === 'cta' && style.fontSize && z.content) {
+        const ctaText = (z.content || '').trim();
+        const maxPxForW = (finalW / 100) * 1080 * 0.82; // 82% of px width (rest = padding)
+        const neededPx  = ctaText.length * style.fontSize * 0.55;
+        if (neededPx > maxPxForW) {
+          style.fontSize = Math.max(24, Math.round(maxPxForW / (ctaText.length * 0.55)));
+        }
+      }
+
+      // Height enforcement: Vision AI consistently underestimates text zone heights.
+      // Use fontSize formula as minimum so stacking post-processing has accurate bottom edges.
+      const rawH    = typeof z.height === 'number' ? z.height : 10;
+      const minFontH = type === 'text' && style.fontSize ? (style.fontSize / 1920) * 100 * 1.25 : 0;
+      const computedH = type === 'text' ? Math.max(rawH, minFontH) : rawH;
 
       return {
         id:             z.id || `z${i + 1}`,
-        type, role,
-        x:              typeof z.x      === 'number' ? z.x      : 5,
+        type: typeOut, role,
+        x:              finalX,
         y:              typeof z.y      === 'number' ? z.y      : 5,
-        width:          typeof z.width  === 'number' ? z.width  : 90,
-        height:         typeof z.height === 'number' ? z.height : 10,
+        width:          finalW,
+        height:         computedH,
         zIndex,
         start:          z.animationDelay ?? (i * 0.1),
         end:            null,
         enterAnimation: z.animation || (type === 'asset' ? 'fadeIn' : type === 'icon' ? 'popIn' : 'fadeIn'),
         exitAnimation:  'none',
         style,
-        ...(content   !== undefined ? { content }   : {}),
-        ...(maxChars  !== undefined ? { maxChars }  : {}),
+        ...(iconifyOut        !== undefined ? { iconify: iconifyOut }                     : {}),
+        ...(content           !== undefined ? { content }                                 : {}),
+        ...(maxChars          !== undefined ? { maxChars }                                : {}),
+        ...(z.assetDescription              ? { assetDescription: z.assetDescription }   : {}),
       };
     }
 
     let zones = (parsed.zones || []).map(toInternalZone);
 
-    // ── Ensure full-bleed background zone ─────────────────────────
-    if (bgCategory === 'solid' || bgCategory === 'pattern') {
-      const hasBg = zones.some(z => z.zIndex === 1 && (z.width ?? 0) >= 90 && (z.height ?? 0) >= 90);
-      if (!hasBg) {
-        const css = bgColors.length >= 2
-          ? `linear-gradient(${bgDirection || 'to bottom'}, ${bgColors.join(', ')})`
-          : (bgColors[0] || '#0a0a0a');
-        zones.unshift({
-          id: 'z_bg', type: 'decorative', role: 'decorative',
-          x: 0, y: 0, width: 100, height: 100,
-          zIndex: 1, start: 0, end: null,
-          enterAnimation: 'none', exitAnimation: 'none',
-          style: { background: css, opacity: 1 },
-        });
+    // ── Post-process 1: stack multi-line headlines (heights now font-corrected) ──
+    {
+      const hlZones = zones
+        .filter(z => z.role === 'headline' && z.type === 'text')
+        .sort((a, b) => (a.y || 0) - (b.y || 0));
+      if (hlZones.length > 1) {
+        let cursor = hlZones[0].y || 0;
+        const newYMap = new Map();
+        for (const hl of hlZones) {
+          newYMap.set(hl.id, Math.round(cursor * 10) / 10);
+          cursor = Math.round(cursor * 10) / 10 + (hl.height || 0) + 0.8;
+        }
+        zones = zones.map(z => newYMap.has(z.id) ? { ...z, y: newYMap.get(z.id) } : z);
       }
-    } else if (bgCategory === 'abstract') {
-      const hasBgAsset = zones.some(z => z.role === 'background_asset');
-      if (!hasBgAsset) {
-        zones.unshift({
-          id: 'z_bgimg', type: 'asset', role: 'background_asset',
-          x: 0, y: 0, width: 100, height: 100,
-          zIndex: 1, start: 0, end: null,
-          enterAnimation: 'fadeIn', exitAnimation: 'none',
-          style: { objectFit: 'cover', opacity: 1 },
-          content: { kind: 'asset', asset: { src: null, type: 'image', objectFit: 'cover', motion: 'none', enterTransition: 'none', exitTransition: 'none' } },
-        });
+    }
+
+    // ── Post-process 2: push ALL non-headline text zones below the headline block ─
+    // Group zones at same y (±1.5%) into rows so side-by-side elements stay together
+    {
+      const hlBottomEdge = zones
+        .filter(z => z.role === 'headline' && z.type === 'text')
+        .reduce((max, z) => Math.max(max, (z.y || 0) + (z.height || 0)), 0);
+
+      if (hlBottomEdge > 0) {
+        // Non-headline text zones that fall inside the headline block area
+        const toPlace = zones
+          .filter(z => z.type === 'text' && z.role !== 'headline' && (z.y || 0) < hlBottomEdge)
+          .sort((a, b) => (a.y || 0) - (b.y || 0));
+
+        if (toPlace.length > 0) {
+          // Group into rows: zones within 1.5% y of each other are side-by-side
+          const rows = [];
+          for (const z of toPlace) {
+            const lastRow = rows[rows.length - 1];
+            if (lastRow && Math.abs((z.y || 0) - lastRow.y) <= 1.5) {
+              lastRow.zones.push(z);
+              lastRow.rowH = Math.max(lastRow.rowH, z.height || 0);
+            } else {
+              rows.push({ y: z.y || 0, rowH: z.height || 0, zones: [z] });
+            }
+          }
+          // Place rows sequentially starting from below the headline block
+          const pushMap = new Map();
+          let cursor = hlBottomEdge + 1.5;
+          for (const row of rows) {
+            const rowY = Math.round(cursor * 10) / 10;
+            for (const z of row.zones) pushMap.set(z.id, rowY);
+            cursor = rowY + row.rowH + 1;
+          }
+          zones = zones.map(z => pushMap.has(z.id) ? { ...z, y: pushMap.get(z.id) } : z);
+        }
+      }
+    }
+
+    // ── Post-process: inject circle decoration behind circular stat/label badges ─
+    {
+      const injections = [];
+      zones.forEach((z, idx) => {
+        const br = z.style?.borderRadius;
+        const hasBg = z.style?.background || z.style?.backgroundColor;
+        const isCircle = br === '50%' || Number(br) >= 50;
+        if (z.type === 'text' && hasBg && isCircle && ['stat', 'metric', 'label'].includes(z.role)) {
+          const bgColor = z.style.background || z.style.backgroundColor;
+          const sz = Math.max(z.width || 10, typeof z.height === 'number' ? z.height : 10);
+          const cx = (z.x || 0) + ((z.width || sz) - sz) / 2;
+          injections.push({
+            before: idx,
+            zone: {
+              id: `${z.id}_circle`,
+              type: 'decorative', role: 'decorative',
+              x: cx, y: z.y || 0, width: sz, height: sz,
+              zIndex: Math.max((z.zIndex || 4) - 1, 1),
+              start: z.start, end: null,
+              enterAnimation: 'fadeIn', exitAnimation: 'none',
+              style: { background: bgColor, borderRadius: '50%' },
+            },
+          });
+          // Strip background/borderRadius from text zone — decorative circle carries it
+          const newStyle = { ...z.style };
+          delete newStyle.background; delete newStyle.backgroundColor; delete newStyle.borderRadius;
+          zones[idx] = { ...z, style: newStyle };
+        }
+      });
+      // Insert in reverse order so earlier indices stay valid
+      for (let i = injections.length - 1; i >= 0; i--) {
+        zones.splice(injections[i].before, 0, injections[i].zone);
       }
     }
 
     // ── Re-index IDs ──────────────────────────────────────────────
     zones = zones.map((z, i) => ({ ...z, id: `z${i + 1}` }));
+
+    console.log('[convert-layout-image] ── PROCESSED ZONES ──────────────────────');
+    zones.forEach(z => {
+      console.log(`  ${z.id} [${z.type}/${z.role}] x:${z.x} y:${z.y} w:${z.width} h:${z.height} | maxChars:${z.maxChars ?? '-'} iconify:${z.iconify ? z.iconify.icon : '-'}${z.assetDescription ? ` | asset:"${z.assetDescription}"` : ''}`);
+    });
+    console.log('──────────────────────────────────────────────────────────────────\n');
+
+    // ── Build default_background for LayoutBackgroundRenderer ─────
+    // For solid/pattern: derive CSS color/gradient → stored as generation_meta.default_background
+    // LayoutRenderer falls back to this when beat.layoutBackground is not explicitly set.
+    // For abstract: value starts null; client fills it in once the background image is generated.
+    let defaultBackground = null;
+    if (bgCategory === 'solid' || bgCategory === 'pattern') {
+      const css = bgColors.length >= 2
+        ? `linear-gradient(${bgDirection || 'to bottom'}, ${bgColors.join(', ')})`
+        : (bgColors[0] || '#0a0a0a');
+      defaultBackground = { type: bgColors.length >= 2 ? 'gradient' : 'color', value: css };
+    } else if (bgCategory === 'abstract') {
+      defaultBackground = { type: 'image', value: null }; // filled in after generate-layout-assets
+    }
 
     return res.json({
       zones,
@@ -1926,6 +2276,7 @@ Context: niche=${niche}, intent=${intent}, energy=${energy}`;
       color_family:        colorFamily,
       background_needs_image:  bgNeedsImg,
       background_image_prompt: bgImgPrompt,
+      default_background:      defaultBackground,
     });
   } catch (err) {
     console.error('[admin/convert-layout-image]', err.message);
@@ -1939,11 +2290,134 @@ app.post("/api/admin/generate-layout-prompts", requireAuth, requireAdmin, async 
   try {
     const { niche = "entertainment", intent = "hook", energy = "high", count = 4 } = req.body;
 
+    // Intent-specific layout structure definitions
+    const INTENT_LAYOUTS = {
+      hook: {
+        description: 'Stop the scroll. Bold visual, dominant headline, immediate impact. Everything fights for attention in the first frame.',
+        elements: `1. BACKGROUND — bold gradient or high-contrast solid. Specify exact hex colors.
+2. CATEGORY LABEL — small pill/tag at very top (top 12%). Uppercase niche name inside colored pill.
+3. HEADLINE — massive ultra-bold text, 2-4 words, dominates upper third (12-42%). Condensed or heavy typeface. Specific placeholder text.
+4. SUBTEXT — 5-8 word supporting line directly below headline, lighter weight.
+5. SUBJECT — striking visual (person, product, character) filling center (40-75%), drop shadow, isolated on background.
+6. DECORATIVE ACCENTS — min 2: corner geometric, side accent strip, floating icon, or price badge.
+7. CTA — full-width bottom bar or large pill button at bottom (88-100%). Bold directive text + arrow.
+8. SPACING: top 12%=label, 12-42%=headline+sub, 42-75%=subject, 75-88%=accent, 88-100%=CTA.`,
+        example: `Bold fitness hook on burnt orange to crimson gradient. TOP: white pill badge "FITNESS" at top-center. Upper third: ultra-bold condensed "FEEL THE BURN" in white, 2 lines, yellow divider line below. Sub-line "Gear Up For Greatness" in off-white. CENTER: red dumbbells product shot, 55% canvas width, drop shadow. Large faint circle behind product. Left: thin yellow accent strip. Bottom-right: circular "50% OFF" badge on dark pill. BOTTOM: full-width charcoal bar "SHOP NOW →" in white bold.`
+      },
+      proof: {
+        description: 'Show evidence. Asset-led — one or two images showing the result, product, or person. Supporting text below or beside. Feels credible and visual. NO CTA — the evidence speaks for itself.',
+        elements: `1. BACKGROUND — clean, professional, neutral or slightly dark. Trust-building palette.
+2. CATEGORY LABEL — small pill at top with niche + "RESULTS" or "VERIFIED" indicator.
+3. PROOF VISUAL — DOMINANT. Person using product, before/after split, or screenshot of results. Large image filling upper-center (12-65%). This is the hero — make it the biggest element.
+4. RESULT STAT — bold prominent number or result overlapping or directly below the visual (e.g. "10,000 CUSTOMERS", "4.9★", "97% SUCCESS"). High contrast.
+5. CLAIM TEXT — brief credibility statement (e.g. "Trusted by professionals worldwide"). Medium weight, 6-10 words.
+6. TRUST BADGES — star rating, certification badge, logo strip, or checkmark list (3 short bullet points). Lower area (72-90%).
+7. NO CTA — end with trust signals. Do not add a CTA button or bar.
+8. SPACING: top 12%=label, 12-65%=dominant proof visual, 65-78%=stat+claim, 78-100%=trust badges.`,
+        example: `Clean dark navy proof layout for finance. TOP: small pill "FINANCE • VERIFIED". CENTER-DOMINANT: professional in suit reviewing charts on laptop, image filling 55% canvas width, clean background. Overlapping the bottom of the image: giant white bold "97% SUCCESS RATE" centered, gold accent underline. Below: "Trusted by 50,000 investors worldwide" in light grey. Bottom area: row of 3 gold checkmarks — "Regulated", "Insured", "Proven". Star rating "4.9 ★★★★★". No CTA button.`
+      },
+      stat: {
+        description: 'One big number owns the screen. Everything else supports it — a label above, context below. Clean, minimal, the number is the hero. NO CTA.',
+        elements: `1. BACKGROUND — minimal, clean solid or soft gradient. Background serves the number, does not compete.
+2. CATEGORY LABEL — tiny label or pill at very top (top 10%).
+3. STAT CONTEXT LABEL — short phrase ABOVE the number telling what it measures (e.g. "Conversion Rate", "Monthly Revenue", "Students Enrolled"). Smaller, lighter weight.
+4. GIANT STAT NUMBER — the SINGLE most important number, ultra-bold, fills 20-50% of canvas height. Centered. E.g. "87%", "$2.4M", "10K+", "3X". This IS the layout. Make it enormous.
+5. CONTEXT VISUAL — small supporting graphic (upward chart, icon, minimal illustration) below the number at 55-72%. NOT dominant.
+6. SUPPORTING CLAIM — one sentence below visual explaining the stat in context. Max 10 words.
+7. NO CTA — the stat is the ending. Do not add a button or CTA bar.
+8. SPACING: 10%=label, 18-28%=stat context label, 28-58%=giant number, 58-72%=small visual, 72-88%=claim text.`,
+        example: `Minimal dark stat layout for business. Soft black background. TOP: tiny "BUSINESS" pill. Small "Active Users This Month" label in medium grey at 22%. CENTER-DOMINANT: enormous white bold "10,000+" number filling 35% of canvas, with thin gold line above and below it. Small upward trend chart icon at 62%. One-line "Growing 40% month over month" in light grey. No CTA button — layout ends with the supporting claim.`
+      },
+      contrast: {
+        description: 'Before vs After. Two states shown side by side or stacked. Clear visual comparison of transformation.',
+        elements: `1. BACKGROUND — split design: LEFT half one color/tone, RIGHT half contrasting color/tone. Or TOP dark, BOTTOM light.
+2. CATEGORY LABEL — centered at very top spanning both sides.
+3. BEFORE LABEL — "BEFORE" text on left/top side in dark or muted color. Small uppercase label.
+4. AFTER LABEL — "AFTER" text on right/bottom side in bright accent color. Small uppercase label.
+5. SPLIT VISUAL — two contrasting images or illustrations side-by-side (person before/after, product old/new, situation bad/good). Takes 35-70% of canvas.
+6. DIVIDER — bold center line or arrow dividing the two states.
+7. CONTRAST HEADLINE — short description of the transformation. E.g. "THE DIFFERENCE IS CLEAR". Spans both sides.
+8. CTA — at bottom spanning full width (88-100%).
+9. SPACING: top 10%=label, 10-25%=before/after labels + headline, 25-72%=split visual with divider, 72-88%=result text, 88-100%=CTA.`,
+        example: `Split contrast layout for skincare. Left half: dull grey-beige, right half: vibrant warm peach. TOP: "SKINCARE" pill centered. LEFT: dull muted skin texture photo labeled "BEFORE" in grey. RIGHT: glowing radiant skin photo labeled "AFTER" in coral. Bold vertical white divider with arrow in center. Headline spanning both: "SEE THE DIFFERENCE" in dark bold at top of image area. Below images: "8 weeks to radiant skin" centered. BOTTOM: full-width peach bar "START YOUR JOURNEY →".`
+      },
+      escalate: {
+        description: 'Building energy. Stacked text layers, each line hitting harder than the last. Feels like things are ramping up — pressure, stakes, momentum. NO CTA.',
+        elements: `IMPORTANT: This layout has MAX 4 ZONES TOTAL — a background, a small label, and 2-3 text lines. Do NOT create more than 4 zones.
+1. BACKGROUND — dark, intense, high-energy colors. Deep red, dark orange, near-black, or dramatic gradient. Full canvas. This is zone 1.
+2. URGENCY LABEL — small pill at top "⚡ LIMITED TIME" or "🔥 BREAKING" in red/orange. This is zone 2.
+3. ESCALATING HEADLINE — a SHORT punchy phrase (3-6 words), ultra-bold condensed, large. Positioned upper-center (20-45%). E.g. "LAST CHANCE" or "THE TIME IS NOW". This is zone 3.
+4. ESCALATING PAYOFF — the final knockout line (1-4 words), even bigger and bolder than zone 3. Positioned center-lower (50-72%). E.g. "GO." or "IT'S HAPPENING." or "MOVE NOW." This is zone 4.
+NO MORE ZONES. Total = 4 zones only. No CTA. No subtext. No accent badges. No extra lines.`,
+        example: `Intense dark escalate layout for fitness. Near-black to deep crimson gradient. TOP: small fiery orange pill "⚡ BREAKING" — zone 2. Zone 3: large white condensed bold "THE TIME IS NOW" centered at 30%. Zone 4: massive ultra-bold full-width "GO." at 60%, biggest element on canvas. Dramatic vignette border. No CTA, no subtext, no extra zones — only 4 zones total.`
+      },
+      explanation: {
+        description: 'Calm and clear. Asset on top showing the subject — sharp, well-lit, professional. Structured text below. Readable, spacious, educational. Step or label element optional. NO CTA.',
+        elements: `1. BACKGROUND — light, clean, or soft toned. Readable and calm — this is educational content.
+2. CATEGORY LABEL — small pill at top with niche category.
+3. EXPLANATION HEADLINE — "HOW IT WORKS", "3 SIMPLE STEPS", or concept title. Bold but not aggressive. Upper area (10-25%).
+4. ASSET/VISUAL — MANDATORY. Sharp, well-lit, professional photo or illustration of the subject. Studio-quality. "Sharp focus", "professional photography", "studio lighting", clean edges. Positioned prominently (25-55%). NOT blurry, NOT stylized — crisp and clear.
+5. STEP/POINT BLOCKS — 2-4 numbered steps or concept points below the visual (55-82%). Each block: number/icon + short title + 1-line description. Visually distinct with subtle dividers or cards.
+6. SUPPORTING SUBTEXT — brief reassurance below the steps (e.g. "Simple. Fast. Effective.").
+7. NO CTA — the explanation is complete. Do not add a button or CTA bar.
+8. SPACING: 10%=label, 10-25%=headline, 25-55%=sharp well-lit asset, 55-82%=step blocks, 82-100%=subtext + quiet space.`,
+        example: `Clean white explanation layout for education. White background with blue accents. TOP: "EDUCATION" blue pill label. Bold "HOW IT WORKS" headline in dark navy. CENTER: sharp professional photo of a student using a tablet app — studio lighting, crisp focus, clean background, product clearly visible — filling 35% of canvas width. THREE numbered step cards below (slight drop shadow, white cards): "① Choose Your Topic" with book icon, "② Practice Daily" with calendar icon, "③ Track Your Progress" with chart icon. Below: "Used by 50,000+ students" in grey. No CTA button — layout ends with the reassurance line.`
+      },
+      reveal: {
+        description: 'Dramatic payoff. Large asset with minimal text overlay. The visual IS the message. Text appears late, feels like a curtain being pulled back. NO CTA.',
+        elements: `1. BACKGROUND — dramatic, transitioning from dark/mystery (top) to vivid/clear (bottom) or full-bleed cinematic image.
+2. CATEGORY LABEL — small pill at top. Minimal.
+3. MYSTERY TEXT — sparse teaser text in upper area (10-30%). E.g. "WHAT IF WE TOLD YOU...", "THE SECRET IS OUT", "REVEALED:". Small, muted — building anticipation, NOT dominating.
+4. REVEAL VISUAL — DOMINANT. The hero image fills 35-78% of the canvas. Product emerging from shadow, dramatic transformation, cinematic unveil. Large, high-impact. The visual IS the message.
+5. SPOTLIGHT/GLOW EFFECT — light rays, starburst, or spotlight glow emanating from the reveal visual. Dramatic.
+6. RESULT TEXT — bold punchy text directly below the visual (78-90%). The payoff line. E.g. product name, transformation result, the revealed secret. High contrast, punchy. This is the last thing they read.
+7. NO CTA — the reveal IS the ending. No button, no bar.
+8. SPACING: 10%=tiny label, 10-30%=sparse mystery text, 30-78%=dominant reveal visual with spotlight, 78-92%=bold payoff result text.`,
+        example: `Dramatic dark-to-gold reveal layout for skincare. Deep charcoal top fading to warm champagne gold at bottom. TOP: small "SKINCARE" label. Sparse italic "The secret is out." in muted grey at 18%. CENTER-DOMINANT: skincare serum bottle emerging dramatically from dark shadow into spotlight, golden light rays radiating outward, product occupying 60% canvas width, filling 40% of canvas height. Dramatic warm glow halo around product. Bold "LIQUID GOLD" in large champagne text below product at 82%. No CTA — the product reveal is the final beat.`
+      },
+      testimonial: {
+        description: 'Human voice. Quote-led design. Large italic text center stage. Small attribution label below. Asset optional — circle avatar or background image at low opacity. NO CTA.',
+        elements: `1. BACKGROUND — warm, approachable, clean. Light neutral or soft gradient. Flatters and feels human.
+2. CATEGORY LABEL — small trust-indicator pill at top (e.g. "★ VERIFIED REVIEW", "REAL RESULTS").
+3. PERSON PHOTO — DOMINANT. Real person (happy, transformed, credible). Upper-center area (10-52%). Large, warm lighting, natural expression. Not a model — relatable. Or a circular avatar if testimonial-card style.
+4. RESULT BADGE — small pill overlapping or near the photo showing their specific result (e.g. "-23 lbs", "Promoted in 3 months", "Saved $400/month").
+5. STAR RATING — 5 stars displayed prominently below the photo.
+6. QUOTE TEXT — HERO. Large italic or bold pull quote (58-84%). 1-2 sentences. E.g. "This changed my life completely. I can't imagine going back." Attribution below: name + credential in smaller text.
+7. NO CTA — the testimonial is the ending. The human voice is the call to believe. No button or bar.
+8. SPACING: 10%=trust label, 10-52%=dominant person photo with result badge, 52-58%=star rating, 58-84%=large quote+attribution, 84-100%=social proof count or quiet space.`,
+        example: `Warm cream testimonial layout for health. Soft cream to pale peach gradient. TOP: "★ VERIFIED RESULT" small green pill. CENTER-DOMINANT: smiling woman, natural photo, warm lighting, 45% canvas width, looking slightly off-camera. Small green pill badge overlapping her photo: "-18 lbs in 60 days". Five gold stars below photo. Large italic quote: "I never thought it would work this fast. My doctor was shocked." — Sarah M., 34. "47,000 people achieved similar results" in small grey text. No CTA — ends with the human story.`
+      },
+      visual_rest: {
+        description: 'Breathe. Full bleed atmospheric asset filling the entire canvas. Minimal text overlaid on top. Palette cleanser between heavy beats. The image IS the content — rich, detailed, cinematic.',
+        elements: `IMPORTANT: This layout has EXACTLY 3 ZONES — 1 asset zone + 1 label text zone + 1 caption text zone. No more.
+1. FULL BLEED ASSET ZONE — MANDATORY. Rich, detailed, atmospheric photograph or cinematic illustration. Fills the ENTIRE canvas (x=0, y=0, width=100, height=100). This is NOT a background color — it is a real image zone with real content. Must depict a specific scene: landscape, styled interior, portrait, nature, or product in environment. NOT a plain color, NOT a gradient, NOT empty.
+2. CATEGORY LABEL TEXT ZONE — small, minimal text. Positioned at top of canvas (y=3-7%). Elegant, refined. E.g. "TRAVEL" or "WELLNESS". Overlaid on the asset.
+3. CAPTION TEXT ZONE — ONE short line, max 8 words. Elegant italic or light weight. Positioned at bottom (y=82-88%). E.g. "The world is waiting." or "Find your still." Overlaid on the asset.
+NO MORE ZONES. Total = 3 zones: asset + label + caption. No headline zone, no CTA, no subtext, no decorative elements.`,
+        example: `Full bleed visual rest layout for travel. Zone 1 ASSET: stunning wide-angle cinematic photo of golden-hour light over a misty mountain valley — rich atmospheric haze, warm amber and deep blue tones, fills 100% canvas. Zone 2 LABEL TEXT: tiny white "TRAVEL" at top (y=5%). Zone 3 CAPTION TEXT: delicate italic "The world is waiting." in soft white at y=85%. Only these 3 zones — no headline, no CTA, no other elements.`
+      },
+      cta: {
+        description: 'Action-oriented. Bold directive headline. Supporting line. No asset needed. Ends with energy — follow, comment, share, click. The CTA button is the hero.',
+        elements: `1. BACKGROUND — high contrast, action-oriented. Bold but not chaotic. Single strong color or tight gradient.
+2. CATEGORY LABEL — small at very top, minimal presence.
+3. BENEFIT HEADLINE — what they GET by clicking. 3-5 words. E.g. "GET YOUR FREE GUIDE", "DOUBLE YOUR SALES". Upper area (10-30%). Bold, benefit-focused.
+4. THE CTA BUTTON — MASSIVE. Centered on canvas (40-65%). Pill or rectangle shape. Largest element. High contrast to background. Action verb + noun. E.g. "CLAIM FREE ACCESS →", "START NOW FREE →". This fills 50-70% canvas width and is visually dominant.
+5. SUPPORTING REASON — 1-2 lines below CTA button explaining WHY to click (e.g. "No credit card. Cancel anytime."). Small, reassuring.
+6. URGENCY LINE — brief urgency element above or below CTA (e.g. "Join 12,000+ members", "Only 50 spots left").
+7. TRUST MICRO-ELEMENT — small lock icon + "Secure", checkmark + "Free", or star rating. Near the CTA.
+8. SPACING: 10%=label, 10-30%=benefit headline, 30-40%=urgency line, 40-65%=GIANT CTA BUTTON, 65-80%=supporting reason, 80-90%=trust micro, 90-100%=secondary text.`,
+        example: `High-impact purple CTA layout for business. Deep violet to rich purple gradient. TOP: tiny white "BUSINESS" label. Bold "DOUBLE YOUR REVENUE" in large white condensed. Below: "12,847 businesses already growing" in soft lavender. CENTER-DOMINANT: massive bright gold rounded rectangle button "CLAIM YOUR FREE STRATEGY CALL →" in dark text, 65% canvas width, slight glow/shadow. Below button: "No obligation. 30 minutes. Real results." in small white. Lock icon + "100% Secure & Confidential" in tiny grey. BOTTOM: "Or learn more at our website" in small muted text.`
+      },
+    };
+
+    const intentKey = intent.toLowerCase().replace(/[^a-z_]/g, '');
+    const layoutSpec = INTENT_LAYOUTS[intentKey] || INTENT_LAYOUTS.hook;
+
     const systemPrompt = `You are a creative director generating image-generation prompts for 9:16 vertical social media layout mockups.
 
 Each prompt describes a COMPLETE, DENSE layout scene — background, subject, text, decorative accents, and CTA all composed together — to be rendered by an AI image generator (Flux). The output will be used as a visual reference for decomposing into editable zones.
 
-Think like a professional art director describing a premium magazine ad or Instagram story template. Every square centimeter of the canvas should feel purposeful. Target 80% canvas utilization — no empty unused areas.
+Think like a professional art director. Every part of the canvas should feel purposeful.
 
 NICHE aesthetic guide:
 - finance: dark, professional, gold accents, authoritative typography
@@ -1959,22 +2433,10 @@ NICHE aesthetic guide:
 - travel: vibrant, scenic, wanderlust-inducing
 - business: dark or light, professional, clean hierarchy
 
-INTENT guide:
-- hook: immediate attention-grabbing, bold contrast, striking visual
-- proof: results, statistics, before/after, credibility signals
-- visual_rest: calm, minimal, breathing room, soft palette
-- escalate: urgency, countdown energy, dramatic
-- reveal: surprise reveal composition, dramatic unveil
-- cta: action-driving, button-like elements, directive text
-- stat: number-dominant, large typography, supporting context
-- explanation: structured, clear hierarchy, educational feel
-- testimonial: person-forward, quote-driven, trust signals
-- contrast: side-by-side comparison, before/after split
-
 ENERGY guide:
-- high: bold colors, large type, dynamic subject angles, high contrast
+- high: bold colors, large type, dynamic angles, high contrast
 - medium: balanced composition, clean type, professional subject
-- low: minimal, lots of negative space, quiet palette, refined
+- low: minimal, quiet palette, refined
 
 LAYOUT DESIGN CONSTRAINTS — CRITICAL FOR EDITABILITY:
 The generated layout image will be broken down into editable zones by our system.
@@ -1983,56 +2445,43 @@ The generated layout image will be broken down into editable zones by our system
 - Maximum 3 asset zones total, maximum 5 text zones total
 - NOT allowed: gradient text, metallic text, 3D extruded text, text baked into artwork
 
-MANDATORY LAYOUT ELEMENTS — every prompt MUST include ALL 8 of these:
+══════════════════════════════════════
+THIS IS A "${intent.toUpperCase()}" LAYOUT
+Intent: ${layoutSpec.description}
+══════════════════════════════════════
 
-1. BACKGROUND — solid color or simple 2-3 color gradient. Specify exact hex colors or color names.
+MANDATORY ELEMENTS FOR THIS INTENT:
 
-2. CATEGORY LABEL — small pill or tag at the very top of the canvas (top 15%). Example: 'FITNESS', 'SKINCARE', 'FINANCE'. Small uppercase text inside a colored pill or rectangle. Contrasting color to background.
+${layoutSpec.elements}
 
-3. HEADLINE — large ultra-bold text, 2-4 words maximum. Specific placeholder text (e.g. 'FEEL THE BURN', 'GLOW UP NOW'). Positioned in upper third (15-40%). Specify font weight (ultra-bold, condensed, heavy) and color.
+EXAMPLE PROMPT FOR THIS INTENT (different niche — for structural reference only):
+'${layoutSpec.example} Vertical 9:16 social media template. Professional. Sharp. No UI chrome. No device frames.'
 
-4. SUBTEXT — smaller supporting line directly below headline. 5-8 words. Lighter weight, different color or opacity. Example: 'Gear Up For Greatness' or 'Your skin transformation starts today'.
-
-5. SUBJECT — one clearly isolated product, person, or object. Positioned center or lower half (40-75%). Fills 40-65% of canvas width. Has drop shadow or subtle glow to separate from background.
-
-6. DECORATIVE ACCENTS — include minimum 2 of these elements:
-   - Thin horizontal divider line (accent color, below headline or above CTA)
-   - Geometric background shape (large faint circle or rectangle behind subject, slightly lighter/darker than bg)
-   - Corner accent element (small geometric shape or star in one corner)
-   - Stat/price badge (circle or pill with bold number — '50% OFF', '$29', '10K+')
-   - Icon element (small relevant icon — star ★, arrow →, checkmark ✓, lightning bolt)
-   - Side accent strip (thin vertical colored bar on left or right edge)
-
-7. CTA ELEMENT — one of these at the bottom (90-100% of canvas):
-   - Full-width bottom bar (solid colored strip spanning entire width, with CTA text like 'SHOP NOW →' or 'LEARN MORE')
-   - Rounded CTA button (centered, pill-shaped, contrasting color)
-   - Bottom label with arrow (small bold text + directional arrow)
-
-8. SPACING GUIDE — explicitly describe element positions using these bands:
-   - Top 15%: category label/tag
-   - 15-40%: headline + subtext stack
-   - 40-75%: main subject/product
-   - 75-90%: decorative accent, stat badge, or secondary info
-   - 90-100%: CTA bar or bottom element
-
-EXAMPLE OF A COMPLETE, DENSE PROMPT (fitness/hook):
-'Bold fitness hook layout on burnt orange to deep crimson gradient background. TOP: small white pill badge with text FITNESS in black at top-center. Upper third: ultra-bold condensed headline FEEL THE BURN in white, stacked 2 lines, with a thin bright yellow horizontal line accent below it. Below headline in lighter weight: Gear Up For Greatness in off-white. CENTER: red dumbbells and black weight plate product shot with subtle drop shadow, filling 55% of canvas width, sitting in the middle band. Behind the product: large faint circle shape in slightly lighter orange, giving depth. Left edge: thin vertical yellow accent strip. Lower area: small circular badge bottom-right with 50% OFF in bold white on dark red pill. BOTTOM: full-width dark charcoal strip spanning entire canvas width with SHOP NOW in white bold uppercase and right arrow icon. Vertical 9:16 social media template. Professional. Sharp. No UI chrome. No device frames.'
-
-Every prompt you write must be this detailed and this dense.`;
+Your prompts MUST follow the ${intent.toUpperCase()} structure above. Do NOT default to a generic hook/headline/subject/CTA layout if the intent calls for something different.`;
 
     const userPrompt = `Generate ${count} unique image-generation prompts for:
 Niche: ${niche}
 Intent: ${intent}
 Energy: ${energy}
 
-Each prompt must describe a DIFFERENT layout composition style with ALL 8 mandatory elements. Make each one structurally distinct — vary the subject type, background color story, headline placement, and decorative accent choices.
+CRITICAL: These are "${intent.toUpperCase()}" layouts — follow the intent-specific structure defined above.
+Do NOT default to a generic headline+subject+CTA hook layout unless intent is "hook".
+
+Each prompt must be structurally distinct from the others — vary the composition, color story, subject type, and decorative choices while keeping the ${intent} intent structure.
+
+Layout quality rules (apply to all intents):
+- Every element must be in a clearly separated zone — no overlapping text layers
+- Background is separate from subject — subject sits ON the background with visible edge
+- Geometric clarity: use clear rectangles, pills, circles. No random floating elements
+- Clean spacing between all zones — no cramped stacking
+- Simple structure that can be broken into distinct editable zones
 
 Return as JSON: { "prompts": [
   {
     "id": "p1",
     "title": "short descriptive title",
-    "visual_direction": "one sentence summary of the aesthetic",
-    "prompt": "Full detailed image-generation prompt following all mandatory element rules above. Must include: background colors, category label, headline text + style, subtext, subject description + position, minimum 2 decorative accents, CTA element, and spacing guide positions. End with: Vertical 9:16 social media template. Professional. Sharp. No UI chrome. No device frames."
+    "visual_direction": "one sentence describing the ${intent} approach and aesthetic",
+    "prompt": "Full detailed image-generation prompt following the ${intent.toUpperCase()} mandatory elements and spacing guide. Describe every element's position, color, size, and style explicitly. End with: Vertical 9:16 social media template. Professional. Sharp. No UI chrome. No device frames."
   }
 ] }
 Return only valid JSON, no explanation.`;
@@ -2059,7 +2508,7 @@ Return only valid JSON, no explanation.`;
 // Body: { promptId, zones, niche, intent, imagePrompt, background_needs_image, background_image_prompt, color_family }
 app.post('/api/admin/generate-layout-assets', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { promptId, zones, niche, intent, imagePrompt, background_needs_image, background_image_prompt, color_family } = req.body;
+    const { promptId, zones, niche, intent, background_needs_image, background_image_prompt, color_family } = req.body;
     if (!zones || !Array.isArray(zones)) return res.status(400).json({ error: 'zones required' });
 
     const assetZones = zones.filter(z => z.type === 'asset' && ['primary_asset','secondary_asset'].includes(z.role));
@@ -2068,7 +2517,46 @@ app.post('/api/admin/generate-layout-assets', requireAuth, requireAdmin, async (
     // Generate subject/asset images
     for (const zone of assetZones) {
       try {
-        const subjectPrompt = `${imagePrompt || ''}, ${niche} niche, ${intent} intent, isolated subject on transparent or clean background, no text, no overlays, professional marketing asset, ultra high quality`;
+        // Build a niche-specific subject prompt for this asset zone.
+        // Do NOT include any layout/UI description — Flux would generate a full mockup.
+        // Intent modifier — overrides niche subject when intent signals a specific visual style
+        const INTENT_OVERRIDES = {
+          motivate:  { health: 'athletic person in dynamic running or workout pose, sportswear, energetic', lifestyle: 'motivated person in action, bright energetic scene', fitness: 'athlete in powerful workout pose, gym or outdoor' },
+          inspire:   { health: 'athletic person running or jumping, full energy, clean background', fitness: 'athlete at peak performance, dynamic action shot' },
+          challenge: { health: 'person pushing physical limits, sport or fitness activity', fitness: 'competitive athlete in action' },
+          educate:   { health: 'healthcare professional or wellness expert, clean background', finance: 'financial advisor at desk or presentation', business: 'professional presenting or teaching' },
+          entertain: { comedy: 'funny expressive emoji face or cartoon character, bright bold colors', entertainment: 'vibrant performer in colorful costume, dynamic pose' },
+          promote:   {},
+          sell:      {},
+          hook:      {},
+        };
+        const NICHE_ASSET_PROMPTS = {
+          comedy:        'funny expressive emoji face or cartoon character, bright cheerful colors, clean background',
+          entertainment: 'vibrant performer or character, dynamic energetic pose, clean background',
+          gaming:        'gaming character or person with headset and controller, dramatic neon lighting, dark background',
+          education:     'student or teacher with books or laptop, bright professional background',
+          finance:       'confident financial professional in business attire, clean minimal background',
+          business:      'confident professional in smart business attire, clean minimal background',
+          fitness:       'athletic person in dynamic workout pose, gym or studio, energetic',
+          health:        'fit healthy person in athletic wear, vibrant clean background',
+          food:          'appetizing food dish or drink, professional food photography, clean background',
+          fashion:       'stylish person wearing on-trend outfit, editorial studio background',
+          travel:        'person at scenic travel location or with travel gear, vibrant setting',
+          technology:    'sleek modern tech device or person using tech, minimal clean background',
+          lifestyle:     'person enjoying an aspirational lifestyle moment, bright airy background',
+        };
+        const nicheKey = niche?.toLowerCase().replace(/[^a-z]/g, '') || 'business';
+        const intentKey = intent?.toLowerCase() || '';
+        const intentOverride = INTENT_OVERRIDES[intentKey]?.[nicheKey];
+        const nicheDesc = intentOverride || NICHE_ASSET_PROMPTS[nicheKey] || `${niche} subject, professional photo, clean background`;
+        // Vision AI provides per-zone assetDescription — use it as primary prompt when available
+        const zoneDesc = zone.assetDescription || zone._assetDescription;
+        const baseDesc = zoneDesc
+          ? zoneDesc
+          : (zone.role === 'primary_asset'
+            ? `${nicheDesc}, main hero subject, sharp focus, isolated foreground, full body or portrait`
+            : `${nicheDesc}, supporting element, secondary composition`);
+        const subjectPrompt = `${baseDesc}, photorealistic, no text overlays, no logos, no UI elements, no layout mockup, no social media frame, ultra high quality`;
 
         const falRes = await fetch("https://fal.run/fal-ai/flux/dev", {
           method: "POST",
