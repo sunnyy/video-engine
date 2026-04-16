@@ -2245,6 +2245,65 @@ Do NOT create separate zones for every line of text. Max 4 zones total. No CTA z
       }
     }
 
+    // ── visual_rest: ensure exactly asset + label + caption ──────
+    if (intent === 'visual_rest') {
+      // 1. Ensure full-bleed asset zone exists at z-index 1
+      const hasFullAsset = zones.some(z => z.type === 'asset' && (z.width || 0) >= 80 && (z.height || 0) >= 80);
+      if (!hasFullAsset) {
+        // Grab any existing asset zone to steal its assetDescription, else use niche fallback
+        const anyAsset = zones.find(z => z.type === 'asset');
+        const assetDesc = anyAsset?.assetDescription || `atmospheric ${niche || 'lifestyle'} scene, cinematic photography, full bleed`;
+        zones = zones.filter(z => z.type !== 'asset'); // remove partial assets
+        zones.unshift({
+          id: 'vr_asset',
+          type: 'asset', role: 'primary_asset',
+          x: 0, y: 0, width: 100, height: 100,
+          zIndex: 1, start: 0.1, end: null,
+          enterAnimation: 'fadeIn', exitAnimation: 'none',
+          style: { objectFit: 'cover' },
+          content: { kind: 'asset', asset: { src: '', type: 'image', motion: 'none', objectFit: 'cover', enterTransition: 'none', exitTransition: 'none' } },
+          assetDescription: assetDesc,
+          background: {},
+        });
+      }
+      // 2. Ensure label text zone at top
+      const hasLabel = zones.some(z => z.type === 'text' && (z.role === 'label' || (z.y || 0) < 12));
+      if (!hasLabel) {
+        zones.push({
+          id: 'vr_label',
+          type: 'text', role: 'label',
+          x: 35, y: 4, width: 30, height: 3,
+          zIndex: 5, start: 0.2, end: null,
+          enterAnimation: 'fadeIn', exitAnimation: 'none',
+          style: { color: '#ffffff', fontSize: 32, fontWeight: '400', fontFamily: 'Montserrat', textAlign: 'center', letterSpacing: '0.15em' },
+          content: { kind: 'text', text: (niche || 'LIFESTYLE').toUpperCase() },
+          maxChars: 12,
+          background: {},
+        });
+      }
+      // 3. Ensure caption text zone at bottom
+      const hasCaption = zones.some(z => z.type === 'text' && (z.y || 0) > 70);
+      if (!hasCaption) {
+        zones.push({
+          id: 'vr_caption',
+          type: 'text', role: 'subtext',
+          x: 10, y: 84, width: 80, height: 4,
+          zIndex: 5, start: 0.4, end: null,
+          enterAnimation: 'fadeIn', exitAnimation: 'none',
+          style: { color: '#ffffff', fontSize: 44, fontWeight: '300', fontFamily: 'Playfair Display', textAlign: 'center', fontStyle: 'italic' },
+          content: { kind: 'text', text: 'Find your still.' },
+          maxChars: 22,
+          background: {},
+        });
+      }
+      // 4. Remove all other text/decorative/icon zones — keep it minimal
+      zones = zones.filter(z =>
+        (z.type === 'asset' && (z.width || 0) >= 80) ||
+        z.id === 'vr_label' || z.id === 'vr_caption' ||
+        (z.type === 'text' && ((z.role === 'label' && (z.y || 0) < 12) || (z.y || 0) > 70))
+      );
+    }
+
     // ── Re-index IDs ──────────────────────────────────────────────
     zones = zones.map((z, i) => ({ ...z, id: `z${i + 1}` }));
 

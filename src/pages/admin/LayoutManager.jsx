@@ -190,7 +190,7 @@ function LayoutCard({ layout, palette, onEdit, onDuplicate, onDelete }) {
                 ✕
               </button>
             )}
-            <button onClick={onEdit}
+            <button onClick={e => e.ctrlKey || e.metaKey ? window.open(`/admin/layouts/${layout.id}`, '_blank') : onEdit()}
               style={{ padding:"4px 10px", borderRadius:5, fontSize:11, fontWeight:700,
                 background:"#7c5cfc", color:"#fff", border:"none", cursor:"pointer" }}>
               Edit →
