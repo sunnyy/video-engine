@@ -617,42 +617,21 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           );
         })()}
 
-        {/* Asset placeholder — no src yet; only show in editor preview, never in final render */}
-        {previewMode && effectiveType === "asset" && !content.asset?.src && !isAvatarZone && content.kind !== "block" && (() => {
-          const hint = beat?.asset_hint;
-          const keywords = hint?.keywords?.length ? hint.keywords : null;
-          return (
-            <div style={{
-              ...insetBoxStyle,
-              background: "linear-gradient(135deg, rgba(40,40,70,0.9) 0%, rgba(20,20,50,0.9) 100%)",
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              gap: Math.max(4, W * 0.008),
-            }}>
-              <svg width="10%" height="10%" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.15 }}>
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.5"/>
-                <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
-                <path d="M3 15l5-5 4 4 3-3 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              {keywords && (
-                <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap: Math.max(3, W * 0.006), padding: "0 8%" }}>
-                  {keywords.map((kw, i) => (
-                    <span key={i} style={{
-                      fontSize:     Math.max(10, W * 0.014),
-                      fontFamily:   "'JetBrains Mono', monospace",
-                      color:        "rgba(124,92,252,0.85)",
-                      background:   "rgba(124,92,252,0.18)",
-                      borderRadius: 4,
-                      padding:      `${Math.max(2, W * 0.003)}px ${Math.max(4, W * 0.008)}px`,
-                      whiteSpace:   "nowrap",
-                    }}>
-                      {kw}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {/* Asset placeholder — no src yet; only show in editor preview, never in final render.
+            Keywords/hints are handled by ZoneCanvas's ZoneContentLayer overlay — don't duplicate here. */}
+        {previewMode && effectiveType === "asset" && !content.asset?.src && !isAvatarZone && content.kind !== "block" && (
+          <div style={{
+            ...insetBoxStyle,
+            background: "rgba(255,255,255,0.03)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width="18%" height="18%" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.12 }}>
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.5"/>
+              <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
+              <path d="M3 15l5-5 4 4 3-3 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+        )}
 
 
         {/* Text — with optional text effects (suppressed in previewMode) */}
@@ -696,7 +675,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             opacity:         1,
             background:      st.background    || "transparent",
             ...brStyle(),
-            whiteSpace:      st.whiteSpace    || "normal",
+            whiteSpace:      "normal",        // always wrap — never respect stored "nowrap" from stale zone styles
             overflowWrap:    "break-word",   // only breaks within a word when that word alone overflows the line
             wordBreak:       "normal",        // never break mid-character — words wrap at spaces only
             WebkitTextStroke: st.textStrokeWidth > 0

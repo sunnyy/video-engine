@@ -16,14 +16,17 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
 
   const rawZones = raw.zones || null;
 
-  const zones = rawZones || {
+  // Only inject the default z1 zone when there is no layout assigned yet (blank scratch project).
+  // If a layout is present the pipeline's enforceLayoutZones already created the correct zones;
+  // injecting z1 here would create an orphan that survives every layout switch.
+  const zones = rawZones || (raw.layout ? {} : {
     z1: {
       role: mode === "talking_head" ? "avatar" : "asset",
       content: { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
       background: {},
       style: {},
     },
-  };
+  });
 
 
   const captionRaw = raw.caption || {};

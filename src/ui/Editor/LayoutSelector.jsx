@@ -46,7 +46,18 @@ function buildContentPools(oldBeatZones, oldLayoutDef) {
 
   const customZones = {};
   Object.entries(oldBeatZones).forEach(([id, zone]) => {
-    if (!oldDefIds.has(id)) customZones[id] = zone;
+    if (oldDefIds.has(id)) return; // belongs to the layout — handled above
+    // Only carry over custom zones that have real content the user added.
+    // Empty asset zones (src=null) are pipeline/normalization artifacts — drop them
+    // so they don't ghost-haunt every layout the user switches to.
+    const kind = zone?.content?.kind;
+    const hasAssetSrc  = kind === "asset"  && !!zone?.content?.asset?.src;
+    const hasAvatarSrc = kind === "avatar";
+    const hasText      = kind === "text"   && !!zone?.content?.text?.trim();
+    const hasBlock     = kind === "block";
+    if (hasAssetSrc || hasAvatarSrc || hasText || hasBlock) {
+      customZones[id] = zone;
+    }
   });
 
   return { assetPool, textPool, customZones };

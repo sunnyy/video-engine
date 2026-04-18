@@ -4,7 +4,7 @@ import { getUserProjects, deleteProject } from "../services/projects/projectServ
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
 
-function ProjectCard({ project, onDelete, onClick }) {
+function ProjectCard({ project, onDelete }) {
   const [hovering, setHovering] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -48,6 +48,7 @@ function ProjectCard({ project, onDelete, onClick }) {
   const orientation = project.safe_project_json?.meta?.orientation || "9:16";
 
   const handleDelete = (e) => {
+    e.preventDefault();    // don't follow the <a> link
     e.stopPropagation();
     if (confirming) {
       onDelete(project.id);
@@ -58,16 +59,17 @@ function ProjectCard({ project, onDelete, onClick }) {
   };
 
   return (
-    <div
-      onClick={onClick}
+    <a
+      href={`/editor/${project.id}`}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false); }}
-      className="group relative cursor-pointer rounded-[14px] overflow-hidden border transition-all duration-200"
+      className="group relative block rounded-[14px] overflow-hidden border transition-all duration-200"
       style={{
-        background:   "#111118",
-        borderColor:  hovering ? "rgba(124,92,252,0.4)" : "rgba(255,255,255,0.07)",
-        boxShadow:    hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
-        transform:    hovering ? "translateY(-2px)" : "none",
+        textDecoration: "none",
+        background:     "#111118",
+        borderColor:    hovering ? "rgba(124,92,252,0.4)" : "rgba(255,255,255,0.07)",
+        boxShadow:      hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
+        transform:      hovering ? "translateY(-2px)" : "none",
       }}
     >
       {/* Thumbnail */}
@@ -131,7 +133,7 @@ function ProjectCard({ project, onDelete, onClick }) {
           {confirming ? "!" : "✕"}
         </button>
       </div>
-    </div>
+    </a>
   );
 }
 
@@ -179,6 +181,12 @@ export default function Dashboard() {
             style={{ background: "#111118", borderColor: "rgba(255,255,255,0.06)", color: balance !== null && balance < 10 ? "#f97316" : "#7c5cfc" }}>
             ⚡ {balance ?? "—"} credits
           </div>
+          <button
+            onClick={() => navigate("/image-generation")}
+            className="flex items-center gap-2 px-4 py-[8px] rounded-[8px] text-[13px] font-semibold border cursor-pointer transition-all hover:opacity-90"
+            style={{ background: "rgba(124,92,252,0.1)", borderColor: "rgba(124,92,252,0.35)", color: "#a78bfa" }}>
+            🖼 Image Studio
+          </button>
           <button
             onClick={() => navigate("/new")}
             className="flex items-center gap-2 px-4 py-[8px] rounded-[8px] text-[13px] font-bold text-[#0b0b10] border-0 cursor-pointer transition-all hover:opacity-90"
@@ -247,7 +255,6 @@ export default function Dashboard() {
                 key={p.id}
                 project={p}
                 onDelete={handleDelete}
-                onClick={() => navigate(`/editor/${p.id}`)}
               />
             ))}
           </div>

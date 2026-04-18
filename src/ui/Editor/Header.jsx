@@ -330,22 +330,31 @@ export default function Header() {
         )}
 
         {/* Orientation toggle */}
-        <div className="flex bg-[#1c1c28] rounded-[6px] p-[2px]">
+        <div className="flex bg-[#1c1c28] rounded-[6px] p-[2px] gap-[2px]">
           {[
-            ["9:16", "9:16"],
-            ["16:9", "16:9"],
-          ].map(([val, label]) => (
+            ["9:16", /* portrait phone */
+              <svg key="p" width="14" height="18" viewBox="0 0 14 18" fill="none">
+                <rect x="1" y="1" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.6"/>
+              </svg>
+            ],
+            ["16:9", /* landscape */
+              <svg key="l" width="18" height="14" viewBox="0 0 18 14" fill="none">
+                <rect x="1" y="1" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.6"/>
+              </svg>
+            ],
+          ].map(([val, icon]) => (
             <button
               key={val}
               onClick={() => handleOrientationChange(val)}
-              className={`px-3 py-[4px] text-[13px] font-mono rounded-[4px] border-0 transition cursor-pointer
+              title={val}
+              className={`px-[8px] py-[4px] rounded-[4px] border-0 transition cursor-pointer flex items-center justify-center
                 ${
                   project.meta.orientation === val
-                    ? "bg-[#f5c518] text-[#0b0b10] font-bold"
-                    : "bg-[#111118] text-[#55556a] hover:text-[#9494a8]"
+                    ? "bg-[#f5c518] text-[#0b0b10]"
+                    : "bg-transparent text-[#55556a] hover:text-[#9494a8]"
                 }`}
             >
-              {label}
+              {icon}
             </button>
           ))}
         </div>

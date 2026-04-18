@@ -2746,4 +2746,145 @@ app.post('/api/admin/generate-layout-assets', requireAuth, requireAdmin, async (
   }
 });
 
+// POST /api/image-generation/generate
+// Body: { prompt, style, aspect_ratio, quality, count }
+// Generates images via Fal.ai, uploads to Supabase, saves to generated_images table
+app.post("/api/image-generation/generate", requireAuth, async (req, res) => {
+  try {
+    const { prompt, style = "photorealistic", aspect_ratio = "1:1", quality = "standard", count = 1 } = req.body;
+    if (!prompt?.trim()) return res.status(400).json({ error: "prompt required" });
+    if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
+
+    const numImages = Math.min(Math.max(parseInt(count) || 1, 1), 4);
+
+    // Credit cost: standard=1/img, high=2/img
+    const creditsPerImage = quality === "high" ? 2 : 1;
+    const totalCredits = numImages * creditsPerImage;
+
+    const creditResult = await deductCredits(
+      req.user.id,
+      totalCredits,
+      "image_generation",
+      `Image generation: "${prompt.slice(0, 60)}" × ${numImages}`,
+      null
+    );
+    if (!creditResult.success) return res.status(402).json({ error: creditResult.error, code: "NO_CREDITS" });
+
+    // Build fal.ai size from aspect_ratio
+    const SIZES = {
+      "1:1":  { width: 1024, height: 1024 },
+      "16:9": { width: 1280, height: 720  },
+      "9:16": { width: 720,  height: 1280 },
+      "4:3":  { width: 1024, height: 768  },
+      "3:4":  { width: 768,  height: 1024 },
+    };
+    const imageSize = SIZES[aspect_ratio] || SIZES["1:1"];
+
+    // Augment prompt with style hint
+    const STYLE_PROMPTS = {
+      photorealistic: "photorealistic, high quality photo, 8k",
+      illustration:   "digital illustration, vibrant colors, professional artwork",
+      cinematic:      "cinematic photography, dramatic lighting, film grain",
+      minimal:        "minimalist design, clean lines, simple background",
+      anime:          "anime style, detailed, vibrant",
+      "3d":           "3D render, octane render, studio lighting",
+    };
+    const styleHint = STYLE_PROMPTS[style] || "";
+    const fullPrompt = styleHint ? `${prompt.trim()}, ${styleHint}` : prompt.trim();
+
+    const isHighQuality = quality === "high";
+    const model = isHighQuality ? "fal-ai/flux/dev" : "fal-ai/flux/schnell";
+    // schnell: max 12 steps, no guidance_scale; dev: up to 50 steps, guidance_scale supported
+    const falBody = isHighQuality
+      ? { prompt: fullPrompt, image_size: imageSize, num_inference_steps: 28, guidance_scale: 3.5, num_images: numImages, enable_safety_checker: true }
+      : { prompt: fullPrompt, image_size: imageSize, num_inference_steps: 4,  num_images: numImages, enable_safety_checker: true };
+
+    console.log(`[image-gen] user=${req.user.id} model=${model} count=${numImages} size=${imageSize.width}x${imageSize.height}`);
+
+    // Call fal.ai
+    const falRes = await fetch(`https://fal.run/${model}`, {
+      method: "POST",
+      headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(falBody),
+    });
+
+    if (!falRes.ok) {
+      const errText = await falRes.text();
+      console.error("[image-gen] fal.ai error:", errText.slice(0, 200));
+      return res.status(500).json({ error: "Image generation failed", detail: errText.slice(0, 120) });
+    }
+
+    const falData = await falRes.json();
+    const falImages = falData?.images || [];
+    if (!falImages.length) return res.status(500).json({ error: "No images returned from fal.ai" });
+
+    // Upload each image to Supabase storage and save record
+    const results = [];
+    for (const img of falImages) {
+      let storedUrl = img.url;
+      try {
+        const imgRes = await fetch(img.url);
+        if (imgRes.ok) {
+          const buffer = Buffer.from(await imgRes.arrayBuffer());
+          const fname = `generated/${req.user.id}/${uuidv4()}.jpg`;
+          const { error: uploadErr } = await supabaseAdmin.storage
+            .from("user-assets")
+            .upload(fname, buffer, { contentType: "image/jpeg", upsert: false });
+          if (!uploadErr) {
+            const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(fname);
+            storedUrl = publicUrl;
+          } else {
+            console.warn("[image-gen] Upload error:", uploadErr.message);
+          }
+        }
+      } catch (uploadEx) {
+        console.warn("[image-gen] Upload failed:", uploadEx.message);
+      }
+
+      // Save to generated_images table
+      const { data: record } = await supabaseAdmin
+        .from("generated_images")
+        .insert({
+          user_id:      req.user.id,
+          prompt:       prompt.trim(),
+          style,
+          aspect_ratio,
+          quality,
+          url:          storedUrl,
+          fal_url:      img.url,
+          width:        img.width  || imageSize.width,
+          height:       img.height || imageSize.height,
+          credits_used: creditsPerImage,
+        })
+        .select()
+        .single();
+
+      results.push({ url: storedUrl, id: record?.id, width: img.width || imageSize.width, height: img.height || imageSize.height });
+    }
+
+    res.json({ images: results, creditsUsed: totalCredits, balance: creditResult.balance });
+  } catch (err) {
+    console.error("[image-generation/generate]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/image-generation/library — Fetch user's previously generated images
+app.get("/api/image-generation/library", requireAuth, async (req, res) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit)  || 50, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const { data, error } = await supabaseAdmin
+      .from("generated_images")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) throw error;
+    res.json({ images: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));

@@ -285,7 +285,8 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
             role: isGiantDisplay ? "display" : (z.role || "subtext"),
             maxChars,
             isGiantDisplay,
-            locked: z.locked  || false,
+            // Check BOTH layout-def lock (Layout Editor) AND beat-zone lock (ZoneEditor per-beat toggle)
+            locked: z.locked || beat.zones?.[z.id]?.locked || false,
             static: z.static  || false,
           };
         });

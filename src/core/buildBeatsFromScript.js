@@ -30,12 +30,47 @@ function words(text) {
   return text.trim().split(/\s+/).filter(Boolean);
 }
 
-function isLightColor(hex) {
-  if (!hex || !hex.startsWith('#')) return false;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+function isLightColor(color) {
+  if (!color || typeof color !== "string") return false;
+  const c = color.trim().toLowerCase();
+  // CSS named colors → hardcoded luminance classification
+  const LIGHT_NAMES = new Set([
+    "white","whitesmoke","snow","ivory","floralwhite","ghostwhite","mintcream",
+    "aliceblue","lavender","lavenderblush","mistyrose","honeydew","lightyellow",
+    "lightcyan","lightgray","lightgrey","silver","gainsboro","beige","linen",
+    "oldlace","cornsilk","lemonchiffon","lightyellow","papayawhip","blanchedalmond",
+    "bisque","wheat","peachpuff","moccasin","khaki","palegoldenrod","antiquewhite",
+    "yellow","lightsalmon","lightpink","pink","hotpink","plum","thistle","violet",
+    "orchid","palegreen","greenyellow","chartreuse","lime","aquamarine","lightseagreen",
+    "turquoise","lightblue","skyblue","powderblue","paleturquoise","cyan","aqua",
+  ]);
+  const DARK_NAMES = new Set([
+    "black","darkblue","darkgreen","darkred","navy","midnightblue","indigo","purple",
+    "maroon","saddlebrown","sienna","darkslategray","darkslategrey","dimgray","dimgrey",
+    "gray","grey","slategray","slategrey",
+  ]);
+  if (LIGHT_NAMES.has(c)) return true;
+  if (DARK_NAMES.has(c)) return false;
+  // 3-digit hex: #rgb → #rrggbb
+  if (/^#[0-9a-f]{3}$/.test(c)) {
+    const r = parseInt(c[1] + c[1], 16);
+    const g = parseInt(c[2] + c[2], 16);
+    const b = parseInt(c[3] + c[3], 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+  }
+  // 6-digit hex: #rrggbb
+  if (/^#[0-9a-f]{6}$/.test(c)) {
+    const r = parseInt(c.slice(1, 3), 16);
+    const g = parseInt(c.slice(3, 5), 16);
+    const b = parseInt(c.slice(5, 7), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+  }
+  // rgb(...) / rgba(...)
+  const rgb = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgb) {
+    return (parseInt(rgb[1]) * 299 + parseInt(rgb[2]) * 587 + parseInt(rgb[3]) * 114) / 1000 > 128;
+  }
+  return false;
 }
 
 function splitIntoDurationBeats(text) {

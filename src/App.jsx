@@ -22,7 +22,8 @@ import AdminDashboard  from "./pages/admin/AdminDashboard";
 import UserManager     from "./pages/admin/UserManager";
 import LayoutManager   from "./pages/admin/LayoutManager";
 import LayoutEditor    from "./pages/admin/LayoutEditor";
-import LayoutGenerator from "./pages/admin/LayoutGenerator";
+import LayoutGenerator    from "./pages/admin/LayoutGenerator";
+import ImageGeneration   from "./pages/ImageGeneration";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
@@ -100,6 +101,7 @@ export default function App() {
           <>
             <Route path="/" element={<Dashboard />} />
             <Route path="/new" element={<AIGenerator />} />
+            <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/editor/:id" element={<Editor />} />
             <Route path="/terms"   element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />

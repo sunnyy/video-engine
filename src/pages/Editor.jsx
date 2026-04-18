@@ -76,43 +76,53 @@ export default function Editor() {
     }
   };
 
-
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
 
       {showReviewBanner && (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          background: "linear-gradient(90deg, #1a1a2e, #16213e)",
-          borderBottom: "1px solid #7c5cfc44",
-          padding: "10px 20px", gap: 12, flexShrink: 0,
-        }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "linear-gradient(90deg, #1a1a2e, #16213e)",
+            borderBottom: "1px solid #7c5cfc44",
+            padding: "10px 20px",
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18 }}>✅</span>
             <span style={{ fontSize: 13, color: "#c8c8e0", fontWeight: 500 }}>
               Your video is ready — review before exporting:
             </span>
             <span style={{ fontSize: 12, color: "#9090b0" }}>
-              Check images &amp; text on each beat &nbsp;·&nbsp; Swap any images that don't fit &nbsp;·&nbsp; Tweak zones if needed &nbsp;·&nbsp; Then export
+              Check images &amp; text on each beat &nbsp;·&nbsp; Swap any images that don't fit &nbsp;·&nbsp; Tweak
+              zones if needed &nbsp;·&nbsp; Then export
             </span>
           </div>
           <button
             onClick={() => setShowReviewBanner(false)}
             style={{
-              background: "none", border: "none", color: "#6060a0",
-              cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px",
+              background: "none",
+              border: "none",
+              color: "#6060a0",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: 1,
+              padding: "0 4px",
             }}
             title="Dismiss"
-          >×</button>
+          >
+            ×
+          </button>
         </div>
       )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-1 flex-col" style={{ width: "70%" }}>
-          <div style={{ width: "100%" }}>
-            <SystemMessage />
-          </div>
           <div className="flex flex-1 min-h-0 overflow-hidden" style={{ width: "100%" }}>
             <div style={{ width: "10%", height: "100%" }}>
               <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -123,6 +133,8 @@ export default function Editor() {
             </div>
 
             <div style={{ width: "65%", minWidth: "65%", height: "100%" }}>
+              <SystemMessage />
+
               <CanvasPreview
                 selectedZoneIds={selectedZoneIds}
                 onSelectZone={handleSelectZone}

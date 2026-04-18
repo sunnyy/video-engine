@@ -676,8 +676,11 @@ export async function generateStructuredShort({
         const seed = seedMap[zoneDef.role];
         if (!seed || filledRoles.has(zoneDef.role)) return;
 
-        // Skip locked/static zones — content is set by layout designer, not AI
-        if (zoneDef.locked === true || zoneDef.static === true) return;
+        // Skip locked/static zones — content is set by layout designer or user, not AI.
+        // Check BOTH the layout-def-level lock (set in Layout Editor) AND
+        // the beat-level lock (set via ZoneEditor "Lock Zone" toggle in the Editor).
+        const beatZoneLocked = beat.zones?.[zoneDef.id]?.locked === true;
+        if (zoneDef.locked === true || zoneDef.static === true || beatZoneLocked) return;
 
         // Don't overwrite user-edited content
         const existing = beat.zones[zoneDef.id];
@@ -776,7 +779,10 @@ export async function generateStructuredShort({
     const layoutDef = getLayoutDef(beat.layout);
     if (!layoutDef) return;
 
-    const statZones = layoutDef.zones.filter(z => z.type === "text" && z.role === "stat" && !z.locked && !z.static);
+    const statZones = layoutDef.zones.filter(z =>
+      z.type === "text" && z.role === "stat" && !z.locked && !z.static
+      && !beat.zones?.[z.id]?.locked  // also respect beat-level zone lock
+    );
     if (!statZones.length) return;
 
     // Extract the most prominent stat-like token from the spoken text
