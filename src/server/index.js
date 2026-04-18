@@ -13,6 +13,12 @@ import { v4 as uuidv4 } from "uuid";
 import compressVideo from "./compressVideo.cjs";
 import compressAudio from "./compressAudio.cjs";
 import { createClient } from "@supabase/supabase-js";
+import {
+  sendAdminAlert, sendUserEmail,
+  adminNewUserEmail, adminUserDeletedEmail, adminCreditsTopupEmail,
+  adminNewSaleEmail, adminPlanRenewalEmail, adminPlanUpgradeEmail,
+  userWelcomeEmail, userCreditsPurchasedEmail, userLowCreditsEmail,
+} from "./services/emailService.js";
 import axios from "axios";
 import https from "node:https";
 import http  from "node:http";
@@ -76,6 +82,17 @@ async function deductCredits(userId, amount, action, description, projectId = nu
       balance_after: newBalance,
     });
 
+  // Low-credits warning: fire once when balance crosses below 20
+  if (newBalance < 20 && credits.balance >= 20) {
+    supabaseAdmin.auth.admin.getUserById(userId).then(({ data: { user } }) => {
+      if (user?.email) {
+        const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+        const { subject, html } = userLowCreditsEmail(name, newBalance);
+        sendUserEmail(user.email, subject, html);
+      }
+    }).catch(() => {});
+  }
+
   return { success: true, balance: newBalance };
 }
 
@@ -107,6 +124,20 @@ async function addCredits(userId, amount, type, action, description, paymentId =
       payment_id:   paymentId,
       balance_after: newBalance,
     });
+
+  // Fire email alerts for credit purchases (not admin grants / plan assignments)
+  if (type === "purchase" || type === "topup") {
+    supabaseAdmin.auth.admin.getUserById(userId).then(({ data: { user } }) => {
+      if (!user) return;
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+      // Admin alert
+      const adminEmail = adminCreditsTopupEmail({ userEmail: user.email, amount, balance: newBalance });
+      sendAdminAlert(adminEmail.subject, adminEmail.html);
+      // User confirmation
+      const userEmail = userCreditsPurchasedEmail(name, amount, newBalance);
+      sendUserEmail(user.email, userEmail.subject, userEmail.html);
+    }).catch(() => {});
+  }
 
   return { success: true, balance: newBalance };
 }
@@ -180,6 +211,72 @@ async function cacheExternalImage(url) {
     return url;
   }
 }
+
+/* ── User: get own profile ── */
+app.get("/api/user/profile", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", req.user.id)
+      .single();
+    if (error && error.code !== "PGRST116") throw error;
+    res.json(data || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── User: update own profile ── */
+app.post("/api/user/profile", requireAuth, async (req, res) => {
+  try {
+    const allowed = ["niche", "goal", "default_duration", "default_language"];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    updates.updated_at = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update(updates)
+      .eq("id", req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── User: own credit transactions ── */
+app.get("/api/user/transactions", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("credit_transactions")
+      .select("id, amount, type, action, description, balance_after, created_at")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── User: own credit balance + lifetime ── */
+app.get("/api/user/credits", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("user_credits")
+      .select("balance, lifetime_credits")
+      .eq("user_id", req.user.id)
+      .single();
+    if (error && error.code !== "PGRST116") throw error;
+    res.json(data || { balance: 0, lifetime_credits: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /* ---------------- AI ROUTE ---------------- */
 app.post("/api/generate", requireAuth, async (req, res) => {
@@ -947,6 +1044,51 @@ app.get("/api/admin/user-transactions/:userId", requireAuth, requireAdmin, async
     res.json(data || []);
   } catch (err) {
     console.error("[admin/user-transactions]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: delete user ── */
+app.post("/api/admin/delete-user", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId required" });
+
+    // Fetch user info before deleting so we can include it in the alert
+    const { data: { user: deletedUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+    await supabaseAdmin.from("profiles").delete().eq("id", userId);
+    await supabaseAdmin.from("user_credits").delete().eq("user_id", userId);
+    await supabaseAdmin.from("credit_transactions").delete().eq("user_id", userId);
+    await supabaseAdmin.from("projects").delete().eq("user_id", userId);
+    await supabaseAdmin.from("generated_images").delete().eq("user_id", userId);
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (error) throw error;
+
+    // Admin alert
+    const { subject, html } = adminUserDeletedEmail({ id: userId, email: deletedUser?.email || "unknown" });
+    await sendAdminAlert(subject, html);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[admin/delete-user]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Admin: suspend / unsuspend user ── */
+app.post("/api/admin/suspend-user", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, suspend } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId required" });
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      ban_duration: suspend ? "87600h" : "none",
+    });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[admin/suspend-user]", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2746,19 +2888,47 @@ app.post('/api/admin/generate-layout-assets', requireAuth, requireAdmin, async (
   }
 });
 
+// POST /api/image-generation/enhance-prompt
+app.post("/api/image-generation/enhance-prompt", requireAuth, async (req, res) => {
+  try {
+    const { prompt, type } = req.body;
+    if (!prompt?.trim()) return res.status(400).json({ error: "prompt required" });
+    if (!["poster", "thumbnail"].includes(type)) return res.status(400).json({ error: "type must be poster or thumbnail" });
+
+    const instructions = {
+      poster:    "Transform this into a detailed vertical 9:16 marketing poster image generation prompt. Include: bold typography zone, subject/person or product, background style, color palette, decorative elements, CTA area. Professional Canva-style. No UI chrome.",
+      thumbnail: "Transform this into a detailed horizontal 16:9 YouTube thumbnail image generation prompt. Include: expressive human face or reaction, bold text overlay area, high contrast colors, dramatic lighting, click-worthy composition. No UI chrome.",
+    };
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 300,
+      messages: [
+        { role: "system", content: `You are an expert image generation prompt engineer. ${instructions[type]}` },
+        { role: "user",   content: `Original idea: ${prompt.trim()}\n\nWrite an enhanced detailed image generation prompt. Return only the prompt, no explanation.` },
+      ],
+    });
+
+    res.json({ enhanced: response.choices[0].message.content.trim() });
+  } catch (err) {
+    console.error("[enhance-prompt]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/image-generation/generate
 // Body: { prompt, style, aspect_ratio, quality, count }
 // Generates images via Fal.ai, uploads to Supabase, saves to generated_images table
 app.post("/api/image-generation/generate", requireAuth, async (req, res) => {
   try {
-    const { prompt, style = "photorealistic", aspect_ratio = "1:1", quality = "standard", count = 1 } = req.body;
+    const { prompt, aspect_ratio = "1:1", count = 1, type = "image" } = req.body;
+    const quality = "standard";
     if (!prompt?.trim()) return res.status(400).json({ error: "prompt required" });
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
 
     const numImages = Math.min(Math.max(parseInt(count) || 1, 1), 4);
 
-    // Credit cost: standard=1/img, high=2/img
-    const creditsPerImage = quality === "high" ? 2 : 1;
+    const creditsPerImage = 2;
     const totalCredits = numImages * creditsPerImage;
 
     const creditResult = await deductCredits(
@@ -2775,22 +2945,37 @@ app.post("/api/image-generation/generate", requireAuth, async (req, res) => {
       "1:1":  { width: 1024, height: 1024 },
       "16:9": { width: 1280, height: 720  },
       "9:16": { width: 720,  height: 1280 },
-      "4:3":  { width: 1024, height: 768  },
-      "3:4":  { width: 768,  height: 1024 },
     };
     const imageSize = SIZES[aspect_ratio] || SIZES["1:1"];
 
-    // Augment prompt with style hint
-    const STYLE_PROMPTS = {
-      photorealistic: "photorealistic, high quality photo, 8k",
-      illustration:   "digital illustration, vibrant colors, professional artwork",
-      cinematic:      "cinematic photography, dramatic lighting, film grain",
-      minimal:        "minimalist design, clean lines, simple background",
-      anime:          "anime style, detailed, vibrant",
-      "3d":           "3D render, octane render, studio lighting",
+
+    // Auto-enhance short prompts (<200 chars) — transparent to the user
+    const ENHANCE_THRESHOLD = 200;
+    const ENHANCE_INSTRUCTIONS = {
+      image:     "Transform this into a detailed, vivid image generation prompt. Describe lighting, composition, mood, colors, and style. Keep it natural and photographic.",
+      poster:    "Transform this into a detailed vertical 9:16 marketing poster image generation prompt. Include bold typography area, subject, background style, color palette, decorative elements, CTA zone. Professional Canva-style. No text overlays, no UI chrome.",
+      thumbnail: "Transform this into a detailed horizontal 16:9 YouTube thumbnail image generation prompt. Include expressive face or reaction, high contrast colors, dramatic lighting, click-worthy composition. No UI chrome.",
     };
-    const styleHint = STYLE_PROMPTS[style] || "";
-    const fullPrompt = styleHint ? `${prompt.trim()}, ${styleHint}` : prompt.trim();
+
+    let finalPrompt = prompt.trim();
+    if (finalPrompt.length < ENHANCE_THRESHOLD) {
+      try {
+        const enhanced = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_tokens: 200,
+          messages: [
+            { role: "system", content: ENHANCE_INSTRUCTIONS[type] || ENHANCE_INSTRUCTIONS.image },
+            { role: "user",   content: finalPrompt },
+          ],
+        });
+        finalPrompt = enhanced.choices[0].message.content.trim();
+        console.log(`[image-gen] prompt auto-enhanced (${prompt.length} → ${finalPrompt.length} chars)`);
+      } catch (e) {
+        console.warn("[image-gen] prompt enhancement failed, using original:", e.message);
+      }
+    }
+
+    const fullPrompt = finalPrompt;
 
     const isHighQuality = quality === "high";
     const model = isHighQuality ? "fal-ai/flux/dev" : "fal-ai/flux/schnell";
@@ -2841,13 +3026,13 @@ app.post("/api/image-generation/generate", requireAuth, async (req, res) => {
         console.warn("[image-gen] Upload failed:", uploadEx.message);
       }
 
-      // Save to generated_images table
-      const { data: record } = await supabaseAdmin
+      // Save to generated_images table — try full schema first, fall back to minimal
+      let record = null;
+      const { data: dbRecord, error: insertErr } = await supabaseAdmin
         .from("generated_images")
         .insert({
           user_id:      req.user.id,
           prompt:       prompt.trim(),
-          style,
           aspect_ratio,
           quality,
           url:          storedUrl,
@@ -2858,13 +3043,45 @@ app.post("/api/image-generation/generate", requireAuth, async (req, res) => {
         })
         .select()
         .single();
+      if (insertErr) console.error("[image-gen] DB insert error:", insertErr.message);
+      else console.log("[image-gen] Saved record id:", dbRecord?.id);
 
-      results.push({ url: storedUrl, id: record?.id, width: img.width || imageSize.width, height: img.height || imageSize.height });
+      results.push({ url: storedUrl, id: dbRecord?.id, width: img.width || imageSize.width, height: img.height || imageSize.height });
     }
 
     res.json({ images: results, creditsUsed: totalCredits, balance: creditResult.balance });
   } catch (err) {
     console.error("[image-generation/generate]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/image-generation/:id — Delete a generated image record
+app.delete("/api/image-generation/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Verify ownership before deleting
+    const { data, error: fetchErr } = await supabaseAdmin
+      .from("generated_images")
+      .select("id, url, user_id")
+      .eq("id", id)
+      .single();
+    if (fetchErr || !data) return res.status(404).json({ error: "Not found" });
+    if (data.user_id !== req.user.id) return res.status(403).json({ error: "Forbidden" });
+
+    // Delete DB record
+    await supabaseAdmin.from("generated_images").delete().eq("id", id);
+
+    // Best-effort: delete from storage if it's a Supabase URL
+    try {
+      const match = data.url?.match(/\/user-assets\/(.+)$/);
+      if (match) {
+        await supabaseAdmin.storage.from("user-assets").remove([decodeURIComponent(match[1])]);
+      }
+    } catch { /* ignore storage errors */ }
+
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -2883,6 +3100,34 @@ app.get("/api/image-generation/library", requireAuth, async (req, res) => {
     if (error) throw error;
     res.json({ images: data || [] });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Webhook: Supabase new user signup ──────────────────────────────────────
+   Configure in Supabase Dashboard → Database → Webhooks:
+     Table: auth.users  |  Event: INSERT  |  URL: <your-domain>/api/webhooks/user-created
+   During local dev this won't fire — that's fine, wire it up after deployment.
+────────────────────────────────────────────────────────────────────────────── */
+app.post("/api/webhooks/user-created", async (req, res) => {
+  try {
+    const { record } = req.body;
+    if (!record) return res.status(400).json({ error: "no record" });
+
+    const { id, email, raw_user_meta_data } = record;
+    const name = raw_user_meta_data?.full_name || raw_user_meta_data?.name || "";
+
+    // Admin alert (fire-and-forget)
+    const adminEmail = adminNewUserEmail({ id, email, name });
+    sendAdminAlert(adminEmail.subject, adminEmail.html);
+
+    // Welcome email to user
+    const welcome = userWelcomeEmail(name);
+    sendUserEmail(email, welcome.subject, welcome.html);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[webhook/user-created]", err.message);
     res.status(500).json({ error: err.message });
   }
 });

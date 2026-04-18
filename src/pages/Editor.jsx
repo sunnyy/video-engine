@@ -24,7 +24,6 @@ export default function Editor() {
   const [activeTab, setActiveTab] = useState("beats");
   const [beatTab, setBeatTab] = useState("layout");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
-  const [showReviewBanner, setShowReviewBanner] = useState(!!location.state?.showReviewPrompt);
 
   useEffect(() => {
     async function load() {
@@ -80,59 +79,18 @@ export default function Editor() {
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
 
-      {showReviewBanner && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "linear-gradient(90deg, #1a1a2e, #16213e)",
-            borderBottom: "1px solid #7c5cfc44",
-            padding: "10px 20px",
-            gap: 12,
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 18 }}>✅</span>
-            <span style={{ fontSize: 13, color: "#c8c8e0", fontWeight: 500 }}>
-              Your video is ready — review before exporting:
-            </span>
-            <span style={{ fontSize: 12, color: "#9090b0" }}>
-              Check images &amp; text on each beat &nbsp;·&nbsp; Swap any images that don't fit &nbsp;·&nbsp; Tweak
-              zones if needed &nbsp;·&nbsp; Then export
-            </span>
-          </div>
-          <button
-            onClick={() => setShowReviewBanner(false)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#6060a0",
-              cursor: "pointer",
-              fontSize: 18,
-              lineHeight: 1,
-              padding: "0 4px",
-            }}
-            title="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex flex-1 flex-col" style={{ width: "70%" }}>
+        <div className="flex flex-1 flex-col" style={{ width: "65%" }}>
           <div className="flex flex-1 min-h-0 overflow-hidden" style={{ width: "100%" }}>
             <div style={{ width: "10%", height: "100%" }}>
               <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
             </div>
 
-            <div style={{ width: "25%", height: "100%" }}>
+            <div style={{ width: "28%", height: "100%" }}>
               <BeatList setActiveTab={setActiveTab} setBeatTab={setBeatTab} />
             </div>
 
-            <div style={{ width: "65%", minWidth: "65%", height: "100%" }}>
+            <div style={{ width: "62%", minWidth: "62%", height: "100%" }}>
               <SystemMessage />
 
               <CanvasPreview
@@ -144,7 +102,7 @@ export default function Editor() {
           </div>
         </div>
 
-        <div style={{ width: "30%" }}>
+        <div style={{ width: "35%" }}>
           <EditorPanel
             activeTab={activeTab}
             setActiveTab={setActiveTab}

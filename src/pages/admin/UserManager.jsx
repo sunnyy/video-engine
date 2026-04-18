@@ -271,12 +271,17 @@ function EditUserModal({ user, onClose, onUpdated }) {
 
 /* ── Main ── */
 export default function UserManager() {
-  const [users,   setUsers]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState("");
-  const [sortBy,  setSortBy]  = useState("created_at");
-  const [sortDir, setSortDir] = useState("desc");
-  const [editUser, setEditUser] = useState(null);
+  const [users,        setUsers]        = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [search,       setSearch]       = useState("");
+  const [sortBy,       setSortBy]       = useState("created_at");
+  const [sortDir,      setSortDir]      = useState("desc");
+  const [editUser,     setEditUser]     = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // user to delete
+  const [deleting,     setDeleting]     = useState(false);
+  const [suspending,   setSuspending]   = useState(null); // userId being toggled
+  const [creditTarget, setCreditTarget] = useState(null); // userId for inline credit adjust
+  const [creditAmt,    setCreditAmt]    = useState("");
 
   useEffect(() => {
     async function load() {
@@ -296,6 +301,57 @@ export default function UserManager() {
   function handleUpdated(updated) {
     setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
     if (editUser?.id === updated.id) setEditUser(u => ({ ...u, ...updated }));
+  }
+
+  async function handleDelete(user) {
+    setDeleting(true);
+    try {
+      const res = await serverFetch("/api/admin/delete-user", {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+      setDeleteTarget(null);
+    } catch (e) {
+      alert("Delete failed: " + e.message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleSuspend(user) {
+    const suspend = !user.banned_until;
+    setSuspending(user.id);
+    try {
+      const res = await serverFetch("/api/admin/suspend-user", {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id, suspend }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, banned_until: suspend ? "suspended" : null } : u));
+    } catch (e) {
+      alert("Suspend failed: " + e.message);
+    } finally {
+      setSuspending(null);
+    }
+  }
+
+  async function handleQuickCredits(user) {
+    const n = parseInt(creditAmt, 10);
+    if (!n || n === 0) return;
+    try {
+      const res = await serverFetch("/api/admin/add-credits", {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id, amount: n, reason: "Admin quick adjust" }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, balance: (u.balance ?? 0) + n } : u));
+      setCreditTarget(null);
+      setCreditAmt("");
+    } catch (e) {
+      alert("Credits failed: " + e.message);
+    }
   }
 
   /* Sort + filter */
@@ -390,10 +446,58 @@ export default function UserManager() {
                   <td className="px-3 py-3 text-[#666] text-sm whitespace-nowrap">{fmtDate(u.last_sign_in_at)}</td>
                   <td className="px-3 py-3 text-[#666] text-sm whitespace-nowrap">{fmtDate(u.created_at)}</td>
                   <td className="px-3 py-3">
-                    <button onClick={() => setEditUser(u)}
-                      className="px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-lg text-[#aaa] text-xs cursor-pointer hover:bg-[#7c5cfc]/20 hover:text-[#a78bfa] hover:border-[#7c5cfc]/40 transition-colors opacity-0 group-hover:opacity-100">
-                      Edit
-                    </button>
+                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Edit */}
+                      <button onClick={() => setEditUser(u)}
+                        className="px-2.5 py-1.5 bg-white/[0.05] border border-white/10 rounded-lg text-[#aaa] text-xs cursor-pointer hover:bg-[#7c5cfc]/20 hover:text-[#a78bfa] hover:border-[#7c5cfc]/40 transition-colors">
+                        Edit
+                      </button>
+
+                      {/* Suspend */}
+                      <button
+                        onClick={() => handleSuspend(u)}
+                        disabled={suspending === u.id}
+                        className="px-2.5 py-1.5 rounded-lg text-xs cursor-pointer border transition-colors disabled:opacity-50"
+                        style={u.banned_until
+                          ? { background: "rgba(245,197,24,0.08)", borderColor: "rgba(245,197,24,0.3)", color: "#f5c518" }
+                          : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "#888" }}>
+                        {suspending === u.id ? "…" : u.banned_until ? "Unsuspend" : "Suspend"}
+                      </button>
+
+                      {/* Quick credits */}
+                      {creditTarget === u.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            autoFocus
+                            type="number"
+                            placeholder="±amt"
+                            value={creditAmt}
+                            onChange={e => setCreditAmt(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") handleQuickCredits(u); if (e.key === "Escape") { setCreditTarget(null); setCreditAmt(""); } }}
+                            className="w-16 px-2 py-1 bg-[#0d0d14] border border-[#22c55e]/40 rounded-lg text-white text-xs outline-none"
+                          />
+                          <button onClick={() => handleQuickCredits(u)}
+                            className="px-2 py-1.5 bg-[#22c55e]/15 border border-[#22c55e]/30 rounded-lg text-[#22c55e] text-xs cursor-pointer hover:bg-[#22c55e]/25 transition-colors">
+                            ✓
+                          </button>
+                          <button onClick={() => { setCreditTarget(null); setCreditAmt(""); }}
+                            className="px-2 py-1.5 bg-white/[0.03] border border-white/10 rounded-lg text-[#666] text-xs cursor-pointer hover:text-white transition-colors">
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => { setCreditTarget(u.id); setCreditAmt(""); }}
+                          className="px-2.5 py-1.5 bg-transparent border border-[#22c55e]/20 rounded-lg text-[#22c55e] text-xs cursor-pointer hover:bg-[#22c55e]/20 transition-colors">
+                          ⚡ Credits
+                        </button>
+                      )}
+
+                      {/* Delete */}
+                      <button onClick={() => setDeleteTarget(u)}
+                        className="px-2.5 py-1.5 bg-red-500/[0.08] border border-red-500/20 rounded-lg text-red-400 text-xs cursor-pointer hover:bg-red-500/20 transition-colors">
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -413,6 +517,33 @@ export default function UserManager() {
           onClose={() => setEditUser(null)}
           onUpdated={handleUpdated}
         />
+      )}
+
+      {/* Delete confirm dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[1000]"
+          onClick={e => e.target === e.currentTarget && !deleting && setDeleteTarget(null)}>
+          <div className="bg-[#16161f] border border-red-500/20 rounded-2xl w-[400px] p-7 flex flex-col gap-5">
+            <div>
+              <div className="text-lg font-bold text-white mb-1">Delete User</div>
+              <div className="text-sm text-[#888]">This is irreversible. All data — projects, images, credits, and the account — will be permanently deleted.</div>
+            </div>
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3">
+              <div className="text-xs text-[#555] mb-0.5">User</div>
+              <div className="text-sm text-white font-mono truncate">{deleteTarget.email}</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                className="flex-1 py-2.5 bg-white/[0.05] border border-white/10 rounded-lg text-[#888] text-sm cursor-pointer hover:text-white transition-colors disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={() => handleDelete(deleteTarget)} disabled={deleting}
+                className="flex-1 py-2.5 bg-red-500/20 border border-red-500/40 rounded-lg text-red-400 text-sm font-semibold cursor-pointer hover:bg-red-500/30 transition-colors disabled:opacity-50">
+                {deleting ? "Deleting…" : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AdminLayout>
   );

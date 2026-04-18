@@ -13,6 +13,7 @@ import LandingPage     from "./pages/LandingPage";
 import TermsOfService  from "./pages/legal/TermsOfService";
 import PrivacyPolicy   from "./pages/legal/PrivacyPolicy";
 import RefundPolicy    from "./pages/legal/RefundPolicy";
+import About           from "./pages/About";
 import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
@@ -22,8 +23,11 @@ import AdminDashboard  from "./pages/admin/AdminDashboard";
 import UserManager     from "./pages/admin/UserManager";
 import LayoutManager   from "./pages/admin/LayoutManager";
 import LayoutEditor    from "./pages/admin/LayoutEditor";
-import LayoutGenerator    from "./pages/admin/LayoutGenerator";
-import ImageGeneration   from "./pages/ImageGeneration";
+import LayoutGenerator from "./pages/admin/LayoutGenerator";
+import ImageGeneration from "./pages/ImageGeneration";
+import Assets          from "./pages/Assets";
+import CreditsPage     from "./pages/Credits";
+import Settings        from "./pages/Settings";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
@@ -33,16 +37,13 @@ import System          from "./pages/admin/System";
 export default function App() {
   const [session,    setSession]    = useState(null);
   const [loading,    setLoading]    = useState(true);
-  const [recovering, setRecovering] = useState(false); // true when user landed via password-reset link
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
-    // Pre-warm the layout registry cache so sync getters work before generation
     initLayoutRegistry().catch(() => {});
 
-    // Register global handler for 402 NO_CREDITS responses
     setInsufficientCreditsHandler(() => {
       alert("Not enough credits. Purchase more to continue.");
-      // TODO: replace alert with a credits purchase modal / navigate to /pricing
     });
 
     getSession().then((sess) => {
@@ -73,7 +74,6 @@ export default function App() {
 
   const isAdmin = session?.user?.app_metadata?.role === "admin";
 
-  // Password recovery flow — show reset form regardless of session state
   if (recovering) {
     return (
       <BrowserRouter>
@@ -87,46 +87,52 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {!session ? (
-          <>
-            <Route path="/"              element={<LandingPage />} />
-            <Route path="/login"         element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/terms"         element={<TermsOfService />} />
-            <Route path="/privacy"       element={<PrivacyPolicy />} />
-            <Route path="/refunds"       element={<RefundPolicy />} />
-            <Route path="*"              element={<Navigate to="/" />} />
-          </>
-        ) : (
-          <>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/new" element={<AIGenerator />} />
-            <Route path="/image-generation" element={<ImageGeneration />} />
-            <Route path="/editor/:id" element={<Editor />} />
-            <Route path="/terms"   element={<TermsOfService />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/refunds" element={<RefundPolicy />} />
+        {/* ── Public routes — always accessible ── */}
+        <Route path="/"              element={<LandingPage />} />
+        <Route path="/about"         element={<About />} />
+        <Route path="/terms"         element={<TermsOfService />} />
+        <Route path="/privacy"       element={<PrivacyPolicy />} />
+        <Route path="/refunds"       element={<RefundPolicy />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Admin routes — role-gated: app_metadata.role must equal "admin" */}
+        {/* /login → redirect to /dashboard if already signed in */}
+        <Route path="/login" element={session ? <Navigate to="/dashboard" /> : <Auth />} />
+
+        {/* ── Protected app routes ── */}
+        {session ? (
+          <>
+            <Route path="/dashboard"        element={<Dashboard />} />
+            <Route path="/new"              element={<AIGenerator />} />
+            <Route path="/image-generation" element={<ImageGeneration />} />
+            <Route path="/assets"           element={<Assets />} />
+            <Route path="/credits"          element={<CreditsPage />} />
+            <Route path="/settings"         element={<Settings />} />
+            <Route path="/editor/:id"       element={<Editor />} />
+
+            {/* Admin routes */}
             {isAdmin ? (
               <>
-                <Route path="/admin"               element={<AdminDashboard />} />
-                <Route path="/admin/analytics"    element={<Analytics />} />
-                <Route path="/admin/users"        element={<UserManager />} />
-                <Route path="/admin/credits"      element={<Credits />} />
-                <Route path="/admin/plans"        element={<PlansSales />} />
-                <Route path="/admin/system"       element={<System />} />
-                <Route path="/admin/layouts"              element={<LayoutManager />} />
-                <Route path="/admin/ai-generator"         element={<LayoutGenerator />} />
-                <Route path="/admin/layouts/:layoutId"   element={<LayoutEditor />} />
-                <Route path="/admin/library"             element={<ImageLibrary />} />
+                <Route path="/admin"                   element={<AdminDashboard />} />
+                <Route path="/admin/analytics"         element={<Analytics />} />
+                <Route path="/admin/users"             element={<UserManager />} />
+                <Route path="/admin/credits"           element={<Credits />} />
+                <Route path="/admin/plans"             element={<PlansSales />} />
+                <Route path="/admin/system"            element={<System />} />
+                <Route path="/admin/layouts"           element={<LayoutManager />} />
+                <Route path="/admin/ai-generator"      element={<LayoutGenerator />} />
+                <Route path="/admin/layouts/:layoutId" element={<LayoutEditor />} />
+                <Route path="/admin/library"           element={<ImageLibrary />} />
               </>
             ) : (
-              <Route path="/admin/*" element={<Navigate to="/" />} />
+              <Route path="/admin/*" element={<Navigate to="/dashboard" />} />
             )}
 
-            <Route path="*" element={<Navigate to="/" />} />
+            {/* Unknown routes → app home */}
+            <Route path="*" element={<Navigate to="/dashboard" />} />
           </>
+        ) : (
+          /* Unauthenticated → gate to login */
+          <Route path="*" element={<Navigate to="/login" />} />
         )}
       </Routes>
     </BrowserRouter>

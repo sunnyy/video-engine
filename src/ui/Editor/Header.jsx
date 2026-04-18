@@ -142,7 +142,7 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {/* Back to dashboard */}
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/dashboard")}
           className="flex items-center gap-1 text-[#77777f] hover:text-[#e8e8f0] transition-colors text-[16px] bg-transparent border-0 cursor-pointer"
         >
           ← <span className="hidden sm:inline">Home</span>
@@ -241,7 +241,7 @@ export default function Header() {
                   </button>
                 ))}
                 <button
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate("/dashboard")}
                   className="w-full text-left px-2 py-[6px] mt-1 rounded-[6px] text-[12px] text-[#7c5cfc] hover:bg-[rgba(124,92,252,0.1)] bg-transparent border-0 cursor-pointer transition-all"
                 >
                   View all projects →
@@ -251,7 +251,7 @@ export default function Header() {
                 <button
                   onClick={async () => {
                     await signOut();
-                    navigate("/");
+                    navigate("/login");
                   }}
                   className="w-full text-left text-[13px] text-[#f87171] hover:text-[#fca5a5] bg-transparent border-0 cursor-pointer py-1"
                 >
@@ -407,7 +407,7 @@ export default function Header() {
         <button
           onClick={async () => {
             await signOut();
-            navigate("/");
+            navigate("/login");
           }}
           className="text-[13px] text-[#f87171] bg-transparent border-0 cursor-pointer hover:opacity-80 transition-opacity px-1"
         >

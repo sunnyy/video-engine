@@ -3,6 +3,7 @@
  * Shared sidebar + header shell for all admin pages.
  */
 import { NavLink, useNavigate } from "react-router-dom";
+import { signOut } from "../../services/auth/authService";
 
 const NAV = [
   { to: "/admin",            label: "Dashboard",     icon: "▦" },
@@ -45,10 +46,14 @@ export default function AdminLayout({ children, fullBleed = false }) {
           ))}
         </nav>
 
-        <div className="px-5 pt-4 border-t border-white/[0.06]">
-          <button onClick={() => navigate("/")}
+        <div className="px-5 pt-4 border-t border-white/[0.06] flex flex-col gap-2">
+          <button onClick={() => navigate("/dashboard")}
             className="w-full py-2 bg-white/5 border border-white/10 rounded-lg text-[#aaa] text-sm cursor-pointer hover:bg-white/10 transition-colors">
             ← Back to App
+          </button>
+          <button onClick={async () => { await signOut(); navigate("/login"); }}
+            className="w-full py-2 rounded-lg text-sm cursor-pointer transition-colors border border-red-500/50 text-red-400/70 bg-transparent hover:bg-red-500/80 hover:text-white">
+            Sign Out
           </button>
         </div>
       </aside>

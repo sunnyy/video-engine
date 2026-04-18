@@ -21,6 +21,7 @@ export async function signIn(email, password) {
 }
 
 export async function signOut() {
+  sessionStorage.removeItem("onboarding_checked");
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }
@@ -38,6 +39,14 @@ export async function requestPasswordReset(email) {
 
 export async function updatePassword(newPassword) {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${window.location.origin}/dashboard` },
+  });
   if (error) throw error;
 }
 

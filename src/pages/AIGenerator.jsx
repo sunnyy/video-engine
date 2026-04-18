@@ -380,7 +380,28 @@ export default function AIGenerator() {
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8" style={{ background: "#0f0f18" }}>
+    <div className="min-h-screen flex flex-col text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
+
+      {/* ── Header ── */}
+      <div className="border-b border-[rgba(255,255,255,0.06)] px-6 py-3 flex items-center justify-between shrink-0" style={{ background: "#111118" }}>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate("/dashboard")}
+            className="text-[#77777f] hover:text-[#e8e8f0] transition-colors text-[14px] bg-transparent border-0 cursor-pointer">
+            ← Home
+          </button>
+          <div className="w-[1px] h-[18px] bg-[rgba(255,255,255,0.08)]" />
+          <div className="w-[32px] h-[22px] flex items-center justify-center rounded-[4px] bg-[#f5c518] text-[#0b0b10] font-bold text-[13px]"
+            style={{ fontFamily: "'Syne',sans-serif" }}>VE</div>
+          <span className="text-[15px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>
+            Create Video
+          </span>
+        </div>
+      </div>
+
+      {/* ── Page body ── */}
+      <div className="flex-1 flex items-start justify-center px-4 py-10 overflow-y-auto">
+      <div className="w-full max-w-[520px] flex flex-col gap-6">
+
       {/* Loading overlay */}
       {loading && (
         <div
@@ -494,18 +515,11 @@ export default function AIGenerator() {
         </div>
       )}
 
-      <div
-        className="w-full max-w-[520px] rounded-[20px] border border-[rgba(255,255,255,0.12)] p-8 flex flex-col gap-6"
-        style={{ background: "#13132a" }}
-      >
         {/* Header */}
         <div>
           <h2 className="text-[22px] font-bold text-[#e8e8f0] mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>
             Create New Video
           </h2>
-          <p className="text-[14px] text-[#8888a8]">
-            AI writes the script · Engine assembles the video
-          </p>
         </div>
 
         {/* ── Step 1: Mode selection ── */}
@@ -849,6 +863,8 @@ export default function AIGenerator() {
           </div>
         </div>
       )}
+
+      </div>
     </div>
   );
 }

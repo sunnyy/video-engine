@@ -1,848 +1,605 @@
 /**
- * LandingPage.jsx
- * src/pages/LandingPage.jsx
- *
- * Dark cinematic premium landing page.
- * Add to App.jsx route: <Route path="/" element={<LandingPage />} />
- * Google Fonts needed (already in index.html):
- *   Bebas Neue, Outfit, Cormorant Garamond, Barlow Condensed
+ * LandingPage.jsx — src/pages/LandingPage.jsx
+ * VideoEngine — Dark + Yellow. Bento grid. Container-based. No internals exposed.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { signInWithGoogle, getSession } from "../services/auth/authService";
 
-/* ── Scroll reveal hook ─────────────────────────────────── */
 function useReveal() {
   useEffect(() => {
-    const els = document.querySelectorAll(".reveal");
+    const els = document.querySelectorAll("[data-reveal]");
     const io = new IntersectionObserver(
-      (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("revealed"); }),
-      { threshold: 0.12 }
+      entries => entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.style.opacity = "1";
+          e.target.style.transform = "translateY(0) scale(1)";
+        }
+      }),
+      { threshold: 0.08 }
     );
     els.forEach(el => io.observe(el));
     return () => io.disconnect();
   }, []);
 }
 
-/* ── Noise texture SVG (inline) ─────────────────────────── */
-const NoiseBg = () => (
-  <svg style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.03 }} xmlns="http://www.w3.org/2000/svg">
-    <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" /><feColorMatrix type="saturate" values="0" /></filter>
-    <rect width="100%" height="100%" filter="url(#noise)" />
-  </svg>
-);
-
-/* ── Floating orbs background ───────────────────────────── */
-const Orbs = () => (
-  <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
-    <div className="orb orb1" />
-    <div className="orb orb2" />
-    <div className="orb orb3" />
-  </div>
-);
-
-/* ── Beat card mock ─────────────────────────────────────── */
-const BeatCard = ({ bg, accent, label, sub, delay = 0 }) => (
-  <div className="beat-card reveal" style={{ "--delay": `${delay}ms`, "--accent": accent, background: bg }}>
-    <div className="beat-card-img" />
-    <div className="beat-card-body">
-      <div className="beat-card-label">{label}</div>
-      <div className="beat-card-sub">{sub}</div>
-    </div>
-    <div className="beat-card-bar" style={{ background: accent }} />
-  </div>
-);
-
-/* ── Niche pill ─────────────────────────────────────────── */
-const NichePill = ({ label, emoji }) => (
-  <div className="niche-pill">
-    <span>{emoji}</span>
-    <span>{label}</span>
-  </div>
-);
-
-/* ── Feature card ───────────────────────────────────────── */
-const FeatureCard = ({ title, desc, icon, accent, delay = 0 }) => (
-  <div className="feature-card reveal" style={{ "--delay": `${delay}ms`, "--accent": accent }}>
-    <div className="feature-icon">{icon}</div>
-    <h3 className="feature-title">{title}</h3>
-    <p className="feature-desc">{desc}</p>
-  </div>
-);
-
-/* ── Plan card ──────────────────────────────────────────── */
-const PlanCard = ({ name, price, credits, videos, features, accent, highlight }) => {
-  const navigate = useNavigate();
-  return (
-    <div className={`plan-card reveal ${highlight ? "plan-highlight" : ""}`} style={{ "--accent": accent }}>
-      {highlight && <div className="plan-badge">Most Popular</div>}
-      <div className="plan-name">{name}</div>
-      <div className="plan-price">
-        <span className="plan-dollar">$</span>
-        <span className="plan-amount">{price}</span>
-        <span className="plan-per">/mo</span>
-      </div>
-      <div className="plan-credits">{credits} credits/month</div>
-      <div className="plan-hint">~{videos} full AI videos (30-sec)</div>
-      <ul className="plan-features">
-        {features.map((f, i) => <li key={i}><span className="plan-check">✓</span>{f}</li>)}
-      </ul>
-      <button className="plan-btn" onClick={() => navigate("/login")} style={{ background: highlight ? accent : "transparent", borderColor: accent, color: highlight ? "#fff" : accent }}>
-        Get Started
-      </button>
-    </div>
-  );
-};
-
-/* ── FAQ item ───────────────────────────────────────────── */
-const FAQItem = ({ q, a }) => {
+function FAQItem({ q, a }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`faq-item ${open ? "open" : ""}`} onClick={() => setOpen(!open)}>
-      <div className="faq-q">
-        <span>{q}</span>
-        <span className="faq-arrow">{open ? "−" : "+"}</span>
+    <div onClick={() => setOpen(!open)} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "22px 0", cursor: "pointer" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 15, color: "#c8c8d8", fontWeight: 500, lineHeight: 1.5 }}>{q}</span>
+        <span style={{ color: "#f5c518", fontSize: 22, flexShrink: 0, fontWeight: 300, lineHeight: 1, width: 24, textAlign: "center" }}>{open ? "−" : "+"}</span>
       </div>
-      {open && <div className="faq-a">{a}</div>}
+      {open && <div style={{ marginTop: 14, fontFamily: "var(--font-body)", fontSize: 16, color: "#8888a8", lineHeight: 1.75 }}>{a}</div>}
     </div>
   );
-};
+}
 
-/* ── Main page ──────────────────────────────────────────── */
+const CSS = `
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  :root {
+    --bg: #0b0b10; --bg2: #0f0f16; --card: #111118; --card2: #13131c;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.04);
+    --yellow: #f5c518; --yellow-dim: rgba(245,197,24,0.12); --yellow-glow: rgba(245,197,24,0.06);
+    --text: #e8e8f0; --muted: #8888a8; --dim: #606078;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-body: 'Outfit', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 16px; --container: 1160px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  body::after { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); opacity: 0.02; pointer-events: none; z-index: 9999; }
+  .container { max-width: var(--container); margin: 0 auto; padding: 0 40px; }
+  @media (max-width: 768px) { .container { padding: 0 20px; } }
+
+  /* NAV */
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: rgba(11,11,16,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border2); height: 60px; }
+  .nav-inner { max-width: var(--container); margin: 0 auto; padding: 0 40px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  @media (max-width: 768px) { .nav-inner { padding: 0 20px; } }
+  .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .nav-logo-box { width: 30px; height: 20px; background: var(--yellow); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 13px; color: #0b0b10; border-radius: 3px; letter-spacing: 0.5px; }
+  .nav-logo-text { font-family: var(--font-display); font-size: 19px; letter-spacing: 2px; color: var(--text); }
+  .nav-right { display: flex; align-items: center; gap: 8px; }
+  .nav-link { font-family: var(--font-body); font-size: 13px; color: var(--muted); text-decoration: none; padding: 7px 14px; border-radius: 6px; transition: color 0.2s; }
+  .nav-link:hover { color: var(--text); }
+  .btn-ghost { font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 7px; padding: 8px 16px; cursor: pointer; transition: border-color 0.2s; }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.25); }
+  .btn-yellow { font-family: var(--font-body); font-size: 13px; font-weight: 700; color: #0b0b10; background: var(--yellow); border: none; border-radius: 7px; padding: 9px 18px; cursor: pointer; transition: opacity 0.2s; }
+  .btn-yellow:hover { opacity: 0.85; }
+
+  /* HERO */
+  .hero { padding: 140px 0 90px; position: relative; overflow: hidden; }
+  .hero-grid-bg { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(var(--border2) 1px, transparent 1px), linear-gradient(90deg, var(--border2) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%); }
+  .hero-glow { position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 800px; height: 800px; pointer-events: none; background: radial-gradient(circle, rgba(245,197,24,0.07) 0%, transparent 65%); }
+  .hero-inner { position: relative; z-index: 1; text-align: center; max-width: 840px; margin: 0 auto; }
+  .hero-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--yellow-dim); border: 1px solid rgba(245,197,24,0.2); border-radius: 100px; padding: 6px 16px; margin-bottom: 36px; font-family: var(--font-mono); font-size: 11px; color: var(--yellow); letter-spacing: 2px; text-transform: uppercase; }
+  .hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .hero-h1 { font-family: var(--font-display); font-size: clamp(60px, 9vw, 116px); line-height: 0.89; letter-spacing: -1px; color: var(--text); margin-bottom: 28px; }
+  .hero-h1 .yellow { color: var(--yellow); }
+  .hero-h1 .outline { -webkit-text-stroke: 1.5px rgba(255,255,255,0.18); color: transparent; }
+  .hero-sub { font-family: var(--font-body); font-size: 20px; color: var(--muted); line-height: 1.65; max-width: 500px; margin: 0 auto 48px; }
+  .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .hero-cta { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0b0b10; background: var(--yellow); border: none; border-radius: 10px; padding: 16px 36px; cursor: pointer; transition: opacity 0.2s; }
+  .hero-cta:hover { opacity: 0.85; }
+  .hero-cta-ghost { font-family: var(--font-body); font-size: 15px; font-weight: 600; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 15px 28px; cursor: pointer; transition: border-color 0.2s; }
+  .hero-cta-ghost:hover { border-color: rgba(255,255,255,0.3); }
+  .hero-proof { margin-top: 20px; font-family: var(--font-mono); font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+
+  /* TICKER */
+  .ticker-section { padding: 36px 0; border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); overflow: hidden; background: var(--bg2); }
+  .ticker-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); text-align: center; margin-bottom: 18px; }
+  .ticker-track { display: flex; animation: ticker 28s linear infinite; width: max-content; }
+  .ticker-track:hover { animation-play-state: paused; }
+  .ticker-item { display: flex; align-items: center; gap: 24px; padding: 0 28px; font-family: var(--font-mono); font-size: 12px; color: var(--dim); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; }
+  .ticker-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--yellow); opacity: 0.4; flex-shrink: 0; }
+  @keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+  /* STATS */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; }
+  @media (max-width: 600px) { .stats-row { grid-template-columns: 1fr; } }
+  .stat-cell { background: var(--card); padding: 44px 40px; text-align: center; }
+  .stat-num { font-family: var(--font-display); font-size: 60px; color: var(--yellow); line-height: 1; letter-spacing: -2px; margin-bottom: 8px; }
+  .stat-label { font-family: var(--font-body); font-size: 15px; color: var(--muted); }
+
+  /* SECTION */
+  .section { padding: 90px 0; }
+  .section-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--yellow); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .section-label::before { content: ''; width: 24px; height: 1px; background: var(--yellow); }
+  .section-h { font-family: var(--font-display); font-size: clamp(38px, 5vw, 68px); line-height: 0.93; color: var(--text); letter-spacing: -0.5px; margin-bottom: 16px; }
+  .section-h .yellow { color: var(--yellow); }
+  .section-sub { font-family: var(--font-body); font-size: 18px; color: var(--muted); line-height: 1.65; max-width: 480px; }
+
+  /* BENTO */
+  .bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-top: 60px; }
+  @media (max-width: 900px) { .bento { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .bento { grid-template-columns: 1fr; } }
+  .bento-card { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; position: relative; transition: border-color 0.25s, transform 0.25s; }
+  .bento-card:hover { border-color: rgba(245,197,24,0.2); transform: translateY(-2px); }
+  .bc-1 { grid-column: span 5; } .bc-2 { grid-column: span 4; } .bc-3 { grid-column: span 3; }
+  .bc-4 { grid-column: span 7; } .bc-5 { grid-column: span 5; }
+  @media (max-width: 900px) { .bc-1,.bc-2,.bc-3,.bc-4,.bc-5 { grid-column: span 1; } }
+  .bcard-accent-bar { height: 2px; background: transparent; transition: background 0.3s; }
+  .bento-card:hover .bcard-accent-bar { background: var(--yellow); }
+  .bcard-body { padding: 24px 28px; }
+  .bcard-tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--yellow); margin-bottom: 10px; }
+  .bcard-title { font-family: var(--font-body); font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
+  .bcard-desc { font-family: var(--font-body); font-size: 15px; color: var(--muted); line-height: 1.65; }
+  .pill { font-family: var(--font-body); font-size: 12px; color: var(--muted); background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 100px; padding: 5px 14px; display: inline-block; margin: 4px; }
+  .pill.active { color: #0b0b10; background: var(--yellow); border-color: var(--yellow); font-weight: 700; }
+
+  /* PROCESS */
+  .process { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; margin-top: 60px; }
+  @media (max-width: 700px) { .process { grid-template-columns: 1fr; } }
+  .process-step { background: var(--card); padding: 44px 36px; position: relative; transition: background 0.2s; }
+  .process-step:hover { background: var(--card2); }
+  .process-step::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: transparent; transition: background 0.2s; }
+  .process-step:hover::after { background: var(--yellow); }
+  .process-num { font-family: var(--font-display); font-size: 80px; color: rgba(245,197,24,0.08); line-height: 1; margin-bottom: 20px; letter-spacing: -3px; }
+  .process-title { font-family: var(--font-body); font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+  .process-desc { font-family: var(--font-body); font-size: 16px; color: var(--muted); line-height: 1.7; }
+
+  /* SHOWCASE */
+  .showcase-section { padding: 90px 0; background: var(--bg2); border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); }
+  .showcase-frame { margin-top: 50px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; box-shadow: 0 40px 120px rgba(0,0,0,0.5); }
+  .showcase-bar { height: 40px; background: #0e0e18; display: flex; align-items: center; padding: 0 16px; gap: 8px; border-bottom: 1px solid var(--border2); }
+  .showcase-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .showcase-title { font-family: var(--font-mono); font-size: 11px; color: var(--dim); margin: 0 auto; letter-spacing: 1px; }
+  .showcase-body { padding: 28px; display: grid; grid-template-columns: 240px 1fr; gap: 20px; min-height: 400px; }
+  @media (max-width: 700px) { .showcase-body { grid-template-columns: 1fr; } }
+  .showcase-sidebar { display: flex; flex-direction: column; gap: 8px; }
+  .showcase-sb-item { background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 13px 16px; display: flex; align-items: center; gap: 12px; cursor: default; }
+  .showcase-sb-item.active { border-color: rgba(245,197,24,0.3); background: var(--yellow-dim); }
+  .showcase-sb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+  .showcase-sb-item.active .showcase-sb-dot { background: var(--yellow); }
+  .showcase-sb-label { font-family: var(--font-body); font-size: 13px; color: var(--muted); }
+  .showcase-sb-item.active .showcase-sb-label { color: var(--text); }
+  .showcase-main { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .showcase-beat { background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .showcase-beat-header { padding: 10px 12px; border-bottom: 1px solid var(--border2); }
+  .showcase-beat-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); }
+  .showcase-beat-img { flex: 1; min-height: 120px; position: relative; overflow: hidden; }
+  .showcase-beat-overlay { position: absolute; inset: 0; }
+  .showcase-beat-footer { padding: 12px; }
+  .showcase-beat-title { font-family: var(--font-display); font-size: 18px; color: var(--text); line-height: 1; margin-bottom: 4px; }
+  .showcase-beat-sub { font-family: var(--font-body); font-size: 10px; color: var(--dim); }
+  .showcase-beat-cta { display: inline-block; margin-top: 8px; background: var(--yellow); color: #0b0b10; font-family: var(--font-body); font-size: 10px; font-weight: 700; border-radius: 4px; padding: 4px 10px; }
+
+  /* VIDEO */
+  .video-frame { border-radius: 16px; overflow: hidden; border: 1px solid var(--border); aspect-ratio: 16/9; background: var(--card); margin-top: 48px; }
+  .video-frame iframe { width: 100%; height: 100%; display: block; border: none; }
+
+  /* NICHES */
+  .niche-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 40px; }
+  .niche-pill { font-family: var(--font-body); font-size: 13px; color: var(--muted); background: var(--card); border: 1px solid var(--border2); border-radius: 100px; padding: 9px 20px; display: flex; align-items: center; gap: 8px; transition: all 0.2s; cursor: default; }
+  .niche-pill:hover { color: var(--text); border-color: rgba(245,197,24,0.25); background: var(--yellow-glow); }
+
+  /* PRICING */
+  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 60px; }
+  @media (max-width: 800px) { .pricing-grid { grid-template-columns: 1fr; max-width: 380px; } }
+  .plan { background: var(--card); border: 1px solid var(--border2); border-radius: 20px; padding: 36px 32px; position: relative; transition: border-color 0.2s; }
+  .plan:hover { border-color: var(--border); }
+  .plan-hot { border-color: rgba(245,197,24,0.35) !important; }
+  .plan-hot-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0b0b10; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 4px 16px; border-radius: 100px; white-space: nowrap; }
+  .plan-name { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
+  .plan-price { font-family: var(--font-display); font-size: 72px; color: var(--text); line-height: 1; letter-spacing: -3px; margin-bottom: 4px; }
+  .plan-price span { font-size: 28px; color: var(--muted); vertical-align: top; margin-top: 14px; display: inline-block; }
+  .plan-cycle { font-family: var(--font-body); font-size: 13px; color: var(--dim); margin-bottom: 6px; }
+  .plan-credits { font-family: var(--font-mono); font-size: 12px; color: var(--yellow); margin-bottom: 2px; }
+  .plan-hint { font-family: var(--font-body); font-size: 12px; color: var(--dim); margin-bottom: 28px; }
+  .plan-hr { height: 1px; background: var(--border2); margin-bottom: 24px; }
+  .plan-feats { list-style: none; margin-bottom: 32px; }
+  .plan-feats li { font-family: var(--font-body); font-size: 15px; color: var(--muted); padding: 7px 0; display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
+  .plan-feats li::before { content: '✓'; color: var(--yellow); font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+  .plan-btn { width: 100%; font-family: var(--font-body); font-size: 14px; font-weight: 700; border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.2s; }
+  .plan-btn-hot { background: var(--yellow); color: #0b0b10; border: none; }
+  .plan-btn-hot:hover { opacity: 0.85; }
+  .plan-btn-default { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .plan-btn-default:hover { background: rgba(255,255,255,0.04); }
+
+  /* FAQ */
+  .faq-section { padding: 90px 0; }
+  .faq-inner { max-width: 720px; margin: 0 auto; }
+
+  /* CTA BANNER */
+  .cta-banner-section { padding: 0 0 90px; }
+  .cta-banner { background: var(--yellow); border-radius: 24px; padding: 72px 64px; display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; position: relative; overflow: hidden; }
+  @media (max-width: 768px) { .cta-banner { padding: 48px 36px; flex-direction: column; text-align: center; } }
+  .cta-banner::before { content: ''; position: absolute; right: -60px; top: -60px; width: 300px; height: 300px; border-radius: 50%; background: rgba(0,0,0,0.06); }
+  .cta-banner-title { font-family: var(--font-display); font-size: clamp(36px, 4.5vw, 64px); color: #0b0b10; line-height: 0.93; letter-spacing: -1px; margin-bottom: 14px; position: relative; z-index: 1; }
+  .cta-banner-sub { font-family: var(--font-body); font-size: 16px; color: rgba(11,11,16,0.55); position: relative; z-index: 1; }
+  .cta-banner-btn { position: relative; z-index: 1; font-family: var(--font-body); font-size: 15px; font-weight: 700; color: var(--yellow); background: #0b0b10; border: none; border-radius: 12px; padding: 18px 40px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity 0.2s; }
+  .cta-banner-btn:hover { opacity: 0.85; }
+
+  /* FOOTER */
+  .footer { border-top: 1px solid var(--border2); padding: 48px 0; }
+  .footer-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+  .footer-links { display: flex; gap: 28px; }
+  .footer-link { font-family: var(--font-body); font-size: 13px; color: var(--dim); text-decoration: none; transition: color 0.2s; }
+  .footer-link:hover { color: var(--muted); }
+  .footer-copy { font-family: var(--font-mono); font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+
+  [data-reveal] { opacity: 0; transform: translateY(20px) scale(0.99); transition: opacity 0.65s ease, transform 0.65s ease; }
+`;
+
 export default function LandingPage() {
   useReveal();
   const navigate = useNavigate();
-  const videoRef = useRef(null);
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    getSession().then(setSession).catch(() => {});
+  }, []);
+
+  const handleCTA = async () => {
+    if (session) { navigate("/dashboard"); return; }
+    try { await signInWithGoogle(); }
+    catch { navigate("/login"); }
+  };
 
   const niches = [
-    { label: "Entertainment", emoji: "🎬" },
-    { label: "Gaming", emoji: "🎮" },
-    { label: "Finance", emoji: "💹" },
-    { label: "Spiritual", emoji: "🕉️" },
-    { label: "Food", emoji: "🍜" },
-    { label: "Sports", emoji: "⚡" },
-    { label: "Tech", emoji: "🤖" },
-    { label: "Lifestyle", emoji: "✨" },
-    { label: "Education", emoji: "📚" },
-    { label: "Travel", emoji: "🌍" },
-    { label: "Health", emoji: "💪" },
-    { label: "Comedy", emoji: "😂" },
+    { emoji: "🎬", label: "Entertainment" }, { emoji: "🎮", label: "Gaming" },
+    { emoji: "💹", label: "Finance" }, { emoji: "🕉️", label: "Spiritual" },
+    { emoji: "🍜", label: "Food" }, { emoji: "⚡", label: "Sports" },
+    { emoji: "🤖", label: "Tech" }, { emoji: "✨", label: "Lifestyle" },
+    { emoji: "📚", label: "Education" }, { emoji: "🌍", label: "Travel" },
+    { emoji: "💪", label: "Health" }, { emoji: "😂", label: "Comedy" },
+    { emoji: "📊", label: "Business" }, { emoji: "🔥", label: "Motivational" },
+    { emoji: "📰", label: "News" }, { emoji: "🎵", label: "Music" },
+    { emoji: "✦", label: "Skincare" },
   ];
 
-  const features = [
-    {
-      icon: "◈",
-      title: "Beat-Based Production",
-      desc: "Every second of your video is a deliberate design decision. Our beat system gives each moment its own layout, pacing, and visual identity.",
-      accent: "#7c5cfc",
-    },
-    {
-      icon: "◉",
-      title: "Niche DNA System",
-      desc: "Finance videos look like finance. Gaming looks like gaming. Colors, typography, and energy are automatically matched to your niche.",
-      accent: "#00f2ea",
-      delay: 100,
-    },
-    {
-      icon: "◍",
-      title: "90+ Curated Layouts",
-      desc: "Hand-crafted layouts across 10 intent pools — hook, reveal, proof, contrast, stat, testimonial, and more. Not templates. Production blueprints.",
-      accent: "#f59e0b",
-      delay: 200,
-    },
-    {
-      icon: "▣",
-      title: "Talking Head Mode",
-      desc: "Upload your footage. The engine decides when to show your face and when to cut to content — beat by beat, automatically.",
-      accent: "#ec4899",
-      delay: 300,
-    },
-    {
-      icon: "◈",
-      title: "AI Image Generation",
-      desc: "Context-aware images, not random stock photos. The AI understands what each beat needs and generates accordingly.",
-      accent: "#22c55e",
-      delay: 400,
-    },
-    {
-      icon: "◉",
-      title: "Full Edit Control",
-      desc: "Every zone is editable. Move, resize, restyle. Add your own assets. The AI gives you a starting point — you make it yours.",
-      accent: "#7c5cfc",
-      delay: 500,
-    },
-  ];
-
-  const plans = [
-    {
-      name: "Starter",
-      price: 29,
-      credits: 300,
-      videos: 15,
-      accent: "#7c5cfc",
-      features: [
-        "300 credits/month",
-        "AI script + beat generation",
-        "90+ production layouts",
-        "Niche DNA system",
-        "Basic export",
-        "Email support",
-      ],
-    },
-    {
-      name: "Creator",
-      price: 49,
-      credits: 600,
-      videos: 30,
-      accent: "#00f2ea",
-      highlight: true,
-      features: [
-        "600 credits/month",
-        "Everything in Starter",
-        "AI image generation",
-        "TTS voice generation",
-        "Talking head mode",
-        "Priority support",
-      ],
-    },
-    {
-      name: "Pro",
-      price: 79,
-      credits: 1200,
-      videos: 60,
-      accent: "#f59e0b",
-      features: [
-        "1200 credits/month",
-        "Everything in Creator",
-        "Bulk generation",
-        "Advanced analytics",
-        "Custom brand DNA",
-        "Dedicated support",
-      ],
-    },
-  ];
+  const tickerItems = ["AI Video Studio", "17 Niches", "Voice Generation", "Smart Visuals", "Auto Scripting", "Full Edit Control", "Export Ready", "Background Music"];
 
   const faqs = [
-    { q: "How is this different from tools like Opus Clip or Pictory?", a: "Those tools either clip existing videos or create basic text-on-video slideshows. We build each second of your video as a produced beat — with its own layout, typography, color story, and visual identity based on your niche. The output looks like a human editor made deliberate design decisions, not an AI generator." },
-    { q: "What are credits and how are they used?", a: "Credits are consumed when you use AI features. Base video generation costs 8 credits, AI image generation costs 2 per image, TTS voice costs 5 credits, and export costs 2 credits. A typical full AI 30-second video uses 17-20 credits. Basic videos using your own assets cost far fewer credits." },
-    { q: "Can I use my own footage and images?", a: "Yes. You can upload your own images, videos, and talking head footage. The AI generation features are optional — you can use the full production system with your own assets at a much lower credit cost." },
-    { q: "What is Talking Head mode?", a: "Upload a recording of yourself talking. The engine intelligently decides which beats should show your face and which should show content visuals — creating a natural talking head video with dynamic cutaways, automatically." },
-    { q: "What niches are supported?", a: "Entertainment, gaming, finance, spiritual, food, sports, tech, lifestyle, education, travel, health, skincare, comedy, motivational, news, music, and business. Each niche has its own curated color palette, typography system, and layout preferences." },
-    { q: "Can I edit the generated video?", a: "Yes — fully. Every zone in every beat is editable. Move zones, change text, swap images, adjust typography, change colors, add effects. The AI gives you a production-ready starting point that you can refine to perfection." },
+    { q: "How is VideoEngine different from other AI video tools?", a: "Most tools give you plain text-over-broll with auto captions. VideoEngine is a full production studio — every moment of your video is individually crafted with its own visual design, pacing, and narrative intent. The output looks like a human editor made deliberate decisions." },
+    { q: "What are credits and how are they used?", a: "Credits power the AI features. A typical 30-second video uses 17–20 credits — covering script generation, visual production, voice synthesis, and image generation. Basic videos using your own assets cost far fewer credits." },
+    { q: "Can I use my own footage and images?", a: "Yes. Upload your own images, videos, or talking head footage. The AI features are optional — the production engine works with whatever you bring." },
+    { q: "What niches are supported?", a: "17 niches including entertainment, gaming, finance, spiritual, food, sports, tech, lifestyle, education, travel, health, skincare, comedy, motivational, news, music, and business. Each gets its own visual identity." },
+    { q: "Can I edit the video after it's generated?", a: "Fully. Every element of every moment is editable. Change text, swap visuals, adjust timing, add effects. The AI produces a starting point — you have complete control from there." },
+    { q: "Is there a free trial?", a: "Yes. New accounts get free credits to generate your first video at no cost. No credit card required to start." },
   ];
 
   return (
-    <div style={{ background: "#06060e", color: "#ffffff", minHeight: "100vh" }}>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <div style={{ background: "var(--bg)", minHeight: "100vh" }}>
+      <style>{CSS}</style>
 
-        :root {
-          --bg: #06060e;
-          --bg2: #0a0a16;
-          --purple: #7c5cfc;
-          --cyan: #00f2ea;
-          --gold: #f59e0b;
-          --pink: #ec4899;
-          --text: #ffffff;
-          --muted: rgba(255,255,255,0.5);
-          --border: rgba(255,255,255,0.08);
-          --card: rgba(255,255,255,0.03);
-          --font-display: 'Bebas Neue', sans-serif;
-          --font-body: 'Outfit', sans-serif;
-          --font-serif: 'Cormorant Garamond', serif;
-        }
-
-        html { scroll-behavior: smooth; }
-
-        body {
-          background: var(--bg);
-          color: var(--text);
-          font-family: var(--font-body);
-          overflow-x: hidden;
-        }
-
-        /* ── Orbs ── */
-        .orb {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(120px);
-          opacity: 0.12;
-        }
-        .orb1 { width: 800px; height: 800px; background: var(--purple); top: -200px; left: -200px; animation: drift1 20s ease-in-out infinite; }
-        .orb2 { width: 600px; height: 600px; background: var(--cyan); top: 40%; right: -150px; animation: drift2 25s ease-in-out infinite; }
-        .orb3 { width: 500px; height: 500px; background: var(--pink); bottom: 10%; left: 20%; animation: drift3 18s ease-in-out infinite; }
-
-        @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(60px,40px)} }
-        @keyframes drift2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-40px,60px)} }
-        @keyframes drift3 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(30px,-50px)} }
-
-        /* ── Reveal animation ── */
-        .reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.7s ease calc(var(--delay, 0ms)), transform 0.7s ease calc(var(--delay, 0ms)); }
-        .reveal.revealed { opacity: 1; transform: none; }
-
-        /* ── Nav ── */
-        .nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 20px 60px;
-          background: rgba(6,6,14,0.7);
-          backdrop-filter: blur(20px);
-          border-bottom: 1px solid var(--border);
-        }
-        .nav-logo {
-          font-family: var(--font-display);
-          font-size: 28px;
-          letter-spacing: 3px;
-          background: linear-gradient(135deg, #fff 0%, var(--purple) 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        .nav-links { display: flex; gap: 36px; }
-        .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; letter-spacing: 0.05em; transition: color 0.2s; }
-        .nav-links a:hover { color: #fff; }
-        .nav-cta {
-          background: var(--purple);
-          color: #fff;
-          border: none;
-          padding: 10px 24px;
-          border-radius: 6px;
-          font-family: var(--font-body);
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          letter-spacing: 0.05em;
-          transition: opacity 0.2s, transform 0.2s;
-        }
-        .nav-cta:hover { opacity: 0.85; transform: translateY(-1px); }
-
-        /* ── Hero ── */
-        .hero {
-          position: relative; z-index: 1;
-          min-height: 100vh;
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          text-align: center;
-          padding: 140px 60px 100px;
-        }
-        .hero-eyebrow {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: rgba(124,92,252,0.12);
-          border: 1px solid rgba(124,92,252,0.3);
-          border-radius: 100px;
-          padding: 6px 16px;
-          font-size: 12px;
-          letter-spacing: 0.15em;
-          color: var(--purple);
-          text-transform: uppercase;
-          margin-bottom: 32px;
-        }
-        .hero-eyebrow::before { content: "◈"; }
-        .hero-title {
-          font-family: var(--font-display);
-          font-size: clamp(72px, 10vw, 140px);
-          line-height: 0.92;
-          letter-spacing: 2px;
-          margin-bottom: 8px;
-        }
-        .hero-title-line2 {
-          font-family: var(--font-serif);
-          font-style: italic;
-          font-size: clamp(60px, 8vw, 110px);
-          line-height: 1.0;
-          background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          display: block;
-          margin-bottom: 32px;
-        }
-        .hero-sub {
-          font-size: clamp(16px, 2vw, 20px);
-          color: var(--muted);
-          max-width: 560px;
-          line-height: 1.6;
-          margin-bottom: 48px;
-        }
-        .hero-actions { display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap; }
-        .btn-primary {
-          background: var(--purple);
-          color: #fff;
-          border: none;
-          padding: 16px 36px;
-          border-radius: 8px;
-          font-family: var(--font-body);
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          letter-spacing: 0.05em;
-          transition: all 0.2s;
-          position: relative;
-          overflow: hidden;
-        }
-        .btn-primary::after {
-          content: "";
-          position: absolute; inset: 0;
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 100%);
-          opacity: 0; transition: opacity 0.2s;
-        }
-        .btn-primary:hover::after { opacity: 1; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(124,92,252,0.4); }
-        .btn-secondary {
-          background: transparent;
-          color: var(--muted);
-          border: 1px solid var(--border);
-          padding: 16px 36px;
-          border-radius: 8px;
-          font-family: var(--font-body);
-          font-size: 16px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .btn-secondary:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
-
-        .hero-scroll { margin-top: 48px; color: var(--muted); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .hero-scroll-line { width: 1px; height: 48px; background: linear-gradient(to bottom, var(--purple), transparent); animation: scrollPulse 2s ease-in-out infinite; }
-        @keyframes scrollPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
-
-        /* ── Beat preview strip ── */
-        .beat-preview {
-          position: relative; z-index: 1;
-          padding: 0 0 100px;
-          overflow: hidden;
-        }
-        .beat-strip {
-          display: flex; gap: 16px;
-          animation: scrollLeft 30s linear infinite;
-          width: max-content;
-        }
-        .beat-strip-wrap { display: flex; gap: 16px; }
-        @keyframes scrollLeft { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-        .beat-card {
-          width: 200px; height: 340px;
-          border-radius: 14px;
-          overflow: hidden;
-          position: relative;
-          flex-shrink: 0;
-          border: 1px solid var(--border);
-          display: flex; flex-direction: column;
-        }
-        .beat-card-img { flex: 1; background: rgba(255,255,255,0.05); }
-        .beat-card-body { padding: 12px; }
-        .beat-card-label { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-        .beat-card-sub { font-size: 11px; color: var(--muted); }
-        .beat-card-bar { height: 2px; width: 100%; }
-
-        /* ── Section shared ── */
-        section { position: relative; z-index: 1; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 60px; }
-        .section-eyebrow {
-          font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
-          color: var(--purple); margin-bottom: 16px;
-          display: flex; align-items: center; gap: 8px;
-        }
-        .section-eyebrow::before { content: ""; display: block; width: 24px; height: 1px; background: var(--purple); }
-        .section-title {
-          font-family: var(--font-display);
-          font-size: clamp(48px, 6vw, 80px);
-          line-height: 0.95;
-          letter-spacing: 1px;
-          margin-bottom: 24px;
-        }
-        .section-sub { font-size: 18px; color: var(--muted); max-width: 520px; line-height: 1.6; }
-
-        /* ── Niche bar ── */
-        .niche-section { padding: 60px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); overflow: hidden; }
-        .niche-track { display: flex; gap: 12px; animation: scrollLeft 20s linear infinite; width: max-content; }
-        .niche-pill {
-          display: flex; align-items: center; gap: 8px;
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: 100px;
-          padding: 8px 20px;
-          font-size: 14px;
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-
-        /* ── Problem/Solution ── */
-        .problem-section { padding: 120px 0; }
-        .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
-        .problem-label {
-          font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
-          padding: 4px 12px; border-radius: 4px; display: inline-block; margin-bottom: 20px;
-        }
-        .label-bad { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
-        .label-good { background: rgba(124,92,252,0.15); color: var(--purple); border: 1px solid rgba(124,92,252,0.3); }
-        .problem-title { font-family: var(--font-display); font-size: 52px; line-height: 0.95; letter-spacing: 1px; margin-bottom: 16px; }
-        .problem-desc { color: var(--muted); font-size: 16px; line-height: 1.7; }
-        .problem-divider { width: 1px; background: var(--border); height: 100%; }
-
-        /* ── How it works ── */
-        .how-section { padding: 120px 0; }
-        .how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 80px; }
-        .how-step {
-          background: var(--card);
-          border: 1px solid var(--border);
-          padding: 48px 40px;
-          position: relative;
-        }
-        .how-step:first-child { border-radius: 16px 0 0 16px; }
-        .how-step:last-child { border-radius: 0 16px 16px 0; }
-        .how-num {
-          font-family: var(--font-display);
-          font-size: 80px;
-          line-height: 1;
-          color: rgba(255,255,255,0.06);
-          position: absolute;
-          top: 24px; right: 24px;
-        }
-        .how-icon { font-size: 32px; margin-bottom: 24px; }
-        .how-title { font-family: var(--font-display); font-size: 32px; letter-spacing: 1px; margin-bottom: 12px; }
-        .how-desc { color: var(--muted); font-size: 15px; line-height: 1.6; }
-        .how-connector {
-          position: absolute; top: 50%; right: -20px;
-          width: 40px; height: 1px;
-          background: linear-gradient(to right, var(--border), var(--purple));
-          z-index: 2;
-        }
-
-        /* ── Features ── */
-        .features-section { padding: 120px 0; }
-        .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 80px; }
-        .feature-card {
-          background: var(--card);
-          border: 1px solid var(--border);
-          padding: 40px;
-          transition: border-color 0.3s, background 0.3s;
-          position: relative;
-          overflow: hidden;
-        }
-        .feature-card::before {
-          content: "";
-          position: absolute; top: 0; left: 0; right: 0; height: 1px;
-          background: var(--accent, var(--purple));
-          opacity: 0; transition: opacity 0.3s;
-        }
-        .feature-card:hover { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); }
-        .feature-card:hover::before { opacity: 1; }
-        .feature-icon { font-size: 28px; margin-bottom: 20px; color: var(--accent, var(--purple)); }
-        .feature-title { font-family: var(--font-display); font-size: 28px; letter-spacing: 1px; margin-bottom: 12px; }
-        .feature-desc { color: var(--muted); font-size: 15px; line-height: 1.6; }
-
-        /* ── Stats bar ── */
-        .stats-section {
-          padding: 80px 0;
-          border-top: 1px solid var(--border);
-          border-bottom: 1px solid var(--border);
-        }
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; }
-        .stat-item { text-align: center; padding: 40px 20px; }
-        .stat-num { font-family: var(--font-display); font-size: 64px; letter-spacing: 2px; line-height: 1; margin-bottom: 8px; background: linear-gradient(135deg, #fff 0%, var(--muted) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .stat-label { font-size: 14px; color: var(--muted); letter-spacing: 0.1em; }
-
-        /* ── Pricing ── */
-        .pricing-section { padding: 120px 0; }
-        .plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 80px; align-items: start; }
-        .plan-card {
-          background: var(--card);
-          border: 1px solid var(--border);
-          padding: 48px 40px;
-          position: relative;
-          transition: border-color 0.3s;
-        }
-        .plan-card:first-child { border-radius: 16px 0 0 16px; }
-        .plan-card:last-child { border-radius: 0 16px 16px 0; }
-        .plan-highlight {
-          background: rgba(124,92,252,0.08);
-          border-color: rgba(124,92,252,0.4);
-          transform: scaleY(1.02);
-          z-index: 1;
-        }
-        .plan-badge {
-          position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-          background: var(--purple);
-          color: #fff;
-          font-size: 11px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          padding: 4px 16px;
-          border-radius: 100px;
-          white-space: nowrap;
-        }
-        .plan-name { font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
-        .plan-price { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; }
-        .plan-dollar { font-size: 24px; color: var(--muted); }
-        .plan-amount { font-family: var(--font-display); font-size: 72px; line-height: 1; letter-spacing: -1px; }
-        .plan-per { color: var(--muted); font-size: 16px; }
-        .plan-credits { font-size: 14px; color: var(--accent, var(--purple)); margin-bottom: 4px; font-weight: 600; }
-        .plan-hint { font-size: 12px; color: var(--muted); margin-bottom: 32px; }
-        .plan-features { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 36px; }
-        .plan-features li { display: flex; align-items: center; gap: 10px; font-size: 15px; color: rgba(255,255,255,0.8); }
-        .plan-check { color: var(--accent, var(--purple)); font-weight: 700; }
-        .plan-btn {
-          width: 100%;
-          padding: 14px;
-          border-radius: 8px;
-          font-family: var(--font-body);
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          letter-spacing: 0.05em;
-          transition: all 0.2s;
-          border-width: 1px;
-          border-style: solid;
-        }
-        .plan-btn:hover { opacity: 0.85; transform: translateY(-1px); }
-
-        /* ── FAQ ── */
-        .faq-section { padding: 120px 0; }
-        .faq-list { margin-top: 80px; display: flex; flex-direction: column; gap: 2px; }
-        .faq-item {
-          background: var(--card);
-          border: 1px solid var(--border);
-          padding: 28px 36px;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-        .faq-item:first-child { border-radius: 12px 12px 0 0; }
-        .faq-item:last-child { border-radius: 0 0 12px 12px; }
-        .faq-item:hover { background: rgba(255,255,255,0.04); }
-        .faq-q { display: flex; justify-content: space-between; align-items: center; gap: 24px; font-size: 17px; font-weight: 500; }
-        .faq-arrow { color: var(--purple); font-size: 24px; flex-shrink: 0; }
-        .faq-a { margin-top: 16px; color: var(--muted); font-size: 15px; line-height: 1.7; }
-
-        /* ── Final CTA ── */
-        .cta-section {
-          padding: 160px 60px;
-          text-align: center;
-          position: relative;
-          overflow: hidden;
-        }
-        .cta-section::before {
-          content: "";
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse at 50% 50%, rgba(124,92,252,0.15) 0%, transparent 70%);
-        }
-        .cta-title { font-family: var(--font-display); font-size: clamp(56px, 8vw, 100px); line-height: 0.92; letter-spacing: 2px; margin-bottom: 24px; position: relative; }
-        .cta-sub { font-size: 18px; color: var(--muted); max-width: 480px; margin: 0 auto 48px; line-height: 1.6; position: relative; }
-
-        /* ── Footer ── */
-        .footer {
-          padding: 60px;
-          border-top: 1px solid var(--border);
-          display: flex; justify-content: space-between; align-items: center;
-          flex-wrap: wrap; gap: 24px;
-        }
-        .footer-logo { font-family: var(--font-display); font-size: 22px; letter-spacing: 3px; color: var(--muted); }
-        .footer-links { display: flex; gap: 32px; }
-        .footer-links a { color: var(--muted); text-decoration: none; font-size: 14px; transition: color 0.2s; }
-        .footer-links a:hover { color: #fff; }
-        .footer-copy { color: rgba(255,255,255,0.25); font-size: 13px; }
-
-/* ── Responsive ── */
-        @media (max-width: 900px) {
-          .nav { padding: 16px 24px; }
-          .nav-links { display: none; }
-          .container { padding: 0 24px; }
-          .hero { padding: 120px 24px 80px; }
-          .problem-grid { grid-template-columns: 1fr; }
-          .how-steps { grid-template-columns: 1fr; }
-          .how-step { border-radius: 0 !important; }
-          .features-grid { grid-template-columns: 1fr; }
-          .stats-grid { grid-template-columns: 1fr 1fr; }
-          .plans-grid { grid-template-columns: 1fr; }
-          .plan-card { border-radius: 12px !important; transform: none !important; }
-          .footer { flex-direction: column; text-align: center; padding: 40px 24px; }
-          .cta-section { padding: 100px 24px; }
-        }
-      `}</style>
-
-      <NoiseBg />
-      <Orbs />
-
-      {/* ── Nav ── */}
+      {/* NAV */}
       <nav className="nav">
-        <div className="nav-logo">VIDORA</div>
-        <div className="nav-links">
-          <a href="#how">How it works</a>
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#faq">FAQ</a>
+        <div className="nav-inner">
+          <a href="/" className="nav-logo">
+            <div className="nav-logo-box">VE</div>
+            <span className="nav-logo-text">VideoEngine</span>
+          </a>
+          <div className="nav-right">
+            <a href="/about" className="nav-link">About</a>
+            <a href="#how" className="nav-link">How It Works</a>
+            <a href="#pricing" className="nav-link">Pricing</a>
+            <button className="btn-yellow" onClick={handleCTA}>{session ? "Go to Dashboard" : "Sign In with Google"}</button>
+          </div>
         </div>
-        <button style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', padding: '8px 20px', borderRadius: 6, fontSize: 14, cursor: 'pointer', fontFamily: 'var(--font-body)', letterSpacing: '0.05em', transition: 'all 0.2s' }} onClick={() => navigate("/login")}>Login</button>
-        <button className="nav-cta" onClick={() => navigate("/login")}>Get Early Access</button>
       </nav>
 
-        {/* ── Hero ── */}
+      {/* HERO */}
       <section className="hero">
-        <div className="hero-eyebrow">AI Video Production Studio</div>
-        <h1 className="hero-title">
-          STOP GENERATING.<br />
-          <span className="hero-title-line2">Start Producing.</span>
-        </h1>
-        <p className="hero-sub">
-          The first AI engine that builds every second of your video as a deliberate design decision — not a slideshow, not a clip. A produced video.
-        </p>
-        <div className="hero-actions">
-          <button className="btn-primary" onClick={() => navigate("/login")}>Get Early Access — Free</button>
-          <button className="btn-secondary" onClick={() => document.getElementById("how").scrollIntoView({ behavior: "smooth" })}>See How It Works</button>
-        </div>
-        <div className="hero-scroll">
-          <div className="hero-scroll-line" />
-          <span>Scroll</span>
-        </div>
-      </section>
-
-      {/* ── Beat strip ── */}
-      <div className="beat-preview">
-        <div className="beat-strip">
-          <div className="beat-strip-wrap">
-            {[
-              { bg: "linear-gradient(160deg,#0f0500,#1a0800)", accent: "#ff4500", label: "Hook Beat", sub: "entertainment" },
-              { bg: "linear-gradient(160deg,#050510,#0a0a20)", accent: "#7c5cfc", label: "Stat Reveal", sub: "finance" },
-              { bg: "linear-gradient(160deg,#00050a,#001a2e)", accent: "#00f2ea", label: "Tech Hook", sub: "tech" },
-              { bg: "linear-gradient(160deg,#1a0a00,#2a1200)", accent: "#f59e0b", label: "Proof Beat", sub: "motivational" },
-              { bg: "linear-gradient(160deg,#0a0014,#14002a)", accent: "#ec4899", label: "Testimonial", sub: "lifestyle" },
-              { bg: "linear-gradient(160deg,#001a00,#002800)", accent: "#22c55e", label: "Visual Rest", sub: "health" },
-              { bg: "linear-gradient(160deg,#1a0010,#2a0020)", accent: "#f43f5e", label: "Escalate", sub: "gaming" },
-              { bg: "linear-gradient(160deg,#0a0800,#1a1400)", accent: "#fbbf24", label: "Contrast", sub: "spiritual" },
-            ].map((c, i) => <BeatCard key={i} {...c} />)}
-          </div>
-          <div className="beat-strip-wrap" aria-hidden>
-            {[
-              { bg: "linear-gradient(160deg,#0f0500,#1a0800)", accent: "#ff4500", label: "Hook Beat", sub: "entertainment" },
-              { bg: "linear-gradient(160deg,#050510,#0a0a20)", accent: "#7c5cfc", label: "Stat Reveal", sub: "finance" },
-              { bg: "linear-gradient(160deg,#00050a,#001a2e)", accent: "#00f2ea", label: "Tech Hook", sub: "tech" },
-              { bg: "linear-gradient(160deg,#1a0a00,#2a1200)", accent: "#f59e0b", label: "Proof Beat", sub: "motivational" },
-              { bg: "linear-gradient(160deg,#0a0014,#14002a)", accent: "#ec4899", label: "Testimonial", sub: "lifestyle" },
-              { bg: "linear-gradient(160deg,#001a00,#002800)", accent: "#22c55e", label: "Visual Rest", sub: "health" },
-              { bg: "linear-gradient(160deg,#1a0010,#2a0020)", accent: "#f43f5e", label: "Escalate", sub: "gaming" },
-              { bg: "linear-gradient(160deg,#0a0800,#1a1400)", accent: "#fbbf24", label: "Contrast", sub: "spiritual" },
-            ].map((c, i) => <BeatCard key={i + 8} {...c} />)}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Niche bar ── */}
-      <div className="niche-section">
-        <div className="niche-track">
-          {[...niches, ...niches].map((n, i) => <NichePill key={i} {...n} />)}
-        </div>
-      </div>
-
-      {/* ── Problem / Solution ── */}
-      <section className="problem-section">
+        <div className="hero-grid-bg" />
+        <div className="hero-glow" />
         <div className="container">
-          <div className="problem-grid">
-            <div className="reveal">
-              <div className="problem-label label-bad">Every other tool</div>
-              <h2 className="problem-title">Text on video.<br />AI slop.</h2>
-              <p className="problem-desc">Generic slideshows. Random stock footage. The same 5 templates dressed up differently. Your audience has seen it. They scroll past it.</p>
+          <div className="hero-inner">
+            <div className="hero-badge">
+              <div className="hero-badge-dot" />
+              AI Video Production Studio
             </div>
-            <div className="reveal" style={{ "--delay": "150ms" }}>
-              <div className="problem-label label-good">Vidora</div>
-              <h2 className="problem-title">Produced.<br />Intentional.</h2>
-              <p className="problem-desc">Every beat has a layout picked for its intent. Every color chosen for your niche. Every font matched to your energy. The output looks like a designer worked on it. Because a system did.</p>
+            <h1 className="hero-h1">
+              Your Idea.<br />
+              <span className="yellow">Produced.</span><br />
+              <span className="outline">Instantly.</span>
+            </h1>
+            <p className="hero-sub">Type a topic. Walk away with a fully produced video — visuals, voice, music, and motion. Ready to publish.</p>
+            <div className="hero-actions">
+              <button className="hero-cta" onClick={handleCTA}>Create Your First Video →</button>
+              <button className="hero-cta-ghost" onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}>See It In Action</button>
             </div>
+            <div className="hero-proof">Free to start · No credit card required</div>
           </div>
         </div>
       </section>
 
-      {/* ── How it works ── */}
-      <section className="how-section" id="how">
+      {/* TICKER */}
+      <div className="ticker-section">
+        <div className="ticker-label">What's inside</div>
+        <div className="ticker-track">
+          {[...tickerItems, ...tickerItems, ...tickerItems].map((item, i) => (
+            <div key={i} className="ticker-item">{item}<div className="ticker-dot" /></div>
+          ))}
+        </div>
+      </div>
+
+      {/* STATS */}
+      <section className="section" style={{ paddingBottom: 0 }}>
         <div className="container">
-          <div className="section-eyebrow">How it works</div>
-          <h2 className="section-title reveal">THREE STEPS.<br />ONE VIDEO.</h2>
-          <div className="how-steps">
+          <div className="stats-row" data-reveal>
+            <div className="stat-cell"><div className="stat-num">17</div><div className="stat-label">Supported content niches</div></div>
+            <div className="stat-cell"><div className="stat-num">90+</div><div className="stat-label">Unique visual layouts</div></div>
+            <div className="stat-cell"><div className="stat-num">&lt;2m</div><div className="stat-label">Average production time</div></div>
+          </div>
+        </div>
+      </section>
+
+      {/* BENTO */}
+      <section className="section">
+        <div className="container">
+          <div className="section-label">The Studio</div>
+          <h2 className="section-h">Everything you need.<br /><span className="yellow">Nothing you don't.</span></h2>
+          <p className="section-sub">One prompt. One click. A complete video — scripted, visualized, voiced, and scored.</p>
+
+          <div className="bento" data-reveal>
+            {/* Card 1 — Script */}
+            <div className="bento-card bc-1">
+              <div className="bcard-accent-bar" />
+              <div style={{ padding: "28px 28px 12px", background: "linear-gradient(135deg, #13131f 0%, #0f0f18 100%)", minHeight: 190, position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 16, right: 16, width: 100, height: 100, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,197,24,0.1), transparent)", pointerEvents: "none" }} />
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--yellow)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 16 }}>Script · Auto</div>
+                {["Hook that stops the scroll.", "Build tension beat by beat.", "The reveal they didn't see coming.", "A CTA they actually want to click."].map((line, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+                    <div style={{ width: 4, height: 4, borderRadius: "50%", background: i === 0 ? "var(--yellow)" : "var(--dim)", marginTop: 7, flexShrink: 0 }} />
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: i === 0 ? "var(--text)" : "var(--muted)", lineHeight: 1.5 }}>{line}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="bcard-body">
+                <div className="bcard-tag">Smart Scripting</div>
+                <div className="bcard-title">Written to perform, not just inform.</div>
+                <div className="bcard-desc">Every video is structured for retention — built to keep viewers watching from the first second to the last.</div>
+              </div>
+            </div>
+
+            {/* Card 2 — Visuals */}
+            <div className="bento-card bc-2">
+              <div className="bcard-accent-bar" />
+              <div style={{ padding: "24px 24px 12px", background: "#0e0e18", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, minHeight: 190 }}>
+                {[["rgba(245,197,24,0.08)", "HOOK"], ["rgba(56,189,248,0.07)", "PROOF"], ["rgba(239,68,68,0.07)", "REVEAL"], ["rgba(34,197,94,0.07)", "CTA"]].map(([bg, label], i) => (
+                  <div key={i} style={{ background: "#111120", borderRadius: 8, border: "1px solid var(--border2)", aspectRatio: "16/10", position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, ${bg}, transparent)` }} />
+                    <div style={{ position: "absolute", bottom: 6, left: 6, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)", letterSpacing: 1 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="bcard-body">
+                <div className="bcard-tag">Visual Production</div>
+                <div className="bcard-title">Every moment, its own visual identity.</div>
+                <div className="bcard-desc">No two seconds look the same. Each part of your video is designed independently.</div>
+              </div>
+            </div>
+
+            {/* Card 3 — Voice */}
+            <div className="bento-card bc-3">
+              <div className="bcard-accent-bar" />
+              <div style={{ padding: "24px", background: "#0e0e18", minHeight: 190, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--yellow-dim)", border: "1px solid rgba(245,197,24,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🎙</div>
+                  <div>
+                    <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text)", fontWeight: 600 }}>AI Voice</div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--dim)" }}>Natural · Human</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  {Array.from({ length: 28 }).map((_, i) => (
+                    <div key={i} style={{ width: 3, borderRadius: 2, background: i % 4 === 0 ? "var(--yellow)" : "var(--dim)", height: `${10 + Math.sin(i * 0.8) * 14 + 14}px`, opacity: i % 4 === 0 ? 1 : 0.35, flexShrink: 0 }} />
+                  ))}
+                </div>
+              </div>
+              <div className="bcard-body">
+                <div className="bcard-tag">Voice Generation</div>
+                <div className="bcard-title">Sounds like a real creator.</div>
+                <div className="bcard-desc">Natural narration that matches your content's energy and pacing.</div>
+              </div>
+            </div>
+
+            {/* Card 4 — Niches */}
+            <div className="bento-card bc-4">
+              <div className="bcard-accent-bar" />
+              <div style={{ padding: "24px 24px 12px", background: "#0e0e18", minHeight: 170 }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--yellow)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 16 }}>Your niche. Your look.</div>
+                <div style={{ display: "flex", flexWrap: "wrap" }}>
+                  {["Gaming", "Finance", "Health", "Food", "Tech", "Lifestyle", "Education", "Comedy", "+ 9 more"].map((n, i) => (
+                    <span key={n} className={`pill${i < 3 ? " active" : ""}`}>{n}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="bcard-body">
+                <div className="bcard-tag">Niche Awareness</div>
+                <div className="bcard-title">Finance doesn't look like gaming. It never should.</div>
+                <div className="bcard-desc">Visual tone, energy, and style automatically adapt to your content niche — across 17 categories.</div>
+              </div>
+            </div>
+
+            {/* Card 5 — Music */}
+            <div className="bento-card bc-5">
+              <div className="bcard-accent-bar" />
+              <div style={{ padding: "24px", background: "#0e0e18", minHeight: 170, display: "flex", alignItems: "center", gap: 20 }}>
+                <div style={{ fontSize: 40, opacity: 0.6 }}>🎵</div>
+                <div>
+                  <div style={{ fontFamily: "var(--font-body)", fontSize: 15, color: "var(--text)", fontWeight: 700, marginBottom: 6 }}>Background Music</div>
+                  <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>Auto-matched to your video's energy</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {["Hype", "Calm", "Dark", "Uplifting"].map(mood => (
+                      <div key={mood} style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border2)", borderRadius: 4, padding: "3px 8px", letterSpacing: 1 }}>{mood}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="bcard-body">
+                <div className="bcard-tag">Audio Layer</div>
+                <div className="bcard-title">The right track. Automatically.</div>
+                <div className="bcard-desc">Music selected and mixed to match the emotional arc of your video. No DJ required.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="section" id="how" style={{ background: "var(--bg2)", borderTop: "1px solid var(--border2)", borderBottom: "1px solid var(--border2)" }}>
+        <div className="container">
+          <div className="section-label">How It Works</div>
+          <h2 className="section-h">Three steps.<br /><span className="yellow">One video.</span></h2>
+          <div className="process" data-reveal>
             {[
-              { num: "01", icon: "✦", title: "Enter Your Topic", desc: "Type what your video is about. The AI figures out your niche, tone, energy level, and the emotional arc your video needs." },
-              { num: "02", icon: "◈", title: "AI Builds It", desc: "Script, beats, layouts, zone content, colors, typography, audio cues — all generated and assembled into a production-ready video." },
-              { num: "03", icon: "▣", title: "Edit & Export", desc: "Every zone is editable. Swap images, refine text, adjust layouts. When it's right, export in full quality." },
-            ].map((s, i) => (
-              <div key={i} className="how-step reveal" style={{ "--delay": `${i * 150}ms` }}>
-                <div className="how-num">{s.num}</div>
-                <div className="how-icon">{s.icon}</div>
-                <div className="how-title">{s.title}</div>
-                <p className="how-desc">{s.desc}</p>
+              { num: "01", title: "Enter Your Topic", desc: "A question, a headline, a product name — anything. The studio takes it from there." },
+              { num: "02", title: "We Build It", desc: "Script, visuals, voice, music, motion — everything is produced automatically. Takes less than 2 minutes." },
+              { num: "03", title: "Tweak & Export", desc: "Every element is editable. Change what you want, leave what you don't. Export when it's yours." },
+            ].map(step => (
+              <div key={step.num} className="process-step">
+                <div className="process-num">{step.num}</div>
+                <div className="process-title">{step.title}</div>
+                <div className="process-desc">{step.desc}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Stats ── */}
-      <div className="stats-section">
+      {/* SHOWCASE */}
+      <section className="showcase-section" id="demo">
         <div className="container">
-          <div className="stats-grid">
+          <div className="section-label">The Studio</div>
+          <h2 className="section-h">Built for control.<br /><span className="yellow">Designed for speed.</span></h2>
+          <p className="section-sub">No locked outputs. No black boxes. Every element of every moment is yours to edit.</p>
+          <div className="showcase-frame" data-reveal>
+            <div className="showcase-bar">
+              <div className="showcase-dot" style={{ background: "#ff5f57" }} />
+              <div className="showcase-dot" style={{ background: "#febc2e" }} />
+              <div className="showcase-dot" style={{ background: "#28c840" }} />
+              <div className="showcase-title">VideoEngine Studio</div>
+            </div>
+            <div className="showcase-body">
+              <div className="showcase-sidebar">
+                {["Script", "Visuals", "Voice", "Music", "Export"].map((item, i) => (
+                  <div key={item} className={`showcase-sb-item${i === 1 ? " active" : ""}`}>
+                    <div className="showcase-sb-dot" />
+                    <span className="showcase-sb-label">{item}</span>
+                    {i === 1 && <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--yellow)" }}>EDITING</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="showcase-main">
+                {[
+                  { label: "HOOK", title: "STOP HERE", sub: "This changes everything.", cta: false, bg: "rgba(245,197,24,0.06)" },
+                  { label: "PROOF", title: "PROVEN", sub: "The numbers don't lie.", cta: false, bg: "rgba(56,189,248,0.05)" },
+                  { label: "CLOSE", title: "YOUR MOVE", sub: "You already know what to do.", cta: true, bg: "rgba(239,68,68,0.05)" },
+                ].map((beat) => (
+                  <div key={beat.label} className="showcase-beat">
+                    <div className="showcase-beat-header"><div className="showcase-beat-label">{beat.label}</div></div>
+                    <div className="showcase-beat-img" style={{ background: `linear-gradient(135deg, #111120, #0a0a14)` }}>
+                      <div className="showcase-beat-overlay" style={{ background: `radial-gradient(ellipse at 50% 100%, ${beat.bg}, transparent)` }} />
+                    </div>
+                    <div className="showcase-beat-footer">
+                      <div className="showcase-beat-title">{beat.title}</div>
+                      <div className="showcase-beat-sub">{beat.sub}</div>
+                      {beat.cta && <div className="showcase-beat-cta">START NOW</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* DEMO VIDEO */}
+      <section className="section">
+        <div className="container">
+          <div className="section-label">Watch It Work</div>
+          <h2 className="section-h">See the studio<br /><span className="yellow">in action.</span></h2>
+          <div className="video-frame" data-reveal>
+            <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="VideoEngine Demo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+          </div>
+        </div>
+      </section>
+
+      {/* NICHES */}
+      <section className="section" style={{ background: "var(--bg2)", borderTop: "1px solid var(--border2)", borderBottom: "1px solid var(--border2)" }}>
+        <div className="container">
+          <div className="section-label">Niche Coverage</div>
+          <h2 className="section-h">Every niche.<br /><span className="yellow">Its own identity.</span></h2>
+          <p className="section-sub" style={{ marginBottom: 0 }}>17 content categories. Each one gets a distinct visual language, tone, and energy — automatically.</p>
+          <div className="niche-grid" data-reveal>
+            {niches.map(n => <div key={n.label} className="niche-pill"><span>{n.emoji}</span><span>{n.label}</span></div>)}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section className="section" id="pricing">
+        <div className="container">
+          <div className="section-label">Pricing</div>
+          <h2 className="section-h">Simple pricing.<br /><span className="yellow">No surprises.</span></h2>
+          <div className="pricing-grid" data-reveal>
             {[
-              { num: "90+", label: "Production Layouts" },
-              { num: "17", label: "Supported Niches" },
-              { num: "14", label: "Typography Systems" },
-              { num: "10", label: "Intent Pools" },
-            ].map((s, i) => (
-              <div key={i} className="stat-item reveal" style={{ "--delay": `${i * 100}ms` }}>
-                <div className="stat-num">{s.num}</div>
-                <div className="stat-label">{s.label}</div>
+              { name: "Starter", price: 29, credits: 300, videos: 15, hot: false, features: ["300 credits/month", "Full video production", "Voice narration", "Background music", "Standard export", "Email support"] },
+              { name: "Creator", price: 49, credits: 600, videos: 30, hot: true, features: ["600 credits/month", "Everything in Starter", "AI image generation", "Talking head mode", "HD export", "Priority support"] },
+              { name: "Pro", price: 79, credits: 1200, videos: 60, hot: false, features: ["1200 credits/month", "Everything in Creator", "Bulk generation", "Custom brand identity", "Advanced analytics", "Dedicated support"] },
+            ].map(plan => (
+              <div key={plan.name} className={`plan${plan.hot ? " plan-hot" : ""}`}>
+                {plan.hot && <div className="plan-hot-badge">Most Popular</div>}
+                <div className="plan-name">{plan.name}</div>
+                <div className="plan-price"><span>$</span>{plan.price}</div>
+                <div className="plan-cycle">per month</div>
+                <div className="plan-credits">{plan.credits} credits/month</div>
+                <div className="plan-hint">~{plan.videos} videos (30-sec each)</div>
+                <div className="plan-hr" />
+                <ul className="plan-feats">{plan.features.map((f, i) => <li key={i}>{f}</li>)}</ul>
+                <button className={`plan-btn ${plan.hot ? "plan-btn-hot" : "plan-btn-default"}`} onClick={handleCTA}>Get Started</button>
               </div>
             ))}
           </div>
         </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="faq-section">
+        <div className="container">
+          <div className="faq-inner">
+            <div className="section-label">Questions</div>
+            <h2 className="section-h" style={{ marginBottom: 48 }}>Things people<br /><span className="yellow">actually ask.</span></h2>
+            <div data-reveal>
+              {faqs.map((faq, i) => <FAQItem key={i} q={faq.q} a={faq.a} />)}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA BANNER */}
+      <div className="cta-banner-section">
+        <div className="container">
+          <div className="cta-banner" data-reveal>
+            <div>
+              <div className="cta-banner-title">Stop planning.<br />Start publishing.</div>
+              <div className="cta-banner-sub">Your first video is free. No card required.</div>
+            </div>
+            <button className="cta-banner-btn" onClick={handleCTA}>Create Your First Video →</button>
+          </div>
+        </div>
       </div>
 
-      {/* ── Features ── */}
-      <section className="features-section" id="features">
-        <div className="container">
-          <div className="section-eyebrow">What's inside</div>
-          <h2 className="section-title reveal">BUILT DIFFERENT.<br />AT EVERY LEVEL.</h2>
-          <div className="features-grid">
-            {features.map((f, i) => <FeatureCard key={i} {...f} delay={i * 80} />)}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Pricing ── */}
-      <section className="pricing-section" id="pricing">
-        <div className="container">
-          <div className="section-eyebrow">Pricing</div>
-          <h2 className="section-title reveal">SIMPLE.<br />TRANSPARENT.</h2>
-          <p className="section-sub reveal" style={{ "--delay": "100ms" }}>Credits scale with features used. A basic video costs far less than a full AI production.</p>
-          <div className="plans-grid">
-            {plans.map((p, i) => <PlanCard key={i} {...p} />)}
-          </div>
-          <p style={{ textAlign: "center", marginTop: 32, color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
-            All plans include 50 free credits on signup. No credit card required to start.
-          </p>
-        </div>
-      </section>
-
-      {/* ── FAQ ── */}
-      <section className="faq-section" id="faq">
-        <div className="container">
-          <div className="section-eyebrow">FAQ</div>
-          <h2 className="section-title reveal">QUESTIONS<br />ANSWERED.</h2>
-          <div className="faq-list">
-            {faqs.map((f, i) => <FAQItem key={i} {...f} />)}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ── */}
-      <section className="cta-section">
-        <h2 className="cta-title reveal">YOUR AUDIENCE<br />IS SCROLLING.</h2>
-        <p className="cta-sub reveal" style={{ "--delay": "100ms" }}>Stop posting AI slop. Start posting produced content. Get early access today.</p>
-        <button className="btn-primary reveal" style={{ "--delay": "200ms", fontSize: 18, padding: "18px 48px" }} onClick={() => navigate("/login")}>
-          Get Early Access — Free
-        </button>
-      </section>
-
-      {/* ── Footer ── */}
+      {/* FOOTER */}
       <footer className="footer">
-        <div className="footer-logo">VIDORA</div>
-        <div className="footer-links">
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/refunds">Refund Policy</a>
-          <a href="#">Contact</a>
+        <div className="container">
+          <div className="footer-inner">
+            <a href="/" className="nav-logo"><div className="nav-logo-box">VE</div><span className="nav-logo-text">VideoEngine</span></a>
+            <div className="footer-links">
+              <a href="/about" className="footer-link">About</a>
+              <a href="/terms" className="footer-link">Terms</a>
+              <a href="/privacy" className="footer-link">Privacy</a>
+              <a href="/refunds" className="footer-link">Refunds</a>
+            </div>
+            <div className="footer-copy">© 2025 VIDEOENGINE</div>
+          </div>
         </div>
-        <div className="footer-copy">© 2025 PX Galaxy Studio. All rights reserved.</div>
       </footer>
     </div>
   );
