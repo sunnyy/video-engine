@@ -12,10 +12,10 @@ function analyzeProject(project) {
 
   const beats = project.beats;
 
-  // Empty zones
+  // Empty asset zones
   const emptyZones = beats.flatMap((b, i) =>
     Object.entries(b.zones || {})
-      .filter(([, z]) => !z?.content?.asset?.src && z?.role === "asset")
+      .filter(([, z]) => !z?.content?.asset?.src && ['primary_asset', 'secondary_asset'].includes(z?.role))
       .map(([slot]) => `Beat ${i + 1} · ${slot}`)
   );
   if (emptyZones.length > 0) {
@@ -23,6 +23,24 @@ function analyzeProject(project) {
       type:    "warning",
       icon:    "⚠️",
       text:    `${emptyZones.length} zone${emptyZones.length > 1 ? "s" : ""} missing assets: ${emptyZones.slice(0, 3).join(", ")}${emptyZones.length > 3 ? "…" : ""}`,
+    });
+  }
+
+  // Text overflow warning
+  const overflowZones = beats.flatMap((b, i) =>
+    Object.entries(b.zones || {})
+      .filter(([, z]) => {
+        const text     = z?.content?.text || "";
+        const maxChars = z?.maxChars || 40;
+        return text.length > maxChars;
+      })
+      .map(([slot]) => `Beat ${i + 1} · ${slot}`)
+  );
+  if (overflowZones.length > 0) {
+    messages.push({
+      type: "warning",
+      icon: "✍️",
+      text: `${overflowZones.length} text zone${overflowZones.length > 1 ? "s" : ""} may overflow — review: ${overflowZones.slice(0, 3).join(", ")}${overflowZones.length > 3 ? "…" : ""}`,
     });
   }
 

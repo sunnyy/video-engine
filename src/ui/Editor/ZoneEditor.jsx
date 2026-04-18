@@ -544,6 +544,34 @@ export default function ZoneEditor({
           </div>
         </div>
 
+        {/* Lock zone — AI / seed injection won't overwrite this zone's content */}
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-[#9494a8]"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}>Lock Zone</div>
+            <div className="text-[10px] text-[#55556a] mt-[2px]">AI won't fill this zone — content is fixed</div>
+          </div>
+          <button
+            onClick={() => setZoneLayout(slot, "locked", !(zone.locked ?? zoneDef?.locked))}
+            className="relative w-[38px] h-[22px] rounded-full border cursor-pointer transition-all flex-shrink-0"
+            style={{
+              background: (zone.locked ?? zoneDef?.locked) ? "rgba(124,92,252,0.3)" : "rgba(255,255,255,0.06)",
+              borderColor: (zone.locked ?? zoneDef?.locked) ? "#7c5cfc" : "rgba(255,255,255,0.12)",
+            }}
+            title={(zone.locked ?? zoneDef?.locked) ? "Zone is locked — click to unlock" : "Lock zone to prevent AI from filling it"}
+          >
+            <span className="absolute top-[3px] transition-all"
+              style={{
+                left: (zone.locked ?? zoneDef?.locked) ? "18px" : "3px",
+                width: 14, height: 14,
+                borderRadius: "50%",
+                background: (zone.locked ?? zoneDef?.locked) ? "#a78bfa" : "#55556a",
+                display: "block",
+              }}
+            />
+          </button>
+        </div>
+
         {/* Style Presets */}
         <Label>Presets</Label>
         <div className="flex gap-[5px] flex-wrap mt-[5px]">

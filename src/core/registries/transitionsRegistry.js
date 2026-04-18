@@ -170,52 +170,52 @@ export const transitionsRegistry = {
 
     fade: () => ({
       type: "fade",
-      duration: 12
+      duration: 14
     }),
 
     dissolve: () => ({
       type: "dissolve",
-      duration: 14
+      duration: 18
     }),
 
     dipBlack: () => ({
       type: "dipBlack",
-      duration: 14
+      duration: 16
     }),
 
     dipWhite: () => ({
       type: "dipWhite",
-      duration: 14
+      duration: 16
     }),
 
     slideLeft: () => ({
       type: "slideLeft",
-      duration: 14
+      duration: 16
     }),
 
     slideRight: () => ({
       type: "slideRight",
-      duration: 14
+      duration: 16
     }),
 
     slideUp: () => ({
       type: "slideUp",
-      duration: 14
+      duration: 16
     }),
 
     slideDown: () => ({
       type: "slideDown",
-      duration: 14
+      duration: 16
     }),
 
     zoom: () => ({
       type: "zoom",
-      duration: 12
+      duration: 18
     }),
 
     whipPan: () => ({
       type: "whipPan",
-      duration: 10
+      duration: 12
     }),
 
     spin: () => ({
@@ -225,12 +225,12 @@ export const transitionsRegistry = {
 
     glitch: () => ({
       type: "glitch",
-      duration: 12
+      duration: 14
     }),
 
     flash: () => ({
       type: "flash",
-      duration: 8
+      duration: 10
     })
 
   }

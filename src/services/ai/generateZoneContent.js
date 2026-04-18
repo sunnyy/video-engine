@@ -41,7 +41,8 @@ const GIANT_DISPLAY_WORDS = {
 
 /** Zone hint per role — what to independently write (not copy from spoken text) */
 function zoneHint(role, intent, maxChars, isGiantDisplay = false, ordinal = 1) {
-  const mc = `Max ${maxChars} characters.`;
+  const target = Math.floor(maxChars * 0.8);
+  const mc = `Aim for ${target} chars or less (hard max ${maxChars}).`;
   const isCTA = intent === "cta" || intent === "urgency" || intent === "punchline";
 
   // Giant display zones (fontSize >= 200): decorative background word — must be thematic, never spoken text
@@ -114,15 +115,27 @@ function buildZonesList(textZones, intent) {
 
 /** Build the prompt section for a single beat — no inline response template */
 function buildBeatSection(bp) {
-  // Include pre-generated zone content from the script director as creative seeds
   const pg = bp.preGenerated || {};
-  const seeds = Object.entries(pg)
-    .filter(([, v]) => v)
-    .map(([role, text]) => `  ${role}: "${text}"`)
-    .join("\n");
-  const seedBlock = seeds
-    ? `\nPRE-GENERATED SEEDS (use as inspiration — adapt to fit each zone's maxChars and role):\n${seeds}\n`
-    : "";
+
+  // Map seeds directly to zone IDs by role — so AI knows exactly which zone gets which seed
+  const roleToZoneId = {};
+  for (const z of bp.textZones) {
+    if (!roleToZoneId[z.role]) roleToZoneId[z.role] = z.id;
+  }
+
+  const seedLines = [];
+  if (pg.headline && roleToZoneId['headline']) seedLines.push(`  → Zone ${roleToZoneId['headline']} (headline): USE THIS EXACT TEXT: "${pg.headline}"`);
+  if (pg.subtext  && roleToZoneId['subtext'])  seedLines.push(`  → Zone ${roleToZoneId['subtext']}  (subtext):  USE THIS EXACT TEXT: "${pg.subtext}"`);
+  if (pg.label    && roleToZoneId['label'])    seedLines.push(`  → Zone ${roleToZoneId['label']}    (label):    USE THIS EXACT TEXT: "${pg.label}"`);
+  if (pg.stat     && roleToZoneId['stat'])     seedLines.push(`  → Zone ${roleToZoneId['stat']}     (stat):     USE THIS EXACT TEXT: "${pg.stat}"`);
+  if (pg.tagline  && roleToZoneId['tagline'])  seedLines.push(`  → Zone ${roleToZoneId['tagline']} (tagline):  USE THIS EXACT TEXT: "${pg.tagline}"`);
+  if (pg.quote    && roleToZoneId['quote'])    seedLines.push(`  → Zone ${roleToZoneId['quote']}    (quote):    USE THIS EXACT TEXT: "${pg.quote}"`);
+  if (pg.cta      && roleToZoneId['cta'])      seedLines.push(`  → Zone ${roleToZoneId['cta']}      (cta):      USE THIS EXACT TEXT: "${pg.cta}"`);
+
+
+  const seedBlock = seedLines.length
+    ? `\nPRE-ASSIGNED CONTENT — copy these directly into the specified zones exactly as written:\n${seedLines.join('\n')}\nFor zones NOT listed above, generate fresh content based on the spoken text and beat context.\n`
+    : '';
 
   return `--- BEAT ${bp.beatIndex} ---
 The spoken text for this beat is: "${bp.spoken}"
@@ -132,7 +145,7 @@ The niche is: ${bp.niche}
 ${seedBlock}
 For each zone below, generate INDEPENDENT content appropriate for that zone's role.
 DO NOT split or fragment the spoken text across zones.
-DO NOT copy the spoken text into zones — rewrite from scratch using the seeds above as a guide.
+DO NOT copy the spoken text into zones — rewrite from scratch for zones not pre-assigned above.
 Use the spoken text ONLY as context to understand what this beat is about.
 
 Zones to fill:
@@ -145,6 +158,10 @@ function buildZoneContentPrompt(beatsPayload, videoDNA) {
 
   return `You are filling content for zones in video beats (TikTok/Reels/Shorts style).
 Niche: ${niche}.
+
+ABSOLUTE BANS — VIOLATING THESE IS A CRITICAL FAILURE:
+- NEVER INVENT A NUMBER, PERCENTAGE, OR METRIC UNLESS IT COMES FROM A PRE-ASSIGNED SEED. If a stat or metric zone has no pre-assigned seed, write a short phrase like "Top Pick", "Must See", or "No. 1" — never a made-up number.
+- NEVER WRITE A ZONE WITH ONLY ONE WORD THAT IS AN ARTICLE, PREPOSITION, CONJUNCTION, OR VAGUE VERB: "The", "A", "An", "In", "Join", "Go", "Big", "His", "Check", "Get" as standalone zone content is forbidden. Always write a complete short phrase.
 
 CRITICAL RULE — READ THIS FIRST, APPLY TO EVERY BEAT:
 Every zone in a beat must have UNIQUE content.
@@ -164,6 +181,8 @@ STRICT RULES — follow every rule for every zone:
 8. Do not include quotation marks in text content
 9. NEVER split a single number across multiple stat zones — 94% must stay "94%", NOT split into "9", "4", "2" across zones. If a beat has multiple stat zones but only one stat, put the stat in the first zone and leave secondary stat zones blank ("")
 10. Subtext zones must be topic-specific — NEVER write generic phrases like "Discover", "Explore Now", "Learn Today", "Find Out More" — these add zero value
+11. If a stat or metric zone has NO pre-assigned seed content, write a relevant SHORT PHRASE (e.g. "No. 1", "Top Pick", "Best Ever") — NEVER invent a random number or percentage that was not in the spoken text or seeds
+12. Never write a zone with only an article, preposition, or conjunction ("The", "A", "An", "In", "Join", "And", "But") — these are incomplete thoughts. Write a complete short phrase instead
 
 ${beatSections}
 
@@ -243,6 +262,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
   console.log("[zoneContent] generateZoneContent called, beats:", beats.length, "layoutDefs:", layoutDefs.length, "nullDefs:", layoutDefs.filter(d => !d).length);
   const beatsPayload = beats.map((beat, i) => {
     const layoutDef = layoutDefs[i];
+    const beatId = beat.id; // carry beat ID so write-back can use it instead of fragile index
 
     let textZones;
 
@@ -265,6 +285,8 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
             role: isGiantDisplay ? "display" : (z.role || "subtext"),
             maxChars,
             isGiantDisplay,
+            locked: z.locked  || false,
+            static: z.static  || false,
           };
         });
     } else {
@@ -280,11 +302,17 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
             role: isGiantDisplay ? "display" : inferRoleFromBeatZone(zone),
             maxChars: isGiantDisplay ? 8 : maxCharsFromFontSize(fontSize),
             isGiantDisplay,
+            locked: zone.locked || false,
+            static: zone.static || false,
           };
         });
     }
 
-    // decorative, asset, and icon zones are skipped — they don't need AI text content
+    // Skip zones already filled by direct seed injection (Phase 3a) — no AI needed for those
+    textZones = textZones.filter(z => !beat.zones?.[z.id]?.content?.text?.trim());
+
+    // Skip locked/static zones — their content is fixed by the layout designer
+    textZones = textZones.filter(z => !z.locked && !z.static);
 
     // Pre-generated zone content from the script director (headline, subtext, label, etc.)
     // These serve as high-quality seeds — the AI uses them as starting points per role.
@@ -301,6 +329,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
     console.log(`[zoneContent] beat ${i} (id:${beat.id || i}) path:${layoutDef?.zones?.length ? "layoutDef" : "fallback"} textZones:`, textZones.map(z => z.id));
     return {
       beatIndex: i,
+      beatId,
       spoken:    beat.spoken,
       intent:    beat.intent,
       energy:    beat.energy,
@@ -317,7 +346,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
 
   const response = await serverFetch("/api/generate", {
     method: "POST",
-    body:   JSON.stringify({ prompt, model: "gpt-4o-mini" }),
+    body:   JSON.stringify({ prompt, model: "gpt-4o" }),
   });
 
   if (!response.ok) {
@@ -393,8 +422,10 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
     for (const [zoneId, content] of Object.entries(beat.zones || {})) {
       if (!content.text) continue;
       const role = zoneRole[zoneId];
-      // stat / metric zones may legitimately contain numbers from spoken text
-      if (role === "stat" || role === "metric") continue;
+      // stat / metric zones may legitimately contain numbers from spoken text.
+      // label / display zones are short category tags (1-3 words) that intentionally
+      // reference the beat topic — prefix detection would over-clear them.
+      if (role === "stat" || role === "metric" || role === "label" || role === "display") continue;
 
       const zWords = tokenise(content.text);
       if (zWords.length < 2) continue; // single words — skip detection
@@ -418,6 +449,13 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
         content.text = "";
       }
     }
+  }
+
+  // Attach beatId from beatsPayload so the caller can do ID-based write-back
+  // instead of relying on beatIndex (which is relative to the filtered subset, not the full beats array).
+  for (const item of parsed) {
+    const bp = beatsPayload.find(b => b.beatIndex === item.beatIndex);
+    if (bp?.beatId) item.beatId = bp.beatId;
   }
 
   return parsed;

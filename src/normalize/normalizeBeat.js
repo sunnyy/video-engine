@@ -89,6 +89,16 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     visual_hint: raw.visual_hint || "none",
     language:    raw.language    || meta?.language || "english",
 
+    // Pre-generated zone content seeds from the script director.
+    // Passed through to generateZoneContent as creative starting points.
+    headline: raw.headline || null,
+    subtext:  raw.subtext  || null,
+    label:    raw.label    || null,
+    stat:     raw.stat     || null,
+    tagline:  raw.tagline  || null,
+    quote:    raw.quote    || null,
+    cta:      raw.cta      || null,
+
     asset_hint: raw.asset_hint
       ? {
           keywords:     Array.isArray(raw.asset_hint.keywords) ? raw.asset_hint.keywords : [],

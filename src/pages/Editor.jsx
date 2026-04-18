@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { useProjectStore } from "../store/useProjectStore";
 import { getProjectById } from "../services/projects/projectService";
 
@@ -19,10 +19,12 @@ export default function Editor() {
   const project = useProjectStore((s) => s.project);
   const activeBeatId = useProjectStore((s) => s.activeBeatId);
 
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("beats");
   const [beatTab, setBeatTab] = useState("layout");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
+  const [showReviewBanner, setShowReviewBanner] = useState(!!location.state?.showReviewPrompt);
 
   useEffect(() => {
     async function load() {
@@ -78,6 +80,33 @@ export default function Editor() {
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
       <Header />
+
+      {showReviewBanner && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "linear-gradient(90deg, #1a1a2e, #16213e)",
+          borderBottom: "1px solid #7c5cfc44",
+          padding: "10px 20px", gap: 12, flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 18 }}>✅</span>
+            <span style={{ fontSize: 13, color: "#c8c8e0", fontWeight: 500 }}>
+              Your video is ready — review before exporting:
+            </span>
+            <span style={{ fontSize: 12, color: "#9090b0" }}>
+              Check images &amp; text on each beat &nbsp;·&nbsp; Swap any images that don't fit &nbsp;·&nbsp; Tweak zones if needed &nbsp;·&nbsp; Then export
+            </span>
+          </div>
+          <button
+            onClick={() => setShowReviewBanner(false)}
+            style={{
+              background: "none", border: "none", color: "#6060a0",
+              cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px",
+            }}
+            title="Dismiss"
+          >×</button>
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-1 flex-col" style={{ width: "70%" }}>

@@ -20,17 +20,23 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typogra
   const onUpdateRef    = useRef(onUpdate);
   onUpdateRef.current  = onUpdate;
   const lastPct        = useRef(null);
-  // Track the currently-stored zone.height so we can skip updates that are
-  // already correct — this prevents a Zustand→re-render→ResizeObserver feedback loop.
   const zoneHeightRef  = useRef(zone.height);
   zoneHeightRef.current = zone.height;
 
-  const st   = zone.style   || {};
-  const text = zone.content?.text || "\u200B"; // zero-width space keeps 1-line height
+  const st      = zone.style        || {};
+  const rawText = zone.content?.text || "";
+  const text    = rawText || "\u200B"; // zero-width space keeps 1-line height
+
+  // Mirror LayoutRenderer's font auto-scaling so measurement matches actual render
+  const maxChars    = zone.maxChars || 40;
+  const scaleFactor = rawText.length > maxChars * 0.8 ? 0.85 : 1;
 
   const dnaTypo = (!st._userFontFamily && typographySystem && zone.role)
     ? getTypographyForRole(typographySystem, zone.role)
     : null;
+
+  // Mirror LayoutRenderer: contentPadding wins over padding when set
+  const padding = st.contentPadding > 0 ? `${st.contentPadding * canvasScale}px` : (st.padding || "0 8px");
 
   useEffect(() => {
     const el = ref.current;
@@ -38,8 +44,7 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typogra
     const sync = () => {
       const h = el.offsetHeight;
       if (h <= 0) return;
-      const pct = Math.round((h / canvasH) * 1000) / 10; // 1 decimal place
-      // Already stored correctly — skip to avoid feedback loop
+      const pct = Math.round((h / canvasH) * 1000) / 10;
       if (zoneHeightRef.current != null && Math.abs(pct - zoneHeightRef.current) < 0.3) return;
       if (lastPct.current !== null && Math.abs(pct - lastPct.current) < 0.3) return;
       lastPct.current = pct;
@@ -48,8 +53,10 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typogra
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     sync();
+    // Re-measure after fonts load — custom fonts cause wrong initial measurement
+    document.fonts?.ready?.then(sync);
     return () => ro.disconnect();
-  }, [canvasH]); // stable — uses refs for callback and lastPct
+  }, [canvasH]);
 
   return (
     <div ref={ref} style={{
@@ -58,8 +65,8 @@ function TextAutoHeight({ zone, canvasW, canvasH, canvasScale, onUpdate, typogra
       pointerEvents: "none",
       top: 0, left: 0,
       width:         `${(zone.width / 100) * canvasW}px`,
-      padding:       st.padding      || "0 8px",
-      fontSize:      (st.fontSize    || 32) * canvasScale,
+      padding,
+      fontSize:      (st.fontSize || 32) * canvasScale * scaleFactor,
       fontWeight:    dnaTypo?.fontWeight ?? st.fontWeight ?? 700,
       fontFamily:    dnaTypo?.fontFamily ?? st.fontFamily ?? "inherit",
       lineHeight:    st.lineHeight   || 1.15,
@@ -218,6 +225,7 @@ export default function ZoneCanvas({
   beat, selectedZoneIds, onSelectZone,
   canvasW, canvasH, canvasScale,
   videoOverlays, onUpdateVideoOverlay,
+  showTimings = true,
 }) {
   const updateBeatSilent   = useProjectStore((s) => s.updateBeatSilent);
   const _pushHistory       = useProjectStore((s) => s._pushHistory);
@@ -478,7 +486,7 @@ export default function ZoneCanvas({
           );
         })()}
 
-        {allZones.filter(z => (z.start || 0) > 0).map(zone => (
+        {showTimings && allZones.filter(z => (z.start || 0) > 0).map(zone => (
           <div key={`delay_${zone.id}`}
             className="absolute text-[8px] font-mono text-[rgba(255,200,0,0.7)] bg-black/50 px-[3px] py-[1px] rounded-[3px] pointer-events-none leading-[12px]"
             style={{ left: `${zone.x}%`, top: `${zone.y}%`, zIndex: 999 }}

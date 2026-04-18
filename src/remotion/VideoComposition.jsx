@@ -146,7 +146,8 @@ export default function VideoComposition({ project, previewMode = false }) {
       style={{
         backgroundColor: visualIdentity.colorStory.dominant,
         width: meta.width,
-        height: meta.height
+        height: meta.height,
+        overflow: "hidden",
       }}
     >
 
@@ -191,8 +192,8 @@ export default function VideoComposition({ project, previewMode = false }) {
             case "slideUp":    inTransformParts.push(`translateY(${interpolate(progress,[0,1],[meta.height,0])}px)`); break;
             case "slideDown":  inTransformParts.push(`translateY(${interpolate(progress,[0,1],[-meta.height,0])}px)`); break;
             case "zoom":
-              inTransformParts.push(`scale(${interpolate(progress,[0,1],[1 + 0.55 * intensity, 1])})`);
-              inStyle.opacity = interpolate(progress,[0,0.4,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
+              // No opacity — full visibility so the scale animation is seen from frame 0 (like slides)
+              inTransformParts.push(`scale(${1 + (1 - progress) * 0.9 * intensity})`);
               break;
             case "dipBlack": inDipOverlay = `rgba(0,0,0,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
             case "dipWhite": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
@@ -208,7 +209,7 @@ export default function VideoComposition({ project, previewMode = false }) {
               inTransformParts.push(`scale(${interpolate(progress,[0,0.5,1],[1.08,1.02,1])})`);
               inStyle.opacity = interpolate(progress,[0,0.2,0.4,0.6,0.8,1],[0,1,0.6,1,0.8,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
               break;
-            case "flash": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,0.25,1],[1,0,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
+            case "flash": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,0.55,1],[1,0,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
             default: inStyle.opacity = progress; break; // crossfade for cut/unknown: new beat fades in so old beat shows through
           }
         }
@@ -226,8 +227,8 @@ export default function VideoComposition({ project, previewMode = false }) {
           switch (nextTransition.type) {
             case "fade": case "dissolve": break;
             case "zoom":
-              outStyle.transform = `scale(${interpolate(outProgress,[0,1],[1,0.82])})`;
-              outStyle.opacity   = interpolate(outProgress,[0.5,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
+              // Old beat shrinks away; no opacity so the shrink is clearly visible
+              outStyle.transform = `scale(${1 - outProgress * 0.4})`;
               break;
             case "dipBlack": dipOverlay = `rgba(0,0,0,${outProgress})`; break;
             case "dipWhite": dipOverlay = `rgba(255,255,255,${outProgress})`; break;

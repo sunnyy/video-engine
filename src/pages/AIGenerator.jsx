@@ -305,7 +305,7 @@ export default function AIGenerator() {
       });
 
       await updateProject(projectId, safeProject);
-      navigate(`/editor/${projectId}`);
+      navigate(`/editor/${projectId}`, { state: { showReviewPrompt: true } });
     } catch (err) {
       console.error(err);
       setError(err.message || "Generation failed. Please try again.");
@@ -315,13 +315,62 @@ export default function AIGenerator() {
     setLoadingStep(null);
   };
 
-  const STEP_MESSAGES = {
-    transcribing: "Transcribing your video…",
-    uploading:    "Uploading to storage…",
-    script:       "Writing the script…",
-    voice:        "Generating voice…",
+  const STEP_MESSAGE_POOLS = {
+    transcribing: [
+      "Listening closely…",
+      "Absorbing every word…",
+      "Reading between the frames…",
+      "Decoding your story…",
+    ],
+    uploading: [
+      "Preparing your content…",
+      "Beaming it up…",
+      "Syncing to the cloud…",
+      "Securing your footage…",
+    ],
+    script: [
+      "Crafting your narrative…",
+      "Shaping the story arc…",
+      "Painting with motion…",
+      "Composing the sequence…",
+      "Assembling the moments…",
+      "Directing the vision…",
+      "Sculpting your message…",
+      "Weaving the timeline…",
+      "Designing the experience…",
+      "Building something great…",
+      "Conjuring the magic…",
+      "Making it cinematic…",
+    ],
+    voice: [
+      "Finding the perfect voice…",
+      "Breathing life into words…",
+      "Tuning the performance…",
+      "Giving it a voice…",
+    ],
+    _default: [
+      "Igniting the engine…",
+      "Warming up the studio…",
+      "Charging the creative core…",
+      "Calibrating the magic…",
+    ],
   };
-  const currentLoadingMessage = STEP_MESSAGES[loadingStep] || "Generating your video…";
+
+  const [msgIndex, setMsgIndex] = useState(0);
+  const msgStepRef = useRef(null);
+
+  useEffect(() => {
+    if (!loading) { setMsgIndex(0); msgStepRef.current = null; return; }
+    if (loadingStep !== msgStepRef.current) { setMsgIndex(0); msgStepRef.current = loadingStep; }
+    const pool = STEP_MESSAGE_POOLS[loadingStep] ?? STEP_MESSAGE_POOLS._default;
+    const timer = setInterval(() => {
+      setMsgIndex((i) => (i + 1) % pool.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [loading, loadingStep]);
+
+  const _pool = STEP_MESSAGE_POOLS[loadingStep] ?? STEP_MESSAGE_POOLS._default;
+  const currentLoadingMessage = _pool[msgIndex % _pool.length];
 
   const advancedSummary = buildAdvancedSummary({
     tone,
@@ -360,10 +409,10 @@ export default function AIGenerator() {
               40%            { opacity: 1;   transform: scale(1.2); }
             }
             @keyframes ai-fade-msg {
-              0%   { opacity: 0; transform: translateY(8px); }
-              15%  { opacity: 1; transform: translateY(0);   }
-              85%  { opacity: 1; transform: translateY(0);   }
-              100% { opacity: 0; transform: translateY(-6px);}
+              0%   { opacity: 0; transform: translateY(10px); }
+              12%  { opacity: 1; transform: translateY(0);    }
+              88%  { opacity: 1; transform: translateY(0);    }
+              100% { opacity: 0; transform: translateY(-8px); }
             }
           `}</style>
 
@@ -411,7 +460,7 @@ export default function AIGenerator() {
                 color: "#e8e8f0",
                 fontFamily: "'Syne', sans-serif",
                 marginBottom: 10,
-                animation: "ai-fade-msg 0.5s ease forwards",
+                animation: "ai-fade-msg 3s ease forwards",
               }}
             >
               {currentLoadingMessage}

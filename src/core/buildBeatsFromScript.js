@@ -116,20 +116,35 @@ function assignBeatRole(index, total) {
 }
 
 /* ── Transition ── */
-function chooseTransition(layoutId, index, energy = 0.5, isLast = false) {
-  // If the layout has a default transition set by admin, always use it
+
+// Canonical durations per transition type
+const TRANSITION_DURATIONS = {
+  zoom: 18, whipPan: 12, glitch: 14, flash: 10, spin: 14,
+  slideLeft: 16, slideRight: 16, slideUp: 16, slideDown: 16,
+  dissolve: 18, dipBlack: 16, dipWhite: 16, fade: 14, cut: 0,
+};
+
+// Buckets: high-energy uses punchy types, low-energy uses smooth types
+const TRANS_HIGH = ["zoom", "whipPan", "slideLeft", "slideUp", "glitch", "flash", "zoom", "slideRight"];
+const TRANS_LOW  = ["dissolve", "dipBlack", "slideRight", "slideDown", "fade", "dissolve", "dipWhite", "slideLeft"];
+
+function chooseTransition(layoutId, index, energy = 0.5, isLast = false, prevType = null) {
   const layoutDef = getLayoutDef(layoutId);
   if (layoutDef?.defaultTransition) return layoutDef.defaultTransition;
 
   if (index === 0) {
-    // Beat 0: transition IS the opening animation — pick based on energy
-    if (energy >= 0.75) return { type: "zoom",    duration: 12 };
-    if (energy >= 0.45) return { type: "fade",    duration: 12 };
-    return                     { type: "dissolve", duration: 14 };
+    if (energy >= 0.75) return { type: "zoom",    duration: TRANSITION_DURATIONS.zoom };
+    if (energy >= 0.45) return { type: "fade",    duration: TRANSITION_DURATIONS.fade };
+    return                     { type: "dissolve", duration: TRANSITION_DURATIONS.dissolve };
   }
-  if (isLast) return { type: "fade",     duration: 12 };
-  const high = energy >= 0.75;
-  return { type: high ? "zoom" : "dissolve", duration: high ? 12 : 14 };
+  if (isLast) return { type: "dissolve", duration: TRANSITION_DURATIONS.dissolve };
+
+  const pool = energy >= 0.6 ? TRANS_HIGH : TRANS_LOW;
+  // Filter out the previous type to prevent consecutive repeats
+  const available = prevType ? pool.filter(t => t !== prevType) : pool;
+  // Deterministic but varied: mix of index + energy as seed
+  const pick = available[(index * 7 + Math.round(energy * 13)) % available.length];
+  return { type: pick, duration: TRANSITION_DURATIONS[pick] ?? 14 };
 }
 
 /* ── Enforce layout zones — respects new zone type schema ── */
@@ -143,9 +158,22 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
     const existing = existingZones[zoneDef.id];
 
     if (existing) {
-      // Keep existing content but ensure zone id is present
-      fixed[zoneDef.id] = existing;
-      return;
+      // Only reuse existing content if the content type matches the zone definition.
+      // Mismatches (e.g. text content in an asset zone) would cause ghost placeholders
+      // or silent failures — treat them as if there is no existing content.
+      const existingKind = existing?.content?.kind;
+      const kindMatches =
+        (zoneDef.type === "text"       && existingKind === "text")       ||
+        (zoneDef.type === "asset"      && existingKind === "asset")      ||
+        (zoneDef.type === "decorative" && existingKind === "shape")      ||
+        (zoneDef.type === "icon"       && existingKind === "icon")       ||
+        (!existingKind); // no content yet — let it fall through to the empty-zone path
+
+      if (kindMatches && existingKind) {
+        fixed[zoneDef.id] = existing;
+        return;
+      }
+      // Type mismatch — fall through to create a fresh empty zone of the correct type
     }
 
     // Create empty zone matching type from layout definition
@@ -153,6 +181,9 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
       fixed[zoneDef.id] = {
         content: { kind: "text", text: "" },
         style: { ...zoneDef.style },
+        // Carry the background layer (set via Zone Background picker) so the contrast
+        // guard in fillTextZones can see it and derive a readable text color.
+        ...(zoneDef.background ? { background: zoneDef.background } : {}),
       };
     } else if (zoneDef.type === "asset") {
       fixed[zoneDef.id] = {
@@ -167,7 +198,8 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
       const isRing  = br >= 999;
       const isLarge = (zoneDef.width ?? 0) > 60 || (zoneDef.height ?? 0) > 60;
       const shape   = isRing ? "ring" : (isLarge ? "square" : "circle");
-      const filled  = !isRing && !isLarge;
+      // Prefer Admin-saved filled value; fall back to geometry heuristic
+      const filled  = zoneDef.style?.filled ?? (!isRing && !isLarge);
       fixed[zoneDef.id] = {
         content: { shape },
         style: { ...zoneDef.style, color: zoneDef.style?.color || "#ffffff", filled },
@@ -341,19 +373,67 @@ function fillTextZones(beats, colorOptions = {}) {
       //   injectVisualStyle  — preset flair + DNA colors as the baseline
       //   zoneDef.style      — layout definition WINS over preset (font, size, color set by designer)
       //   existing?.style    — user edits in the editor win over both
+      //
+      // Strip whiteSpace: "nowrap" from zoneDef before merging — it is often written by the
+      // Vision AI image converter for stat/label zones where the zone was auto-widened to fit
+      // static text.  When dynamic AI content is longer, nowrap + overflow:visible causes the
+      // text to visually overflow the zone boundary. Dynamic zones must wrap.
+      const { whiteSpace: _strippedWS, ...zoneDef_styleNoNowrap } =
+        zoneDef.style?.whiteSpace === "nowrap"
+          ? zoneDef.style
+          : { whiteSpace: undefined, ...zoneDef.style };
+
       const mergedVisual = {
         ...injectVisualStyle,
-        ...zoneDef.style,
+        ...zoneDef_styleNoNowrap,
         ...(existing?.style || {}),
+        // Always force normal wrapping — never let nowrap survive into the render
+        whiteSpace: "normal",
       };
 
       // Final textShadow pass — strip on light backgrounds regardless of what any layer set.
       // Check 1: niche/colorStory bg is light → strip textShadow on ALL text zones.
       // Check 2: zone's own background is a light solid color → strip on that zone specifically.
-      const zoneBg = mergedVisual.background;
-      const zoneBgIsLight = typeof zoneBg === "string" && isLightColor(zoneBg);
+      //
+      // There are TWO distinct background concepts for a zone:
+      //   a) zone.style.background  — CSS background on the text element (pill presets, badge colours)
+      //   b) zone.background.color  — separate background *layer* rendered behind the zone
+      //                               (set via the Zone Background picker in the editor)
+      // Both must be checked; the picker path is the more common one designers use.
+      const zoneBgStyle = mergedVisual.background; // (a) from zone.style.background
+      const zoneBgLayer =                          // (b) from zone.background layer
+        (typeof zoneDef.background?.color === "string" ? zoneDef.background.color : null)
+        ?? (typeof existing?.background?.color === "string" ? existing.background.color : null);
+      // Prefer whichever is the more specific / non-transparent value
+      const zoneBg = (zoneBgStyle && zoneBgStyle !== "transparent") ? zoneBgStyle : (zoneBgLayer || null);
+
+      const isSolidColor = (v) => v && typeof v === "string"
+        && v !== "transparent"
+        && !v.includes("gradient")
+        && !v.includes("linear")
+        && !v.includes("radial");
+
+      const zoneBgIsLight = isSolidColor(zoneBg) && isLightColor(zoneBg);
       if (bgIsLight || zoneBgIsLight) {
         mergedVisual.textShadow = "none";
+      }
+
+      // Zone background contrast guard:
+      // If the zone has a solid background (CSS style OR background layer), verify that the
+      // merged text color is actually readable.  Don't rely on "did the designer pin a color" —
+      // a previous wrong pipeline run may have stored white in existing.style.color, which wins
+      // over zoneDef.style.color in the merge and creates e.g. white text on white background.
+      // Instead, check actual contrast: if text and background are both light (or both dark),
+      // the text is unreadable and we must fix it — regardless of which layer set the color.
+      // Exception: _userColor flag means the user deliberately picked this color in the editor.
+      const hasZoneBackground = isSolidColor(zoneBg);
+
+      if (hasZoneBackground && !existing?.style?._userColor) {
+        const textIsLight = isLightColor(mergedVisual.color || "#ffffff");
+        if (textIsLight === zoneBgIsLight) {
+          // Text and background have the same lightness → invisible. Derive a readable colour.
+          mergedVisual.color = zoneBgIsLight ? "#0a0a0a" : "#ffffff";
+        }
       }
 
       zones[zoneDef.id] = {
@@ -383,6 +463,50 @@ function fillTextZones(beats, colorOptions = {}) {
           style: { ...existing.style, textShadow: "none" },
         };
       }
+    });
+
+    return { ...beat, zones };
+  });
+}
+
+/* ── Decorative zone color theming ── */
+// Applies the DNA accent/primary color to decorative zones whose color was NOT
+// explicitly set by the layout designer (i.e. they were left at the default white).
+// Designer-pinned colors are always respected.
+function fillDecorativeZones(beats, colorOptions = {}) {
+  const accent  = colorOptions.colorStory?.primary
+    || colorOptions.dna?.colorStory?.primary
+    || "#7c5cfc";
+  const accent2 = colorOptions.brandColor || accent;
+
+  return beats.map(beat => {
+    const def = getLayoutDef(beat.layout);
+    if (!def) return beat;
+
+    const decorativeZones = def.zones.filter(z => z.type === "decorative" || z.type === "icon");
+    if (!decorativeZones.length) return beat;
+
+    const zones = { ...beat.zones };
+
+    decorativeZones.forEach((zoneDef, idx) => {
+      // Designer explicitly set a color → respect it, don't override
+      if (zoneDef.style?.color && zoneDef.style.color !== "#ffffff") return;
+
+      const existing = zones[zoneDef.id];
+      // User manually edited this zone in the editor → preserve their choice
+      if (existing?.style?._userColor) return;
+
+      // Alternate between accent and accent2 for visual variety when multiple decoratives exist
+      const themeColor = idx % 2 === 0 ? accent : accent2;
+
+      zones[zoneDef.id] = {
+        ...(existing || {}),
+        style: {
+          ...(existing?.style || {}),
+          ...(zoneDef.style || {}),
+          color: themeColor,
+        },
+      };
     });
 
     return { ...beat, zones };
@@ -541,14 +665,37 @@ export async function buildBeatsFromScript({
       overlays: [],
       audio_cues: sfxCue ? [sfxCue] : [],
 
-      transition: chooseTransition(visual.layout, index, energy, isLast),
+      transition: chooseTransition(visual.layout, index, energy, isLast, null /* anti-repeat applied below */),
 
       spoken, intent, energy, visual_hint, language, role,
       asset_hint: item.asset_hint || null,
+      // Pre-generated zone content seeds from the script director
+      // These are passed through to generateZoneContent as creative seeds
+      headline: item.headline || null,
+      subtext:  item.subtext  || null,
+      label:    item.label    || null,
+      stat:     item.stat     || null,
+      tagline:  item.tagline  || null,
+      quote:    item.quote    || null,
+      cta:      item.cta      || null,
       duration_sec: end_sec - start_sec,
       start_sec, end_sec,
     };
   });
+
+  /* ── Anti-repeat transition pass ──
+     Walk beats in order; if two consecutive beats share the same transition type,
+     re-run chooseTransition passing prevType so the pool excludes the duplicate. */
+  for (let i = 1; i < beats.length; i++) {
+    const prevType = beats[i - 1].transition?.type;
+    if (beats[i].transition?.type && beats[i].transition.type === prevType) {
+      const beat = beats[i];
+      beats[i] = {
+        ...beat,
+        transition: chooseTransition(beat.layout, i, beat.energy ?? 0.5, i === beats.length - 1, prevType),
+      };
+    }
+  }
 
   /* ── Post-processing ── */
   beats = fillTextZones(beats, {
@@ -558,11 +705,30 @@ export async function buildBeatsFromScript({
     niche:       dna?.niche       || null,
   });
 
+  beats = fillDecorativeZones(beats, {
+    dna,
+    colorStory:  dna?.colorStory  || null,
+    brandColor:  brandColor       || null,
+  });
+
   /* ── Assign asset zone visual styling: border radius, animated border, shine ── */
   beats = beats.map(beat => {
     const layoutDef = getLayoutDef(beat.layout);
     if (!layoutDef) return beat;
     const zones = { ...beat.zones };
+
+    // Identify the PRIMARY asset zone for this layout — animated borders are only
+    // applied to it, not to background or secondary decorative asset zones.
+    // Primary = the largest non-background asset zone by area; fall back to the
+    // first asset zone if all are backgrounds or there's only one.
+    const allAssetZoneDefs = layoutDef.zones.filter(z => z.type === "asset");
+    const nonBgAssetZoneDefs = allAssetZoneDefs.filter(z => z.role !== "background_asset");
+    const primaryAssetZone = (nonBgAssetZoneDefs.length > 0 ? nonBgAssetZoneDefs : allAssetZoneDefs)
+      .reduce((best, z) =>
+        (z.width ?? 0) * (z.height ?? 0) > ((best?.width ?? 0) * (best?.height ?? 0)) ? z : best,
+        null
+      );
+    const primaryAssetZoneId = primaryAssetZone?.id ?? null;
 
     layoutDef.zones.forEach(zoneDef => {
       if (zoneDef.type !== "asset") return;
@@ -586,8 +752,12 @@ export async function buildBeatsFromScript({
         styleUpdates.borderRadius = 100 + (seed % 51); // 100–150
       }
 
-      // ── Animated border (~25% of non-full-canvas zones) ───────────────────
-      if (!isFullCanvas && !existingStyle.animatedBorder && !existingStyle.clipShape) {
+      // ── Animated border (~25% chance, PRIMARY zone only) ──────────────────
+      // Only the primary (most prominent / non-background) asset zone gets an
+      // animated border — applying it to secondary or background zones looks
+      // cluttered and distracts from the focal subject.
+      const isPrimaryZone = zoneDef.id === primaryAssetZoneId;
+      if (isPrimaryZone && !isFullCanvas && !existingStyle.animatedBorder && !existingStyle.clipShape) {
         if (seed % 4 === 0) {
           styleUpdates.animatedBorder = resolveAnimatedBorderForZone(beat, dna);
         }

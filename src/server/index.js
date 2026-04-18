@@ -379,16 +379,27 @@ async function bingScrapeImages(query) {
   if (!r.ok) throw new Error(`Bing scrape HTTP ${r.status}`);
   const html = await r.text();
 
-  // Bing HTML-encodes quotes: murl&quot;:&quot;URL&quot;
-  const murls = [...html.matchAll(/murl&quot;:&quot;(https?:[^&]+)&quot;/g)].map(m => m[1]);
-  const turls = [...html.matchAll(/turl&quot;:&quot;(https?:[^&]+)&quot;/g)].map(m => m[1]);
+  // Bing embeds image URLs in multiple formats depending on region/version:
+  // 1. HTML-encoded:  murl&quot;:&quot;URL&quot;
+  // 2. Raw JSON:      "murl":"URL"
+  // Try both and deduplicate.
+  const murlsEncoded = [...html.matchAll(/murl&quot;:&quot;(https?:[^&"]+)&quot;/g)].map(m => m[1]);
+  const murlsRaw     = [...html.matchAll(/"murl"\s*:\s*"(https?:[^"]+)"/g)].map(m => m[1]);
+  const turlsEncoded = [...html.matchAll(/turl&quot;:&quot;(https?:[^&"]+)&quot;/g)].map(m => m[1]);
+  const turlsRaw     = [...html.matchAll(/"turl"\s*:\s*"(https?:[^"]+)"/g)].map(m => m[1]);
+
+  // Merge and deduplicate while preserving order
+  const dedupe = (...arrs) => [...new Set(arrs.flat().filter(Boolean))];
+  const murls = dedupe(murlsEncoded, murlsRaw);
+  const turls = dedupe(turlsEncoded, turlsRaw);
 
   const results = [];
   for (let i = 0; i < Math.max(murls.length, turls.length); i++) {
     results.push({ murl: murls[i] || null, turl: turls[i] || null });
   }
 
-  console.log(`[search] Bing found ${results.length} results for "${query}"`);
+  console.log(`[search] Bing found ${results.length} results for "${query}" (encoded:${murlsEncoded.length} raw:${murlsRaw.length})`);
+  if (results.length === 0) console.warn(`[search] Zero results — Bing HTML may have changed format. Check /api/test-search?q=${encodeURIComponent(query)}`);
   return results;
 }
 
@@ -1672,6 +1683,19 @@ app.post('/api/admin/convert-layout-image', requireAuth, requireAdmin, async (re
 
     const visionPrompt = `You are a precision layout extraction engine for short-form video design. Your job is to analyze a marketing image and output accurate zone coordinates + metadata.
 
+⚠️ CRITICAL — TEXT IN THIS IMAGE IS AI-GENERATED GIBBERISH:
+The image was produced by a Fal.ai diffusion model which cannot render real text. Every word you see is garbled nonsense — "AKRAQAIMED", "UNPARALAJELED", "EXCLUME", "Eleleate2" etc. DO NOT attempt to read or OCR any text from the image.
+Instead, for every text zone you detect, you MUST write real, meaningful placeholder content based on the zone's ROLE + the context below (niche=${niche}, intent=${intent}).
+Use these role-specific rules to generate content — the image text is irrelevant:
+  • headline zone  → a real curiosity-style hook phrase for this niche/intent, 6-10 words, e.g. "WHY MILLIONS ARE SWITCHING TO THIS NOW"
+  • label zone     → the niche name in ALL CAPS, e.g. "${(niche||'LIFESTYLE').toUpperCase()}"
+  • subtext zone   → a real supporting sentence relevant to the niche, e.g. "Join 50,000 people already transforming their results."
+  • tagline zone   → a short memorable brand-style phrase, e.g. "Built for the bold."
+  • cta zone       → a real action directive, e.g. "FOLLOW NOW" or "GET STARTED →"
+  • stat zone      → a realistic metric for this niche, e.g. "10,000+" or "94%" or "$3.5M"
+  • quote zone     → a quotable pull-quote sentence relevant to the beat
+Generate content that would actually appear in a real ${niche} ${intent} video — not generic fillers.
+
 CANVAS: 1080 wide × 1920 tall (9:16 vertical). All output coordinates are PERCENTAGES of canvas dimensions (0–100).
 
 ══════════════════════════════════════
@@ -1789,11 +1813,14 @@ EXTRACTION RULES:
    Colored diagonal strips, bottom bars, side accent strips → decorative, shapeKey:rectangle or shapeKey:pill
 9. SIMPLE ICONS (star, sparkle, arrow, check, fire, crown, heart, etc.) → icon
 10. DIVIDER LINE → decorative, shapeKey:line
-11. If text is unreadable, blurry, too small, stylized, or produces garbled output — ALWAYS use placeholder.
-    When in doubt, use the placeholder. NEVER guess at text content.
-    headline→"YOUR HEADLINE" | subtext→"Supporting detail goes here" | label→niche category name | stat→"30% OFF" | cta→"GET STARTED"
-    For subtext/body text: if the text is smaller than ~30px or spans more than 1 line of small type,
-    use placeholder "Supporting detail goes here" rather than attempting to OCR-read it.
+11. ALL text in this image is AI-generated gibberish — NEVER attempt to read it. For EVERY text zone, generate real meaningful content based on role + context (niche=${niche}, intent=${intent}):
+    headline → curiosity-style hook, 6-10 words, relevant to ${niche} ${intent}, e.g. "WHY MILLIONS ARE SWITCHING TO THIS NOW"
+    label    → "${(niche||'lifestyle').toUpperCase()}" — just the niche name in caps
+    subtext  → a real ${niche} supporting sentence, e.g. "Join 50,000 people already seeing results."
+    tagline  → short memorable phrase, e.g. "Built for the bold."
+    stat     → realistic ${niche} metric, e.g. "10,000+" or "94%" or "$3.5M"
+    cta      → real action directive, e.g. "FOLLOW NOW" or "GET STARTED →" or "LEARN MORE"
+    quote    → quotable ${niche} pull-quote sentence
 12. Do NOT create a background zone — background is handled separately
 13. TEXT ZONE HEIGHT: use fontSize to estimate: height = (fontSize/1920)*100*1.5
     Example: 160px font → height ≈ 12.5%. Do not make text zones taller than needed.
@@ -2355,13 +2382,13 @@ app.post("/api/admin/generate-layout-prompts", requireAuth, requireAdmin, async 
         description: 'Stop the scroll. Bold visual, dominant headline, immediate impact. Everything fights for attention in the first frame.',
         elements: `1. BACKGROUND — bold gradient or high-contrast solid. Specify exact hex colors.
 2. CATEGORY LABEL — small pill/tag at very top (top 12%). Uppercase niche name inside colored pill.
-3. HEADLINE — massive ultra-bold text, 2-4 words, dominates upper third (12-42%). Condensed or heavy typeface. Specific placeholder text.
+3. HEADLINE — massive ultra-bold text, 6-10 words shown as a COMPLETE THOUGHT or curiosity question across 1-2 lines (12-42%). e.g. "WHY MRBEAST GIVES AWAY MILLIONS" or "THIS CHANGED EVERYTHING OVERNIGHT". Condensed heavy typeface. NEVER a single dramatic word like "WOW", "EPIC", "BIG", "ARENA" — always a meaningful multi-word phrase that makes sense on its own.
 4. SUBTEXT — 5-8 word supporting line directly below headline, lighter weight.
 5. SUBJECT — striking visual (person, product, character) filling center (40-75%), drop shadow, isolated on background.
 6. DECORATIVE ACCENTS — min 2: corner geometric, side accent strip, floating icon, or price badge.
 7. CTA — full-width bottom bar or large pill button at bottom (88-100%). Bold directive text + arrow.
 8. SPACING: top 12%=label, 12-42%=headline+sub, 42-75%=subject, 75-88%=accent, 88-100%=CTA.`,
-        example: `Bold fitness hook on burnt orange to crimson gradient. TOP: white pill badge "FITNESS" at top-center. Upper third: ultra-bold condensed "FEEL THE BURN" in white, 2 lines, yellow divider line below. Sub-line "Gear Up For Greatness" in off-white. CENTER: red dumbbells product shot, 55% canvas width, drop shadow. Large faint circle behind product. Left: thin yellow accent strip. Bottom-right: circular "50% OFF" badge on dark pill. BOTTOM: full-width charcoal bar "SHOP NOW →" in white bold.`
+        example: `Bold fitness hook on burnt orange to crimson gradient. TOP: white pill badge "FITNESS" at top-center. Upper third: ultra-bold condensed "WHY 10 MILLION PEOPLE CAN'T STOP WATCHING" in white across 2 lines, yellow divider line below. Sub-line "Gear Up For Greatness" in off-white. CENTER: red dumbbells product shot, 55% canvas width, drop shadow. Large faint circle behind product. Left: thin yellow accent strip. Bottom-right: circular "50% OFF" badge on dark pill. BOTTOM: full-width charcoal bar "SHOP NOW →" in white bold.`
       },
       proof: {
         description: 'Show evidence. Asset-led — one or two images showing the result, product, or person. Supporting text below or beside. Feels credible and visual. NO CTA — the evidence speaks for itself.',
@@ -2503,6 +2530,8 @@ The generated layout image will be broken down into editable zones by our system
 - Subject must sit cleanly ON the background — not blended into it
 - Maximum 3 asset zones total, maximum 5 text zones total
 - NOT allowed: gradient text, metallic text, 3D extruded text, text baked into artwork
+- Headline zones must contain 6+ words — single decorative words like "WOW", "EPIC", "BIG", "ARENA", "GO" are NOT headlines, they are design flaws. Every headline must be a complete readable thought or question.
+- maxChars for headline zones must accommodate at least 20 characters of real content — never design a headline zone so narrow it can only fit 1-2 words.
 
 ══════════════════════════════════════
 THIS IS A "${intent.toUpperCase()}" LAYOUT

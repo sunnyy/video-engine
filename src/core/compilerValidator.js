@@ -66,11 +66,16 @@ export function validateBeats(beats) {
 
     }
 
-    // Preserve extra zones not in the layout def (block zones, element zones, user-added zones):
+    // Preserve extra zones not in the layout def (block zones, element zones, user-added zones).
+    // Skip orphan asset zones with no src — these are failed injected bg zones from image generation
+    // that accumulate across reruns and render as phantom placeholder boxes in the video.
     if (beat.zones) {
       const defZoneSet = new Set(layoutDef ? layoutDef.zones : ["z1"]);
       Object.entries(beat.zones).forEach(([id, zone]) => {
-        if (!defZoneSet.has(id)) zones[id] = zone;
+        if (defZoneSet.has(id)) return; // layout-def zones already handled above
+        const isEmptyAsset = (zone?.type === "asset" || zone?.content?.kind === "asset")
+          && !zone?.content?.asset?.src;
+        if (!isEmptyAsset) zones[id] = zone;
       });
     }
 
@@ -143,6 +148,16 @@ export function validateBeats(beats) {
     // avatarZone must survive validation — undefined = not set, null = explicitly none, string = zone id
     if (beat.avatarZone !== undefined) cleanBeat.avatarZone = beat.avatarZone;
     if (beat.deletedZones) cleanBeat.deletedZones = beat.deletedZones;
+
+    // Pre-generated zone content seeds from the script director.
+    // Must survive validation so generateZoneContent can use them as creative starting points.
+    if (beat.headline) cleanBeat.headline = beat.headline;
+    if (beat.subtext)  cleanBeat.subtext  = beat.subtext;
+    if (beat.label)    cleanBeat.label    = beat.label;
+    if (beat.stat)     cleanBeat.stat     = beat.stat;
+    if (beat.tagline)  cleanBeat.tagline  = beat.tagline;
+    if (beat.quote)    cleanBeat.quote    = beat.quote;
+    if (beat.cta)      cleanBeat.cta      = beat.cta;
 
     return cleanBeat;
 

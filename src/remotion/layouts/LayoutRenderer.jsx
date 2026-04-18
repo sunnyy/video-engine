@@ -617,8 +617,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           );
         })()}
 
-        {/* Asset placeholder — no src yet and not an avatar zone */}
-        {effectiveType === "asset" && !content.asset?.src && !isAvatarZone && content.kind !== "block" && (() => {
+        {/* Asset placeholder — no src yet; only show in editor preview, never in final render */}
+        {previewMode && effectiveType === "asset" && !content.asset?.src && !isAvatarZone && content.kind !== "block" && (() => {
           const hint = beat?.asset_hint;
           const keywords = hint?.keywords?.length ? hint.keywords : null;
           return (
@@ -661,6 +661,13 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           const textEffect  = previewMode ? "none" : (st.textEffect || "none");
           const effectSpeed = st.textEffectSpeed ?? 1.0;
 
+          // Auto-scale font down when text is longer than the zone's intended capacity.
+          // Prevents overflow without changing layout dimensions — a rendering safety net.
+          const rawText  = text;
+          const maxChars = zone.maxChars || 40;
+          const scaleFactor = rawText.length > maxChars * 0.8 ? 0.85 : 1;
+          const adjustedFontSize = (st.fontSize || 32) * scaleFactor;
+
           // DNA typography override — applies fontFamily + fontWeight by zone role.
           // Only overrides when the zone style hasn't been manually edited by the user
           // (user edits set st._userFontFamily / st._userFontWeight flags).
@@ -675,7 +682,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             width:           "100%",
             padding:         st.contentPadding > 0 ? `${st.contentPadding}px` : (st.padding || "0 8px"),
             boxSizing:       "border-box",
-            fontSize:        st.fontSize      || 32,
+            fontSize:        adjustedFontSize,
             fontWeight:      dnaTypo?.fontWeight ?? st.fontWeight ?? 700,
             fontFamily:      dnaTypo?.fontFamily ?? st.fontFamily ?? "inherit",
             fontStyle:       st.fontStyle     || "normal",
@@ -690,8 +697,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             background:      st.background    || "transparent",
             ...brStyle(),
             whiteSpace:      st.whiteSpace    || "normal",
-            overflowWrap:    "break-word",
-            wordBreak:       st.whiteSpace === "nowrap" ? "normal" : "break-word",
+            overflowWrap:    "break-word",   // only breaks within a word when that word alone overflows the line
+            wordBreak:       "normal",        // never break mid-character — words wrap at spaces only
             WebkitTextStroke: st.textStrokeWidth > 0
               ? `${st.textStrokeWidth}px ${st.textStrokeColor || "#000000"}`
               : undefined,

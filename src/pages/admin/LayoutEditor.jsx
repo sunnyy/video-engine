@@ -106,7 +106,7 @@ const NEW_LAYOUT_DEF = {
 
 /* Collect edited zone definitions from the store beat, merging back into def zones */
 const DEF_FIELDS = ["x","y","width","height","zIndex","start","end",
-  "enterAnimation","exitAnimation","maxChars","order","role","visual_type"];
+  "enterAnimation","exitAnimation","maxChars","order","role","visual_type","locked"];
 
 function buildSaveZones(defZones, beatZones, deletedZones = []) {
   const deletedSet  = new Set(deletedZones);
@@ -254,9 +254,11 @@ export default function LayoutEditor() {
     const energyNum = previewEnergy === "high" ? 0.9 : previewEnergy === "medium" ? 0.6 : 0.3;
     const dna       = generateVideoDNA({ videoType:"viral", tone:"bold", niche: previewNiche, energy:energyNum });
     const beat      = buildFakeBeat(layoutDef, dna);
-    // Preserve background and zone edits when only niche/energy changed (not a full layout switch)
+    // Preserve background when only niche/energy changed — but NOT when switching layouts.
+    // Checking existingBeat.layout === (layoutDef?.id ?? layoutId) guards against copying
+    // Layout A's background onto Layout B when the user navigates between layouts.
     const existingBeat = useProjectStore.getState().project?.beats?.[0];
-    if (existingBeat && existingBeat.layoutBackground) {
+    if (existingBeat && existingBeat.layout === (layoutDef?.id ?? layoutId) && existingBeat.layoutBackground) {
       beat.layoutBackground = existingBeat.layoutBackground;
     }
     const proj      = buildFakeProject(beat, dna, layoutDef);
@@ -329,6 +331,12 @@ export default function LayoutEditor() {
       visibility:       metaVisibility,
       show_caption:       metaShowCaption,
       default_transition: metaTransitionType ? { type: metaTransitionType, duration: metaTransitionDur } : null,
+      // Persist the layout background inside generation_meta (no standalone DB column exists).
+      // Merge with any existing generation_meta so we don't clobber other keys.
+      generation_meta: {
+        ...(layoutDef?.generation_meta ?? {}),
+        default_background: beat?.layoutBackground ?? null,
+      },
       zones:              saveZones,
     };
 

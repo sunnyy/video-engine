@@ -36,6 +36,9 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const [showPlayer,     setShowPlayer]     = useState(false);
   const [pausedFrame,    setPausedFrame]    = useState(null);
   const [showShortcuts,  setShowShortcuts]  = useState(false);
+  const [showTimings,    setShowTimings]    = useState(() => {
+    try { return document.cookie.split("; ").find(r => r.startsWith("ve_showTimings="))?.split("=")[1] !== "0"; } catch { return true; }
+  });
   const [userZoom,       setUserZoom]       = useState(1.0);
   const [isSpaceDown,    setIsSpaceDown]    = useState(false);
   const [isPanning,      setIsPanning]      = useState(false);
@@ -260,6 +263,13 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         return;
       }
 
+      // T — toggle timing badges (works even while typing is false)
+      if (e.code === "KeyT" && !isTyping) {
+        e.preventDefault();
+        setShowTimings(t => !t);
+        return;
+      }
+
       if (isTyping) return;
 
       // Zone shortcuts — single or multi-select
@@ -407,6 +417,23 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           <span>Esc deselect</span>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          {/* Timing badges toggle */}
+          <button
+            onClick={() => setShowTimings(t => {
+              const next = !t;
+              try { document.cookie = `ve_showTimings=${next ? "1" : "0"};path=/;max-age=${60 * 60 * 24 * 365}`; } catch {}
+              return next;
+            })}
+            title={`${showTimings ? "Hide" : "Show"} zone timing (T)`}
+            style={{
+              fontSize: 11, fontFamily: "monospace", padding: "2px 7px", borderRadius: 4,
+              border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
+              background: showTimings ? "rgba(255,200,0,0.12)" : "rgba(255,255,255,0.04)",
+              color: showTimings ? "rgba(255,200,0,0.9)" : "#555",
+            }}
+          >
+            +Ts
+          </button>
           {/* Zoom controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
             <button
@@ -580,11 +607,13 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
                 component={VideoComposition}
                 inputProps={{ project, previewMode: true }}
                 frameToDisplay={(() => {
-                  // After pausing: show exactly where the player stopped
-                  if (pausedFrame !== null) return pausedFrame;
-                  // First load (never played): show beat in its "settled" state
                   const beatStart    = Math.floor((activeBeat.start_sec || 0) * fps);
-                  const beatDuration = Math.floor(((activeBeat.end_sec || 0) - (activeBeat.start_sec || 0)) * fps);
+                  const beatEnd      = Math.floor((activeBeat.end_sec   || 0) * fps) - 1;
+                  // After pausing: clamp to active beat's range to avoid showing two beats at once
+                  // when the player stopped exactly on a beat boundary frame.
+                  if (pausedFrame !== null) return Math.max(beatStart, Math.min(beatEnd, pausedFrame));
+                  // First load (never played): show beat in its "settled" state
+                  const beatDuration = beatEnd - beatStart + 1;
                   const zones = Object.values(activeBeat.zones || {});
                   const maxZoneStartFrame = zones.reduce((max, z) => Math.max(max, Math.floor((z.start || 0) * fps)), 0);
                   const settled = maxZoneStartFrame + 30;
@@ -606,6 +635,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
                   canvasScale={effectiveScale}
                   videoOverlays={project.overlays || []}
                   onUpdateVideoOverlay={handleUpdateVideoOverlay}
+                  showTimings={showTimings}
                 />
               </div>
             </div>
