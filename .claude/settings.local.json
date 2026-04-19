@@ -15,7 +15,10 @@
       "Bash(node -e \"const https = require\\('https'\\); const req = https.request\\({hostname:'cdn.pixabay.com',path:'/video/2025/05/06/277097_medium.mp4',method:'HEAD',headers:{'Referer':'https://pixabay.com/','User-Agent':'Mozilla/5.0'}}, r => { console.log\\('STATUS:', r.statusCode\\); console.log\\('HEADERS:', JSON.stringify\\(r.headers, null, 2\\)\\); req.destroy\\(\\); }\\); req.on\\('error', e => console.error\\('ERR:', e.message\\)\\); req.end\\(\\);\")",
       "Bash(supabase functions *)",
       "Bash(npx supabase *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

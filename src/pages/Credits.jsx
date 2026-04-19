@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "../lib/supabase";
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { serverFetch } from "../services/serverApi";
@@ -167,7 +166,7 @@ export default function Credits() {
                   <span style={{ color: "#f5c518" }}>⚡</span>
                   {subscription.credits_granted} credits/mo included
                 </div>
-                <button onClick={() => navigate("/pricing")}
+                <button onClick={() => { window.location.href = "/#pricing"; }}
                   className="text-[13px] font-bold cursor-pointer rounded-[8px] px-4 py-2 border-0 self-start"
                   style={{ background: "rgba(245,197,24,0.1)", color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
                   Upgrade Plan →

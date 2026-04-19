@@ -80,7 +80,7 @@ export default function Checkout() {
     return (
       <div style={{ minHeight: "100vh", background: "#0b0b10", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: "'Outfit',sans-serif" }}>
         <div style={{ color: "#f87171", fontSize: 16 }}>{error || "Plan not found."}</div>
-        <button onClick={() => navigate("/pricing")}
+        <button onClick={() => { window.location.href = "/#pricing"; }}
           style={{ background: "#f5c518", color: "#0b0b10", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
           View Plans
         </button>
@@ -199,7 +199,7 @@ export default function Checkout() {
 
       {/* Nav */}
       <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 40px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <button onClick={() => navigate("/pricing")}
+        <button onClick={() => { window.location.href = "/#pricing"; }}
           style={{ background: "none", border: "none", color: "#9494a8", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Outfit',sans-serif" }}>
           ← Back to Pricing
         </button>
@@ -360,7 +360,7 @@ export default function Checkout() {
 
           <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
-          <button onClick={() => navigate("/pricing")}
+          <button onClick={() => { window.location.href = "/#pricing"; }}
             style={{ background: "none", border: "none", color: "#9494a8", fontSize: 14, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>
             ← Choose a different plan
           </button>

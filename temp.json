@@ -1,1 +1,1532 @@
-{"id":"fe4de8a1-93cc-4b37-a1ae-d9cd36d99274","dna":{"niche":"tech","colorStory":{"bg":"#000a0a","mood":"matrix","text":"#00f2ea","accent":"#7c5cfc","primary":"#00f2ea","colorFamily":"cool"},"motionStyle":"kinetic","typographySystem":"tech"},"meta":{"fps":25,"mode":"faceless","name":"","tone":"auto","brand":{},"width":1080,"height":1920,"audience":"general","language":"english","videoType":"auto","brand_color":null,"orientation":"9:16"},"audio":{"tts":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/bf55dbc4-a47d-417c-ade6-e0d444524718.mp3","volume":1},"music":{"src":"/music/eliveta491224.mp3","volume":0.12}},"beats":[{"id":"43985183-42ad-41db-bd6c-3ed72342d774","cta":null,"stat":null,"text":null,"label":"TECH MAGIC","order":0,"quote":"Spotify's like a musical psychic.","zones":{"z2":{"role":"label","style":{"color":"#00f2ea","fontSize":50,"_presetId":"pill-tag","textAlign":"center","fontFamily":"Arial, sans-serif","fontWeight":700,"lineHeight":1,"textEffect":"typewriter","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal"},"height":2.2,"content":{"kind":"text","text":"TECH MAGIC"}},"z3":{"role":"headline","style":{"color":"#00f2ea","fontSize":164,"_presetId":"hero","fontStyle":"normal","textAlign":"center","background":"transparent","fontFamily":"'Bebas Neue', sans-serif","fontWeight":900,"lineHeight":1,"textShadow":"0 4px 24px rgba(0,0,0,0.8)","_userPreset":true,"borderRadius":0,"letterSpacing":7,"textDecoration":"none"},"height":25.6,"content":{"kind":"text","text":"MUSIC MIND READER"}},"z4":{"role":"subtext","style":{"color":"#00f2ea","fontSize":64,"_presetId":"headline","textAlign":"center","fontFamily":"Arial, sans-serif","fontWeight":400,"lineHeight":1.2,"textEffect":"wordReveal","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal"},"height":6.7,"content":{"kind":"text","text":"Spotify predicts your favorite tracks."}},"z5":{"style":{"scale":1,"shadowBlur":0,"shineEffect":"streak","borderRadius":8,"animatedBorder":"lava"},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/16dd2d3f-cbe6-4bd1-bada-767c03af44f4.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z7":{"role":"cta","style":{"color":"#0a0a0a","padding":"10px","fontSize":50,"_presetId":"subtitle","textAlign":"center","background":"#ff6600","fontFamily":"Arial, sans-serif","fontWeight":700,"lineHeight":1.2,"textEffect":"wordReveal","textShadow":"none","whiteSpace":"normal","borderRadius":"5px"},"height":5.9,"content":{"kind":"text","text":"Tap Now"}},"z8":{"style":{"color":"#7f9080","filled":true,"opacity":0.46,"rotation":-11,"strokeWidth":3},"content":{"shape":"square"}},"z9":{"style":{"color":"#00f2ea","filled":true,"opacity":0.5,"rotation":-11,"strokeWidth":3},"content":{"shape":"square"}}},"blocks":[],"energy":0.9,"intent":"shock","layout":"4c7f936f-ae68-4eaa-ae1a-8b67a0046b7e","spoken":"Spotify knows your next favorite song before you do.","caption":{"show":false,"text":"Spotify knows your next favorite song before you do.","style":"wordBlaze","position":80,"animation":"fade","emphasis_words":[]},"end_sec":3.5,"heading":null,"subtext":"Spotify predicts your favorite tracks.","tagline":"Your playlist, their magic","headline":"MUSIC MIND READER","language":"english","overlays":[],"start_sec":0,"asset_hint":{"prompt":"A person wearing headphones, smiling with surprise.","keywords":["listening","headphones","surprise"],"visual_type":"abstract","search_query":null},"audio_cues":[{"id":"sfx_1776548456217","key":"cinematic_boom","label":"Cinematic Boom","source":"beat","volume":0.2,"position":0}],"avatarZone":null,"components":{},"transition":{"type":"zoom","duration":18},"visual_hint":"faces","deletedZones":[],"duration_sec":3.5,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"meshNeonTriad"}},{"id":"528b4da0-75ff-4c5f-bd38-518d6805d9e6","cta":null,"stat":null,"text":null,"label":"MYSTERY","order":1,"quote":"It's like magic, but tech.","zones":{"z1":{"role":"label","style":{"color":"#00f2ea","fontSize":46,"_presetId":"mono","textAlign":"center","background":"#E62430","fontFamily":"Montserrat","fontWeight":"700","lineHeight":1.5,"textEffect":"slideUp","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","borderRadius":8},"content":{"kind":"text","text":"MYSTERY"}},"z2":{"role":"headline","style":{"color":"#00f2ea","fontSize":180,"_presetId":"headline","textAlign":"left","fontFamily":"Bebas Neue","fontWeight":"800","lineHeight":1.05,"textEffect":"wordReveal","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal"},"content":{"kind":"text","text":"THE BIG QUESTION"}},"z4":{"role":"subtext","style":{"color":"#00f2ea","fontSize":88,"_presetId":"mono","fontStyle":"italic","textAlign":"left","fontFamily":"'Playfair Display', serif","fontWeight":"600","lineHeight":1.5,"textEffect":"typewriter","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","_userFontFamily":true},"content":{"kind":"text","text":"How does Spotify do it?"}},"z5":{"style":{"scale":1,"shadowBlur":0,"borderRadius":112},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/53610f2a-a196-4246-97b8-b40a785dac69.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z6":{"role":"stat","style":{"color":"#00f2ea","fontSize":40,"_presetId":"stat-mono","textAlign":"left","fontFamily":"Montserrat","fontWeight":"700","lineHeight":1,"textEffect":"popIn","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal"},"content":{"kind":"text","text":"Top Pick"}},"z7":{"role":"cta","style":{"color":"#00f2ea","fontSize":60,"_presetId":"stat-flood","textAlign":"center","background":"#0c3546","fontFamily":"Montserrat","fontWeight":"700","lineHeight":0.9,"textEffect":"fadeWords","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","borderRadius":79},"content":{"kind":"text","text":"Find Out"}},"z8":{"style":{"color":"#ff2424","filled":false,"opacity":1,"rotation":90,"strokeWidth":4,"borderRadius":0},"content":{"shape":"circle"}},"z9":{"style":{"color":"#86d6fe","filled":true,"opacity":1,"strokeWidth":3},"content":{"shape":"square"}},"z10":{"style":{"color":"#c2ebff","filled":true,"opacity":1,"strokeWidth":3,"gradientType":"linear","gradientStops":[{"pos":0,"color":"#c2ebff","opacity":100},{"pos":100,"color":"#248dc2","opacity":100}]},"content":{"shape":"square"}},"z11":{"style":{"color":"#ffd60a","filled":true,"opacity":1,"rotation":-29,"strokeWidth":3},"content":{"shape":"square"}},"z12":{"style":{"color":"#ff0a23","filled":true,"opacity":1,"rotation":-31,"strokeWidth":3},"content":{"shape":"square"}}},"blocks":[],"energy":0.7,"intent":"curiosity","layout":"18b46973-3a32-4599-bad9-8e94f0bf91f3","spoken":"But how does it pull off this wizardry?","caption":{"show":false,"text":"But how does it pull off this wizardry?","style":"wordBlaze","position":80,"animation":"word_pop","emphasis_words":[]},"end_sec":6.6,"heading":null,"subtext":"How does Spotify do it?","tagline":"The secret sauce","headline":"THE BIG QUESTION","language":"english","overlays":[],"start_sec":3.5,"asset_hint":{"prompt":"But, how, does, photorealistic scene","keywords":["But","how","does","it"],"visual_type":"abstract","search_query":null},"audio_cues":[{"id":"sfx_1776548456219","key":"ground_impact","label":"Ground Impact","source":"beat","volume":0.2,"position":0}],"avatarZone":null,"components":{},"transition":{"type":"flash","duration":10},"visual_hint":"text_only","deletedZones":[],"duration_sec":3.1,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"neonCyanGlow"}},{"id":"3cd7891d-d6ec-49a5-8604-3523fe6db0da","cta":null,"stat":"30B","text":null,"label":"WILD STAT","order":2,"quote":"That's a lot of listening.","zones":{"z2":{"role":"label","style":{"color":"#00f2ea","fontSize":119,"_presetId":"pill-tag","fontStyle":"italic","textAlign":"center","fontFamily":"'Playfair Display', serif","fontWeight":700,"lineHeight":1,"textEffect":"fadeWords","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","_userFontFamily":true},"content":{"kind":"text","text":"WILD STAT"}},"z3":{"role":"headline","style":{"color":"#00f2ea","fontSize":88,"_presetId":"hero","textAlign":"center","background":"#111111","fontFamily":"Outfit, sans-serif","fontWeight":800,"lineHeight":1,"paddingTop":4,"textEffect":"typewriter","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","paddingLeft":12,"paddingRight":12,"letterSpacing":"-1px","paddingBottom":4},"content":{"kind":"text","text":"30 BILLION STREAMS"}},"z4":{"role":"tagline","style":{"color":"#00f2ea","fontSize":68,"_presetId":"pill-tag","textAlign":"center","fontFamily":"Outfit, sans-serif","fontWeight":600,"lineHeight":1,"textEffect":"slideUp","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","letterSpacing":"5px","textTransform":"uppercase"},"content":{"kind":"text","text":"Data-driven beats"}},"z5":{"style":{"scale":1,"shadowBlur":0,"borderRadius":12},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/e5fc0144-8b11-4f8c-a64b-e0435e9591aa.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z6":{"style":{"scale":1,"shadowBlur":0,"shineEffect":"scan","borderRadius":12},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/abf6c9da-9ac2-4af0-8b89-d3e1c6f2f613.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z7":{"style":{"scale":1,"shadowBlur":0,"shineEffect":"streak","borderRadius":12},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/d8a0d097-2626-41fd-9985-ddda622c6bb0.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z8":{"role":"stat","style":{"color":"#00f2ea","fontSize":66,"_presetId":"stat-flood","textAlign":"center","background":"#111111","fontFamily":"Outfit, sans-serif","fontWeight":700,"lineHeight":1,"paddingTop":6,"textEffect":"popIn","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","paddingLeft":8,"borderRadius":999,"paddingRight":8,"paddingBottom":6},"content":{"kind":"text","text":""}},"z9":{"role":"stat","style":{"color":"#00f2ea","fontSize":65,"_presetId":"stat-flood","textAlign":"center","background":"#111111","fontFamily":"Outfit, sans-serif","fontWeight":700,"lineHeight":1,"paddingTop":6,"textEffect":"fadeWords","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","paddingLeft":8,"borderRadius":999,"paddingRight":8,"paddingBottom":6},"content":{"kind":"text","text":""}},"z10":{"role":"stat","style":{"color":"#00f2ea","fontSize":66,"_presetId":"stat-flood","textAlign":"center","background":"#111111","fontFamily":"Outfit, sans-serif","fontWeight":700,"lineHeight":1,"paddingTop":6,"textEffect":"wordReveal","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","paddingLeft":8,"borderRadius":999,"paddingRight":8,"paddingBottom":6},"content":{"kind":"text","text":""}},"z11":{"style":{"color":"#00f2ea","filled":false,"opacity":1,"background":"#111111"},"content":{"shape":"square"}},"z12":{"role":"cta","style":{"color":"#00f2ea","opacity":1,"fontSize":51,"_presetId":"spaced-caps-tag","fontStyle":"normal","textAlign":"center","background":"transparent","fontFamily":"'Outfit', sans-serif","fontWeight":400,"lineHeight":1.4,"textShadow":"none","_userPreset":true,"borderRadius":0,"letterSpacing":"0.25em","textTransform":"uppercase","textDecoration":"none"},"content":{"kind":"text","text":"See The Magic"}}},"blocks":[],"energy":0.8,"intent":"proof","layout":"4f2e4960-4269-4f5a-84a8-db8c33712d30","spoken":"Spotify's algorithm tracks 30 billion streams monthly.","caption":{"show":false,"text":"Spotify's algorithm tracks 30 billion streams monthly.","style":"wordBlaze","position":50,"animation":"word_reveal","emphasis_words":[]},"end_sec":9.3,"heading":null,"subtext":"Spotify's algorithm tracks billions monthly.","tagline":"Data-driven beats","headline":"30 BILLION STREAMS","language":"english","overlays":[],"start_sec":6.6,"asset_hint":{"prompt":"A digital dashboard showing streaming data charts.","keywords":["algorithm","data","streams"],"visual_type":"abstract","search_query":null},"audio_cues":[{"id":"sfx_1776548456219","key":"great_success","label":"Great Success","source":"beat","volume":0.2,"position":0}],"avatarZone":null,"components":{},"transition":{"type":"zoom","duration":18},"visual_hint":"stat","deletedZones":[],"duration_sec":2.7,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"cobalt"}},{"id":"63a6388c-be6d-4e4d-8fd8-90adfe006c0f","cta":null,"stat":null,"text":null,"label":"INSIGHT","order":3,"quote":"It's like you're teaching Spotify.","zones":{"z1":{"x":12.3,"y":9.2,"role":"headline","style":{"color":"#00f2ea","fontSize":93,"_presetId":"neon-glow","textAlign":"center","fontFamily":"Poppins","fontWeight":"700","lineHeight":1,"textEffect":"typewriter","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal"},"width":75,"height":4.1,"content":{"kind":"text","text":"MUSIC BEHAVIOR"}},"z2":{"x":11.6,"y":15.3,"role":"tagline","style":{"color":"#00f2ea","fontSize":61,"_presetId":"pill","textAlign":"center","fontFamily":"Poppins","fontWeight":"600","lineHeight":1.2,"textEffect":"slideUp","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal"},"height":3.3,"content":{"kind":"text","text":"Every click counts"}},"z3":{"style":{"color":"#005885","filled":true,"iconSize":80},"content":{"iconId":null}},"z4":{"x":12.3,"y":21.1,"role":"subtext","style":{"color":"#00f2ea","fontSize":56,"_presetId":"mono","textAlign":"left","fontFamily":"Poppins","fontWeight":"600","lineHeight":1.5,"textEffect":"fadeWords","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal"},"height":7.5,"content":{"kind":"text","text":"Your actions guide Spotify's suggestions."}},"z5":{"x":12.3,"y":30.6,"role":"subtext","style":{"color":"#00f2ea","fontSize":52,"_presetId":"mono","textAlign":"left","fontFamily":"Poppins","fontWeight":"600","lineHeight":1.5,"textEffect":"typewriter","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal"},"height":4.1,"content":{"kind":"text","text":"Your actions guide"}},"z6":{"x":12.1,"y":36.3,"role":"subtext","style":{"color":"#00f2ea","fontSize":52,"_presetId":"mono","textAlign":"left","fontFamily":"Poppins","fontWeight":"600","lineHeight":1.5,"textEffect":"slideUp","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal"},"width":71,"height":4.1,"content":{"kind":"text","text":"Every choice"}},"z7":{"x":12.3,"y":43,"role":"subtext","style":{"color":"#00f2ea","fontSize":54,"_presetId":"mono","textAlign":"left","fontFamily":"Poppins","fontWeight":"600","lineHeight":1.5,"textEffect":"wordReveal","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal"},"height":3.5,"content":{"kind":"text","text":"Data shapes tunes."}},"z8":{"style":{"scale":1,"shadowBlur":18,"borderRadius":12,"animatedBorder":"arctic"},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/2e4bc8cb-1df2-4396-bec9-c52d6f5b8cce.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z9":{"role":"cta","style":{"color":"#0a0a0a","fontSize":64,"_presetId":"stat-mono","textAlign":"center","background":"#ffffff","fontFamily":"Poppins","fontWeight":"800","lineHeight":1,"textEffect":"typewriter","textShadow":"none","whiteSpace":"normal","borderRadius":59,"contentPadding":12},"content":{"kind":"text","text":"Try Now"}}},"blocks":[],"energy":0.6,"intent":"explanation","layout":"e89a0b5b-d784-4333-9914-a98adfdfc434","spoken":"Each play, skip, and replay tells Spotify about you.","caption":{"show":false,"text":"Each play, skip, and replay tells Spotify about you.","style":"wordBlaze","position":80,"animation":"pop","emphasis_words":[]},"end_sec":12.8,"heading":null,"subtext":"Your actions guide Spotify's suggestions.","tagline":"Every click counts","headline":"MUSIC BEHAVIOR","language":"english","overlays":[],"start_sec":9.3,"asset_hint":{"prompt":"A person interacting with a music app on their phone.","keywords":["user","interaction","music"],"visual_type":"abstract","search_query":null},"audio_cues":[{"id":"sfx_1776548456220","key":"pop_soft","label":"Pop Soft","source":"beat","volume":0.2,"position":0}],"avatarZone":null,"components":{},"transition":{"type":"flash","duration":10},"visual_hint":"scene","deletedZones":[],"duration_sec":3.5,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"darkSlate"}},{"id":"a3233a13-d055-434a-95d9-6d50f1086e97","cta":null,"stat":null,"text":null,"label":"REVEAL","order":4,"quote":"Like a global music party.","zones":{"z1":{"style":{"scale":1,"shadowBlur":0,"borderRadius":0},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/3417e052-1820-4bdb-b3b9-75dd6883e2f9.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z3":{"role":"label","style":{"color":"#00f2ea","opacity":0.9,"fontSize":28,"_presetId":"mono-tag","textAlign":"center","fontFamily":"Outfit, sans-serif","fontWeight":700,"lineHeight":1,"textEffect":"typewriter","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal","letterSpacing":"3px","textTransform":"uppercase"},"height":1.2,"content":{"kind":"text","text":"REVEAL"}},"z5":{"role":"label","style":{"color":"#00f2ea","opacity":0.9,"fontSize":28,"_presetId":"mono-tag","textAlign":"center","fontFamily":"Outfit, sans-serif","fontWeight":700,"lineHeight":1,"textEffect":"popIn","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal","letterSpacing":"3px","textTransform":"uppercase"},"content":{"kind":"text","text":"REVEAL"}},"z6":{"style":{"scale":1,"shadowBlur":0,"borderRadius":116},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/60ea8206-d86c-47e9-b5c4-833ec672ec84.jpg","type":"image","motion":"none","objectFit":"cover"}},"background":{}},"z7":{"role":"stat","style":{"color":"#00f2ea","fontSize":186,"_presetId":"stat-flood","fontStyle":"normal","textAlign":"center","background":"transparent","fontFamily":"'Bebas Neue', sans-serif","fontWeight":900,"lineHeight":0.9,"textShadow":"0 8px 40px rgba(0,0,0,0.9)","_userPreset":true,"borderRadius":0,"letterSpacing":"-4px","textDecoration":"none"},"height":8.7,"content":{"kind":"text","text":"Top"}},"z8":{"style":{"scale":1,"shadowBlur":0,"shineEffect":"scan","borderRadius":118},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/0b527908-0791-42b0-8b38-b230d501e103.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z9":{"role":"label","style":{"color":"#00f2ea","fontSize":34,"_presetId":"mono-tag","textAlign":"center","fontFamily":"Outfit, sans-serif","fontWeight":600,"lineHeight":1,"textEffect":"fadeWords","textShadow":"0 2px 18px rgba(0,0,0,0.9)","whiteSpace":"normal","letterSpacing":"2px"},"content":{"kind":"text","text":"MIX"}},"z11":{"role":"headline","style":{"color":"#00f2ea","opacity":1,"fontSize":104,"_presetId":"serif-subtext","fontStyle":"italic","textAlign":"center","background":"transparent","fontFamily":"'Playfair Display', serif","fontWeight":400,"lineHeight":1.35,"textEffect":"typewriter","textShadow":"0 2px 12px rgba(0,0,0,0.5)","_userPreset":true,"borderRadius":0,"letterSpacing":"0px","textDecoration":"none"},"height":12.6,"content":{"kind":"text","text":"SHARED TASTES"}},"z13":{"style":{"scale":1,"shadowBlur":0,"borderRadius":111},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/31e5b97f-e9af-4d98-8ad6-22c8868a3544.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z14":{"style":{"color":"#00f2ea","filled":true,"opacity":1,"strokeWidth":3,"gradientType":"linear","gradientAngle":180,"gradientStops":[{"pos":0,"color":"#000000","opacity":0},{"pos":50,"color":"#211812","opacity":87},{"pos":100,"color":"#000000","opacity":0}]},"content":{"shape":"square"}},"z15":{"style":{"color":"#00f2ea","filled":true,"opacity":1,"strokeWidth":3,"gradientType":"linear","gradientAngle":0,"gradientStops":[{"pos":50,"color":"#000000","opacity":56},{"pos":0,"color":"#000000","opacity":0}]},"content":{"shape":"square"}},"z16":{"style":{"color":"#fefbfc","filled":true,"opacity":1,"strokeWidth":0},"content":{"iconId":null}}},"blocks":[],"energy":0.5,"intent":"reveal","layout":"0c76dbf6-0a35-433d-a659-e905c662116e","spoken":"Then it mixes your taste with similar listeners.","caption":{"show":false,"text":"Then it mixes your taste with similar listeners.","style":"wordBlaze","position":80,"animation":"wave","emphasis_words":[]},"end_sec":15.9,"heading":null,"subtext":"Blending your taste with others.","tagline":"United by music","headline":"SHARED TASTES","language":"english","overlays":[],"start_sec":12.8,"asset_hint":{"prompt":"Two people listening to similar music with a shared playlist.","keywords":["community","similar","music"],"visual_type":"abstract","search_query":null},"audio_cues":[{"id":"sfx_1776548456220","key":"whoosh","label":"Whoosh","source":"beat","volume":0.2,"position":0}],"avatarZone":null,"components":{},"transition":{"type":"cut","intensity":1},"visual_hint":"comparison","deletedZones":[],"duration_sec":3.1,"layoutPadding":21,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"neonCyanGlow"}},{"id":"4a9328ca-95c8-48a3-94d5-df4d429e9dbc","cta":"DISCOVER NOW","stat":null,"text":null,"label":"CTA","order":5,"quote":"Don't miss your new jam.","zones":{"z1":{"x":4.9,"y":3,"role":"label","style":{"color":"#00f2ea","fontSize":40,"_presetId":"badge-label","textAlign":"left","background":"#5a7096","fontFamily":"Montserrat","fontWeight":"600","lineHeight":1,"textEffect":"wordReveal","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal","borderRadius":0},"width":10.6,"height":4.2,"content":{"kind":"text","text":"CTA"}},"z2":{"style":{"color":"#26165a","filled":true,"iconSize":80},"content":{"iconId":null}},"z3":{"role":"headline","style":{"color":"#00f2ea","fontSize":190,"_presetId":"headline","textAlign":"left","fontFamily":"Bebas Neue","fontWeight":"800","lineHeight":0.85,"textEffect":"typewriter","textShadow":"0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)","whiteSpace":"normal"},"height":8.4,"content":{"kind":"text","text":"FIND YOUR JAM"}},"z5":{"role":"subtext","style":{"color":"#0a0a0a","fontSize":63,"_presetId":"headline","textAlign":"left","background":"#fcf075","fontFamily":"Montserrat","fontWeight":600,"lineHeight":1.1,"textEffect":"popIn","textShadow":"none","whiteSpace":"normal","borderRadius":8},"height":7.2,"content":{"kind":"text","text":"Discover new favorites today."}},"z6":{"style":{"scale":1,"shadowBlur":0,"borderRadius":8,"animatedBorder":"fireGlow"},"content":{"kind":"asset","asset":{"src":"https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/b98034ec-71af-4869-bd0c-14e9668b7482.jpg","type":"image","motion":"none","objectFit":"cover"}}},"z7":{"role":"cta","style":{"color":"#000000","fontSize":117,"_presetId":"condensed-impact","fontStyle":"normal","textAlign":"center","background":"transparent","fontFamily":"'Barlow Condensed', sans-serif","fontWeight":900,"lineHeight":0.95,"textShadow":"none","_userPreset":true,"textShadowX":0,"textShadowY":0,"borderRadius":0,"letterSpacing":"-1px","textDecoration":"none"},"content":{"kind":"text","text":"DISCOVER NOW"}},"z9":{"style":{"color":"#fedc34","filled":true,"opacity":1,"strokeWidth":3,"gradientType":"linear","gradientStops":[{"pos":0,"color":"#fedc34","opacity":100},{"pos":100,"color":"#adfe16","opacity":100}]},"content":{"shape":"square"}},"z10":{"style":{"color":"#fedc34","filled":true,"opacity":1,"strokeWidth":3,"gradientType":"linear","gradientStops":[{"pos":0,"color":"#87ff66","opacity":100},{"pos":100,"color":"#16a5fe","opacity":100}]},"content":{"shape":"square"}},"z11":{"style":{"color":"#00f2ea","filled":true,"opacity":1,"strokeWidth":3},"content":{"shape":"circle"}}},"blocks":[],"energy":0.8,"intent":"urgency","layout":"7c2a032e-a8a5-44ce-8498-7fa8b0a2f6c2","spoken":"Now, go discover your next favorite track!","caption":{"show":false,"text":"Now, go discover your next favorite track!","style":"wordBlaze","position":80,"animation":"slide","emphasis_words":[]},"end_sec":18.6,"heading":null,"subtext":"Discover new favorites today.","tagline":"Your next favorite awaits","headline":"FIND YOUR JAM","language":"english","overlays":[],"start_sec":15.9,"asset_hint":{"prompt":"A glowing screen with the Spotify logo open, inviting.","keywords":["music","discovery","Spotify"],"visual_type":"entity","search_query":"Spotify app interface"},"audio_cues":[{"id":"sfx_1776548456221","key":"cinematic_boom","label":"Cinematic Boom","source":"beat","volume":0.2,"position":0}],"avatarZone":null,"components":{},"transition":{"type":"dissolve","duration":18},"visual_hint":"product","deletedZones":[],"duration_sec":2.7,"layoutPadding":0,"asset_settings":{},"layoutBackground":{"type":"pattern","value":"indigoBlue"}}],"avatar":null,"script":{"text":"Spotify knows your next favorite song before you do. But how does it pull off this wizardry? Spotify's algorithm tracks 30 billion streams monthly. Each play, skip, and replay tells Spotify about you. Then it mixes your taste with similar listeners. Now, go discover your next favorite track!","emotionalArc":"Curiosity builds to reveal how Spotify reads your mind."},"overlays":[],"workflow":{"avatar_completed":false,"script_completed":true,"beats_initialized":true},"duration_sec":18.6}
+{
+  "id": "62989674-6bff-4c79-bc0a-c58faf481e18",
+  "dna": {
+    "niche": "finance",
+    "colorStory": {
+      "bg": "#020817",
+      "mood": "trust",
+      "text": "#ffffff",
+      "accent": "#22c55e",
+      "primary": "#3b82f6",
+      "colorFamily": "cool"
+    },
+    "motionStyle": "kinetic",
+    "typographySystem": "minimal"
+  },
+  "meta": {
+    "fps": 25,
+    "mode": "faceless",
+    "name": "",
+    "tone": "auto",
+    "brand": {},
+    "width": 1080,
+    "height": 1920,
+    "audience": "general",
+    "language": "english",
+    "videoType": "auto",
+    "brand_color": null,
+    "orientation": "9:16"
+  },
+  "audio": {
+    "tts": {
+      "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/tts/a03471b2-4f83-49d0-8c49-73a57480057c/tts-1776611668468.mp3",
+      "volume": 1
+    },
+    "music": { "src": "/music/mood_mode.mp3", "volume": 0.12 }
+  },
+  "beats": [
+    {
+      "id": "6fb7ac4d-f195-4a09-9d84-82b7f31b853d",
+      "cta": "WATCH NOW",
+      "stat": "₹10L",
+      "text": null,
+      "label": "MIND BLOWN",
+      "order": 0,
+      "quote": "Earn big money in little time.",
+      "zones": {
+        "z2": {
+          "role": "label",
+          "style": {
+            "color": "#0a0a0a",
+            "opacity": 1,
+            "fontSize": 32,
+            "_presetId": "breaking-tag",
+            "fontStyle": "italic",
+            "textAlign": "center",
+            "background": "#1eaaf1",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 5,
+            "textEffect": "typewriter",
+            "textShadow": "none",
+            "whiteSpace": "normal",
+            "paddingLeft": 10,
+            "borderRadius": 20,
+            "paddingRight": 10,
+            "paddingBottom": 5,
+            "_userFontFamily": true
+          },
+          "content": { "kind": "text", "text": "MIND BLOWN" }
+        },
+        "z3": {
+          "role": "headline",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 208,
+            "_presetId": "slab-punch",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1.05,
+            "paddingTop": 4,
+            "textEffect": "slideUp",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 12,
+            "paddingRight": 12,
+            "letterSpacing": "-1px",
+            "paddingBottom": 4
+          },
+          "content": { "kind": "text", "text": "₹10 LAKH IN SECONDS" }
+        },
+        "z4": {
+          "role": "tagline",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 40,
+            "_presetId": "breaking-tag",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "textEffect": "wordReveal",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "letterSpacing": "5px",
+            "textTransform": "uppercase"
+          },
+          "content": { "kind": "text", "text": "Quick cash, big impact" }
+        },
+        "z5": {
+          "style": { "shineEffect": "streak", "animatedBorder": "fireGlow" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/bab86392-fb0a-4c32-9605-28957ff88735.jpg",
+              "type": "image",
+              "motion": "droneRise",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z6": {
+          "style": { "scale": 1, "shadowBlur": 0, "shineEffect": "anamorphic", "borderRadius": 0 },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/61f340b6-c4ca-4388-88c7-023898247e2c.jpg",
+              "type": "image",
+              "motion": "droneRise",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z7": {
+          "style": {},
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/ddc71221-5aab-47bb-9ff8-6570b987451e.jpg",
+              "type": "image",
+              "motion": "droneRise",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z8": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 55,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#003d5c",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 10,
+            "textEffect": "fadeWords",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 20,
+            "borderRadius": 25,
+            "paddingRight": 20,
+            "paddingBottom": 10,
+            "contentPadding": 7
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z9": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 65,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "typewriter",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" },
+          "background": {}
+        },
+        "z10": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 116,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "popIn",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z11": {
+          "style": { "color": "#3b82f6", "filled": false, "opacity": 1, "background": "#111111" },
+          "content": { "shape": "square" }
+        },
+        "z12": {
+          "role": "cta",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 51,
+            "_presetId": "spaced-caps-tag",
+            "fontStyle": "normal",
+            "textAlign": "center",
+            "background": "transparent",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1.4,
+            "textShadow": "none",
+            "_userPreset": true,
+            "borderRadius": 0,
+            "letterSpacing": "0.25em",
+            "textTransform": "uppercase",
+            "textDecoration": "none"
+          },
+          "content": { "kind": "text", "text": "WATCH NOW" },
+          "background": {}
+        }
+      },
+      "blocks": [],
+      "energy": 1,
+      "intent": "shock",
+      "layout": "4f2e4960-4269-4f5a-84a8-db8c33712d30",
+      "spoken": "You can earn ₹10 lakh in just 15 seconds.",
+      "caption": {
+        "show": false,
+        "text": "You can earn ₹10 lakh in just 15 seconds.",
+        "style": "premiumBlock",
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
+      },
+      "end_sec": 3.4,
+      "heading": null,
+      "subtext": "Short videos bring massive earnings.",
+      "tagline": "Quick cash, big impact",
+      "headline": "₹10 LAKH IN SECONDS",
+      "language": "english",
+      "overlays": [],
+      "start_sec": 0,
+      "asset_hint": {
+        "prompt": "You, can, earn, photorealistic scene",
+        "keywords": ["You", "can", "earn", "₹10"],
+        "visual_type": "abstract",
+        "search_query": null
+      },
+      "audio_cues": [
+        {
+          "id": "sfx_1776611645577",
+          "key": "ground_impact",
+          "label": "Ground Impact",
+          "source": "beat",
+          "volume": 0.2,
+          "position": 0
+        }
+      ],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "zoom", "duration": 18 },
+      "visual_hint": "text_only",
+      "deletedZones": [],
+      "duration_sec": 3.4,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "pattern", "value": "gradientMidnight" }
+    },
+    {
+      "id": "ef0e2c63-3aec-483c-b630-e590a74efbfb",
+      "cta": "DISCOVER MORE",
+      "stat": "₹12L",
+      "text": null,
+      "label": "WILD STAT",
+      "order": 1,
+      "quote": "Big money from small clips.",
+      "zones": {
+        "z2": {
+          "role": "label",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 119,
+            "_presetId": "breaking-tag",
+            "fontStyle": "italic",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "textEffect": "fadeWords",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "_userFontFamily": true
+          },
+          "content": { "kind": "text", "text": "WILD STAT" }
+        },
+        "z3": {
+          "role": "headline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 88,
+            "_presetId": "slab-punch",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "paddingTop": 4,
+            "textEffect": "typewriter",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 12,
+            "paddingRight": 12,
+            "letterSpacing": "-1px",
+            "paddingBottom": 4
+          },
+          "content": { "kind": "text", "text": "TOP EARNERS" }
+        },
+        "z4": {
+          "role": "tagline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 68,
+            "_presetId": "breaking-tag",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "textEffect": "slideUp",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "letterSpacing": "5px",
+            "textTransform": "uppercase"
+          },
+          "content": { "kind": "text", "text": "Creators cashing in" }
+        },
+        "z5": {
+          "style": { "scale": 1, "shadowBlur": 0, "shineEffect": "streak", "borderRadius": 12 },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/dc001a53-0813-4240-b80e-c2e5066cb9ef.jpg",
+              "type": "image",
+              "motion": "cinematicPush",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z6": {
+          "style": { "scale": 1, "shadowBlur": 0, "shineEffect": "anamorphic", "borderRadius": 12 },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/5fef0977-8fbf-4586-a044-0b8fa571cd11.jpg",
+              "type": "image",
+              "motion": "cinematicPush",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z7": {
+          "style": { "scale": 1, "shadowBlur": 0, "borderRadius": 12 },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/34f0ea99-fafa-4f71-b389-3b06c6a4f241.jpg",
+              "type": "image",
+              "motion": "cinematicPush",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z8": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "popIn",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z9": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 65,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "fadeWords",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z10": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "wordReveal",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z11": {
+          "style": { "color": "#3b82f6", "filled": false, "opacity": 1, "background": "#111111" },
+          "content": { "shape": "square" }
+        },
+        "z12": {
+          "role": "cta",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 51,
+            "_presetId": "spaced-caps-tag",
+            "fontStyle": "normal",
+            "textAlign": "center",
+            "background": "transparent",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1.4,
+            "textShadow": "none",
+            "_userPreset": true,
+            "borderRadius": 0,
+            "letterSpacing": "0.25em",
+            "textTransform": "uppercase",
+            "textDecoration": "none"
+          },
+          "content": { "kind": "text", "text": "DISCOVER MORE" }
+        }
+      },
+      "blocks": [],
+      "energy": 0.8,
+      "intent": "proof",
+      "layout": "4f2e4960-4269-4f5a-84a8-db8c33712d30",
+      "spoken": "Top YouTubers are raking in ₹5 to ₹12 lakh monthly.",
+      "caption": {
+        "show": false,
+        "text": "Top YouTubers are raking in ₹5 to ₹12 lakh monthly.",
+        "style": "premiumBlock",
+        "position": 50,
+        "animation": "word_pop",
+        "emphasis_words": []
+      },
+      "end_sec": 7.199999999999999,
+      "heading": null,
+      "subtext": "Flying Beast and Slayy Point lead the pack.",
+      "tagline": "Creators cashing in",
+      "headline": "TOP EARNERS",
+      "language": "english",
+      "overlays": [],
+      "start_sec": 3.4,
+      "asset_hint": {
+        "prompt": "A YouTuber showing off their earnings with a phone in hand, surrounded by excitement.",
+        "keywords": ["YouTuber", "money", "earnings"],
+        "visual_type": "abstract",
+        "search_query": null
+      },
+      "audio_cues": [
+        {
+          "id": "sfx_1776611645579",
+          "key": "great_success",
+          "label": "Great Success",
+          "source": "beat",
+          "volume": 0.2,
+          "position": 0
+        }
+      ],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "whipPan", "duration": 12 },
+      "visual_hint": "stat",
+      "deletedZones": [],
+      "duration_sec": 3.8,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "pattern", "value": "gradientMidnight" }
+    },
+    {
+      "id": "2d6adb05-adb1-47a8-a720-dc67ac10db41",
+      "cta": "JOIN NOW",
+      "stat": null,
+      "text": null,
+      "label": "INSIDER TIP",
+      "order": 2,
+      "quote": "You don't need a badge to earn cash.",
+      "zones": {
+        "z2": {
+          "role": "label",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 160,
+            "_presetId": "mono-tag",
+            "fontStyle": "italic",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "textEffect": "wordReveal",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "_userFontFamily": true
+          },
+          "content": { "kind": "text", "text": "INSIDER TIP" }
+        },
+        "z3": {
+          "role": "headline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 88,
+            "_presetId": "gradient-text",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "paddingTop": 4,
+            "textEffect": "popIn",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "paddingLeft": 12,
+            "paddingRight": 12,
+            "letterSpacing": "-1px",
+            "paddingBottom": 4
+          },
+          "content": { "kind": "text", "text": "NO PARTNER, NO PROBLEM" },
+          "background": {}
+        },
+        "z4": {
+          "role": "tagline",
+          "style": {
+            "color": "#444444",
+            "fontSize": 68,
+            "_presetId": "mono-tag",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "textEffect": "fadeWords",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "letterSpacing": "5px",
+            "textTransform": "uppercase"
+          },
+          "content": { "kind": "text", "text": "Open to all creators" },
+          "background": {}
+        },
+        "z5": {
+          "style": { "animatedBorder": "arctic" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/b1b03b3e-3c9f-4024-9a74-42bd3d8c0209.jpg",
+              "type": "image",
+              "motion": "microZoom",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z6": {
+          "style": {},
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/05c9b6a8-1c1d-49c2-a12d-9c72055af73a.jpg",
+              "type": "image",
+              "motion": "microZoom",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z7": {
+          "style": { "shineEffect": "scan" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/73f44bd0-6965-4976-8233-a76ce6353834.jpg",
+              "type": "image",
+              "motion": "microZoom",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z8": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "slideUp",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" },
+          "background": {}
+        },
+        "z9": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 54,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "wordReveal",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z10": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 73,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "typewriter",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z11": {
+          "style": { "color": "#3b82f6", "filled": false, "opacity": 1, "background": "#111111" },
+          "content": { "shape": "square" }
+        },
+        "z12": {
+          "role": "cta",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 51,
+            "_presetId": "spaced-caps-tag",
+            "fontStyle": "normal",
+            "textAlign": "center",
+            "background": "transparent",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1.4,
+            "textShadow": "none",
+            "_userPreset": true,
+            "borderRadius": 0,
+            "letterSpacing": "0.25em",
+            "textTransform": "uppercase",
+            "textDecoration": "none"
+          },
+          "content": { "kind": "text", "text": "JOIN NOW" },
+          "background": {}
+        }
+      },
+      "blocks": [],
+      "energy": 0.6,
+      "intent": "explanation",
+      "layout": "4f2e4960-4269-4f5a-84a8-db8c33712d30",
+      "spoken": "No need to be a YouTube Partner to earn big.",
+      "caption": {
+        "show": false,
+        "text": "No need to be a YouTube Partner to earn big.",
+        "style": "premiumBlock",
+        "position": 80,
+        "animation": "word_reveal",
+        "emphasis_words": []
+      },
+      "end_sec": 11,
+      "heading": null,
+      "subtext": "Anyone can tap into the Shorts Fund.",
+      "tagline": "Open to all creators",
+      "headline": "NO PARTNER, NO PROBLEM",
+      "language": "english",
+      "overlays": [],
+      "start_sec": 7.199999999999999,
+      "asset_hint": {
+        "prompt": "No, need, to, photorealistic scene",
+        "keywords": ["No", "need", "to", "be"],
+        "visual_type": "abstract",
+        "search_query": null
+      },
+      "audio_cues": [
+        {
+          "id": "sfx_1776611645580",
+          "key": "tick_digital",
+          "label": "Tick Digital",
+          "source": "beat",
+          "volume": 0.2,
+          "position": 0
+        }
+      ],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "zoom", "duration": 18 },
+      "visual_hint": "text_only",
+      "deletedZones": [],
+      "duration_sec": 3.8,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "pattern", "value": "gradientMidnight" }
+    },
+    {
+      "id": "4209bb27-30d3-4276-9913-f27d60269724",
+      "cta": "SEE THE STATS",
+      "stat": "600M",
+      "text": null,
+      "label": "FACT",
+      "order": 3,
+      "quote": "India's views are a goldmine.",
+      "zones": {
+        "z2": {
+          "role": "label",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 119,
+            "_presetId": "breaking-tag",
+            "fontStyle": "italic",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "textEffect": "fadeWords",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "_userFontFamily": true
+          },
+          "content": { "kind": "text", "text": "FACT" }
+        },
+        "z3": {
+          "role": "headline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 88,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "paddingTop": 4,
+            "textEffect": "typewriter",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 12,
+            "paddingRight": 12,
+            "letterSpacing": "-1px",
+            "paddingBottom": 4
+          },
+          "content": { "kind": "text", "text": "MASSIVE VIEWERSHIP" }
+        },
+        "z4": {
+          "role": "tagline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 68,
+            "_presetId": "breaking-tag",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "textEffect": "slideUp",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "letterSpacing": "5px",
+            "textTransform": "uppercase"
+          },
+          "content": { "kind": "text", "text": "Views equal value" }
+        },
+        "z5": {
+          "style": {
+            "scale": 1,
+            "shadowBlur": 0,
+            "shineEffect": "anamorphic",
+            "borderRadius": 12,
+            "animatedBorder": "arctic"
+          },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/a901718b-2271-4cdc-8a18-4c86f4979536.jpg",
+              "type": "image",
+              "motion": "droneRise",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z6": {
+          "style": { "scale": 1, "shadowBlur": 0, "borderRadius": 12 },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/dd183eb4-191d-4a08-a5b4-f60c0511d7a0.jpg",
+              "type": "image",
+              "motion": "droneRise",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z7": {
+          "style": { "scale": 1, "shadowBlur": 0, "borderRadius": 12 },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/969b812c-b6cd-45d4-8241-dc92a1b42744.jpg",
+              "type": "image",
+              "motion": "droneRise",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z8": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "clean-subtext",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "popIn",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z9": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 65,
+            "_presetId": "clean-subtext",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "fadeWords",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z10": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "clean-subtext",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "wordReveal",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z11": {
+          "style": { "color": "#3b82f6", "filled": false, "opacity": 1, "background": "#111111" },
+          "content": { "shape": "square" }
+        },
+        "z12": {
+          "role": "cta",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 51,
+            "_presetId": "spaced-caps-tag",
+            "fontStyle": "normal",
+            "textAlign": "center",
+            "background": "transparent",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1.4,
+            "textShadow": "none",
+            "_userPreset": true,
+            "borderRadius": 0,
+            "letterSpacing": "0.25em",
+            "textTransform": "uppercase",
+            "textDecoration": "none"
+          },
+          "content": { "kind": "text", "text": "SEE THE STATS" }
+        }
+      },
+      "blocks": [],
+      "energy": 0.7,
+      "intent": "proof",
+      "layout": "4f2e4960-4269-4f5a-84a8-db8c33712d30",
+      "spoken": "India's 600 million monthly users fuel the views.",
+      "caption": {
+        "show": false,
+        "text": "India's 600 million monthly users fuel the views.",
+        "style": "premiumBlock",
+        "position": 80,
+        "animation": "pop",
+        "emphasis_words": []
+      },
+      "end_sec": 14,
+      "heading": null,
+      "subtext": "India's user base boosts earnings.",
+      "tagline": "Views equal value",
+      "headline": "MASSIVE VIEWERSHIP",
+      "language": "english",
+      "overlays": [],
+      "start_sec": 11,
+      "asset_hint": {
+        "prompt": "A bustling street in India with people watching videos on their phones.",
+        "keywords": ["India", "YouTube", "users"],
+        "visual_type": "abstract",
+        "search_query": null
+      },
+      "audio_cues": [
+        {
+          "id": "sfx_1776611645580",
+          "key": "cash_register",
+          "label": "Cash Register",
+          "source": "beat",
+          "volume": 0.2,
+          "position": 0
+        }
+      ],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "whipPan", "duration": 12 },
+      "visual_hint": "stat",
+      "deletedZones": [],
+      "duration_sec": 3,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "pattern", "value": "gradientMidnight" }
+    },
+    {
+      "id": "6daacc98-a958-42c6-b1ea-fd713e8e735a",
+      "cta": "START CREATING",
+      "stat": "10M",
+      "text": null,
+      "label": "GOAL",
+      "order": 4,
+      "quote": "View milestones equal big payouts.",
+      "zones": {
+        "z2": {
+          "role": "label",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 61,
+            "_presetId": "mono-tag",
+            "fontStyle": "italic",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "textEffect": "wordReveal",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "_userFontFamily": true
+          },
+          "content": { "kind": "text", "text": "GOAL" }
+        },
+        "z3": {
+          "role": "headline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 88,
+            "_presetId": "gradient-text",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "paddingTop": 4,
+            "textEffect": "popIn",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "paddingLeft": 12,
+            "paddingRight": 12,
+            "letterSpacing": "-1px",
+            "paddingBottom": 4
+          },
+          "content": { "kind": "text", "text": "UNLOCK EARNINGS" },
+          "background": {}
+        },
+        "z4": {
+          "role": "tagline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 56,
+            "_presetId": "mono-tag",
+            "textAlign": "left",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "textEffect": "fadeWords",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "letterSpacing": "5px",
+            "textTransform": "uppercase"
+          },
+          "content": { "kind": "text", "text": "Views are currency" }
+        },
+        "z5": {
+          "style": {},
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/9252caf8-8ffa-4010-905a-7888e6b9c76a.jpg",
+              "type": "image",
+              "motion": "cinematicPush",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z6": {
+          "style": { "shineEffect": "scan" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/4dab9100-4ff6-4710-aaac-9c3415d1ef3d.jpg",
+              "type": "image",
+              "motion": "cinematicPush",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z7": {
+          "style": { "shineEffect": "streak" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/1fc5334e-4273-425c-8b0c-f026e6c1c152.jpg",
+              "type": "image",
+              "motion": "cinematicPush",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z8": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "slideUp",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" },
+          "background": {}
+        },
+        "z9": {
+          "role": null,
+          "style": {
+            "color": "#0a0a0a",
+            "fontSize": 64,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#ffffff",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "wordReveal",
+            "textShadow": "none",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 59,
+            "paddingRight": 8,
+            "paddingBottom": 6,
+            "contentPadding": 12
+          },
+          "content": { "kind": "text", "text": "" }
+        },
+        "z10": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "typewriter",
+            "textShadow": "0 2px 18px rgba(0,0,0,0.9)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" },
+          "background": {}
+        },
+        "z11": {
+          "style": { "color": "#3b82f6", "filled": false, "opacity": 1, "background": "#111111" },
+          "content": { "shape": "square" }
+        },
+        "z12": {
+          "role": "cta",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 51,
+            "_presetId": "spaced-caps-tag",
+            "fontStyle": "normal",
+            "textAlign": "center",
+            "background": "transparent",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1.4,
+            "textShadow": "none",
+            "_userPreset": true,
+            "borderRadius": 0,
+            "letterSpacing": "0.25em",
+            "textTransform": "uppercase",
+            "textDecoration": "none"
+          },
+          "content": { "kind": "text", "text": "START CREATING" },
+          "background": {}
+        }
+      },
+      "blocks": [],
+      "energy": 0.5,
+      "intent": "explanation",
+      "layout": "4f2e4960-4269-4f5a-84a8-db8c33712d30",
+      "spoken": "10 million views in 90 days unlocks max payout.",
+      "caption": {
+        "show": false,
+        "text": "10 million views in 90 days unlocks max payout.",
+        "style": "premiumBlock",
+        "position": 80,
+        "animation": "wave",
+        "emphasis_words": []
+      },
+      "end_sec": 17.4,
+      "heading": null,
+      "subtext": "Hit the views, get the cash.",
+      "tagline": "Views are currency",
+      "headline": "UNLOCK EARNINGS",
+      "language": "english",
+      "overlays": [],
+      "start_sec": 14,
+      "asset_hint": {
+        "prompt": "10, million, views, photorealistic scene",
+        "keywords": ["10", "million", "views", "in"],
+        "visual_type": "abstract",
+        "search_query": null
+      },
+      "audio_cues": [
+        { "id": "sfx_1776611645581", "key": "click", "label": "Click", "source": "beat", "volume": 0.2, "position": 0 }
+      ],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "slideDown", "duration": 16 },
+      "visual_hint": "text_only",
+      "deletedZones": [],
+      "duration_sec": 3.4,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "pattern", "value": "gradientMidnight" }
+    },
+    {
+      "id": "c2791f6d-c3fc-45b1-92c6-5b5a4651c48a",
+      "cta": "CREATE SHORTS",
+      "stat": null,
+      "text": null,
+      "label": "TREND",
+      "order": 5,
+      "quote": "15 seconds can change your life.",
+      "zones": {
+        "z2": {
+          "role": "label",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 60,
+            "_presetId": "breaking-tag",
+            "fontStyle": "italic",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "textEffect": "popIn",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "_userFontFamily": true
+          },
+          "content": { "kind": "text", "text": "TREND" }
+        },
+        "z3": {
+          "role": "headline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 88,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "paddingTop": 4,
+            "textEffect": "fadeWords",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 12,
+            "paddingRight": 12,
+            "letterSpacing": "-1px",
+            "paddingBottom": 4
+          },
+          "content": { "kind": "text", "text": "THE NEW GOLDMINE" },
+          "background": {}
+        },
+        "z4": {
+          "role": "tagline",
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 70,
+            "_presetId": "breaking-tag",
+            "textAlign": "center",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1,
+            "textEffect": "typewriter",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "letterSpacing": "5px",
+            "textTransform": "uppercase"
+          },
+          "content": { "kind": "text", "text": "Shorts are king" }
+        },
+        "z5": {
+          "style": { "shineEffect": "scan" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/a3447aef-433c-4652-885b-8594dd35cece.jpg",
+              "type": "image",
+              "motion": "microZoom",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z6": {
+          "style": { "shineEffect": "streak" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/375c7622-6caf-4126-9180-c01f26c17496.jpg",
+              "type": "image",
+              "motion": "microZoom",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z7": {
+          "style": { "shineEffect": "anamorphic" },
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/a03471b2-4f83-49d0-8c49-73a57480057c/669b1f09-db94-4acf-a1a6-56f0d1fc0aa3.jpg",
+              "type": "image",
+              "motion": "microZoom",
+              "objectFit": "cover"
+            }
+          }
+        },
+        "z8": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "wordReveal",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" },
+          "background": {}
+        },
+        "z9": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 65,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "popIn",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" },
+          "background": {}
+        },
+        "z10": {
+          "role": null,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 66,
+            "_presetId": "headline",
+            "textAlign": "center",
+            "background": "#111111",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1,
+            "paddingTop": 6,
+            "textEffect": "slideUp",
+            "textShadow": "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)",
+            "whiteSpace": "normal",
+            "paddingLeft": 8,
+            "borderRadius": 999,
+            "paddingRight": 8,
+            "paddingBottom": 6
+          },
+          "content": { "kind": "text", "text": "" },
+          "background": {}
+        },
+        "z11": {
+          "style": { "color": "#3b82f6", "filled": false, "opacity": 1, "background": "#111111" },
+          "content": { "shape": "square" }
+        },
+        "z12": {
+          "role": "cta",
+          "style": {
+            "color": "#ffffff",
+            "opacity": 1,
+            "fontSize": 51,
+            "_presetId": "spaced-caps-tag",
+            "fontStyle": "normal",
+            "textAlign": "center",
+            "background": "transparent",
+            "fontFamily": "'Outfit', sans-serif",
+            "fontWeight": 400,
+            "lineHeight": 1.4,
+            "textShadow": "none",
+            "_userPreset": true,
+            "borderRadius": 0,
+            "letterSpacing": "0.25em",
+            "textTransform": "uppercase",
+            "textDecoration": "none"
+          },
+          "content": { "kind": "text", "text": "CREATE SHORTS" },
+          "background": {}
+        }
+      },
+      "blocks": [],
+      "energy": 0.9,
+      "intent": "contrast",
+      "layout": "4f2e4960-4269-4f5a-84a8-db8c33712d30",
+      "spoken": "Shorts are the new money-makers, not long videos.",
+      "caption": {
+        "show": false,
+        "text": "Shorts are the new money-makers, not long videos.",
+        "style": "premiumBlock",
+        "position": 80,
+        "animation": "slide",
+        "emphasis_words": []
+      },
+      "end_sec": 20.4,
+      "heading": null,
+      "subtext": "Shorts challenge long-form success.",
+      "tagline": "Shorts are king",
+      "headline": "THE NEW GOLDMINE",
+      "language": "english",
+      "overlays": [],
+      "start_sec": 17.4,
+      "asset_hint": {
+        "prompt": "Split screen: one side showing a short video being made, the other a long video setup.",
+        "keywords": ["short videos", "long videos", "YouTube"],
+        "visual_type": "abstract",
+        "search_query": null
+      },
+      "audio_cues": [
+        {
+          "id": "sfx_1776611645581",
+          "key": "glitch_long",
+          "label": "Glitch Long",
+          "source": "beat",
+          "volume": 0.2,
+          "position": 0
+        }
+      ],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "dissolve", "duration": 18 },
+      "visual_hint": "comparison",
+      "deletedZones": [],
+      "duration_sec": 3,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "pattern", "value": "gradientMidnight" }
+    }
+  ],
+  "avatar": null,
+  "script": {
+    "text": "You can earn ₹10 lakh in just 15 seconds. Top YouTubers are raking in ₹5 to ₹12 lakh monthly. No need to be a YouTube Partner to earn big. India's 600 million monthly users fuel the views. 10 million views in 90 days unlocks max payout. Shorts are the new money-makers, not long videos.",
+    "emotionalArc": "Curiosity turns into excitement as viewers discover the surprising earnings potential of short videos."
+  },
+  "overlays": [],
+  "workflow": { "avatar_completed": false, "script_completed": true, "beats_initialized": true },
+  "duration_sec": 20.4
+}

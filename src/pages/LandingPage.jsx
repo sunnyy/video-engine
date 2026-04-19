@@ -6,6 +6,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithGoogle, getSession } from "../services/auth/authService";
+import { SERVER } from "../services/serverApi";
+
+const FALLBACK_RATE = 92.60;
+function calcDiscounted(base, pct) { return pct ? +(base * (1 - pct / 100)).toFixed(2) : base; }
+function toINR(usd, rate) { return Math.round(usd * rate); }
 
 function useReveal() {
   useEffect(() => {
@@ -229,9 +234,20 @@ export default function LandingPage() {
   useReveal();
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
+  const [plans,   setPlans]   = useState([]);
+  const [rate,    setRate]    = useState(FALLBACK_RATE);
+  const [cycle,   setCycle]   = useState("monthly");
 
   useEffect(() => {
     getSession().then(setSession).catch(() => {});
+    fetch(`${SERVER}/api/plans`)
+      .then(r => r.json())
+      .then(d => setPlans(Array.isArray(d) ? d.sort((a, b) => (a.sort_order ?? 99) - (b.sort_order ?? 99)) : []))
+      .catch(() => {});
+    fetch(`${SERVER}/api/exchange-rate`)
+      .then(r => r.json())
+      .then(d => { if (d?.rate) setRate(d.rate); })
+      .catch(() => {});
   }, []);
 
   const handleCTA = async () => {
@@ -276,7 +292,7 @@ export default function LandingPage() {
           <div className="nav-right">
             <a href="/about" className="nav-link">About</a>
             <a href="#how" className="nav-link">How It Works</a>
-            <a href="/pricing" className="nav-link">Pricing</a>
+            <a href="#pricing" className="nav-link">Pricing</a>
             <button className="btn-yellow" onClick={handleCTA}>{session ? "Go to Dashboard" : "Sign In with Google"}</button>
           </div>
         </div>
@@ -537,24 +553,66 @@ export default function LandingPage() {
         <div className="container">
           <div className="section-label">Pricing</div>
           <h2 className="section-h">Simple pricing.<br /><span className="yellow">No surprises.</span></h2>
-          <div className="pricing-grid" data-reveal>
-            {[
-              { name: "Starter", price: 29, credits: 300, videos: 15, hot: false, features: ["300 credits/month", "Full video production", "Voice narration", "Background music", "Standard export", "Email support"] },
-              { name: "Creator", price: 49, credits: 600, videos: 30, hot: true, features: ["600 credits/month", "Everything in Starter", "AI image generation", "Talking head mode", "HD export", "Priority support"] },
-              { name: "Pro", price: 79, credits: 1200, videos: 60, hot: false, features: ["1200 credits/month", "Everything in Creator", "Bulk generation", "Custom brand identity", "Advanced analytics", "Dedicated support"] },
-            ].map(plan => (
-              <div key={plan.name} className={`plan${plan.hot ? " plan-hot" : ""}`}>
-                {plan.hot && <div className="plan-hot-badge">Most Popular</div>}
-                <div className="plan-name">{plan.name}</div>
-                <div className="plan-price"><span>$</span>{plan.price}</div>
-                <div className="plan-cycle">per month</div>
-                <div className="plan-credits">{plan.credits} credits/month</div>
-                <div className="plan-hint">~{plan.videos} videos (30-sec each)</div>
-                <div className="plan-hr" />
-                <ul className="plan-feats">{plan.features.map((f, i) => <li key={i}>{f}</li>)}</ul>
-                <button className={`plan-btn ${plan.hot ? "plan-btn-hot" : "plan-btn-default"}`} onClick={() => window.location.href = "/pricing"}>Get Started</button>
-              </div>
-            ))}
+          <p className="section-sub" style={{ marginBottom: 0 }}>Pick a plan, start creating. Upgrade or cancel anytime.</p>
+
+          {/* Billing toggle */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 32, flexWrap: "wrap" }}>
+            <div style={{ display: "inline-flex", background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 10, padding: 4, gap: 4 }}>
+              {["monthly", "annual"].map(c => (
+                <button key={c} onClick={() => setCycle(c)} style={{
+                  padding: "7px 20px", borderRadius: 7, border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)",
+                  background: cycle === c ? "var(--yellow)" : "transparent",
+                  color:      cycle === c ? "#0b0b10" : "var(--muted)",
+                  transition: "all 0.15s",
+                }}>
+                  {c === "monthly" ? "Monthly" : "Annual"}
+                  {c === "annual" && <span style={{ fontSize: 10, marginLeft: 5, color: cycle === "annual" ? "#0b0b10" : "var(--yellow)" }}>Save more</span>}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)" }}>
+              Live rate: 1 USD = ₹{rate.toFixed(2)}
+            </div>
+          </div>
+
+          <div className="pricing-grid" data-reveal style={{ gridTemplateColumns: `repeat(${Math.min(plans.length || 3, 3)}, 1fr)` }}>
+            {plans.length === 0 ? (
+              // Loading skeleton — same grid, 3 faint cards
+              [0,1,2].map(i => (
+                <div key={i} className="plan" style={{ opacity: 0.3, minHeight: 320 }} />
+              ))
+            ) : plans.map(plan => {
+              const base  = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
+              const usd   = calcDiscounted(base, plan.discount_percent);
+              const inr   = toINR(usd, rate);
+              const saved = plan.discount_percent > 0;
+              const feats = Array.isArray(plan.features) ? plan.features : [];
+              return (
+                <div key={plan.id} className={`plan${plan.is_popular ? " plan-hot" : ""}`}>
+                  {plan.is_popular && <div className="plan-hot-badge">Most Popular</div>}
+                  <div className="plan-name">{plan.name}</div>
+
+                  {/* Price */}
+                  <div className="plan-price"><span>$</span>{usd}</div>
+                  <div className="plan-cycle" style={{ marginBottom: 2 }}>
+                    per {cycle === "annual" ? "year" : "month"}
+                    {saved && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--yellow)", fontFamily: "var(--font-mono)" }}>−{plan.discount_percent}%</span>}
+                  </div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)", marginBottom: 8 }}>≈ ₹{inr}/{cycle === "annual" ? "yr" : "mo"}</div>
+
+                  <div className="plan-credits">⚡ {plan.credits} credits/month</div>
+                  <div className="plan-hr" />
+                  <ul className="plan-feats">{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>
+                  <button
+                    className={`plan-btn ${plan.is_popular ? "plan-btn-hot" : "plan-btn-default"}`}
+                    onClick={() => navigate(`/checkout?plan=${plan.slug}&cycle=${cycle}`)}
+                  >
+                    Get Started
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
