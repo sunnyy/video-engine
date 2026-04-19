@@ -159,7 +159,7 @@ export default function Header() {
   const hasAvatar = !!project?.avatar?.src;
 
   return (
-    <div className="flex items-center justify-between px-5 py-[10px] border-b border-[rgba(255,255,255,0.06)] bg-[#111118] shrink-0">
+    <div className="flex items-center justify-between px-5 border-b border-[rgba(255,255,255,0.06)] bg-[#111118] shrink-0">
       {/* Left — logo + project dropdown */}
       <div className="flex items-center gap-3">
         {/* Back to dashboard */}
