@@ -158,7 +158,7 @@ function MultiAlignPanel({ selectedZoneIds, beat, zoneDefs, zones, updateBeat })
   );
 }
 
-export default function ZonesSection({ beat, project, selectedZoneId, selectedZoneIds, onSelectZone }) {
+export default function ZonesSection({ beat, project, selectedZoneId, selectedZoneIds, onSelectZone, isAdmin = false }) {
   const updateBeat       = useProjectStore((s) => s.updateBeat);
   const updateBeatSilent = useProjectStore((s) => s.updateBeatSilent);
 
@@ -566,6 +566,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
             clearContent={clearContent}
             clearBackground={clearBackground}
             onDelete={() => deleteZone(selectedZoneId)}
+            isAdmin={isAdmin}
             allZoneZIndices={Object.entries(zones)
               .filter(([id]) => id !== selectedZoneId)
               .map(([id, z]) => {

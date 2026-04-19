@@ -392,6 +392,7 @@ export default function ZoneEditor({
   setZoneStyleSilent, setZoneLayoutSilent,
   patchZoneSilent, clearContent, clearBackground, onDelete,
   allZoneZIndices,
+  isAdmin = false,
 }) {
   const commitBeat    = useProjectStore(s => s.commitBeat);
   const pushHistory   = useProjectStore(s => s._pushHistory);
@@ -1589,8 +1590,8 @@ export default function ZoneEditor({
           </div>
         )}
 
-        {/* AI Image Type */}
-        {!isAvatarZone && (
+        {/* AI Image Type — admin only */}
+        {isAdmin && !isAvatarZone && (
           <div className="mb-4">
             <Label>AI Image Type</Label>
             <div className="flex gap-[4px]">

@@ -618,6 +618,7 @@ export default function LayoutEditor() {
                   selectedZoneId={selectedZoneId}
                   selectedZoneIds={selectedZoneIds}
                   onSelectZone={handleSelectZone}
+                  isAdmin={true}
                 />
               )}
               {rightTab === "assets" && (() => {
