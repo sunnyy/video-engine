@@ -345,11 +345,11 @@ export default function Checkout() {
               onMouseEnter={e => { if (!paying) e.currentTarget.style.background = "#e0b016"; }}
               onMouseLeave={e => { if (!paying) e.currentTarget.style.background = "#f5c518"; }}
             >
-              {paying ? "Processing…" : `Pay ₹${finalINR} with Razorpay`}
+              {paying ? "Processing…" : `Pay ₹${finalINR} now >`}
             </button>
 
             <div style={{ fontSize: 12, color: "#55556a", textAlign: "center", lineHeight: 1.6 }}>
-              Secured by Razorpay · 256-bit SSL encryption<br />
+              🔒 256-bit SSL encryption<br />
               Cancel anytime from your account.
             </div>
           </div>
