@@ -580,7 +580,7 @@ export default function LayoutEditor() {
       {/* ── Canvas + Zone Editor ─────────────────────────────────── */}
       {activeBeat ? (
         <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
-          <div style={{ flex:1, minWidth:0, overflow:"hidden", paddingBottom: 24 }}>
+          <div style={{ flex:1, minWidth:0, overflow:"hidden", paddingBottom: 24, display:"flex", flexDirection:"column" }}>
             <CanvasPreview
               selectedZoneIds={selectedZoneIds}
               onSelectZone={handleSelectZone}
