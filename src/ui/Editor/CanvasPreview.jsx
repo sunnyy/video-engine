@@ -7,7 +7,7 @@ import { Player, Thumbnail } from "@remotion/player";
 import { useProjectStore } from "../../store/useProjectStore";
 import VideoComposition from "../../remotion/VideoComposition";
 import ZoneCanvas from "./ZoneCanvas";
-import { getLayoutDef } from "../../core/registries/layoutRegistry";
+import { getLayoutDef, initLayoutRegistry } from "../../core/registries/layoutRegistry";
 
 function nextZoneId(layoutDef, beatZones) {
   const allIds = [
@@ -47,6 +47,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const playerRef      = useRef(null);
   const containerRef   = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 400, height: 700 });
+  const [layoutsReady,  setLayoutsReady]  = useState(false);
 
   const MIN_ZOOM  = 0.25;
   const MAX_ZOOM  = 3.0;
@@ -96,6 +97,11 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const effectiveCanvasW = Math.max(0, Math.floor(canvasW * userZoom));
   const effectiveCanvasH = Math.max(0, Math.floor(canvasH * userZoom));
   const effectiveScale   = scale * userZoom;
+
+  /* ── Wait for layout registry before rendering Thumbnail/Player ── */
+  useEffect(() => {
+    initLayoutRegistry().then(() => setLayoutsReady(true)).catch(() => setLayoutsReady(true));
+  }, []);
 
   /* ── Measure container ── */
   useEffect(() => {
@@ -599,7 +605,10 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         }}>
 
         {/* Static edit canvas — Thumbnail + ZoneCanvas + controls */}
-        {activeBeat && !showPlayer && (
+        {activeBeat && !showPlayer && !layoutsReady && (
+          <div style={{ width: effectiveCanvasW || 200, height: effectiveCanvasH || 356, background: "#111", borderRadius: 8, outline: "2px solid rgba(255,255,255,0.18)" }} />
+        )}
+        {activeBeat && !showPlayer && layoutsReady && (
           <div
             className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
           >
@@ -670,7 +679,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         {/* Always mounted (display toggle) so Player preserves its frame position on pause/play */}
         <div
           className={`flex gap-3 ${is169 ? "flex-col items-center" : "flex-row items-start"}`}
-          style={{ display: showPlayer ? "flex" : "none" }}
+          style={{ display: showPlayer && layoutsReady ? "flex" : "none" }}
         >
             <Player
               key={`player-${videoW}x${videoH}`}
