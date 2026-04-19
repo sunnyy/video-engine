@@ -9,7 +9,7 @@
 
 import { supabase } from "../lib/supabase";
 
-export const SERVER = "http://localhost:5000";
+export const SERVER = import.meta.env.VITE_APP_URL || "http://localhost:5000";
 
 async function getAuthToken() {
   const { data: { session } } = await supabase.auth.getSession();
