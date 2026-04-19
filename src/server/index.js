@@ -22,6 +22,7 @@ import {
 import axios from "axios";
 import https from "node:https";
 import http  from "node:http";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -147,8 +148,9 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "100mb" }));
 
-const __dirnameResolved = path.dirname(new URL(import.meta.url).pathname).replace(/^\//, "");
-const PROJECT_ROOT = path.resolve(__dirnameResolved, "../..");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const TEMP_DIR     = path.join(PROJECT_ROOT, "src/server/temp");
 const PUBLIC_DIR   = path.join(PROJECT_ROOT, "public");
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
