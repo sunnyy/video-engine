@@ -234,6 +234,22 @@ async function cacheExternalImage(url) {
   }
 }
 
+/* ── Public: active plans ── */
+app.get("/api/plans", async (_req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("plans")
+      .select("id, name, slug, description, credits, price_monthly, price_annual, discount_percent, is_popular, sort_order, features")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    console.error("[plans]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── User: get own profile ── */
 app.get("/api/user/profile", requireAuth, async (req, res) => {
   try {

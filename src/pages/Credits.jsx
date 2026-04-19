@@ -132,11 +132,18 @@ export default function Credits() {
               </div>
             </div>
 
-            <button onClick={() => window.open("/#pricing", "_blank")}
-              className="self-start px-5 py-2 rounded-[8px] text-[14px] font-bold border-0 cursor-pointer"
-              style={{ background: "#f5c518", color: "#0b0b10", fontFamily: "'Outfit',sans-serif" }}>
-              Buy Credits
-            </button>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={() => window.open("/#pricing", "_blank")}
+                className="px-5 py-2 rounded-[8px] text-[14px] font-bold border-0 cursor-pointer"
+                style={{ background: "#f5c518", color: "#0b0b10", fontFamily: "'Outfit',sans-serif" }}>
+                Buy Credits
+              </button>
+              <button onClick={() => window.location.href = "/pricing"}
+                className="px-5 py-2 rounded-[8px] text-[14px] font-bold cursor-pointer"
+                style={{ background: "transparent", color: "#f5c518", border: "1px solid rgba(245,197,24,0.3)", fontFamily: "'Outfit',sans-serif" }}>
+                View Plans
+              </button>
+            </div>
 
             {/* Transaction history */}
             <div className="rounded-[14px] border p-6 flex flex-col gap-5" style={{ background: "#111118", borderColor: "rgba(255,255,255,0.07)" }}>

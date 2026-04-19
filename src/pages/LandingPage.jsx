@@ -276,7 +276,7 @@ export default function LandingPage() {
           <div className="nav-right">
             <a href="/about" className="nav-link">About</a>
             <a href="#how" className="nav-link">How It Works</a>
-            <a href="#pricing" className="nav-link">Pricing</a>
+            <a href="/pricing" className="nav-link">Pricing</a>
             <button className="btn-yellow" onClick={handleCTA}>{session ? "Go to Dashboard" : "Sign In with Google"}</button>
           </div>
         </div>
@@ -552,7 +552,7 @@ export default function LandingPage() {
                 <div className="plan-hint">~{plan.videos} videos (30-sec each)</div>
                 <div className="plan-hr" />
                 <ul className="plan-feats">{plan.features.map((f, i) => <li key={i}>{f}</li>)}</ul>
-                <button className={`plan-btn ${plan.hot ? "plan-btn-hot" : "plan-btn-default"}`} onClick={handleCTA}>Get Started</button>
+                <button className={`plan-btn ${plan.hot ? "plan-btn-hot" : "plan-btn-default"}`} onClick={() => window.location.href = "/pricing"}>Get Started</button>
               </div>
             ))}
           </div>

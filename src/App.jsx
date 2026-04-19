@@ -27,6 +27,8 @@ import LayoutGenerator from "./pages/admin/LayoutGenerator";
 import ImageGeneration from "./pages/ImageGeneration";
 import Transcription   from "./pages/Transcription";
 import Feedback        from "./pages/Feedback";
+import Pricing         from "./pages/Pricing";
+import Checkout        from "./pages/Checkout";
 import Assets          from "./pages/Assets";
 import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
@@ -96,6 +98,7 @@ export default function App() {
         <Route path="/terms"         element={<TermsOfService />} />
         <Route path="/privacy"       element={<PrivacyPolicy />} />
         <Route path="/refunds"       element={<RefundPolicy />} />
+        <Route path="/pricing"       element={<Pricing />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* /login → redirect to /dashboard if already signed in */}
@@ -109,6 +112,7 @@ export default function App() {
             <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/transcription"    element={<Transcription />} />
             <Route path="/feedback"         element={<Feedback />} />
+            <Route path="/checkout"         element={<Checkout />} />
             <Route path="/assets"           element={<Assets />} />
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
