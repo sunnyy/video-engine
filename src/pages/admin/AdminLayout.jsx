@@ -27,7 +27,7 @@ export default function AdminLayout({ children, fullBleed = false }) {
       <aside className="w-[220px] bg-[#111118] border-r border-white/[0.06] flex flex-col py-6 shrink-0">
         <div className="px-5 pb-6 border-b border-white/[0.06]">
           <div className="text-[11px] font-bold tracking-[2px] text-[#7c5cfc] uppercase">Admin</div>
-          <div className="text-lg font-bold mt-1">Video Engine</div>
+          <div className="text-lg font-bold mt-1">Vidquence</div>
         </div>
 
         <nav className="flex-1 p-3 flex flex-col gap-1">

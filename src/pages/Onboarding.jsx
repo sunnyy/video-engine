@@ -25,8 +25,10 @@ export default function Onboarding({ userId, onComplete }) {
   const [niches, setNiches] = useState([]);
   const [goal,   setGoal]   = useState(null);
   const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState(null);
 
   const handleSkip = async () => {
+    // Best-effort save on skip — dismiss regardless
     try { await completeOnboarding(userId, { niche: niches.length ? niches : null, goal: goal || null }); } catch {}
     onComplete();
   };
@@ -34,9 +36,15 @@ export default function Onboarding({ userId, onComplete }) {
   const handleNext = async () => {
     if (step === 1) { setStep(2); return; }
     setSaving(true);
-    try { await completeOnboarding(userId, { niche: niches.length ? niches : null, goal }); } catch {}
-    setSaving(false);
-    onComplete();
+    setError(null);
+    try {
+      await completeOnboarding(userId, { niche: niches.length ? niches : null, goal });
+      onComplete();
+    } catch {
+      setError("Failed to save — please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -101,6 +109,9 @@ export default function Onboarding({ userId, onComplete }) {
         )}
 
         {/* Actions */}
+        {error && (
+          <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#f87171", marginBottom: 16, textAlign: "center" }}>{error}</div>
+        )}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={handleSkip}
             style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
@@ -108,7 +119,7 @@ export default function Onboarding({ userId, onComplete }) {
           </button>
           <button onClick={handleNext} disabled={saving}
             style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#0b0b10", background: "#f5c518", border: "none", borderRadius: 8, padding: "12px 28px", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "Saving…" : step === 1 ? "Next →" : "Finish →"}
+            {saving ? "Saving…" : step === 1 ? "Next →" : error ? "Retry →" : "Finish →"}
           </button>
         </div>
 

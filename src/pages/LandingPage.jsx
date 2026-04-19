@@ -1,6 +1,6 @@
 /**
  * LandingPage.jsx — src/pages/LandingPage.jsx
- * VideoEngine — Dark + Yellow. Bento grid. Container-based. No internals exposed.
+ * Vidquence — Dark + Yellow. Bento grid. Container-based. No internals exposed.
  */
 
 import { useEffect, useState } from "react";
@@ -255,7 +255,7 @@ export default function LandingPage() {
   const tickerItems = ["AI Video Studio", "17 Niches", "Voice Generation", "Smart Visuals", "Auto Scripting", "Full Edit Control", "Export Ready", "Background Music"];
 
   const faqs = [
-    { q: "How is VideoEngine different from other AI video tools?", a: "Most tools give you plain text-over-broll with auto captions. VideoEngine is a full production studio — every moment of your video is individually crafted with its own visual design, pacing, and narrative intent. The output looks like a human editor made deliberate decisions." },
+    { q: "How is Vidquence different from other AI video tools?", a: "Most tools give you plain text-over-broll with auto captions. Vidquence is a full production studio — every moment of your video is individually crafted with its own visual design, pacing, and narrative intent. The output looks like a human editor made deliberate decisions." },
     { q: "What are credits and how are they used?", a: "Credits power the AI features. A typical 30-second video uses 17–20 credits — covering script generation, visual production, voice synthesis, and image generation. Basic videos using your own assets cost far fewer credits." },
     { q: "Can I use my own footage and images?", a: "Yes. Upload your own images, videos, or talking head footage. The AI features are optional — the production engine works with whatever you bring." },
     { q: "What niches are supported?", a: "17 niches including entertainment, gaming, finance, spiritual, food, sports, tech, lifestyle, education, travel, health, skincare, comedy, motivational, news, music, and business. Each gets its own visual identity." },
@@ -272,7 +272,7 @@ export default function LandingPage() {
         <div className="nav-inner">
           <a href="/" className="nav-logo">
             <div className="nav-logo-box">VE</div>
-            <span className="nav-logo-text">VideoEngine</span>
+            <span className="nav-logo-text">Vidquence</span>
           </a>
           <div className="nav-right">
             <a href="/about" className="nav-link">About</a>
@@ -474,7 +474,7 @@ export default function LandingPage() {
               <div className="showcase-dot" style={{ background: "#ff5f57" }} />
               <div className="showcase-dot" style={{ background: "#febc2e" }} />
               <div className="showcase-dot" style={{ background: "#28c840" }} />
-              <div className="showcase-title">VideoEngine Studio</div>
+              <div className="showcase-title">Vidquence Studio</div>
             </div>
             <div className="showcase-body">
               <div className="showcase-sidebar">
@@ -516,7 +516,7 @@ export default function LandingPage() {
           <div className="section-label">Watch It Work</div>
           <h2 className="section-h">See the studio<br /><span className="yellow">in action.</span></h2>
           <div className="video-frame" data-reveal>
-            <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="VideoEngine Demo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Vidquence Demo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
           </div>
         </div>
       </section>
@@ -590,14 +590,14 @@ export default function LandingPage() {
       <footer className="footer">
         <div className="container">
           <div className="footer-inner">
-            <a href="/" className="nav-logo"><div className="nav-logo-box">VE</div><span className="nav-logo-text">VideoEngine</span></a>
+            <a href="/" className="nav-logo"><div className="nav-logo-box">VE</div><span className="nav-logo-text">Vidquence</span></a>
             <div className="footer-links">
               <a href="/about" className="footer-link">About</a>
               <a href="/terms" className="footer-link">Terms</a>
               <a href="/privacy" className="footer-link">Privacy</a>
               <a href="/refunds" className="footer-link">Refunds</a>
             </div>
-            <div className="footer-copy">© 2025 VIDEOENGINE</div>
+            <div className="footer-copy">© 2025 VIDQUENCE</div>
           </div>
         </div>
       </footer>

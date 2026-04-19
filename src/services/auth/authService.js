@@ -21,7 +21,9 @@ export async function signIn(email, password) {
 }
 
 export async function signOut() {
-  sessionStorage.removeItem("onboarding_checked");
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith("onboarding_done_")) localStorage.removeItem(k);
+  });
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }

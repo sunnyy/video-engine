@@ -315,16 +315,16 @@ export default function Dashboard() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setUserId(user.id);
-        // Skip if already checked this browser session (prevents re-showing on navigation)
-        if (sessionStorage.getItem("onboarding_checked")) return;
+        const lsKey = `onboarding_done_${user.id}`;
+        // Already confirmed complete this device — skip the DB round-trip
+        if (localStorage.getItem(lsKey)) return;
         getProfile(user.id).then(profile => {
-          sessionStorage.setItem("onboarding_checked", "1");
-          if (!profile || !profile.onboarding_completed) {
+          if (profile?.onboarding_completed) {
+            localStorage.setItem(lsKey, "1");
+          } else {
             setShowOnboarding(true);
           }
-        }).catch(() => {
-          sessionStorage.setItem("onboarding_checked", "1");
-        });
+        }).catch(() => {});
       }
     });
   }, []);
@@ -346,7 +346,10 @@ export default function Dashboard() {
     <div className="flex min-h-screen text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
 
       {showOnboarding && userId && (
-        <Onboarding userId={userId} onComplete={() => setShowOnboarding(false)} />
+        <Onboarding userId={userId} onComplete={() => {
+          localStorage.setItem(`onboarding_done_${userId}`, "1");
+          setShowOnboarding(false);
+        }} />
       )}
 
       {/* ── Sidebar ── */}
@@ -363,7 +366,7 @@ export default function Dashboard() {
             VE
           </div>
           <span className="text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>
-            VideoEngine
+            Vidquence
           </span>
         </div>
 
@@ -421,7 +424,7 @@ export default function Dashboard() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search projects…"
+                placeholder="Search videos…"
                 className="bg-[#111118] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[6px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none w-[200px]"
               />
             )}
@@ -430,7 +433,7 @@ export default function Dashboard() {
               className="flex items-center gap-2 px-4 py-[7px] rounded-[8px] text-[15px] font-bold text-[#0b0b10] border-0 cursor-pointer hover:opacity-90 transition-opacity"
               style={{ background: "#f5c518" }}
             >
-              + New Project
+              + New Video
             </button>
           </div>
         </div>

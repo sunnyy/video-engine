@@ -2,13 +2,13 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sunny17jpr@gmail.com";
-const FROM_EMAIL  = "VideoEngine <onboarding@resend.dev>";
+const FROM_EMAIL  = "Vidquence <onboarding@resend.dev>";
 
 /* ── Base senders ──────────────────────────────────────────── */
 
 export async function sendAdminAlert(subject, html) {
   try {
-    await resend.emails.send({ from: FROM_EMAIL, to: ADMIN_EMAIL, subject: `[VideoEngine] ${subject}`, html });
+    await resend.emails.send({ from: FROM_EMAIL, to: ADMIN_EMAIL, subject: `[Vidquence] ${subject}`, html });
   } catch (err) {
     console.error("[email] Admin alert failed:", err.message);
   }
@@ -29,13 +29,13 @@ function wrap(body) {
     <div style="font-family:'Segoe UI',Arial,sans-serif;background:#0b0b10;padding:40px 0;min-height:100vh">
       <div style="max-width:520px;margin:0 auto;background:#111118;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden">
         <div style="background:#f5c518;padding:18px 32px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px;font-weight:900;color:#0b0b10;letter-spacing:-0.5px">VideoEngine</span>
+          <span style="font-size:18px;font-weight:900;color:#0b0b10;letter-spacing:-0.5px">Vidquence</span>
         </div>
         <div style="padding:32px;color:#e8e8f0;line-height:1.6">
           ${body}
         </div>
         <div style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);font-size:12px;color:#55556a">
-          VideoEngine · This is an automated message.
+          Vidquence · This is an automated message.
         </div>
       </div>
     </div>
@@ -47,7 +47,7 @@ function adminWrap(body) {
     <div style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f4f5;padding:40px 0;min-height:100vh">
       <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden">
         <div style="background:#0b0b10;padding:16px 28px;display:flex;align-items:center;gap:8px">
-          <span style="font-size:14px;font-weight:800;color:#f5c518;letter-spacing:-0.3px">VideoEngine</span>
+          <span style="font-size:14px;font-weight:800;color:#f5c518;letter-spacing:-0.3px">Vidquence</span>
           <span style="font-size:11px;color:#55556a;margin-left:6px;background:rgba(255,255,255,0.07);padding:2px 8px;border-radius:4px">ADMIN</span>
         </div>
         <div style="padding:28px;color:#111118;line-height:1.6">
@@ -157,12 +157,12 @@ export function adminCreditsTopupEmail({ userEmail, amount, balance }) {
 
 export function userWelcomeEmail(name) {
   return {
-    subject: "Welcome to VideoEngine 🎬",
+    subject: "Welcome to Vidquence 🎬",
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Welcome, ${name || "Creator"}!</h2>
       <p style="color:#c8c8d8;margin:0 0 16px">Your account is ready. You've got <strong style="color:#f5c518">50 free credits</strong> to get started — enough to create several AI-powered videos.</p>
       <p style="color:#c8c8d8;margin:0 0 24px">Head to your dashboard and create your first short.</p>
-      <a href="${process.env.APP_URL || "https://videoengine.ai"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Go to Dashboard →</a>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Go to Dashboard →</a>
     `),
   };
 }
@@ -179,19 +179,19 @@ export function userCreditsPurchasedEmail(name, amount, balance) {
         <div style="font-size:36px;font-weight:900;color:#f5c518">${balance}</div>
         <div style="font-size:13px;color:#8888a8">credits</div>
       </div>
-      <a href="${process.env.APP_URL || "https://videoengine.ai"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
     `),
   };
 }
 
 export function userLowCreditsEmail(name, balance) {
   return {
-    subject: "Your VideoEngine credits are running low",
+    subject: "Your Vidquence credits are running low",
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#f97316">Low Credits ⚠️</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">You have <strong style="color:#f97316">${balance} credits</strong> remaining. Top up to keep creating without interruption.</p>
-      <a href="${process.env.APP_URL || "https://videoengine.ai"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Top Up Credits →</a>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Top Up Credits →</a>
     `),
   };
 }

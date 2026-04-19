@@ -96,7 +96,7 @@ function AboutContent() {
           lineHeight: 1.6,
           margin: 0,
         }}>
-          VideoEngine is an AI video production studio for the next generation of creators and businesses.
+          Vidquence is an AI video production studio for the next generation of creators and businesses.
         </p>
       </section>
 
@@ -121,7 +121,7 @@ function AboutContent() {
           maxWidth: 680,
           margin: 0,
         }}>
-          We believe professional-quality video content should be accessible to everyone — from solo creators growing an audience to businesses scaling their brand. VideoEngine was built to close that gap.
+          We believe professional-quality video content should be accessible to everyone — from solo creators growing an audience to businesses scaling their brand. Vidquence was built to close that gap.
         </p>
       </section>
 
@@ -203,7 +203,7 @@ function AboutContent() {
         }}>
           Have a question or feedback?
         </div>
-        <a href="mailto:hello@videoengine.com" style={{
+        <a href="mailto:hello@vidquence.com" style={{
           display: "inline-block",
           background: "#f5c518",
           color: "#0b0b10",
@@ -214,7 +214,7 @@ function AboutContent() {
           borderRadius: 8,
           textDecoration: "none",
         }}>
-          hello@videoengine.com
+          hello@vidquence.com
         </a>
       </section>
 
@@ -247,7 +247,7 @@ export default function About() {
         <aside className="flex flex-col shrink-0 border-r" style={{ width: 220, borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
           <div className="px-4 py-5 flex items-center gap-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
             <div className="w-[32px] h-[22px] flex items-center justify-center rounded-[4px] bg-[#f5c518] text-[#0b0b10] font-bold text-[14px]" style={{ fontFamily: "'Syne',sans-serif" }}>VE</div>
-            <span className="text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>VideoEngine</span>
+            <span className="text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>Vidquence</span>
           </div>
           <nav className="flex-1 px-3 py-4 overflow-y-auto">
             <div className="flex flex-col gap-[2px] mb-5">
@@ -301,7 +301,7 @@ export default function About() {
             borderRadius: 4, background: "#f5c518", color: "#0b0b10", fontWeight: 900, fontSize: 13,
             fontFamily: "'Syne', sans-serif",
           }}>VE</div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 16, color: "#e8e8f0" }}>VideoEngine</span>
+          <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 16, color: "#e8e8f0" }}>Vidquence</span>
         </a>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <a href="/#pricing" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none" }}>Pricing</a>
