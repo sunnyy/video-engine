@@ -3207,14 +3207,20 @@ app.get("/api/image-generation/library", requireAuth, async (req, res) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit)  || 50, 100);
     const offset = parseInt(req.query.offset) || 0;
-    const { data, error } = await supabaseAdmin
-      .from("generated_images")
-      .select("*")
-      .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-    if (error) throw error;
-    res.json({ images: data || [] });
+    const [listRes, countRes] = await Promise.all([
+      supabaseAdmin
+        .from("generated_images")
+        .select("*")
+        .eq("user_id", req.user.id)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1),
+      supabaseAdmin
+        .from("generated_images")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", req.user.id),
+    ]);
+    if (listRes.error) throw listRes.error;
+    res.json({ images: listRes.data || [], total: countRes.count || 0 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

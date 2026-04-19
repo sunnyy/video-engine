@@ -222,6 +222,11 @@ export default function ImageGeneration() {
     if (activeTab === "library" && !libraryFetched) loadLibrary(true);
   }, [activeTab]);
 
+  // Always load library on mount so generate tab shows past images
+  useEffect(() => {
+    if (!libraryFetched) loadLibrary(true);
+  }, []);
+
   const creditCost = count * 2;
   const lockedRatio = TYPE_RATIO[genType] || null;
 
@@ -457,6 +462,33 @@ export default function ImageGeneration() {
                       <ImageCard key={img.id || i} img={{ ...img, prompt }} />
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* My Generated Images — always visible below results */}
+              {library.length > 0 && (
+                <div style={{ marginTop: results.length > 0 ? 32 : 0 }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-[12px] font-bold uppercase tracking-wider" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+                      My Generated Images
+                    </div>
+                    <button onClick={() => loadLibrary(true)}
+                      className="text-[11px] text-[#7c5cfc] bg-transparent border-0 cursor-pointer hover:opacity-80">
+                      Refresh
+                    </button>
+                  </div>
+                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+                    {library.slice(0, 12).map((img, i) => (
+                      <ImageCard key={img.id || i} img={img} onDelete={(id) => removeImage(id)} />
+                    ))}
+                  </div>
+                  {library.length > 12 && (
+                    <button onClick={() => setActiveTab("library")}
+                      className="w-full mt-3 py-[8px] rounded-[8px] text-[12px] border border-[rgba(255,255,255,0.07)] bg-transparent cursor-pointer hover:border-[rgba(124,92,252,0.4)] hover:text-[#a78bfa] transition-all"
+                      style={{ color: "#55556a" }}>
+                      View all {library.length} images →
+                    </button>
+                  )}
                 </div>
               )}
             </div>
