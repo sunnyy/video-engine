@@ -195,8 +195,16 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /* ── Bundle — rebuilt on every render so code changes are always picked up ── */
 async function getBundle() {
+  // Prefer the pre-built bundle (generated locally via `npm run prebundle`).
+  // This avoids spawning esbuild at runtime, which crashes on restricted hosts.
+  const PREBUNDLE_DIR = path.join(PROJECT_ROOT, "remotion-bundle");
+  if (fs.existsSync(path.join(PREBUNDLE_DIR, "index.html"))) {
+    console.log("[bundle] Using pre-built bundle at:", PREBUNDLE_DIR);
+    return PREBUNDLE_DIR;
+  }
+  // Fallback: build at runtime (local dev only).
   const { bundle } = await import("@remotion/bundler");
-  console.log("[bundle] Building bundle...");
+  console.log("[bundle] Building bundle at runtime (dev only)...");
   const result = await bundle({
     entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx"),
     publicDir:  PUBLIC_DIR,
