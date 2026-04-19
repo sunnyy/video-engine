@@ -45,18 +45,23 @@ export default function Checkout() {
   const [rate,    setRate]    = useState(FALLBACK_RATE);
 
   useEffect(() => {
-    // Fetch plan and live rate in parallel
     Promise.all([
-      fetch(`${SERVER}/api/plans`).then(r => r.json()),
+      fetch(`${SERVER}/api/plans`).then(r => { if (!r.ok) throw new Error(`plans ${r.status}`); return r.json(); }),
       fetch(`${SERVER}/api/exchange-rate`).then(r => r.json()).catch(() => ({ rate: FALLBACK_RATE })),
     ]).then(([plans, rateData]) => {
       if (rateData?.rate) setRate(rateData.rate);
-      const found = (Array.isArray(plans) ? plans : []).find(p => p.slug === slug);
-      if (!found) setError("Plan not found. Please go back and choose a plan.");
-      else setPlan(found);
+      const list  = Array.isArray(plans) ? plans : [];
+      // Case-insensitive slug match with whitespace guard
+      const found = list.find(p => p.slug?.trim().toLowerCase() === slug.trim().toLowerCase());
+      if (!found) {
+        const available = list.map(p => p.slug).join(", ");
+        setError(`Plan "${slug}" not found.${available ? ` Available: ${available}` : " No active plans returned from server."}`);
+      } else {
+        setPlan(found);
+      }
       setLoading(false);
-    }).catch(() => {
-      setError("Failed to load plan details.");
+    }).catch(err => {
+      setError(`Failed to load plans: ${err.message}`);
       setLoading(false);
     });
   }, [slug]);
