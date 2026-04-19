@@ -3149,7 +3149,7 @@ app.post("/api/webhooks/user-created", async (req, res) => {
 
 // Serve built frontend — must come after all API routes
 app.use(express.static(path.join(PROJECT_ROOT, "dist")));
-app.get("*", (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(PROJECT_ROOT, "dist", "index.html"));
 });
 
