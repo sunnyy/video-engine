@@ -111,10 +111,14 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
       }));
     };
 
-    measure(); // immediate sync read before first paint
+    measure(); // immediate sync read (may be 0 if flex layout not yet resolved)
+    // Double-rAF ensures we read after the browser has completed layout and paint
+    let raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(measure);
+    });
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
   /* ── Sync active beat with player ── */
