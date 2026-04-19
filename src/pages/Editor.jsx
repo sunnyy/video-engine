@@ -21,6 +21,7 @@ export default function Editor() {
 
   const location = useLocation();
   const [loading, setLoading] = useState(true);
+  const [renderProgress, setRenderProgress] = useState(null); // null = idle, 0-100 = rendering
   const [activeTab, setActiveTab] = useState("beats");
   const [beatTab, setBeatTab] = useState("layout");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
@@ -77,7 +78,48 @@ export default function Editor() {
 
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
-      <Header />
+      <Header progress={renderProgress} setProgress={setRenderProgress} />
+
+      {/* Render lock overlay */}
+      {renderProgress !== null && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "rgba(7,7,16,0.82)",
+          backdropFilter: "blur(4px)",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: 20,
+          pointerEvents: "all",
+        }}>
+          {/* Spinner */}
+          <div style={{
+            width: 56, height: 56, borderRadius: "50%",
+            border: "3px solid rgba(245,197,24,0.15)",
+            borderTopColor: "#f5c518",
+            animation: "spin 0.9s linear infinite",
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#e8e8f0", marginBottom: 6, fontFamily: "'Outfit',sans-serif" }}>
+              Rendering…
+            </div>
+            <div style={{ fontSize: 14, color: "#9494a8", fontFamily: "'JetBrains Mono',monospace" }}>
+              {renderProgress}% complete — please don't close this tab
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ width: 280, height: 4, background: "rgba(255,255,255,0.07)", borderRadius: 99, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: 99,
+              background: "linear-gradient(90deg, #f5c518, #f97316)",
+              width: `${renderProgress}%`,
+              transition: "width 0.4s ease",
+            }} />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-1 flex-col" style={{ width: "65%" }}>

@@ -11,7 +11,7 @@ import { serverFetch } from "../../services/serverApi";
 import { useCreditsStore } from "../../store/useCreditsStore";
 
 
-export default function Header() {
+export default function Header({ progress, setProgress }) {
   const navigate = useNavigate();
   const project = useProjectStore((s) => s.project);
   const databaseId = useProjectStore((s) => s.databaseId);
@@ -21,7 +21,6 @@ export default function Header() {
   const setProjectName = useProjectStore((s) => s.setProjectName);
 
   const [resolution, setResolution] = useState("1080p");
-  const [progress, setProgress] = useState(null);
   const [projectList, setProjectList] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [rendersOpen, setRendersOpen] = useState(false);
