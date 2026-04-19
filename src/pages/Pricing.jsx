@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { SERVER } from "../services/serverApi";
 
-const FALLBACK_RATE = 83;
+const FALLBACK_RATE = 92.60;
 
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;

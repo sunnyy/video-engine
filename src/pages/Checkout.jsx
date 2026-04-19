@@ -9,7 +9,7 @@ import { SERVER, serverFetch } from "../services/serverApi";
 import { supabase } from "../lib/supabase";
 import { useCreditsStore } from "../store/useCreditsStore";
 
-const FALLBACK_RATE = 83;
+const FALLBACK_RATE = 92.60;
 
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;

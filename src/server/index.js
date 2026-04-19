@@ -3647,7 +3647,7 @@ app.get("/api/admin/feedback", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /* ── Exchange rate cache ─────────────────────────────────────────────────── */
-const FALLBACK_RATE   = 83;
+const FALLBACK_RATE   = 92.60;
 const RATE_CACHE_TTL  = 60 * 60 * 1000; // 1 hour
 let   _cachedRate     = null;
 let   _cacheTimestamp = 0;
