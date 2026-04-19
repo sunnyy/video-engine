@@ -464,9 +464,24 @@ app.post("/api/generate-tts", requireAuth, async (req, res) => {
     await normalizeTTS(rawPath, normPath);
     fs.unlinkSync(rawPath);
 
-    const url = `http://localhost:5000/renders/${normName}`;
-    console.log("[TTS] Done (normalized):", url);
-    res.json({ url });
+    // Upload directly to Supabase so the URL is permanent across all environments
+    const storageKey = `tts/${req.user.id}/${normName}`;
+    const normBuffer = fs.readFileSync(normPath);
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from("user-assets")
+      .upload(storageKey, normBuffer, { contentType: "audio/mpeg", upsert: false });
+
+    if (!uploadErr) {
+      fs.unlinkSync(normPath);
+      const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+      console.log("[TTS] Uploaded to Supabase:", publicUrl);
+      res.json({ url: publicUrl });
+    } else {
+      // Fallback: return localhost temp URL (only works in local dev)
+      const url = `http://localhost:5000/renders/${normName}`;
+      console.warn("[TTS] Supabase upload failed, using temp URL:", uploadErr.message);
+      res.json({ url });
+    }
   } catch (err) {
     console.error("[TTS] Error:", err?.message || err);
     res.status(500).json({ error: err?.message || "TTS generation failed" });

@@ -1006,17 +1006,15 @@ export async function generateStructuredShort({
         body:   JSON.stringify({ script, voice: ttsVoice, speed: 1.0 }),
       });
       if (ttsRes.ok) {
-        const ttsData  = await ttsRes.json();
-        const audioRes = await fetch(ttsData.url);
-        const blob     = await audioRes.blob();
-        const file     = new File([blob], `tts-${Date.now()}.mp3`, { type: "audio/mpeg" });
-        const uploaded = await uploadUserAsset(file, "audio", null, "project", projectId);
+        const ttsData = await ttsRes.json();
+        // Server now uploads directly to Supabase and returns a permanent URL.
+        const audioUrl = ttsData.url;
 
         // Sync beat durations to TTS duration
-        const duration = await measureAudioDuration(uploaded.url);
+        const duration = await measureAudioDuration(audioUrl);
         beats = syncBeatsToTTS(beats, duration);
 
-        ttsAudio = { src: uploaded.url, volume: 1, generated: true, voice: ttsVoice };
+        ttsAudio = { src: audioUrl, volume: 1, generated: true, voice: ttsVoice };
       }
     } catch (e) {
       console.warn("[TTS gen] failed:", e.message);
