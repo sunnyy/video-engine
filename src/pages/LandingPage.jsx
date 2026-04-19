@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { signInWithGoogle, getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
 
@@ -233,6 +233,7 @@ const CSS = `
 export default function LandingPage() {
   useReveal();
   const navigate = useNavigate();
+  const location = useLocation();
   const [session, setSession] = useState(null);
   const [plans,   setPlans]   = useState([]);
   const [rate,    setRate]    = useState(FALLBACK_RATE);
@@ -249,6 +250,22 @@ export default function LandingPage() {
       .then(d => { if (d?.rate) setRate(d.rate); })
       .catch(() => {});
   }, []);
+
+  // Scroll to hash section (e.g. /#pricing) on load or navigation
+  useEffect(() => {
+    const hash = location.hash; // e.g. "#pricing"
+    if (!hash) return;
+    const el = document.querySelector(hash);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    } else {
+      // Element may not be rendered yet — retry once after a short delay
+      const t = setTimeout(() => {
+        document.querySelector(hash)?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [location.hash]);
 
   const handleCTA = async () => {
     if (session) { navigate("/dashboard"); return; }
