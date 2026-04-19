@@ -12,12 +12,10 @@ import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
 import { planBeatVisual }         from "./visualPlanner";
 import { getLayoutDef, layoutRegistry, initLayoutRegistry, findLayouts } from "./registries/layoutRegistry";
 import { resolveColors }          from "./colorContrastResolver";
-import { resolvePresetColor, resolvePresetBackground } from "./resolveColor.js";
 import { resolveBeatColors }      from "./elements/colorContrastResolver";
 import { backgroundPatternRegistry, getBackgroundForIntent } from "./registries/backgroundPatternRegistry.js";
 import { getNicheColorFamily, getNicheAvoid } from "./registries/nichePaletteRegistry.js";
 import { pickBeatSFX } from "./registries/sfxRegistry";
-import { textStylePresets }               from "./registries/textStylePresets";
 import { PIPELINE_EFFECTS }              from "./registries/textEffectRegistry.jsx";
 import { PIPELINE_SHINE_EFFECTS }        from "./registries/assetShineRegistry.jsx";
 import { resolveAnimatedBorderForZone }  from "./registries/animatedBorderRegistry.js";
@@ -258,49 +256,11 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
 }
 
 
-function pickPresetForZone(zoneDef, order, intent, energy = 0.5, niche = null) {
-  const role = zoneDef.role || (order === 0 ? "headline" : "subtext");
-
-  // Filter presets that explicitly support this zone role
-  let candidates = textStylePresets.filter(p => p.roles?.includes(role));
-
-  // If niche is set, prefer presets that match (or have no niche restriction)
-  if (niche && candidates.length > 1) {
-    const nicheMatch = candidates.filter(p => !p.niche?.length || p.niche.includes(niche));
-    if (nicheMatch.length > 0) candidates = nicheMatch;
-  }
-
-  // If energy is high, prefer high/explosive presets; if low, prefer calm/low
-  // Handles both string energy ("high") and array energy (["high", "medium"])
-  if (candidates.length > 1) {
-    const energyBucket = energy >= 0.75 ? ["explosive", "high"] : energy <= 0.35 ? ["low", "calm"] : ["medium", "high"];
-    const energyMatch = candidates.filter(p => {
-      const pe = Array.isArray(p.energy) ? p.energy : [p.energy].filter(Boolean);
-      return pe.some(e => energyBucket.includes(e));
-    });
-    if (energyMatch.length > 0) candidates = energyMatch;
-  }
-
-  // Fallback: use all presets if nothing matched
-  if (!candidates.length) candidates = textStylePresets;
-
-  // Stable deterministic pick within the filtered pool
-  const seed = (intent || "").charCodeAt(0) + (zoneDef.id || "").charCodeAt(0);
-  return candidates[seed % candidates.length].id;
-}
-
-/* ── Fill text zones — applies DNA font + color + preset flair ── */
-// Preset is the primary visual identity: fontFamily, fontWeight, textAlign, color.
-// Layout def only controls: fontSize (zone sizing).
-// Presets drive all typography (fontFamily, fontWeight, etc.) — no blanket DNA override.
-// Color resolution: resolvePresetColor() — white presets follow brand/DNA, thematic colors stay fixed.
-// On asset layouts: override to white for readability (thematic non-white colors are kept).
+/* ── Fill text zones — DNA-driven color + typography lock ── */
+// Presets are NOT used in automation. All typography comes from dna.typographySystem
+// via getTypographyForRole(). All color comes from dna.colorStory. Layout zone styles
+// (fontSize, textAlign, letterSpacing) are preserved from the layout definition.
 function fillTextZones(beats, colorOptions = {}) {
-  // Build the context object used by resolvePresetColor / resolvePresetBackground
-  const colorContext = {
-    dna:   colorOptions.dna   || null,
-    brand: { color: colorOptions.brandColor || null, color2: colorOptions.brandColor2 || null },
-  };
 
   // Lock typography system for the whole video — logged once here
   const typographySystem = colorOptions.dna?.typographySystem || null;
@@ -336,61 +296,41 @@ function fillTextZones(beats, colorOptions = {}) {
     textZones.forEach((zoneDef, order) => {
       const existing = zones[zoneDef.id];
 
-      // User manually applied a preset — skip automation styling entirely so it isn't overridden on regeneration.
+      // User manually applied a preset — skip automation styling so it isn't clobbered on regen.
       // NOTE: textShadow correction for _userPreset zones is handled in the separate pass below.
       if (existing?.style?._userPreset) return;
 
-      // Pick a preset for this zone
-      const presetId = pickPresetForZone(zoneDef, order, beat.intent, beat.energy ?? 0.5, colorOptions.niche || null);
-      const preset   = textStylePresets.find(p => p.id === presetId);
-
-      // Presets in automation: used ONLY for color-role resolution (resolvePresetColor,
-      // resolvePresetBackground). Their raw style keys (fontFamily, fontWeight, lineHeight,
-      // etc.) are NOT applied — the DNA typography lock below owns all font decisions.
-      // This prevents per-zone preset variation from breaking visual consistency.
-      const presetFlair = {}; // intentionally empty — no preset style keys in automation
-
-      // Build inject: DNA color + shadow; no preset style pollution.
-      const inject = {};
-
-      // bgIsLight is hoisted above the forEach — computed once per beat from colorOptions.
+      // ── Automation: NO preset involvement ────────────────────────────────────
+      // Presets are for manual user styling only. In automation, all visual decisions
+      // come from DNA / colorStory. This is the only way to guarantee consistency
+      // across zones and beats within one video.
       const paletteText = colorOptions.colorStory?.text || colorOptions.dna?.colorStory?.text || "#ffffff";
       const primary     = colorOptions.colorStory?.primary || colorOptions.dna?.colorStory?.primary || "#7c5cfc";
 
-      if (hasAssetZones) {
-        // Asset layouts: use palette text color (contrast-safe for this niche's bg).
-        inject.color = paletteText;
-        inject.textShadow = bgIsLight
-          ? "none"
-          : (beat.energy >= 0.7
-            ? "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)"
-            : "0 2px 18px rgba(0,0,0,0.9)");
-        delete inject.background; // no bg overlay on asset zones
-      } else {
-        // Non-asset layouts: resolve through three-tier color system.
-        inject.color = resolvePresetColor(preset, colorContext);
+      const inject = {};
 
-        // Resolve background for pill/badge/quote presets (backgroundRole: "primary")
-        const resolvedBg = resolvePresetBackground(preset, colorContext);
-        if (resolvedBg) inject.background = resolvedBg;
+      // Color: always the DNA palette text color — contrast-safe for this niche's bg.
+      inject.color = paletteText;
 
-        if (!bgIsLight && colors.textShadow && colors.textShadow !== "none") {
-          inject.textShadow = colors.textShadow;
-        } else if (bgIsLight) {
-          inject.textShadow = "none";
-        }
+      // Text shadow: DNA-driven, stripped on light backgrounds.
+      if (bgIsLight) {
+        inject.textShadow = "none";
+      } else if (hasAssetZones) {
+        inject.textShadow = beat.energy >= 0.7
+          ? "0 4px 28px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8)"
+          : "0 2px 18px rgba(0,0,0,0.9)";
+      } else if (colors.textShadow && colors.textShadow !== "none") {
+        inject.textShadow = colors.textShadow;
       }
 
-      // WebkitTextStroke: replace hardcoded color with DNA primary
-      if (inject.textStrokeColor || presetFlair.textStrokeColor) {
-        inject.textStrokeColor = primary;
-      }
-      if (inject.WebkitTextStrokeColor || presetFlair.WebkitTextStrokeColor) {
+      // No automatic background on text zones — pill/badge BGs are designer-set in
+      // the layout zone style, not injected per zone by automation.
+
+      // WebkitTextStroke: keep if zoneDef has it, tinted to DNA primary
+      if (zoneDef.style?.WebkitTextStrokeColor || zoneDef.style?.textStrokeColor) {
         inject.WebkitTextStrokeColor = primary;
+        inject.textStrokeColor       = primary;
       }
-
-      // Store which preset was applied so ZoneEditor can highlight it
-      inject._presetId = presetId;
 
       // Assign a default text effect if the zone doesn't already have one
       if (!existing?.style?.textEffect) {
@@ -400,9 +340,9 @@ function fillTextZones(beats, colorOptions = {}) {
 
       const existingContent = existing?.content || { kind: "text", text: "" };
 
-      // Separate visual style from pipeline metadata so metadata doesn't get wiped
-      // by zoneDef.style spreading over it.
-      const { _presetId, textEffect, ...injectVisualStyle } = inject;
+      // Pull textEffect out so it's handled separately; no _presetId in automation.
+      const { textEffect, ...injectVisualStyle } = inject;
+      const _presetId = null; // no preset applied in automation
 
       // Merge order (lowest → highest priority):
       //   injectVisualStyle  — preset flair + DNA colors as the baseline
