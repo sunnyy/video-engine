@@ -255,6 +255,14 @@ const Icons = {
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
     </svg>
   ),
+  mic: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="2" width="6" height="11" rx="3"/>
+      <path d="M5 10a7 7 0 0014 0"/>
+      <line x1="12" y1="21" x2="12" y2="17"/>
+      <line x1="9" y1="21" x2="15" y2="21"/>
+    </svg>
+  ),
 };
 
 /* ── Sidebar nav item ── */
@@ -367,6 +375,7 @@ export default function Dashboard() {
           <div className="flex flex-col gap-[2px] mb-5">
             <NavItem icon={Icons.folder}  label="Videos"  active={location.pathname === "/dashboard"}      onClick={() => navigate("/dashboard")} />
             <NavItem icon={Icons.gallery} label="Images"  active={location.pathname === "/image-generation"} onClick={() => navigate("/image-generation")} />
+            <NavItem icon={Icons.mic}     label="Transcribe" active={location.pathname === "/transcription"}  onClick={() => navigate("/transcription")} />
             <NavItem icon={Icons.box}     label="Assets"  active={location.pathname === "/assets"}           onClick={() => navigate("/assets")} />
             <NavItem icon={Icons.credits} label="Credits" active={location.pathname === "/credits"}          onClick={() => navigate("/credits")} />
           </div>

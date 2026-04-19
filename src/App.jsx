@@ -25,6 +25,7 @@ import LayoutManager   from "./pages/admin/LayoutManager";
 import LayoutEditor    from "./pages/admin/LayoutEditor";
 import LayoutGenerator from "./pages/admin/LayoutGenerator";
 import ImageGeneration from "./pages/ImageGeneration";
+import Transcription   from "./pages/Transcription";
 import Assets          from "./pages/Assets";
 import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
@@ -104,6 +105,7 @@ export default function App() {
             <Route path="/dashboard"        element={<Dashboard />} />
             <Route path="/new"              element={<AIGenerator />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
+            <Route path="/transcription"    element={<Transcription />} />
             <Route path="/assets"           element={<Assets />} />
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />

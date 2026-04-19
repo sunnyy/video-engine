@@ -1646,6 +1646,128 @@ app.post("/api/transcribe", requireAuth, upload.single("video"), async (req, res
   }
 });
 
+/* ── Transcription Service ─────────────────────────────────────────── */
+
+const uploadTranscription = multer({
+  dest: TEMP_DIR,
+  limits: { fileSize: 500 * 1024 * 1024 },
+});
+
+function getFileDuration(filePath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) reject(err);
+      else resolve(metadata?.format?.duration || 0);
+    });
+  });
+}
+
+app.post("/api/transcription/transcribe", requireAuth, uploadTranscription.single("file"), async (req, res) => {
+  const tempFiles = [];
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    tempFiles.push(req.file.path);
+
+    let durationSeconds = 0;
+    try {
+      durationSeconds = await getFileDuration(req.file.path);
+    } catch (e) {
+      console.warn("[transcription] ffprobe failed, defaulting to 60s:", e.message);
+      durationSeconds = 60;
+    }
+
+    const creditsUsed = Math.max(2, Math.ceil(durationSeconds / 60) * 2);
+    const deduction = await deductCredits(req.user.id, creditsUsed, "transcription_service", "Transcription service", null);
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+    // Extract audio — Whisper works on audio only, keeps file small
+    const audioPath = req.file.path + ".mp3";
+    tempFiles.push(audioPath);
+    await new Promise((resolve, reject) => {
+      ffmpeg(req.file.path)
+        .noVideo()
+        .audioCodec("libmp3lame")
+        .audioBitrate("64k")
+        .audioChannels(1)
+        .on("end", resolve)
+        .on("error", reject)
+        .save(audioPath);
+    });
+
+    const transcription = await openai.audio.transcriptions.create({
+      file:            fs.createReadStream(audioPath),
+      model:           "whisper-1",
+      response_format: "verbose_json",
+      timestamp_granularities: ["segment"],
+    });
+
+    const transcript = transcription.text || "";
+    const segments   = (transcription.segments || []).map(s => ({
+      start: s.start ?? 0,
+      end:   s.end   ?? 0,
+      text:  s.text?.trim() || "",
+    })).filter(s => s.text);
+    const language   = transcription.language || "en";
+
+    const { data: record, error: insertErr } = await supabaseAdmin
+      .from("transcriptions")
+      .insert({
+        user_id:          req.user.id,
+        file_name:        req.file.originalname || req.file.filename,
+        duration_seconds: Math.round(durationSeconds),
+        credits_used:     creditsUsed,
+        transcript,
+        segments,
+        language,
+      })
+      .select()
+      .single();
+    if (insertErr) console.error("[transcription] DB insert:", insertErr.message);
+
+    res.json({
+      id:               record?.id,
+      transcript,
+      segments,
+      language,
+      duration_seconds: Math.round(durationSeconds),
+      credits_used:     creditsUsed,
+    });
+  } catch (err) {
+    console.error("[transcription]", err.message);
+    res.status(500).json({ error: err.message || "Transcription failed" });
+  } finally {
+    tempFiles.forEach(f => { try { fs.unlinkSync(f); } catch {} });
+  }
+});
+
+app.get("/api/transcription/history", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("transcriptions")
+      .select("id, file_name, duration_seconds, credits_used, transcript, segments, language, created_at")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json({ transcriptions: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/transcription/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error: fetchErr } = await supabaseAdmin
+      .from("transcriptions").select("user_id").eq("id", id).single();
+    if (fetchErr || !data) return res.status(404).json({ error: "Not found" });
+    if (data.user_id !== req.user.id) return res.status(403).json({ error: "Forbidden" });
+    await supabaseAdmin.from("transcriptions").delete().eq("id", id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── Admin: AI Layout Generation ─────────────────────────────────── */
 
 // POST /api/admin/generate-concepts — GPT-4o generates layout concept sketches

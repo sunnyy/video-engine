@@ -2011,7 +2011,7 @@ function RemoveBgSection({ src, onDone }) {
     <Section title="Background Removal" icon="✂️" defaultOpen={false}>
       <div className="flex flex-col gap-3">
         <div className="text-[11px] text-[#55556a] leading-relaxed">
-          Remove the background from this image using AI. The result will replace the current image with a transparent PNG.
+          Remove the background from this image. The result will replace the current image with a transparent PNG.
         </div>
         {state.error && (
           <div className="text-[11px] text-[#f87171]">{state.error}</div>
