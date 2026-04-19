@@ -3646,6 +3646,40 @@ app.get("/api/admin/feedback", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/* ── Exchange rate cache ─────────────────────────────────────────────────── */
+const FALLBACK_RATE   = 83;
+const RATE_CACHE_TTL  = 60 * 60 * 1000; // 1 hour
+let   _cachedRate     = null;
+let   _cacheTimestamp = 0;
+
+async function getUSDtoINR() {
+  const now = Date.now();
+  if (_cachedRate && (now - _cacheTimestamp) < RATE_CACHE_TTL) return _cachedRate;
+  try {
+    const r = await fetch("https://api.exchangerate-api.com/v4/latest/USD", { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) throw new Error("non-ok response");
+    const data = await r.json();
+    const rate = data?.rates?.INR;
+    if (!rate || typeof rate !== "number") throw new Error("no INR rate");
+    _cachedRate     = rate;
+    _cacheTimestamp = now;
+    return rate;
+  } catch {
+    console.warn("[exchange-rate] fetch failed, using fallback", FALLBACK_RATE);
+    return FALLBACK_RATE;
+  }
+}
+
+/** GET /api/exchange-rate — live USD→INR rate, cached 1 hour */
+app.get("/api/exchange-rate", async (_req, res) => {
+  try {
+    const rate = await getUSDtoINR();
+    res.json({ rate, timestamp: Date.now() });
+  } catch (err) {
+    res.json({ rate: FALLBACK_RATE, timestamp: Date.now() });
+  }
+});
+
 /* ── Payments: Razorpay ──────────────────────────────────────────────────── */
 function getRazorpay() {
   return new Razorpay({
@@ -3657,7 +3691,7 @@ function getRazorpay() {
 /** POST /api/payments/create-order — create a Razorpay order for a plan */
 app.post("/api/payments/create-order", requireAuth, async (req, res) => {
   try {
-    const { planSlug, billingCycle } = req.body;
+    const { planSlug, billingCycle, exchangeRate: clientRate } = req.body;
     if (!planSlug || !billingCycle) return res.status(400).json({ error: "planSlug and billingCycle required" });
 
     const { data: plan, error } = await supabaseAdmin
@@ -3668,10 +3702,14 @@ app.post("/api/payments/create-order", requireAuth, async (req, res) => {
       .single();
     if (error || !plan) return res.status(404).json({ error: "Plan not found" });
 
+    // Use client-provided rate only if it looks sane (50–150); otherwise fetch server-side
+    const rate = (typeof clientRate === "number" && clientRate >= 50 && clientRate <= 150)
+      ? clientRate
+      : await getUSDtoINR();
+
     const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
     const discounted = plan.discount_percent > 0 ? baseUSD * (1 - plan.discount_percent / 100) : baseUSD;
-    const amountINR  = +(discounted * 83).toFixed(2); // USD → INR
-    const amountPaise = Math.round(amountINR * 100);
+    const amountPaise = Math.round(discounted * rate * 100);
 
     const razorpay = getRazorpay();
     const order = await razorpay.orders.create({
@@ -3729,7 +3767,8 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
 
     const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
     const discounted = plan.discount_percent > 0 ? baseUSD * (1 - plan.discount_percent / 100) : baseUSD;
-    const amountINR  = +(discounted * 83).toFixed(2);
+    const rate       = await getUSDtoINR();
+    const amountINR  = +(discounted * rate).toFixed(2);
 
     const now = new Date();
     const periodDays = billingCycle === "annual" ? 365 : 30;

@@ -1,7 +1,7 @@
 /**
  * Checkout.jsx
  * src/pages/Checkout.jsx
- * Auth-protected checkout with Razorpay payment.
+ * Auth-protected checkout with Razorpay payment and live USD→INR rate.
  */
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -9,16 +9,14 @@ import { SERVER, serverFetch } from "../services/serverApi";
 import { supabase } from "../lib/supabase";
 import { useCreditsStore } from "../store/useCreditsStore";
 
-const USD_TO_INR = 83;
+const FALLBACK_RATE = 83;
 
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;
   return +(base * (1 - discountPct / 100)).toFixed(2);
 }
 
-function toINR(usd) {
-  return Math.round(usd * USD_TO_INR);
-}
+function toINR(usd, rate) { return Math.round(usd * rate); }
 
 function loadRazorpayScript() {
   return new Promise(resolve => {
@@ -43,18 +41,24 @@ export default function Checkout() {
   const [loading, setLoading] = useState(true);
   const [paying,  setPaying]  = useState(false);
   const [error,   setError]   = useState("");
-  const [success, setSuccess] = useState(null); // { credits, balance }
+  const [success, setSuccess] = useState(null);
+  const [rate,    setRate]    = useState(FALLBACK_RATE);
 
   useEffect(() => {
-    fetch(`${SERVER}/api/plans`)
-      .then(r => r.json())
-      .then(plans => {
-        const found = (Array.isArray(plans) ? plans : []).find(p => p.slug === slug);
-        if (!found) setError("Plan not found. Please go back and choose a plan.");
-        else setPlan(found);
-        setLoading(false);
-      })
-      .catch(() => { setError("Failed to load plan details."); setLoading(false); });
+    // Fetch plan and live rate in parallel
+    Promise.all([
+      fetch(`${SERVER}/api/plans`).then(r => r.json()),
+      fetch(`${SERVER}/api/exchange-rate`).then(r => r.json()).catch(() => ({ rate: FALLBACK_RATE })),
+    ]).then(([plans, rateData]) => {
+      if (rateData?.rate) setRate(rateData.rate);
+      const found = (Array.isArray(plans) ? plans : []).find(p => p.slug === slug);
+      if (!found) setError("Plan not found. Please go back and choose a plan.");
+      else setPlan(found);
+      setLoading(false);
+    }).catch(() => {
+      setError("Failed to load plan details.");
+      setLoading(false);
+    });
   }, [slug]);
 
   // Redirect after success
@@ -84,10 +88,10 @@ export default function Checkout() {
     );
   }
 
-  const basePrice    = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
-  const finalUSD     = calcPrice(basePrice, plan.discount_percent);
-  const finalINR     = toINR(finalUSD);
-  const originalINR  = toINR(basePrice);
+  const baseUSD      = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
+  const finalUSD     = calcPrice(baseUSD, plan.discount_percent);
+  const finalINR     = toINR(finalUSD, rate);
+  const originalINR  = toINR(baseUSD, rate);
   const saved        = plan.discount_percent > 0;
   const features     = Array.isArray(plan.features) ? plan.features : [];
   const cycleLabel   = cycle === "annual" ? "year" : "month";
@@ -96,11 +100,11 @@ export default function Checkout() {
     setError("");
     setPaying(true);
     try {
-      // 1. Get Razorpay order from server
+      // 1. Create Razorpay order — pass client-side rate so server uses same value
       const orderRes = await serverFetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planSlug: slug, billingCycle: cycle }),
+        body: JSON.stringify({ planSlug: slug, billingCycle: cycle, exchangeRate: rate }),
       });
       if (!orderRes.ok) {
         const e = await orderRes.json();
@@ -134,7 +138,6 @@ export default function Checkout() {
           },
           handler: async (response) => {
             try {
-              // 5. Verify payment on server
               const verifyRes = await serverFetch("/api/payments/verify", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -152,7 +155,6 @@ export default function Checkout() {
                 return;
               }
               const data = await verifyRes.json();
-              // Refresh credits in store
               fetchCredits();
               resolve(data);
             } catch (e) {
@@ -243,7 +245,10 @@ export default function Checkout() {
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
                   <span style={{ color: "#9494a8" }}>Original</span>
-                  <span style={{ color: "#55556a", textDecoration: "line-through" }}>₹{originalINR}/{cycleLabel}</span>
+                  <span style={{ color: "#55556a" }}>
+                    <s>${baseUSD}/{cycleLabel}</s>
+                    <span style={{ marginLeft: 8, fontSize: 12 }}>≈ <s>₹{originalINR}</s></span>
+                  </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
                   <span style={{ color: "#9494a8" }}>Discount</span>
@@ -252,9 +257,14 @@ export default function Checkout() {
               </>
             )}
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 20, fontWeight: 800 }}>
-              <span style={{ color: "#e8e8f0" }}>Total</span>
-              <span style={{ color: "#f5c518" }}>₹{finalINR}/{cycleLabel}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <span style={{ fontSize: 18, fontWeight: 800, color: "#e8e8f0" }}>Total</span>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, color: "#f5c518", lineHeight: 1 }}>
+                  ${finalUSD}<span style={{ fontSize: 16, color: "#9494a8" }}>/{cycleLabel}</span>
+                </div>
+                <div style={{ fontSize: 13, color: "#55556a" }}>≈ ₹{finalINR}/{cycleLabel}</div>
+              </div>
             </div>
           </div>
 
@@ -276,6 +286,11 @@ export default function Checkout() {
               ))}
             </ul>
           )}
+
+          {/* Live rate note */}
+          <div style={{ fontSize: 11, color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+            Live rate: 1 USD = ₹{rate.toFixed(2)}
+          </div>
         </div>
 
         {/* ── Payment ── */}
@@ -293,10 +308,12 @@ export default function Checkout() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 13, color: "#9494a8" }}>{plan.name} · {cycle}</div>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 44, color: "#f5c518", lineHeight: 1 }}>₹{finalINR}</div>
-                <div style={{ fontSize: 13, color: "#55556a" }}>per {cycleLabel}</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 44, color: "#f5c518", lineHeight: 1 }}>
+                  ₹{finalINR}
+                </div>
+                <div style={{ fontSize: 13, color: "#55556a" }}>${finalUSD} per {cycleLabel}</div>
               </div>
-              <div style={{ fontSize: 40, opacity: 0.6 }}>💳</div>
+              <div style={{ fontSize: 40, opacity: 0.5 }}>💳</div>
             </div>
 
             {error && (

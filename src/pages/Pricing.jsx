@@ -1,20 +1,20 @@
 /**
  * Pricing.jsx
  * src/pages/Pricing.jsx
- * Public pricing page — fetches live plans from DB.
+ * Public pricing page — fetches live plans + live USD→INR rate from server.
  */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { SERVER } from "../services/serverApi";
 
-const USD_TO_INR = 83;
+const FALLBACK_RATE = 83;
 
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;
   return +(base * (1 - discountPct / 100)).toFixed(2);
 }
 
-function toINR(usd) { return Math.round(usd * USD_TO_INR); }
+function toINR(usd, rate) { return Math.round(usd * rate); }
 
 function StarIcon() {
   return (
@@ -27,32 +27,32 @@ function StarIcon() {
 export default function Pricing() {
   const navigate = useNavigate();
   const [plans,   setPlans]   = useState([]);
-  const [cycle,   setCycle]   = useState("monthly"); // monthly | annual
+  const [cycle,   setCycle]   = useState("monthly");
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
+  const [rate,    setRate]    = useState(FALLBACK_RATE);
 
   useEffect(() => {
     fetch(`${SERVER}/api/plans`)
       .then(r => r.json())
       .then(d => { setPlans(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => { setError("Failed to load plans."); setLoading(false); });
+
+    fetch(`${SERVER}/api/exchange-rate`)
+      .then(r => r.json())
+      .then(d => { if (d?.rate) setRate(d.rate); })
+      .catch(() => {});
   }, []);
 
-  const activePlans = plans
-    .sort((a, b) => (a.sort_order ?? 99) - (b.sort_order ?? 99));
+  const activePlans = plans.sort((a, b) => (a.sort_order ?? 99) - (b.sort_order ?? 99));
 
-  const getPrice = (plan) => {
+  const getUSD = (plan) => {
     const base = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
     return calcPrice(base, plan.discount_percent);
   };
-  const getOriginal = (plan) => cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
+  const getUSDOriginal = (plan) => cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
 
-  const handleCTA = (plan) => {
-    navigate(`/checkout?plan=${plan.slug}&cycle=${cycle}`);
-  };
-
-  const getINRPrice    = (plan) => toINR(getPrice(plan));
-  const getINROriginal = (plan) => toINR(getOriginal(plan));
+  const handleCTA = (plan) => navigate(`/checkout?plan=${plan.slug}&cycle=${cycle}`);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0b0b10", color: "#e8e8f0", fontFamily: "'Outfit', sans-serif" }}>
@@ -86,7 +86,7 @@ export default function Pricing() {
         </p>
 
         {/* Billing toggle */}
-        <div style={{ display: "inline-flex", background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 4, gap: 4 }}>
+        <div style={{ display: "inline-flex", background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 4, gap: 4, marginBottom: 8 }}>
           {["monthly", "annual"].map(c => (
             <button key={c} onClick={() => setCycle(c)}
               style={{
@@ -100,6 +100,11 @@ export default function Pricing() {
               {c === "annual" && <span style={{ fontSize: 11, marginLeft: 6, color: cycle === "annual" ? "#0b0b10" : "#f5c518" }}>Save more</span>}
             </button>
           ))}
+        </div>
+
+        {/* Live rate note */}
+        <div style={{ fontSize: 12, color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+          Live rate: 1 USD = ₹{rate.toFixed(2)}
         </div>
       </div>
 
@@ -123,22 +128,24 @@ export default function Pricing() {
             gap: 24,
           }}>
             {activePlans.map(plan => {
-              const price    = getPrice(plan);
-              const original = getOriginal(plan);
-              const saved    = plan.discount_percent > 0;
-              const isPopular = plan.is_popular;
-              const features  = Array.isArray(plan.features) ? plan.features : [];
+              const usdPrice    = getUSD(plan);
+              const usdOriginal = getUSDOriginal(plan);
+              const inrPrice    = toINR(usdPrice, rate);
+              const inrOriginal = toINR(usdOriginal, rate);
+              const saved       = plan.discount_percent > 0;
+              const isPopular   = plan.is_popular;
+              const features    = Array.isArray(plan.features) ? plan.features : [];
 
               return (
                 <div key={plan.id} style={{
-                  background:   isPopular ? "rgba(245,197,24,0.04)" : "#111118",
-                  border:       isPopular ? "2px solid #f5c518" : "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 20,
-                  padding:      "32px 28px",
-                  display:      "flex",
-                  flexDirection:"column",
-                  gap:          20,
-                  position:     "relative",
+                  background:    isPopular ? "rgba(245,197,24,0.04)" : "#111118",
+                  border:        isPopular ? "2px solid #f5c518" : "1px solid rgba(255,255,255,0.08)",
+                  borderRadius:  20,
+                  padding:       "32px 28px",
+                  display:       "flex",
+                  flexDirection: "column",
+                  gap:           20,
+                  position:      "relative",
                 }}>
                   {isPopular && (
                     <div style={{
@@ -162,25 +169,31 @@ export default function Pricing() {
                     )}
                   </div>
 
-                  {/* Price */}
+                  {/* Price — USD primary, INR secondary */}
                   <div>
                     {saved && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 16, color: "#55556a", textDecoration: "line-through" }}>
-                          ₹{getINROriginal(plan)}{cycle === "annual" ? "/yr" : "/mo"}
+                        <span style={{ fontSize: 14, color: "#55556a", textDecoration: "line-through" }}>
+                          ${usdOriginal}{cycle === "annual" ? "/yr" : "/mo"}
                         </span>
                         <span style={{ fontSize: 12, fontWeight: 700, background: "rgba(245,197,24,0.15)", color: "#f5c518", padding: "2px 8px", borderRadius: 99 }}>
                           Save {plan.discount_percent}%
                         </span>
                       </div>
                     )}
-                    <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
                       <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, color: isPopular ? "#f5c518" : "#e8e8f0", lineHeight: 1 }}>
-                        ₹{getINRPrice(plan)}
+                        ${usdPrice}
                       </span>
                       <span style={{ fontSize: 15, color: "#9494a8", paddingBottom: 8 }}>
                         /{cycle === "annual" ? "yr" : "mo"}
                       </span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#55556a", marginTop: 2 }}>
+                      {saved
+                        ? <>≈ <s>₹{inrOriginal}</s> ₹{inrPrice}{cycle === "annual" ? "/yr" : "/mo"}</>
+                        : <>≈ ₹{inrPrice}{cycle === "annual" ? "/yr" : "/mo"}</>
+                      }
                     </div>
                   </div>
 
@@ -206,7 +219,7 @@ export default function Pricing() {
                   <button
                     onClick={() => handleCTA(plan)}
                     style={{
-                      marginTop: "auto",
+                      marginTop:    "auto",
                       background:   isPopular ? "#f5c518" : "rgba(245,197,24,0.1)",
                       color:        isPopular ? "#0b0b10" : "#f5c518",
                       border:       isPopular ? "none" : "1px solid rgba(245,197,24,0.3)",
