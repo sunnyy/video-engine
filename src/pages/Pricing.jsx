@@ -7,10 +7,14 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { SERVER } from "../services/serverApi";
 
+const USD_TO_INR = 83;
+
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;
   return +(base * (1 - discountPct / 100)).toFixed(2);
 }
+
+function toINR(usd) { return Math.round(usd * USD_TO_INR); }
 
 function StarIcon() {
   return (
@@ -46,6 +50,9 @@ export default function Pricing() {
   const handleCTA = (plan) => {
     navigate(`/checkout?plan=${plan.slug}&cycle=${cycle}`);
   };
+
+  const getINRPrice    = (plan) => toINR(getPrice(plan));
+  const getINROriginal = (plan) => toINR(getOriginal(plan));
 
   return (
     <div style={{ minHeight: "100vh", background: "#0b0b10", color: "#e8e8f0", fontFamily: "'Outfit', sans-serif" }}>
@@ -160,7 +167,7 @@ export default function Pricing() {
                     {saved && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                         <span style={{ fontSize: 16, color: "#55556a", textDecoration: "line-through" }}>
-                          ${original}{cycle === "annual" ? "/yr" : "/mo"}
+                          ₹{getINROriginal(plan)}{cycle === "annual" ? "/yr" : "/mo"}
                         </span>
                         <span style={{ fontSize: 12, fontWeight: 700, background: "rgba(245,197,24,0.15)", color: "#f5c518", padding: "2px 8px", borderRadius: 99 }}>
                           Save {plan.discount_percent}%
@@ -169,7 +176,7 @@ export default function Pricing() {
                     )}
                     <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
                       <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, color: isPopular ? "#f5c518" : "#e8e8f0", lineHeight: 1 }}>
-                        ${price}
+                        ₹{getINRPrice(plan)}
                       </span>
                       <span style={{ fontSize: 15, color: "#9494a8", paddingBottom: 8 }}>
                         /{cycle === "annual" ? "yr" : "mo"}

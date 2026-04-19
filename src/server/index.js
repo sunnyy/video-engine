@@ -20,8 +20,10 @@ import {
   userWelcomeEmail, userCreditsPurchasedEmail, userLowCreditsEmail,
 } from "./services/emailService.js";
 import axios from "axios";
-import https from "node:https";
-import http  from "node:http";
+import https   from "node:https";
+import http    from "node:http";
+import crypto  from "node:crypto";
+import Razorpay from "razorpay";
 import { fileURLToPath } from "url";
 
 console.log("Server starting...", new Date().toISOString());
@@ -3640,6 +3642,151 @@ app.get("/api/admin/feedback", requireAuth, requireAdmin, async (req, res) => {
     res.json({ feedback, averageRating: avgRating });
   } catch (err) {
     console.error("[admin/feedback]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Payments: Razorpay ──────────────────────────────────────────────────── */
+function getRazorpay() {
+  return new Razorpay({
+    key_id:     process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+}
+
+/** POST /api/payments/create-order — create a Razorpay order for a plan */
+app.post("/api/payments/create-order", requireAuth, async (req, res) => {
+  try {
+    const { planSlug, billingCycle } = req.body;
+    if (!planSlug || !billingCycle) return res.status(400).json({ error: "planSlug and billingCycle required" });
+
+    const { data: plan, error } = await supabaseAdmin
+      .from("plans")
+      .select("id, name, slug, price_monthly, price_annual, discount_percent, credits")
+      .eq("slug", planSlug)
+      .eq("is_active", true)
+      .single();
+    if (error || !plan) return res.status(404).json({ error: "Plan not found" });
+
+    const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
+    const discounted = plan.discount_percent > 0 ? baseUSD * (1 - plan.discount_percent / 100) : baseUSD;
+    const amountINR  = +(discounted * 83).toFixed(2); // USD → INR
+    const amountPaise = Math.round(amountINR * 100);
+
+    const razorpay = getRazorpay();
+    const order = await razorpay.orders.create({
+      amount:   amountPaise,
+      currency: "INR",
+      receipt:  `order_${uuidv4().slice(0, 8)}`,
+      notes: {
+        user_id:       req.user.id,
+        plan_slug:     planSlug,
+        billing_cycle: billingCycle,
+      },
+    });
+
+    res.json({
+      orderId:      order.id,
+      amount:       amountPaise,
+      currency:     "INR",
+      keyId:        process.env.RAZORPAY_KEY_ID,
+      planName:     plan.name,
+      planSlug,
+      billingCycle,
+    });
+  } catch (err) {
+    console.error("[payments/create-order]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** POST /api/payments/verify — verify signature, provision credits, insert subscription */
+app.post("/api/payments/verify", requireAuth, async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planSlug, billingCycle } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !planSlug) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Verify Razorpay signature
+    const expected = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
+
+    if (expected !== razorpay_signature) {
+      return res.status(400).json({ error: "Payment verification failed" });
+    }
+
+    // Fetch plan
+    const { data: plan, error } = await supabaseAdmin
+      .from("plans")
+      .select("id, name, price_monthly, price_annual, discount_percent, credits")
+      .eq("slug", planSlug)
+      .eq("is_active", true)
+      .single();
+    if (error || !plan) return res.status(404).json({ error: "Plan not found" });
+
+    const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
+    const discounted = plan.discount_percent > 0 ? baseUSD * (1 - plan.discount_percent / 100) : baseUSD;
+    const amountINR  = +(discounted * 83).toFixed(2);
+
+    const now = new Date();
+    const periodDays = billingCycle === "annual" ? 365 : 30;
+    const periodEnd  = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
+
+    // Insert subscription record
+    await supabaseAdmin.from("subscriptions").insert({
+      user_id:                req.user.id,
+      plan_id:                plan.id,
+      status:                 "active",
+      billing_cycle:          billingCycle,
+      price_paid:             amountINR,
+      credits_granted:        plan.credits,
+      current_period_start:   now.toISOString(),
+      current_period_end:     periodEnd.toISOString(),
+      razorpay_payment_id,
+      razorpay_subscription_id: razorpay_order_id,
+    });
+
+    // Add credits
+    const { balance: newBalance } = await addCredits(
+      req.user.id, plan.credits, "purchase", "plan_subscription",
+      `${plan.name} plan – ${billingCycle}`, razorpay_payment_id,
+    );
+
+    // Emails (fire-and-forget)
+    supabaseAdmin.auth.admin.getUserById(req.user.id).then(({ data: { user } }) => {
+      if (!user) return;
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+      const adminEmail = adminNewSaleEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2), credits: plan.credits });
+      sendAdminAlert(adminEmail.subject, adminEmail.html);
+      const userEmail = userCreditsPurchasedEmail(name, plan.credits, newBalance);
+      sendUserEmail(user.email, userEmail.subject, userEmail.html);
+    }).catch(() => {});
+
+    res.json({ success: true, credits: plan.credits, balance: newBalance });
+  } catch (err) {
+    console.error("[payments/verify]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** GET /api/payments/subscription — active subscription for this user */
+app.get("/api/payments/subscription", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, status, billing_cycle, price_paid, credits_granted, current_period_start, current_period_end, razorpay_payment_id, plans(name, slug, credits)")
+      .eq("user_id", req.user.id)
+      .eq("status", "active")
+      .order("current_period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    res.json({ subscription: data || null });
+  } catch (err) {
+    console.error("[payments/subscription]", err.message);
     res.status(500).json({ error: err.message });
   }
 });

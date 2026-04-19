@@ -1,38 +1,68 @@
 /**
  * Checkout.jsx
  * src/pages/Checkout.jsx
- * Auth-protected checkout — reads ?plan=SLUG&cycle=monthly|annual from URL.
+ * Auth-protected checkout with Razorpay payment.
  */
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { SERVER } from "../services/serverApi";
+import { SERVER, serverFetch } from "../services/serverApi";
+import { supabase } from "../lib/supabase";
+import { useCreditsStore } from "../store/useCreditsStore";
+
+const USD_TO_INR = 83;
 
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;
   return +(base * (1 - discountPct / 100)).toFixed(2);
 }
 
+function toINR(usd) {
+  return Math.round(usd * USD_TO_INR);
+}
+
+function loadRazorpayScript() {
+  return new Promise(resolve => {
+    if (window.Razorpay) return resolve(true);
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload  = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
+
 export default function Checkout() {
-  const navigate      = useNavigate();
-  const [params]      = useSearchParams();
-  const slug          = params.get("plan") || "";
-  const cycle         = params.get("cycle") === "annual" ? "annual" : "monthly";
+  const navigate        = useNavigate();
+  const [params]        = useSearchParams();
+  const slug            = params.get("plan") || "";
+  const [cycle, setCycle] = useState(params.get("cycle") === "annual" ? "annual" : "monthly");
+
+  const { fetchCredits } = useCreditsStore();
 
   const [plan,    setPlan]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const [paying,  setPaying]  = useState(false);
   const [error,   setError]   = useState("");
+  const [success, setSuccess] = useState(null); // { credits, balance }
 
   useEffect(() => {
     fetch(`${SERVER}/api/plans`)
       .then(r => r.json())
       .then(plans => {
-        const found = (Array.isArray(plans) ? plans : []).find(p => p.slug === slug && p.is_active);
+        const found = (Array.isArray(plans) ? plans : []).find(p => p.slug === slug);
         if (!found) setError("Plan not found. Please go back and choose a plan.");
         else setPlan(found);
         setLoading(false);
       })
       .catch(() => { setError("Failed to load plan details."); setLoading(false); });
   }, [slug]);
+
+  // Redirect after success
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => navigate("/dashboard"), 3000);
+    return () => clearTimeout(t);
+  }, [success, navigate]);
 
   if (loading) {
     return (
@@ -54,12 +84,114 @@ export default function Checkout() {
     );
   }
 
-  const basePrice  = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
-  const finalPrice = calcPrice(basePrice, plan.discount_percent);
-  const saved      = plan.discount_percent > 0;
-  const features   = Array.isArray(plan.features) ? plan.features : [];
-  const cycleLabel = cycle === "annual" ? "year" : "month";
+  const basePrice    = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
+  const finalUSD     = calcPrice(basePrice, plan.discount_percent);
+  const finalINR     = toINR(finalUSD);
+  const originalINR  = toINR(basePrice);
+  const saved        = plan.discount_percent > 0;
+  const features     = Array.isArray(plan.features) ? plan.features : [];
+  const cycleLabel   = cycle === "annual" ? "year" : "month";
 
+  async function handlePay() {
+    setError("");
+    setPaying(true);
+    try {
+      // 1. Get Razorpay order from server
+      const orderRes = await serverFetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planSlug: slug, billingCycle: cycle }),
+      });
+      if (!orderRes.ok) {
+        const e = await orderRes.json();
+        throw new Error(e.error || "Failed to create order");
+      }
+      const { orderId, amount, currency, keyId, planName } = await orderRes.json();
+
+      // 2. Load Razorpay script
+      const loaded = await loadRazorpayScript();
+      if (!loaded) throw new Error("Razorpay failed to load. Check your connection.");
+
+      // 3. Get user info for prefill
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 4. Open Razorpay modal
+      await new Promise((resolve, reject) => {
+        const rzp = new window.Razorpay({
+          key:         keyId,
+          amount,
+          currency,
+          name:        "Vidquence",
+          description: `${planName} Plan`,
+          order_id:    orderId,
+          prefill: {
+            email: user?.email || "",
+            name:  user?.user_metadata?.full_name || user?.user_metadata?.name || "",
+          },
+          theme: { color: "#f5c518" },
+          modal: {
+            ondismiss: () => reject(new Error("Payment cancelled")),
+          },
+          handler: async (response) => {
+            try {
+              // 5. Verify payment on server
+              const verifyRes = await serverFetch("/api/payments/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id:   response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature:  response.razorpay_signature,
+                  planSlug:            slug,
+                  billingCycle:        cycle,
+                }),
+              });
+              if (!verifyRes.ok) {
+                const e = await verifyRes.json();
+                reject(new Error(e.error || "Payment verification failed"));
+                return;
+              }
+              const data = await verifyRes.json();
+              // Refresh credits in store
+              fetchCredits();
+              resolve(data);
+            } catch (e) {
+              reject(e);
+            }
+          },
+        });
+        rzp.open();
+      }).then(data => {
+        setSuccess(data);
+      }).catch(err => {
+        if (err.message !== "Payment cancelled") setError(err.message);
+      });
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  /* ── Success screen ── */
+  if (success) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0b0b10", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 24, fontFamily: "'Outfit',sans-serif", textAlign: "center", padding: 32 }}>
+        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(34,197,94,0.15)", border: "2px solid #22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>✓</div>
+        <div>
+          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 48, color: "#e8e8f0", lineHeight: 1 }}>Payment Successful!</div>
+          <div style={{ fontSize: 16, color: "#9494a8", marginTop: 8 }}>
+            <span style={{ color: "#f5c518", fontWeight: 700 }}>⚡ {success.credits} credits</span> have been added to your account.
+          </div>
+          <div style={{ fontSize: 14, color: "#55556a", marginTop: 4 }}>New balance: {success.balance} credits</div>
+        </div>
+        <div style={{ fontSize: 14, color: "#55556a" }}>Redirecting to dashboard…</div>
+      </div>
+    );
+  }
+
+  /* ── Main checkout layout ── */
   return (
     <div style={{ minHeight: "100vh", background: "#0b0b10", color: "#e8e8f0", fontFamily: "'Outfit', sans-serif" }}>
 
@@ -72,7 +204,7 @@ export default function Checkout() {
         <a href="/" style={{ textDecoration: "none" }}>
           <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 40, width: "auto" }} />
         </a>
-        <div style={{ width: 120 }} /> {/* spacer */}
+        <div style={{ width: 120 }} />
       </nav>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "start" }}>
@@ -87,19 +219,31 @@ export default function Checkout() {
             {plan.description && <div style={{ fontSize: 14, color: "#9494a8", marginTop: 4 }}>{plan.description}</div>}
           </div>
 
+          {/* Billing toggle */}
+          <div style={{ display: "inline-flex", background: "#0b0b10", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 4, gap: 4 }}>
+            {["monthly", "annual"].map(c => (
+              <button key={c} onClick={() => setCycle(c)}
+                style={{
+                  padding: "7px 18px", borderRadius: 7, border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 700, fontFamily: "'Outfit',sans-serif",
+                  background: cycle === c ? "#f5c518" : "transparent",
+                  color:      cycle === c ? "#0b0b10" : "#9494a8",
+                }}>
+                {c === "monthly" ? "Monthly" : "Annual"}
+                {c === "annual" && <span style={{ fontSize: 10, marginLeft: 5, color: cycle === "annual" ? "#0b0b10" : "#f5c518" }}>Save more</span>}
+              </button>
+            ))}
+          </div>
+
           <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
           {/* Pricing breakdown */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-              <span style={{ color: "#9494a8" }}>Billing cycle</span>
-              <span style={{ color: "#e8e8f0", fontWeight: 600, textTransform: "capitalize" }}>{cycle}</span>
-            </div>
             {saved && (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-                  <span style={{ color: "#9494a8" }}>Original price</span>
-                  <span style={{ color: "#55556a", textDecoration: "line-through" }}>${basePrice}/{cycleLabel}</span>
+                  <span style={{ color: "#9494a8" }}>Original</span>
+                  <span style={{ color: "#55556a", textDecoration: "line-through" }}>₹{originalINR}/{cycleLabel}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
                   <span style={{ color: "#9494a8" }}>Discount</span>
@@ -108,9 +252,9 @@ export default function Checkout() {
               </>
             )}
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 800 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 20, fontWeight: 800 }}>
               <span style={{ color: "#e8e8f0" }}>Total</span>
-              <span style={{ color: "#f5c518" }}>${finalPrice}/{cycleLabel}</span>
+              <span style={{ color: "#f5c518" }}>₹{finalINR}/{cycleLabel}</span>
             </div>
           </div>
 
@@ -134,7 +278,7 @@ export default function Checkout() {
           )}
         </div>
 
-        {/* ── Payment Section ── */}
+        {/* ── Payment ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#55556a", fontFamily: "'JetBrains Mono',monospace", marginBottom: 8 }}>
@@ -143,33 +287,47 @@ export default function Checkout() {
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, color: "#e8e8f0" }}>Complete your order</div>
           </div>
 
-          {/* Payment placeholder */}
-          <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "28px 24px", display: "flex", flexDirection: "column", gap: 16, alignItems: "center", textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, background: "rgba(245,197,24,0.1)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
-              💳
-            </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0", marginBottom: 4 }}>Razorpay Integration</div>
-              <div style={{ fontSize: 13, color: "#9494a8" }}>Secure payment processing will be available soon.</div>
+          <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "28px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* Amount summary */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, color: "#9494a8" }}>{plan.name} · {cycle}</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 44, color: "#f5c518", lineHeight: 1 }}>₹{finalINR}</div>
+                <div style={{ fontSize: 13, color: "#55556a" }}>per {cycleLabel}</div>
+              </div>
+              <div style={{ fontSize: 40, opacity: 0.6 }}>💳</div>
             </div>
 
-            <button disabled style={{
-              width: "100%",
-              background: "rgba(245,197,24,0.15)",
-              border:     "1px solid rgba(245,197,24,0.25)",
-              borderRadius: 10,
-              padding:    "14px 0",
-              fontSize:   16,
-              fontWeight: 700,
-              color:      "#9a8520",
-              cursor:     "not-allowed",
-              fontFamily: "'Outfit', sans-serif",
-            }}>
-              Complete Payment — Coming Soon
+            {error && (
+              <div style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#f87171" }}>
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handlePay}
+              disabled={paying}
+              style={{
+                background:   paying ? "rgba(245,197,24,0.4)" : "#f5c518",
+                color:        "#0b0b10",
+                border:       "none",
+                borderRadius: 10,
+                padding:      "15px 0",
+                fontSize:     16,
+                fontWeight:   800,
+                cursor:       paying ? "not-allowed" : "pointer",
+                fontFamily:   "'Outfit', sans-serif",
+                transition:   "all 0.15s",
+              }}
+              onMouseEnter={e => { if (!paying) e.currentTarget.style.background = "#e0b016"; }}
+              onMouseLeave={e => { if (!paying) e.currentTarget.style.background = "#f5c518"; }}
+            >
+              {paying ? "Processing…" : `Pay ₹${finalINR} with Razorpay`}
             </button>
 
-            <div style={{ fontSize: 13, color: "#55556a", lineHeight: 1.5 }}>
-              You will be charged <strong style={{ color: "#9494a8" }}>${finalPrice}</strong> per {cycleLabel}.<br />
+            <div style={{ fontSize: 12, color: "#55556a", textAlign: "center", lineHeight: 1.6 }}>
+              Secured by Razorpay · 256-bit SSL encryption<br />
               Cancel anytime from your account.
             </div>
           </div>
@@ -190,6 +348,7 @@ export default function Checkout() {
             ← Choose a different plan
           </button>
         </div>
+
       </div>
     </div>
   );
