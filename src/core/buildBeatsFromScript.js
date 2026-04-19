@@ -213,9 +213,13 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
 
     // Create empty zone matching type from layout definition
     if (zoneDef.type === "text") {
+      // Strip _presetId from layout zone styles — old generations may have baked in preset IDs
+      // (e.g. "slab-punch") that should never propagate to automation output.
+      // eslint-disable-next-line no-unused-vars
+      const { _presetId: _stripped, ...layoutZoneStyle } = zoneDef.style || {};
       fixed[zoneDef.id] = {
         content: { kind: "text", text: "" },
-        style: { ...zoneDef.style },
+        style: { ...layoutZoneStyle },
         // Carry the background layer (set via Zone Background picker) so the contrast
         // guard in fillTextZones can see it and derive a readable text color.
         ...(zoneDef.background ? { background: zoneDef.background } : {}),
@@ -353,15 +357,22 @@ function fillTextZones(beats, colorOptions = {}) {
       // Vision AI image converter for stat/label zones where the zone was auto-widened to fit
       // static text.  When dynamic AI content is longer, nowrap + overflow:visible causes the
       // text to visually overflow the zone boundary. Dynamic zones must wrap.
-      const { whiteSpace: _strippedWS, ...zoneDef_styleNoNowrap } =
+      // Strip whiteSpace:"nowrap" AND _presetId from layout zone style before merging.
+      // _presetId is a preset-system metadata tag that must never flow into automation output.
+      // eslint-disable-next-line no-unused-vars
+      const { whiteSpace: _strippedWS, _presetId: _strippedPreset, ...zoneDef_styleNoNowrap } =
         zoneDef.style?.whiteSpace === "nowrap"
           ? zoneDef.style
           : { whiteSpace: undefined, ...zoneDef.style };
 
+      // Also strip _presetId from existing zone style — a prior generation may have stored it.
+      // eslint-disable-next-line no-unused-vars
+      const { _presetId: _existingPreset, ...existingStyleClean } = existing?.style || {};
+
       const mergedVisual = {
         ...injectVisualStyle,
         ...zoneDef_styleNoNowrap,
-        ...(existing?.style || {}),
+        ...existingStyleClean,
         // Always force normal wrapping — never let nowrap survive into the render
         whiteSpace: "normal",
       };
