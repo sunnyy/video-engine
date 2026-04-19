@@ -86,6 +86,13 @@ function normalize(row) {
 }
 
 async function _fetch() {
+  // supabase is null in Remotion's webpack render context (no Vite env injection)
+  if (!supabase) {
+    if (_rows.length === 0) _rows = [normalize(FALLBACK_ROW)];
+    _map   = Object.fromEntries(_rows.map(r => [r.id, r]));
+    _ready = true;
+    return _rows;
+  }
   try {
     const { data, error } = await supabase
       .from("layouts")
