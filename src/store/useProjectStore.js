@@ -92,21 +92,23 @@ export const useProjectStore = create((set, get) => ({
   },
 
   undo: () => {
-    const { project, _history, _future } = get();
+    const { project, _history, _future, databaseId } = get();
     if (!_history.length) return;
     const prev    = _history[_history.length - 1];
     const newHist = _history.slice(0, -1);
     const newFut  = project ? [JSON.parse(JSON.stringify(project)), ..._future] : _future;
     set({ project: prev, _history: newHist, _future: newFut });
+    if (databaseId) updateProject(databaseId, prev);
   },
 
   redo: () => {
-    const { project, _history, _future } = get();
+    const { project, _history, _future, databaseId } = get();
     if (!_future.length) return;
     const next    = _future[0];
     const newFut  = _future.slice(1);
     const newHist = project ? [..._history, JSON.parse(JSON.stringify(project))] : _history;
     set({ project: next, _history: newHist, _future: newFut });
+    if (databaseId) updateProject(databaseId, next);
   },
 
   updateProjectMeta: async (updates) => {
