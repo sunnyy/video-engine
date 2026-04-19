@@ -7,8 +7,8 @@ import fs from "fs";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
-import { bundle } from "@remotion/bundler";
-import { renderFrames, stitchFramesToVideo, getCompositions } from "@remotion/renderer";
+// @remotion/bundler and @remotion/renderer are lazy-imported inside the render
+// route to avoid crashing the server on hosts without the required native binaries.
 import { v4 as uuidv4 } from "uuid";
 import compressVideo from "./compressVideo.cjs";
 import compressAudio from "./compressAudio.cjs";
@@ -195,6 +195,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /* ── Bundle — rebuilt on every render so code changes are always picked up ── */
 async function getBundle() {
+  const { bundle } = await import("@remotion/bundler");
   console.log("[bundle] Building bundle...");
   const result = await bundle({
     entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx"),
@@ -857,6 +858,7 @@ app.post("/api/render", requireAuth, async (req, res) => {
     const serveUrl = await getBundle();
 
     /* ── 5. Get composition ── */
+    const { getCompositions, renderFrames, stitchFramesToVideo } = await import("@remotion/renderer");
     const comps = await getCompositions(serveUrl, { inputProps: { project } });
     const comp  = comps.find((c) => c.id === "VideoComposition");
     if (!comp) throw new Error("VideoComposition not found");

@@ -476,6 +476,7 @@
     - normalizeMusic.js
     - normalizeProject.js
   - pages
+    - About.jsx
     - admin
       - AdminDashboard.jsx
       - AdminLayout.jsx
@@ -489,9 +490,12 @@
       - System.jsx
       - UserManager.jsx
     - AIGenerator.jsx
+    - Assets.jsx
     - Auth.jsx
+    - Credits.jsx
     - Dashboard.jsx
     - Editor.jsx
+    - ImageGeneration.jsx
     - LandingPage.jsx
     - legal
       - LegalLayout.jsx
@@ -499,7 +503,9 @@
       - RefundPolicy.jsx
       - Section.jsx
       - TermsOfService.jsx
+    - Onboarding.jsx
     - ResetPassword.jsx
+    - Settings.jsx
   - remotion
     - avatarVideoSingleton.js
     - BeatRenderer.jsx
@@ -549,15 +555,20 @@
     - compressAudio.cjs
     - compressVideo.cjs
     - index.js
+    - services
+      - emailService.js
     - temp
       - frames-03da57da-cc40-4055-8785-9894d36271f3
       - frames-f3f484f0-c2c1-4116-8625-b0be79b016bc
-      - tts-1776259818053.mp3
-      - tts-1776262505794.mp3
-      - tts-1776263142029.mp3
-      - tts-1776267466990.mp3
-      - tts-1776274344012.mp3
-      - tts-1776274539356.mp3
+      - tts-1776517117946.mp3
+      - tts-1776520335943.mp3
+      - tts-1776522108238.mp3
+      - tts-1776523111213.mp3
+      - tts-1776523241899.mp3
+      - tts-1776526430380.mp3
+      - tts-1776526910689.mp3
+      - tts-1776527136847.mp3
+      - tts-1776548485256.mp3
   - services
     - ai
       - generateStructuredShort.js
@@ -570,8 +581,11 @@
       - uploadUserAsset.js
     - auth
       - authService.js
+      - deleteAccount.js
     - credits
       - creditService.js
+    - profile
+      - profileService.js
     - projects
       - projectService.js
     - puppeteer
@@ -580,6 +594,8 @@
   - store
     - useAssetsStore.js
     - useCreditsStore.js
+    - useImageLibraryStore.js
+    - useProjectsStore.js
     - useProjectStore.js
   - ui
     - components
@@ -646,6 +662,13 @@
         - ZonePreview.jsx
       - ZonesSection.jsx
 - Strategy.txt
+- supabase
+  - .temp
+    - cli-latest
+    - linked-project.json
+  - functions
+    - delete-user
+      - index.ts
 - tailwind.config.js
 - Tasks.txt
 - temp.json
