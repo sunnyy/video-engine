@@ -213,10 +213,11 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
 
     // Create empty zone matching type from layout definition
     if (zoneDef.type === "text") {
-      // Strip _presetId from layout zone styles — old generations may have baked in preset IDs
-      // (e.g. "slab-punch") that should never propagate to automation output.
+      // Strip automation-owned properties from layout zone styles.
+      // DNA owns: color, background (inline), fontFamily, fontWeight, _presetId.
+      // Layout zones contribute structure: fontSize, letterSpacing, textTransform, padding, etc.
       // eslint-disable-next-line no-unused-vars
-      const { _presetId: _stripped, ...layoutZoneStyle } = zoneDef.style || {};
+      const { _presetId: _sp, color: _sc, background: _sb, fontFamily: _sff, fontWeight: _sfw, ...layoutZoneStyle } = zoneDef.style || {};
       fixed[zoneDef.id] = {
         content: { kind: "text", text: "" },
         style: { ...layoutZoneStyle },
@@ -353,27 +354,31 @@ function fillTextZones(beats, colorOptions = {}) {
       //   zoneDef.style      — layout definition WINS over preset (font, size, color set by designer)
       //   existing?.style    — user edits in the editor win over both
       //
-      // Strip whiteSpace: "nowrap" from zoneDef before merging — it is often written by the
-      // Vision AI image converter for stat/label zones where the zone was auto-widened to fit
-      // static text.  When dynamic AI content is longer, nowrap + overflow:visible causes the
-      // text to visually overflow the zone boundary. Dynamic zones must wrap.
-      // Strip whiteSpace:"nowrap" AND _presetId from layout zone style before merging.
-      // _presetId is a preset-system metadata tag that must never flow into automation output.
+      // Strip automation-owned + legacy preset properties from the layout zone style.
+      // DNA owns: color, background (inline), fontFamily, fontWeight.
+      // Preset system: _presetId must never flow into output.
+      // Layout zones contribute structure only: fontSize, letterSpacing, textTransform, padding…
+      // Also strip whiteSpace:"nowrap" — dynamic content wraps by definition.
       // eslint-disable-next-line no-unused-vars
-      const { whiteSpace: _strippedWS, _presetId: _strippedPreset, ...zoneDef_styleNoNowrap } =
-        zoneDef.style?.whiteSpace === "nowrap"
-          ? zoneDef.style
-          : { whiteSpace: undefined, ...zoneDef.style };
+      const { whiteSpace: _sWS, _presetId: _sPI, color: _sC, background: _sBG, fontFamily: _sFF, fontWeight: _sFW, ...zoneDef_styleNoNowrap } =
+        zoneDef.style || {};
 
-      // Also strip _presetId from existing zone style — a prior generation may have stored it.
+      // Strip _presetId + automation-owned color/font from existing zone style too.
+      // A prior generation may have stored stale values for these.
       // eslint-disable-next-line no-unused-vars
-      const { _presetId: _existingPreset, ...existingStyleClean } = existing?.style || {};
+      const { _presetId: _ePI, color: _eC, background: _eBG, fontFamily: _eFF, fontWeight: _eFW, ...existingStyleClean } = existing?.style || {};
+      // Re-admit user-pinned values so manual editor choices survive.
+      if (existing?.style?._userColor)    existingStyleClean.color      = existing.style.color;
+      if (existing?.style?._userBackground) existingStyleClean.background = existing.style.background;
+      if (existing?.style?._userPreset)   {
+        existingStyleClean.fontFamily = existing.style.fontFamily;
+        existingStyleClean.fontWeight = existing.style.fontWeight;
+      }
 
       const mergedVisual = {
-        ...injectVisualStyle,
-        ...zoneDef_styleNoNowrap,
-        ...existingStyleClean,
-        // Always force normal wrapping — never let nowrap survive into the render
+        ...injectVisualStyle,        // baseline: textShadow, WebkitTextStroke, textEffect
+        ...zoneDef_styleNoNowrap,    // layout structure: fontSize, letterSpacing, padding…
+        ...existingStyleClean,       // user-pinned values win (color, font, bg if flagged)
         whiteSpace: "normal",
       };
 
@@ -422,16 +427,21 @@ function fillTextZones(beats, colorOptions = {}) {
         }
       }
 
-      // ── Video-level typography lock ────────────────────────────────────────
-      // Only fills fontFamily/fontWeight when the layout zone has NOT set them.
-      // Layout designer values (zoneDef.style.fontFamily etc.) are always respected —
-      // the DNA system fills gaps, it does not override deliberate layout styling.
-      // User manual edits (_userPreset) are also preserved.
+      // ── Force DNA color (after merge, so it wins over any layout zone color) ─────────
+      // DNA palette text color is the single source of truth for text color across all beats.
+      // Only skip if the user explicitly pinned a color in the editor.
+      if (!existing?.style?._userColor) {
+        mergedVisual.color = paletteText;
+      }
+
+      // ── Video-level typography lock (ALWAYS apply, not gap-fill) ──────────────────────
+      // layout zone color/fontFamily/fontWeight are stripped before merging, so DNA typography
+      // is the only source for these. User _userPreset flag preserves manual editor choices.
       if (typographySystem && !existing?.style?._userPreset) {
         const zoneRole = zoneDef.role || (order === 0 ? "headline" : "subtext");
         const { fontFamily, fontWeight } = getTypographyForRole(typographySystem, zoneRole);
-        if (fontFamily && !zoneDef.style?.fontFamily) mergedVisual.fontFamily = fontFamily;
-        if (fontWeight && !zoneDef.style?.fontWeight) mergedVisual.fontWeight  = fontWeight;
+        if (fontFamily) mergedVisual.fontFamily = fontFamily;
+        if (fontWeight) mergedVisual.fontWeight  = fontWeight;
       }
 
       zones[zoneDef.id] = {
