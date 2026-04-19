@@ -3,7 +3,7 @@ import Section, { P, UL, Highlight, ContactBlock } from "./Section";
 
 export default function PrivacyPolicy() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="January 1, 2025">
+    <LegalLayout title="Privacy Policy" lastUpdated="April 19, 2026">
 
       <Section title="1. Introduction">
         <P>PX Galaxy Studio ("we", "us", "our") operates Vidquence and is committed to protecting your personal information. This Privacy Policy explains what data we collect, how we use it, and your rights regarding that data.</P>

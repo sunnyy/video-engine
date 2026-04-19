@@ -61,8 +61,6 @@ export function ContactBlock({ email }) {
     }}>
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Contact</div>
       <div style={{ fontSize: 15, color: "#e8e8f0", fontWeight: 500 }}>PX Galaxy Studio</div>
-      <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>Proprietor: Sunny Lalwani</div>
-      <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>Jaipur, Rajasthan, India — 302001</div>
       <a href={`mailto:${email}`} style={{ color: "#7c5cfc", fontSize: 14, display: "block", marginTop: 8 }}>{email}</a>
     </div>
   );

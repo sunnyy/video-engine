@@ -3,7 +3,7 @@ import Section, { P, UL, Highlight, ContactBlock } from "./Section";
 
 export default function TermsOfService() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="January 1, 2025">
+    <LegalLayout title="Terms of Service" lastUpdated="April 19, 2026">
 
       <Section title="1. Acceptance of Terms">
         <P>By accessing or using Vidquence ("the Service"), operated by PX Galaxy Studio, you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</P>
@@ -92,7 +92,7 @@ export default function TermsOfService() {
       </Section>
 
       <Section title="10. Governing Law">
-        <P>These Terms are governed by and construed in accordance with the laws of India. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts located in Jaipur, Rajasthan, India.</P>
+        <P>These Terms are governed by and construed in accordance with the laws of India. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts of India.</P>
         <P>If any provision of these Terms is found to be unenforceable, the remaining provisions will continue in full force and effect.</P>
       </Section>
 

@@ -3,7 +3,7 @@ import Section, { P, UL, Highlight, ContactBlock } from "./Section";
 
 export default function RefundPolicy() {
   return (
-    <LegalLayout title="Refund Policy" lastUpdated="January 1, 2025">
+    <LegalLayout title="Refund Policy" lastUpdated="April 19, 2026">
 
       <Section title="1. Overview">
         <P>This Refund Policy governs all purchases of credits and subscription plans on Vidquence, operated by PX Galaxy Studio. Please read this policy carefully before making any purchase.</P>

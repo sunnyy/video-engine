@@ -597,7 +597,7 @@ export default function LandingPage() {
               <a href="/privacy" className="footer-link">Privacy</a>
               <a href="/refunds" className="footer-link">Refunds</a>
             </div>
-            <div className="footer-copy">© 2025 VIDQUENCE</div>
+            <div className="footer-copy">© 2026 VIDQUENCE</div>
           </div>
         </div>
       </footer>
