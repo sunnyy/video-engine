@@ -9,7 +9,9 @@ import { useCreditsStore } from "../store/useCreditsStore";
 import { useProjectsStore } from "../store/useProjectsStore";
 import { supabase } from "../lib/supabase";
 import { getProfile } from "../services/profile/profileService";
+import { serverFetch } from "../services/serverApi";
 import Onboarding from "./Onboarding";
+import FeedbackModal from "../ui/components/FeedbackModal";
 
 /* ── Niche → gradient map ── */
 const NICHE_GRADIENTS = {
@@ -263,6 +265,11 @@ const Icons = {
       <line x1="9" y1="21" x2="15" y2="21"/>
     </svg>
   ),
+  message: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+    </svg>
+  ),
 };
 
 /* ── Sidebar nav item ── */
@@ -312,6 +319,7 @@ export default function Dashboard() {
   const location  = useLocation();
   const [search,         setSearch]         = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showFeedback,   setShowFeedback]   = useState(false);
   const [userId,         setUserId]         = useState(null);
   const { balance, fetchCredits } = useCreditsStore();
   const { projects, loading, fetchProjects, removeProject } = useProjectsStore();
@@ -335,6 +343,20 @@ export default function Dashboard() {
         }).catch(() => {});
       }
     });
+
+    // Show feedback modal after 3s if user has never submitted feedback
+    if (!localStorage.getItem("feedback_prompted")) {
+      serverFetch("/api/feedback/mine").then(r => r.json()).then(({ count }) => {
+        if (count === 0) {
+          setTimeout(() => {
+            localStorage.setItem("feedback_prompted", "true");
+            setShowFeedback(true);
+          }, 3000);
+        } else {
+          localStorage.setItem("feedback_prompted", "true");
+        }
+      }).catch(() => {});
+    }
   }, []);
 
   const handleDelete = async (id) => {
@@ -360,6 +382,10 @@ export default function Dashboard() {
         }} />
       )}
 
+      {showFeedback && (
+        <FeedbackModal context="post_visit" onClose={() => setShowFeedback(false)} />
+      )}
+
       {/* ── Sidebar ── */}
       <aside
         className="flex flex-col shrink-0 border-r"
@@ -382,6 +408,7 @@ export default function Dashboard() {
 
           <NavSection title="Account">
             <NavItem icon={Icons.settings} label="Settings" active={location.pathname === "/settings"} onClick={() => navigate("/settings")} />
+            <NavItem icon={Icons.message}  label="Feedback" active={location.pathname === "/feedback"} onClick={() => navigate("/feedback")} />
           </NavSection>
         </nav>
 

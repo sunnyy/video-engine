@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { supabase as sb } from "../../lib/supabase";
+import { serverFetch } from "../../services/serverApi";
 import AdminLayout from "./AdminLayout";
 
 /* ── helpers ── */
@@ -122,6 +123,7 @@ export default function Analytics() {
   const [topUsers, setTopUsers]             = useState([]);
   const [txTypes, setTxTypes]               = useState([]);
   const [totals, setTotals]                 = useState({ projects30: 0, credits30: 0, debits: 0, purchases: 0 });
+  const [feedbackData, setFeedbackData]     = useState({ feedback: [], averageRating: 0 });
 
   useEffect(() => {
     async function load() {
@@ -190,6 +192,13 @@ export default function Analytics() {
           debits:     typeCounts["debit"]    || 0,
           purchases:  typeCounts["purchase"] || typeCounts["credit"] || 0,
         });
+        // Feedback
+        try {
+          const fbRes  = await serverFetch("/api/admin/feedback");
+          const fbData = await fbRes.json();
+          setFeedbackData(fbData);
+        } catch { /* non-fatal */ }
+
       } catch (e) {
         console.error("[admin] Analytics load failed:", e.message);
       } finally {
@@ -278,6 +287,56 @@ export default function Analytics() {
           {modeBreakdown.length === 0 && topUsers.length === 0 && (
             <div className="text-[#444] text-lg mt-4">No data yet — create some projects first.</div>
           )}
+
+          {/* Feedback section */}
+          <div className="mt-8">
+            <SectionCard title="User Feedback" sub={`${feedbackData.feedback.length} submission${feedbackData.feedback.length !== 1 ? "s" : ""}`}>
+              {feedbackData.feedback.length === 0 ? (
+                <div className="text-[#444] text-sm">No feedback submitted yet.</div>
+              ) : (
+                <>
+                  {/* Summary row */}
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="flex gap-[2px]">
+                      {[1,2,3,4,5].map(n => (
+                        <span key={n} style={{ fontSize: 20, color: n <= Math.round(feedbackData.averageRating) ? "#f5c518" : "#2a2a38" }}>★</span>
+                      ))}
+                    </div>
+                    <span className="text-2xl font-bold" style={{ color: "#f5c518" }}>{feedbackData.averageRating}</span>
+                    <span className="text-sm text-[#666]">average rating</span>
+                  </div>
+
+                  {/* Feedback rows */}
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.06] text-[#555] text-left">
+                        <th className="py-1.5 font-medium">User</th>
+                        <th className="py-1.5 font-medium">Rating</th>
+                        <th className="py-1.5 font-medium">Message</th>
+                        <th className="py-1.5 font-medium text-right">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feedbackData.feedback.slice(0, 50).map(f => (
+                        <tr key={f.id} className="border-b border-white/[0.04]">
+                          <td className="py-2.5 text-[#aaa] font-mono text-xs max-w-[160px] truncate">{f.email}</td>
+                          <td className="py-2.5">
+                            <span style={{ color: "#f5c518", letterSpacing: 1 }}>
+                              {"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-[#888] max-w-[260px]">
+                            {f.message ? <span className="line-clamp-2">{f.message}</span> : <span className="text-[#444] italic">—</span>}
+                          </td>
+                          <td className="py-2.5 text-right text-[#555] text-xs whitespace-nowrap">{fmtDate(f.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </SectionCard>
+          </div>
         </>
       )}
     </AdminLayout>

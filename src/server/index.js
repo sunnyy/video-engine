@@ -3348,6 +3348,85 @@ app.get("/api/image-generation/library", requireAuth, async (req, res) => {
   }
 });
 
+/* ── Feedback ─────────────────────────────────────────────────────────────── */
+app.post("/api/feedback", requireAuth, async (req, res) => {
+  try {
+    const { rating, message, context } = req.body;
+    if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: "rating 1-5 required" });
+    const { error } = await supabaseAdmin.from("feedback").insert({
+      user_id: req.user.id,
+      rating,
+      message: message || null,
+      context: context || null,
+    });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[feedback]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/feedback/mine", requireAuth, async (req, res) => {
+  try {
+    const { count, error } = await supabaseAdmin
+      .from("feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", req.user.id);
+    if (error) throw error;
+    res.json({ count: count || 0 });
+  } catch (err) {
+    console.error("[feedback/mine]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/feedback/my-history", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("feedback")
+      .select("id, rating, message, context, created_at")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json({ feedback: data || [] });
+  } catch (err) {
+    console.error("[feedback/my-history]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/admin/feedback", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("feedback")
+      .select("id, user_id, rating, message, context, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    const rows = data || [];
+    const avgRating = rows.length
+      ? Math.round((rows.reduce((s, r) => s + r.rating, 0) / rows.length) * 10) / 10
+      : 0;
+
+    // Enrich with user emails (batch unique user ids)
+    const uniqueIds = [...new Set(rows.map(r => r.user_id))];
+    const emailMap = {};
+    await Promise.all(uniqueIds.map(async uid => {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(uid);
+        emailMap[uid] = user?.email || uid;
+      } catch { emailMap[uid] = uid; }
+    }));
+
+    const feedback = rows.map(r => ({ ...r, email: emailMap[r.user_id] || r.user_id }));
+    res.json({ feedback, averageRating: avgRating });
+  } catch (err) {
+    console.error("[admin/feedback]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── Webhook: Supabase new user signup ──────────────────────────────────────
    Configure in Supabase Dashboard → Database → Webhooks:
      Table: auth.users  |  Event: INSERT  |  URL: <your-domain>/api/webhooks/user-created
