@@ -458,6 +458,42 @@ function parseAIResponse(raw) {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   TOPIC RESEARCH — Step 1 of 2-step generation
+───────────────────────────────────────────────────────────── */
+async function researchTopic({ topic, videoType, audience, language }) {
+  try {
+    const res = await serverFetch("/api/research-topic", {
+      method: "POST",
+      body:   JSON.stringify({ topic, videoType, audience, language }),
+    });
+    if (!res.ok) throw new Error(`Research endpoint returned ${res.status}`);
+    const d = await res.json();
+
+    const keyFacts   = Array.isArray(d.key_facts)         ? d.key_facts.join("\n")         : "";
+    const hookIdeas  = Array.isArray(d.hook_ideas)        ? d.hook_ideas.join("\n")         : "";
+    const entities   = Array.isArray(d.specific_entities) ? d.specific_entities.join(", ") : "";
+    const angle      = d.counterintuitive_angle  || "";
+    const nowContext = d.current_context          || "";
+    const emotion    = d.emotional_angle          || "";
+
+    const formatted = [
+      keyFacts   && `KEY FACTS:\n${keyFacts}`,
+      angle      && `COUNTERINTUITIVE ANGLE: ${angle}`,
+      hookIdeas  && `HOOK IDEAS:\n${hookIdeas}`,
+      entities   && `SPECIFIC ENTITIES: ${entities}`,
+      nowContext && `CURRENT CONTEXT: ${nowContext}`,
+      emotion    && `EMOTIONAL ANGLE: ${emotion}`,
+    ].filter(Boolean).join("\n");
+
+    console.log("[research] Topic researched:", topic);
+    return formatted;
+  } catch (err) {
+    console.warn("[research] Research failed, continuing without context:", err.message);
+    return "";
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
    MAIN EXPORT
 ───────────────────────────────────────────────────────────── */
 export async function generateStructuredShort({
@@ -574,7 +610,14 @@ export async function generateStructuredShort({
     /* ── Standard path — Claude script generation ── */
     report("script");
 
-    const prompt = buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone });
+    // Step 1: Research the topic if no context was provided by the caller
+    let effectiveContext = context;
+    if (!effectiveContext) {
+      report("research");
+      effectiveContext = await researchTopic({ topic, videoType, audience, language });
+    }
+
+    const prompt = buildPrompt({ topic, videoType, language, durationCategory, context: effectiveContext, audience, tone });
 
     const response = await serverFetch("/api/generate", {
       method: "POST",

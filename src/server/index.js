@@ -343,6 +343,58 @@ app.post("/api/generate", requireAuth, async (req, res) => {
   }
 });
 
+/* ---------------- TOPIC RESEARCH ---------------- */
+app.post("/api/research-topic", requireAuth, async (req, res) => {
+  try {
+    const { topic, videoType, audience, language } = req.body;
+    if (!topic) return res.status(400).json({ error: "topic required" });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 800,
+      messages: [
+        {
+          role: "system",
+          content: "You are a research assistant for a viral video scriptwriter. Your job is to find the most interesting, specific, counterintuitive, and current facts about a topic that will make a short-form video script compelling. Return ONLY a JSON object, no markdown.",
+        },
+        {
+          role: "user",
+          content: `Research this topic for a viral short-form video script:
+
+TOPIC: ${topic}
+VIDEO TYPE: ${videoType || "viral"}
+AUDIENCE: ${audience || "general"}
+LANGUAGE: ${language || "english"}
+
+Return a JSON object with:
+{
+  "key_facts": ["3-5 specific facts with real numbers, names, dates"],
+  "counterintuitive_angle": "one surprising or contrarian take on this topic",
+  "hook_ideas": ["2-3 possible opening lines that would stop someone scrolling"],
+  "specific_entities": ["real people, brands, products, events related to this topic"],
+  "current_context": "what is happening RIGHT NOW related to this topic in 2025-2026",
+  "emotional_angle": "what emotion does this topic tap into — fear, awe, anger, curiosity, inspiration"
+}
+
+Be specific. Use real numbers. No vague generalities. If you don't know exact current stats, use the best known figures.`,
+        },
+      ],
+      temperature: 0.7,
+    });
+
+    const raw = completion.choices[0]?.message?.content || "{}";
+    let parsed;
+    try {
+      parsed = JSON.parse(raw.replace(/```json\n?/gi, "").replace(/```\n?/gi, "").trim());
+    } catch {
+      return res.status(500).json({ error: "Research returned invalid JSON" });
+    }
+    res.json(parsed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------------- TRANSCRIPT BEAT PROCESSING ---------------- */
 app.post("/api/process-beats", requireAuth, async (req, res) => {
   try {
