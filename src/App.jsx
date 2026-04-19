@@ -33,7 +33,8 @@ import Settings        from "./pages/Settings";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
-import PlansSales      from "./pages/admin/PlansSales";
+import Plans           from "./pages/admin/Plans";
+import Sales           from "./pages/admin/Sales";
 import System          from "./pages/admin/System";
 
 export default function App() {
@@ -120,7 +121,8 @@ export default function App() {
                 <Route path="/admin/analytics"         element={<Analytics />} />
                 <Route path="/admin/users"             element={<UserManager />} />
                 <Route path="/admin/credits"           element={<Credits />} />
-                <Route path="/admin/plans"             element={<PlansSales />} />
+                <Route path="/admin/plans"             element={<Plans />} />
+                <Route path="/admin/sales"             element={<Sales />} />
                 <Route path="/admin/system"            element={<System />} />
                 <Route path="/admin/layouts"           element={<LayoutManager />} />
                 <Route path="/admin/ai-generator"      element={<LayoutGenerator />} />

@@ -1253,6 +1253,147 @@ app.get("/api/admin/credits-overview", requireAuth, requireAdmin, async (_req, r
   }
 });
 
+/* ── Plans CRUD (admin) ─────────────────────────────────────────────────── */
+app.get("/api/admin/plans", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("plans")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    console.error("[admin/plans GET]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/plans", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { name, slug, description, credits, price_monthly, price_annual,
+            discount_percent, is_active, is_popular, sort_order, features } = req.body;
+    if (!name || !slug || !credits || !price_monthly) {
+      return res.status(400).json({ error: "name, slug, credits, price_monthly required" });
+    }
+    const { data, error } = await supabaseAdmin.from("plans").insert({
+      name, slug, description: description || null,
+      credits: Number(credits), price_monthly: Number(price_monthly),
+      price_annual: price_annual ? Number(price_annual) : null,
+      discount_percent: Number(discount_percent) || 0,
+      is_active: is_active !== false,
+      is_popular: !!is_popular,
+      sort_order: Number(sort_order) || 0,
+      features: features || [],
+    }).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("[admin/plans POST]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/plans/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, slug, description, credits, price_monthly, price_annual,
+            discount_percent, is_active, is_popular, sort_order, features } = req.body;
+    const patch = {};
+    if (name           !== undefined) patch.name             = name;
+    if (slug           !== undefined) patch.slug             = slug;
+    if (description    !== undefined) patch.description      = description;
+    if (credits        !== undefined) patch.credits          = Number(credits);
+    if (price_monthly  !== undefined) patch.price_monthly    = Number(price_monthly);
+    if (price_annual   !== undefined) patch.price_annual     = price_annual ? Number(price_annual) : null;
+    if (discount_percent !== undefined) patch.discount_percent = Number(discount_percent) || 0;
+    if (is_active      !== undefined) patch.is_active        = !!is_active;
+    if (is_popular     !== undefined) patch.is_popular       = !!is_popular;
+    if (sort_order     !== undefined) patch.sort_order       = Number(sort_order) || 0;
+    if (features       !== undefined) patch.features         = features;
+    const { data, error } = await supabaseAdmin.from("plans").update(patch).eq("id", id).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("[admin/plans PUT]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/admin/plans/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin.from("plans").delete().eq("id", req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[admin/plans DELETE]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Grant plan to user by email ── */
+app.post("/api/admin/plans/:id/grant", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, billing_cycle } = req.body;
+    if (!email) return res.status(400).json({ error: "email required" });
+
+    // Resolve user by email
+    const { data: { users }, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    if (listErr) throw listErr;
+    const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user) return res.status(404).json({ error: `No user found with email: ${email}` });
+
+    // Get plan
+    const { data: plan, error: planErr } = await supabaseAdmin.from("plans").select("*").eq("id", id).single();
+    if (planErr || !plan) return res.status(404).json({ error: "Plan not found" });
+
+    // Add credits
+    await addCredits(user.id, plan.credits, "plan_assign", "plan_assign",
+      `Plan assigned: ${plan.name} (${plan.credits} credits, $${plan.price_monthly}/mo)`);
+
+    // Upsert subscription row
+    const now = new Date();
+    const end = new Date(now);
+    end.setMonth(end.getMonth() + (billing_cycle === "annual" ? 12 : 1));
+    await supabaseAdmin.from("subscriptions").upsert({
+      user_id: user.id, plan_id: id, plan_name: plan.name,
+      status: "active", billing_cycle: billing_cycle || "monthly",
+      price_paid: billing_cycle === "annual" ? plan.price_annual : plan.price_monthly,
+      period_start: now.toISOString(), period_end: end.toISOString(),
+    }, { onConflict: "user_id" });
+
+    res.json({ ok: true, credits: plan.credits, user_id: user.id });
+  } catch (err) {
+    console.error("[admin/plans/grant]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── All subscriptions (admin) ── */
+app.get("/api/subscriptions/all", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("subscriptions")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const rows = data || [];
+    // Enrich with user emails
+    const uniqueIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
+    const emailMap = {};
+    await Promise.all(uniqueIds.map(async uid => {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(uid);
+        emailMap[uid] = user?.email || uid;
+      } catch { emailMap[uid] = uid; }
+    }));
+    res.json({ subscriptions: rows.map(r => ({ ...r, email: emailMap[r.user_id] || r.user_id })) });
+  } catch (err) {
+    console.error("[subscriptions/all]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── Admin: assign a plan to a user (adds plan credits, logs plan_assign) ── */
 app.post("/api/admin/assign-plan", requireAuth, requireAdmin, async (req, res) => {
   try {
