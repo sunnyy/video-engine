@@ -6,7 +6,7 @@ export default function RefundPolicy() {
     <LegalLayout title="Refund Policy" lastUpdated="January 1, 2025">
 
       <Section title="1. Overview">
-        <P>This Refund Policy governs all purchases of credits and subscription plans on Vidora, operated by PX Galaxy Studio. Please read this policy carefully before making any purchase.</P>
+        <P>This Refund Policy governs all purchases of credits and subscription plans on Vidquence, operated by PX Galaxy Studio. Please read this policy carefully before making any purchase.</P>
         <Highlight>By purchasing credits or a subscription plan, you acknowledge that you have read and agree to this Refund Policy.</Highlight>
       </Section>
 
@@ -65,7 +65,7 @@ export default function RefundPolicy() {
       <Section title="7. Dispute Process">
         <P>If you believe you are entitled to a refund under this policy:</P>
         <UL items={[
-          "Contact us at support@vidora.in within 7 days of the transaction or incident",
+          "Contact us at hello@vidquence.com within 7 days of the transaction or incident",
           "Include your account email, transaction reference or project ID, and a clear description of the issue",
           "We will acknowledge your request within 2 business days",
           "We will review and respond with a decision within 7 business days of acknowledgement",
@@ -80,7 +80,7 @@ export default function RefundPolicy() {
 
       <Section title="9. Contact for Refund Requests">
         <P>All refund requests must be submitted via email. We do not process refund requests through social media or chat.</P>
-        <ContactBlock email="support@vidora.in" />
+        <ContactBlock email="hello@vidquence.com" />
       </Section>
 
     </LegalLayout>

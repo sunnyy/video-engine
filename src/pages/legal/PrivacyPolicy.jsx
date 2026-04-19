@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
     <LegalLayout title="Privacy Policy" lastUpdated="January 1, 2025">
 
       <Section title="1. Introduction">
-        <P>PX Galaxy Studio ("we", "us", "our") operates Vidora and is committed to protecting your personal information. This Privacy Policy explains what data we collect, how we use it, and your rights regarding that data.</P>
+        <P>PX Galaxy Studio ("we", "us", "our") operates Vidquence and is committed to protecting your personal information. This Privacy Policy explains what data we collect, how we use it, and your rights regarding that data.</P>
         <P>By using the Service, you consent to the practices described in this policy. If you do not agree, please discontinue use of the Service.</P>
       </Section>
 
@@ -92,7 +92,7 @@ export default function PrivacyPolicy() {
 
       <Section title="11. Contact for Privacy Requests">
         <P>For privacy-related requests, questions, or concerns:</P>
-        <ContactBlock email="privacy@vidora.in" />
+        <ContactBlock email="hello@vidquence.com" />
       </Section>
 
     </LegalLayout>

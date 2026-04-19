@@ -6,12 +6,12 @@ export default function TermsOfService() {
     <LegalLayout title="Terms of Service" lastUpdated="January 1, 2025">
 
       <Section title="1. Acceptance of Terms">
-        <P>By accessing or using Vidora ("the Service"), operated by PX Galaxy Studio, you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</P>
+        <P>By accessing or using Vidquence ("the Service"), operated by PX Galaxy Studio, you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</P>
         <P>These Terms apply to all users, visitors, and others who access or use the Service. We reserve the right to update these Terms at any time. Continued use of the Service after changes constitutes acceptance of the updated Terms.</P>
       </Section>
 
       <Section title="2. Description of Service">
-        <P>Vidora is an AI-powered video production platform that enables users to generate, edit, and export short-form videos using artificial intelligence. The Service operates on a credit-based system where different actions consume varying amounts of credits.</P>
+        <P>Vidquence is an AI-powered video production platform that enables users to generate, edit, and export short-form videos using artificial intelligence. The Service operates on a credit-based system where different actions consume varying amounts of credits.</P>
         <P>Core features include AI script generation, beat-based video structuring, AI image generation, text-to-speech voice synthesis, layout management, and video export. Feature availability depends on the user's active plan and credit balance.</P>
       </Section>
 
@@ -58,7 +58,7 @@ export default function TermsOfService() {
       <Section title="6. Intellectual Property">
         <P><strong style={{ color: "#fff" }}>Your content:</strong> You retain full ownership of the videos, scripts, and creative output you generate using the Service. By using the Service, you grant us a limited, non-exclusive license to process your inputs and store your outputs solely for the purpose of providing the Service.</P>
         <P><strong style={{ color: "#fff" }}>Our platform:</strong> The Service, including its software, AI models, layout systems, design assets, branding, and underlying technology, is owned exclusively by PX Galaxy Studio and protected by applicable intellectual property laws. You may not copy, reproduce, modify, reverse engineer, or create derivative works from any part of our platform without written permission.</P>
-        <P>The Vidora name, logo, and associated marks are trademarks of PX Galaxy Studio. Unauthorized use of our trademarks is prohibited.</P>
+        <P>The Vidquence name, logo, and associated marks are trademarks of PX Galaxy Studio. Unauthorized use of our trademarks is prohibited.</P>
       </Section>
 
       <Section title="7. AI-Generated Content">
@@ -98,7 +98,7 @@ export default function TermsOfService() {
 
       <Section title="11. Contact">
         <P>For questions about these Terms, please contact us:</P>
-        <ContactBlock email="support@vidora.in" />
+        <ContactBlock email="hello@vidquence.com" />
       </Section>
 
     </LegalLayout>
