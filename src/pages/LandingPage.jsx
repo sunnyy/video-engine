@@ -9,7 +9,7 @@ import { signInWithGoogle, getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
 
 const FALLBACK_RATE = 92.60;
-function calcDiscounted(base, pct) { return pct ? +(base * (1 - pct / 100)).toFixed(2) : base; }
+function calcDiscounted(base, pct) { return pct ? Math.round(base * (1 - pct / 100)) : base; }
 function toINR(usd, rate) { return Math.round(usd * rate); }
 
 function useReveal() {
@@ -586,7 +586,6 @@ export default function LandingPage() {
               const base  = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
               const usd   = calcDiscounted(base, plan.discount_percent);
               const inr   = toINR(usd, rate);
-              const saved = plan.discount_percent > 0;
               const feats = Array.isArray(plan.features) ? plan.features : [];
               return (
                 <div key={plan.id} className={`plan${plan.is_popular ? " plan-hot" : ""}`}>
@@ -597,11 +596,9 @@ export default function LandingPage() {
                   <div className="plan-price"><span>$</span>{usd}</div>
                   <div className="plan-cycle" style={{ marginBottom: 2 }}>
                     per {cycle === "annual" ? "year" : "month"}
-                    {saved && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--yellow)", fontFamily: "var(--font-mono)" }}>−{plan.discount_percent}%</span>}
                   </div>
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)", marginBottom: 8 }}>≈ ₹{inr}/{cycle === "annual" ? "yr" : "mo"}</div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)", marginBottom: 16 }}>≈ ₹{inr}/{cycle === "annual" ? "yr" : "mo"}</div>
 
-                  <div className="plan-credits">⚡ {plan.credits} credits/month</div>
                   <div className="plan-hr" />
                   <ul className="plan-feats">{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>
                   <button
