@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { buildSafeProject } from "../normalize/normalizeProject";
 import { calculateTimeline } from "../core/calculateTimeline";
 import { getPacingProfile } from "../core/registries/pacingProfiles";
-import { updateProject } from "../services/projects/projectService";
+import { updateProject, getProjectRenders } from "../services/projects/projectService";
 
 const MAX_HISTORY = 50;
 
@@ -55,11 +55,23 @@ export const useProjectStore = create((set, get) => ({
   activeBeatId: null,
   databaseId:   null,
   projectName:  null,
+  renders:      [],
   _history:     [],
   _future:      [],
 
   setDatabaseId:  (id)   => set({ databaseId: id }),
   setProjectName: (name) => set({ projectName: name }),
+  setRenders:     (renders) => set({ renders }),
+
+  fetchRenders: async (projectId) => {
+    if (!projectId) return;
+    try {
+      const renders = await getProjectRenders(projectId);
+      set({ renders });
+    } catch (err) {
+      console.warn("[renders] Failed to fetch:", err.message);
+    }
+  },
 
   setProject: (rawProject) => {
     const safeProject = buildSafeProject(rawProject);

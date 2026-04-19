@@ -22,15 +22,18 @@ export default function Header() {
 
   const [resolution, setResolution] = useState("1080p");
   const [progress, setProgress] = useState(null);
-  const [downloadUrl, setDownloadUrl] = useState(null);
   const [projectList, setProjectList] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [rendersOpen, setRendersOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameVal, setNameVal] = useState("");
   const [avatarProgress, setAvatarProgress] = useState(null); // null | 'uploading' | 'generating' | 'polling' | 'done' | string (error)
   const dropdownRef = useRef(null);
+  const rendersRef  = useRef(null);
   const avatarInputRef = useRef(null);
 
+  const renders      = useProjectStore((s) => s.renders);
+  const fetchRenders = useProjectStore((s) => s.fetchRenders);
   const { balance, fetchCredits } = useCreditsStore();
 
   // These MUST be above any conditional returns (React hooks rules)
@@ -45,9 +48,16 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
+    if (databaseId) fetchRenders(databaseId);
+  }, [databaseId]);
+
+  useEffect(() => {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
+      }
+      if (rendersRef.current && !rendersRef.current.contains(e.target)) {
+        setRendersOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -89,12 +99,11 @@ export default function Header() {
       return;
     }
     setProgress(0);
-    setDownloadUrl(null);
 
     try {
       const res = await serverFetch("/api/render", {
         method: "POST",
-        body: JSON.stringify({ project, resolution }),
+        body: JSON.stringify({ project, resolution, projectId: databaseId }),
       });
       const { jobId } = await res.json();
 
@@ -105,7 +114,7 @@ export default function Header() {
         if (status.done) {
           clearInterval(interval);
           setProgress(null);
-          setDownloadUrl(status.url);
+          if (databaseId) fetchRenders(databaseId);
         }
       }, 500);
     } catch (err) {
@@ -381,21 +390,50 @@ export default function Header() {
           {progress !== null ? `${progress}%` : "Export"}
         </button>
 
-        {downloadUrl && (
-          <button
-            onClick={async () => {
-              const res = await serverFetch(`/api/render-download/${downloadUrl.split("/").pop()}`);
-              const blob = await res.blob();
-              const a = document.createElement("a");
-              a.href = URL.createObjectURL(blob);
-              a.download = "video.mp4";
-              a.click();
-              URL.revokeObjectURL(a.href);
-            }}
-            className="bg-[#2dd4bf] text-[#0b0b10] font-semibold text-[14px] px-4 py-[6px] rounded-[6px] cursor-pointer border-0"
-          >
-            Download
-          </button>
+        {/* Renders — persists across refreshes */}
+        {renders.length > 0 && (
+          <div ref={rendersRef} className="relative">
+            {renders.length === 1 ? (
+              <a
+                href={renders[0].video_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 bg-[#2dd4bf] text-[#0b0b10] font-semibold text-[14px] px-4 py-[6px] rounded-[6px] border-0 cursor-pointer no-underline"
+                style={{ textDecoration: "none" }}
+              >
+                Download
+              </a>
+            ) : (
+              <>
+                <button
+                  onClick={() => setRendersOpen((o) => !o)}
+                  className="flex items-center gap-1.5 bg-[#2dd4bf] text-[#0b0b10] font-semibold text-[14px] px-4 py-[6px] rounded-[6px] border-0 cursor-pointer"
+                >
+                  Downloads ({renders.length}) <span className="text-[11px]">▾</span>
+                </button>
+                {rendersOpen && (
+                  <div className="absolute top-[calc(100%+6px)] right-0 w-[300px] bg-[#1c1c28] border border-[rgba(255,255,255,0.1)] rounded-[10px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
+                    {renders.map((r, i) => (
+                      <a
+                        key={r.id}
+                        href={r.video_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between px-4 py-[10px] text-[13px] text-[#9494a8] hover:text-[#e8e8f0] hover:bg-[rgba(255,255,255,0.04)] transition-all"
+                        style={{ textDecoration: "none" }}
+                      >
+                        <span>
+                          {i === 0 && <span className="text-[#2dd4bf] text-[11px] font-semibold mr-1.5">LATEST</span>}
+                          {new Date(r.created_at).toLocaleDateString()} {new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <span className="text-[11px] text-[#55556a]">↓ MP4</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         )}
 
         {/* Sign out */}

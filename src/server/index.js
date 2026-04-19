@@ -905,11 +905,42 @@ app.post("/api/render", requireAuth, async (req, res) => {
     tempFiles.forEach(f => { try { fs.unlinkSync(f); } catch {} });
     console.log("[render] Cleaned", tempFiles.length, "temp files");
 
+    /* ── 7. Upload render to Supabase storage + save DB record ── */
+    let videoUrl = null;
+    try {
+      const storageKey  = `renders/${req.user.id}/render-${jobId}.mp4`;
+      const videoBuffer = fs.readFileSync(outputPath);
+      const { error: storageErr } = await supabaseAdmin.storage
+        .from("user-assets")
+        .upload(storageKey, videoBuffer, { contentType: "video/mp4", upsert: false });
+      if (storageErr) {
+        console.warn("[render] Storage upload failed:", storageErr.message);
+      } else {
+        const { data: { publicUrl } } = supabaseAdmin.storage
+          .from("user-assets")
+          .getPublicUrl(storageKey);
+        videoUrl = publicUrl;
+        const projectId = req.body.projectId || req.body.project?.id || null;
+        await supabaseAdmin.from("renders").insert([{
+          project_id: projectId,
+          user_id:    req.user.id,
+          video_url:  videoUrl,
+          status:     "done",
+          file_path:  storageKey,
+          created_at: new Date().toISOString(),
+        }]);
+        console.log("[render] Saved to storage + DB:", videoUrl);
+      }
+    } catch (e) {
+      console.warn("[render] Post-render save failed:", e.message);
+    }
+
     renderJobs[jobId] = {
-      progress: 100,
-      done:     true,
-      url:      `http://localhost:5000/api/render-download/${jobId}`,
-      error:    null,
+      progress:  100,
+      done:      true,
+      url:       `http://localhost:5000/api/render-download/${jobId}`,
+      video_url: videoUrl,
+      error:     null,
     };
     console.log("[render] Done:", jobId);
 

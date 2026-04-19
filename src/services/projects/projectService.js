@@ -92,6 +92,20 @@ export async function deleteProject(id) {
   if (error) throw error;
 }
 /* ─────────────────────────────────────────────────────────────
+   Renders history — per-project list from `renders` table
+───────────────────────────────────────────────────────────── */
+export async function getProjectRenders(projectId) {
+  const { data, error } = await supabase
+    .from("renders")
+    .select("id, video_url, status, created_at, file_path")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/* ─────────────────────────────────────────────────────────────
    #22 — Save rendered video URL tied to project
 ───────────────────────────────────────────────────────────── */
 export async function saveRenderedVideo(projectId, videoUrl) {
