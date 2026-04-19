@@ -412,14 +412,15 @@ function fillTextZones(beats, colorOptions = {}) {
       }
 
       // ── Video-level typography lock ────────────────────────────────────────
-      // fontFamily and fontWeight are decided once from dna.typographySystem
-      // and always win over preset flair and zoneDef.style.
-      // User manual edits (_userPreset) are still respected.
+      // Only fills fontFamily/fontWeight when the layout zone has NOT set them.
+      // Layout designer values (zoneDef.style.fontFamily etc.) are always respected —
+      // the DNA system fills gaps, it does not override deliberate layout styling.
+      // User manual edits (_userPreset) are also preserved.
       if (typographySystem && !existing?.style?._userPreset) {
         const zoneRole = zoneDef.role || (order === 0 ? "headline" : "subtext");
         const { fontFamily, fontWeight } = getTypographyForRole(typographySystem, zoneRole);
-        if (fontFamily) mergedVisual.fontFamily = fontFamily;
-        if (fontWeight) mergedVisual.fontWeight  = fontWeight;
+        if (fontFamily && !zoneDef.style?.fontFamily) mergedVisual.fontFamily = fontFamily;
+        if (fontWeight && !zoneDef.style?.fontWeight) mergedVisual.fontWeight  = fontWeight;
       }
 
       zones[zoneDef.id] = {
