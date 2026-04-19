@@ -122,22 +122,14 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
     setError("");
     setGenerating(true);
     try {
-      // Step 1 — Generate TTS on server
       const res = await serverFetch("/api/generate-tts", {
         method: "POST",
         body:   JSON.stringify({ script, voice: selectedVoice, speed }),
       });
-      if (!res.ok) throw new Error("TTS generation failed");
       const data = await res.json();
-
-      // Step 2 — Fetch the MP3 and upload to Supabase
-      const audioRes = await fetch(data.url);
-      const blob     = await audioRes.blob();
-      const file     = new File([blob], `tts-${Date.now()}.mp3`, { type: "audio/mpeg" });
-      const uploaded = await uploadUserAsset(file, null, () => {});
-
-      // Step 3 — Store Supabase URL on project
-      onGenerated({ src: uploaded.url, volume: 2, generated: true, voice: selectedVoice });
+      if (!res.ok) throw new Error(data.error || "TTS generation failed");
+      // Server uploads directly to Supabase and returns a permanent URL — use it as-is
+      onGenerated({ src: data.url, volume: 2, generated: true, voice: selectedVoice });
       setShowGenerate(false);
     } catch (e) {
       setError(e.message || "Generation failed");
