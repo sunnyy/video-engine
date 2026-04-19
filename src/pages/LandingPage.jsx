@@ -597,6 +597,7 @@ export default function LandingPage() {
               <a href="/privacy" className="footer-link">Privacy</a>
               <a href="/refunds" className="footer-link">Refunds</a>
             </div>
+            <a href="mailto:hello@vidquence.com" className="footer-link">hello@vidquence.com</a>
             <div className="footer-copy">© 2026 VIDQUENCE</div>
           </div>
         </div>

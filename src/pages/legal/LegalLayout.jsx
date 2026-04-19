@@ -19,8 +19,8 @@ export default function LegalLayout({ title, lastUpdated, children }) {
         borderBottom: "1px solid rgba(255,255,255,0.07)",
       }}>
         <button onClick={() => navigate("/")}
-          style={{ background: "none", border: "none", color: "#7c5cfc", fontSize: 20, fontWeight: 800, letterSpacing: 3, cursor: "pointer", fontFamily: "inherit" }}>
-          VIDORA
+          style={{ background: "none", border: "none", color: "#f5c518", fontSize: 20, fontWeight: 800, letterSpacing: 3, cursor: "pointer", fontFamily: "inherit" }}>
+          Vidquence
         </button>
         <button onClick={() => navigate(-1)}
           style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#aaa", fontSize: 13, padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
@@ -31,7 +31,7 @@ export default function LegalLayout({ title, lastUpdated, children }) {
       {/* Content */}
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "60px 32px 120px" }}>
         <div style={{ marginBottom: 48 }}>
-          <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#7c5cfc", marginBottom: 12 }}>Legal</div>
+          <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#f5c518", marginBottom: 12 }}>Legal</div>
           <h1 style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, lineHeight: 1.1, marginBottom: 12, color: "#fff" }}>{title}</h1>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.3)" }}>Last updated: {lastUpdated}</div>
         </div>

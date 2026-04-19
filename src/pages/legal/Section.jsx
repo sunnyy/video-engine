@@ -60,8 +60,7 @@ export function ContactBlock({ email }) {
       marginTop: 16,
     }}>
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Contact</div>
-      <div style={{ fontSize: 15, color: "#e8e8f0", fontWeight: 500 }}>PX Galaxy Studio</div>
-      <a href={`mailto:${email}`} style={{ color: "#7c5cfc", fontSize: 14, display: "block", marginTop: 8 }}>{email}</a>
+      <a href={`mailto:${email}`} style={{ color: "#f5c518", fontSize: 14, display: "block", marginTop: 8 }}>{email}</a>
     </div>
   );
 }
