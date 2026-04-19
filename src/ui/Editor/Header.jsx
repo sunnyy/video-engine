@@ -128,6 +128,7 @@ export default function Header() {
           clearInterval(interval);
           setProgress(null);
           if (databaseId) fetchRenders(databaseId);
+          fetchCredits();
         }
       }, 500);
     } catch (err) {
