@@ -246,7 +246,7 @@ export default function About() {
       <div className="flex min-h-screen text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
         <aside className="flex flex-col shrink-0 border-r" style={{ width: 220, borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
           <div className="px-4 py-5 flex items-center gap-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 28, width: "auto" }} />
+            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
           </div>
           <nav className="flex-1 px-3 py-4 overflow-y-auto">
             <div className="flex flex-col gap-[2px] mb-5">
@@ -295,7 +295,7 @@ export default function About() {
         justifyContent: "space-between",
       }}>
         <a href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
-          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 32, width: "auto" }} />
+          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
         </a>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <a href="/#pricing" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none" }}>Pricing</a>

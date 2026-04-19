@@ -359,7 +359,7 @@ export default function Dashboard() {
       >
         {/* Logo */}
         <div className="px-4 py-5 flex items-center gap-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 28, width: "auto" }} />
+          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
         </div>
 
         {/* Nav */}

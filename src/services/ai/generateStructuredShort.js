@@ -19,6 +19,7 @@ import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs"
 import { getUserRules } from "../../hooks/useUserRules";
 import { generateVideoDNA } from "../../core/videoDNA";
 import { generateZoneContent } from "./generateZoneContent";
+import { pickMotion } from "../../core/visualPlanner";
 
 /* ─────────────────────────────────────────────────────────────
    INTENT DEFINITIONS
@@ -849,7 +850,7 @@ export async function generateStructuredShort({
 
     const isLogo    = isEntity && /logo|icon/i.test(hint.search_query);
     const objectFit = isLogo ? "contain" : "cover";
-    const motion    = "none";
+    const motion    = pickMotion(beat.energy ?? 0.5, beatIndex, null, dna?.motionStyle);
 
     try {
       // Tier 1 — entity beats: search for the official image (always runs, used for zone 0 only)
@@ -963,7 +964,7 @@ export async function generateStructuredShort({
             zIndex:  0,
             start:   0, end: null,
             enterAnimation: "fadeIn", exitAnimation: "none",
-            content: { kind: "asset", asset: { src: imgUrl, type: "image", objectFit: "cover", motion: "none" } },
+            content: { kind: "asset", asset: { src: imgUrl, type: "image", objectFit: "cover", motion } },
             style:   { opacity: 1, borderRadius: 0 },
             background: {},
           };

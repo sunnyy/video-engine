@@ -40,7 +40,7 @@ const MOTIONS_BY_STYLE = {
   static:  ["parallax", "microZoom"],
 };
 
-function pickMotion(energy, index = 0, lastMotion = null, motionStyle = null) {
+export function pickMotion(energy, index = 0, lastMotion = null, motionStyle = null) {
   const pool = motionStyle && MOTIONS_BY_STYLE[motionStyle]
     ? MOTIONS_BY_STYLE[motionStyle].filter(m => m !== lastMotion)
     : MOTIONS_BY_ENERGY[energyLevel(energy)].filter(m => m !== lastMotion);

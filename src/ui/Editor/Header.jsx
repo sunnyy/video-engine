@@ -152,7 +152,7 @@ export default function Header() {
 
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 26, width: "auto" }} />
+          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
         </div>
 
         {/* Project name + dropdown */}
