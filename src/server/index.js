@@ -3690,9 +3690,6 @@ function getRazorpay() {
 
 /** POST /api/payments/create-order — create a Razorpay order for a plan */
 app.post("/api/payments/create-order", requireAuth, async (req, res) => {
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    return res.status(500).json({ error: "Payment gateway not configured. Please contact support." });
-  }
   try {
     const { planSlug, billingCycle, exchangeRate: clientRate } = req.body;
     if (!planSlug || !billingCycle) return res.status(400).json({ error: "planSlug and billingCycle required" });
