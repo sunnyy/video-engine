@@ -24,6 +24,17 @@ import https from "node:https";
 import http  from "node:http";
 import { fileURLToPath } from "url";
 
+console.log("Server starting...", new Date().toISOString());
+
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("UNHANDLED REJECTION:", reason);
+  process.exit(1);
+});
+
 dotenv.config();
 
 /* ── Auth middleware ── */
