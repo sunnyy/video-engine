@@ -571,6 +571,7 @@ function getMusicFilename(key) { return MUSIC_FILENAMES[key] || `${key}.mp3`; }
 async function bingScrapeImages(query) {
   const url = `https://www.bing.com/images/async?q=${encodeURIComponent(query)}&first=1&count=10&adlt=Moderate&mmasync=1`;
   const r   = await fetch(url, {
+    signal: AbortSignal.timeout(10000),
     headers: {
       "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
       "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -578,7 +579,11 @@ async function bingScrapeImages(query) {
       "Referer":         "https://www.bing.com/images/search",
     },
   });
-  if (!r.ok) throw new Error(`Bing scrape HTTP ${r.status}`);
+  if (!r.ok) {
+    const err = new Error(`Bing scrape HTTP ${r.status}`);
+    err.httpStatus = r.status;
+    throw err;
+  }
   const html = await r.text();
 
   // Bing embeds image URLs in multiple formats depending on region/version:
@@ -670,8 +675,11 @@ app.post("/api/search-image", requireAuth, async (req, res) => {
 
     res.status(404).json({ error: "No usable image found", query });
   } catch (e) {
-    console.error("[search] Bing scrape failed:", e.message);
-    res.status(500).json({ error: e.message });
+    // Bing blocks cloud-hosting IPs (403/429) or the scrape timed out.
+    // Return 503 (upstream dependency unavailable) — not a server bug.
+    // The generation pipeline checks res.ok and falls through to AI image gen.
+    console.warn(`[search] Bing unavailable for "${query}": ${e.message}`);
+    res.status(503).json({ error: "Image search unavailable", detail: e.message });
   }
 });
 
