@@ -10,11 +10,12 @@ import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
 import { applyBeatVariation }     from "./beatVariationEngine";
 import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
 import { planBeatVisual }         from "./visualPlanner";
-import { getLayoutDef, layoutRegistry, initLayoutRegistry } from "./registries/layoutRegistry";
+import { getLayoutDef, layoutRegistry, initLayoutRegistry, findLayouts } from "./registries/layoutRegistry";
 import { resolveColors }          from "./colorContrastResolver";
 import { resolvePresetColor, resolvePresetBackground } from "./resolveColor.js";
 import { resolveBeatColors }      from "./elements/colorContrastResolver";
-import { backgroundPatternRegistry } from "./registries/backgroundPatternRegistry.js";
+import { backgroundPatternRegistry, getBackgroundForIntent } from "./registries/backgroundPatternRegistry.js";
+import { getNicheColorFamily, getNicheAvoid } from "./registries/nichePaletteRegistry.js";
 import { pickBeatSFX } from "./registries/sfxRegistry";
 import { textStylePresets }               from "./registries/textStylePresets";
 import { PIPELINE_EFFECTS }              from "./registries/textEffectRegistry.jsx";
@@ -548,6 +549,98 @@ function fillDecorativeZones(beats, colorOptions = {}) {
   });
 }
 
+/* ─────────────────────────────────────────────────────────────
+   VIDEO-LEVEL VISUAL PLAN
+   Runs ONCE before the beat loop.
+   Returns a locked background key + a 2–3 layout rotation for
+   the entire video so all beats share the same visual identity.
+───────────────────────────────────────────────────────────── */
+
+// Minimal AI-intent → background-registry-intent mapping (subset of visualPlanner's map)
+const INTENT_TO_BG_INTENT_LOCAL = {
+  shock: "shock", curiosity: "curiosity", proof: "proof",
+  irony: "irony", reveal: "reveal", empathy: "empathy",
+  urgency: "urgency", explanation: "explanation", contrast: "contrast",
+  punchline: "punchline", hook: "shock", stat: "proof",
+};
+
+// AI-intent → layout-registry-intent (mirrors visualPlanner's AI_TO_LAYOUT_INTENT)
+const INTENT_TO_LAYOUT_INTENT_LOCAL = {
+  shock: "hook", curiosity: "hook", proof: "proof",
+  irony: "contrast", reveal: "reveal", empathy: "testimonial",
+  urgency: "escalate", explanation: "explanation", contrast: "contrast",
+  punchline: "cta", stat: "proof", hook: "hook",
+};
+
+function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
+  const niche      = dna?.niche       || null;
+  const colorStory = dna?.colorStory  || null;
+
+  // 1. Dominant intent across all beats
+  const intentCounts = {};
+  sourceBeats.forEach(b => {
+    const k = b.intent || "explanation";
+    intentCounts[k] = (intentCounts[k] || 0) + 1;
+  });
+  const dominantIntent = Object.entries(intentCounts)
+    .sort(([, a], [, b]) => b - a)[0]?.[0] || "curiosity";
+
+  // 2. Pick ONE locked background for the whole video
+  const colorFamily = getNicheColorFamily(niche);
+  const nicheAvoid  = getNicheAvoid(niche);
+  const bgIntentKey = INTENT_TO_BG_INTENT_LOCAL[dominantIntent] || "curiosity";
+
+  const lockedBg = getBackgroundForIntent(
+    bgIntentKey, "dark", colorFamily, true, niche, nicheAvoid,
+  );
+
+  // CTA beat gets a companion from the same family but a different key
+  const ctaBg = getBackgroundForIntent(
+    "urgency", "dark", colorFamily, true, niche, [lockedBg.key, ...nicheAvoid],
+  );
+
+  // 3. Pick 2–3 layout IDs for the whole video
+  const layoutIntent = INTENT_TO_LAYOUT_INTENT_LOCAL[dominantIntent] || "hook";
+  let candidates = findLayouts({ intent: layoutIntent, orientation, niche });
+  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation });
+  if (!candidates.length) candidates = findLayouts({ orientation });
+
+  // Prefer layouts that have at least one asset zone (visual richness)
+  const withAsset = candidates.filter(l => (l.def?.assetCount ?? 0) >= 1);
+  if (withAsset.length >= 2) candidates = withAsset;
+
+  // Pick up to 3 distinct layouts with different text zone counts for variety
+  const family = [];
+  const usedIds = new Set();
+  const usedTextCounts = new Set();
+  for (const l of candidates) {
+    if (family.length >= 3) break;
+    const tc = l.def?.textCount ?? 0;
+    if (usedIds.has(l.id)) continue;
+    // Allow at most one layout per text-count bucket to ensure visual variety
+    if (!usedTextCounts.has(tc) || family.length < 2) {
+      family.push(l.id);
+      usedIds.add(l.id);
+      usedTextCounts.add(tc);
+    }
+  }
+  // Ensure at least 2 entries — duplicate first if only one was found
+  if (family.length === 1) family.push(family[0]);
+  if (!family.length) family.push("DuoStackHook");
+
+  const colorLocked = {
+    bg:     colorStory?.bg      || "#0b0b10",
+    text:   colorStory?.text    || "#ffffff",
+    accent: colorStory?.primary || "#7c5cfc",
+  };
+
+  console.log(
+    `[visual-system] bg="${lockedBg.key}" ctaBg="${ctaBg.key}" layouts=[${family.join(", ")}]`,
+  );
+
+  return { backgroundKey: lockedBg.key, ctaBackgroundKey: ctaBg.key, layoutFamily: family, colorLocked };
+}
+
 /* ── Main pipeline ── */
 export async function buildBeatsFromScript({
   script           = "",
@@ -607,6 +700,9 @@ export async function buildBeatsFromScript({
   let lastMotion    = null;
   let lastSFXKey    = null;
 
+  /* ── VIDEO-LEVEL VISUAL SYSTEM — locked once for the whole video ── */
+  const visualSystem = planVideoVisualSystem(sourceBeats, dna, orientation);
+
   /* ── Build beats ── */
   let beats = sourceBeats.map((item, index) => {
     const spoken      = String(item.spoken || "").trim();
@@ -644,6 +740,25 @@ export async function buildBeatsFromScript({
       motionStyle: dna?.motionStyle || null,
       niche:       dna?.niche       || null,
     });
+
+    // ── Lock layout to the pre-planned family rotation ──────────────────────
+    // Override whatever planBeatVisual chose with the video-level layout family.
+    // enforceLayoutZones below rebuilds zones for the locked layout anyway.
+    const isLastBeat  = index === total - 1;
+    const familyIdx   = index % visualSystem.layoutFamily.length;
+    // Never use same layout as the immediately preceding beat — step forward one slot
+    const prevLayout  = usedLayoutIds.length ? usedLayoutIds[usedLayoutIds.length - 1] : null;
+    let lockedLayout  = visualSystem.layoutFamily[familyIdx];
+    if (lockedLayout === prevLayout && visualSystem.layoutFamily.length > 1) {
+      lockedLayout = visualSystem.layoutFamily[(familyIdx + 1) % visualSystem.layoutFamily.length];
+    }
+    visual.layout = lockedLayout;
+
+    // ── Lock background to ONE pattern for the whole video ───────────────────
+    visual.layoutBackground = {
+      type:  "pattern",
+      value: isLastBeat ? visualSystem.ctaBackgroundKey : visualSystem.backgroundKey,
+    };
 
     usedLayoutIds = [...usedLayoutIds, visual.layout];
     const z1Motion = visual.zones?.z1?.content?.asset?.motion;
@@ -717,6 +832,16 @@ export async function buildBeatsFromScript({
       start_sec, end_sec,
     };
   });
+
+  /* ── Consistency check ── */
+  {
+    const uniqueBgs     = new Set(beats.map(b => b.layoutBackground?.value)).size;
+    const uniqueLayouts = new Set(beats.map(b => b.layout)).size;
+    console.log(`[consistency] backgrounds: ${uniqueBgs}  layouts: ${uniqueLayouts}`);
+    if (uniqueBgs > 2) {
+      console.warn(`[consistency] WARNING: too many background variations (${uniqueBgs})`);
+    }
+  }
 
   /* ── Anti-repeat transition pass ──
      Walk beats in order; if two consecutive beats share the same transition type,
