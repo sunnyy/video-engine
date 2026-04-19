@@ -340,6 +340,7 @@ export default function Dashboard() {
         // Already confirmed complete this device — skip the DB round-trip
         if (localStorage.getItem(lsKey)) return;
         getProfile(user.id).then(profile => {
+          if (profile === null) return; // profile row missing — don't pop onboarding
           if (profile?.onboarding_completed) {
             localStorage.setItem(lsKey, "1");
           } else {

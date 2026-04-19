@@ -19,5 +19,11 @@ export async function updateProfile(userId, updates) {
 }
 
 export async function completeOnboarding(userId, { niche, goal }) {
-  await updateProfile(userId, { niche, goal, onboarding_completed: true });
+  const { error } = await supabase
+    .from("profiles")
+    .upsert(
+      { id: userId, niche, goal, onboarding_completed: true, updated_at: new Date().toISOString() },
+      { onConflict: "id" }
+    );
+  if (error) throw error;
 }
