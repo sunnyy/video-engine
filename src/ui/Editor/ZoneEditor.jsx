@@ -531,7 +531,8 @@ export default function ZoneEditor({
           <Label>AI Role</Label>
           <div className="flex gap-[4px] flex-wrap">
             {["headline","subtext","label","stat","tagline","quote","cta","display","metric"].map(r => {
-              const active = (zone.role || zoneDef?.role) === r;
+              const effectiveRole = zone.role === null ? null : (zone.role || zoneDef?.role);
+              const active = effectiveRole === r;
               return (
                 <button key={r}
                   onClick={() => setZoneLayout(slot, "role", r)}
