@@ -5,8 +5,7 @@
  */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const SERVER = import.meta.env.VITE_SERVER_URL || "http://localhost:5000";
+import { SERVER } from "../services/serverApi";
 
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;
