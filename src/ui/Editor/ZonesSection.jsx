@@ -366,7 +366,12 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
 
   const setZoneStyle       = (slot, key, value) => updateZone(slot,       { style: { ...(zones[slot]?.style || {}), [key]: value } });
   const setZoneStyleSilent = (slot, key, value) => updateZoneSilent(slot, { style: { ...(zones[slot]?.style || {}), [key]: value } });
-  const setZoneLayout       = (slot, key, value) => updateZone(slot,       { [key]: value });
+  const setZoneLayout       = (slot, key, value) => {
+    const patch = { [key]: value };
+    // Locking a zone clears its AI role so the AI won't try to fill it
+    if (key === "locked" && value === true) patch.role = null;
+    updateZone(slot, patch);
+  };
   const setZoneLayoutSilent = (slot, key, value) => updateZoneSilent(slot, { [key]: value });
   // Patch layout fields AND style keys in one atomic call (prevents second call clobbering first)
   const patchZoneSilent = (slot, layoutPatch, stylePatch) => {
