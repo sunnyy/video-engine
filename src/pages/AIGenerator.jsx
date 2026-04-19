@@ -390,8 +390,7 @@ export default function AIGenerator() {
             ← Home
           </button>
           <div className="w-[1px] h-[18px] bg-[rgba(255,255,255,0.08)]" />
-          <div className="w-[32px] h-[22px] flex items-center justify-center rounded-[4px] bg-[#f5c518] text-[#0b0b10] font-bold text-[13px]"
-            style={{ fontFamily: "'Syne',sans-serif" }}>VE</div>
+          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 26, width: "auto" }} />
           <span className="text-[15px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>
             Create Video
           </span>

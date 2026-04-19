@@ -154,6 +154,8 @@ export default function Credits() {
   const [showModal, setShowModal] = useState(false);
   const [txFilter, setTxFilter] = useState(ALL);
   const [txSearch, setTxSearch] = useState("");
+  const [txPage,   setTxPage]   = useState(1);
+  const TX_PAGE_SIZE = 25;
 
   async function load() {
     setLoading(true); setError("");
@@ -181,6 +183,9 @@ export default function Credits() {
   const filteredTx = (data?.recentTransactions || [])
     .filter(tx => txFilter === ALL || tx.type === txFilter)
     .filter(tx => !txSearch || tx.user_id?.includes(txSearch) || tx.description?.toLowerCase().includes(txSearch.toLowerCase()));
+
+  const txTotalPages = Math.max(1, Math.ceil(filteredTx.length / TX_PAGE_SIZE));
+  const pagedTx = filteredTx.slice((txPage - 1) * TX_PAGE_SIZE, txPage * TX_PAGE_SIZE);
 
   return (
     <AdminLayout>
@@ -270,12 +275,12 @@ export default function Credits() {
             {/* Filters */}
             <div className="flex gap-3 mb-4 flex-wrap items-center">
               <input type="text" placeholder="Search user ID or description…" value={txSearch}
-                onChange={e => setTxSearch(e.target.value)}
+                onChange={e => { setTxSearch(e.target.value); setTxPage(1); }}
                 className="px-3 py-2 bg-[#111118] border border-white/[0.08] rounded-lg text-sm text-white outline-none focus:border-[#7c5cfc] placeholder-[#444] w-64" />
 
               <div className="flex gap-1 flex-wrap">
                 {allTypes.map(t => (
-                  <button key={t} onClick={() => setTxFilter(t)}
+                  <button key={t} onClick={() => { setTxFilter(t); setTxPage(1); }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer border transition-colors
                       ${txFilter === t
                         ? "bg-[#7c5cfc]/20 border-[#7c5cfc]/40 text-[#a78bfa]"
@@ -299,7 +304,7 @@ export default function Credits() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTx.map((tx, i) => {
+                  {pagedTx.map((tx, i) => {
                     const col = TX_COLORS[tx.type] || "#888";
                     return (
                       <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
@@ -321,12 +326,56 @@ export default function Credits() {
                       </tr>
                     );
                   })}
-                  {filteredTx.length === 0 && (
+                  {pagedTx.length === 0 && (
                     <tr><td colSpan={6} className="px-3 py-8 text-[#444] text-center">No transactions match.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {txTotalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 px-1">
+                <div className="text-xs text-[#555]">
+                  {(txPage - 1) * TX_PAGE_SIZE + 1}–{Math.min(txPage * TX_PAGE_SIZE, filteredTx.length)} of {filteredTx.length}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setTxPage(1)} disabled={txPage === 1}
+                    className="px-2 py-1 rounded text-xs text-[#555] hover:text-white disabled:opacity-30 cursor-pointer border border-white/[0.07] bg-transparent transition-colors">
+                    «
+                  </button>
+                  <button onClick={() => setTxPage(p => p - 1)} disabled={txPage === 1}
+                    className="px-3 py-1 rounded text-xs text-[#555] hover:text-white disabled:opacity-30 cursor-pointer border border-white/[0.07] bg-transparent transition-colors">
+                    ‹ Prev
+                  </button>
+                  {Array.from({ length: txTotalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === txTotalPages || Math.abs(p - txPage) <= 2)
+                    .reduce((acc, p, idx, arr) => {
+                      if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, i) => p === "…"
+                      ? <span key={`ellipsis-${i}`} className="px-2 text-[#444] text-xs">…</span>
+                      : <button key={p} onClick={() => setTxPage(p)}
+                          className={`px-3 py-1 rounded text-xs cursor-pointer border transition-colors
+                            ${txPage === p
+                              ? "bg-[#7c5cfc]/20 border-[#7c5cfc]/40 text-[#a78bfa]"
+                              : "bg-transparent border-white/[0.07] text-[#555] hover:text-white"}`}>
+                          {p}
+                        </button>
+                    )}
+                  <button onClick={() => setTxPage(p => p + 1)} disabled={txPage === txTotalPages}
+                    className="px-3 py-1 rounded text-xs text-[#555] hover:text-white disabled:opacity-30 cursor-pointer border border-white/[0.07] bg-transparent transition-colors">
+                    Next ›
+                  </button>
+                  <button onClick={() => setTxPage(txTotalPages)} disabled={txPage === txTotalPages}
+                    className="px-2 py-1 rounded text-xs text-[#555] hover:text-white disabled:opacity-30 cursor-pointer border border-white/[0.07] bg-transparent transition-colors">
+                    »
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

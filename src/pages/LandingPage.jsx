@@ -271,8 +271,7 @@ export default function LandingPage() {
       <nav className="nav">
         <div className="nav-inner">
           <a href="/" className="nav-logo">
-            <div className="nav-logo-box">VE</div>
-            <span className="nav-logo-text">Vidquence</span>
+            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 32, width: "auto" }} />
           </a>
           <div className="nav-right">
             <a href="/about" className="nav-link">About</a>
@@ -590,7 +589,7 @@ export default function LandingPage() {
       <footer className="footer">
         <div className="container">
           <div className="footer-inner">
-            <a href="/" className="nav-logo"><div className="nav-logo-box">VE</div><span className="nav-logo-text">Vidquence</span></a>
+            <a href="/" className="nav-logo"><img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 28, width: "auto" }} /></a>
             <div className="footer-links">
               <a href="/about" className="footer-link">About</a>
               <a href="/terms" className="footer-link">Terms</a>

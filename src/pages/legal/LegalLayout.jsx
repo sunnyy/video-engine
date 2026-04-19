@@ -20,8 +20,7 @@ export default function LegalLayout({ title, lastUpdated, children }) {
       }}>
         <button onClick={() => navigate("/")}
           style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: 0 }}>
-          <div style={{ width: 30, height: 20, background: "#f5c518", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, color: "#0b0b10", borderRadius: 3, letterSpacing: "0.5px", flexShrink: 0 }}>VE</div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e8e8f0", letterSpacing: 1 }}>Vidquence</span>
+          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 30, width: "auto" }} />
         </button>
         <button onClick={() => navigate(-1)}
           style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#aaa", fontSize: 13, padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>

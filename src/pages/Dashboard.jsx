@@ -359,15 +359,7 @@ export default function Dashboard() {
       >
         {/* Logo */}
         <div className="px-4 py-5 flex items-center gap-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <div
-            className="w-[32px] h-[22px] flex items-center justify-center rounded-[4px] bg-[#f5c518] text-[#0b0b10] font-bold text-[14px]"
-            style={{ fontFamily: "'Syne',sans-serif" }}
-          >
-            VE
-          </div>
-          <span className="text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>
-            Vidquence
-          </span>
+          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 28, width: "auto" }} />
         </div>
 
         {/* Nav */}

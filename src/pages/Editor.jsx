@@ -90,7 +90,7 @@ export default function Editor() {
               <BeatList setActiveTab={setActiveTab} setBeatTab={setBeatTab} />
             </div>
 
-            <div style={{ width: "62%", minWidth: "62%", height: "100%" }}>
+            <div className="flex flex-col min-h-0" style={{ width: "62%", minWidth: "62%", height: "100%" }}>
               <SystemMessage />
 
               <CanvasPreview

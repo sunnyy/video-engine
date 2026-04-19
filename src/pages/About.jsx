@@ -246,8 +246,7 @@ export default function About() {
       <div className="flex min-h-screen text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
         <aside className="flex flex-col shrink-0 border-r" style={{ width: 220, borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
           <div className="px-4 py-5 flex items-center gap-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <div className="w-[32px] h-[22px] flex items-center justify-center rounded-[4px] bg-[#f5c518] text-[#0b0b10] font-bold text-[14px]" style={{ fontFamily: "'Syne',sans-serif" }}>VE</div>
-            <span className="text-[16px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>Vidquence</span>
+            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 28, width: "auto" }} />
           </div>
           <nav className="flex-1 px-3 py-4 overflow-y-auto">
             <div className="flex flex-col gap-[2px] mb-5">
@@ -295,13 +294,8 @@ export default function About() {
         alignItems: "center",
         justifyContent: "space-between",
       }}>
-        <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-          <div style={{
-            width: 32, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
-            borderRadius: 4, background: "#f5c518", color: "#0b0b10", fontWeight: 900, fontSize: 13,
-            fontFamily: "'Syne', sans-serif",
-          }}>VE</div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 16, color: "#e8e8f0" }}>Vidquence</span>
+        <a href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 32, width: "auto" }} />
         </a>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <a href="/#pricing" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none" }}>Pricing</a>

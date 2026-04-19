@@ -83,7 +83,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   // For 16:9 (landscape): scale to full available width — container scrolls vertically.
   // For 9:16 (portrait):  fit within both dimensions so it never overflows.
   const availW    = Math.max(0, containerSize.width  - 16);
-  const availH    = Math.max(0, containerSize.height - 16);
+  const availH    = Math.max(0, containerSize.height - 24);
   // For portrait: scale by width only — height constraint caused invisible canvas
   // when containerSize.height was measured incorrectly. Overflow clips the bottom.
   const scale     = is169
@@ -403,7 +403,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   }, [togglePlayPause]);
 
   return (
-    <div className="w-full bg-black border-l border-[rgba(255,255,255,0.06)] flex flex-col h-full">
+    <div className="w-full bg-black border-l border-[rgba(255,255,255,0.06)] flex flex-col flex-1 min-h-0 overflow-hidden">
 
       {/* Toolbar */}
       <div className="flex items-center px-3 py-[6px] border-b border-[rgba(255,255,255,0.06)] shrink-0 gap-3">
