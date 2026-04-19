@@ -25,6 +25,7 @@ import { resolveAnimatedBorderForZone }  from "./registries/animatedBorderRegist
 import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
 import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
 import { validateAIOutputs }  from "./ai/aiOutputValidator";
+import { getTypographyForRole } from "./videoDNA.js";
 
 /* ── Helpers ── */
 function words(text) {
@@ -301,6 +302,12 @@ function fillTextZones(beats, colorOptions = {}) {
     brand: { color: colorOptions.brandColor || null, color2: colorOptions.brandColor2 || null },
   };
 
+  // Lock typography system for the whole video — logged once here
+  const typographySystem = colorOptions.dna?.typographySystem || null;
+  if (typographySystem) {
+    console.log("[typography] Locking system:", typographySystem);
+  }
+
   return beats.map(beat => {
     const def = getLayoutDef(beat.layout);
     if (!def) return beat;
@@ -470,6 +477,17 @@ function fillTextZones(beats, colorOptions = {}) {
           // Text and background have the same lightness → invisible. Derive a readable colour.
           mergedVisual.color = zoneBgIsLight ? "#0a0a0a" : "#ffffff";
         }
+      }
+
+      // ── Video-level typography lock ────────────────────────────────────────
+      // fontFamily and fontWeight are decided once from dna.typographySystem
+      // and always win over preset flair and zoneDef.style.
+      // User manual edits (_userPreset) are still respected.
+      if (typographySystem && !existing?.style?._userPreset) {
+        const zoneRole = zoneDef.role || (order === 0 ? "headline" : "subtext");
+        const { fontFamily, fontWeight } = getTypographyForRole(typographySystem, zoneRole);
+        if (fontFamily) mergedVisual.fontFamily = fontFamily;
+        if (fontWeight) mergedVisual.fontWeight  = fontWeight;
       }
 
       zones[zoneDef.id] = {
