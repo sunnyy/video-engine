@@ -3132,4 +3132,10 @@ app.post("/api/webhooks/user-created", async (req, res) => {
   }
 });
 
+// Serve built frontend — must come after all API routes
+app.use(express.static(path.join(PROJECT_ROOT, "dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(PROJECT_ROOT, "dist", "index.html"));
+});
+
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));
