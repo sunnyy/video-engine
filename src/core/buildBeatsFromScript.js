@@ -344,22 +344,14 @@ function fillTextZones(beats, colorOptions = {}) {
       const presetId = pickPresetForZone(zoneDef, order, beat.intent, beat.energy ?? 0.5, colorOptions.niche || null);
       const preset   = textStylePresets.find(p => p.id === presetId);
 
-      // Fix 6: Presets are TYPOGRAPHY HINTS only in automation.
-      // Only carry fontFamily/fontWeight/fontStyle/lineHeight/textAlign from the preset.
-      // Visual properties (color, shadow, transforms, spacing, borders, background)
-      // come from DNA/colorStory and layout zone defaults — NOT from presets.
-      // Fix 1: textShadow stripped here — background-aware logic sets it below.
-      // Fix 3: textTransform stripped here — layout zone definition controls casing.
-      // Fix 4: color/background/border/padding stripped — never from preset directly.
-      const PRESET_TYPOGRAPHY_KEYS = new Set([
-        'fontFamily', 'fontWeight', 'fontStyle', 'lineHeight', 'textAlign',
-      ]);
-      const presetFlair = preset
-        ? Object.fromEntries(Object.entries(preset.style).filter(([k]) => PRESET_TYPOGRAPHY_KEYS.has(k)))
-        : {};
+      // Presets in automation: used ONLY for color-role resolution (resolvePresetColor,
+      // resolvePresetBackground). Their raw style keys (fontFamily, fontWeight, lineHeight,
+      // etc.) are NOT applied — the DNA typography lock below owns all font decisions.
+      // This prevents per-zone preset variation from breaking visual consistency.
+      const presetFlair = {}; // intentionally empty — no preset style keys in automation
 
-      // Build inject: typography flair as base, DNA color + shadow layered on top.
-      const inject = { ...presetFlair };
+      // Build inject: DNA color + shadow; no preset style pollution.
+      const inject = {};
 
       // bgIsLight is hoisted above the forEach — computed once per beat from colorOptions.
       const paletteText = colorOptions.colorStory?.text || colorOptions.dna?.colorStory?.text || "#ffffff";
@@ -382,7 +374,7 @@ function fillTextZones(beats, colorOptions = {}) {
         const resolvedBg = resolvePresetBackground(preset, colorContext);
         if (resolvedBg) inject.background = resolvedBg;
 
-        if (!bgIsLight && colors.textShadow && colors.textShadow !== "none" && !presetFlair.textShadow) {
+        if (!bgIsLight && colors.textShadow && colors.textShadow !== "none") {
           inject.textShadow = colors.textShadow;
         } else if (bgIsLight) {
           inject.textShadow = "none";
