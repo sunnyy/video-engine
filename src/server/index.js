@@ -782,6 +782,21 @@ app.post("/api/render", requireAuth, async (req, res) => {
   try {
     let { project } = req.body;
 
+    /* ── 0. Clamp transition durations — never let a transition exceed 80% of its beat ── */
+    if (project?.beats) {
+      project = {
+        ...project,
+        beats: project.beats.map((beat) => {
+          const beatDuration = (beat.end_sec ?? 0) - (beat.start_sec ?? 0);
+          const maxTransition = beatDuration * 0.8;
+          if (beat.transition?.duration && beatDuration > 0 && beat.transition.duration > maxTransition) {
+            return { ...beat, transition: { ...beat.transition, duration: Math.round(maxTransition * 100) / 100 } };
+          }
+          return beat;
+        }),
+      };
+    }
+
     console.log("[render] Job", jobId, "— caching external assets...");
     const tempFiles = []; // track all temp files to clean up after render
 

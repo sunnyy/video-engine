@@ -37,17 +37,6 @@ export default function validateProject(project) {
       errors.push(`Beat ${index + 1}: start_sec must be less than end_sec`);
     }
 
-    const beatDuration = beat.end_sec - beat.start_sec;
-
-    if (
-      beat.transition?.duration &&
-      beat.transition.duration > beatDuration
-    ) {
-      errors.push(
-        `Beat ${index + 1}: Transition longer than beat duration`
-      );
-    }
-
     // Only validate zones that belong to the current layout
     const layoutDef    = layoutRegistry[beat.layout];
     const layoutZones  = layoutDef?.zones || Object.keys(beat.zones || {});
