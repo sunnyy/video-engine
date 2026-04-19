@@ -864,24 +864,11 @@ export async function generateStructuredShort({
           });
           if (searchRes.ok) {
             const searchData = await searchRes.json();
-            const tempUrl    = searchData.url || null;
-            if (tempUrl) {
-              try {
-                const imgRes   = await fetch(tempUrl);
-                const blob     = await imgRes.blob();
-                const ext      = blob.type.includes("png") ? "png" : "jpg";
-                const file     = new File([blob], `entity-${Date.now()}.${ext}`, { type: blob.type });
-                const uploaded = await uploadUserAsset(file, "image", null, "project", projectId);
-                entityImgUrl = uploaded.url;
-                console.log(`[img] Beat ${beatIndex}: entity → Supabase — ${entityImgUrl}`);
-                useAssetsStore.getState().addMyAsset({
-                  id: uploaded.id, url: uploaded.url, file_path: uploaded.file_path,
-                  type: "image", name: uploaded.name || file.name, size: uploaded.size || file.size,
-                  scope: "project", project_id: projectId || null, source: "user",
-                });
-              } catch {
-                entityImgUrl = tempUrl; // fallback: use temp URL directly
-              }
+            // Server now uploads directly to Supabase and returns a permanent URL.
+            // Use it as-is — no client-side re-fetch/re-upload needed.
+            entityImgUrl = searchData.url || null;
+            if (entityImgUrl) {
+              console.log(`[img] Beat ${beatIndex}: entity → ${entityImgUrl}`);
             }
           }
         } catch (e) {

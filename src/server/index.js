@@ -537,7 +537,7 @@ async function cacheImageStrict(url) {
     const fname    = `search-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const filePath = path.join(TEMP_DIR, fname);
     fs.writeFileSync(filePath, buffer);
-    return { localUrl: `http://localhost:5000/renders/${fname}`, filePath };
+    return { localUrl: `http://localhost:5000/renders/${fname}`, filePath, buffer, contentType: ct, ext, fname };
   } catch {
     return null;
   }
@@ -560,13 +560,27 @@ app.post("/api/search-image", requireAuth, async (req, res) => {
     for (const imgUrl of sorted) {
       const cached = await cacheImageStrict(imgUrl);
       if (cached) {
-        console.log(`[search] Cached for "${query}": ${imgUrl}`);
-        // Send response first, then schedule temp file deletion after client has time to fetch it
+        // Upload directly to Supabase storage so the URL is permanent and accessible
+        // from any environment (no localhost round-trip through the browser).
+        try {
+          const storageKey = `search/${req.user.id}/${cached.fname}`;
+          const { error: uploadErr } = await supabaseAdmin.storage
+            .from("user-assets")
+            .upload(storageKey, cached.buffer, { contentType: cached.contentType, upsert: false });
+          if (!uploadErr) {
+            const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+            try { fs.unlinkSync(cached.filePath); } catch {}
+            console.log(`[search] Uploaded to Supabase for "${query}": ${publicUrl}`);
+            res.json({ url: publicUrl, source: "bing_scrape", query });
+            return;
+          }
+          console.warn(`[search] Supabase upload failed, falling back to temp URL`);
+        } catch (e) {
+          console.warn(`[search] Supabase upload error: ${e.message}`);
+        }
+        // Fallback: temp local URL (only works in local dev)
         res.json({ url: cached.localUrl, source: "bing_scrape", query });
-        setTimeout(() => {
-          try { fs.unlinkSync(cached.filePath); } catch {}
-          console.log(`[search] Cleaned temp: ${path.basename(cached.filePath)}`);
-        }, 30_000); // 30s — plenty of time for client to download + upload to Supabase
+        setTimeout(() => { try { fs.unlinkSync(cached.filePath); } catch {} }, 30_000);
         return;
       }
     }
