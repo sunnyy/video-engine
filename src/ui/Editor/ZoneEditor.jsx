@@ -17,6 +17,7 @@ import decorativeShapeRegistry, { renderDecorativeSVG, DECORATIVE_SHAPE_OPTIONS 
 import iconRegistry, { ICON_OPTIONS, renderIconSVG } from "../../../src/core/registries/iconRegistry.jsx";
 import { decorativeById, decorativeRegistry } from "../../../src/core/registries/decorativeRegistry.js";
 import blockEditors            from "./blocks/blockEditors";
+import { serverFetch }        from "../../../src/services/serverApi";
 
 /* ── Font options ── */
 const FONT_FAMILIES = [
@@ -1948,6 +1949,31 @@ export default function ZoneEditor({
         </div>
       </Section>
 
+      {/* Remove Background — only when zone has an image src */}
+      {(() => {
+        const imgSrc = content.asset?.src;
+        if (!imgSrc || content.asset?.type === "video") return null;
+        return (
+          <RemoveBgSection
+            src={imgSrc}
+            onDone={(transparentUrl) => {
+              pushHistory();
+              const cur = useProjectStore.getState().project?.beats?.find(b => b.id === beatId);
+              if (!cur) return;
+              const zones = { ...cur.zones };
+              zones[slot] = {
+                ...(zones[slot] ?? {}),
+                content: {
+                  ...(zones[slot]?.content ?? {}),
+                  asset: { ...(zones[slot]?.content?.asset ?? {}), src: transparentUrl, objectFit: "contain" },
+                },
+              };
+              useProjectStore.getState().updateBeat(beatId, { zones });
+            }}
+          />
+        );
+      })()}
+
       <LayerSection slot={slot} setZoneLayout={setZoneLayout} currentZIndex={currentZIndex} maxZ={maxZ} minZ={minZ} isAtFront={isAtFront} isAtBack={isAtBack} hidden={safeZone.hidden} />
       </Accordion>
 
@@ -1958,6 +1984,55 @@ export default function ZoneEditor({
         </button>
       </div>
     </div>
+  );
+}
+
+/* ── Remove Background section ── */
+function RemoveBgSection({ src, onDone }) {
+  const [state, setState] = useState({ loading: false, done: false, error: null });
+
+  const handle = async () => {
+    setState({ loading: true, done: false, error: null });
+    try {
+      const r = await serverFetch("/api/admin/remove-background", {
+        method: "POST",
+        body: JSON.stringify({ imageUrl: src }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || r.status);
+      const { transparentUrl } = await r.json();
+      onDone(transparentUrl);
+      setState({ loading: false, done: true, error: null });
+    } catch (e) {
+      setState({ loading: false, done: false, error: e.message });
+    }
+  };
+
+  return (
+    <Section title="Background Removal" icon="✂️" defaultOpen={false}>
+      <div className="flex flex-col gap-3">
+        <div className="text-[11px] text-[#55556a] leading-relaxed">
+          Remove the background from this image using AI. The result will replace the current image with a transparent PNG.
+        </div>
+        {state.error && (
+          <div className="text-[11px] text-[#f87171]">{state.error}</div>
+        )}
+        {state.done && (
+          <div className="text-[11px] text-[#22c55e]">✓ Background removed</div>
+        )}
+        <button
+          onClick={handle}
+          disabled={state.loading}
+          className="w-full py-[8px] rounded-[8px] text-[12px] font-bold border cursor-pointer transition-all disabled:opacity-50"
+          style={{
+            background: state.done ? "rgba(34,197,94,0.1)" : "rgba(124,92,252,0.12)",
+            borderColor: state.done ? "rgba(34,197,94,0.3)" : "rgba(124,92,252,0.3)",
+            color: state.done ? "#22c55e" : "#a78bfa",
+          }}
+        >
+          {state.loading ? "Removing…" : state.done ? "↺ Remove Again" : "Remove Background"}
+        </button>
+      </div>
+    </Section>
   );
 }
 
