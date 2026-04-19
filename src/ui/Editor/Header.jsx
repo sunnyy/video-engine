@@ -93,7 +93,20 @@ export default function Header() {
   };
 
   const handleExport = async () => {
-    const result = validateProject(project);
+    // Clamp transition durations before validation — never block export for this
+    const clampedProject = {
+      ...project,
+      beats: (project?.beats || []).map((beat) => {
+        const beatDuration = (beat.end_sec ?? 0) - (beat.start_sec ?? 0);
+        const maxTransition = beatDuration * 0.8;
+        if (beat.transition?.duration && beatDuration > 0 && beat.transition.duration > maxTransition) {
+          return { ...beat, transition: { ...beat.transition, duration: Math.round(maxTransition * 100) / 100 } };
+        }
+        return beat;
+      }),
+    };
+
+    const result = validateProject(clampedProject);
     if (!result.valid) {
       alert(result.errors.join("\n"));
       return;
@@ -103,7 +116,7 @@ export default function Header() {
     try {
       const res = await serverFetch("/api/render", {
         method: "POST",
-        body: JSON.stringify({ project, resolution, projectId: databaseId }),
+        body: JSON.stringify({ project: clampedProject, resolution, projectId: databaseId }),
       });
       const { jobId } = await res.json();
 
