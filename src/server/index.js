@@ -877,6 +877,24 @@ app.post("/api/render", requireAuth, async (req, res) => {
     }
     if (project?.avatar?.src) project.avatar.src = clean(project.avatar.src);
 
+    /* ── 3.5. Embed layout definitions so Remotion never needs Supabase inside Chromium ── */
+    try {
+      const layoutIds = [...new Set((project.beats || []).map(b => b.layout).filter(Boolean))];
+      if (layoutIds.length > 0) {
+        const { data: layoutRows } = await supabaseAdmin
+          .from("layouts")
+          .select("*")
+          .in("id", layoutIds);
+        if (layoutRows?.length) {
+          const layoutDefs = Object.fromEntries(layoutRows.map(r => [r.id, r]));
+          project = { ...project, meta: { ...project.meta, layoutDefs } };
+          console.log(`[render] Embedded ${layoutRows.length} layout defs into inputProps`);
+        }
+      }
+    } catch (e) {
+      console.warn("[render] Failed to embed layout defs:", e.message);
+    }
+
     /* ── 4. Get cached bundle ── */
     const serveUrl = await getBundle();
 

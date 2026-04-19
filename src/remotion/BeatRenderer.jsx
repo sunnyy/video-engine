@@ -16,10 +16,11 @@ import { getLayoutDef, getAllLayouts } from "../core/registries/layoutRegistry.j
 export default function BeatRenderer({ beat, project, previewMode = false, sequenceStartFrame = 0 }) {
 
   const layoutId = beat?.layout || "FullBleed";
-  // project.meta.inlineLayoutDef is injected by the admin LayoutEditor for unsaved/"new" layouts
-  // so the canvas shows the correct zones without needing a registry entry.
-  // Only fall back to first layout as last resort when DB is empty.
-  const layoutDef = getLayoutDef(layoutId)
+  // During rendering, layout defs are embedded in project.meta.layoutDefs by the server
+  // so Chromium never needs to call Supabase. Fall back to the live registry for the
+  // web editor preview, and to inlineLayoutDef for unsaved admin layouts.
+  const layoutDef = project?.meta?.layoutDefs?.[layoutId]
+    ?? getLayoutDef(layoutId)
     ?? project?.meta?.inlineLayoutDef
     ?? getAllLayouts()[0]?.def
     ?? null;
