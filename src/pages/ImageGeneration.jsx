@@ -304,7 +304,7 @@ export default function ImageGeneration() {
           style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
           <h1 className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Images</h1>
           <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
-            {[["generate", "Generate"], ["library", "My Library"]].map(([id, label]) => (
+            {[["generate", "Image Generator"], ["library", "My Generated Images"]].map(([id, label]) => (
               <button key={id} onClick={() => setActiveTab(id)}
                 className="px-5 py-[6px] rounded-[6px] text-[13px] font-semibold border-0 cursor-pointer transition-all"
                 style={{ background: activeTab === id ? "#f5c518" : "transparent", color: activeTab === id ? "#0b0b10" : "#55556a" }}>
@@ -465,32 +465,6 @@ export default function ImageGeneration() {
                 </div>
               )}
 
-              {/* My Generated Images — always visible below results */}
-              {library.length > 0 && (
-                <div style={{ marginTop: results.length > 0 ? 32 : 0 }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-[12px] font-bold uppercase tracking-wider" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
-                      My Generated Images
-                    </div>
-                    <button onClick={() => loadLibrary(true)}
-                      className="text-[11px] text-[#7c5cfc] bg-transparent border-0 cursor-pointer hover:opacity-80">
-                      Refresh
-                    </button>
-                  </div>
-                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
-                    {library.slice(0, 12).map((img, i) => (
-                      <ImageCard key={img.id || i} img={img} onDelete={(id) => removeImage(id)} />
-                    ))}
-                  </div>
-                  {library.length > 12 && (
-                    <button onClick={() => setActiveTab("library")}
-                      className="w-full mt-3 py-[8px] rounded-[8px] text-[12px] border border-[rgba(255,255,255,0.07)] bg-transparent cursor-pointer hover:border-[rgba(124,92,252,0.4)] hover:text-[#a78bfa] transition-all"
-                      style={{ color: "#55556a" }}>
-                      View all {library.length} images →
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
 
           </div>
