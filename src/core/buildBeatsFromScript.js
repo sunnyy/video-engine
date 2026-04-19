@@ -363,22 +363,23 @@ function fillTextZones(beats, colorOptions = {}) {
       const { whiteSpace: _sWS, _presetId: _sPI, color: _sC, background: _sBG, fontFamily: _sFF, fontWeight: _sFW, ...zoneDef_styleNoNowrap } =
         zoneDef.style || {};
 
-      // Strip _presetId + automation-owned color/font from existing zone style too.
-      // A prior generation may have stored stale values for these.
-      // eslint-disable-next-line no-unused-vars
-      const { _presetId: _ePI, color: _eC, background: _eBG, fontFamily: _eFF, fontWeight: _eFW, ...existingStyleClean } = existing?.style || {};
-      // Re-admit user-pinned values so manual editor choices survive.
-      if (existing?.style?._userColor)    existingStyleClean.color      = existing.style.color;
-      if (existing?.style?._userBackground) existingStyleClean.background = existing.style.background;
-      if (existing?.style?._userPreset)   {
-        existingStyleClean.fontFamily = existing.style.fontFamily;
-        existingStyleClean.fontWeight = existing.style.fontWeight;
+      // Only re-admit values the user explicitly pinned in the editor.
+      // Every other property in existing.style belongs to the layout definition or a
+      // previous automation run — spreading it would let stale fontSize, letterSpacing,
+      // textAlign, textTransform, padding, etc. from an old layout override the current
+      // layout's zone definition, causing mid-video typography/size inconsistencies.
+      const userOverrides = {};
+      if (existing?.style?._userColor)      userOverrides.color      = existing.style.color;
+      if (existing?.style?._userBackground) userOverrides.background = existing.style.background;
+      if (existing?.style?._userPreset) {
+        userOverrides.fontFamily = existing.style.fontFamily;
+        userOverrides.fontWeight = existing.style.fontWeight;
       }
 
       const mergedVisual = {
-        ...injectVisualStyle,        // baseline: textShadow, WebkitTextStroke, textEffect
-        ...zoneDef_styleNoNowrap,    // layout structure: fontSize, letterSpacing, padding…
-        ...existingStyleClean,       // user-pinned values win (color, font, bg if flagged)
+        ...injectVisualStyle,     // baseline: textShadow, WebkitTextStroke
+        ...zoneDef_styleNoNowrap, // layout structure: fontSize, letterSpacing, padding…
+        ...userOverrides,         // only explicitly user-pinned values
         whiteSpace: "normal",
       };
 
@@ -449,10 +450,9 @@ function fillTextZones(beats, colorOptions = {}) {
         content: existingContent,
         style: {
           ...mergedVisual,
-          // Metadata always from pipeline — not subject to layout/user override
           _presetId,
-          // Only apply pipeline textEffect if user hasn't set their own
-          ...(existing?.style?.textEffect ? {} : { textEffect }),
+          // Preserve user's textEffect pick; otherwise use pipeline-assigned one
+          textEffect: existing?.style?.textEffect || textEffect,
         },
       };
     });
