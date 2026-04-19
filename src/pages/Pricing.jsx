@@ -35,7 +35,6 @@ export default function Pricing() {
   }, []);
 
   const activePlans = plans
-    .filter(p => p.is_active)
     .sort((a, b) => (a.sort_order ?? 99) - (b.sort_order ?? 99));
 
   const getPrice = (plan) => {
