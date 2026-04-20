@@ -163,7 +163,7 @@ For fact beats: label="FACT #N", stat=the key number if any, visual_hint="stat",
 ${BEAT_OUTPUT_SCHEMA}
 `,
 
-  explainer: ({ topic, listCount, niche, language, audience, expandedSequence, researchContext }) => `
+  explainer: ({ topic, niche, language, audience, expandedSequence, researchContext }) => `
 You are writing a viral short-form explainer video script.
 
 TOPIC: ${topic}
@@ -178,6 +178,9 @@ CRITICAL RULE: Actually explain the thing. Don't talk about explaining it.
 - Each step beat: one specific actionable step, not a vague principle
 - Close with the real transformation or result
 - The hook spoken text MUST NOT be a question. State something directly. A question hook is a failure.
+- Even if the topic itself is phrased as a question (e.g. "What happens inside a microwave"), the hook spoken text must REFRAME it as a statement — never repeat the question. Example: topic "What happens inside a microwave" → hook "What's happening inside your microwave will change how you use it forever." NOT "Ever wonder what happens inside a microwave?"
+
+TOPIC FIDELITY — critical: The video must explain the EXACT topic given, not a subtopic or related concept. Topic "What happens inside a microwave" → explain the actual mechanism inside a microwave (magnetron, radiation, water molecules, rotation). Do NOT drift to "why food heats unevenly" or any other subtopic unless the topic explicitly asks for it.
 
 Generate exactly ${expandedSequence.length} beats:
 ${expandedSequence.map((type, i) => {
