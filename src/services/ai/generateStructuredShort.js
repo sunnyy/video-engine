@@ -218,25 +218,28 @@ export async function generateStructuredShort({
       emotionalArc: "",
       patternKey,
       expandedSequence,
-      beats: validatedBeats.map((b, i) => ({
-        order:              i,
-        spoken:             String(b.spoken || "").trim(),
-        intent:             b.intent       || "explanation",
-        energy:             typeof b.energy === "number" ? Math.min(1, Math.max(0, b.energy)) : 0.5,
-        visual_hint:        b.visual_hint  || "none",
-        text_density:       b.text_density || "medium",
-        image_count_needed: b.image_count_needed ?? 1,
-        emphasis_words:     b.emphasis_words || [],
-        headline:           b.headline  || null,
-        subtext:            b.subtext   || null,
-        label:              b.label ? b.label.toUpperCase() : null,
-        stat:               b.stat      || null,
-        tagline:            b.tagline   || null,
-        quote:              b.quote     || null,
-        cta:                b.cta ? b.cta.toUpperCase() : null,
-        asset_hint:         b.asset_hint || null,
-        beatType:           b.beatType  || expandedSequence[i] || null,
-      })),
+      beats: validatedBeats.map((b, i) => {
+        console.log("[mapping] beat", i, "stat:", b.stat, "cta:", b.cta, "label:", b.label, "beatType:", b.beatType, "→ seq:", expandedSequence[i]);
+        return {
+          order:              i,
+          spoken:             String(b.spoken || "").trim(),
+          intent:             b.intent       || "explanation",
+          energy:             typeof b.energy === "number" ? Math.min(1, Math.max(0, b.energy)) : 0.5,
+          visual_hint:        b.visual_hint  || "none",
+          text_density:       b.text_density || "medium",
+          image_count_needed: b.image_count_needed ?? 1,
+          emphasis_words:     b.emphasis_words || [],
+          headline:           b.headline  || null,
+          subtext:            b.subtext   || null,
+          label:              b.label ? b.label.toUpperCase() : null,
+          stat:               b.stat      || null,
+          tagline:            b.tagline   || null,
+          quote:              b.quote     || null,
+          cta:                b.cta ? b.cta.toUpperCase() : null,
+          asset_hint:         b.asset_hint || null,
+          beatType:           b.beatType  || expandedSequence[i] || null,
+        };
+      }),
     };
   }
 

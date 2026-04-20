@@ -821,7 +821,11 @@ export async function buildBeatsFromScript({
       headline: item.headline || null,
       subtext:  item.subtext  || null,
       label:    item.beatType === "item" ? (item.cta    || null) : (item.label || null),
-      stat:     item.beatType === "item" ? (item.label  || null) : (item.stat  || null),
+      stat:     (() => {
+        const statVal = item.beatType === "item" ? (item.label || null) : (item.stat || null);
+        console.log("[buildBeats] beat", index, "beatType:", item.beatType, "stat before remap:", item.stat, "stat after:", statVal);
+        return statVal;
+      })(),
       tagline:  item.tagline  || null,
       quote:    item.quote    || null,
       cta:      item.beatType === "item" ? null               : (item.cta   || null),
