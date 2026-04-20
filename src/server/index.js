@@ -1637,18 +1637,21 @@ app.post("/api/admin/layouts", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, label, intent, energy, niche, orientation, visibility,
             show_caption, default_transition, zones, tags, asset_count, text_count,
-            thumbnail_url, generation_meta } = req.body;
-    if (!name || !label || !intent || !Array.isArray(zones)) {
-      return res.status(400).json({ error: "name, label, intent, zones[] required" });
+            thumbnail_url, generation_meta, type, beat_type } = req.body;
+    if (!name || !label || !Array.isArray(zones)) {
+      return res.status(400).json({ error: "name, label, zones[] required" });
     }
     const { data, error } = await supabaseAdmin
       .from("layouts")
       .insert({
-        name, label, intent,
+        name, label,
+        intent:       intent       ?? "hook",
         energy:       energy       ?? ["high", "medium", "low"],
         niche:        niche        ?? [],
         orientation:  orientation  ?? "9:16",
         visibility:   visibility   ?? "active",
+        type:         type         ?? "template",
+        beat_type:    beat_type    ?? null,
         show_caption:        show_caption ?? true,
         default_transition:  default_transition ?? null,
         zones:               zones,

@@ -165,7 +165,7 @@ export function findLayouts({ intent, energy, orientation, assetCount, textCount
     if (!includeInactive && !l.isActive)                                  return false; // skip inactive unless explicitly requested
     if (type        && l.type     !== type)                               return false;
     if (beatType    && l.beatType !== beatType)                           return false;
-    if (intent      && l.intent !== intent)                               return false;
+    if (intent && !beatType && l.intent !== intent)                        return false; // beatType drives structural layouts; skip intent when beatType is set
     if (energy      && !l.energy.includes(energy))                        return false;
     if (orientation && l.orientation !== orientation)                     return false;
     if (assetCount  !== undefined && l.assetCount !== assetCount)         return false;

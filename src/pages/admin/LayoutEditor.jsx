@@ -519,15 +519,17 @@ export default function LayoutEditor() {
               </div>
             )}
 
-            {/* Intent */}
-            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>INTENT</label>
-              <select value={metaIntent} onChange={e => setMetaIntent(e.target.value)}
-                style={{ padding:"5px 8px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
-                  borderRadius:5, color:"#e8e8f0", fontSize:12, outline:"none" }}>
-                {INTENTS.map(i => <option key={i} value={i}>{i}</option>)}
-              </select>
-            </div>
+            {/* Intent — templates only (structural layouts use beatType instead) */}
+            {metaType !== "layout" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>INTENT</label>
+                <select value={metaIntent} onChange={e => setMetaIntent(e.target.value)}
+                  style={{ padding:"5px 8px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
+                    borderRadius:5, color:"#e8e8f0", fontSize:12, outline:"none" }}>
+                  {INTENTS.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </div>
+            )}
 
             {/* Visibility */}
             <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
