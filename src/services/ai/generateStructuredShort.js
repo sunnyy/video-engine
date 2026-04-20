@@ -114,6 +114,31 @@ const VIDEO_TYPE_CONFIGS = {
 };
 
 /* ─────────────────────────────────────────────────────────────
+   HOOK TEMPLATES
+   Structures proven to stop the scroll in first 3 seconds.
+───────────────────────────────────────────────────────────── */
+const HOOK_TEMPLATES = [
+  { style: "stat_shock",    example: "X did Y in Z days. Here's the number no one talks about." },
+  { style: "contradiction", example: "Everyone said it was impossible. It happened anyway." },
+  { style: "identity_hook", example: "If you do X, this is exactly what happens to you." },
+  { style: "open_loop",     example: "There's a reason why X does Y. And it's not what you think." },
+  { style: "confession",    example: "I spent 3 years doing this wrong. Here's what I missed." },
+  { style: "comparison",    example: "X made $1M. Y made $10. Same effort. Here's the difference." },
+];
+
+/* ─────────────────────────────────────────────────────────────
+   VIDEO TYPE BEAT FLOWS
+   Suggested intent sequence per video type — AI uses as a guide.
+───────────────────────────────────────────────────────────── */
+const VIDEO_TYPE_BEAT_FLOWS = {
+  revealing: "hook → curiosity → proof → reveal → cta",
+  explainer: "hook → explanation → explanation → proof → cta",
+  facts:     "hook → stat → stat → contrast → reveal → cta",
+  listicle:  "hook → list → list → list → reveal → cta",
+  viral:     "hook → shock → curiosity → irony → reveal → punchline → cta",
+};
+
+/* ─────────────────────────────────────────────────────────────
    NICHE VOICE RULES
 ───────────────────────────────────────────────────────────── */
 const NICHE_VOICE_RULES = `
@@ -218,6 +243,8 @@ LANGUAGE: ${langInstr}
 VIDEO TYPE: ${videoTypeLabel}
 TONE: ${toneLabel} — ${typeConfig.tone}. ${toneOverride}
 STRUCTURE: ${typeConfig.structure}
+VIDEO FLOW BLUEPRINT: ${VIDEO_TYPE_BEAT_FLOWS[effectiveVideoType] || VIDEO_TYPE_BEAT_FLOWS.viral}
+(Use this beat intent sequence as a guide — match energy and emotional arc to this flow)
 AVOID: ${typeConfig.avoid}
 
 AUDIENCE: ${audienceInstr}
@@ -243,6 +270,10 @@ YOUR PHILOSOPHY:
 - Pattern interrupt every 3-5 seconds. New angle, new energy, new perspective.
 - Write exactly how a human talks on camera. Contractions, incomplete sentences, pauses.
 - The CTA beat must feel earned, not forced. Never say "follow for more" — make them WANT to.
+
+HOOK STYLE GUIDE — your first beat must use one of these structures:
+${HOOK_TEMPLATES.map((h, i) => `${i + 1}. ${h.style}: "${h.example}"`).join("\n")}
+Never start with "Did you know", "Today we", "In this video", or any meta-commentary.
 
 BEAT ENERGY RULES:
 - Hook beat: Maximum shock, curiosity, or disbelief. Drop the viewer into the deep end.

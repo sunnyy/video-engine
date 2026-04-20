@@ -118,6 +118,9 @@ function pickLayout({
   role             = null,
   niche            = null,
   spokenWordCount  = 0,    // word count of the beat's spoken text
+  imageCountNeeded = null, // 0 = text-only beat, 1 = one image, 2 = two images
+  textDensity      = null, // "simple" | "medium" | "rich"
+  visualHint       = null, // "text_only" | "stat" | "comparison" | "list" | "faces" | "scene" | "product"
 }) {
   const level = energyLevel(energy);
   const layoutIntent = AI_TO_LAYOUT_INTENT[intent] || intent;
@@ -175,6 +178,41 @@ function pickLayout({
   if (spokenWordCount > 0 && spokenWordCount < 10) {
     const simple = candidates.filter(l => l.textCount <= 2);
     if (simple.length >= 1) candidates = simple;
+  }
+
+  // Signal-driven filters — applied after intent/energy matching, before dedup
+
+  // imageCountNeeded: 0 = pure text beat (no asset zone), 2 = needs two asset zones
+  if (imageCountNeeded === 0) {
+    const textOnly = candidates.filter(l => (l.def?.assetCount ?? 0) === 0);
+    if (textOnly.length >= 1) candidates = textOnly;
+  } else if (imageCountNeeded === 2) {
+    const dualAsset = candidates.filter(l => (l.def?.assetCount ?? 0) >= 2);
+    if (dualAsset.length >= 1) candidates = dualAsset;
+  }
+
+  // textDensity: "simple" = prefer ≤2 text zones, "rich" = prefer ≥3 text zones
+  if (textDensity === "simple") {
+    const sparse = candidates.filter(l => (l.def?.textCount ?? l.textCount ?? 0) <= 2);
+    if (sparse.length >= 1) candidates = sparse;
+  } else if (textDensity === "rich") {
+    const dense = candidates.filter(l => (l.def?.textCount ?? l.textCount ?? 0) >= 3);
+    if (dense.length >= 1) candidates = dense;
+  }
+
+  // visualHint: structural hint from the AI script director
+  if (visualHint === "text_only") {
+    const noAsset = candidates.filter(l => (l.def?.assetCount ?? 0) === 0);
+    if (noAsset.length >= 1) candidates = noAsset;
+  } else if (visualHint === "comparison") {
+    const sideBySide = candidates.filter(l => l.id === "SideBySide" || (l.def?.assetCount ?? 0) >= 2);
+    if (sideBySide.length >= 1) candidates = sideBySide;
+  } else if (visualHint === "list") {
+    const listLayouts = candidates.filter(l => /list|row|stack/i.test(l.id));
+    if (listLayouts.length >= 1) candidates = listLayouts;
+  } else if (visualHint === "stat") {
+    const statLayouts = candidates.filter(l => /stat|data|proof|number/i.test(l.id));
+    if (statLayouts.length >= 1) candidates = statLayouts;
   }
 
   // Exclude ALL layouts already used in this video for maximum variety
@@ -398,6 +436,9 @@ export function planBeatVisual({
   motionStyle              = null,
   niche                    = null,
   spokenWordCount          = 0,
+  imageCountNeeded         = null,
+  textDensity              = null,
+  visualHint               = null,
 }) {
   const layout = pickLayout({
     intent,
@@ -409,6 +450,9 @@ export function planBeatVisual({
     role,
     niche,
     spokenWordCount,
+    imageCountNeeded,
+    textDensity,
+    visualHint,
   });
 
   const zones = buildZones({

@@ -722,6 +722,9 @@ export async function buildBeatsFromScript({
       colorStory:  dna?.colorStory  || null,
       motionStyle: dna?.motionStyle || null,
       niche:       dna?.niche       || null,
+      imageCountNeeded: item.image_count_needed ?? null,
+      textDensity:      item.text_density       ?? null,
+      visualHint:       item.visual_hint        ?? null,
     });
 
     // ── Lock layout to the pre-planned family rotation ──────────────────────
