@@ -30,7 +30,7 @@ const FALLBACK_ROW = {
   energy: ["high", "medium", "low"],
   niche: [],
   orientation: "9:16",
-  visibility: "internal",
+  visibility: "active",
   show_caption: true,
   asset_count: 0,
   text_count: 1,
@@ -69,7 +69,10 @@ function normalize(row) {
     energy:          Array.isArray(row.energy)       ? row.energy       : ["high", "medium", "low"],
     orientation:     row.orientation || "9:16",
     niche:           Array.isArray(row.niche)        ? row.niche        : [],
-    visibility:      row.visibility  || "internal",
+    // visibility: "active" = available for AI pipeline | "inactive" = excluded from selection
+    // Legacy values "internal"/"external" treated as active for backward compatibility
+    visibility:      row.visibility  || "active",
+    isActive:        row.visibility !== "inactive",
     tags:            Array.isArray(row.tags)         ? row.tags         : [],
     thumbnail_url:   row.thumbnail_url || null,
     is_active:       row.is_active ?? true,
@@ -157,8 +160,9 @@ export function getLayoutsByNiche(niche) {
   return _rows.filter(l => !l.niche.length || l.niche.includes(niche));
 }
 
-export function findLayouts({ intent, energy, orientation, assetCount, textCount, niche, type, beatType } = {}) {
+export function findLayouts({ intent, energy, orientation, assetCount, textCount, niche, type, beatType, includeInactive = false } = {}) {
   return _rows.filter(l => {
+    if (!includeInactive && !l.isActive)                                  return false; // skip inactive unless explicitly requested
     if (type        && l.type     !== type)                               return false;
     if (beatType    && l.beatType !== beatType)                           return false;
     if (intent      && l.intent !== intent)                               return false;

@@ -1648,7 +1648,7 @@ app.post("/api/admin/layouts", requireAuth, requireAdmin, async (req, res) => {
         energy:       energy       ?? ["high", "medium", "low"],
         niche:        niche        ?? [],
         orientation:  orientation  ?? "9:16",
-        visibility:   visibility   ?? "internal",
+        visibility:   visibility   ?? "active",
         show_caption:        show_caption ?? true,
         default_transition:  default_transition ?? null,
         zones:               zones,

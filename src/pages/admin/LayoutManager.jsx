@@ -184,9 +184,9 @@ function LayoutCard({ layout, palette, onEdit, onDuplicate, onDelete, selected, 
               {layout.intent}
             </span>
           )}
-          {layout.visibility === "external" && (
+          {!layout.isActive && (
             <span style={{ padding:"2px 5px", borderRadius:4, fontSize:8,
-              background:"rgba(34,197,94,0.7)", color:"#fff" }}>public</span>
+              background:"rgba(248,113,113,0.7)", color:"#fff" }}>inactive</span>
           )}
           {layout.showCaption === false && (
             <span style={{ padding:"2px 5px", borderRadius:4, fontSize:8,
@@ -288,7 +288,8 @@ export default function LayoutManager() {
     // Field filters
     if (filterIntent !== "all" && l.intent !== filterIntent) return false;
     if (filterEnergy !== "all" && !l.energy.includes(filterEnergy)) return false;
-    if (filterVis    !== "all" && l.visibility !== filterVis) return false;
+    if (filterVis === "active"   && !l.isActive)  return false;
+    if (filterVis === "inactive" &&  l.isActive)  return false;
     if (filterBeat   !== "all" && l.beatType !== filterBeat) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -478,8 +479,8 @@ export default function LayoutManager() {
           style={{ padding:"6px 10px", background:"#111118", border:"1px solid rgba(255,255,255,0.1)",
             borderRadius:6, color:"#aaa", fontSize:12, outline:"none" }}>
           <option value="all">All Visibility</option>
-          <option value="internal">Internal</option>
-          <option value="external">External</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
         </select>
         <select value={previewNiche} onChange={e => setPreviewNiche(e.target.value)}
           style={{ padding:"6px 10px", background:"#111118", border:"1px solid rgba(255,255,255,0.1)",

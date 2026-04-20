@@ -184,7 +184,7 @@ export default function LayoutEditor() {
   const [metaIntent,     setMetaIntent]     = useState(layout?.intent          ?? "hook");
   const [metaEnergy,     setMetaEnergy]     = useState(layout?.energy          ?? ["high","medium","low"]);
   const [metaNiche,      setMetaNiche]      = useState(layout?.niche           ?? []);
-  const [metaVisibility,   setMetaVisibility]   = useState(layout?.visibility  ?? "internal");
+  const [metaVisibility,   setMetaVisibility]   = useState(layout?.visibility  ?? "active");
   const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? true);
   const [metaTransitionType, setMetaTransitionType] = useState(layout?.defaultTransition?.type ?? "");
   const [metaTransitionDur,  setMetaTransitionDur]  = useState(layout?.defaultTransition?.duration ?? 12);
@@ -233,7 +233,7 @@ export default function LayoutEditor() {
         setMetaIntent(entry.intent        ?? "hook");
         setMetaEnergy(entry.energy        ?? ["high","medium","low"]);
         setMetaNiche(entry.niche          ?? []);
-        setMetaVisibility(entry.visibility ?? "internal");
+        setMetaVisibility(entry.visibility ?? "active");
         setMetaShowCaption(entry.showCaption ?? true);
         setMetaTransitionType(entry.defaultTransition?.type ?? "");
         setMetaTransitionDur(entry.defaultTransition?.duration ?? 12);
@@ -491,15 +491,15 @@ export default function LayoutEditor() {
 
             {/* Visibility */}
             <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>VISIBILITY</label>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>STATUS</label>
               <div style={{ display:"flex", background:"#0d0d18", borderRadius:5, overflow:"hidden",
                 border:"1px solid rgba(255,255,255,0.1)" }}>
-                {["internal","external"].map(v => (
+                {[["active","Active"],["inactive","Inactive"]].map(([v, label]) => (
                   <button key={v} onClick={() => setMetaVisibility(v)}
                     style={{ padding:"5px 10px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
-                      background: metaVisibility === v ? "#7c5cfc" : "transparent",
+                      background: metaVisibility === v ? (v === "inactive" ? "#dc2626" : "#7c5cfc") : "transparent",
                       color: metaVisibility === v ? "#fff" : "#666" }}>
-                    {v}
+                    {label}
                   </button>
                 ))}
               </div>
