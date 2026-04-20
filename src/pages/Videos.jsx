@@ -201,10 +201,13 @@ function ProjectCard({ project, onDelete }) {
   );
 }
 
+const PAGE_SIZE = 12;
+
 /* ── Videos ── */
 export default function Videos() {
   const navigate = useNavigate();
   const [search,         setSearch]         = useState("");
+  const [page,           setPage]           = useState(1);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showFeedback,   setShowFeedback]   = useState(false);
   const [userId,         setUserId]         = useState(null);
@@ -255,6 +258,11 @@ export default function Videos() {
   const filtered = projects.filter(p =>
     (p.name || "").toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset to page 1 when search changes
+  const handleSearch = (val) => { setSearch(val); setPage(1); };
 
   return (
     <AppLayout>
@@ -284,7 +292,7 @@ export default function Videos() {
           {projects.length > 4 && (
             <input
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => handleSearch(e.target.value)}
               placeholder="Search videos…"
               className="bg-[#111118] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[6px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none w-[200px]"
             />
@@ -327,11 +335,49 @@ export default function Videos() {
         )}
 
         {!loading && filtered.length > 0 && (
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-            {filtered.map(p => (
-              <ProjectCard key={p.id} project={p} onDelete={handleDelete} />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+              {paginated.map(p => (
+                <ProjectCard key={p.id} project={p} onDelete={handleDelete} />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-[6px] rounded-[7px] text-[13px] font-semibold border-0 cursor-pointer transition-all disabled:opacity-30 disabled:cursor-default"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "#a0a0b8" }}
+                >
+                  ← Prev
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setPage(n)}
+                    className="w-[32px] h-[32px] rounded-[7px] text-[13px] font-bold border-0 cursor-pointer transition-all"
+                    style={{
+                      background: n === page ? "#7c5cfc" : "rgba(255,255,255,0.06)",
+                      color:      n === page ? "#fff"     : "#a0a0b8",
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-[6px] rounded-[7px] text-[13px] font-semibold border-0 cursor-pointer transition-all disabled:opacity-30 disabled:cursor-default"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "#a0a0b8" }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </AppLayout>
