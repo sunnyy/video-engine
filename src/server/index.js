@@ -397,6 +397,98 @@ Be specific. Use real numbers. No vague generalities. If you don't know exact cu
   }
 });
 
+/* ---------------- TOPIC CLASSIFIER ---------------- */
+app.post("/api/classify-topic", requireAuth, async (req, res) => {
+  try {
+    const { topic, language, audience } = req.body;
+    if (!topic) return res.status(400).json({ error: "topic required" });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 200,
+      temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content: "You are a video content classifier. Return ONLY valid JSON.",
+        },
+        {
+          role: "user",
+          content: `Classify this video topic into a pattern.
+
+Topic: "${topic}"
+Language: ${language || "english"}
+Audience: ${audience || "general"}
+
+Return ONLY JSON:
+{
+  "pattern": "listicle_simple|listicle_with_facts|facts_rapid|explainer|revealing|viral",
+  "listCount": <number or null>,
+  "niche": "entertainment|gaming|sports|finance|education|health|lifestyle|food|travel|tech|spiritual|skincare|business|music|comedy|news|motivational"
+}
+
+Rules:
+- listicle_simple: topic has a number and list-type word (ways/tips/hooks/steps etc) AND number > 7
+- listicle_with_facts: same but number <= 7
+- facts_rapid: "facts about", "did you know", "things about"
+- explainer: "how to", "guide to", "explained", "step by step"
+- revealing: "secret", "nobody knows", "shocking truth", "hidden"
+- viral: everything else`,
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content || "{}";
+    let parsed;
+    try {
+      parsed = JSON.parse(raw.replace(/```json\n?/gi, "").replace(/```\n?/gi, "").trim());
+    } catch {
+      return res.status(500).json({ error: "Classifier returned invalid JSON" });
+    }
+    res.json(parsed);
+  } catch (err) {
+    console.error("[classify-topic]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ---------------- PATTERN CONTENT GENERATION ---------------- */
+app.post("/api/generate-content", requireAuth, async (req, res) => {
+  try {
+    const { prompt, expectedBeats } = req.body;
+    if (!prompt) return res.status(400).json({ error: "prompt required" });
+
+    const deduction = await deductCredits(req.user.id, 8, "base_generation", "Video generation");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 4000,
+      temperature: 0.7,
+      messages: [
+        { role: "system", content: "You are a strict JSON generator. Output only a valid JSON array of beat objects. No markdown. No explanation." },
+        { role: "user", content: prompt },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content || "[]";
+    let beats;
+    try {
+      const cleaned = raw.replace(/```json\n?/gi, "").replace(/```\n?/gi, "").trim();
+      beats = JSON.parse(cleaned);
+      if (!Array.isArray(beats)) throw new Error("Not an array");
+    } catch {
+      return res.status(500).json({ error: "Content generation returned invalid JSON" });
+    }
+
+    console.log(`[generate-content] got ${beats.length} beats (expected ${expectedBeats})`);
+    res.json({ beats });
+  } catch (err) {
+    console.error("[generate-content]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------------- TRANSCRIPT BEAT PROCESSING ---------------- */
 app.post("/api/process-beats", requireAuth, async (req, res) => {
   try {

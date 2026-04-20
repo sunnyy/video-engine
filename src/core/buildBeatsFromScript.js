@@ -24,6 +24,7 @@ import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
 import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
 import { validateAIOutputs }  from "./ai/aiOutputValidator";
 import { getTypographyForRole } from "./videoDNA.js";
+import { getPattern } from "../services/ai/patterns";
 
 /* ── Helpers ── */
 function words(text) {
@@ -641,10 +642,14 @@ export async function buildBeatsFromScript({
   audience:         _audience         = "general",
   tone:             _tone             = "bold",
   dna              = null,
+  patternKey       = null,
 }) {
 
   /* ── Ensure layout registry is loaded before picking layouts ── */
   await initLayoutRegistry();
+
+  /* ── Pattern layout hints (override intent/energy/visual_hint per beatType) ── */
+  const patternLayoutHints = patternKey ? (getPattern(patternKey)?.layoutHints || {}) : {};
 
   /* ── Source beats ── */
   const isRich = Array.isArray(structuredBeats) &&
@@ -689,9 +694,10 @@ export async function buildBeatsFromScript({
   /* ── Build beats ── */
   let beats = sourceBeats.map((item, index) => {
     const spoken      = String(item.spoken || "").trim();
-    const intent      = item.intent      || classifyBeatIntent(spoken);
-    const energy      = item.energy      ?? 0.5;
-    const visual_hint = item.visual_hint || "none";
+    const beatHints   = patternLayoutHints[item.beatType] || {};
+    const intent      = beatHints.intent     || item.intent      || classifyBeatIntent(spoken);
+    const energy      = beatHints.energy     !== undefined ? beatHints.energy : (item.energy ?? 0.5);
+    const visual_hint = beatHints.visualHint || item.visual_hint || "none";
     const isLast      = index === total - 1;
 
     // Use Whisper timestamps if provided (talking head mode) — exact speech timing
