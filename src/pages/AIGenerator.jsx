@@ -7,6 +7,7 @@ import { getCredits } from "../services/credits/creditService";
 import { estimateCreditCost, CREDIT_COSTS } from "../core/utils/creditCosts";
 import { serverFetch } from "../services/serverApi";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
+import { BLANK_LAYOUT_ID } from "../core/registries/layoutRegistry.js";
 
 /* ── Options ──────────────────────────────────────────────── */
 
@@ -149,7 +150,7 @@ export default function AIGenerator() {
       const defaultBeat = {
         id: crypto.randomUUID(),
         order: 0,
-        layout: null,
+        layout: BLANK_LAYOUT_ID,
         layoutBackground: { type: "color", value: "#111118" },
         zones: {},
         caption: { show: true, text: "", style: "wordBlaze", position: 80, emphasis_words: [] },

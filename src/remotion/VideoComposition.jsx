@@ -43,6 +43,9 @@ function loadCaptionFonts() {
     "https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap",
     "https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap",
     "https://fonts.googleapis.com/css2?family=Pacifico&display=swap",
+    // ── Indic script support ──
+    "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;500;600;700;800;900&display=swap",
   ];
 
   fonts.forEach((url) => {

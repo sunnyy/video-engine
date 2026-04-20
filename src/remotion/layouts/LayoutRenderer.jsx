@@ -657,6 +657,13 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             ? getTypographyForRole(typographySystem, zone.role)
             : null;
 
+          // Devanagari fallback — appended to every font stack so Hindi/Sanskrit text
+          // renders correctly even when the primary font (e.g. Playfair Display) has no Devanagari glyphs.
+          const primaryFont = dnaTypo?.fontFamily ?? st.fontFamily ?? null;
+          const fontFamilyWithFallback = primaryFont && primaryFont !== "inherit"
+            ? `${primaryFont}, 'Noto Sans Devanagari', 'Noto Serif Devanagari'`
+            : "inherit";
+
           const baseStyle = {
             position:        "relative",
             display:         "block",
@@ -665,7 +672,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             boxSizing:       "border-box",
             fontSize:        adjustedFontSize,
             fontWeight:      dnaTypo?.fontWeight ?? st.fontWeight ?? 700,
-            fontFamily:      dnaTypo?.fontFamily ?? st.fontFamily ?? "inherit",
+            fontFamily:      fontFamilyWithFallback,
             fontStyle:       st.fontStyle     || "normal",
             textDecoration:  st.textDecoration || "none",
             color:           st.color         || "#ffffff",

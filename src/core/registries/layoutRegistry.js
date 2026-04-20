@@ -21,31 +21,42 @@
 
 import { supabase } from "../../lib/supabase.js";
 
-/* ── Fallback when the DB has no layouts yet ─────────────────── */
-const FALLBACK_ROW = {
-  id: "fallback",
-  name: "Fallback",
-  label: "Fallback",
-  intent: "hook",
+/* ── Built-in blank layout — always available, used for from-scratch beats ── */
+export const BLANK_LAYOUT_ID = "blank";
+const BLANK_ROW = {
+  id: BLANK_LAYOUT_ID,
+  name: "Blank",
+  label: "Blank",
+  intent: "explanation",
   energy: ["high", "medium", "low"],
   niche: [],
   orientation: "9:16",
   visibility: "active",
   show_caption: true,
-  asset_count: 0,
+  asset_count: 1,
   text_count: 1,
   tags: [],
   thumbnail_url: null,
   is_active: true,
   zones: [
     {
-      id: "z1", type: "text", role: "headline",
-      x: 5, y: 40, width: 90, height: 20, zIndex: 2,
-      style: { fontSize: 80, fontWeight: 900, textAlign: "center", color: "#ffffff" },
-      enterAnimation: "fadeIn", maxChars: 30,
+      id: "z1", type: "asset",
+      x: 0, y: 0, width: 100, height: 100, zIndex: 0,
+      style: { objectFit: "cover" },
+      enterAnimation: "fadeIn",
+    },
+    {
+      id: "z2", type: "text", role: "headline",
+      x: 5, y: 38, width: 90, height: 24, zIndex: 2,
+      style: { fontSize: 80, fontWeight: 900, textAlign: "center", color: "#ffffff",
+               lineHeight: 1.1, letterSpacing: "-0.5px" },
+      enterAnimation: "fadeIn",
     },
   ],
 };
+
+// Keep FALLBACK_ROW for the no-DB scenario
+const FALLBACK_ROW = BLANK_ROW;
 
 /* ── In-memory cache ──────────────────────────────────────────── */
 let _rows    = [];   // array of normalized entries
@@ -96,6 +107,7 @@ async function _fetch() {
   if (!supabase) {
     if (_rows.length === 0) _rows = [normalize(FALLBACK_ROW)];
     _map   = Object.fromEntries(_rows.map(r => [r.id, r]));
+    _map[BLANK_LAYOUT_ID] = normalize(BLANK_ROW);
     _ready = true;
     return _rows;
   }
@@ -116,6 +128,8 @@ async function _fetch() {
   }
 
   _map   = Object.fromEntries(_rows.map(r => [r.id, r]));
+  // Always ensure the built-in blank layout is available, regardless of DB contents
+  _map[BLANK_LAYOUT_ID] = normalize(BLANK_ROW);
   _ready = true;
   _scheduleAutoRefresh();
   return _rows;
