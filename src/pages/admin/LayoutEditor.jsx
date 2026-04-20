@@ -365,19 +365,6 @@ export default function LayoutEditor() {
         if (!res.ok) throw new Error(data.error ?? "Save failed");
         await refreshCache();
         clearTimeout(autoSaveTimer.current); // cancel pending auto-save — we just saved
-        // Sync beat.zones so any "custom" zones we just saved are now treated as layout-defined
-        // zones on the next save. Without this, stale custom-zone IDs accumulate in the layout.
-        const freshDef = layoutRegistry[layoutId]?.def;
-        if (freshDef?.zones) {
-          const freshZoneIds = new Set(freshDef.zones.map(z => z.id));
-          const currentBeat = useProjectStore.getState().project?.beats?.[0];
-          if (currentBeat) {
-            const cleanedZones = Object.fromEntries(
-              Object.entries(currentBeat.zones ?? {}).filter(([id]) => freshZoneIds.has(id))
-            );
-            useProjectStore.getState().updateBeatSilent(currentBeat.id, { zones: cleanedZones });
-          }
-        }
         setSaveMsg({ ok:true, text:`Saved ${saveZones.length} zones` });
       }
     } catch (err) {
