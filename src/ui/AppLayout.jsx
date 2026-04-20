@@ -124,19 +124,19 @@ export default function AppLayout({ children }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          <div className="flex flex-col gap-[2px] mb-5">
+          <NavSection title="Generate">
             <NavItem icon={Icons.home}    label="Dashboard"  active={location.pathname === "/dashboard"}        onClick={() => navigate("/dashboard")} />
             <NavItem icon={Icons.folder}  label="Videos"     active={location.pathname === "/videos"}           onClick={() => navigate("/videos")} />
             <NavItem icon={Icons.gallery} label="Images"     active={location.pathname === "/image-generation"} onClick={() => navigate("/image-generation")} />
-            <NavItem icon={Icons.mic}     label="Transcribe"  active={location.pathname === "/transcription"}   onClick={() => navigate("/transcription")} />
-            <NavItem icon={Icons.box}     label="Assets"     active={location.pathname === "/assets"}           onClick={() => navigate("/assets")} />
-            <NavItem icon={Icons.credits} label="Credits"    active={location.pathname === "/credits"}          onClick={() => navigate("/credits")} />
-          </div>
+            <NavItem icon={Icons.mic}     label="Transcribe" active={location.pathname === "/transcription"}    onClick={() => navigate("/transcription")} />
+          </NavSection>
 
           <NavSection title="Account">
-            <NavItem icon={Icons.star}     label="Upgrade"  active={false}                               onClick={() => { window.location.href = "/#pricing"; }} />
-            <NavItem icon={Icons.settings} label="Settings" active={location.pathname === "/settings"}   onClick={() => navigate("/settings")} />
-            <NavItem icon={Icons.message}  label="Feedback" active={location.pathname === "/feedback"}   onClick={() => navigate("/feedback")} />
+            <NavItem icon={Icons.credits}  label="Credits"   active={location.pathname === "/credits"}  onClick={() => navigate("/credits")} />
+            <NavItem icon={Icons.star}     label="Upgrade"   active={false}                             onClick={() => { window.location.href = "/#pricing"; }} />
+            <NavItem icon={Icons.box}      label="My Files"  active={location.pathname === "/assets"}   onClick={() => navigate("/assets")} />
+            <NavItem icon={Icons.settings} label="Settings"  active={location.pathname === "/settings"} onClick={() => navigate("/settings")} />
+            <NavItem icon={Icons.message}  label="Feedback"  active={location.pathname === "/feedback"} onClick={() => navigate("/feedback")} />
           </NavSection>
         </nav>
 
