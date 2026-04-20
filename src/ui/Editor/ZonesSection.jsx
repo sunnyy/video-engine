@@ -504,10 +504,11 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
                   {typeLabel}
                 </span>
                 {isHidden && <span className="text-[9px] text-[#55556a]" title="Hidden">◌</span>}
-                {row.isCustom && (
+                {!row.isOverlay && (
                   <span
                     onClick={e => { e.stopPropagation(); deleteZone(row.id); }}
                     className="text-[9px] text-[#55556a] hover:text-[#f87171] cursor-pointer leading-none opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove zone from this beat"
                   >✕</span>
                 )}
               </button>

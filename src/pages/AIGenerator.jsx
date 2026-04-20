@@ -149,9 +149,9 @@ export default function AIGenerator() {
       const defaultBeat = {
         id: crypto.randomUUID(),
         order: 0,
-        layout: "FullBleed",
+        layout: null,
         layoutBackground: { type: "color", value: "#111118" },
-        zones: { z1: { type: "asset", content: {}, style: {}, background: {} } },
+        zones: {},
         caption: { show: true, text: "", style: "wordBlaze", position: 80, emphasis_words: [] },
         spoken: "",
         intent: "explanation",
