@@ -427,10 +427,19 @@ export default function LayoutEditor() {
           {isNew ? "New Layout" : (layout?.name ?? layoutId)}
         </span>
         {!isNew && (
-          <span style={{ padding:"2px 7px", borderRadius:4, fontSize:14, fontWeight:700,
-            background:`${IC[layout?.intent]??"#888"}22`, color:IC[layout?.intent]??"#aaa" }}>
-            {layout?.intent}
-          </span>
+          metaType === "layout" ? (
+            metaBeatType ? (
+              <span style={{ padding:"2px 7px", borderRadius:4, fontSize:11, fontWeight:700,
+                background:"#f9731622", color:"#f97316" }}>
+                {metaBeatType}
+              </span>
+            ) : null
+          ) : (
+            <span style={{ padding:"2px 7px", borderRadius:4, fontSize:11, fontWeight:700,
+              background:`${IC[metaIntent]??"#888"}22`, color:IC[metaIntent]??"#aaa" }}>
+              {metaIntent}
+            </span>
+          )
         )}
 
         <div style={{ marginLeft:"auto", display:"flex", gap:8, alignItems:"center" }}>
