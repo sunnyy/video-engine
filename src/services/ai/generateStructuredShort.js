@@ -220,7 +220,7 @@ function buildUserRulesBlock() {
   return `\nCREATOR RULES (highest priority — follow without exception):\n${lines.join("\n")}\n`;
 }
 
-function buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone }) {
+function buildPrompt({ topic, videoType, language, durationCategory, context, audience, tone, listCount = null }) {
   // "auto" values → let AI infer from the topic
   const effectiveVideoType = (!videoType || videoType === "auto") ? "viral" : videoType;
   const typeConfig    = VIDEO_TYPE_CONFIGS[effectiveVideoType] || VIDEO_TYPE_CONFIGS.viral;
@@ -272,6 +272,7 @@ TONE: ${toneLabel} — ${typeConfig.tone}. ${toneOverride}
 STRUCTURE: ${typeConfig.structure}
 VIDEO FLOW BLUEPRINT: ${VIDEO_TYPE_BEAT_FLOWS[effectiveVideoType] || VIDEO_TYPE_BEAT_FLOWS.viral}
 (Use this beat intent sequence as a guide — match energy and emotional arc to this flow)
+${listCount ? `LISTICLE ITEM COUNT: This topic promises exactly ${listCount} items. You MUST generate ${listCount} item beats (one per list item) + 1 hook beat + 1 CTA beat = ${listCount + 2} beats total. Never fewer. Each item beat spoken text = one list item directly stated.` : ""}
 AVOID: ${typeConfig.avoid}
 
 AUDIENCE: ${audienceInstr}
@@ -420,6 +421,13 @@ ZONE CONTENT RULES — these fields fill layout zones independently:
 - headline and subtext must NOT share the same opening words
 - label must be a category tag, never a sentence fragment
 - All zone fields must be INDEPENDENT — no zone should repeat another zone's content
+${listCount ? `
+LISTICLE ITEM BEAT ZONE RULES (beats 1 to ${listCount}):
+- label: "HOOK #N" where N is the item number (e.g. "HOOK #1", "HOOK #2"). Max 12 chars.
+- headline: the hook itself condensed to max 6 words — punchy, direct, memorable
+- cta: the hook type in one word ALL CAPS — CURIOSITY / NEGATIVE / PERSONAL / URGENCY / EMPATHY / STORY / FOMO
+- stat: null (listicle item beats never have stats)
+- quote: null` : ""}
 `.trim();
 }
 
@@ -723,7 +731,24 @@ export async function generateStructuredShort({
     const effectiveVideoType = autoDetected || ((!videoType || videoType === "auto") ? "viral" : videoType);
     console.log("[videoType] auto-detected:", autoDetected, "→ using:", effectiveVideoType);
 
-    const prompt = buildPrompt({ topic, videoType: effectiveVideoType, language, durationCategory, context: effectiveContext, audience, tone });
+    // For listicle topics, extract the promised item count and scale beat count to match
+    const NUMBER_WORDS = { ten:10, five:5, seven:7, three:3, four:4, six:6, eight:8, nine:9, eleven:11, twelve:12 };
+    let listCount = null;
+    let effectiveDurationCategory = durationCategory;
+    if (effectiveVideoType === "listicle") {
+      const listMatch = topic.match(/\b(\d+|ten|five|seven|three|four|six|eight|nine|eleven|twelve)\b/i);
+      if (listMatch) {
+        listCount = parseInt(listMatch[1]) || NUMBER_WORDS[listMatch[1].toLowerCase()] || null;
+      }
+      if (listCount) {
+        if      (listCount <= 5)  effectiveDurationCategory = "short";
+        else if (listCount <= 8)  effectiveDurationCategory = "medium";
+        else                      effectiveDurationCategory = "long";
+        console.log(`[listicle] ${listCount} items → durationCategory overridden to "${effectiveDurationCategory}"`);
+      }
+    }
+
+    const prompt = buildPrompt({ topic, videoType: effectiveVideoType, language, durationCategory: effectiveDurationCategory, context: effectiveContext, audience, tone, listCount });
 
     const response = await serverFetch("/api/generate", {
       method: "POST",
@@ -739,10 +764,13 @@ export async function generateStructuredShort({
     parsedScript  = parseAIResponse(rawText);
 
     // Enforce minimum beat count — retry once if AI returned too few beats
-    const beatCount = BEAT_COUNTS[durationCategory] || BEAT_COUNTS.short;
-    if (parsedScript.beats.length < beatCount.min) {
-      console.warn(`[generateStructuredShort] Only ${parsedScript.beats.length} beats returned (min ${beatCount.min} for "${durationCategory}") — retrying`);
-      const retryPrompt = prompt + `\n\nCRITICAL: Your previous response returned only ${parsedScript.beats.length} beats. You MUST return at least ${beatCount.min} beats for "${durationCategory}" duration. Target is ${beatCount.max} beats. Add more distinct beats to meet the minimum.`;
+    // For listicle topics the effective beat target is listCount + 2 (hook + items + CTA)
+    const listicleTarget = listCount ? listCount + 2 : null;
+    const beatCount = BEAT_COUNTS[effectiveDurationCategory] || BEAT_COUNTS.short;
+    const minExpected = listicleTarget || beatCount.min;
+    if (parsedScript.beats.length < minExpected) {
+      console.warn(`[generateStructuredShort] Only ${parsedScript.beats.length} beats returned (min ${minExpected}) — retrying`);
+      const retryPrompt = prompt + `\n\nCRITICAL: Your previous response returned only ${parsedScript.beats.length} beats. You MUST return at least ${minExpected} beats. ${listicleTarget ? `This is a listicle with ${listCount} items — you need ${listCount} item beats + 1 hook + 1 CTA = ${listicleTarget} total.` : `Target is ${beatCount.max} beats.`} Add more distinct beats to meet the minimum.`;
       try {
         const retryRes = await serverFetch("/api/generate", {
           method: "POST",
