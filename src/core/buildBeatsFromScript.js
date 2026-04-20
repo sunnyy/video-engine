@@ -608,9 +608,36 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
       usedTextCounts.add(tc);
     }
   }
-  // Ensure at least 2 entries — duplicate first if only one was found
-  if (family.length === 1) family.push(family[0]);
-  if (!family.length) family.push("DuoStackHook");
+
+  // If primary intent pool yielded fewer than 3 unique layouts, pull from related intent pools
+  const FALLBACK_INTENTS = ["hook", "explanation", "proof", "reveal", "contrast", "cta"];
+  if (family.length < 3) {
+    for (const fallbackIntent of FALLBACK_INTENTS) {
+      if (family.length >= 3) break;
+      const fallbackCandidates = findLayouts({ intent: fallbackIntent, orientation });
+      for (const l of fallbackCandidates) {
+        if (family.length >= 3) break;
+        if (!usedIds.has(l.id)) {
+          family.push(l.id);
+          usedIds.add(l.id);
+        }
+      }
+    }
+  }
+
+  // Deduplicate — never allow the same layout twice in the rotation
+  const uniqueFamily = [...new Set(family)];
+  if (uniqueFamily.length === 1) {
+    console.warn("[visual-system] WARNING: Only 1 unique layout found — video will have no layout variety");
+  }
+
+  const finalFamily = uniqueFamily.slice(0, 3);
+  // Last resort: if still only 1, grab any other available layout
+  if (finalFamily.length === 1) {
+    const anyOther = findLayouts({ orientation }).find(l => l.id !== finalFamily[0]);
+    if (anyOther) finalFamily.push(anyOther.id);
+  }
+  if (!finalFamily.length) finalFamily.push("DuoStackHook");
 
   const colorLocked = {
     bg:     colorStory?.bg      || "#0b0b10",
@@ -619,10 +646,10 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
   };
 
   console.log(
-    `[visual-system] bg="${lockedBg.key}" ctaBg="${ctaBg.key}" layouts=[${family.join(", ")}]`,
+    `[visual-system] bg="${lockedBg.key}" ctaBg="${ctaBg.key}" layouts=[${finalFamily.join(", ")}]`,
   );
 
-  return { backgroundKey: lockedBg.key, ctaBackgroundKey: ctaBg.key, layoutFamily: family, colorLocked };
+  return { backgroundKey: lockedBg.key, ctaBackgroundKey: ctaBg.key, layoutFamily: finalFamily, colorLocked };
 }
 
 /* ── Main pipeline ── */
