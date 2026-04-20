@@ -101,8 +101,9 @@ export function expandPattern(pattern, listCount) {
     const primaryType = pattern.sequence.find(s => s === "item" || s === "fact" || s === "step");
     sequence.push(primaryType || "item");
 
-    // For listicle_with_facts, alternate with a fact every 2 items
-    if (pattern.sequence.includes("fact") && i > 0 && i % 2 === 1) {
+    // For listicle_with_facts only: alternate with a supporting fact every 2 items
+    // Guard: pattern must have BOTH "item" AND "fact" beats (not facts_rapid which only has "fact")
+    if (pattern.sequence.includes("item") && pattern.sequence.includes("fact") && i > 0 && i % 2 === 1) {
       sequence.push("fact");
     }
   }

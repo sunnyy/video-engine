@@ -143,6 +143,7 @@ CRITICAL RULE: Each fact beat must contain ONE real, specific, surprising fact.
 - Use actual numbers, names, dates — never vague generalities
 - "Popcorn kernels pop at 180°C because of a trapped water pocket" NOT "popcorn is interesting"
 - Hook: the most counterintuitive fact — state it directly, don't tease it
+- NEVER open with "Did you know" — find a more original, surprising hook. State the most shocking fact directly without asking a question.
 - Each fact more surprising than the last
 
 Generate exactly ${expandedSequence.length} beats:
