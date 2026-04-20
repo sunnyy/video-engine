@@ -216,8 +216,13 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
       // Strip automation-owned properties from layout zone styles.
       // DNA owns: color, background (inline), fontFamily, fontWeight, _presetId.
       // Layout zones contribute structure: fontSize, letterSpacing, textTransform, padding, etc.
+      // EXCEPTION: _userFontFamily on a layout zone means the designer intentionally chose that
+      // font — preserve fontFamily + fontWeight so DNA does not override the designer's choice.
       // eslint-disable-next-line no-unused-vars
-      const { _presetId: _sp, color: _sc, background: _sb, fontFamily: _sff, fontWeight: _sfw, ...layoutZoneStyle } = zoneDef.style || {};
+      const { _presetId: _sp, color: _sc, background: _sb, fontFamily: _sff, fontWeight: _sfw, ...baseLayoutStyle } = zoneDef.style || {};
+      const layoutZoneStyle = zoneDef.style?._userFontFamily
+        ? { ...baseLayoutStyle, fontFamily: _sff, fontWeight: _sfw } // keep designer-chosen font
+        : baseLayoutStyle;
       fixed[zoneDef.id] = {
         content: { kind: "text", text: "" },
         style: { ...layoutZoneStyle },
@@ -436,13 +441,19 @@ function fillTextZones(beats, colorOptions = {}) {
       }
 
       // ── Video-level typography lock (ALWAYS apply, not gap-fill) ──────────────────────
-      // layout zone color/fontFamily/fontWeight are stripped before merging, so DNA typography
-      // is the only source for these. User _userPreset flag preserves manual editor choices.
-      if (typographySystem && !existing?.style?._userPreset) {
+      // layout zone fontFamily/fontWeight are stripped before merging so DNA typography is
+      // the default source. Two opt-out flags suppress DNA and preserve a chosen font:
+      //   _userPreset  — user manually applied a preset in the editor
+      //   _userFontFamily (on zoneDef.style) — layout designer explicitly chose this font
+      if (typographySystem && !existing?.style?._userPreset && !zoneDef.style?._userFontFamily) {
         const zoneRole = zoneDef.role || (order === 0 ? "headline" : "subtext");
         const { fontFamily, fontWeight } = getTypographyForRole(typographySystem, zoneRole);
         if (fontFamily) mergedVisual.fontFamily = fontFamily;
         if (fontWeight) mergedVisual.fontWeight  = fontWeight;
+      } else if (zoneDef.style?._userFontFamily) {
+        // Layout designer's font choice — re-admit it (it was stripped from zoneDef_styleNoNowrap)
+        if (zoneDef.style.fontFamily) mergedVisual.fontFamily = zoneDef.style.fontFamily;
+        if (zoneDef.style.fontWeight) mergedVisual.fontWeight  = zoneDef.style.fontWeight;
       }
 
       zones[zoneDef.id] = {

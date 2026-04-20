@@ -229,7 +229,7 @@ export default function ZoneCanvas({
 }) {
   const updateBeatSilent   = useProjectStore((s) => s.updateBeatSilent);
   const _pushHistory       = useProjectStore((s) => s._pushHistory);
-  const typographySystem   = useProjectStore((s) => s.project?.meta?.dna?.typographySystem);
+  const typographySystem   = useProjectStore((s) => s.project?.dna?.typographySystem ?? s.project?.meta?.dna?.typographySystem);
   const inlineLayoutDef    = useProjectStore((s) => s.project?.meta?.inlineLayoutDef);
   const [editingZoneId, setEditingZoneId] = useState(null);
   const layoutDef        = getLayoutDef(beat?.layout) ?? inlineLayoutDef;

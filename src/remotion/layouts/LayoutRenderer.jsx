@@ -650,7 +650,8 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           // DNA typography override — applies fontFamily + fontWeight by zone role.
           // Only overrides when the zone style hasn't been manually edited by the user
           // (user edits set st._userFontFamily / st._userFontWeight flags).
-          const typographySystem = project?.meta?.dna?.typographySystem;
+          // DNA is stored at project.dna (not project.meta.dna).
+          const typographySystem = project?.dna?.typographySystem ?? project?.meta?.dna?.typographySystem;
           const dnaTypo = (!st._userFontFamily && typographySystem && zone.role)
             ? getTypographyForRole(typographySystem, zone.role)
             : null;

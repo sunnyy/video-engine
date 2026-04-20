@@ -28,9 +28,11 @@ export function validateBeats(beats) {
 
       layoutDef.zones.forEach((z) => {
 
-        zones[z] =
-          beat.zones && beat.zones[z]
-            ? beat.zones[z]
+        const zId = z.id || z;
+
+        zones[zId] =
+          beat.zones && beat.zones[zId]
+            ? beat.zones[zId]
             : {
                 role: "asset",
                 padding: {},
@@ -70,7 +72,7 @@ export function validateBeats(beats) {
     // Skip orphan asset zones with no src — these are failed injected bg zones from image generation
     // that accumulate across reruns and render as phantom placeholder boxes in the video.
     if (beat.zones) {
-      const defZoneSet = new Set(layoutDef ? layoutDef.zones : ["z1"]);
+      const defZoneSet = new Set(layoutDef ? layoutDef.zones.map(z => z.id || z) : ["z1"]);
       Object.entries(beat.zones).forEach(([id, zone]) => {
         if (defZoneSet.has(id)) return; // layout-def zones already handled above
         const isEmptyAsset = (zone?.type === "asset" || zone?.content?.kind === "asset")
