@@ -19,8 +19,9 @@ import ZonesSection             from "../../ui/Editor/ZonesSection";
 import BeatSection              from "../../ui/Editor/BeatSection";
 
 /* ── Constants ────────────────────────────────────────────────── */
-const NICHES   = Object.keys(nichePaletteRegistry).sort();
-const INTENTS  = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
+const NICHES     = Object.keys(nichePaletteRegistry).sort();
+const INTENTS    = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
+const BEAT_TYPES = ["hook","item","fact","stat","reveal","explanation","cta","contrast","tension"];
 const ENERGIES = ["high","medium","low"];
 const IC = {
   hook:"#f97316", proof:"#22c55e", visual_rest:"#38bdf8", escalate:"#f87171",
@@ -184,6 +185,8 @@ export default function LayoutEditor() {
   const [metaIntent,     setMetaIntent]     = useState(layout?.intent          ?? "hook");
   const [metaEnergy,     setMetaEnergy]     = useState(layout?.energy          ?? ["high","medium","low"]);
   const [metaNiche,      setMetaNiche]      = useState(layout?.niche           ?? []);
+  const [metaType,         setMetaType]         = useState(layout?.type        ?? "template");
+  const [metaBeatType,     setMetaBeatType]     = useState(layout?.beatType    ?? "");
   const [metaVisibility,   setMetaVisibility]   = useState(layout?.visibility  ?? "active");
   const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? true);
   const [metaTransitionType, setMetaTransitionType] = useState(layout?.defaultTransition?.type ?? "");
@@ -233,6 +236,8 @@ export default function LayoutEditor() {
         setMetaIntent(entry.intent        ?? "hook");
         setMetaEnergy(entry.energy        ?? ["high","medium","low"]);
         setMetaNiche(entry.niche          ?? []);
+        setMetaType(entry.type     ?? "template");
+        setMetaBeatType(entry.beatType ?? "");
         setMetaVisibility(entry.visibility ?? "active");
         setMetaShowCaption(entry.showCaption ?? true);
         setMetaTransitionType(entry.defaultTransition?.type ?? "");
@@ -328,6 +333,8 @@ export default function LayoutEditor() {
       energy:           metaEnergy,
       niche:            metaNiche,
       orientation:      "9:16",
+      type:             metaType,
+      beat_type:        metaType === "layout" && metaBeatType ? metaBeatType : null,
       visibility:       metaVisibility,
       show_caption:       metaShowCaption,
       default_transition: metaTransitionType ? { type: metaTransitionType, duration: metaTransitionDur } : null,
@@ -479,6 +486,39 @@ export default function LayoutEditor() {
                   borderRadius:5, color:"#e8e8f0", fontSize:12, outline:"none", width:160 }} />
             </div>
 
+            {/* Type */}
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>TYPE</label>
+              <div style={{ display:"flex", background:"#0d0d18", borderRadius:5, overflow:"hidden",
+                border:"1px solid rgba(255,255,255,0.1)" }}>
+                {[["template","Template"],["layout","Layout"]].map(([v, lbl]) => (
+                  <button key={v} onClick={() => { setMetaType(v); setMetaBeatType(""); }}
+                    style={{ flex:1, padding:"5px 10px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                      background: metaType === v ? "#7c5cfc" : "transparent",
+                      color: metaType === v ? "#fff" : "#666" }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Beat Type — only for layout type */}
+            {metaType === "layout" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>BEAT TYPE</label>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+                  {["", ...BEAT_TYPES].map(bt => (
+                    <button key={bt} onClick={() => setMetaBeatType(bt)}
+                      style={{ padding:"4px 9px", borderRadius:4, border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                        background: metaBeatType === bt ? "#f97316" : "#1c1c28",
+                        color: metaBeatType === bt ? "#fff" : "#666" }}>
+                      {bt === "" ? "none" : bt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Intent */}
             <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
               <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>INTENT</label>
@@ -556,22 +596,24 @@ export default function LayoutEditor() {
               </div>
             </div>
 
-            {/* Niche multi-select */}
-            <div style={{ display:"flex", flexDirection:"column", gap:4, maxWidth:400 }}>
-              <label style={{ fontSize:12, color:"#555", fontFamily:"monospace" }}>
-                NICHE <span style={{ color:"#777" }}>(empty = all niches)</span>
-              </label>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
-                {NICHES.map(n => (
-                  <button key={n} onClick={() => toggleNiche(n)}
-                    style={{ padding:"3px 7px", borderRadius:4, border:"none", cursor:"pointer", fontSize:12, fontWeight:600,
-                      background: metaNiche.includes(n) ? "#f5c518" : "#1c1c28",
-                      color: metaNiche.includes(n) ? "#0b0b10" : "#777" }}>
-                    {n}
-                  </button>
-                ))}
+            {/* Niche multi-select — templates only (structural layouts are niche-agnostic) */}
+            {metaType !== "layout" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:4, maxWidth:400 }}>
+                <label style={{ fontSize:12, color:"#555", fontFamily:"monospace" }}>
+                  NICHE <span style={{ color:"#777" }}>(empty = all niches)</span>
+                </label>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
+                  {NICHES.map(n => (
+                    <button key={n} onClick={() => toggleNiche(n)}
+                      style={{ padding:"3px 7px", borderRadius:4, border:"none", cursor:"pointer", fontSize:12, fontWeight:600,
+                        background: metaNiche.includes(n) ? "#f5c518" : "#1c1c28",
+                        color: metaNiche.includes(n) ? "#0b0b10" : "#777" }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
           </div>
         </div>
