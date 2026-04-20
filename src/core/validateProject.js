@@ -20,7 +20,8 @@ export default function validateProject(project) {
 
   beats?.forEach((beat, index) => {
 
-    if (!beat.layout) {
+    // layout: null is valid for freeform (from-scratch) beats — they have no layout def
+    if (beat.layout === undefined) {
       errors.push(`Beat ${index + 1}: Missing layout`);
     }
 
