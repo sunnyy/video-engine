@@ -44,12 +44,6 @@ const TONES = [
   { value: "emotional", label: "Emotional / Empathy" },
 ];
 
-const DURATIONS = [
-  { value: "short", label: "Short  (15–30 sec)" },
-  { value: "medium", label: "Medium (30–60 sec)" },
-  { value: "long", label: "Long   (60+ sec)" },
-];
-
 const ORIENTATIONS = [
   { value: "9:16", label: "9:16  — Vertical (TikTok / Reels)" },
   { value: "16:9", label: "16:9  — Horizontal (YouTube)" },
@@ -124,7 +118,7 @@ export default function AIGenerator() {
   // Visible fields
   const [topic, setTopic] = useState("");
   const [orientation, setOrientation] = useState("9:16");
-  const [durationCategory, setDurationCategory] = useState("short");
+
 
   // Advanced fields (collapsed by default)
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -198,12 +192,12 @@ export default function AIGenerator() {
     let estimate;
     if (mode === "talking_head") {
       const C = CREDIT_COSTS;
-      const beatCount = durationCategory === "short" ? 5 : durationCategory === "medium" ? 10 : 18;
+      const beatCount = 8;
       const images    = generateImages ? beatCount * C.ai_image : 0;
       const total = C.base_generation + C.transcription + images + C.export_local;
       estimate = { total, breakdown: { base: C.base_generation, transcription: C.transcription, images, export: C.export_local, beatCount } };
     } else {
-      estimate = estimateCreditCost(durationCategory, { tts: generateTTS, aiImages: generateImages });
+      estimate = estimateCreditCost("medium", { tts: generateTTS, aiImages: generateImages });
     }
 
     const credits = await getCredits();
@@ -270,7 +264,7 @@ export default function AIGenerator() {
       const aiResult = await generateStructuredShort({
         topic: effectiveTopic,
         context: "",
-        mode, language, orientation, durationCategory,
+        mode, language, orientation,
         generateImages,
         generateTTS: needsTTS,
         ttsVoice,
@@ -584,12 +578,6 @@ export default function AIGenerator() {
             <Label>Orientation</Label>
             <Select value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
           </div>
-          {mode === "faceless" && (
-            <div>
-              <Label>Duration</Label>
-              <Select value={durationCategory} onChange={setDurationCategory} options={DURATIONS} />
-            </div>
-          )}
           <div>
             <Label>Language</Label>
             <Select value={language} onChange={setLanguage} options={LANGUAGES} />

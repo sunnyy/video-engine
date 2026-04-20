@@ -12,8 +12,6 @@ import { serverFetch } from "../serverApi";
 import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/registries/musicRegistry";
 import { generateZoneImage } from "../../server/assets/falService";
 import { getLayoutDef, refreshCache } from "../../core/registries/layoutRegistry";
-import { uploadUserAsset } from "../assets/uploadUserAsset";
-import { useAssetsStore }  from "../../store/useAssetsStore";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
 import { generateVideoDNA } from "../../core/videoDNA";
 import { generateZoneContent } from "./generateZoneContent";
@@ -66,7 +64,6 @@ export async function generateStructuredShort({
   topic,
   mode             = "faceless",
   orientation      = "9:16",
-  durationCategory = "short",
   generateImages   = false,
   generateTTS      = false,
   ttsVoice         = "female_warm",
@@ -258,7 +255,7 @@ export async function generateStructuredShort({
 
   let beats = await buildBeatsFromScript({
     structuredBeats: parsedScript.beats,
-    mode, videoType, orientation, durationCategory,
+    mode, videoType, orientation,
     language, topic, brandColor, audience, tone,
     assetSource: "none",
     dna,
