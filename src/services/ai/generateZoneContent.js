@@ -63,7 +63,7 @@ function zoneHint(role, intent, maxChars, isGiantDisplay = false, ordinal = 1) {
       : `The main number or percentage from this beat. ${mc} e.g. 94%, ₹10L, 3X. Never a sentence.`;
     case "metric":   return `A short metric with unit. ${mc} e.g. 1M views, ₹10 lakh.`;
     case "quote":    return `A full impactful quote. ${mc} Should feel quotable.`;
-    case "cta":      return `A short action directive. ${mc} e.g. Follow Now, Learn More.`;
+    case "cta":      return `A short action phrase (2-4 words). ${mc} e.g. Follow Now, Learn More. Never a single capitalised keyword like NEGATIVE or FOMO.`;
     case "display":  return isCTA
       ? `Single bold action word. ${mc} e.g. FOLLOW, JOIN, START.`
       : `Single bold word or very short phrase. ${mc}`;
@@ -317,14 +317,17 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
 
     // Pre-generated zone content from the script director (headline, subtext, label, etc.)
     // These serve as high-quality seeds — the AI uses them as starting points per role.
+    // For item beats, beat.label = ordinal ("HOOK #3") and beat.cta = hook type tag
+    // ("NEGATIVE", "FOMO"). Item layouts use stat for the ordinal and label for the tag.
+    const isItemBeat = beat.beatType === "item";
     const preGenerated = {
       headline: beat.headline || null,
       subtext:  beat.subtext  || null,
-      label:    beat.label    || null,
-      stat:     beat.stat     || null,
+      label:    isItemBeat ? (beat.cta   || null) : (beat.label || null),
+      stat:     isItemBeat ? (beat.label || null) : (beat.stat  || null),
       tagline:  beat.tagline  || null,
       quote:    beat.quote    || null,
-      cta:      beat.cta      || null,
+      cta:      isItemBeat ? null : (beat.cta || null),
     };
 
     console.log(`[zoneContent] beat ${i} (id:${beat.id || i}) path:${layoutDef?.zones?.length ? "layoutDef" : "fallback"} textZones:`, textZones.map(z => z.id));
