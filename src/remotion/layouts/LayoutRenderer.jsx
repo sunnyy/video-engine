@@ -491,6 +491,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
                 exitTransition:  "none",
                 motion:          content.asset.motion || "none",
                 type:            content.asset.type   || "image",
+                muted:           content.asset.muted,
                 borderRadius:    0,
                 scale:           1,
               }}

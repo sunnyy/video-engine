@@ -152,7 +152,7 @@ export default function AssetRenderer({ zone, beat, slot }) {
     }}>
       <div style={{ width: "100%", height: "100%", ...style }}>
         {isVideo ? (
-          <Video src={source} muted loop style={mediaStyle}
+          <Video src={source} muted={zone?.muted !== false} loop style={mediaStyle}
             onError={(e) => console.warn("[AssetRenderer] video error", source, e)} />
         ) : (
           <Img src={source} style={mediaStyle}

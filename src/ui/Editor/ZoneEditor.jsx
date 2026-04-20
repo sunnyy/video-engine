@@ -1671,6 +1671,21 @@ export default function ZoneEditor({
                 onChange={v => setZoneStyle(slot, "objectFit", v)}
               />
             </div>
+
+            {content.asset?.type === "video" && (
+              <div>
+                <Label>Video Audio</Label>
+                <BtnGroup
+                  fullWidth
+                  options={[
+                    { label: "🔇 Muted", value: "muted" },
+                    { label: "🔊 Audio On", value: "on" },
+                  ]}
+                  value={content.asset?.muted === false ? "on" : "muted"}
+                  onChange={v => updateContentProp(slot, "muted", v !== "on")}
+                />
+              </div>
+            )}
             <div className="flex gap-3">
               <div className="flex-1">
                 <Slider label="Opacity" value={Math.round(opacity * 100)}
