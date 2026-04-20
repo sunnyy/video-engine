@@ -12,7 +12,6 @@ import LayoutRenderer from "./layouts/LayoutRenderer.jsx";
 import SFXRenderer from "./elements/SFXRenderer.jsx";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { getLayoutDef } from "../core/registries/layoutRegistry.js";
-import LayoutBackgroundRenderer from "./layouts/LayoutBackgroundRenderer.jsx";
 
 export default function BeatRenderer({ beat, project, previewMode = false, sequenceStartFrame = 0 }) {
 
@@ -30,17 +29,9 @@ export default function BeatRenderer({ beat, project, previewMode = false, seque
 
   const overlays = Array.isArray(beat.overlays) ? beat.overlays : [];
 
-  // No layout assigned — render just the background (blank canvas for from-scratch beats)
-  if (!layoutDef) {
-    const bg = beat?.layoutBackground || { type: "color", value: "#111118" };
-    return (
-      <AbsoluteFill>
-        <LayoutBackgroundRenderer background={bg} beat={beat} />
-        <OverlayRenderer overlays={overlays} />
-        <SFXRenderer beat={beat} />
-      </AbsoluteFill>
-    );
-  }
+  // No layout assigned — use a synthetic empty layoutDef so LayoutRenderer still
+  // renders any custom zones the user added (beat.zones extra zones), plus the background.
+  const effectiveLayoutDef = layoutDef || { id: null, zones: [] };
 
   return (
     <AbsoluteFill>
@@ -48,7 +39,7 @@ export default function BeatRenderer({ beat, project, previewMode = false, seque
       <LayoutRenderer
         beat={beat}
         project={project}
-        layoutDef={layoutDef}
+        layoutDef={effectiveLayoutDef}
         previewMode={previewMode}
         sequenceStartFrame={sequenceStartFrame}
       />
