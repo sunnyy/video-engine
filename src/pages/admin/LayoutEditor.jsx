@@ -188,7 +188,7 @@ export default function LayoutEditor() {
   const [metaType,         setMetaType]         = useState(layout?.type        ?? "template");
   const [metaBeatType,     setMetaBeatType]     = useState(layout?.beatType    ?? "");
   const [metaVisibility,   setMetaVisibility]   = useState(layout?.visibility  ?? "active");
-  const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? true);
+  const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? false);
   const [metaTransitionType, setMetaTransitionType] = useState(layout?.defaultTransition?.type ?? "");
   const [metaTransitionDur,  setMetaTransitionDur]  = useState(layout?.defaultTransition?.duration ?? 12);
 
@@ -545,16 +545,23 @@ export default function LayoutEditor() {
               </div>
             </div>
 
-            {/* Show captions by default */}
+            {/* Captions */}
             <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
               <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>CAPTIONS</label>
-              <button
-                onClick={() => setMetaShowCaption(v => !v)}
-                style={{ padding:"5px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
-                  borderRadius:5, background: metaShowCaption ? "#f5c518" : "#1c1c28",
-                  color: metaShowCaption ? "#0b0b10" : "#555" }}>
-                {metaShowCaption ? "Show by default" : "Hidden by default"}
-              </button>
+              <div style={{ display:"flex", background:"#0d0d18", borderRadius:5, overflow:"hidden",
+                border:"1px solid rgba(255,255,255,0.1)" }}>
+                {[["show","Show"],["hide","Hide"]].map(([v, lbl]) => {
+                  const active = v === "show" ? metaShowCaption : !metaShowCaption;
+                  return (
+                    <button key={v} onClick={() => setMetaShowCaption(v === "show")}
+                      style={{ flex:1, padding:"5px 10px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                        background: active ? "#7c5cfc" : "transparent",
+                        color: active ? "#fff" : "#666" }}>
+                      {lbl}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Default transition */}
