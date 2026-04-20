@@ -10,15 +10,6 @@ import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 
 /* ── Options ──────────────────────────────────────────────── */
 
-const VIDEO_TYPES = [
-  { value: "auto", label: "Auto — AI decides" },
-  { value: "viral", label: "Viral / Hook" },
-  { value: "entertainment", label: "Entertainment" },
-  { value: "news", label: "News" },
-  { value: "explainer", label: "Explainer" },
-  { value: "opinion", label: "Opinion / Hot Take" },
-  { value: "story", label: "Story / Narrative" },
-];
 
 const LANGUAGES = [
   { value: "auto", label: "Auto — match topic" },
@@ -117,9 +108,8 @@ function Toggle({ value, onChange }) {
 }
 
 /* ── Advanced summary line ────────────────────────────────── */
-function buildAdvancedSummary({ tone, videoType, audience, brandColor }) {
+function buildAdvancedSummary({ tone, audience, brandColor }) {
   const parts = [];
-  if (videoType !== "auto") parts.push(VIDEO_TYPES.find((o) => o.value === videoType)?.label || videoType);
   if (tone !== "auto") parts.push(TONES.find((o) => o.value === tone)?.label || tone);
   if (audience !== "general") parts.push(AUDIENCES.find((o) => o.value === audience)?.label || audience);
   if (brandColor) parts.push("Brand color set");
@@ -140,7 +130,6 @@ export default function AIGenerator() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [audience, setAudience] = useState("general");
   const [tone, setTone] = useState("auto");
-  const [videoType, setVideoType] = useState("auto");
   const [mode, setMode] = useState("faceless");
   const [language, setLanguage] = useState("english");
   const [brandColor, setBrandColor] = useState("");
@@ -267,7 +256,7 @@ export default function AIGenerator() {
     try {
       const projectName = (effectiveTopic || "Talking Head Video").slice(0, 60);
       const placeholder = buildSafeProject({
-        meta: { orientation, mode, videoType, language, brand_color: effectiveBrandColor, audience, tone },
+        meta: { orientation, mode, language, brand_color: effectiveBrandColor, audience, tone },
         script: { text: "", emotionalArc: [] },
         dna: null, audio: { tts: null, music: null }, beats: [],
         workflow: { script_completed: false, avatar_completed: false, beats_initialized: false },
@@ -281,7 +270,7 @@ export default function AIGenerator() {
       const aiResult = await generateStructuredShort({
         topic: effectiveTopic,
         context: "",
-        videoType, mode, language, orientation, durationCategory,
+        mode, language, orientation, durationCategory,
         generateImages,
         generateTTS: needsTTS,
         ttsVoice,
@@ -294,7 +283,7 @@ export default function AIGenerator() {
       });
 
       const safeProject = buildSafeProject({
-        meta: { orientation, mode, videoType, language, brand_color: effectiveBrandColor, audience, tone },
+        meta: { orientation, mode, language, brand_color: effectiveBrandColor, audience, tone },
         script: { text: aiResult.script, emotionalArc: aiResult.meta?.emotionalArc },
         dna: aiResult.meta?.dna || null,
         audio: aiResult.audio || { tts: null, music: null },
@@ -374,7 +363,6 @@ export default function AIGenerator() {
 
   const advancedSummary = buildAdvancedSummary({
     tone,
-    videoType,
     audience,
     brandColor: brandColor.trim(),
   });
@@ -686,10 +674,6 @@ export default function AIGenerator() {
                   <Label>Tone</Label>
                   <Select value={tone} onChange={setTone} options={TONES} />
                 </div>
-              </div>
-              <div>
-                <Label>Video Type</Label>
-                <Select value={videoType} onChange={setVideoType} options={VIDEO_TYPES} />
               </div>
               <div>
                 <Label>
