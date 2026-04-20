@@ -83,6 +83,7 @@ export async function generateStructuredShort({
   await refreshCache();
 
   let parsedScript;
+  let detectedNiche = null; // hoisted so it's accessible after the if/else for generateVideoDNA
 
   /* ── Transcript path (Upload Video option) — focused Claude call for beat splitting + intent ── */
   if (talkingHead?.type === "upload" && talkingHead.segments?.length) {
@@ -176,7 +177,7 @@ export async function generateStructuredShort({
     const classification = await classifyTopic({ topic, language, audience });
     const patternKey     = classification.pattern || "viral";
     const listCount      = classification.listCount || null;
-    const detectedNiche  = classification.niche || null;
+    detectedNiche  = classification.niche || null;
     console.log("[pipeline] pattern:", patternKey, "listCount:", listCount, "niche:", detectedNiche);
 
     // STEP 2 — Expand pattern into concrete beat sequence
@@ -244,10 +245,11 @@ export async function generateStructuredShort({
     ? parsedScript.beats.reduce((s, b) => s + (b.energy ?? 0.5), 0) / parsedScript.beats.length
     : 0.7;
 
+  console.log("[dna] niche from classifier:", detectedNiche, "niche from script:", parsedScript.niche);
   const dna = generateVideoDNA({
     videoType,
     tone,
-    niche:      parsedScript.niche || null,
+    niche:      detectedNiche || parsedScript.niche || null,
     energy:     avgEnergy,
     brandColor: brandColor || null,
     language,
