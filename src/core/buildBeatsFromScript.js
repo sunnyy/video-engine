@@ -305,10 +305,6 @@ function fillTextZones(beats, colorOptions = {}) {
     textZones.forEach((zoneDef, order) => {
       const existing = zones[zoneDef.id];
 
-      // User manually applied a preset — skip automation styling so it isn't clobbered on regen.
-      // NOTE: textShadow correction for _userPreset zones is handled in the separate pass below.
-      if (existing?.style?._userPreset) return;
-
       // ── Automation: NO preset involvement ────────────────────────────────────
       // Presets are for manual user styling only. In automation, all visual decisions
       // come from DNA / colorStory. This is the only way to guarantee consistency
@@ -353,14 +349,12 @@ function fillTextZones(beats, colorOptions = {}) {
       const { textEffect, ...injectVisualStyle } = inject;
 
       // Merge order (lowest → highest priority):
-      //   injectVisualStyle  — preset flair + DNA colors as the baseline
-      //   zoneDef.style      — layout definition WINS over preset (font, size, color set by designer)
-      //   existing?.style    — user edits in the editor win over both
+      //   injectVisualStyle  — DNA colors / textShadow / stroke as the baseline
+      //   zoneDef.style      — layout structure: fontSize, letterSpacing, textTransform, padding…
+      //   userOverrides      — only explicitly user-pinned values (_userColor, _userBackground)
       //
-      // Strip automation-owned + legacy preset properties from the layout zone style.
-      // DNA owns: color, background (inline), fontFamily, fontWeight.
-      // Preset system: _presetId must never flow into output.
-      // Layout zones contribute structure only: fontSize, letterSpacing, textTransform, padding…
+      // Strip DNA-owned properties from the layout zone style so DNA always wins:
+      //   color, background (inline), fontFamily, fontWeight are set by DNA — not layout defs.
       // Also strip whiteSpace:"nowrap" — dynamic content wraps by definition.
       // eslint-disable-next-line no-unused-vars
       const { whiteSpace: _sWS, _presetId: _sPI, color: _sC, background: _sBG, fontFamily: _sFF, fontWeight: _sFW, ...zoneDef_styleNoNowrap } =
@@ -374,10 +368,6 @@ function fillTextZones(beats, colorOptions = {}) {
       const userOverrides = {};
       if (existing?.style?._userColor)      userOverrides.color      = existing.style.color;
       if (existing?.style?._userBackground) userOverrides.background = existing.style.background;
-      if (existing?.style?._userPreset) {
-        userOverrides.fontFamily = existing.style.fontFamily;
-        userOverrides.fontWeight = existing.style.fontWeight;
-      }
 
       const mergedVisual = {
         ...injectVisualStyle,     // baseline: textShadow, WebkitTextStroke
@@ -438,20 +428,15 @@ function fillTextZones(beats, colorOptions = {}) {
         mergedVisual.color = paletteText;
       }
 
-      // ── Video-level typography lock (ALWAYS apply, not gap-fill) ──────────────────────
-      // layout zone fontFamily/fontWeight are stripped before merging so DNA typography is
-      // the default source. Two opt-out flags suppress DNA and preserve a chosen font:
-      //   _userPreset  — user manually applied a preset in the editor
-      //   _userFontFamily (on zoneDef.style) — layout designer explicitly chose this font
-      if (typographySystem && !existing?.style?._userPreset && !zoneDef.style?._userFontFamily) {
+      // ── Video-level typography lock — DNA always wins ──────────────────────────────────
+      // layout zone fontFamily/fontWeight are stripped before merging so DNA is the sole
+      // source of truth for fonts. The only exception: _userEditedFont means the user
+      // explicitly changed this zone's font in the editor and wants to keep it.
+      if (typographySystem && !existing?.style?._userEditedFont) {
         const zoneRole = zoneDef.role || (order === 0 ? "headline" : "subtext");
         const { fontFamily, fontWeight } = getTypographyForRole(typographySystem, zoneRole);
         if (fontFamily) mergedVisual.fontFamily = fontFamily;
         if (fontWeight) mergedVisual.fontWeight  = fontWeight;
-      } else if (zoneDef.style?._userFontFamily) {
-        // Layout designer's font choice — re-admit it (it was stripped from zoneDef_styleNoNowrap)
-        if (zoneDef.style.fontFamily) mergedVisual.fontFamily = zoneDef.style.fontFamily;
-        if (zoneDef.style.fontWeight) mergedVisual.fontWeight  = zoneDef.style.fontWeight;
       }
 
       zones[zoneDef.id] = {
@@ -463,22 +448,6 @@ function fillTextZones(beats, colorOptions = {}) {
           textEffect: existing?.style?.textEffect || textEffect,
         },
       };
-    });
-
-    // Fix 2: textShadow removal applies to ALL zones regardless of _userPreset.
-    // _userPreset preserves the user's typography choice, but background-aware contrast
-    // corrections must still run — presets are assigned by automation, not deliberately chosen
-    // by the user with the intent to keep a text shadow on a light background.
-    textZones.forEach(zoneDef => {
-      const existing = zones[zoneDef.id];
-      if (!existing?.style?._userPreset) return; // already corrected in the main pass above
-      const zoneBgIsLight = typeof existing.style.background === "string" && isLightColor(existing.style.background);
-      if (bgIsLight || zoneBgIsLight) {
-        zones[zoneDef.id] = {
-          ...existing,
-          style: { ...existing.style, textShadow: "none" },
-        };
-      }
     });
 
     return { ...beat, zones };
