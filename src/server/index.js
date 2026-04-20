@@ -1709,6 +1709,41 @@ app.delete("/api/admin/layouts/:id", requireAuth, requireAdmin, async (req, res)
   }
 });
 
+// POST bulk update layouts (type, beat_type, etc.)
+app.post("/api/admin/layouts/bulk-update", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids, updates } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: "ids[] required" });
+    if (!updates || typeof updates !== "object") return res.status(400).json({ error: "updates object required" });
+    const { error } = await supabaseAdmin
+      .from("layouts")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .in("id", ids);
+    if (error) throw error;
+    res.json({ success: true, updated: ids.length });
+  } catch (err) {
+    console.error("[admin/layouts bulk-update]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST bulk delete layouts
+app.post("/api/admin/layouts/bulk-delete", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: "ids[] required" });
+    const { error } = await supabaseAdmin
+      .from("layouts")
+      .delete()
+      .in("id", ids);
+    if (error) throw error;
+    res.json({ success: true, deleted: ids.length });
+  } catch (err) {
+    console.error("[admin/layouts bulk-delete]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST duplicate a layout
 app.post("/api/admin/layouts/:id/duplicate", requireAuth, requireAdmin, async (req, res) => {
   try {

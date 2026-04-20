@@ -61,6 +61,9 @@ function normalize(row) {
     id:              row.id,
     name:            row.name,
     label:           row.label || row.name,
+    // Layout vs Template classification
+    type:            row.type     || "template",   // 'layout' = structural AI-use | 'template' = styled user-facing
+    beatType:        row.beat_type || null,         // hook|item|fact|stat|reveal|explanation|cta|contrast|tension
     // Layout metadata
     intent:          row.intent,
     energy:          Array.isArray(row.energy)       ? row.energy       : ["high", "medium", "low"],
@@ -154,8 +157,10 @@ export function getLayoutsByNiche(niche) {
   return _rows.filter(l => !l.niche.length || l.niche.includes(niche));
 }
 
-export function findLayouts({ intent, energy, orientation, assetCount, textCount, niche } = {}) {
+export function findLayouts({ intent, energy, orientation, assetCount, textCount, niche, type, beatType } = {}) {
   return _rows.filter(l => {
+    if (type        && l.type     !== type)                               return false;
+    if (beatType    && l.beatType !== beatType)                           return false;
     if (intent      && l.intent !== intent)                               return false;
     if (energy      && !l.energy.includes(energy))                        return false;
     if (orientation && l.orientation !== orientation)                     return false;

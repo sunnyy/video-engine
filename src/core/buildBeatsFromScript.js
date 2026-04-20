@@ -585,7 +585,10 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
 
   // 3. Pick 2–3 layout IDs for the whole video
   const layoutIntent = INTENT_TO_LAYOUT_INTENT_LOCAL[dominantIntent] || "hook";
-  let candidates = findLayouts({ intent: layoutIntent, orientation, niche });
+  // Prefer structural 'layout' type rows; fall back to all layouts when none exist yet
+  let candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout" });
+  if (!candidates.length) candidates = findLayouts({ orientation, type: "layout" });
+  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation, niche });
   if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation });
   if (!candidates.length) candidates = findLayouts({ orientation });
 
@@ -614,7 +617,11 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
   if (family.length < 3) {
     for (const fallbackIntent of FALLBACK_INTENTS) {
       if (family.length >= 3) break;
-      const fallbackCandidates = findLayouts({ intent: fallbackIntent, orientation });
+      // Prefer structural layouts; fall back to all
+      const fallbackCandidates =
+        findLayouts({ intent: fallbackIntent, orientation, type: "layout" }).length
+          ? findLayouts({ intent: fallbackIntent, orientation, type: "layout" })
+          : findLayouts({ intent: fallbackIntent, orientation });
       for (const l of fallbackCandidates) {
         if (family.length >= 3) break;
         if (!usedIds.has(l.id)) {
@@ -758,6 +765,7 @@ export async function buildBeatsFromScript({
       imageCountNeeded: item.image_count_needed ?? null,
       textDensity:      item.text_density       ?? null,
       visualHint:       item.visual_hint        ?? null,
+      beatType:         item.beatType           ?? null,
     });
 
     // ── Lock layout to the pre-planned family rotation ──────────────────────

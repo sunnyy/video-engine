@@ -121,24 +121,39 @@ function pickLayout({
   imageCountNeeded = null, // 0 = text-only beat, 1 = one image, 2 = two images
   textDensity      = null, // "simple" | "medium" | "rich"
   visualHint       = null, // "text_only" | "stat" | "comparison" | "list" | "faces" | "scene" | "product"
+  beatType         = null, // hook|item|fact|stat|reveal|explanation|cta|contrast|tension
 }) {
   const level = energyLevel(energy);
   const layoutIntent = AI_TO_LAYOUT_INTENT[intent] || intent;
 
-  // Try intent + energy + orientation + niche
-  let candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, niche });
+  // PRIMARY: beatType filter on structural 'layout' type rows
+  // When structural layouts exist in DB, this gives the most accurate zone-structure match.
+  // Falls back to intent-based matching when no structural layouts exist yet.
+  let candidates = beatType
+    ? findLayouts({ beatType, type: "layout", orientation })
+    : [];
 
-  // Relax energy if no match
+  // beatType + orientation yielded nothing — try type='layout' with intent
+  if (!candidates.length) {
+    candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, type: "layout" });
+  }
+  if (!candidates.length) {
+    candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout" });
+  }
+  if (!candidates.length) {
+    candidates = findLayouts({ orientation, type: "layout" });
+  }
+
+  // No structural layouts in DB yet — fall back to all layouts (templates) by intent
+  if (!candidates.length) {
+    candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, niche });
+  }
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, orientation, niche });
   }
-
-  // Relax niche if still no match
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, orientation });
   }
-
-  // Relax intent if still no match
   if (!candidates.length) {
     candidates = findLayouts({ orientation });
   }
@@ -439,6 +454,7 @@ export function planBeatVisual({
   imageCountNeeded         = null,
   textDensity              = null,
   visualHint               = null,
+  beatType                 = null,
 }) {
   const layout = pickLayout({
     intent,
@@ -453,6 +469,7 @@ export function planBeatVisual({
     imageCountNeeded,
     textDensity,
     visualHint,
+    beatType,
   });
 
   const zones = buildZones({
