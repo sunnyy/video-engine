@@ -46,7 +46,8 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
   const end   = start + duration;
 
   // Caption show default — driven by layout's show_caption boolean
-  const layoutDef          = layoutRegistry[raw.layout || "FullBleed"];
+  const resolvedLayout     = raw.layout || null;
+  const layoutDef          = resolvedLayout ? layoutRegistry[resolvedLayout] : null;
   const captionShowDefault = layoutDef?.showCaption ?? true;
   const captionShow = captionRaw.show !== undefined ? captionRaw.show : captionShowDefault;
 
@@ -54,7 +55,7 @@ export function normalizeBeat(raw = {}, index = 0, meta = {}) {
     id:    raw.id || crypto.randomUUID(),
     order: index,
 
-    layout:           raw.layout || "FullBleed",
+    layout:           resolvedLayout,
     layoutBackground,
     layoutPadding:    raw.layoutPadding || 0,
 
