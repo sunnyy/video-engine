@@ -315,6 +315,7 @@ function fillTextZones(beats, colorOptions = {}) {
       const inject = {};
 
       // Color: always the DNA palette text color — contrast-safe for this niche's bg.
+      console.log("[fillTextZones] paletteText:", paletteText, "colorStory:", JSON.stringify(colorOptions.colorStory?.text), "dna:", JSON.stringify(colorOptions.dna?.colorStory?.text));
       inject.color = paletteText;
 
       // Text shadow: DNA-driven, stripped on light backgrounds.
