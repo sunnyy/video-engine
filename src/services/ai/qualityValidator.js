@@ -17,6 +17,17 @@ const INTENT_SCENES = {
   irony:       "Two contrasting scenes side by side, dramatic lighting",
 };
 
+const REAL_METRIC_RE = /^[\d$€£¥%.,\s+\-xX]+$/;
+
+function fixItemBeatStat(beat) {
+  if (beat.beatType !== "item") return beat;
+  if (!beat.stat) return beat;
+  if (!REAL_METRIC_RE.test(String(beat.stat).trim())) {
+    return { ...beat, stat: null };
+  }
+  return beat;
+}
+
 function fixAssetHint(beat) {
   if (!beat.asset_hint?.prompt) return beat;
 
@@ -71,7 +82,7 @@ export async function validateContent({ beats, pattern, expandedSequence, listCo
   }
 
   // Fix issues locally — no retry needed
-  const fixedBeats = beats.map(fixAssetHint);
+  const fixedBeats = beats.map(fixItemBeatStat).map(fixAssetHint);
 
   if (issues.length === 0) {
     console.log("[validator] ✓ Content passed all checks");

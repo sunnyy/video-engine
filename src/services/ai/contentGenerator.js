@@ -96,6 +96,7 @@ For item beats:
 - headline: the item/hook condensed to max 5 words in ALL CAPS
 - cta: hook type in one word ALL CAPS (CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY/STORY/FOMO)
 - spoken: the full item stated naturally as voiceover
+- stat: MUST be null — never put hook types (STORY/FOMO/CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY) in stat. stat is ONLY for real numbers/metrics (e.g. "40%", "$10M", "3X"). Item beats have no stats — always null.
 
 ${BEAT_OUTPUT_SCHEMA}
 `,
@@ -125,7 +126,7 @@ ${expandedSequence.map((type, i) => {
   return `Beat ${i} (${type})`;
 }).join("\n")}
 
-For item beats: label="HOOK #N", headline=item condensed to 5 words ALL CAPS, cta=hook type (CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY/STORY/FOMO)
+For item beats: label="HOOK #N", headline=item condensed to 5 words ALL CAPS, cta=hook type (CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY/STORY/FOMO), stat=null (NEVER put hook types in stat)
 For fact beats: label="THE PROOF", visual_hint="stat", stat=the key number, image_count_needed=0
 
 ${BEAT_OUTPUT_SCHEMA}
