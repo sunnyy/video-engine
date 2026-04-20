@@ -17,9 +17,10 @@ import { backgroundPatternRegistry } from "../../core/registries/backgroundPatte
 import { refreshCache } from "../../core/registries/layoutRegistry";
 import AdminLayout from "./AdminLayout";
 
-const INTENTS  = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
-const NICHES   = Object.keys(nichePaletteRegistry).sort();
-const ENERGIES = ["high","medium","low"];
+const INTENTS    = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
+const NICHES     = Object.keys(nichePaletteRegistry).sort();
+const ENERGIES   = ["high","medium","low"];
+const BEAT_TYPES = ["hook","item","fact","stat","reveal","explanation","cta","contrast","tension"];
 const STEP_LABELS = ["Configure","Prompts","Images","Convert","Assets","Review","Save"];
 
 /* ── Styles ─────────────────────────────────────────────────── */
@@ -266,7 +267,7 @@ export default function LayoutGenerator() {
   const navigate = useNavigate();
 
   const [step,   setStep]   = useState(1);
-  const [config, setConfig] = useState({ niche:"entertainment", intent:"hook", energy:"high", count:4 });
+  const [config, setConfig] = useState({ niche:"entertainment", intent:"hook", energy:"high", count:4, type:"template", beatType:"" });
 
   // Step 2 — prompts
   const [prompts,        setPrompts]        = useState([]);
@@ -387,7 +388,7 @@ export default function LayoutGenerator() {
           name:  p.title.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,30),
           label: p.title,
           intent: config.intent, energy: config.energy,
-          niche: config.niche, show_caption: true, visibility: "internal",
+          niche: config.niche, show_caption: true, visibility: "active",
         },
       }));
     } catch (e) {
@@ -509,7 +510,9 @@ export default function LayoutGenerator() {
             energy:       [meta.energy || config.energy],
             niche:        [config.niche],
             orientation:  "9:16",
-            visibility:   meta.visibility  || "internal",
+            visibility:   "active",
+            type:         config.type     || "template",
+            beat_type:    config.type === "layout" && config.beatType ? config.beatType : null,
             show_caption: meta.show_caption ?? true,
             zones,
             thumbnail_url: thumbnailUrl,
@@ -588,6 +591,22 @@ export default function LayoutGenerator() {
                   {ENERGIES.map(en => <option key={en} value={en}>{en}</option>)}
                 </select>
               </div>
+              <div>
+                <span style={C.lbl}>Type</span>
+                <select style={C.inp} value={config.type} onChange={e => setConfig(c => ({ ...c, type:e.target.value, beatType:"" }))}>
+                  <option value="template">template — styled, user-facing</option>
+                  <option value="layout">layout — structural, AI pipeline</option>
+                </select>
+              </div>
+              {config.type === "layout" && (
+                <div>
+                  <span style={C.lbl}>Beat Type</span>
+                  <select style={C.inp} value={config.beatType} onChange={e => setConfig(c => ({ ...c, beatType:e.target.value }))}>
+                    <option value="">— none —</option>
+                    {BEAT_TYPES.map(bt => <option key={bt} value={bt}>{bt}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <span style={C.lbl}>Prompts to generate</span>
                 <select style={C.inp} value={config.count} onChange={e => setConfig(c => ({ ...c, count:Number(e.target.value) }))}>
