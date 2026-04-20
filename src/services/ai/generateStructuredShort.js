@@ -234,6 +234,33 @@ function buildPrompt({ topic, videoType, language, durationCategory, context, au
   const toneLabel      = (!tone || tone === "auto")           ? "auto (infer from topic)" : tone;
 
   return `
+MOST IMPORTANT RULE — READ FIRST:
+When the topic is a list (e.g. "11 hooks that always work", "5 AI tools replacing creators", "7 mistakes new investors make"):
+- DO NOT write about the list
+- DO NOT analyze or discuss the list
+- DO NOT add statistics about the list
+- WRITE THE ACTUAL LIST — each beat spoken text IS one item from the list
+- Beat 0: Hook that teases the list ("You're doing hooks wrong — here are 11 that actually work")
+- Beats 1 to N: Each beat spoken text = one actual list item, stated directly and creatively
+- Final beat: CTA
+
+Example — topic "11 hooks that always work":
+CORRECT beat spoken texts:
+- Beat 0: "You're doing hooks wrong. Here are 11 that always work."
+- Beat 1: "Nobody is telling you this — and that's exactly why it works."
+- Beat 2: "You're doing this wrong. Say it. Watch them stop scrolling."
+- Beat 3: "This changed everything for me. Personal. Relatable. Unstoppable."
+- Beat 4: "Here's the harsh truth. People don't want content. They want answers."
+
+WRONG beat spoken texts:
+- "Hooks with 'you' boost engagement by 47%." ← analyzing, not delivering
+- "Curiosity-driven hooks get 68% more clicks." ← statistics about hooks, not hooks themselves
+- "Everyone thinks positive hooks are best." ← discussing hooks, not delivering them
+
+The topic is a CREATIVE BRIEF. Deliver the content, not commentary about it.
+
+---
+
 You are a viral short-form video director with 15+ years of experience.
 Your videos have generated billions of views across YouTube Shorts, Instagram Reels, and TikTok.
 You think like a filmmaker, not a writer. Every beat is a scene. Every scene has a purpose.
