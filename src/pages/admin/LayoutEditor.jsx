@@ -276,7 +276,14 @@ export default function LayoutEditor() {
     setTimeout(() => { skipAutoSave.current = false; }, 500);
   }, [layoutId, metaNiche, metaEnergy, registryReady]);
 
-  /* Auto-save — debounced 3 s after any zone/style change, existing layouts only */
+  /* Auto-save — debounced 3 s after any zone/style change, existing layouts only.
+     Use a JSON fingerprint of zones+deletedZones rather than the whole beat object
+     so that unrelated store updates (saving state, selectedZoneIds, etc.) don't
+     restart the timer and cause spurious saves. */
+  const beatZonesFingerprint = activeBeat
+    ? JSON.stringify({ z: activeBeat.zones, d: activeBeat.deletedZones })
+    : null;
+
   useEffect(() => {
     if (isNew || !activeBeat) return;
     if (skipAutoSave.current) return;
@@ -285,7 +292,7 @@ export default function LayoutEditor() {
       handleSaveRef.current?.();
     }, 3000);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [activeBeat]);
+  }, [beatZonesFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectZone = useCallback((id, mod = false) => {
     if (!id) { setSelectedZoneIds(new Set()); return; }

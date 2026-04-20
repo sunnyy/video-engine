@@ -579,12 +579,14 @@ export default function LayoutGenerator() {
                   {NICHES.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
-              <div>
-                <span style={C.lbl}>Intent</span>
-                <select style={C.inp} value={config.intent} onChange={e => setConfig(c => ({ ...c, intent:e.target.value }))}>
-                  {INTENTS.map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
-              </div>
+              {config.type !== "layout" && (
+                <div>
+                  <span style={C.lbl}>Intent</span>
+                  <select style={C.inp} value={config.intent} onChange={e => setConfig(c => ({ ...c, intent:e.target.value }))}>
+                    {INTENTS.map(i => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <span style={C.lbl}>Energy</span>
                 <select style={C.inp} value={config.energy} onChange={e => setConfig(c => ({ ...c, energy:e.target.value }))}>
