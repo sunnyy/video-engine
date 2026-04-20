@@ -53,13 +53,15 @@ export default function About() {
         <a href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
           <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
         </a>
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <a href="/#pricing" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none" }}>Pricing</a>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <a href="/about" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#f5c518", textDecoration: "none", padding: "7px 14px", borderRadius: 6 }}>About</a>
+          <a href="/#how" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none", padding: "7px 14px", borderRadius: 6 }}>How It Works</a>
+          <a href="/#pricing" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none", padding: "7px 14px", borderRadius: 6 }}>Pricing</a>
           <button onClick={() => navigate("/dashboard")}
             style={{
               fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
               background: "#f5c518", color: "#0b0b10", padding: "7px 16px",
-              borderRadius: 7, border: "none", cursor: "pointer",
+              borderRadius: 7, border: "none", cursor: "pointer", marginLeft: 8,
             }}>
             Open App →
           </button>
