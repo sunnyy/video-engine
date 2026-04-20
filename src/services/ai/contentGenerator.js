@@ -77,6 +77,7 @@ CRITICAL RULE: You are DELIVERING the list, not talking ABOUT the list.
 - Each item beat spoken text = one actual list item, stated directly and creatively
 - Never say "studies show" or add statistics unless the topic is specifically about facts
 - Never explain what you're about to do — just do it
+- The hook spoken text MUST NOT be a question. State something directly. A question hook is a failure.
 
 BEAT STRUCTURE — generate exactly ${expandedSequence.length} beats:
 ${expandedSequence.map((type, i) => {
@@ -110,6 +111,7 @@ NICHE VOICE: ${NICHE_VOICE[niche] || "conversational, engaging"}
 ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
 
 CRITICAL RULE: Each item beat IS the item — stated directly. Each fact beat adds a real specific stat or detail that makes the item more credible or surprising.
+- The hook spoken text MUST NOT be a question. State something directly. A question hook is a failure.
 
 BEAT STRUCTURE — generate exactly ${expandedSequence.length} beats:
 ${expandedSequence.map((type, i) => {
@@ -143,7 +145,8 @@ CRITICAL RULE: Each fact beat must contain ONE real, specific, surprising fact.
 - Use actual numbers, names, dates — never vague generalities
 - "Popcorn kernels pop at 180°C because of a trapped water pocket" NOT "popcorn is interesting"
 - Hook: the most counterintuitive fact — state it directly, don't tease it
-- NEVER open with "Did you know" — find a more original, surprising hook. State the most shocking fact directly without asking a question.
+- The hook spoken text MUST NOT be a question. State the most shocking fact directly. A question hook is a failure.
+- NEVER open with "Did you know" or any question form.
 - Each fact more surprising than the last
 
 Generate exactly ${expandedSequence.length} beats:
@@ -174,6 +177,7 @@ CRITICAL RULE: Actually explain the thing. Don't talk about explaining it.
 - Walk through the actual mechanism, concept, or steps
 - Each step beat: one specific actionable step, not a vague principle
 - Close with the real transformation or result
+- The hook spoken text MUST NOT be a question. State something directly. A question hook is a failure.
 
 Generate exactly ${expandedSequence.length} beats:
 ${expandedSequence.map((type, i) => {
@@ -202,6 +206,7 @@ ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
 
 CRITICAL RULE: Withhold the answer until the reveal beat. Build genuine tension.
 - Hook: tease without revealing. Open a loop that MUST be closed.
+- The hook spoken text MUST NOT be a question. State something that creates tension. A question hook is a failure.
 - Tension/escalate beats: raise stakes, add evidence, build curiosity — never reveal yet
 - Reveal beat: the payoff. Must feel earned and surprising.
 - Never resolve tension early. Never be predictable.
@@ -230,6 +235,7 @@ ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
 
 CRITICAL RULE: Every beat must make the viewer think "wait, what?" Pattern interrupt every 3-4 seconds.
 - Hook: maximum pattern interrupt. Say something that makes no sense until context arrives.
+- The hook spoken text MUST NOT be a question. State something directly. A question hook is a failure.
 - Never resolve tension early. Never be predictable.
 - Satisfying payoff that reframes everything at the end.
 
