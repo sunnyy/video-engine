@@ -34,7 +34,7 @@ const NICHE_KEYWORDS = {
   motivational:  /\b(success|hustle|grind|goal|dream|achieve|mindset|win|productive|discipline|habit|motivation|inspire|confidence|leader|consistency)\b/i,
   business:      /\b(business|entrepreneur|startup|brand|marketing|sales|client|customer|revenue|profit|strategy|founder|ceo|product|market|growth)\b/i,
   skincare:      /\b(skincare|skin|acne|moisturizer|serum|sunscreen|beauty|glow|routine|pore|wrinkle|cleanser|toner|collagen|retinol)\b/i,
-  spiritual:     /\b(spiritual|universe|manifest|energy|chakra|mindfulness|consciousness|soul|karma|meditation|prayer|faith|god|divine|zen)\b/i,
+  spiritual:     /\b(spiritual|universe|manifest|energy|chakra|mindfulness|consciousness|soul|karma|meditation|prayer|faith|god|goddess|divine|zen|hanuman|shiva|krishna|ram|ganesh|durga|vishnu|brahma|devi|lakshmi|parvati|hindu|buddhist|temple|mandir|pooja|puja|deity|scripture|vedic|yoga)\b/i,
   lifestyle:     /\b(lifestyle|morning routine|life hack|self.improvement|relationship|dating|fashion|home|decor|minimalist|productivity|hack)\b/i,
   music:         /\b(music|song|album|artist|band|singer|rapper|beat|lyrics|playlist|genre|pop|hip.hop|rock|jazz|concert|tour)\b/i,
   comedy:        /\b(funny|comedy|joke|humor|laugh|meme|prank|roast|skit|stand.up|parody|satire)\b/i,

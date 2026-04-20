@@ -20,9 +20,11 @@ const INTENT_SCENES = {
 const REAL_METRIC_RE = /^[\d$€£¥%.,\s+\-xX]+$/;
 
 function fixItemBeatStat(beat) {
-  if (beat.beatType !== "item") return beat;
   if (!beat.stat) return beat;
-  if (!REAL_METRIC_RE.test(String(beat.stat).trim())) {
+  const statStr = String(beat.stat).trim();
+  console.log("[validator] checking stat:", beat.stat, "beatType:", beat.beatType);
+  if (!REAL_METRIC_RE.test(statStr)) {
+    console.log("[validator] nulling non-metric stat:", beat.stat, "on beat order:", beat.order);
     return { ...beat, stat: null };
   }
   return beat;
