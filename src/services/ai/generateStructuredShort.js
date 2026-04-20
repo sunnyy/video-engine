@@ -385,6 +385,24 @@ ZONE CONTENT RULES — these fields fill layout zones independently:
 }
 
 /* ─────────────────────────────────────────────────────────────
+   INTENT SCENE FALLBACKS
+   Used when the AI echoes spoken text as the asset prompt.
+   These are real-world scenes, not abstract descriptions.
+───────────────────────────────────────────────────────────── */
+const INTENT_SCENE_FALLBACKS = {
+  shock:       "A person with wide eyes and open mouth reacting to shocking news on their phone, dramatic lighting, close-up",
+  curiosity:   "A person leaning forward intently, looking at a glowing screen with curiosity, cinematic lighting",
+  proof:       "A chart or graph showing dramatic growth, data visualization, clean professional setting",
+  irony:       "Two contrasting scenes side by side, dramatic lighting, split composition",
+  reveal:      "A person's face lighting up with realization, dramatic moment, cinematic close-up",
+  empathy:     "A person nodding in understanding, warm lighting, genuine emotion, close-up",
+  urgency:     "A person urgently looking at their phone, time pressure, dynamic angle",
+  explanation: "A person explaining with hand gestures, clear background, confident posture",
+  contrast:    "Two dramatically different scenarios shown in split frame, high contrast lighting",
+  punchline:   "A person laughing or celebrating, energetic moment, bright lighting",
+};
+
+/* ─────────────────────────────────────────────────────────────
    PARSE AND VALIDATE AI RESPONSE
 ───────────────────────────────────────────────────────────── */
 function parseAIResponse(raw) {
@@ -478,7 +496,7 @@ function parseAIResponse(raw) {
       const promptWords   = prompt.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean);
       const spokenOverlap = promptWords.filter(w => w.length > 3 && spokenWordSet.has(w)).length;
       const cleanedPrompt = spokenOverlap > 2
-        ? `A photorealistic scene showing ${visual_type === "entity" ? "a specific subject" : (beat.intent || "visual") + " energy"}, ${(keywords.filter(k => !spokenWordSet.has(k.toLowerCase())).slice(0, 2).join(", ") || keywords.slice(0, 2).join(", "))}, dramatic lighting, vertical 9:16`
+        ? (INTENT_SCENE_FALLBACKS[beat.intent] || `A dramatic cinematic scene representing ${beat.intent} energy, professional photography, vertical 9:16`)
         : prompt;
 
       return { keywords, prompt: cleanedPrompt, visual_type, search_query };
@@ -527,6 +545,20 @@ async function researchTopic({ topic, videoType, audience, language }) {
 /* ─────────────────────────────────────────────────────────────
    MAIN EXPORT
 ───────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────
+   VIDEO TYPE AUTO-DETECTION
+   Runs only when videoType is "auto" — inspects the topic string
+   for structural patterns before falling back to "viral".
+───────────────────────────────────────────────────────────── */
+function detectVideoType(topic) {
+  const t = topic.toLowerCase();
+  if (/\b(\d+|ten|five|seven|three|four|six|eight|nine|eleven|twelve)\s+(ways|tips|hooks|things|reasons|mistakes|secrets|steps|hacks|facts|rules|signs|tricks)\b/.test(t)) return "listicle";
+  if (/^(how to|why you|the truth|nobody tells|stop doing|you're doing)\b/i.test(t)) return "revealing";
+  if (/\b(how does|what is|explain|understand|guide to|breakdown)\b/.test(t)) return "explainer";
+  if (/\b(\d+)\s+(facts|stats|statistics|numbers|figures)\b/.test(t)) return "facts";
+  return null; // null = keep user selection or default to viral
+}
+
 export async function generateStructuredShort({
   topic,
   mode             = "faceless",
@@ -648,7 +680,11 @@ export async function generateStructuredShort({
       effectiveContext = await researchTopic({ topic, videoType, audience, language });
     }
 
-    const prompt = buildPrompt({ topic, videoType, language, durationCategory, context: effectiveContext, audience, tone });
+    const autoDetected = (!videoType || videoType === "auto") ? detectVideoType(topic) : null;
+    const effectiveVideoType = autoDetected || ((!videoType || videoType === "auto") ? "viral" : videoType);
+    console.log("[videoType] auto-detected:", autoDetected, "→ using:", effectiveVideoType);
+
+    const prompt = buildPrompt({ topic, videoType: effectiveVideoType, language, durationCategory, context: effectiveContext, audience, tone });
 
     const response = await serverFetch("/api/generate", {
       method: "POST",
