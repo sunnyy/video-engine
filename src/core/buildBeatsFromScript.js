@@ -17,8 +17,6 @@ import { backgroundPatternRegistry, getBackgroundForIntent } from "./registries/
 import { getNicheColorFamily, getNicheAvoid } from "./registries/nichePaletteRegistry.js";
 import { pickBeatSFX } from "./registries/sfxRegistry";
 import { PIPELINE_EFFECTS }              from "./registries/textEffectRegistry.jsx";
-import { PIPELINE_SHINE_EFFECTS }        from "./registries/assetShineRegistry.jsx";
-import { resolveAnimatedBorderForZone }  from "./registries/animatedBorderRegistry.js";
 
 import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
 import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
@@ -351,9 +349,8 @@ function fillTextZones(beats, colorOptions = {}) {
 
       const existingContent = existing?.content || { kind: "text", text: "" };
 
-      // Pull textEffect out so it's handled separately; no _presetId in automation.
+      // Pull textEffect out so it's handled separately.
       const { textEffect, ...injectVisualStyle } = inject;
-      const _presetId = null; // no preset applied in automation
 
       // Merge order (lowest → highest priority):
       //   injectVisualStyle  — preset flair + DNA colors as the baseline
@@ -462,7 +459,6 @@ function fillTextZones(beats, colorOptions = {}) {
         content: existingContent,
         style: {
           ...mergedVisual,
-          _presetId,
           // Preserve user's textEffect pick; otherwise use pipeline-assigned one
           textEffect: existing?.style?.textEffect || textEffect,
         },
@@ -912,62 +908,8 @@ export async function buildBeatsFromScript({
     // applied to it, not to background or secondary decorative asset zones.
     // Primary = the largest non-background asset zone by area; fall back to the
     // first asset zone if all are backgrounds or there's only one.
-    const allAssetZoneDefs = layoutDef.zones.filter(z => z.type === "asset");
-    const nonBgAssetZoneDefs = allAssetZoneDefs.filter(z => z.role !== "background_asset");
-    const primaryAssetZone = (nonBgAssetZoneDefs.length > 0 ? nonBgAssetZoneDefs : allAssetZoneDefs)
-      .reduce((best, z) =>
-        (z.width ?? 0) * (z.height ?? 0) > ((best?.width ?? 0) * (best?.height ?? 0)) ? z : best,
-        null
-      );
-    const primaryAssetZoneId = primaryAssetZone?.id ?? null;
-
-    layoutDef.zones.forEach(zoneDef => {
-      if (zoneDef.type !== "asset") return;
-      const existing = zones[zoneDef.id] || {};
-      const existingStyle = existing.style || {};
-
-      // Deterministic seed unique to this beat+zone combination
-      const seed = (beat.intent || "").charCodeAt(0) + (zoneDef.id || "").charCodeAt(1) + (beat.order ?? 0) * 13;
-
-      // Full-canvas zones (fill the whole background) — skip rounding/borders,
-      // they would just clip at the canvas edge and the effect wouldn't be visible.
-      const isFullCanvas = (zoneDef.width ?? 100) >= 90 && (zoneDef.height ?? 100) >= 85;
-
-      const styleUpdates = {};
-
-      // ── Border radius (100–150px) ──────────────────────────────────────────
-      // Skip if: full canvas, layout already set a specific radius, already edited,
-      // or layout uses an outline (polaroid frame) — rounding breaks the square frame.
-      const hasOutline = !!(zoneDef.style?.outline || zoneDef.style?.outlineOffset);
-      if (!isFullCanvas && !hasOutline && !existingStyle.borderRadius && !(zoneDef.style?.borderRadius > 0)) {
-        styleUpdates.borderRadius = 100 + (seed % 51); // 100–150
-      }
-
-      // ── Animated border (~25% chance, PRIMARY zone only) ──────────────────
-      // Only the primary (most prominent / non-background) asset zone gets an
-      // animated border — applying it to secondary or background zones looks
-      // cluttered and distracts from the focal subject.
-      const isPrimaryZone = zoneDef.id === primaryAssetZoneId;
-      if (isPrimaryZone && !isFullCanvas && !existingStyle.animatedBorder && !existingStyle.clipShape) {
-        if (seed % 4 === 0) {
-          styleUpdates.animatedBorder = resolveAnimatedBorderForZone(beat, dna);
-        }
-      }
-
-      // ── One-shot shine effect (~60% of all asset zones) ───────────────────
-      if (!existingStyle.shineEffect) {
-        if (seed % 5 >= 2) {
-          styleUpdates.shineEffect = PIPELINE_SHINE_EFFECTS[seed % PIPELINE_SHINE_EFFECTS.length];
-        }
-      }
-
-      if (Object.keys(styleUpdates).length > 0) {
-        zones[zoneDef.id] = {
-          ...existing,
-          style: { ...existingStyle, ...styleUpdates },
-        };
-      }
-    });
+    // Asset zone styling (borderRadius, animatedBorder, shineEffect) is entirely the
+    // layout designer's responsibility — the pipeline does not inject any overrides.
 
     return { ...beat, zones };
   });
