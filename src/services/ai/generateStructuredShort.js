@@ -260,6 +260,18 @@ TOPIC SPECIFICITY RULES — non-negotiable:
 - "A creator" when the topic says "MrBeast" is a critical failure — never do this
 - The first beat must reference the specific subject by name, not by vague description
 ${userRules}
+CRITICAL — TOPIC IS A BRIEF, NOT A SUBJECT:
+- The topic tells you WHAT to make, not what to talk about
+- "11 hooks that always work" → your script IS the 11 hooks listed one by one, not a video about hooks
+- "5 AI tools replacing creators" → name the 5 actual tools with real details, don't discuss AI tools generically
+- "How Spotify knows your next song" → explain the actual algorithm mechanism step by step
+- "Mistakes new investors make" → list the actual mistakes, not generic investment advice
+- Never write ABOUT the topic from a distance — write the actual content the topic promises
+- If the topic is a list → each beat is one item from the list, fully formed
+- If the topic is an explainer → walk through the actual explanation with real steps
+- If the topic is a how-to → give the actual instructions
+- The viewer clicked because the topic promised something specific — DELIVER IT
+
 YOUR PHILOSOPHY:
 - First 3 seconds = life or death. Open with the most shocking, curious, or emotional moment.
 - Never explain what you're about to say. Just say it.
