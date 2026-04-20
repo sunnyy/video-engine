@@ -1,9 +1,11 @@
 /**
- * Dashboard.jsx
+ * Dashboard.jsx — Home hub after login.
+ * Shows service cards, recent videos, and credit status.
+ * For new users with no projects: acts as an onboarding / product tour.
  */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deleteProject } from "../services/projects/projectService";
+import { useCreditsStore } from "../store/useCreditsStore";
 import { useProjectsStore } from "../store/useProjectsStore";
 import { supabase } from "../lib/supabase";
 import { getProfile } from "../services/profile/profileService";
@@ -12,50 +14,49 @@ import AppLayout from "../ui/AppLayout";
 import Onboarding from "./Onboarding";
 import FeedbackModal from "../ui/components/FeedbackModal";
 
-/* ── Niche → gradient map ── */
-const NICHE_GRADIENTS = {
-  finance:       "linear-gradient(135deg,#0f2027,#203a43,#2c5364)",
-  fitness:       "linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)",
-  tech:          "linear-gradient(135deg,#0d0d1a,#1a0533,#2d1b69)",
-  technology:    "linear-gradient(135deg,#0d0d1a,#1a0533,#2d1b69)",
-  entertainment: "linear-gradient(135deg,#1a0a00,#3d1a00,#7a2d00)",
-  food:          "linear-gradient(135deg,#1a0a0a,#3d1515,#6b2020)",
-  travel:        "linear-gradient(135deg,#001a2c,#003459,#006494)",
-  business:      "linear-gradient(135deg,#0d1117,#161b22,#21262d)",
-  education:     "linear-gradient(135deg,#0a1628,#0d2137,#112a4a)",
-  health:        "linear-gradient(135deg,#0a1f0a,#0d2e0d,#0f3d0f)",
-  fashion:       "linear-gradient(135deg,#1a0a1a,#2d0d2d,#4a1a4a)",
-  sports:        "linear-gradient(135deg,#1a1a0a,#2d2d0d,#3d3d10)",
-  gaming:        "linear-gradient(135deg,#0d001a,#1a0033,#2d0052)",
-  beauty:        "linear-gradient(135deg,#1a0a12,#2d0d1e,#4a1a33)",
-  real_estate:   "linear-gradient(135deg,#0a1419,#0d1e26,#112733)",
-};
-const DEFAULT_GRADIENT = "linear-gradient(135deg,#111118,#1a1a28,#16161f)";
-
-function nicheGradient(niche) {
-  if (!niche) return DEFAULT_GRADIENT;
-  return NICHE_GRADIENTS[niche.toLowerCase().replace(/\s+/g, "_")] || DEFAULT_GRADIENT;
-}
-
-/* ── Niche pill color ── */
-const NICHE_PILL_COLORS = {
-  finance:       { bg: "rgba(245,197,24,0.15)",  color: "#f5c518" },
-  fitness:       { bg: "rgba(59,130,246,0.15)",  color: "#60a5fa" },
-  tech:          { bg: "rgba(124,92,252,0.15)",  color: "#a78bfa" },
-  technology:    { bg: "rgba(124,92,252,0.15)",  color: "#a78bfa" },
-  entertainment: { bg: "rgba(251,146,60,0.15)",  color: "#fb923c" },
-  food:          { bg: "rgba(239,68,68,0.15)",   color: "#f87171" },
-  travel:        { bg: "rgba(6,182,212,0.15)",   color: "#22d3ee" },
-  business:      { bg: "rgba(148,163,184,0.12)", color: "#94a3b8" },
-  education:     { bg: "rgba(59,130,246,0.15)",  color: "#93c5fd" },
-  health:        { bg: "rgba(34,197,94,0.15)",   color: "#4ade80" },
-  gaming:        { bg: "rgba(167,139,250,0.15)", color: "#c4b5fd" },
-  beauty:        { bg: "rgba(236,72,153,0.15)",  color: "#f472b6" },
-};
-function nichePillStyle(niche) {
-  if (!niche) return null;
-  return NICHE_PILL_COLORS[niche.toLowerCase().replace(/\s+/g, "_")] || { bg: "rgba(255,255,255,0.08)", color: "#9494a8" };
-}
+/* ── Service cards ── */
+const SERVICES = [
+  {
+    emoji: "🎬",
+    title: "AI Video",
+    desc: "Turn a script or idea into a fully produced short video — beats, visuals, voice, and music.",
+    cta: "Generate Video",
+    href: "/new",
+    accent: "#f5c518",
+    bg: "rgba(245,197,24,0.06)",
+    border: "rgba(245,197,24,0.18)",
+  },
+  {
+    emoji: "🖼️",
+    title: "AI Images",
+    desc: "Generate stunning images for your videos, thumbnails, or social posts with a single prompt.",
+    cta: "Generate Image",
+    href: "/image-generation",
+    accent: "#a78bfa",
+    bg: "rgba(124,92,252,0.06)",
+    border: "rgba(124,92,252,0.18)",
+  },
+  {
+    emoji: "🎙️",
+    title: "Transcription",
+    desc: "Upload any audio or video and get an accurate, clean transcript back in seconds.",
+    cta: "Transcribe",
+    href: "/transcription",
+    accent: "#22d3ee",
+    bg: "rgba(6,182,212,0.06)",
+    border: "rgba(6,182,212,0.18)",
+  },
+  {
+    emoji: "🗂️",
+    title: "Asset Library",
+    desc: "Browse and manage all your uploaded images, videos, and audio in one organised place.",
+    cta: "Open Library",
+    href: "/assets",
+    accent: "#4ade80",
+    bg: "rgba(34,197,94,0.06)",
+    border: "rgba(34,197,94,0.18)",
+  },
+];
 
 /* ── Time label ── */
 function timeLabel(dateStr) {
@@ -63,140 +64,93 @@ function timeLabel(dateStr) {
   const diff = Math.floor((Date.now() - d) / 86400000);
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
-  if (diff < 7)  return `${diff} days ago`;
+  if (diff < 7)  return `${diff}d ago`;
   return d.toLocaleDateString();
 }
 
-/* ── ProjectCard ── */
-function ProjectCard({ project, onDelete }) {
-  const [hovering,   setHovering]   = useState(false);
-  const [confirming, setConfirming] = useState(false);
+/* ── ServiceCard ── */
+function ServiceCard({ service }) {
+  const navigate = useNavigate();
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      onClick={() => navigate(service.href)}
+      className="rounded-[16px] border p-6 flex flex-col gap-4 cursor-pointer transition-all duration-200"
+      style={{
+        background:   hov ? service.bg : "#111118",
+        borderColor:  hov ? service.border : "rgba(255,255,255,0.07)",
+        transform:    hov ? "translateY(-2px)" : "none",
+        boxShadow:    hov ? `0 8px 32px rgba(0,0,0,0.3)` : "none",
+      }}
+    >
+      <div style={{ fontSize: 32 }}>{service.emoji}</div>
+      <div>
+        <div className="text-[17px] font-bold mb-1" style={{ color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>
+          {service.title}
+        </div>
+        <div className="text-[13px] leading-relaxed" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
+          {service.desc}
+        </div>
+      </div>
+      <div
+        className="self-start text-[13px] font-bold px-4 py-2 rounded-[8px] transition-all"
+        style={{
+          background:  hov ? service.accent : "rgba(255,255,255,0.06)",
+          color:       hov ? "#0b0b10" : service.accent,
+          fontFamily:  "'Outfit',sans-serif",
+        }}
+      >
+        {service.cta} →
+      </div>
+    </div>
+  );
+}
 
-  const meta        = project.safe_project_json?.meta || {};
-  const beats       = project.safe_project_json?.beats || [];
-  const firstBeat   = beats[0];
-  const niche       = meta.niche || null;
-  const orientation = meta.orientation || "9:16";
-  const beatCount   = beats.length;
-  const duration    = project.safe_project_json?.duration_sec
-    ? `${Math.round(project.safe_project_json.duration_sec)}s`
-    : null;
+/* ── MiniVideoCard ── */
+function MiniVideoCard({ project }) {
+  const beats     = project.safe_project_json?.beats || [];
+  const meta      = project.safe_project_json?.meta || {};
+  const firstBeat = beats[0];
 
-  let thumb   = null;
-  let thumbBg = null;
-
-  if (meta.thumbnail) thumb = meta.thumbnail;
+  let thumb = meta.thumbnail || null;
   if (!thumb && firstBeat) {
-    const zones = firstBeat.zones || {};
-    for (const zone of Object.values(zones)) {
-      const src = zone.content?.asset?.src;
-      if (src) { thumb = src; break; }
+    for (const zone of Object.values(firstBeat.zones || {})) {
+      if (zone.content?.asset?.src) { thumb = zone.content.asset.src; break; }
     }
   }
-  if (!thumb && firstBeat) {
-    const bg = firstBeat.layoutBackground;
-    if (bg?.type === "image" || bg?.type === "video") thumb = bg.value;
+  if (!thumb && firstBeat?.layoutBackground?.type === "image") {
+    thumb = firstBeat.layoutBackground.value;
   }
-  if (!thumb && firstBeat?.layoutBackground?.type === "color") {
-    thumbBg = firstBeat.layoutBackground.value;
-  }
-  if (!thumb && !thumbBg) thumbBg = nicheGradient(niche);
-
-  const pillStyle = nichePillStyle(niche);
-
-  const handleDelete = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (confirming) {
-      onDelete(project.id);
-    } else {
-      setConfirming(true);
-      setTimeout(() => setConfirming(false), 2500);
-    }
-  };
 
   return (
     <a
       href={`/editor/${project.id}`}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => { setHovering(false); setConfirming(false); }}
-      className="group relative block rounded-[14px] overflow-hidden border transition-all duration-200"
-      style={{
-        textDecoration: "none",
-        background:     "#111118",
-        borderColor:    hovering ? "rgba(124,92,252,0.4)" : "rgba(255,255,255,0.07)",
-        boxShadow:      hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
-        transform:      hovering ? "translateY(-2px)" : "none",
-      }}
+      className="flex items-center gap-3 rounded-[10px] border px-3 py-3 transition-all"
+      style={{ background: "#111118", borderColor: "rgba(255,255,255,0.07)", textDecoration: "none" }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(124,92,252,0.35)"}
+      onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"}
     >
-      {/* Thumbnail */}
-      <div className="relative overflow-hidden" style={{ paddingTop: "56.25%", background: thumbBg || "#111118" }}>
+      <div
+        className="shrink-0 rounded-[6px] overflow-hidden"
+        style={{ width: 52, height: 52, background: "#1a1a28", display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
         {thumb ? (
-          <img src={thumb} className="absolute inset-0 w-full h-full object-cover"
-            onError={e => { e.target.style.display = "none"; }} />
+          <img src={thumb} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center"
-            style={{ background: thumbBg || nicheGradient(niche) }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.15 }}>
-              <rect x="2" y="2" width="20" height="20" rx="3" stroke="white" strokeWidth="1.5"/>
-              <path d="M10 8l6 4-6 4V8z" fill="white"/>
-            </svg>
-          </div>
-        )}
-
-        {/* Badges */}
-        <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
-          <span className="px-[6px] py-[2px] rounded-[4px] text-[10px] font-bold text-white"
-            style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
-            {orientation}
-          </span>
-          {beatCount > 0 && (
-            <span className="px-[6px] py-[2px] rounded-[4px] text-[10px] font-bold text-white"
-              style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
-              {beatCount} beats
-            </span>
-          )}
-        </div>
-
-        {duration && (
-          <div className="absolute bottom-2 right-2 px-[6px] py-[2px] rounded-[4px] text-[10px] font-bold text-white"
-            style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", fontFamily: "'JetBrains Mono',monospace" }}>
-            {duration}
-          </div>
+          <span style={{ fontSize: 22 }}>🎬</span>
         )}
       </div>
-
-      {/* Info row */}
-      <div className="px-3 py-3 flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-bold text-[#e8e8f0] truncate" style={{ fontFamily: "'Syne',sans-serif" }}>
-            {project.name || "Untitled"}
-          </div>
-          <div className="flex items-center gap-2 mt-[4px]">
-            <span className="text-[13px] text-[#77777f]" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
-              {timeLabel(project.updated_at)}
-            </span>
-            {niche && pillStyle && (
-              <span className="px-[6px] py-[1px] rounded-[4px] text-[11px] font-semibold capitalize"
-                style={{ background: pillStyle.bg, color: pillStyle.color }}>
-                {niche}
-              </span>
-            )}
-          </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[14px] font-semibold truncate" style={{ color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>
+          {project.name || "Untitled"}
         </div>
-
-        <button
-          onClick={handleDelete}
-          className="shrink-0 w-[26px] h-[26px] rounded-[6px] flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 border-0 cursor-pointer text-[12px]"
-          style={{
-            background: confirming ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.06)",
-            color:      confirming ? "#f87171" : "#55556a",
-          }}
-          title={confirming ? "Click again to confirm" : "Delete project"}
-        >
-          {confirming ? "!" : "✕"}
-        </button>
+        <div className="text-[12px] mt-0.5" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+          {timeLabel(project.updated_at)} · {beats.length} beats
+        </div>
       </div>
+      <div style={{ color: "#55556a", fontSize: 14 }}>›</div>
     </a>
   );
 }
@@ -204,29 +158,31 @@ function ProjectCard({ project, onDelete }) {
 /* ── Dashboard ── */
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [search,         setSearch]         = useState("");
+  const { balance } = useCreditsStore();
+  const { projects, loading, fetchProjects } = useProjectsStore();
+
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showFeedback,   setShowFeedback]   = useState(false);
   const [userId,         setUserId]         = useState(null);
-  const { projects, loading, fetchProjects, removeProject } = useProjectsStore();
+  const [userName,       setUserName]       = useState("");
 
   useEffect(() => {
     fetchProjects();
 
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setUserId(user.id);
-        const lsKey = `onboarding_done_${user.id}`;
-        if (localStorage.getItem(lsKey)) return;
-        getProfile(user.id).then(profile => {
-          if (profile === null) return;
-          if (profile?.onboarding_completed) {
-            localStorage.setItem(lsKey, "1");
-          } else {
-            setShowOnboarding(true);
-          }
-        }).catch(() => {});
-      }
+      if (!user) return;
+      setUserId(user.id);
+      setUserName(user.user_metadata?.full_name?.split(" ")[0] || user.user_metadata?.name?.split(" ")[0] || "");
+      const lsKey = `onboarding_done_${user.id}`;
+      if (localStorage.getItem(lsKey)) return;
+      getProfile(user.id).then(profile => {
+        if (profile === null) return;
+        if (profile?.onboarding_completed) {
+          localStorage.setItem(lsKey, "1");
+        } else {
+          setShowOnboarding(true);
+        }
+      }).catch(() => {});
     });
 
     if (!localStorage.getItem("feedback_prompted")) {
@@ -243,18 +199,11 @@ export default function Dashboard() {
     }
   }, []);
 
-  const handleDelete = async (id) => {
-    try {
-      await deleteProject(id);
-      removeProject(id);
-    } catch (e) {
-      console.error("Delete failed", e);
-    }
-  };
+  const recentProjects = [...projects]
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    .slice(0, 4);
 
-  const filtered = projects.filter(p =>
-    (p.name || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const isNew = !loading && projects.length === 0;
 
   return (
     <AppLayout>
@@ -264,75 +213,90 @@ export default function Dashboard() {
           setShowOnboarding(false);
         }} />
       )}
-
       {showFeedback && (
         <FeedbackModal context="post_visit" onClose={() => setShowFeedback(false)} />
       )}
 
-      {/* Top bar */}
-      <div
-        className="flex items-center justify-between px-6 py-4 border-b shrink-0"
-        style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}
-      >
-        <h1 className="text-[20px] font-bold text-[#f5c518]" style={{ fontFamily: "'Syne',sans-serif" }}>
-          Videos
-          {!loading && (
-            <span className="ml-2 text-[15px] font-normal text-[#77777f]">({projects.length})</span>
-          )}
-        </h1>
-        <div className="flex items-center gap-3">
-          {projects.length > 4 && (
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search videos…"
-              className="bg-[#111118] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[6px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none w-[200px]"
-            />
-          )}
-          <button
-            onClick={() => navigate("/new")}
-            className="flex items-center gap-2 px-4 py-[7px] rounded-[8px] text-[15px] font-bold text-[#0b0b10] border-0 cursor-pointer hover:opacity-90 transition-opacity"
-            style={{ background: "#f5c518" }}
-          >
-            + New Video
-          </button>
-        </div>
-      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div style={{ maxWidth: 900, padding: "40px 40px 80px", margin: "0 auto" }}>
 
-      {/* Grid area */}
-      <div className="flex-1 px-6 py-6 overflow-y-auto">
-        {loading && (
-          <div className="flex items-center justify-center py-24">
-            <div className="w-6 h-6 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />
+          {/* ── Greeting ── */}
+          <div className="mb-8">
+            <h1 className="text-[26px] font-bold" style={{ color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>
+              {userName ? `Hey, ${userName} 👋` : "Welcome back 👋"}
+            </h1>
+            <p className="text-[15px] mt-1" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
+              {isNew
+                ? "Here's what you can build with Vidquence — pick a service to get started."
+                : "Here's a quick look at your workspace."}
+            </p>
           </div>
-        )}
 
-        {!loading && projects.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="text-[48px]">🎬</div>
-            <div className="text-[20px] font-bold text-[#e8e8f0]">No projects yet</div>
-            <div className="text-[16px] text-[#77777f]">Create your first AI video to get started</div>
+          {/* ── Credits strip ── */}
+          <div
+            className="flex items-center justify-between rounded-[12px] border px-5 py-4 mb-8"
+            style={{
+              background:   balance !== null && balance < 10 ? "rgba(249,115,22,0.06)" : "rgba(124,92,252,0.06)",
+              borderColor:  balance !== null && balance < 10 ? "rgba(249,115,22,0.25)" : "rgba(124,92,252,0.2)",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: 20 }}>⚡</span>
+              <div>
+                <div className="text-[13px]" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>Credits Available</div>
+                <div className="text-[22px] font-bold" style={{ color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'Syne',sans-serif" }}>
+                  {balance ?? "—"}
+                </div>
+              </div>
+            </div>
             <button
-              onClick={() => navigate("/new")}
-              className="mt-2 px-6 py-[10px] rounded-[10px] text-[16px] font-bold text-[#0b0b10] border-0 cursor-pointer"
-              style={{ background: "#f5c518" }}
+              onClick={() => navigate("/credits")}
+              className="text-[13px] font-bold px-4 py-2 rounded-[8px] border-0 cursor-pointer"
+              style={{ background: "rgba(255,255,255,0.06)", color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}
             >
-              + Create First Project
+              {balance !== null && balance < 10 ? "Top Up →" : "View Details →"}
             </button>
           </div>
-        )}
 
-        {!loading && filtered.length === 0 && projects.length > 0 && (
-          <div className="text-center py-16 text-[15px] text-[#77777f]">No projects match "{search}"</div>
-        )}
-
-        {!loading && filtered.length > 0 && (
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-            {filtered.map(p => (
-              <ProjectCard key={p.id} project={p} onDelete={handleDelete} />
-            ))}
+          {/* ── Services ── */}
+          <div className="mb-10">
+            <div className="text-[11px] font-bold uppercase tracking-[2px] mb-4" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+              Services
+            </div>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+              {SERVICES.map(s => <ServiceCard key={s.title} service={s} />)}
+            </div>
           </div>
-        )}
+
+          {/* ── Recent Videos (only if user has projects) ── */}
+          {!isNew && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[11px] font-bold uppercase tracking-[2px]" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+                  Recent Videos
+                </div>
+                <button
+                  onClick={() => navigate("/videos")}
+                  className="text-[13px] border-0 cursor-pointer bg-transparent"
+                  style={{ color: "#7c5cfc", fontFamily: "'Outfit',sans-serif" }}
+                >
+                  View All →
+                </button>
+              </div>
+              {loading ? (
+                <div className="flex items-center gap-2 py-4" style={{ color: "#55556a" }}>
+                  <div className="w-4 h-4 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[13px]">Loading…</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {recentProjects.map(p => <MiniVideoCard key={p.id} project={p} />)}
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
       </div>
     </AppLayout>
   );

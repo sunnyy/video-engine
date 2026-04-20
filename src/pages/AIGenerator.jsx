@@ -385,9 +385,9 @@ export default function AIGenerator() {
       {/* ── Header ── */}
       <div className="border-b border-[rgba(255,255,255,0.06)] px-6 py-3 flex items-center justify-between shrink-0" style={{ background: "#111118" }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/dashboard")}
+          <button onClick={() => navigate("/videos")}
             className="text-[#77777f] hover:text-[#e8e8f0] transition-colors text-[14px] bg-transparent border-0 cursor-pointer">
-            ← Home
+            ← Videos
           </button>
           <div className="w-[1px] h-[18px] bg-[rgba(255,255,255,0.08)]" />
           <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />

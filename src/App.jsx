@@ -17,6 +17,7 @@ import About           from "./pages/About";
 import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
+import Videos         from "./pages/Videos";
 import AIGenerator     from "./pages/AIGenerator";
 import Editor          from "./pages/Editor";
 import AdminDashboard  from "./pages/admin/AdminDashboard";
@@ -107,6 +108,7 @@ export default function App() {
         {session ? (
           <>
             <Route path="/dashboard"        element={<Dashboard />} />
+            <Route path="/videos"           element={<Videos />} />
             <Route path="/new"              element={<AIGenerator />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/transcription"    element={<Transcription />} />

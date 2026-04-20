@@ -166,7 +166,7 @@ export default function Header({ progress, setProgress }) {
       <div className="flex items-center gap-3">
         {/* Back to dashboard */}
         <button
-          onClick={() => { invalidateProjects(); navigate("/dashboard"); }}
+          onClick={() => { invalidateProjects(); navigate("/videos"); }}
           className="flex items-center gap-1 text-[#77777f] hover:text-[#e8e8f0] transition-colors text-[16px] bg-transparent border-0 cursor-pointer"
         >
           ← <span className="hidden sm:inline">Home</span>
@@ -260,7 +260,7 @@ export default function Header({ progress, setProgress }) {
                   </button>
                 ))}
                 <button
-                  onClick={() => { invalidateProjects(); navigate("/dashboard"); }}
+                  onClick={() => { invalidateProjects(); navigate("/videos"); }}
                   className="w-full text-left px-2 py-[6px] mt-1 rounded-[6px] text-[12px] text-[#7c5cfc] hover:bg-[rgba(124,92,252,0.1)] bg-transparent border-0 cursor-pointer transition-all"
                 >
                   View all projects →

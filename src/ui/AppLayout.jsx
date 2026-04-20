@@ -10,6 +10,12 @@ import { useCreditsStore } from "../store/useCreditsStore";
 
 /* ── Icons ── */
 const Icons = {
+  home: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+      <path d="M9 21V12h6v9"/>
+    </svg>
+  ),
   folder: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
@@ -119,11 +125,12 @@ export default function AppLayout({ children }) {
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           <div className="flex flex-col gap-[2px] mb-5">
-            <NavItem icon={Icons.folder}  label="Videos"    active={location.pathname === "/dashboard"}        onClick={() => navigate("/dashboard")} />
-            <NavItem icon={Icons.gallery} label="Images"    active={location.pathname === "/image-generation"} onClick={() => navigate("/image-generation")} />
-            <NavItem icon={Icons.mic}     label="Transcribe" active={location.pathname === "/transcription"}   onClick={() => navigate("/transcription")} />
-            <NavItem icon={Icons.box}     label="Assets"    active={location.pathname === "/assets"}           onClick={() => navigate("/assets")} />
-            <NavItem icon={Icons.credits} label="Credits"   active={location.pathname === "/credits"}          onClick={() => navigate("/credits")} />
+            <NavItem icon={Icons.home}    label="Dashboard"  active={location.pathname === "/dashboard"}        onClick={() => navigate("/dashboard")} />
+            <NavItem icon={Icons.folder}  label="Videos"     active={location.pathname === "/videos"}           onClick={() => navigate("/videos")} />
+            <NavItem icon={Icons.gallery} label="Images"     active={location.pathname === "/image-generation"} onClick={() => navigate("/image-generation")} />
+            <NavItem icon={Icons.mic}     label="Transcribe"  active={location.pathname === "/transcription"}   onClick={() => navigate("/transcription")} />
+            <NavItem icon={Icons.box}     label="Assets"     active={location.pathname === "/assets"}           onClick={() => navigate("/assets")} />
+            <NavItem icon={Icons.credits} label="Credits"    active={location.pathname === "/credits"}          onClick={() => navigate("/credits")} />
           </div>
 
           <NavSection title="Account">
