@@ -123,6 +123,8 @@ function pickLayout({
   visualHint       = null, // "text_only" | "stat" | "comparison" | "list" | "faces" | "scene" | "product"
   beatType         = null, // hook|item|fact|stat|reveal|explanation|cta|contrast|tension
 }) {
+  console.log("[pickLayout] called with beatType:", beatType, "intent:", intent, "orientation:", orientation);
+
   const level = energyLevel(energy);
   const layoutIntent = AI_TO_LAYOUT_INTENT[intent] || intent;
 
@@ -133,6 +135,7 @@ function pickLayout({
     ? findLayouts({ beatType, type: "layout", orientation })
     : [];
 
+  console.log("[pickLayout] step1 structural candidates:", candidates.length, candidates.slice(0,3).map(l => l.id + '/' + (l.name || l.id)));
   console.log("[pickLayout] beat:", intent, "beatType:", beatType, "→ step1 (beatType+layout):", candidates.length, "ids:", candidates.slice(0,3).map(l=>l.id+'/'+l.name));
 
   // beatType + orientation yielded nothing — try type='layout' with intent
