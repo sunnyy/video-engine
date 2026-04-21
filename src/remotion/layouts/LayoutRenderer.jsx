@@ -641,12 +641,20 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
           const textEffect  = previewMode ? "none" : (st.textEffect || "none");
           const effectSpeed = st.textEffectSpeed ?? 1.0;
 
-          // Auto-scale font down when text is longer than the zone's intended capacity.
-          // Prevents overflow without changing layout dimensions — a rendering safety net.
-          const rawText  = text;
-          const maxChars = zone.maxChars || 40;
-          const scaleFactor = rawText.length > maxChars * 0.8 ? 0.85 : 1;
-          const adjustedFontSize = (st.fontSize || 32) * scaleFactor;
+          const rawText     = text;
+          const rawFontSize = st.fontSize || 32;
+          // Scale down so the longest word fits within the zone width — prevents mid-word wraps.
+          // 0.55em/char is a conservative overestimate that works across condensed and normal fonts.
+          const words       = rawText.split(/\s+/).filter(Boolean);
+          const longestWord = words.reduce((a, b) => a.length >= b.length ? a : b, "");
+          const zonePixelW  = ((zone.width ?? 100) / 100) * W;
+          const estimatedWordW = longestWord.length * rawFontSize * 0.55;
+          const wordScaleFactor = estimatedWordW > zonePixelW * 0.9
+            ? Math.max(0.45, (zonePixelW * 0.9) / estimatedWordW)
+            : 1;
+          const charScaleFactor = rawText.length > (zone.maxChars || 40) * 0.8 ? 0.85 : 1;
+          const scaleFactor     = Math.min(wordScaleFactor, charScaleFactor);
+          const adjustedFontSize = rawFontSize * scaleFactor;
 
           // DNA typography override — applies fontFamily + fontWeight by zone role.
           // Only overrides when the zone style hasn't been manually edited by the user
@@ -684,10 +692,10 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             opacity:         1,
             background:      st.background    || "transparent",
             ...brStyle(),
-            whiteSpace:      "normal",        // always wrap — never respect stored "nowrap" from stale zone styles
-            wordBreak:       "keep-all",      // never break within a word mid-character
-            overflowWrap:    "break-word",    // wrap at word boundaries only
-            hyphens:         "none",          // no hyphenation ever
+            whiteSpace:      "normal",    // always wrap
+            wordBreak:       "normal",    // wrap at spaces only (keep-all = same for Latin)
+            overflowWrap:    "normal",    // never break mid-word even as last resort
+            hyphens:         "none",      // no hyphenation
             WebkitTextStroke: st.textStrokeWidth > 0
               ? `${st.textStrokeWidth}px ${st.textStrokeColor || "#000000"}`
               : undefined,

@@ -375,9 +375,9 @@ function fillTextZones(beats, colorOptions = {}) {
         ...zoneDef_styleNoNowrap, // layout structure: fontSize, letterSpacing, padding…
         ...userOverrides,         // only explicitly user-pinned values
         whiteSpace:    "normal",
-        wordBreak:     "keep-all",    // never break within a word
-        overflowWrap:  "break-word",  // wrap at word boundaries only
-        hyphens:       "none",        // no hyphenation ever
+        wordBreak:     "normal",   // wrap at spaces only
+        overflowWrap:  "normal",   // never break mid-word even as last resort
+        hyphens:       "none",     // no hyphenation
       };
 
       // Final textShadow pass — strip on light backgrounds regardless of what any layer set.
