@@ -685,8 +685,9 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             background:      st.background    || "transparent",
             ...brStyle(),
             whiteSpace:      "normal",        // always wrap — never respect stored "nowrap" from stale zone styles
-            overflowWrap:    "break-word",   // only breaks within a word when that word alone overflows the line
-            wordBreak:       "normal",        // never break mid-character — words wrap at spaces only
+            wordBreak:       "keep-all",      // never break within a word mid-character
+            overflowWrap:    "break-word",    // wrap at word boundaries only
+            hyphens:         "none",          // no hyphenation ever
             WebkitTextStroke: st.textStrokeWidth > 0
               ? `${st.textStrokeWidth}px ${st.textStrokeColor || "#000000"}`
               : undefined,

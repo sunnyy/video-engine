@@ -374,7 +374,10 @@ function fillTextZones(beats, colorOptions = {}) {
         ...injectVisualStyle,     // baseline: textShadow, WebkitTextStroke
         ...zoneDef_styleNoNowrap, // layout structure: fontSize, letterSpacing, padding…
         ...userOverrides,         // only explicitly user-pinned values
-        whiteSpace: "normal",
+        whiteSpace:    "normal",
+        wordBreak:     "keep-all",    // never break within a word
+        overflowWrap:  "break-word",  // wrap at word boundaries only
+        hyphens:       "none",        // no hyphenation ever
       };
 
       // Final textShadow pass — strip on light backgrounds regardless of what any layer set.
