@@ -133,34 +133,44 @@ function pickLayout({
     ? findLayouts({ beatType, type: "layout", orientation })
     : [];
 
+  console.log("[pickLayout] beat:", intent, "beatType:", beatType, "→ step1 (beatType+layout):", candidates.length, "ids:", candidates.slice(0,3).map(l=>l.id+'/'+l.name));
+
   // beatType + orientation yielded nothing — try type='layout' with intent
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, type: "layout" });
+    if (candidates.length) console.log("[pickLayout] falling back to step2a (intent+energy+layout type):", candidates.length);
   }
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout" });
+    if (candidates.length) console.log("[pickLayout] falling back to step2b (intent+layout type):", candidates.length);
   }
   if (!candidates.length) {
     candidates = findLayouts({ orientation, type: "layout" });
+    if (candidates.length) console.log("[pickLayout] falling back to step2c (orientation+layout type):", candidates.length);
   }
 
   // No structural layouts in DB yet — fall back to all layouts (templates) by intent
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, niche });
+    if (candidates.length) console.log("[pickLayout] falling back to step3a (intent+energy+niche):", candidates.length);
   }
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, orientation, niche });
+    if (candidates.length) console.log("[pickLayout] falling back to step3b (intent+niche):", candidates.length);
   }
   if (!candidates.length) {
     candidates = findLayouts({ intent: layoutIntent, orientation });
+    if (candidates.length) console.log("[pickLayout] falling back to step3c (intent only):", candidates.length);
   }
   if (!candidates.length) {
     candidates = findLayouts({ orientation });
+    if (candidates.length) console.log("[pickLayout] falling back to step3d (orientation only):", candidates.length);
   }
 
   // Last resort — any layout
   if (!candidates.length) {
     candidates = findLayouts({});
+    console.log("[pickLayout] falling back to step4 (any):", candidates.length);
   }
 
   // Talking head mode: HARD filter — only layouts with at least one asset zone (for avatar).
@@ -253,7 +263,9 @@ function pickLayout({
     // repeat — caller can relax further on next beat.
   }
 
-  return candidates[Math.floor(Math.random() * candidates.length)]?.id || "DuoStackHook";
+  const pickedId = candidates[Math.floor(Math.random() * candidates.length)]?.id || "DuoStackHook";
+  console.log("[pickLayout] PICKED:", pickedId, "name:", candidates.find(l=>l.id===pickedId)?.name, "from", candidates.length, "candidates:", candidates.slice(0,5).map(l=>l.id));
+  return pickedId;
 }
 
 /* ─────────────────────────────────────────────────────────────
