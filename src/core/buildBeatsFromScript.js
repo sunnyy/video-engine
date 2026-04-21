@@ -488,11 +488,9 @@ function fillDecorativeZones(beats, colorOptions = {}) {
     const zones = { ...beat.zones };
 
     decorativeZones.forEach((zoneDef, idx) => {
-      // Designer explicitly set a color → respect it, don't override
-      if (zoneDef.style?.color && zoneDef.style.color !== "#ffffff") return;
-
       const existing = zones[zoneDef.id];
-      // User manually edited this zone in the editor → preserve their choice
+      // Only skip if user explicitly pinned a color in the editor.
+      // Never skip based on the layout's baked color — DNA always recolors decoratives.
       if (existing?.style?._userColor) return;
 
       // Alternate between accent and accent2 for visual variety when multiple decoratives exist
@@ -826,7 +824,10 @@ export async function buildBeatsFromScript({
       stat:     item.beatType === "item" ? null                 : (item.stat  || null),
       tagline:  item.tagline  || null,
       quote:    item.quote    || null,
-      cta:      item.beatType === "item" ? null               : (item.cta   || null),
+      cta:      item.beatType === "item" ? null
+              : (item.beatType === "cta" && ["FOMO","STORY","CURIOSITY","NEGATIVE","CONTRAST","EMPATHY","PERSONAL","URGENCY"].includes((item.cta || "").toUpperCase()))
+                ? null  // hook types leaked into the cta beat field — strip them
+                : (item.cta || null),
       duration_sec: end_sec - start_sec,
       start_sec, end_sec,
     };

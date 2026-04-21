@@ -96,15 +96,21 @@ export function expandPattern(pattern, listCount) {
   if (!pattern.itemExpandable || !listCount) return pattern.sequence;
 
   const sequence = ["hook"];
+  const hasFact = pattern.sequence.includes("item") && pattern.sequence.includes("fact");
+  const primaryType = pattern.sequence.find(s => s === "item" || s === "fact" || s === "step") || "item";
+  const midpoint = Math.floor(listCount / 2) - 1;
 
   for (let i = 0; i < listCount; i++) {
-    const primaryType = pattern.sequence.find(s => s === "item" || s === "fact" || s === "step");
-    sequence.push(primaryType || "item");
+    sequence.push(primaryType);
 
-    // For listicle_with_facts only: alternate with a supporting fact every 2 items
-    // Guard: pattern must have BOTH "item" AND "fact" beats (not facts_rapid which only has "fact")
-    if (pattern.sequence.includes("item") && pattern.sequence.includes("fact") && i > 0 && i % 2 === 1) {
+    // For listicle_with_facts: insert a fact beat after every 2nd item
+    if (hasFact && i > 0 && i % 2 === 1) {
       sequence.push("fact");
+    }
+
+    // For longer lists (5+ items): insert a contrast beat at the midpoint for variety
+    if (listCount >= 5 && i === midpoint) {
+      sequence.push("contrast");
     }
   }
 

@@ -98,6 +98,8 @@ For item beats:
 - spoken: the full item stated naturally as voiceover
 - stat: MUST be null — never put hook types (STORY/FOMO/CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY) in stat. stat is ONLY for real numbers/metrics (e.g. "40%", "$10M", "3X"). Item beats have no stats — always null.
 
+For cta beats: the cta field MUST be a real call to action like "Follow for more", "Subscribe now", "Share this video". NEVER put hook types (FOMO, STORY, CURIOSITY, NEGATIVE, PERSONAL, URGENCY, EMPATHY) in the cta field of a cta beat.
+
 ${BEAT_OUTPUT_SCHEMA}
 `,
 
@@ -128,6 +130,7 @@ ${expandedSequence.map((type, i) => {
 
 For item beats: label="HOOK #N", headline=item condensed to 5 words ALL CAPS, cta=hook type (CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY/STORY/FOMO), stat=null (NEVER put hook types in stat)
 For fact beats: label="THE PROOF", visual_hint="stat", stat=the key number, image_count_needed=0
+For cta beats: the cta field MUST be a real call to action like "Follow for more", "Subscribe now", "Share this video". NEVER put hook types (FOMO, STORY, CURIOSITY, NEGATIVE, PERSONAL, URGENCY, EMPATHY) in the cta field of a cta beat.
 
 ${BEAT_OUTPUT_SCHEMA}
 `,

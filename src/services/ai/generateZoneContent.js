@@ -278,7 +278,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
             ? Math.max(10, Math.round(exampleText.length * 1.2)) // 20% buffer over example length
             : 50;
           const fontSize      = z.style?.fontSize ?? 0;
-          const isGiantDisplay = fontSize >= 200;
+          const isGiantDisplay = fontSize >= 200 && beat.beatType !== "item";
           const maxChars = isGiantDisplay ? 8 : (z.maxChars ?? derivedMax);
           return {
             id:   z.id,
@@ -324,7 +324,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
       headline: beat.headline || null,
       subtext:  beat.subtext  || null,
       label:    isItemBeat ? (beat.cta   || null) : (beat.label || null),
-      stat:     isItemBeat ? (beat.label || null) : (beat.stat  || null),
+      stat:     isItemBeat ? null : (beat.stat  || null),
       tagline:  beat.tagline  || null,
       quote:    beat.quote    || null,
       cta:      isItemBeat ? null : (beat.cta || null),
