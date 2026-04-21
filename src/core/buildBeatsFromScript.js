@@ -298,9 +298,17 @@ function fillTextZones(beats, colorOptions = {}) {
     const zones = { ...beat.zones };
     const hasAssetZones = def.zones.some(z => z.type === "asset");
 
-    // Hoist bgIsLight — constant per beat, needed by both the main forEach and the _userPreset pass.
-    const nicheBg   = colorOptions.colorStory?.bg || colorOptions.dna?.colorStory?.bg || "#0b0b10";
-    const bgIsLight = isLightColor(nicheBg);
+    // Hoist bgIsLight — check the ACTUAL layout background, not just the niche palette bg.
+    // colorStory.bg is the niche's intended palette bg (e.g. #fef3c7 for food), but the
+    // rendered background is beat.layoutBackground (pattern/color). Patterns are always dark.
+    const nicheBg         = colorOptions.colorStory?.bg || colorOptions.dna?.colorStory?.bg || "#0b0b10";
+    const actualBg        = beat.layoutBackground;
+    const actualBgIsDark  = !actualBg
+      || actualBg.type === "pattern"
+      || actualBg.type === "image"
+      || actualBg.type === "video"
+      || (actualBg.type === "color" && !isLightColor(actualBg.value));
+    const bgIsLight = !actualBgIsDark && isLightColor(nicheBg);
 
     textZones.forEach((zoneDef, order) => {
       const existing = zones[zoneDef.id];
@@ -309,7 +317,9 @@ function fillTextZones(beats, colorOptions = {}) {
       // Presets are for manual user styling only. In automation, all visual decisions
       // come from DNA / colorStory. This is the only way to guarantee consistency
       // across zones and beats within one video.
-      const paletteText = colorOptions.colorStory?.text || colorOptions.dna?.colorStory?.text || "#ffffff";
+      const rawPaletteText = colorOptions.colorStory?.text || colorOptions.dna?.colorStory?.text || "#ffffff";
+      // If the actual background is dark but niche palette chose dark text, force white.
+      const paletteText = actualBgIsDark && !isLightColor(rawPaletteText) ? "#ffffff" : rawPaletteText;
       const primary     = colorOptions.colorStory?.primary || colorOptions.dna?.colorStory?.primary || "#7c5cfc";
 
       const inject = {};
