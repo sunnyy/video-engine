@@ -737,18 +737,7 @@ export async function buildBeatsFromScript({
       beatType:         item.beatType           ?? null,
     });
 
-    // ── Lock layout to the pre-planned family rotation ──────────────────────
-    // Override whatever planBeatVisual chose with the video-level layout family.
-    // enforceLayoutZones below rebuilds zones for the locked layout anyway.
-    const isLastBeat  = index === total - 1;
-    const familyIdx   = index % visualSystem.layoutFamily.length;
-    // Never use same layout as the immediately preceding beat — step forward one slot
-    const prevLayout  = usedLayoutIds.length ? usedLayoutIds[usedLayoutIds.length - 1] : null;
-    let lockedLayout  = visualSystem.layoutFamily[familyIdx];
-    if (lockedLayout === prevLayout && visualSystem.layoutFamily.length > 1) {
-      lockedLayout = visualSystem.layoutFamily[(familyIdx + 1) % visualSystem.layoutFamily.length];
-    }
-    visual.layout = lockedLayout;
+    const isLastBeat = index === total - 1;
 
     // ── Lock background to ONE pattern for the whole video ───────────────────
     visual.layoutBackground = {
