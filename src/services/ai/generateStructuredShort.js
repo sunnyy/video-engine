@@ -266,6 +266,8 @@ export async function generateStructuredShort({
     dna,
   });
 
+  console.log("[CLIENT] beat layouts:", beats.map(b => ({ order: b.order, beatType: b.beatType, layout: b.layout })));
+
   // Attach asset_hint to each beat for editor display.
   parsedScript.beats.forEach((src, i) => {
     if (!beats[i] || !src.asset_hint) return;

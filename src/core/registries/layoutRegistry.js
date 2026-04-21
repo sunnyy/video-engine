@@ -175,6 +175,8 @@ export function getLayoutsByNiche(niche) {
 }
 
 export function findLayouts({ intent, energy, orientation, assetCount, textCount, niche, type, beatType, includeInactive = false } = {}) {
+  console.log("[findLayouts] called with:", JSON.stringify({ intent, energy, orientation, niche, type, beatType }));
+  console.log("[findLayouts] total registry size:", _rows.length, "| type=layout count:", _rows.filter(l => l.type === "layout").length);
   return _rows.filter(l => {
     if (!includeInactive && !l.isActive)                                  return false; // skip inactive unless explicitly requested
     if (type        && l.type     !== type)                               return false;
