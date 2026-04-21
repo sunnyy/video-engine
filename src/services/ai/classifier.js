@@ -27,7 +27,7 @@ const NICHE_KEYWORDS = {
   tech:          /\b(ai|app|software|code|programming|algorithm|data|machine learning|developer|startup|saas|api|robot|automation|gadget|hardware|phone|laptop|digital|cyber|blockchain|crypto)\b/i,
   health:        /\b(diet|fitness|workout|exercise|calories|weight|nutrition|healthy|sleep|stress|mental health|meditation|yoga|muscle|keto|protein|doctor|symptom|disease|wellness|body)\b/i,
   gaming:        /\b(game|gaming|gamer|esports|minecraft|fortnite|roblox|console|fps|rpg|mmo|twitch|stream|playstation|xbox|pc gaming)\b/i,
-  food:          /\b(recipe|cooking|food|eat|dish|ingredient|restaurant|chef|meal|breakfast|lunch|dinner|taste|flavor|cuisine|bake|grill|snack)\b/i,
+  food:          /\b(recipe|cooking|food|eat|dish|ingredient|restaurant|chef|meal|breakfast|lunch|dinner|taste|flavor|cuisine|bake|grill|snack|popcorn|pizza|burger|sandwich|sushi|chocolate|coffee|tea|candy|dessert|cake|bread|cheese|fruit|vegetable|soup|pasta|noodle|spice|herb|drink|beverage|diet|nutrition|calories)\b/i,
   travel:        /\b(travel|destination|trip|visit|flight|hotel|vacation|explore|adventure|city|beach|mountain|tour|journey|passport|country)\b/i,
   sports:        /\b(sport|athlete|football|basketball|soccer|cricket|tennis|golf|olympic|training|champion|team|player|coach|match|tournament)\b/i,
   education:     /\b(learn|study|student|school|college|university|course|degree|teach|knowledge|history|science|math|exam|class|lesson)\b/i,
