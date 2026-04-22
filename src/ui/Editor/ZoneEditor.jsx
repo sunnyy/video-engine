@@ -700,6 +700,25 @@ export default function ZoneEditor({
             onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
         </div>
 
+        <div className="mb-3">
+          <Label>Text Transform</Label>
+          <div className="flex gap-[4px]">
+            {[
+              { v: "none",       label: "Ag",  title: "None"       },
+              { v: "uppercase",  label: "AG",  title: "Uppercase"  },
+              { v: "lowercase",  label: "ag",  title: "Lowercase"  },
+              { v: "capitalize", label: "Ag_", title: "Capitalize" },
+            ].map(({ v, label, title }) => (
+              <button key={v} title={title}
+                onClick={() => updateTextStyle(slot, "textTransform", v)}
+                className="flex-1 py-[5px] rounded-[6px] text-[11px] font-bold border cursor-pointer transition-all"
+                style={(style.textTransform ?? "none") === v ? ACTIVE_BTN : INACTIVE_BTN}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <ColorRow label="Text Color" value={style.color ?? "#ffffff"}
             onChange={v => updateTextStyle(slot, "color", v)} />
