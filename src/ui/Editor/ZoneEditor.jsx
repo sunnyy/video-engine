@@ -1814,6 +1814,28 @@ export default function ZoneEditor({
         </div>
       </Section>
 
+      {/* Flags */}
+      <Section title="Flags">
+        {[
+          ["animatedBorder", "Apply Animated Border"],
+          ["shineEffect",    "Apply Shine Effect"],
+          ["transparentAsset", "Remove Background"],
+        ].map(([key, label]) => {
+          const isOn = !!style[key];
+          return (
+            <div key={key} className="flex items-center justify-between py-[6px]">
+              <span className="text-[12px] text-[#b0b0c8]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{label}</span>
+              <button
+                onClick={() => { pushHistory(); setZoneStyle(slot, key, isOn ? null : true); commit(); }}
+                className="px-3 py-[5px] rounded-[7px] text-[11px] font-bold border cursor-pointer transition-all"
+                style={isOn ? ACTIVE_BTN : INACTIVE_BTN}>
+                {isOn ? "ON" : "OFF"}
+              </button>
+            </div>
+          );
+        })}
+      </Section>
+
       {/* Frame & Mask — clip shapes only */}
       <Section title="Frame & Mask" icon="⬡" defaultOpen={false}>
         <div>
@@ -1949,21 +1971,6 @@ export default function ZoneEditor({
               onCommit={commit} min={0.25} max={4} step={0.25} unit="×" />
           </div>
         )}
-      </Section>
-
-      {/* Transparent Asset — layout-level flag: auto-remove bg on video generation */}
-      <Section title="Auto Remove Background" badge={style.transparentAsset ? "on" : undefined}>
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] text-[#888] leading-snug" style={{ maxWidth: 180 }}>
-            Remove background automatically when an image is assigned to this zone during generation.
-          </span>
-          <button
-            onClick={() => { pushHistory(); setZoneStyle(slot, "transparentAsset", style.transparentAsset ? null : true); commit(); }}
-            className="shrink-0 px-3 py-[6px] rounded-[8px] text-[12px] font-bold border cursor-pointer transition-all"
-            style={style.transparentAsset ? ACTIVE_BTN : INACTIVE_BTN}>
-            {style.transparentAsset ? "ON" : "OFF"}
-          </button>
-        </div>
       </Section>
 
       {/* Transform */}
