@@ -26,6 +26,18 @@ const NICHE_VOICE = {
   skincare:      "aspirational, gentle, transformation-focused",
 };
 
+function languageInstruction(language) {
+  const lang = (language || "english").toLowerCase();
+  if (lang === "hinglish") {
+    return `LANGUAGE RULE: Write ALL spoken text in Hinglish — a natural mix of Hindi and English as spoken by Indian content creators on Instagram/YouTube Shorts. English sentence structure with Hindi words woven in naturally. Example: "Yaar, ye 5 cheezein tumhari life badal sakti hain" or "Bhai, ek kaam karo — aaj hi ye try karo." Spoken text must sound like a real Hindi-English bilingual speaker, NOT like a translation. Headlines and labels stay in English ALL CAPS.`;
+  }
+  if (lang === "hindi") {
+    return `LANGUAGE RULE: Write ALL spoken text in Hindi (Devanagari script). Headlines and labels can be Roman transliteration ALL CAPS. The spoken voiceover must be fully in Hindi.`;
+  }
+  if (lang === "english") return "";
+  return `LANGUAGE RULE: Write ALL spoken text in ${language}. Headlines and labels stay in English ALL CAPS.`;
+}
+
 const BEAT_OUTPUT_SCHEMA = `
 Return ONLY a valid JSON array of beat objects — no markdown, no explanation:
 [
@@ -69,6 +81,7 @@ You are writing a viral short-form video script for a listicle.
 TOPIC: ${topic}
 LIST COUNT: ${listCount} items
 LANGUAGE: ${language}
+${languageInstruction(language)}
 AUDIENCE: ${audience}
 NICHE VOICE: ${NICHE_VOICE[niche] || "conversational, engaging"}
 ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
@@ -109,6 +122,7 @@ You are writing a viral short-form video script for a listicle with supporting f
 TOPIC: ${topic}
 LIST COUNT: ${listCount} items
 LANGUAGE: ${language}
+${languageInstruction(language)}
 AUDIENCE: ${audience}
 NICHE VOICE: ${NICHE_VOICE[niche] || "conversational, engaging"}
 ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
@@ -141,6 +155,7 @@ You are writing a viral rapid-fire facts video script.
 TOPIC: ${topic}
 FACT COUNT: ${listCount || 5}
 LANGUAGE: ${language}
+${languageInstruction(language)}
 AUDIENCE: ${audience}
 NICHE VOICE: ${NICHE_VOICE[niche] || "conversational, engaging"}
 ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
@@ -172,6 +187,7 @@ You are writing a viral short-form explainer video script.
 
 TOPIC: ${topic}
 LANGUAGE: ${language}
+${languageInstruction(language)}
 AUDIENCE: ${audience}
 NICHE VOICE: ${NICHE_VOICE[niche] || "clear, confident, slightly conversational"}
 ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
@@ -207,6 +223,7 @@ You are writing a viral revealing/mystery video script.
 
 TOPIC: ${topic}
 LANGUAGE: ${language}
+${languageInstruction(language)}
 AUDIENCE: ${audience}
 NICHE VOICE: ${NICHE_VOICE[niche] || "punchy, surprising"}
 ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
@@ -236,6 +253,7 @@ You are writing a maximum-impact viral short-form video script.
 
 TOPIC: ${topic}
 LANGUAGE: ${language}
+${languageInstruction(language)}
 AUDIENCE: ${audience}
 NICHE VOICE: ${NICHE_VOICE[niche] || "punchy, surprising, every line makes you want to hear the next"}
 ${researchContext ? `\nRESEARCH CONTEXT:\n${researchContext}` : ""}
