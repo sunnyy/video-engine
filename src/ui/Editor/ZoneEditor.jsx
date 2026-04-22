@@ -1951,6 +1951,21 @@ export default function ZoneEditor({
         )}
       </Section>
 
+      {/* Transparent Asset — layout-level flag: auto-remove bg on video generation */}
+      <Section title="Auto Remove Background" badge={style.transparentAsset ? "on" : undefined}>
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] text-[#888] leading-snug" style={{ maxWidth: 180 }}>
+            Remove background automatically when an image is assigned to this zone during generation.
+          </span>
+          <button
+            onClick={() => { pushHistory(); setZoneStyle(slot, "transparentAsset", style.transparentAsset ? null : true); commit(); }}
+            className="shrink-0 px-3 py-[6px] rounded-[8px] text-[12px] font-bold border cursor-pointer transition-all"
+            style={style.transparentAsset ? ACTIVE_BTN : INACTIVE_BTN}>
+            {style.transparentAsset ? "ON" : "OFF"}
+          </button>
+        </div>
+      </Section>
+
       {/* Transform */}
       <Section title="Transform" icon="⟳" defaultOpen={false}>
         <div className="mb-3">
