@@ -31,7 +31,12 @@ const IC = {
 const PLACEHOLDER = {
   headline:"THIS IS THE HOOK", subtext:"Here's what you need to know",
   label:"LABEL", cta:"TAP NOW →", stat:"94%", metric:"10X",
-  quote:'"This is a testimonial quote"', default:"Text Zone",
+  quote:'"This is a testimonial quote"',
+  eyebrow:"CATEGORY", number:"01", item_title:"Item Title",
+  item_body:"Supporting detail for this item goes here",
+  before:"BEFORE STATE", after:"AFTER STATE",
+  kicker:"Bold closing line", caption:"Short descriptive caption",
+  default:"Text Zone",
 };
 const ASSET_BG = ["#1a1e40","#1a3020","#301a1a","#1a2a35","#2a1a35"];
 

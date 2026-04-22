@@ -447,8 +447,14 @@ function fillTextZones(beats, colorOptions = {}) {
       // source of truth for fonts. The only exception: _userEditedFont means the user
       // explicitly changed this zone's font in the editor and wants to keep it.
       if (typographySystem && !existing?.style?._userEditedFont) {
+        const ROLE_TO_TYPOGRAPHY_ROLE = {
+          eyebrow: "label", number: "display", item_title: "headline",
+          item_body: "subtext", before: "subtext", after: "subtext",
+          kicker: "headline", caption: "subtext",
+        };
         const zoneRole = zoneDef.role || (order === 0 ? "headline" : "subtext");
-        const { fontFamily, fontWeight } = getTypographyForRole(typographySystem, zoneRole);
+        const resolvedTypoRole = ROLE_TO_TYPOGRAPHY_ROLE[zoneDef.role] || zoneRole;
+        const { fontFamily, fontWeight } = getTypographyForRole(typographySystem, resolvedTypoRole);
         if (fontFamily) mergedVisual.fontFamily = fontFamily;
         if (fontWeight) mergedVisual.fontWeight  = fontWeight;
       }

@@ -61,7 +61,15 @@ function zoneHint(role, intent, maxChars, isGiantDisplay = false, ordinal = 1) {
     case "stat":     return ordinal > 1
       ? `A DIFFERENT short metric or number related to this beat's topic. ${mc} e.g. 10X, 5 min, 3 steps. Do NOT split the primary stat into digit fragments — if no second stat exists, leave this blank.`
       : `The main number or percentage from this beat. ${mc} e.g. 94%, ₹10L, 3X. Never a sentence.`;
-    case "metric":   return `A short metric with unit. ${mc} e.g. 1M views, ₹10 lakh.`;
+    case "metric":     return `A short metric with unit. ${mc} e.g. 1M views, ₹10 lakh.`;
+    case "eyebrow":    return `A very short category/topic tag above the headline. ${mc} 1-3 words. ALL CAPS. Like "EPISODE 3" or "BREAKING".`;
+    case "number":     return `The item number/counter for this list item. ${mc} Formatted like "01", "02", "03". Just the number, nothing else.`;
+    case "item_title": return `The name or title of this list item. ${mc} Short, punchy, 2-5 words. Title case.`;
+    case "item_body":  return `A brief supporting detail for this list item. ${mc} 1 complete sentence. Specific, not generic.`;
+    case "before":     return `The "before" state in a before/after or contrast layout. ${mc} Short phrase describing the problem or starting point.`;
+    case "after":      return `The "after" state in a before/after or contrast layout. ${mc} Short phrase describing the result or improvement. Must contrast with the before zone.`;
+    case "kicker":     return `A punchy closing emphasis line. ${mc} Not a call to action — just a bold final statement. No verbs like "Follow" or "Join".`;
+    case "caption":    return `A short descriptive caption under an image or stat. ${mc} 1 short sentence. Factual and specific.`;
     case "quote":    return `A full impactful quote. ${mc} Should feel quotable.`;
     case "cta":      return `A short action phrase (2-4 words). ${mc} e.g. Follow Now, Learn More. Never a single capitalised keyword like NEGATIVE or FOMO.`;
     case "display":  return isCTA
@@ -429,7 +437,7 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
       // stat / metric zones may legitimately contain numbers from spoken text.
       // label / display zones are short category tags (1-3 words) that intentionally
       // reference the beat topic — prefix detection would over-clear them.
-      if (role === "stat" || role === "metric" || role === "label" || role === "display") continue;
+      if (role === "stat" || role === "metric" || role === "label" || role === "display" || role === "number" || role === "eyebrow") continue;
 
       const zWords = tokenise(content.text);
       if (zWords.length < 2) continue; // single words — skip detection
