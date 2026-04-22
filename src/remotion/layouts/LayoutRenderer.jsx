@@ -685,6 +685,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             textDecoration:  st.textDecoration || "none",
             color:           st.color         || "#ffffff",
             textAlign:       st.textAlign     || "center",
+            textTransform:   st.textTransform || "none",
             textShadow:      st.textShadow    || "none",
             lineHeight:      st.lineHeight    || 1.15,
             letterSpacing:   st.letterSpacing || "normal",
