@@ -280,6 +280,25 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         return;
       }
 
+      // Ctrl+[ / Ctrl+] — z-index shortcuts work even when right panel has focus
+      if ((e.metaKey || e.ctrlKey) && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+        const _ids = selectedZoneIdsRef.current;
+        const _selectedZoneId = (_ids instanceof Set && _ids.size === 1) ? [..._ids][0] : null;
+        if (_selectedZoneId) {
+          e.preventDefault();
+          const { project: _lp, activeBeatId: _lid } = useProjectStore.getState();
+          const _beat = _lp?.beats?.find(b => b.id === _lid);
+          if (_beat) {
+            const _bz  = _beat.zones || {};
+            const _def = getLayoutDef(_beat.layout)?.zones?.find(z => z.id === _selectedZoneId) || {};
+            const _cur = _bz[_selectedZoneId]?.zIndex ?? _def.zIndex ?? 0;
+            const _newZ = e.code === "BracketRight" ? _cur + 1 : _cur - 1;
+            updateBeatSilent(_beat.id, { zones: { ..._bz, [_selectedZoneId]: { ...(_bz[_selectedZoneId] || {}), zIndex: _newZ } } });
+          }
+          return;
+        }
+      }
+
       if (isTyping) return;
 
       // Zone shortcuts — single or multi-select
@@ -375,15 +394,6 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         return;
       }
 
-      // Ctrl+] — bring forward (zIndex +1)
-      // Ctrl+[ — send backward (zIndex -1)
-      if ((e.metaKey || e.ctrlKey) && (e.code === "BracketRight" || e.code === "BracketLeft")) {
-        e.preventDefault();
-        const currentZ = override.zIndex ?? defZone.zIndex ?? 0;
-        const newZ = e.code === "BracketRight" ? currentZ + 1 : currentZ - 1;
-        updateBeatSilent(liveBeat.id, { zones: { ...bz, [selectedZoneId]: { ...override, zIndex: newZ } } });
-        return;
-      }
 
     };
     // capture:true — fires before any child handler, nothing can stopPropagation before us
