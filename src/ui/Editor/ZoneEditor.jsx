@@ -531,7 +531,7 @@ export default function ZoneEditor({
         <div className="mb-4">
           <Label>AI Role</Label>
           <div className="flex gap-[4px] flex-wrap">
-            {["headline","subtext","label","stat","tagline","quote","cta","display","metric"].map(r => {
+            {["headline","subtext","label","stat","quote","cta","display","eyebrow","number","item_title","item_body","before","after","kicker","caption"].map(r => {
               const effectiveRole = zone.role === null ? null : (zone.role || zoneDef?.role);
               const active = effectiveRole === r;
               return (
