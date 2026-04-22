@@ -191,6 +191,9 @@ export default function LayoutEditor() {
   const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? false);
   const [metaTransitionType, setMetaTransitionType] = useState(layout?.defaultTransition?.type ?? "");
   const [metaTransitionDur,  setMetaTransitionDur]  = useState(layout?.defaultTransition?.duration ?? 12);
+  const [metaAnimatedBorder,  setMetaAnimatedBorder]  = useState(layout?.animatedBorder  ?? false);
+  const [metaShineEffect,     setMetaShineEffect]     = useState(layout?.shineEffect     ?? false);
+  const [metaTransparentAsset,setMetaTransparentAsset]= useState(layout?.transparentAsset ?? false);
 
   /* UI state */
   const [registryReady,   setRegistryReady]   = useState(false);
@@ -242,6 +245,9 @@ export default function LayoutEditor() {
         setMetaShowCaption(entry.showCaption ?? true);
         setMetaTransitionType(entry.defaultTransition?.type ?? "");
         setMetaTransitionDur(entry.defaultTransition?.duration ?? 12);
+        setMetaAnimatedBorder(entry.animatedBorder  ?? false);
+        setMetaShineEffect(entry.shineEffect        ?? false);
+        setMetaTransparentAsset(entry.transparentAsset ?? false);
       }
     });
   }, []);
@@ -343,7 +349,10 @@ export default function LayoutEditor() {
       type:             metaType,
       beat_type:        metaType === "layout" && metaBeatType ? metaBeatType : null,
       visibility:       metaVisibility,
-      show_caption:       metaShowCaption,
+      show_caption:        metaShowCaption,
+      animated_border:     metaAnimatedBorder,
+      shine_effect:        metaShineEffect,
+      transparent_asset:   metaTransparentAsset,
       default_transition: metaTransitionType ? { type: metaTransitionType, duration: metaTransitionDur } : null,
       // Persist the layout background inside generation_meta (no standalone DB column exists).
       // Merge with any existing generation_meta so we don't clobber other keys.
@@ -567,6 +576,22 @@ export default function LayoutEditor() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Asset flags */}
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>ASSET FLAGS</label>
+              {[
+                ["Animated border",  metaAnimatedBorder,   setMetaAnimatedBorder],
+                ["Shine effect",     metaShineEffect,      setMetaShineEffect],
+                ["Transparent asset",metaTransparentAsset, setMetaTransparentAsset],
+              ].map(([lbl, val, setter]) => (
+                <label key={lbl} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+                  <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)}
+                    style={{ accentColor:"#7c5cfc", width:14, height:14 }} />
+                  <span style={{ fontSize:12, color:"#aaa", fontFamily:"monospace" }}>{lbl}</span>
+                </label>
+              ))}
             </div>
 
             {/* Default transition */}
