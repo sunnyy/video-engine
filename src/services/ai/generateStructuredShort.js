@@ -438,15 +438,8 @@ export async function generateStructuredShort({
       .filter(z => !beat.zones[z.id]?.content?.asset?.src)
       .filter(z => z.id !== beat.avatarZone);
 
-    let injectedBgZoneId = null;
-    if (defAssetZones.length === 0 && hint && beat.visual_hint !== "text_only") {
-      const existingNums = Object.keys(beat.zones)
-        .map(id => parseInt(id.replace(/\D/g, ""), 10))
-        .filter(n => !isNaN(n));
-      const nextN = existingNums.length ? Math.max(...existingNums) + 1 : 1;
-      injectedBgZoneId = `z${nextN}`;
-      defAssetZones = [{ id: injectedBgZoneId, type: "asset" }];
-    }
+    // Never inject a background asset zone — if the layout has no asset zones, respect that.
+    const injectedBgZoneId = null;
 
     if (!defAssetZones.length) return;
 
