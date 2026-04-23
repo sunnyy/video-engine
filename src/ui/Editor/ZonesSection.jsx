@@ -24,9 +24,10 @@ function nextZoneId(layoutDef, beatZones) {
   return `z${max + 1}`;
 }
 
-/* ── Multi-zone alignment panel ── */
+/* ── Alignment panel — single zone aligns to canvas, multi aligns to each other ── */
 function MultiAlignPanel({ selectedZoneIds, beat, zoneDefs, zones, updateBeat }) {
-  const ids = [...selectedZoneIds];
+  const ids    = [...selectedZoneIds];
+  const single = ids.length === 1;
 
   // Resolve effective x/y/w/h for each selected zone (merge layoutDef + beat override)
   const getRect = (id) => {
@@ -42,7 +43,6 @@ function MultiAlignPanel({ selectedZoneIds, beat, zoneDefs, zones, updateBeat })
   };
 
   const apply = (patches) => {
-    // patches: { [id]: { x?, y?, width?, height? } }
     const newZones = { ...zones };
     for (const [id, patch] of Object.entries(patches)) {
       newZones[id] = { ...(zones[id] || {}), ...patch };
@@ -54,38 +54,50 @@ function MultiAlignPanel({ selectedZoneIds, beat, zoneDefs, zones, updateBeat })
     const rects = ids.map(getRect);
     const patches = {};
 
-    if (type === "left") {
-      const minX = Math.min(...rects.map(r => r.x));
-      rects.forEach(r => { patches[r.id] = { x: minX }; });
-    } else if (type === "center-h") {
-      const avgCx = rects.reduce((s, r) => s + r.x + r.w / 2, 0) / rects.length;
-      rects.forEach(r => { patches[r.id] = { x: avgCx - r.w / 2 }; });
-    } else if (type === "right") {
-      const maxR = Math.max(...rects.map(r => r.x + r.w));
-      rects.forEach(r => { patches[r.id] = { x: maxR - r.w }; });
-    } else if (type === "top") {
-      const minY = Math.min(...rects.map(r => r.y));
-      rects.forEach(r => { patches[r.id] = { y: minY }; });
-    } else if (type === "middle-v") {
-      const avgCy = rects.reduce((s, r) => s + r.y + r.h / 2, 0) / rects.length;
-      rects.forEach(r => { patches[r.id] = { y: avgCy - r.h / 2 }; });
-    } else if (type === "bottom") {
-      const maxB = Math.max(...rects.map(r => r.y + r.h));
-      rects.forEach(r => { patches[r.id] = { y: maxB - r.h }; });
-    } else if (type === "dist-h") {
-      const sorted = [...rects].sort((a, b) => a.x - b.x);
-      const totalW = sorted.reduce((s, r) => s + r.w, 0);
-      const span   = (sorted[sorted.length - 1].x + sorted[sorted.length - 1].w) - sorted[0].x;
-      const gap    = (span - totalW) / (sorted.length - 1);
-      let cursor   = sorted[0].x;
-      sorted.forEach(r => { patches[r.id] = { x: Math.round(cursor * 10) / 10 }; cursor += r.w + gap; });
-    } else if (type === "dist-v") {
-      const sorted = [...rects].sort((a, b) => a.y - b.y);
-      const totalH = sorted.reduce((s, r) => s + r.h, 0);
-      const span   = (sorted[sorted.length - 1].y + sorted[sorted.length - 1].h) - sorted[0].y;
-      const gap    = (span - totalH) / (sorted.length - 1);
-      let cursor   = sorted[0].y;
-      sorted.forEach(r => { patches[r.id] = { y: Math.round(cursor * 10) / 10 }; cursor += r.h + gap; });
+    if (single) {
+      // Align single zone to canvas (100×100 coordinate space)
+      const r = rects[0];
+      if      (type === "left")     patches[r.id] = { x: 0 };
+      else if (type === "center-h") patches[r.id] = { x: (100 - r.w) / 2 };
+      else if (type === "right")    patches[r.id] = { x: 100 - r.w };
+      else if (type === "top")      patches[r.id] = { y: 0 };
+      else if (type === "middle-v") patches[r.id] = { y: (100 - r.h) / 2 };
+      else if (type === "bottom")   patches[r.id] = { y: 100 - r.h };
+    } else {
+      // Align multiple zones to each other
+      if (type === "left") {
+        const minX = Math.min(...rects.map(r => r.x));
+        rects.forEach(r => { patches[r.id] = { x: minX }; });
+      } else if (type === "center-h") {
+        const avgCx = rects.reduce((s, r) => s + r.x + r.w / 2, 0) / rects.length;
+        rects.forEach(r => { patches[r.id] = { x: avgCx - r.w / 2 }; });
+      } else if (type === "right") {
+        const maxR = Math.max(...rects.map(r => r.x + r.w));
+        rects.forEach(r => { patches[r.id] = { x: maxR - r.w }; });
+      } else if (type === "top") {
+        const minY = Math.min(...rects.map(r => r.y));
+        rects.forEach(r => { patches[r.id] = { y: minY }; });
+      } else if (type === "middle-v") {
+        const avgCy = rects.reduce((s, r) => s + r.y + r.h / 2, 0) / rects.length;
+        rects.forEach(r => { patches[r.id] = { y: avgCy - r.h / 2 }; });
+      } else if (type === "bottom") {
+        const maxB = Math.max(...rects.map(r => r.y + r.h));
+        rects.forEach(r => { patches[r.id] = { y: maxB - r.h }; });
+      } else if (type === "dist-h") {
+        const sorted = [...rects].sort((a, b) => a.x - b.x);
+        const totalW = sorted.reduce((s, r) => s + r.w, 0);
+        const span   = (sorted[sorted.length - 1].x + sorted[sorted.length - 1].w) - sorted[0].x;
+        const gap    = (span - totalW) / (sorted.length - 1);
+        let cursor   = sorted[0].x;
+        sorted.forEach(r => { patches[r.id] = { x: Math.round(cursor * 10) / 10 }; cursor += r.w + gap; });
+      } else if (type === "dist-v") {
+        const sorted = [...rects].sort((a, b) => a.y - b.y);
+        const totalH = sorted.reduce((s, r) => s + r.h, 0);
+        const span   = (sorted[sorted.length - 1].y + sorted[sorted.length - 1].h) - sorted[0].y;
+        const gap    = (span - totalH) / (sorted.length - 1);
+        let cursor   = sorted[0].y;
+        sorted.forEach(r => { patches[r.id] = { y: Math.round(cursor * 10) / 10 }; cursor += r.h + gap; });
+      }
     }
 
     apply(patches);
@@ -109,7 +121,7 @@ function MultiAlignPanel({ selectedZoneIds, beat, zoneDefs, zones, updateBeat })
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#7878a0]"
           style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          Align {ids.length} zones
+          {single ? "Align to canvas" : `Align ${ids.length} zones`}
         </span>
       </div>
 
@@ -118,22 +130,22 @@ function MultiAlignPanel({ selectedZoneIds, beat, zoneDefs, zones, updateBeat })
         <div className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#55556a] mb-2"
           style={{ fontFamily: "'JetBrains Mono', monospace" }}>Align</div>
         <div className="grid grid-cols-6 gap-[5px]">
-          <Btn type="left" title="Align left edges">
+          <Btn type="left" title={single ? "Snap to left edge" : "Align left edges"}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="1" width="2" height="16" rx="1" fill="currentColor" opacity=".5"/><rect x="4" y="3" width="8" height="4" rx="1" fill="currentColor"/><rect x="4" y="10" width="11" height="4" rx="1" fill="currentColor"/></svg>
           </Btn>
-          <Btn type="center-h" title="Align horizontal centers">
+          <Btn type="center-h" title={single ? "Center horizontally on canvas" : "Align horizontal centers"}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="8" y="1" width="2" height="16" rx="1" fill="currentColor" opacity=".5"/><rect x="3" y="3" width="12" height="4" rx="1" fill="currentColor"/><rect x="5" y="10" width="8" height="4" rx="1" fill="currentColor"/></svg>
           </Btn>
-          <Btn type="right" title="Align right edges">
+          <Btn type="right" title={single ? "Snap to right edge" : "Align right edges"}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="14" y="1" width="2" height="16" rx="1" fill="currentColor" opacity=".5"/><rect x="6" y="3" width="8" height="4" rx="1" fill="currentColor"/><rect x="3" y="10" width="11" height="4" rx="1" fill="currentColor"/></svg>
           </Btn>
-          <Btn type="top" title="Align top edges">
+          <Btn type="top" title={single ? "Snap to top edge" : "Align top edges"}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="2" width="16" height="2" rx="1" fill="currentColor" opacity=".5"/><rect x="3" y="4" width="4" height="8" rx="1" fill="currentColor"/><rect x="10" y="4" width="4" height="11" rx="1" fill="currentColor"/></svg>
           </Btn>
-          <Btn type="middle-v" title="Align vertical centers">
+          <Btn type="middle-v" title={single ? "Center vertically on canvas" : "Align vertical centers"}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="8" width="16" height="2" rx="1" fill="currentColor" opacity=".5"/><rect x="3" y="3" width="4" height="12" rx="1" fill="currentColor"/><rect x="10" y="5" width="4" height="8" rx="1" fill="currentColor"/></svg>
           </Btn>
-          <Btn type="bottom" title="Align bottom edges">
+          <Btn type="bottom" title={single ? "Snap to bottom edge" : "Align bottom edges"}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="14" width="16" height="2" rx="1" fill="currentColor" opacity=".5"/><rect x="3" y="6" width="4" height="8" rx="1" fill="currentColor"/><rect x="10" y="3" width="4" height="11" rx="1" fill="currentColor"/></svg>
           </Btn>
         </div>
@@ -521,7 +533,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
       <div className="h-[1px] bg-[rgba(255,255,255,0.05)] shrink-0 mb-3" />
 
       {/* ── Editor area ── */}
-      {!activeRowId && !(selectedZoneIds?.size > 1) && (
+      {!activeRowId && !(selectedZoneIds?.size >= 1) && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-30">
           <span className="text-[11px] text-[#9494a8] text-center font-mono">Select a zone above to edit</span>
         </div>
@@ -541,6 +553,14 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
 
       {!!selectedZoneId && (
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <MultiAlignPanel
+            selectedZoneIds={selectedZoneIds}
+            beat={beat}
+            zoneDefs={zoneDefs}
+            zones={zones}
+            updateBeat={updateBeat}
+          />
+          <div className="h-[1px] bg-[rgba(255,255,255,0.05)] my-1" />
           <ZoneEditor
             key={selectedZoneId}
             beatId={beat.id}
