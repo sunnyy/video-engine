@@ -1001,7 +1001,7 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
   });
 
   const extraZones = Object.entries(beatZones)
-    .filter(([id]) => !defZoneIds.has(id))
+    .filter(([id]) => !defZoneIds.has(id) && !deletedZones.has(id))
     .map(([id, z]) => ({
       id, type: z.type || "asset",
       x: z.x ?? 0, y: z.y ?? 0, width: z.width ?? 50, height: z.height ?? 50,

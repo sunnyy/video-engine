@@ -389,7 +389,10 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         const newId = nextZoneId(layoutDef, bz);
         // Omit `id` from the merged data — the dict key is the zone's identity
         const { id: _ignored, ...defRest } = defZone;
-        updateBeat(liveBeat.id, { zones: { ...bz, [newId]: { ...defRest, ...override, x: x + 2, y: y + 2 } } });
+        const mergedStyle = { ...(defRest.style || {}), ...(override.style || {}) };
+        // Mark explicit fontFamily so LayoutRenderer doesn't override with DNA typography
+        if (mergedStyle.fontFamily && mergedStyle.fontFamily !== "inherit") mergedStyle._userFontFamily = true;
+        updateBeat(liveBeat.id, { zones: { ...bz, [newId]: { ...defRest, ...override, x: x + 2, y: y + 2, style: mergedStyle } } });
         onSelectZoneRef.current(newId);
         return;
       }
