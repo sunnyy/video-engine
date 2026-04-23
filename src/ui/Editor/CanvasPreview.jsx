@@ -348,6 +348,31 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         return;
       }
 
+      // Ctrl+D — duplicate zone(s) — works for single AND multi-select
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyD") {
+        e.preventDefault();
+        const srcIds = isMulti ? [...ids] : (selectedZoneId ? [selectedZoneId] : []);
+        if (!srcIds.length) return;
+        let newZones = { ...bz };
+        const newIds = [];
+        for (const srcId of srcIds) {
+          const srcOverride = newZones[srcId] || {};
+          const srcDef      = layoutDef?.zones?.find(z => z.id === srcId) || {};
+          const x           = srcOverride.x ?? srcDef.x ?? 0;
+          const y           = srcOverride.y ?? srcDef.y ?? 0;
+          const newId       = nextZoneId(layoutDef, newZones);
+          const { id: _ignored, ...defRest } = srcDef;
+          const mergedStyle = { ...(defRest.style || {}), ...(srcOverride.style || {}) };
+          if (mergedStyle.fontFamily && mergedStyle.fontFamily !== "inherit") mergedStyle._userFontFamily = true;
+          newZones[newId] = { ...defRest, ...srcOverride, x: x + 2, y: y + 2, style: mergedStyle };
+          newIds.push(newId);
+        }
+        updateBeat(liveBeat.id, { zones: newZones });
+        onSelectZoneRef.current(newIds[0]);
+        for (let i = 1; i < newIds.length; i++) onSelectZoneRef.current(newIds[i], true);
+        return;
+      }
+
       // Single-zone-only shortcuts below
       if (!selectedZoneId) return;
 
@@ -378,22 +403,6 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           updateBeat(liveBeat.id, { zones: rest, deletedZones: newDeletedZones });
         }
         onSelectZoneRef.current(null);
-        return;
-      }
-
-      // Ctrl+D — duplicate zone
-      if ((e.metaKey || e.ctrlKey) && e.code === "KeyD") {
-        e.preventDefault();
-        const x = override.x ?? defZone.x ?? 0;
-        const y = override.y ?? defZone.y ?? 0;
-        const newId = nextZoneId(layoutDef, bz);
-        // Omit `id` from the merged data — the dict key is the zone's identity
-        const { id: _ignored, ...defRest } = defZone;
-        const mergedStyle = { ...(defRest.style || {}), ...(override.style || {}) };
-        // Mark explicit fontFamily so LayoutRenderer doesn't override with DNA typography
-        if (mergedStyle.fontFamily && mergedStyle.fontFamily !== "inherit") mergedStyle._userFontFamily = true;
-        updateBeat(liveBeat.id, { zones: { ...bz, [newId]: { ...defRest, ...override, x: x + 2, y: y + 2, style: mergedStyle } } });
-        onSelectZoneRef.current(newId);
         return;
       }
 
