@@ -268,8 +268,18 @@ export default function LayoutEditor() {
     // Checking existingBeat.layout === (layoutDef?.id ?? layoutId) guards against copying
     // Layout A's background onto Layout B when the user navigates between layouts.
     const existingBeat = useProjectStore.getState().project?.beats?.[0];
-    if (existingBeat && existingBeat.layout === (layoutDef?.id ?? layoutId) && existingBeat.layoutBackground) {
-      beat.layoutBackground = existingBeat.layoutBackground;
+    const isSameLayout = existingBeat && existingBeat.layout === (layoutDef?.id ?? layoutId);
+    if (isSameLayout) {
+      // Preserve all existing zone edits — only rebuild zones for zones not yet in the existing beat.
+      // This prevents niche/energy/DNA changes from wiping in-progress zone work.
+      if (existingBeat.layoutBackground) beat.layoutBackground = existingBeat.layoutBackground;
+      if (existingBeat.zones) {
+        beat.zones = {
+          ...beat.zones,           // default zones from def (placeholder content)
+          ...existingBeat.zones,   // existing edits always win
+        };
+      }
+      if (existingBeat.deletedZones?.length) beat.deletedZones = existingBeat.deletedZones;
     }
     const proj      = buildFakeProject(beat, dna, layoutDef);
     setDatabaseId(null);

@@ -279,15 +279,12 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     const prev = beat.deletedZones || [];
     const newDeletedZones = prev.includes(slot) ? prev : [...prev, slot];
 
-    const isLayoutZone = zoneDefs.some(z => z.id === slot);
-    if (isLayoutZone) {
-      updateBeat(beat.id, { deletedZones: newDeletedZones });
-    } else {
-      // Custom zone — also remove from zones dict
-      const newZones = { ...zones };
-      delete newZones[slot];
-      updateBeat(beat.id, { zones: newZones, deletedZones: newDeletedZones });
-    }
+    // Always remove from beat.zones too — if a layout zone is deleted and later
+    // drops out of the def (after save+refreshCache), it must not ghost back as a
+    // "custom zone" just because it still exists in beat.zones.
+    const newZones = { ...zones };
+    delete newZones[slot];
+    updateBeat(beat.id, { zones: newZones, deletedZones: newDeletedZones });
     if (selectedZoneId === slot) onSelectZone(null);
   };
 
@@ -427,8 +424,8 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
       const type  = zData.type || z.type || "asset";
       return { id: z.id, name: z.label || z.id, type, isCustom: false, isOverlay: false };
     }),
-    // Custom zones added by the pipeline or user (not in the layout def, not hidden)
-    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id) && !zones[id]?.hidden).map(([id, z]) => {
+    // Custom zones added by the pipeline or user (not in the layout def, not hidden, not deleted)
+    ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id) && !zones[id]?.hidden && !deletedZonesSet.has(id)).map(([id, z]) => {
       const type = z.type || "asset";
       const name = type === "text"
         ? (z.content?.text?.slice(0, 16) || "Text")
