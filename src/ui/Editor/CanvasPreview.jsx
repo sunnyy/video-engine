@@ -373,38 +373,34 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
         return;
       }
 
+      // Delete / Backspace — remove zone(s) or video overlay — works for single AND multi-select
+      if (e.code === "Delete" || e.code === "Backspace") {
+        const delIds = isMulti ? [...ids] : (selectedZoneId ? [selectedZoneId] : []);
+        if (!delIds.length) return;
+        e.preventDefault();
+        let newZones = { ...bz };
+        let newDeletedZones = [...(liveBeat.deletedZones || [])];
+        for (const id of delIds) {
+          if (id.startsWith("_vo_")) {
+            const voId = id.slice(4);
+            const { project: lp } = useProjectStore.getState();
+            updateProjectMeta({ overlays: (lp.overlays || []).filter(o => o.id !== voId) });
+            continue;
+          }
+          if (!newDeletedZones.includes(id)) newDeletedZones.push(id);
+          const isLayoutZone = layoutDef?.zones?.some(z => z.id === id);
+          if (!isLayoutZone) delete newZones[id];
+        }
+        updateBeat(liveBeat.id, { zones: newZones, deletedZones: newDeletedZones });
+        onSelectZoneRef.current(null);
+        return;
+      }
+
       // Single-zone-only shortcuts below
       if (!selectedZoneId) return;
 
       const override = bz[selectedZoneId] || {};
       const defZone  = layoutDef?.zones?.find(z => z.id === selectedZoneId) || {};
-
-      // Delete / Backspace — remove zone or video overlay
-      if (e.code === "Delete" || e.code === "Backspace") {
-        e.preventDefault();
-        // Video overlay
-        if (selectedZoneId.startsWith("_vo_")) {
-          const voId = selectedZoneId.slice(4);
-          const { project: lp } = useProjectStore.getState();
-          updateProjectMeta({ overlays: (lp.overlays || []).filter(o => o.id !== voId) });
-          onSelectZoneRef.current(null);
-          return;
-        }
-        // Always track in deletedZones (matches ZonesSection.deleteZone logic).
-        // This prevents the auto-save race condition where a freshly-saved custom
-        // zone becomes a layout zone but only got removed from beat.zones here.
-        const prev = liveBeat.deletedZones || [];
-        const newDeletedZones = prev.includes(selectedZoneId) ? prev : [...prev, selectedZoneId];
-        const isLayoutZone = layoutDef?.zones?.some(z => z.id === selectedZoneId);
-        if (isLayoutZone) {
-          updateBeat(liveBeat.id, { deletedZones: newDeletedZones });
-        } else {
-          const { [selectedZoneId]: _removed, ...rest } = bz;
-          updateBeat(liveBeat.id, { zones: rest, deletedZones: newDeletedZones });
-        }
-        onSelectZoneRef.current(null);
-        return;
-      }
 
 
     };
