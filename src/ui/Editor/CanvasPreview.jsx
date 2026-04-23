@@ -292,7 +292,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
             const _bz  = _beat.zones || {};
             const _def = getLayoutDef(_beat.layout)?.zones?.find(z => z.id === _selectedZoneId) || {};
             const _cur = _bz[_selectedZoneId]?.zIndex ?? _def.zIndex ?? 0;
-            const _newZ = e.code === "BracketRight" ? _cur + 1 : _cur - 1;
+            const _newZ = e.code === "BracketRight" ? _cur + 1 : Math.max(0, _cur - 1);
             updateBeatSilent(_beat.id, { zones: { ..._bz, [_selectedZoneId]: { ...(_bz[_selectedZoneId] || {}), zIndex: _newZ } } });
           }
           return;
