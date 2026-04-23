@@ -627,10 +627,20 @@ export default function ZoneEditor({
 
       {/* Typography */}
       <Section title="Typography" icon="Aa">
+        {/* Row 1 — Font Family */}
         <div className="mb-3">
           <Sel label="Font Family" value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyleBulk(slot, { fontFamily: v, _userFontFamily: true })} options={FONT_FAMILIES} />
         </div>
 
+        {/* Row 2 — Weight */}
+        <div className="mb-3">
+          <Label>Weight</Label>
+          <BtnGroup fullWidth options={FONT_WEIGHTS.map(w => ({ label: w.label, value: String(w.value) }))}
+            value={String(style.fontWeight ?? 700)}
+            onChange={v => updateTextStyle(slot, "fontWeight", Number(v))} />
+        </div>
+
+        {/* Row 3 — Size | Opacity */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Slider label="Size" value={Math.round(parseFloat(style.fontSize ?? 32))}
             onChangeSilent={v => {
@@ -646,13 +656,38 @@ export default function ZoneEditor({
             onCommit={commit} min={0} max={100} unit="%" />
         </div>
 
-        <div className="mb-3">
-          <Label>Weight</Label>
-          <BtnGroup fullWidth options={FONT_WEIGHTS.map(w => ({ label: w.label, value: String(w.value) }))}
-            value={String(style.fontWeight ?? 700)}
-            onChange={v => updateTextStyle(slot, "fontWeight", Number(v))} />
+        {/* Row 4 — Line Height | Letter Spacing */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Slider label="Line Height"
+            value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
+            onChangeSilent={v => setStyleSilent("lineHeight", v)}
+            onCommit={commit} min={0.7} max={3} step={0.05} unit="×" />
+          <Slider label="Letter Spacing"
+            value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
+            onChangeSilent={v => setStyleSilent("letterSpacing", v)}
+            onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
         </div>
 
+        {/* Row 5 — Align */}
+        <div className="mb-3">
+          <Label>Align</Label>
+          <div className="flex gap-[4px]">
+            {[
+              { v: "left",    label: "⬦", title: "Left"    },
+              { v: "center",  label: "◈", title: "Center"  },
+              { v: "right",   label: "⬧", title: "Right"   },
+              { v: "justify", label: "≡", title: "Justify" },
+            ].map(({ v, label, title }) => (
+              <button key={v} title={title}
+                onClick={() => updateTextStyle(slot, "textAlign", v)}
+                className="flex-1 py-[5px] rounded-[6px] text-[13px] border cursor-pointer transition-all"
+                style={(style.textAlign ?? "center") === v ? ACTIVE_BTN : INACTIVE_BTN}
+              >{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 6 — Style | Transform (mirrors Figma's Decoration | Case row) */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <Label>Style</Label>
@@ -671,54 +706,26 @@ export default function ZoneEditor({
             </div>
           </div>
           <div>
-            <Label>Align</Label>
+            <Label>Case</Label>
             <div className="flex gap-[4px]">
               {[
-                { v: "left",    label: "⬦", title: "Left"    },
-                { v: "center",  label: "◈", title: "Center"  },
-                { v: "right",   label: "⬧", title: "Right"   },
-                { v: "justify", label: "≡", title: "Justify" },
+                { v: "none",       label: "Ag",  title: "None"       },
+                { v: "uppercase",  label: "AG",  title: "Uppercase"  },
+                { v: "lowercase",  label: "ag",  title: "Lowercase"  },
+                { v: "capitalize", label: "Ag↑", title: "Capitalize" },
               ].map(({ v, label, title }) => (
                 <button key={v} title={title}
-                  onClick={() => updateTextStyle(slot, "textAlign", v)}
-                  className="flex-1 py-[5px] rounded-[6px] text-[13px] border cursor-pointer transition-all"
-                  style={(style.textAlign ?? "center") === v ? ACTIVE_BTN : INACTIVE_BTN}
-                >{label}</button>
+                  onClick={() => updateTextStyle(slot, "textTransform", v)}
+                  className="flex-1 py-[5px] rounded-[6px] text-[10px] font-bold border cursor-pointer transition-all"
+                  style={(style.textTransform ?? "none") === v ? ACTIVE_BTN : INACTIVE_BTN}>
+                  {label}
+                </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <Slider label="Line Height"
-            value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
-            onChangeSilent={v => setStyleSilent("lineHeight", v)}
-            onCommit={commit} min={0.7} max={3} step={0.05} unit="×" />
-          <Slider label="Letter Spacing"
-            value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
-            onChangeSilent={v => setStyleSilent("letterSpacing", v)}
-            onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
-        </div>
-
-        <div className="mb-3">
-          <Label>Text Transform</Label>
-          <div className="flex gap-[4px]">
-            {[
-              { v: "none",       label: "Ag",  title: "None"       },
-              { v: "uppercase",  label: "AG",  title: "Uppercase"  },
-              { v: "lowercase",  label: "ag",  title: "Lowercase"  },
-              { v: "capitalize", label: "Ag_", title: "Capitalize" },
-            ].map(({ v, label, title }) => (
-              <button key={v} title={title}
-                onClick={() => updateTextStyle(slot, "textTransform", v)}
-                className="flex-1 py-[5px] rounded-[6px] text-[11px] font-bold border cursor-pointer transition-all"
-                style={(style.textTransform ?? "none") === v ? ACTIVE_BTN : INACTIVE_BTN}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
+        {/* Row 7 — Text Color | Background */}
         <div className="grid grid-cols-2 gap-3">
           <ColorRow label="Text Color" value={style.color ?? "#ffffff"}
             onChange={v => updateTextStyle(slot, "color", v)} />
