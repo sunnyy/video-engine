@@ -439,7 +439,7 @@ export async function generateStructuredShort({
       .filter(z => z.id !== beat.avatarZone);
 
     let injectedBgZoneId = null;
-    if (defAssetZones.length === 0 && hint) {
+    if (defAssetZones.length === 0 && hint && beat.visual_hint !== "text_only") {
       const existingNums = Object.keys(beat.zones)
         .map(id => parseInt(id.replace(/\D/g, ""), 10))
         .filter(n => !isNaN(n));
