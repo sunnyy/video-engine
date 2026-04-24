@@ -32,12 +32,15 @@ const FONT_FAMILIES = [
 ];
 
 const FONT_WEIGHTS = [
-  { label: "Reg",   value: 400 },
-  { label: "Med",   value: 500 },
-  { label: "Semi",  value: 600 },
-  { label: "Bold",  value: 700 },
-  { label: "Xtra",  value: 800 },
-  { label: "Black", value: 900 },
+  { label: "100 Thin",        value: 100 },
+  { label: "200 Extra Light", value: 200 },
+  { label: "300 Light",       value: 300 },
+  { label: "400 Regular",     value: 400 },
+  { label: "500 Medium",      value: 500 },
+  { label: "600 Semi Bold",   value: 600 },
+  { label: "700 Bold",        value: 700 },
+  { label: "800 Extra Bold",  value: 800 },
+  { label: "900 Black",       value: 900 },
 ];
 
 /* ── Primitive UI atoms ── */
@@ -119,6 +122,22 @@ function Sel({ label, value, onChange, options }) {
         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239494a8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}>
         {options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
       </select>
+    </div>
+  );
+}
+
+/* ── Compact number input with icon prefix (for LH, LS, Size, Opacity) ── */
+function CompactInput({ icon, value, onChange, onCommit, min, max, step = 1, unit }) {
+  return (
+    <div className="flex items-center gap-[5px] bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-[8px] py-[7px]">
+      {icon && <span className="text-[10px] text-[#55556a] shrink-0 select-none">{icon}</span>}
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={e => onChange(Number(e.target.value))}
+        onBlur={onCommit} onKeyDown={e => e.key === "Enter" && onCommit?.()}
+        className="w-full bg-transparent text-[12px] text-[#e8e8f0] outline-none min-w-0 font-mono"
+        style={{ MozAppearance: "textfield", appearance: "textfield" }}
+      />
+      {unit && <span className="text-[10px] text-[#55556a] shrink-0 select-none">{unit}</span>}
     </div>
   );
 }
@@ -628,106 +647,98 @@ export default function ZoneEditor({
       {/* Typography */}
       <Section title="Typography" icon="Aa">
         {/* Row 1 — Font Family */}
-        <div className="mb-3">
-          <Sel label="Font Family" value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyleBulk(slot, { fontFamily: v, _userFontFamily: true })} options={FONT_FAMILIES} />
+        <div className="mb-2">
+          <Sel value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyleBulk(slot, { fontFamily: v, _userFontFamily: true })} options={FONT_FAMILIES} />
         </div>
 
-        {/* Row 2 — Weight */}
-        <div className="mb-3">
-          <Label>Weight</Label>
-          <BtnGroup fullWidth options={FONT_WEIGHTS.map(w => ({ label: w.label, value: String(w.value) }))}
-            value={String(style.fontWeight ?? 700)}
-            onChange={v => updateTextStyle(slot, "fontWeight", Number(v))} />
-        </div>
-
-        {/* Row 3 — Size | Opacity */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <Slider label="Size" value={Math.round(parseFloat(style.fontSize ?? 32))}
-            onChangeSilent={v => {
+        {/* Row 2 — Weight dropdown | Size input */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <select
+            value={style.fontWeight ?? 700}
+            onChange={e => updateTextStyle(slot, "fontWeight", Number(e.target.value))}
+            className="bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[7px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239494a8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}>
+            {FONT_WEIGHTS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+          </select>
+          <CompactInput icon="T" value={Math.round(parseFloat(style.fontSize ?? 32))}
+            onChange={v => {
               const curFont = parseFloat(style.fontSize ?? 32);
               const ratio   = curFont > 0 ? v / curFont : 1;
-              const curW    = safeZone.width  ?? zoneDef?.width  ?? 50;
+              const curW    = safeZone.width ?? zoneDef?.width ?? 50;
               const newW    = Math.max(5, Math.round(curW * ratio * 10) / 10);
               patchZoneSilent(slot, { width: newW }, { fontSize: v });
             }}
             onCommit={commit} min={10} max={300} unit="px" />
-          <Slider label="Opacity" value={Math.round(opacity * 100)}
-            onChangeSilent={v => setStyleSilent("opacity", v / 100)}
-            onCommit={commit} min={0} max={100} unit="%" />
         </div>
 
-        {/* Row 4 — Line Height | Letter Spacing */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <Slider label="Line Height"
-            value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
-            onChangeSilent={v => setStyleSilent("lineHeight", v)}
+        {/* Row 3 — Line Height | Letter Spacing */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <CompactInput icon="↕" value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
+            onChange={v => setStyleSilent("lineHeight", v)}
             onCommit={commit} min={0.7} max={3} step={0.05} unit="×" />
-          <Slider label="Letter Spacing"
-            value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
-            onChangeSilent={v => setStyleSilent("letterSpacing", v)}
+          <CompactInput icon="↔" value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
+            onChange={v => setStyleSilent("letterSpacing", v)}
             onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
         </div>
 
+        {/* Row 4 — Opacity */}
+        <div className="mb-2">
+          <CompactInput icon="◎" value={Math.round(opacity * 100)}
+            onChange={v => setStyleSilent("opacity", v / 100)}
+            onCommit={commit} min={0} max={100} unit="%" />
+        </div>
+
         {/* Row 5 — Align */}
-        <div className="mb-3">
-          <Label>Align</Label>
+        <div className="flex gap-[4px] mb-2">
+          {[
+            { v: "left",    label: "⬦", title: "Left"    },
+            { v: "center",  label: "◈", title: "Center"  },
+            { v: "right",   label: "⬧", title: "Right"   },
+            { v: "justify", label: "≡", title: "Justify" },
+          ].map(({ v, label, title }) => (
+            <button key={v} title={title}
+              onClick={() => updateTextStyle(slot, "textAlign", v)}
+              className="flex-1 py-[6px] rounded-[6px] text-[13px] border cursor-pointer transition-all"
+              style={(style.textAlign ?? "center") === v ? ACTIVE_BTN : INACTIVE_BTN}
+            >{label}</button>
+          ))}
+        </div>
+
+        {/* Row 6 — Style (I/U/S) | Case (Ag/AG/ag/Ag) */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <div className="flex gap-[4px]">
             {[
-              { v: "left",    label: "⬦", title: "Left"    },
-              { v: "center",  label: "◈", title: "Center"  },
-              { v: "right",   label: "⬧", title: "Right"   },
-              { v: "justify", label: "≡", title: "Justify" },
+              { label: "I", title: "Italic",        prop: "fontStyle",      val: "italic",       off: "normal", style: { fontStyle: "italic" } },
+              { label: "U", title: "Underline",     prop: "textDecoration", val: "underline",    off: "none",   style: { textDecoration: "underline" } },
+              { label: "S", title: "Strikethrough", prop: "textDecoration", val: "line-through", off: "none",   style: { textDecoration: "line-through" } },
+            ].map(({ label, title, prop, val, off, style: s }) => (
+              <ToggleBtn key={title} title={title}
+                active={style[prop] === val}
+                onClick={() => updateTextStyle(slot, prop, style[prop] === val ? off : val)}
+                style={s}
+              ><span style={s}>{label}</span></ToggleBtn>
+            ))}
+          </div>
+          <div className="flex gap-[3px]">
+            {[
+              { v: "none",       label: "Ag",  title: "None"       },
+              { v: "uppercase",  label: "AG",  title: "Uppercase"  },
+              { v: "lowercase",  label: "ag",  title: "Lowercase"  },
+              { v: "capitalize", label: "Ag↑", title: "Capitalize" },
             ].map(({ v, label, title }) => (
               <button key={v} title={title}
-                onClick={() => updateTextStyle(slot, "textAlign", v)}
-                className="flex-1 py-[5px] rounded-[6px] text-[13px] border cursor-pointer transition-all"
-                style={(style.textAlign ?? "center") === v ? ACTIVE_BTN : INACTIVE_BTN}
-              >{label}</button>
+                onClick={() => updateTextStyle(slot, "textTransform", v)}
+                className="flex-1 py-[6px] rounded-[6px] text-[10px] font-bold border cursor-pointer transition-all"
+                style={(style.textTransform ?? "none") === v ? ACTIVE_BTN : INACTIVE_BTN}>
+                {label}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Row 6 — Style | Transform (mirrors Figma's Decoration | Case row) */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <Label>Style</Label>
-            <div className="flex gap-[5px]">
-              {[
-                { label: "I", title: "Italic",        prop: "fontStyle",      val: "italic",       off: "normal", style: { fontStyle: "italic" } },
-                { label: "U", title: "Underline",     prop: "textDecoration", val: "underline",    off: "none",   style: { textDecoration: "underline" } },
-                { label: "S", title: "Strikethrough", prop: "textDecoration", val: "line-through", off: "none",   style: { textDecoration: "line-through" } },
-              ].map(({ label, title, prop, val, off, style: s }) => (
-                <ToggleBtn key={title} title={title}
-                  active={style[prop] === val}
-                  onClick={() => updateTextStyle(slot, prop, style[prop] === val ? off : val)}
-                  style={s}
-                ><span style={s}>{label}</span></ToggleBtn>
-              ))}
-            </div>
-          </div>
-          <div>
-            <Label>Case</Label>
-            <div className="flex gap-[4px]">
-              {[
-                { v: "none",       label: "Ag",  title: "None"       },
-                { v: "uppercase",  label: "AG",  title: "Uppercase"  },
-                { v: "lowercase",  label: "ag",  title: "Lowercase"  },
-                { v: "capitalize", label: "Ag↑", title: "Capitalize" },
-              ].map(({ v, label, title }) => (
-                <button key={v} title={title}
-                  onClick={() => updateTextStyle(slot, "textTransform", v)}
-                  className="flex-1 py-[5px] rounded-[6px] text-[10px] font-bold border cursor-pointer transition-all"
-                  style={(style.textTransform ?? "none") === v ? ACTIVE_BTN : INACTIVE_BTN}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* Row 7 — Text Color | Background */}
-        <div className="grid grid-cols-2 gap-3">
-          <ColorRow label="Text Color" value={style.color ?? "#ffffff"}
+        <div className="grid grid-cols-2 gap-2">
+          <ColorRow label="Color" value={style.color ?? "#ffffff"}
             onChange={v => updateTextStyle(slot, "color", v)} />
           <ColorRow label="Background"
             value={!style.background || style.background === "transparent" ? "#000000" : style.background}
