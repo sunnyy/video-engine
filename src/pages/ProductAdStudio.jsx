@@ -198,6 +198,7 @@ export default function ProductAdStudio() {
   async function handleUpload() {
     setUploadErr("");
     if (!imageFile && !imageUrl) { setUploadErr("Please select an image or paste a URL."); return; }
+    let finalUrl = imageUrl;
     if (imageFile) {
       setUploading(true);
       try {
@@ -206,13 +207,14 @@ export default function ProductAdStudio() {
         const res  = await serverFetch("/api/product-ad/upload", { method: "POST", body: form });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Upload failed");
+        finalUrl = data.url;
         setImageUrl(data.url);
         setPreviewUrl(data.url);
       } catch (e) { setUploadErr(e.message); setUploading(false); return; }
       setUploading(false);
     }
     setStep(2);
-    runAnalysis(imageFile ? null : imageUrl);
+    runAnalysis(finalUrl);
   }
 
   /* ── Step 2: analyze ── */
