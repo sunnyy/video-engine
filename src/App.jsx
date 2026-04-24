@@ -32,6 +32,7 @@ import Checkout        from "./pages/Checkout";
 import Assets          from "./pages/Assets";
 import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
+import ProductAdStudio from "./pages/ProductAdStudio";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
@@ -118,6 +119,7 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/editor/:id"       element={<Editor />} />
+            <Route path="/product-ad-studio" element={<ProductAdStudio />} />
 
             {/* Admin routes */}
             {isAdmin ? (

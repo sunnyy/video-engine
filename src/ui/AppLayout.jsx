@@ -62,6 +62,13 @@ const Icons = {
       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
     </svg>
   ),
+  ad: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2"/>
+      <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+      <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+    </svg>
+  ),
 };
 
 function NavItem({ icon, label, active, onClick, soon }) {
@@ -129,6 +136,7 @@ export default function AppLayout({ children }) {
             <NavItem icon={Icons.folder}  label="Videos"     active={location.pathname === "/videos"}           onClick={() => navigate("/videos")} />
             <NavItem icon={Icons.gallery} label="Images"     active={location.pathname === "/image-generation"} onClick={() => navigate("/image-generation")} />
             <NavItem icon={Icons.mic}     label="Transcribe" active={location.pathname === "/transcription"}    onClick={() => navigate("/transcription")} />
+            <NavItem icon={Icons.ad}      label="Product Ads" active={location.pathname === "/product-ad-studio"} onClick={() => navigate("/product-ad-studio")} />
           </NavSection>
 
           <NavSection title="Account">

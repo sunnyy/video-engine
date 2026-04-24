@@ -56,6 +56,16 @@ const SERVICES = [
     bg: "rgba(34,197,94,0.06)",
     border: "rgba(34,197,94,0.18)",
   },
+  {
+    emoji: "🛍️",
+    title: "Product Ad Studio",
+    desc: "Upload a product photo and generate a full short-form video ad — AI visuals, clips, and strategy.",
+    cta: "Create Ad",
+    href: "/product-ad-studio",
+    accent: "#f97316",
+    bg: "rgba(249,115,22,0.06)",
+    border: "rgba(249,115,22,0.18)",
+  },
 ];
 
 /* ── Time label ── */

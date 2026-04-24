@@ -2304,6 +2304,131 @@ app.post("/api/admin/remove-background", requireAuth, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCT AD STUDIO
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/product-ad/upload — Upload product image to Supabase, return public URL
+app.post("/api/product-ad/upload", requireAuth, upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const userId  = req.user.id;
+    const ext     = req.file.originalname.split(".").pop().toLowerCase() || "jpg";
+    const key     = `product-ads/${userId}/${Date.now()}_${uuidv4().slice(0, 8)}.${ext}`;
+    const buffer  = fs.readFileSync(req.file.path);
+    const mime    = req.file.mimetype || "image/jpeg";
+    const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: mime, upsert: false });
+    fs.unlinkSync(req.file.path);
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    console.error("[product-ad/upload]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/product-ad/analyze — GPT-4o Vision analyses product image, returns shot strategy
+app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
+
+    const { getProductAnalysisPrompt } = await import("./prompts/productAdAnalysis.js");
+
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) throw new Error("Failed to fetch product image");
+    const buffer   = await imgRes.arrayBuffer();
+    const base64   = Buffer.from(buffer).toString("base64");
+    const mimeType = imgRes.headers.get("content-type") || "image/jpeg";
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 2000,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+          { type: "text", text: getProductAnalysisPrompt("auto") },
+        ],
+      }],
+    });
+
+    const raw     = response.choices[0].message.content;
+    const cleaned = raw.replace(/```json\n?/gi, "").replace(/```\n?/gi, "").trim();
+    const parsed  = JSON.parse(cleaned);
+    res.json(parsed);
+  } catch (e) {
+    console.error("[product-ad/analyze]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/product-ad/generate-images — Generate all shot images in parallel via Fal.ai
+app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
+  try {
+    const { shots, orientation = "9:16" } = req.body;
+    if (!shots?.length) return res.status(400).json({ error: "shots required" });
+
+    const imageSize = orientation === "9:16" ? { width: 768, height: 1344 } : { width: 1344, height: 768 };
+    const NO_TEXT   = "no text, no numbers, no watermark, no typography, no writing, no signs, no labels";
+    const FAL_KEY   = process.env.FAL_API_KEY || process.env.FAL_KEY;
+
+    const results = await Promise.allSettled(shots.map(async (shot) => {
+      const prompt = `${shot.image_generation_prompt}, photorealistic, sharp focus, 8k quality, ${NO_TEXT}`;
+      let lastErr  = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+            method:  "POST",
+            headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+            body:    JSON.stringify({ prompt, image_size: imageSize, num_images: 1, num_inference_steps: 4, enable_safety_checker: false }),
+          });
+          if (!falRes.ok) { lastErr = await falRes.text(); continue; }
+          const data   = await falRes.json();
+          const falUrl = data.images?.[0]?.url;
+          if (!falUrl) throw new Error("No image URL from Fal.ai");
+          return { shotId: shot.id, imageUrl: falUrl, ok: true };
+        } catch (e) { lastErr = e.message; }
+      }
+      return { shotId: shot.id, error: lastErr, ok: false };
+    }));
+
+    res.json({ results: results.map(r => r.status === "fulfilled" ? r.value : { ok: false, error: r.reason?.message }) });
+  } catch (e) {
+    console.error("[product-ad/generate-images]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/product-ad/generate-clip — Image-to-video via Fal.ai LTX-Video 13B Distilled
+app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
+  try {
+    const { imageUrl, motionPrompt, durationSeconds = 3 } = req.body;
+    if (!imageUrl || !motionPrompt) return res.status(400).json({ error: "imageUrl and motionPrompt required" });
+
+    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    const falRes  = await fetch("https://fal.run/fal-ai/ltxv-13b-098-distilled/image-to-video", {
+      method:  "POST",
+      headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ image_url: imageUrl, prompt: motionPrompt, num_frames: durationSeconds * 24, fps: 24 }),
+    });
+
+    if (!falRes.ok) {
+      const err = await falRes.text();
+      throw new Error(`Fal.ai LTX failed: ${err.slice(0, 200)}`);
+    }
+
+    const data     = await falRes.json();
+    const videoUrl = data.video?.url || data.url;
+    if (!videoUrl) throw new Error("No video URL returned");
+    res.json({ videoUrl });
+  } catch (e) {
+    console.error("[product-ad/generate-clip]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/admin/generate-zone-assets — Generate images for asset zones (no DB write)
 // Body: { zones, visual_direction, prompt, niche, intent, energy, background_type, background_colors }
 // Returns: { results: [{ zoneId, role, imageUrl }] }
