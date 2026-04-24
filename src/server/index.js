@@ -608,7 +608,8 @@ app.post("/api/generate-tts", requireAuth, async (req, res) => {
     console.log("[TTS] Request:", { voice, speed, scriptLength: script?.length });
     if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
 
-    const resolvedVoice = TTS_VOICES[voice] || "nova";
+    const validVoices = ["nova","shimmer","coral","alloy","sage","ash","onyx","echo","fable","verse","marin","cedar"];
+    const resolvedVoice = validVoices.includes(voice) ? voice : "nova";
     const mp3 = await openai.audio.speech.create({
       model: "tts-1-hd",
       voice: resolvedVoice,
@@ -637,6 +638,14 @@ app.post("/api/generate-tts", requireAuth, async (req, res) => {
       fs.unlinkSync(normPath);
       const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
       console.log("[TTS] Uploaded to Supabase:", publicUrl);
+      await supabaseAdmin.from("tts_generations").insert({
+        user_id:    req.user.id,
+        voice_id:   resolvedVoice,
+        script:     script.trim().slice(0, 500),
+        audio_url:  publicUrl,
+        char_count: script.trim().length,
+        project_id: projectId || null,
+      }).catch(() => {});
       res.json({ url: publicUrl });
     } else {
       // Fallback: return localhost temp URL (only works in local dev)
@@ -648,6 +657,66 @@ app.post("/api/generate-tts", requireAuth, async (req, res) => {
     console.error("[TTS] Error:", err?.message || err);
     res.status(500).json({ error: err?.message || "TTS generation failed" });
   }
+});
+
+/* ── TTS Voice Catalog + Sample Pre-generation ── */
+const VOICE_CATALOG = [
+  { id: "nova",    gender: "female",  tone: "warm",            label: "Nova",    desc: "Warm & friendly"      },
+  { id: "shimmer", gender: "female",  tone: "clear",           label: "Shimmer", desc: "Clear & bright"       },
+  { id: "coral",   gender: "female",  tone: "expressive",      label: "Coral",   desc: "Expressive & lively"  },
+  { id: "alloy",   gender: "neutral", tone: "balanced",        label: "Alloy",   desc: "Balanced & versatile" },
+  { id: "sage",    gender: "neutral", tone: "calm",            label: "Sage",    desc: "Calm & measured"      },
+  { id: "ash",     gender: "neutral", tone: "conversational",  label: "Ash",     desc: "Conversational"       },
+  { id: "onyx",    gender: "male",    tone: "deep",            label: "Onyx",    desc: "Deep & authoritative" },
+  { id: "echo",    gender: "male",    tone: "neutral",         label: "Echo",    desc: "Clear & neutral"      },
+  { id: "fable",   gender: "male",    tone: "storyteller",     label: "Fable",   desc: "Warm storyteller"     },
+];
+const TTS_SAMPLE_TEXT = "Hey, this is how I sound. I can narrate your videos with clarity and energy.";
+
+app.get("/api/tts/voices", requireAuth, async (_req, res) => {
+  const result = await Promise.all(VOICE_CATALOG.map(async (voice) => {
+    const storageKey = `tts/samples/${voice.id}.mp3`;
+    const { data: existing } = await supabaseAdmin.storage
+      .from("user-assets")
+      .list("tts/samples", { search: `${voice.id}.mp3` });
+    if (existing?.length > 0) {
+      const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+      return { ...voice, sampleUrl: publicUrl };
+    }
+    try {
+      const mp3 = await openai.audio.speech.create({
+        model: "tts-1-hd", voice: voice.id, input: TTS_SAMPLE_TEXT, speed: 1.0,
+      });
+      const buffer = Buffer.from(await mp3.arrayBuffer());
+      await supabaseAdmin.storage.from("user-assets").upload(storageKey, buffer, { contentType: "audio/mpeg", upsert: true });
+      const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+      return { ...voice, sampleUrl: publicUrl };
+    } catch {
+      return { ...voice, sampleUrl: null };
+    }
+  }));
+  res.json({ voices: result });
+});
+
+app.get("/api/tts/history", requireAuth, async (req, res) => {
+  const { data, error } = await supabaseAdmin
+    .from("tts_generations")
+    .select("*")
+    .eq("user_id", req.user.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ history: data || [] });
+});
+
+app.delete("/api/tts/history/:id", requireAuth, async (req, res) => {
+  const { error } = await supabaseAdmin
+    .from("tts_generations")
+    .delete()
+    .eq("id", req.params.id)
+    .eq("user_id", req.user.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
 });
 
 /* ── Music key to filename map ── */

@@ -69,6 +69,14 @@ const Icons = {
       <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
     </svg>
   ),
+  voice: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+      <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+      <line x1="12" y1="19" x2="12" y2="23"/>
+      <line x1="8" y1="23" x2="16" y2="23"/>
+    </svg>
+  ),
 };
 
 function NavItem({ icon, label, active, onClick, soon }) {
@@ -135,8 +143,9 @@ export default function AppLayout({ children }) {
             <NavItem icon={Icons.home}    label="Dashboard"  active={location.pathname === "/dashboard"}        onClick={() => navigate("/dashboard")} />
             <NavItem icon={Icons.folder}  label="Videos"     active={location.pathname === "/videos"}           onClick={() => navigate("/videos")} />
             <NavItem icon={Icons.gallery} label="Images"     active={location.pathname === "/image-generation"} onClick={() => navigate("/image-generation")} />
-            <NavItem icon={Icons.mic}     label="Transcribe" active={location.pathname === "/transcription"}    onClick={() => navigate("/transcription")} />
-            <NavItem icon={Icons.ad}      label="Product Ads" active={location.pathname === "/product-ad-studio"} onClick={() => navigate("/product-ad-studio")} />
+            <NavItem icon={Icons.mic}     label="Transcribe"   active={location.pathname === "/transcription"}     onClick={() => navigate("/transcription")} />
+            <NavItem icon={Icons.voice}   label="Voice Studio" active={location.pathname === "/tts-studio"}        onClick={() => navigate("/tts-studio")} />
+            <NavItem icon={Icons.ad}      label="Product Ads"  active={location.pathname === "/product-ad-studio"} onClick={() => navigate("/product-ad-studio")} />
           </NavSection>
 
           <NavSection title="Account">
