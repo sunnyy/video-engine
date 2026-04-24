@@ -638,14 +638,16 @@ app.post("/api/generate-tts", requireAuth, async (req, res) => {
       fs.unlinkSync(normPath);
       const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
       console.log("[TTS] Uploaded to Supabase:", publicUrl);
-      await supabaseAdmin.from("tts_generations").insert({
-        user_id:    req.user.id,
-        voice_id:   resolvedVoice,
-        script:     script.trim().slice(0, 500),
-        audio_url:  publicUrl,
-        char_count: script.trim().length,
-        project_id: projectId || null,
-      }).catch(() => {});
+      try {
+        await supabaseAdmin.from("tts_generations").insert({
+          user_id:    req.user.id,
+          voice_id:   resolvedVoice,
+          script:     script.trim().slice(0, 500),
+          audio_url:  publicUrl,
+          char_count: script.trim().length,
+          project_id: projectId || null,
+        });
+      } catch {}
       res.json({ url: publicUrl });
     } else {
       // Fallback: return localhost temp URL (only works in local dev)
