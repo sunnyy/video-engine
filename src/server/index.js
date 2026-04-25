@@ -2438,22 +2438,24 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
 // POST /api/product-ad/generate-images — Generate all shot images in parallel via Fal.ai
 app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
   try {
-    const { shots, orientation = "9:16" } = req.body;
-    if (!shots?.length) return res.status(400).json({ error: "shots required" });
+    const { shots, productImageUrl, orientation = "9:16" } = req.body;
+    if (!shots?.length || !productImageUrl) return res.status(400).json({ error: "shots and productImageUrl required" });
 
-    const imageSize = orientation === "9:16" ? { width: 768, height: 1344 } : { width: 1344, height: 768 };
-    const NO_TEXT   = "no text, no numbers, no watermark, no typography, no writing, no signs, no labels";
-    const FAL_KEY   = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
     const results = await Promise.allSettled(shots.map(async (shot) => {
-      const prompt = `${shot.image_generation_prompt}, photorealistic, sharp focus, 8k quality, ${NO_TEXT}`;
-      let lastErr  = null;
+      let lastErr = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+          const falRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-            body:    JSON.stringify({ prompt, image_size: imageSize, num_images: 1, num_inference_steps: 4, enable_safety_checker: false }),
+            body:    JSON.stringify({
+              prompt:               shot.image_generation_prompt,
+              image_url:            productImageUrl,
+              guidance_scale:       3.5,
+              num_inference_steps:  28,
+            }),
           });
           if (!falRes.ok) { lastErr = await falRes.text(); continue; }
           const data   = await falRes.json();

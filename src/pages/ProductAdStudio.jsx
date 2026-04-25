@@ -247,7 +247,7 @@ export default function ProductAdStudio() {
       return next;
     });
     try {
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Image generation failed");
       setImages(prev => {
@@ -266,7 +266,7 @@ export default function ProductAdStudio() {
   async function regenImage(shot) {
     setImages(prev => ({ ...prev, [shot.id]: { loading: true } }));
     try {
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots: [shot] }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots: [shot], productImageUrl: imageUrl }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       const r = data.results?.[0];

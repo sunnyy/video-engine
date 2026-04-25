@@ -46,7 +46,7 @@ Return ONLY valid JSON, no markdown, no explanation:
       "narrative": "what this shot communicates to the viewer",
       "duration_seconds": 3,
       "camera_motion": "e.g. slow orbit, dolly in, static, gentle push",
-      "image_generation_prompt": "full prompt for Fal.ai image generation — photorealistic, 9:16 portrait, no text",
+      "image_generation_prompt": "Start with: 'Use the uploaded photo as the product reference. Keep the same branding, label, colors, and identity.' Then describe ONLY the scene, environment, surface, lighting, and camera angle. Example: 'Use the uploaded photo as the product reference. Keep the same branding, label, colors, and identity. Place it on a marble kitchen counter with soft morning light from a window, surrounded by fresh cherries and vanilla beans, low angle macro shot, hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.'",
       "video_motion_prompt": "motion-only prompt for video model — describe camera and subject motion only, not the subject itself"
     }
   ]
