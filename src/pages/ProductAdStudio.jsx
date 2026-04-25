@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { createProject as createDBProject, updateProject } from "../services/projects/projectService";
 import { useProjectStore } from "../store/useProjectStore";
+import { MUSIC_LIBRARY } from "../core/registries/musicRegistry";
 import AppLayout from "../ui/AppLayout";
 
 const STEP_LABELS = ["Product", "Strategy", "Visuals", "Production", "Edit"];
@@ -136,6 +137,14 @@ export default function ProductAdStudio() {
 
   // Step 5 state
   const [creatingProject, setCreatingProject] = useState(false);
+
+  /* ── Auto-advance step 3 → 4 when all images ready ── */
+  const allImagesReady = analysis?.shots?.every(s => images[s.id]?.url);
+  useEffect(() => {
+    if (allImagesReady && !imagesLoading && step === 3) {
+      setStep(4);
+    }
+  }, [allImagesReady, imagesLoading, step]);
 
   /* ── Auto-start clips when entering step 4 ── */
   useEffect(() => {
@@ -321,6 +330,14 @@ export default function ProductAdStudio() {
     const successfulShots = analysis.shots.filter(s => clips[s.id]?.videoUrl);
     if (!successfulShots.length) { setCreatingProject(false); return; }
 
+    const TRANSITIONS = [
+      { type: "dissolve",  duration: 16 },
+      { type: "fade",      duration: 14 },
+      { type: "slideLeft", duration: 18 },
+      { type: "wipe",      duration: 16 },
+      { type: "zoom",      duration: 14 },
+    ];
+
     let currentTime = 0;
     const beats = [];
     successfulShots.forEach((shot, index) => {
@@ -331,7 +348,7 @@ export default function ProductAdStudio() {
       beats.push({
         id:               crypto.randomUUID(),
         order:            index,
-        layout:           "blank",
+        layout:           null,
         layoutBackground: { type: "color", value: "#000000" },
         zones: {
           z1: {
@@ -345,8 +362,8 @@ export default function ProductAdStudio() {
         audio_cues:  [],
         caption:     { show: false, text: "", style: "wordBlaze", position: 80 },
         transition:  index < successfulShots.length - 1
-          ? { type: "dissolve", duration: 16 }
-          : { type: "fade",     duration: 14 },
+          ? TRANSITIONS[index % TRANSITIONS.length]
+          : { type: "fade", duration: 14 },
         spoken:      "",
         intent:      "hook",
         energy:      0.8,
@@ -361,14 +378,15 @@ export default function ProductAdStudio() {
       energetic: "eliveta_1", luxury: "nastelbom", playful: "eliveta_2",
       calm: "the_mountain",   dramatic: "mood_mode",
     };
-    const musicKey = MOOD_TO_MUSIC[analysis.product_analysis.recommended_music_mood] || "eliveta_1";
+    const musicKey = MOOD_TO_MUSIC[analysis.product_analysis.recommended_music_mood] || "eliveta_2";
+    const musicSrc = MUSIC_LIBRARY[musicKey]?.file || MUSIC_LIBRARY["eliveta_2"].file;
 
     const project = {
       id:           crypto.randomUUID(),
       meta:         { width: 1080, height: 1920, fps: 25, orientation: "9:16", mode: "faceless" },
       beats,
       duration_sec: currentTime,
-      audio:        { music: { key: musicKey, volume: 0.4 } },
+      audio:        { music: { src: musicSrc, volume: 0.4 } },
       avatar:       null,
       dna:          null,
     };
@@ -390,8 +408,6 @@ export default function ProductAdStudio() {
     setProject(project);
     navigate("/editor");
   }
-
-  const allImagesReady = analysis?.shots?.every(s => images[s.id]?.url);
 
   /* ══ Render ══════════════════════════════════════════════════ */
   return (
@@ -506,16 +522,9 @@ export default function ProductAdStudio() {
               ))}
             </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setStep(4)}
-                disabled={!allImagesReady || imagesLoading}
-                style={{ ...C.btnP, opacity: (!allImagesReady || imagesLoading) ? 0.5 : 1 }}
-              >
-                {imagesLoading ? "Generating…" : "Produce Clips →"}
-              </button>
+            {!imagesLoading && !allImagesReady && (
               <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
-            </div>
+            )}
           </div>
         )}
 
