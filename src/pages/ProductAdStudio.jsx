@@ -325,14 +325,21 @@ export default function ProductAdStudio() {
       dna:          null,
     };
 
+    let saved = null;
     try {
-      const saved = await createDBProject({
+      saved = await createDBProject({
         name:        `${analysis.product_analysis.product_type} Ad`,
         rawAI:       null,
         safeProject: project,
       });
       if (saved?.id) setDbId(saved.id);
-    } catch {}
+    } catch (dbErr) {
+      console.error("[ProductAd] createDBProject error:", dbErr);
+    }
+
+    console.log("[ProductAd] project:", JSON.stringify(project).slice(0, 500));
+    console.log("[ProductAd] dbId:", saved?.id);
+    console.log("[ProductAd] beats[0]:", JSON.stringify(project.beats?.[0]));
 
     setProject(project);
     navigate("/editor");
