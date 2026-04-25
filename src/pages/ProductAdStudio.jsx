@@ -267,7 +267,8 @@ export default function ProductAdStudio() {
         const res  = await serverFetch("/api/product-ad/generate-clip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: imgData.url, motionPrompt: shot.video_motion_prompt, durationSeconds: shot.duration_seconds || 3 }) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Clip failed");
-        setClips(prev => ({ ...prev, [shot.id]: { videoUrl: data.videoUrl } }));
+        const permanentUrl = await uploadClipToSupabase(data.videoUrl);
+        setClips(prev => ({ ...prev, [shot.id]: { videoUrl: permanentUrl } }));
       } catch (e) { setClips(prev => ({ ...prev, [shot.id]: { error: e.message } })); }
     }
     setClipsLoading(false);
@@ -297,20 +298,17 @@ export default function ProductAdStudio() {
 
   async function uploadClipToSupabase(falUrl) {
     try {
-      const res = await serverFetch("/api/proxy-video-upload", {
+      const res  = await serverFetch("/api/proxy-video-upload", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ url: falUrl }),
       });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        console.error("[uploadClip] status:", res.status, errText.slice(0, 200));
-        return falUrl;
-      }
       const data = await res.json();
+      console.log("[uploadClip] status:", res.status, JSON.stringify(data).slice(0, 100));
+      if (!res.ok) return falUrl;
       return data.url || falUrl;
     } catch (e) {
-      console.error("[uploadClip] exception:", e.message);
+      console.error("[uploadClip] error:", e.message);
       return falUrl;
     }
   }
@@ -323,18 +321,10 @@ export default function ProductAdStudio() {
     const successfulShots = analysis.shots.filter(s => clips[s.id]?.videoUrl);
     if (!successfulShots.length) { setCreatingProject(false); return; }
 
-    // Upload clips to permanent Supabase storage (avoids Fal.ai QUIC/expiry issues)
-    const uploadedClipUrls = {};
-    await Promise.all(
-      successfulShots.map(async (shot) => {
-        uploadedClipUrls[shot.id] = await uploadClipToSupabase(clips[shot.id].videoUrl);
-      })
-    );
-
     let currentTime = 0;
     const beats = [];
     successfulShots.forEach((shot, index) => {
-      const clipUrl  = uploadedClipUrls[shot.id];
+      const clipUrl  = clips[shot.id].videoUrl;
       const duration = shot.duration_seconds || 3;
       const start    = currentTime;
       currentTime   += duration;
