@@ -3,16 +3,19 @@
  * /product-ad-studio
  *
  * Step 1 — Upload product photo
- * Step 2 — Analyze (GPT-4o Vision → shot strategy)
- * Step 3 — Images (Fal.ai → one image per shot)
- * Step 4 — Clips (Fal.ai LTX → video clip per shot)
- * Step 5 — Done (download / open editor)
+ * Step 2 — Strategy (GPT-4o Vision)
+ * Step 3 — Visuals (Fal.ai Kontext images)
+ * Step 4 — Production (Fal.ai LTX clips)
+ * Step 5 — Edit (create project + open editor)
  */
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
+import { createProject as createDBProject } from "../services/projects/projectService";
+import { useProjectStore } from "../store/useProjectStore";
 import AppLayout from "../ui/AppLayout";
 
-const STEP_LABELS = ["Upload", "Analyze", "Images", "Clips", "Done"];
+const STEP_LABELS = ["Product", "Strategy", "Visuals", "Production", "Edit"];
 
 /* ── Styles ── */
 const C = {
@@ -55,61 +58,18 @@ function StepBar({ step }) {
   );
 }
 
-/* ── ShotCard (Step 2) ── */
-function ShotCard({ shot, index, onEditMotion }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft]     = useState(shot.video_motion_prompt);
-  return (
-    <div style={{ ...C.card, padding: 14 }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
-        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#7c5cfc22", border: "1px solid #7c5cfc44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: "#a78bfa", flexShrink: 0 }}>
-          {index + 1}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#e8e8f0", marginBottom: 2 }}>{shot.shot_type}</div>
-          <div style={{ fontSize: 11, color: "#666", lineHeight: 1.5 }}>{shot.narrative}</div>
-        </div>
-        <div style={{ ...C.badge("#22d3ee"), flexShrink: 0 }}>{shot.duration_seconds}s</div>
-      </div>
-      <div style={{ fontSize: 10, color: "#555", marginBottom: 6 }}>
-        <span style={{ color: "#666", fontWeight: 600 }}>Camera: </span>{shot.camera_motion}
-      </div>
-      <div style={{ fontSize: 11, color: "#7878a0", marginBottom: 6, fontStyle: "italic", lineHeight: 1.5 }}>
-        <span style={{ color: "#555", fontWeight: 600, fontStyle: "normal" }}>Motion prompt: </span>
-        {editing ? null : shot.video_motion_prompt}
-      </div>
-      {editing ? (
-        <div>
-          <textarea
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            rows={3}
-            style={{ ...C.inp, resize: "vertical", fontSize: 11, marginBottom: 6 }}
-          />
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => { onEditMotion(shot.id, draft); setEditing(false); }} style={{ ...C.btnP, padding: "6px 14px", fontSize: 11 }}>Save</button>
-            <button onClick={() => { setDraft(shot.video_motion_prompt); setEditing(false); }} style={{ ...C.btnG, padding: "6px 14px", fontSize: 11 }}>Cancel</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setEditing(true)} style={{ ...C.btnG, padding: "4px 10px", fontSize: 10 }}>✎ Edit motion</button>
-      )}
-    </div>
-  );
-}
-
 /* ── ImageCard (Step 3) ── */
-function ImageCard({ shot, imageData, onRegenerate }) {
+function ImageCard({ index, imageData, onRegenerate }) {
   const THUMB_W = 160, THUMB_H = Math.round(160 * 16 / 9);
   return (
     <div style={{ ...C.card, width: THUMB_W + 16, flexShrink: 0 }}>
       <div style={{ width: THUMB_W, height: THUMB_H, margin: 8, borderRadius: 6, overflow: "hidden", background: "#0b0b10", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {imageData?.loading && <div style={{ textAlign: "center", color: "#444", fontSize: 10 }}>⏳ generating…</div>}
         {imageData?.error   && <div style={{ textAlign: "center", color: "#f87171", fontSize: 9, padding: 4 }}>✕ {imageData.error.slice(0, 50)}</div>}
-        {imageData?.url     && <img src={imageData.url} alt={shot.shot_type} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+        {imageData?.url     && <img src={imageData.url} alt={`Scene ${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
       </div>
       <div style={{ padding: "0 8px 8px" }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#9494a8", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shot.shot_type}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9494a8", marginBottom: 4 }}>Scene {index + 1}</div>
         <button onClick={onRegenerate} disabled={imageData?.loading} style={{ ...C.btnG, padding: "4px 10px", fontSize: 10, width: "100%", opacity: imageData?.loading ? 0.4 : 1 }}>↺ Regen</button>
       </div>
     </div>
@@ -117,12 +77,11 @@ function ImageCard({ shot, imageData, onRegenerate }) {
 }
 
 /* ── ClipCard (Step 4) ── */
-function ClipCard({ shot, clipData }) {
+function ClipCard({ index, clipData }) {
   return (
     <div style={{ ...C.card, padding: 14 }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        {/* Thumbnail */}
-        <div style={{ width: 72, height: 128, borderRadius: 6, overflow: "hidden", background: "#0b0b10", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ width: 52, height: 92, borderRadius: 6, overflow: "hidden", background: "#0b0b10", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {clipData?.videoUrl
             ? <video src={clipData.videoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted loop autoPlay playsInline />
             : clipData?.loading
@@ -133,16 +92,11 @@ function ClipCard({ shot, clipData }) {
           }
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#e8e8f0", marginBottom: 4 }}>{shot.shot_type}</div>
-          <div style={{ fontSize: 11, color: "#666", marginBottom: 8, lineHeight: 1.4 }}>{shot.narrative}</div>
-          {clipData?.loading && <div style={{ ...C.badge("#f5c518"), display: "inline-block" }}>⏳ Generating…</div>}
-          {clipData?.error   && <div style={{ ...C.badge("#f87171"), display: "inline-block" }}>✕ {clipData.error.slice(0, 60)}</div>}
-          {clipData?.videoUrl && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ ...C.badge("#22c55e"), display: "inline-block" }}>✓ Done</span>
-              <a href={clipData.videoUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#7c5cfc" }}>Download ↗</a>
-            </div>
-          )}
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#e8e8f0", marginBottom: 6 }}>Scene {index + 1}</div>
+          {clipData?.loading  && <div style={{ ...C.badge("#f5c518"), display: "inline-block" }}>⏳ Generating…</div>}
+          {clipData?.error    && <div style={{ ...C.badge("#f87171"), display: "inline-block" }}>✕ {clipData.error.slice(0, 60)}</div>}
+          {clipData?.videoUrl && <div style={{ ...C.badge("#22c55e"), display: "inline-block" }}>✓ Done</div>}
+          {!clipData          && <div style={{ fontSize: 11, color: "#444" }}>Queued…</div>}
         </div>
       </div>
     </div>
@@ -151,31 +105,52 @@ function ClipCard({ shot, clipData }) {
 
 /* ══ Main Component ══════════════════════════════════════════════ */
 export default function ProductAdStudio() {
+  const navigate   = useNavigate();
+  const setProject = useProjectStore(s => s.setProject);
+  const setDbId    = useProjectStore(s => s.setDatabaseId);
+
   const [step, setStep] = useState(1);
 
   // Step 1 state
-  const [imageUrl,    setImageUrl]    = useState("");
-  const [imageFile,   setImageFile]   = useState(null);
-  const [previewUrl,  setPreviewUrl]  = useState("");
-  const [brandName,   setBrandName]   = useState("");
-  const [uploading,   setUploading]   = useState(false);
-  const [uploadErr,   setUploadErr]   = useState("");
+  const [imageUrl,   setImageUrl]   = useState("");
+  const [imageFile,  setImageFile]  = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [brandName,  setBrandName]  = useState("");
+  const [uploading,  setUploading]  = useState(false);
+  const [uploadErr,  setUploadErr]  = useState("");
   const fileInputRef = useRef();
 
   // Step 2 state
-  const [analysis,    setAnalysis]    = useState(null);  // { product_analysis, shots }
-  const [analyzing,   setAnalyzing]   = useState(false);
-  const [analyzeErr,  setAnalyzeErr]  = useState("");
+  const [analysis,   setAnalysis]   = useState(null);
+  const [analyzing,  setAnalyzing]  = useState(false);
+  const [analyzeErr, setAnalyzeErr] = useState("");
 
   // Step 3 state
-  const [images, setImages] = useState({});  // { [shotId]: { loading, url, error } }
+  const [images,        setImages]        = useState({});
   const [imagesLoading, setImagesLoading] = useState(false);
 
   // Step 4 state
-  const [clips, setClips]  = useState({});  // { [shotId]: { loading, videoUrl, error } }
+  const [clips,        setClips]        = useState({});
   const [clipsLoading, setClipsLoading] = useState(false);
-
   const generatingClips = useRef(false);
+
+  // Step 5 state
+  const [creatingProject, setCreatingProject] = useState(false);
+
+  /* ── Auto-start clips when entering step 4 ── */
+  useEffect(() => {
+    if (step === 4 && !generatingClips.current) {
+      runClips();
+    }
+  }, [step]);
+
+  /* ── Auto-advance to step 5 when all clips done ── */
+  const allClipsDone = analysis?.shots?.every(s => clips[s.id]?.videoUrl || clips[s.id]?.error);
+  useEffect(() => {
+    if (allClipsDone && clipsLoading === false && Object.keys(clips).length > 0) {
+      setStep(5);
+    }
+  }, [allClipsDone, clipsLoading]);
 
   /* ── Step 1: file pick ── */
   function handleFilePick(e) {
@@ -228,13 +203,6 @@ export default function ProductAdStudio() {
       setAnalysis(data);
     } catch (e) { setAnalyzeErr(e.message); }
     setAnalyzing(false);
-  }
-
-  function handleEditMotion(shotId, newPrompt) {
-    setAnalysis(prev => ({
-      ...prev,
-      shots: prev.shots.map(s => s.id === shotId ? { ...s, video_motion_prompt: newPrompt } : s),
-    }));
   }
 
   /* ── Step 3: generate images ── */
@@ -297,8 +265,80 @@ export default function ProductAdStudio() {
     generatingClips.current = false;
   }
 
+  /* ── Step 5: build project + open editor ── */
+  async function createProject() {
+    if (creatingProject) return;
+    setCreatingProject(true);
+
+    const successfulShots = analysis.shots.filter(s => clips[s.id]?.videoUrl);
+    if (!successfulShots.length) { setCreatingProject(false); return; }
+
+    let currentTime = 0;
+    const beats = [];
+    successfulShots.forEach((shot, index) => {
+      const clipUrl  = clips[shot.id].videoUrl;
+      const duration = shot.duration_seconds || 3;
+      const start    = currentTime;
+      currentTime   += duration;
+      beats.push({
+        id:               crypto.randomUUID(),
+        order:            index,
+        layout:           "FullBleed",
+        layoutBackground: { type: "color", value: "#000000" },
+        zones: {
+          z1: {
+            type:       "asset",
+            content:    { kind: "asset", asset: { src: clipUrl, type: "video", objectFit: "cover", motion: "none", enterTransition: "none", exitTransition: "none" } },
+            style:      {},
+            background: {},
+          },
+        },
+        overlays:    [],
+        audio_cues:  [],
+        caption:     { show: false, text: "", style: "wordBlaze", position: 80 },
+        transition:  index < successfulShots.length - 1
+          ? { type: "dissolve", duration: 16 }
+          : { type: "fade",     duration: 14 },
+        spoken:      "",
+        intent:      "hook",
+        energy:      0.8,
+        beatType:    null,
+        duration_sec: duration,
+        start_sec:   start,
+        end_sec:     currentTime,
+      });
+    });
+
+    const MOOD_TO_MUSIC = {
+      energetic: "eliveta_1", luxury: "nastelbom", playful: "eliveta_2",
+      calm: "the_mountain",   dramatic: "mood_mode",
+    };
+    const musicKey = MOOD_TO_MUSIC[analysis.product_analysis.recommended_music_mood] || "eliveta_1";
+
+    const project = {
+      id:           crypto.randomUUID(),
+      meta:         { width: 1080, height: 1920, fps: 25, orientation: "9:16", mode: "faceless" },
+      beats,
+      duration_sec: currentTime,
+      audio:        { music: { key: musicKey, volume: 0.4 } },
+      avatar:       null,
+      dna:          null,
+    };
+
+    try {
+      const saved = await createDBProject({
+        name:        `${analysis.product_analysis.product_type} Ad`,
+        rawAI:       null,
+        safeProject: project,
+      });
+      if (saved?.id) setDbId(saved.id);
+    } catch {}
+
+    setProject(project);
+    navigate("/editor");
+  }
+
   const allImagesReady = analysis?.shots?.every(s => images[s.id]?.url);
-  const allClipsDone   = analysis?.shots?.every(s => clips[s.id]?.videoUrl || clips[s.id]?.error);
 
   /* ══ Render ══════════════════════════════════════════════════ */
   return (
@@ -311,13 +351,13 @@ export default function ProductAdStudio() {
             🛍️ Product Ad Studio
           </h1>
           <p style={{ fontSize: 13, color: "#666", marginTop: 6 }}>
-            Upload a product photo — AI writes the shot strategy, generates images, and produces video clips.
+            Upload a product photo — AI creates your video ad and opens it in the editor.
           </p>
         </div>
 
         <StepBar step={step} />
 
-        {/* ── STEP 1 — Upload ── */}
+        {/* ── STEP 1 — Product ── */}
         {step === 1 && (
           <div style={{ display: "grid", gridTemplateColumns: previewUrl ? "1fr 1fr" : "1fr", gap: 24 }}>
             <div style={{ ...C.card, padding: 24 }}>
@@ -351,7 +391,7 @@ export default function ProductAdStudio() {
               {uploadErr && <div style={{ color: "#f87171", fontSize: 12, marginBottom: 12 }}>✕ {uploadErr}</div>}
 
               <button onClick={handleUpload} disabled={uploading || (!imageFile && !imageUrl)} style={{ ...C.btnP, width: "100%", opacity: (!imageFile && !imageUrl) ? 0.5 : 1 }}>
-                {uploading ? "Uploading…" : "Analyze Product →"}
+                {uploading ? "Uploading…" : "Create Ad →"}
               </button>
             </div>
 
@@ -363,14 +403,14 @@ export default function ProductAdStudio() {
           </div>
         )}
 
-        {/* ── STEP 2 — Analyze ── */}
+        {/* ── STEP 2 — Strategy ── */}
         {step === 2 && (
           <div>
             {analyzing && (
               <div style={{ textAlign: "center", padding: "60px 0", color: "#666" }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#9494a8", marginBottom: 6 }}>Analyzing your product…</div>
-                <div style={{ fontSize: 12 }}>GPT-4o Vision is reading the image and writing your shot strategy</div>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>✨</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#9494a8", marginBottom: 6 }}>Crafting your video strategy…</div>
+                <div style={{ fontSize: 12 }}>This usually takes 10–15 seconds</div>
               </div>
             )}
             {analyzeErr && (
@@ -380,65 +420,36 @@ export default function ProductAdStudio() {
               </div>
             )}
             {analysis && !analyzing && (
-              <div>
-                {/* Product summary */}
-                <div style={{ ...C.card, padding: 18, marginBottom: 20 }}>
-                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
-                    <img src={previewUrl} alt="product" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }} />
-                    <div style={{ flex: 1, minWidth: 200 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#e8e8f0", marginBottom: 6 }}>{analysis.product_analysis.product_type}</div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                        <span style={C.badge("#7c5cfc")}>{analysis.product_analysis.category}</span>
-                        <span style={C.badge("#22d3ee")}>{analysis.product_analysis.recommended_music_mood}</span>
-                        <span style={C.badge("#f5c518")}>{analysis.product_analysis.aesthetic_style}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: "#666" }}>
-                        <span style={{ fontWeight: 600, color: "#888" }}>Audience: </span>{analysis.product_analysis.target_audience}
-                      </div>
-                      <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                        {analysis.product_analysis.key_features?.map((f, i) => (
-                          <span key={i} style={{ fontSize: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, padding: "2px 7px", color: "#9494a8" }}>{f}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+              <div style={{ ...C.card, padding: 24, textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0", marginBottom: 6 }}>
+                  Strategy Ready
                 </div>
-
-                {/* Shot cards */}
-                <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  Shot Strategy — {analysis.shots.length} shots
+                <div style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
+                  {analysis.shots.length} scenes planned for your {analysis.product_analysis.product_type}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-                  {analysis.shots.map((shot, i) => (
-                    <ShotCard key={shot.id} shot={shot} index={i} onEditMotion={handleEditMotion} />
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 20 }}>
+                  {analysis.product_analysis.key_features?.slice(0, 4).map((f, i) => (
+                    <span key={i} style={{ fontSize: 11, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, padding: "3px 9px", color: "#9494a8" }}>{f}</span>
                   ))}
                 </div>
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => { setStep(3); runImages(); }} style={C.btnP}>Generate Images →</button>
-                  <button onClick={() => setStep(1)} style={C.btnG}>← Back</button>
-                </div>
+                <button onClick={() => { setStep(3); runImages(); }} style={C.btnP}>Create Ad →</button>
               </div>
             )}
           </div>
         )}
 
-        {/* ── STEP 3 — Images ── */}
+        {/* ── STEP 3 — Visuals ── */}
         {step === 3 && (
           <div>
-            <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Generating Shot Images</div>
-                <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>All {analysis.shots.length} shots generated in parallel via Fal.ai</div>
-              </div>
-              {!imagesLoading && (
-                <button onClick={() => runImages()} style={{ ...C.btnG, padding: "7px 14px", fontSize: 11 }}>↺ Regenerate All</button>
-              )}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Creating Your Scenes</div>
+              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Generating high-quality product imagery…</div>
             </div>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-              {analysis.shots.map(shot => (
-                <ImageCard key={shot.id} shot={shot} imageData={images[shot.id]} onRegenerate={() => regenImage(shot)} />
+              {analysis.shots.map((shot, i) => (
+                <ImageCard key={shot.id} index={i} imageData={images[shot.id]} onRegenerate={() => regenImage(shot)} />
               ))}
             </div>
 
@@ -448,94 +459,52 @@ export default function ProductAdStudio() {
                 disabled={!allImagesReady || imagesLoading}
                 style={{ ...C.btnP, opacity: (!allImagesReady || imagesLoading) ? 0.5 : 1 }}
               >
-                {imagesLoading ? "Generating…" : "Generate Clips →"}
+                {imagesLoading ? "Generating…" : "Produce Clips →"}
               </button>
               <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
             </div>
           </div>
         )}
 
-        {/* ── STEP 4 — Clips ── */}
+        {/* ── STEP 4 — Production ── */}
         {step === 4 && (
           <div>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Generating Video Clips</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Producing Your Video</div>
               <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-                Clips generated one at a time via LTX-Video 13B — takes ~1–2 min per clip
+                Bringing your scenes to life… this takes a few minutes
               </div>
             </div>
 
-            {!clipsLoading && !Object.keys(clips).length && (
-              <div style={{ ...C.card, padding: 24, textAlign: "center", marginBottom: 20 }}>
-                <div style={{ fontSize: 32, marginBottom: 10 }}>🎬</div>
-                <div style={{ fontSize: 14, color: "#9494a8", marginBottom: 16 }}>Ready to generate {analysis.shots.length} video clips</div>
-                <button onClick={() => { setStep(4); runClips(); }} style={C.btnP}>Start Generating Clips</button>
-              </div>
-            )}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-              {analysis.shots.map(shot => (
-                <ClipCard key={shot.id} shot={shot} clipData={clips[shot.id]} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+              {analysis.shots.map((shot, i) => (
+                <ClipCard key={shot.id} index={i} clipData={clips[shot.id]} />
               ))}
             </div>
-
-            {allClipsDone && (
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setStep(5)} style={C.btnP}>View Results →</button>
-              </div>
-            )}
-            {!allClipsDone && Object.keys(clips).length > 0 && (
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setStep(2)} style={C.btnG}>← Back to Analysis</button>
-              </div>
-            )}
           </div>
         )}
 
-        {/* ── STEP 5 — Done ── */}
+        {/* ── STEP 5 — Edit ── */}
         {step === 5 && (
-          <div>
-            <div style={{ textAlign: "center", padding: "32px 0 24px", marginBottom: 24 }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Syne',sans-serif", marginBottom: 6 }}>Your Ad is Ready!</div>
-              <div style={{ fontSize: 13, color: "#666" }}>{analysis.shots.length} video clips generated for {analysis.product_analysis.product_type}</div>
+          <div style={{ textAlign: "center", padding: "60px 0" }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>🎬</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Syne',sans-serif", marginBottom: 8 }}>
+              Your Ad is Ready
             </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginBottom: 24 }}>
-              {analysis.shots.map((shot, i) => {
-                const clip = clips[shot.id];
-                return (
-                  <div key={shot.id} style={{ ...C.card, overflow: "hidden" }}>
-                    <div style={{ aspectRatio: "9/16", background: "#0b0b10", position: "relative" }}>
-                      {clip?.videoUrl
-                        ? <video src={clip.videoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted loop autoPlay playsInline />
-                        : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#444", fontSize: 12 }}>No clip</div>
-                      }
-                      <div style={{ position: "absolute", top: 6, left: 6, ...C.badge("#111118"), fontSize: 9 }}>Shot {i + 1}</div>
-                    </div>
-                    <div style={{ padding: 10 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#9494a8", marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {shot.shot_type}
-                      </div>
-                      {clip?.videoUrl && (
-                        <a href={clip.videoUrl} target="_blank" rel="noreferrer"
-                          style={{ display: "block", textAlign: "center", padding: "6px 0", background: "rgba(124,92,252,0.1)", border: "1px solid rgba(124,92,252,0.3)", borderRadius: 6, fontSize: 11, color: "#a78bfa", textDecoration: "none" }}>
-                          ↓ Download
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ fontSize: 14, color: "#666", marginBottom: 32, maxWidth: 400, margin: "0 auto 32px" }}>
+              {analysis.shots.filter(s => clips[s.id]?.videoUrl).length} scenes produced for {analysis.product_analysis.product_type}. Open in editor to add text, adjust transitions, and export.
             </div>
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              <button onClick={() => { setStep(1); setAnalysis(null); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); }} style={C.btnG}>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <button onClick={createProject} disabled={creatingProject} style={{ ...C.btnP, fontSize: 14, padding: "12px 28px", opacity: creatingProject ? 0.6 : 1 }}>
+                {creatingProject ? "Opening…" : "Open in Editor →"}
+              </button>
+              <button onClick={() => { setStep(1); setAnalysis(null); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); generatingClips.current = false; }} style={C.btnG}>
                 ← New Product
               </button>
             </div>
           </div>
         )}
+
       </div>
     </AppLayout>
   );
