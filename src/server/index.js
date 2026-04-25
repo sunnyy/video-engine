@@ -2503,6 +2503,50 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/proxy-video-upload — Fetch a video URL server-side and upload to Supabase
+app.post("/api/proxy-video-upload", requireAuth, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: "url required" });
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+    const buffer     = Buffer.from(await response.arrayBuffer());
+    const fileName   = `clip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.mp4`;
+    const storageKey = `product-ads/${req.user.id}/${fileName}`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("user-assets").upload(storageKey, buffer, { contentType: "video/mp4", upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    console.error("[proxy-video-upload]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/proxy-image-upload — Fetch an image URL server-side and upload to Supabase
+app.post("/api/proxy-image-upload", requireAuth, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: "url required" });
+    const response    = await fetch(url);
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+    const buffer      = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const ext         = contentType.includes("png") ? "png" : "jpg";
+    const fileName    = `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const storageKey  = `product-ads/${req.user.id}/${fileName}`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("user-assets").upload(storageKey, buffer, { contentType, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    console.error("[proxy-image-upload]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/admin/generate-zone-assets — Generate images for asset zones (no DB write)
 // Body: { zones, visual_direction, prompt, niche, intent, energy, background_type, background_colors }
 // Returns: { results: [{ zoneId, role, imageUrl }] }

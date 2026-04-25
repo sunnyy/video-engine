@@ -218,13 +218,17 @@ export default function ProductAdStudio() {
       const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Image generation failed");
-      setImages(prev => {
-        const next = { ...prev };
-        data.results.forEach(r => {
-          next[r.shotId] = r.ok ? { url: r.imageUrl } : { error: r.error || "Failed" };
-        });
-        return next;
-      });
+      // Upload each generated image to Supabase for permanent storage
+      const next = {};
+      await Promise.all(data.results.map(async r => {
+        if (r.ok) {
+          const permanentUrl = await uploadImageToSupabase(r.imageUrl);
+          next[r.shotId] = { url: permanentUrl };
+        } else {
+          next[r.shotId] = { error: r.error || "Failed" };
+        }
+      }));
+      setImages(prev => ({ ...prev, ...next }));
     } catch (e) {
       shots.forEach(s => setImages(prev => ({ ...prev, [s.id]: { error: e.message } })));
     }
@@ -238,7 +242,12 @@ export default function ProductAdStudio() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       const r = data.results?.[0];
-      setImages(prev => ({ ...prev, [shot.id]: r?.ok ? { url: r.imageUrl } : { error: r?.error || "Failed" } }));
+      if (r?.ok) {
+        const permanentUrl = await uploadImageToSupabase(r.imageUrl);
+        setImages(prev => ({ ...prev, [shot.id]: { url: permanentUrl } }));
+      } else {
+        setImages(prev => ({ ...prev, [shot.id]: { error: r?.error || "Failed" } }));
+      }
     } catch (e) { setImages(prev => ({ ...prev, [shot.id]: { error: e.message } })); }
   }
 
@@ -265,24 +274,32 @@ export default function ProductAdStudio() {
     generatingClips.current = false;
   }
 
-  /* ── Proxy a Fal.ai clip URL to permanent Supabase storage ── */
-  async function uploadClipToSupabase(falUrl, index) {
+  /* ── Upload helpers — proxy Fal.ai URLs to permanent Supabase storage ── */
+  async function uploadImageToSupabase(falUrl) {
     try {
-      const res = await serverFetch("/api/proxy-image", {
+      const res = await serverFetch("/api/proxy-image-upload", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ url: falUrl }),
       });
       if (!res.ok) return falUrl;
-      const blob = await res.blob();
-      const file = new File([blob], `product-clip-${Date.now()}-${index}.mp4`, { type: "video/mp4" });
-      const { supabase } = await import("../lib/supabase");
-      const { data: { user } } = await supabase.auth.getUser();
-      const storageKey = `product-ads/${user.id}/${file.name}`;
-      const { error } = await supabase.storage.from("user-assets").upload(storageKey, file, { contentType: "video/mp4", upsert: false });
-      if (error) return falUrl;
-      const { data: { publicUrl } } = supabase.storage.from("user-assets").getPublicUrl(storageKey);
-      return publicUrl;
+      const data = await res.json();
+      return data.url || falUrl;
+    } catch {
+      return falUrl;
+    }
+  }
+
+  async function uploadClipToSupabase(falUrl) {
+    try {
+      const res = await serverFetch("/api/proxy-video-upload", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ url: falUrl }),
+      });
+      if (!res.ok) return falUrl;
+      const data = await res.json();
+      return data.url || falUrl;
     } catch {
       return falUrl;
     }
@@ -299,8 +316,8 @@ export default function ProductAdStudio() {
     // Upload clips to permanent Supabase storage (avoids Fal.ai QUIC/expiry issues)
     const uploadedClipUrls = {};
     await Promise.all(
-      successfulShots.map(async (shot, index) => {
-        uploadedClipUrls[shot.id] = await uploadClipToSupabase(clips[shot.id].videoUrl, index);
+      successfulShots.map(async (shot) => {
+        uploadedClipUrls[shot.id] = await uploadClipToSupabase(clips[shot.id].videoUrl);
       })
     );
 
