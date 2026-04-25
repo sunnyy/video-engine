@@ -11,7 +11,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
-import { createProject as createDBProject } from "../services/projects/projectService";
+import { createProject as createDBProject, updateProject } from "../services/projects/projectService";
 import { useProjectStore } from "../store/useProjectStore";
 import AppLayout from "../ui/AppLayout";
 
@@ -265,6 +265,29 @@ export default function ProductAdStudio() {
     generatingClips.current = false;
   }
 
+  /* ── Proxy a Fal.ai clip URL to permanent Supabase storage ── */
+  async function uploadClipToSupabase(falUrl, index) {
+    try {
+      const res = await serverFetch("/api/proxy-image", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ url: falUrl }),
+      });
+      if (!res.ok) return falUrl;
+      const blob = await res.blob();
+      const file = new File([blob], `product-clip-${Date.now()}-${index}.mp4`, { type: "video/mp4" });
+      const { supabase } = await import("../lib/supabase");
+      const { data: { user } } = await supabase.auth.getUser();
+      const storageKey = `product-ads/${user.id}/${file.name}`;
+      const { error } = await supabase.storage.from("user-assets").upload(storageKey, file, { contentType: "video/mp4", upsert: false });
+      if (error) return falUrl;
+      const { data: { publicUrl } } = supabase.storage.from("user-assets").getPublicUrl(storageKey);
+      return publicUrl;
+    } catch {
+      return falUrl;
+    }
+  }
+
   /* ── Step 5: build project + open editor ── */
   async function createProject() {
     if (creatingProject) return;
@@ -273,10 +296,18 @@ export default function ProductAdStudio() {
     const successfulShots = analysis.shots.filter(s => clips[s.id]?.videoUrl);
     if (!successfulShots.length) { setCreatingProject(false); return; }
 
+    // Upload clips to permanent Supabase storage (avoids Fal.ai QUIC/expiry issues)
+    const uploadedClipUrls = {};
+    await Promise.all(
+      successfulShots.map(async (shot, index) => {
+        uploadedClipUrls[shot.id] = await uploadClipToSupabase(clips[shot.id].videoUrl, index);
+      })
+    );
+
     let currentTime = 0;
     const beats = [];
     successfulShots.forEach((shot, index) => {
-      const clipUrl  = clips[shot.id].videoUrl;
+      const clipUrl  = uploadedClipUrls[shot.id];
       const duration = shot.duration_seconds || 3;
       const start    = currentTime;
       currentTime   += duration;
@@ -325,21 +356,19 @@ export default function ProductAdStudio() {
       dna:          null,
     };
 
-    let saved = null;
     try {
-      saved = await createDBProject({
+      const saved = await createDBProject({
         name:        `${analysis.product_analysis.product_type} Ad`,
-        rawAI:       null,
+        rawAI:       {},
         safeProject: project,
       });
-      if (saved?.id) setDbId(saved.id);
-    } catch (dbErr) {
-      console.error("[ProductAd] createDBProject error:", dbErr);
+      if (saved?.id) {
+        setDbId(saved.id);
+        await updateProject(saved.id, project);
+      }
+    } catch (e) {
+      console.error("[ProductAd] DB save error:", e);
     }
-
-    console.log("[ProductAd] project:", JSON.stringify(project).slice(0, 500));
-    console.log("[ProductAd] dbId:", saved?.id);
-    console.log("[ProductAd] beats[0]:", JSON.stringify(project.beats?.[0]));
 
     setProject(project);
     navigate("/editor");
