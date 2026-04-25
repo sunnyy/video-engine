@@ -282,10 +282,15 @@ export default function ProductAdStudio() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ url: falUrl }),
       });
-      if (!res.ok) return falUrl;
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        console.error("[uploadImage] status:", res.status, errText.slice(0, 200));
+        return falUrl;
+      }
       const data = await res.json();
       return data.url || falUrl;
-    } catch {
+    } catch (e) {
+      console.error("[uploadImage] exception:", e.message);
       return falUrl;
     }
   }
@@ -297,10 +302,15 @@ export default function ProductAdStudio() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ url: falUrl }),
       });
-      if (!res.ok) return falUrl;
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        console.error("[uploadClip] status:", res.status, errText.slice(0, 200));
+        return falUrl;
+      }
       const data = await res.json();
       return data.url || falUrl;
-    } catch {
+    } catch (e) {
+      console.error("[uploadClip] exception:", e.message);
       return falUrl;
     }
   }
