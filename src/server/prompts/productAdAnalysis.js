@@ -56,5 +56,9 @@ FOR wearable (watches, earphones, glasses, rings, etc.):
   Shot 5 — Aspirational: product in a premium aspirational environment — rooftop, luxury interior, golden hour outdoor
 
 IMPORTANT for image_generation_prompt: always start with the product reference instruction, then describe ONLY the scene — not the product. The product comes from the reference image.
-IMPORTANT for video_motion_prompt: describe ONLY motion and camera behavior. Never describe the product appearance.`;
+IMPORTANT for video_motion_prompt: describe ONLY motion and camera behavior. Never describe the product appearance.
+
+FOR CLOTHING AND WEARABLE PRODUCTS ONLY — the image_generation_prompt for EVERY shot must begin with exactly:
+"Use the uploaded photo as the product reference. Do not alter, redesign, or reimagine the garment or product in any way. Preserve every design detail exactly: colors, patterns, prints, embroidery, cut, collar, sleeves, hem, buttons, and any graphic elements. Only change the scene, background, lighting, and model pose."
+Then add the scene description after this instruction.`;
 }

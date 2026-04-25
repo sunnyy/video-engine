@@ -283,7 +283,7 @@ export default function ProductAdStudio() {
       beats.push({
         id:               crypto.randomUUID(),
         order:            index,
-        layout:           "FullBleed",
+        layout:           "blank",
         layoutBackground: { type: "color", value: "#000000" },
         zones: {
           z1: {

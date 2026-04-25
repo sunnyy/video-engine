@@ -2455,6 +2455,7 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
               image_url:            productImageUrl,
               guidance_scale:       3.5,
               num_inference_steps:  28,
+              strength:             0.85,
             }),
           });
           if (!falRes.ok) { lastErr = await falRes.text(); continue; }
