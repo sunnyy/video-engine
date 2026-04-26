@@ -126,7 +126,12 @@ export default function ProductAdStudio() {
   const [analyzing,  setAnalyzing]  = useState(false);
   const [analyzeErr, setAnalyzeErr] = useState("");
 
-  // Step 3 state
+  // Step 3 state — base image (model wearing product OR enhanced product)
+  const [baseImage,   setBaseImage]   = useState(null);
+  const [baseLoading, setBaseLoading] = useState(false);
+  const [baseErr,     setBaseErr]     = useState("");
+
+  // Step 3 state — scene shots
   const [images,        setImages]        = useState({});
   const [imagesLoading, setImagesLoading] = useState(false);
 
@@ -243,9 +248,42 @@ export default function ProductAdStudio() {
     setAnalyzing(false);
   }
 
-  /* ── Step 3: generate images ── */
-  async function runImages(shotsToRegen = null) {
-    const shots = shotsToRegen || analysis.shots;
+  /* ── Step 3a: generate base reference image ── */
+  async function runBaseImage(category, modelUrl) {
+    setBaseLoading(true); setBaseErr("");
+    try {
+      const res  = await serverFetch("/api/product-ad/generate-base-image", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ productImageUrl: imageUrl, modelImageUrl: modelUrl, category }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Base image failed");
+      const permanentUrl = await uploadImageToSupabase(data.imageUrl);
+      setBaseImage(permanentUrl);
+      return permanentUrl;
+    } catch (e) {
+      setBaseErr(e.message);
+      return null;
+    } finally {
+      setBaseLoading(false);
+    }
+  }
+
+  /* Called by "Create Ad →" button — generates base image then all scenes */
+  async function handleStartVisuals() {
+    setStep(3);
+    const category = analysis.product_analysis?.category;
+    const refUrl   = await runBaseImage(category, pickedModelUrl.current);
+    if (!refUrl) return; // baseErr is set — user sees error + retry
+    runImages(null, refUrl);
+  }
+
+  /* ── Step 3b: generate scene images using base reference ── */
+  async function runImages(shotsToRegen = null, refUrl = null) {
+    const shots      = shotsToRegen || analysis.shots;
+    const referenceImageUrl = refUrl || baseImage;
+    if (!referenceImageUrl) return;
     setImagesLoading(true);
     setImages(prev => {
       const next = { ...prev };
@@ -253,12 +291,13 @@ export default function ProductAdStudio() {
       return next;
     });
     try {
-      console.log("[runImages] pickedModelUrl.current:", pickedModelUrl.current);
-      console.log("[runImages] imageUrl:", imageUrl);
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl, modelImageUrl: pickedModelUrl.current }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ shots, referenceImageUrl }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Image generation failed");
-      // Upload each generated image to Supabase for permanent storage
       const next = {};
       await Promise.all(data.results.map(async r => {
         if (r.ok) {
@@ -278,7 +317,11 @@ export default function ProductAdStudio() {
   async function regenImage(shot) {
     setImages(prev => ({ ...prev, [shot.id]: { loading: true } }));
     try {
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots: [shot], productImageUrl: imageUrl, modelImageUrl: pickedModelUrl.current }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ shots: [shot], referenceImageUrl: baseImage }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       const r = data.results?.[0];
@@ -537,7 +580,7 @@ export default function ProductAdStudio() {
                     <span key={i} style={{ fontSize: 11, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, padding: "3px 9px", color: "#9494a8" }}>{f}</span>
                   ))}
                 </div>
-                <button onClick={() => { setStep(3); runImages(); }} style={C.btnP}>Create Ad →</button>
+                <button onClick={handleStartVisuals} style={C.btnP}>Create Ad →</button>
               </div>
             )}
           </div>
@@ -546,19 +589,48 @@ export default function ProductAdStudio() {
         {/* ── STEP 3 — Visuals ── */}
         {step === 3 && (
           <div>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Creating Your Scenes</div>
-              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Generating high-quality product imagery…</div>
-            </div>
+            {/* Phase A: generating base reference image */}
+            {baseLoading && (
+              <div style={{ textAlign: "center", padding: "50px 0" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>🎨</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#9494a8", marginBottom: 6 }}>
+                  {analysis.product_analysis?.category === "clothing" || analysis.product_analysis?.category === "wearable"
+                    ? "Fitting model with your product…"
+                    : "Enhancing your product image…"}
+                </div>
+                <div style={{ fontSize: 12, color: "#555" }}>This takes about 15 seconds</div>
+              </div>
+            )}
 
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-              {analysis.shots.map((shot, i) => (
-                <ImageCard key={shot.id} index={i} imageData={images[shot.id]} onRegenerate={() => regenImage(shot)} />
-              ))}
-            </div>
+            {/* Base image error */}
+            {baseErr && !baseLoading && (
+              <div style={{ ...C.card, padding: 20, borderColor: "rgba(248,113,113,0.3)", textAlign: "center", marginBottom: 16 }}>
+                <div style={{ color: "#f87171", marginBottom: 12 }}>✕ {baseErr}</div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <button onClick={() => handleStartVisuals()} style={C.btnP}>↺ Retry</button>
+                  <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
+                </div>
+              </div>
+            )}
 
-            {!imagesLoading && !allImagesReady && (
-              <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
+            {/* Phase B: scene shots */}
+            {!baseLoading && !baseErr && (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Creating Your Scenes</div>
+                  <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Generating high-quality product imagery…</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+                  {analysis.shots.map((shot, i) => (
+                    <ImageCard key={shot.id} index={i} imageData={images[shot.id]} onRegenerate={() => regenImage(shot)} />
+                  ))}
+                </div>
+
+                {!imagesLoading && !allImagesReady && (
+                  <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -641,7 +713,7 @@ export default function ProductAdStudio() {
                 <button onClick={createProject} disabled={creatingProject} style={{ ...C.btnP, fontSize: 14, padding: "12px 28px", opacity: creatingProject ? 0.6 : 1 }}>
                   {creatingProject ? "Opening…" : "Open in Editor →"}
                 </button>
-                <button onClick={() => { setStep(1); setAnalysis(null); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); generatingClips.current = false; }} style={C.btnG}>
+                <button onClick={() => { setStep(1); setAnalysis(null); setBaseImage(null); setBaseErr(""); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); generatingClips.current = false; pickedModelUrl.current = null; projectDbId.current = null; }} style={C.btnG}>
                   ← New Product
                 </button>
               </div>

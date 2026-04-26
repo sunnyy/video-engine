@@ -2547,11 +2547,69 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/product-ad/generate-images — Generate all shot images in parallel via Fal.ai
+// POST /api/product-ad/generate-base-image — Generate one reference image before scene shots
+// Clothing/wearable: nano-banana/edit [modelUrl, productUrl] → model wearing the product
+// Non-worn: Kontext with productUrl → cleaned studio product photo
+app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) => {
+  try {
+    const { productImageUrl, modelImageUrl, category } = req.body;
+    if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
+    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+
+    let falUrl;
+
+    if ((category === "clothing" || category === "wearable") && modelImageUrl) {
+      // Pass model + product to nano-banana; instruct it to dress the model in the exact garment
+      const prompt = "Dress the person from image 1 in the exact outfit shown in image 2. Keep the person's face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce the garment from image 2 exactly — same colors, embroidery, fabric texture, cut, silhouette, and every design detail. Full body visible, natural confident pose, clean studio background, soft professional lighting. Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
+      const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+        method:  "POST",
+        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body:    JSON.stringify({ image_urls: [modelImageUrl, productImageUrl], prompt }),
+      });
+      const raw = await falRes.text();
+      console.log(`[generate-base-image] clothing status=${falRes.status} body=${raw.slice(0, 300)}`);
+      if (!falRes.ok) throw new Error(`nano-banana failed: ${raw.slice(0, 200)}`);
+      const data = JSON.parse(raw);
+      falUrl = data.images?.[0]?.url;
+    } else {
+      // Enhance/clean product photo via Kontext
+      const prompt = "Professional product photo enhancement. Replace the background with a pure white seamless studio backdrop. Improve lighting to clean directional studio light with soft shadows. Keep the product itself — including all branding, labels, colors, shape, and design — completely unchanged. No people, no props, no text additions. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
+      const falRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
+        method:  "POST",
+        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body:    JSON.stringify({ image_url: productImageUrl, prompt, guidance_scale: 3.5, num_inference_steps: 28, strength: 0.7 }),
+      });
+      const raw = await falRes.text();
+      console.log(`[generate-base-image] non_worn status=${falRes.status} body=${raw.slice(0, 300)}`);
+      if (!falRes.ok) throw new Error(`Kontext failed: ${raw.slice(0, 200)}`);
+      const data = JSON.parse(raw);
+      falUrl = data.images?.[0]?.url;
+    }
+
+    if (!falUrl) throw new Error("No image URL returned from Fal.ai");
+
+    // Proxy to permanent Supabase storage
+    const imgRes   = await fetch(falUrl);
+    const buffer   = Buffer.from(await imgRes.arrayBuffer());
+    const ct       = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext      = ct.includes("png") ? "png" : "jpg";
+    const fileName = `base-${Date.now()}.${ext}`;
+    const key      = `product-ads/${req.user.id}/${fileName}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    res.json({ imageUrl: publicUrl });
+  } catch (e) {
+    console.error("[product-ad/generate-base-image]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/product-ad/generate-images — Generate scene shots using base image reference
 app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
   try {
-    const { shots, productImageUrl, modelImageUrl, orientation = "9:16" } = req.body;
-    if (!shots?.length || !productImageUrl) return res.status(400).json({ error: "shots and productImageUrl required" });
+    const { shots, referenceImageUrl } = req.body;
+    if (!shots?.length || !referenceImageUrl) return res.status(400).json({ error: "shots and referenceImageUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
@@ -2564,14 +2622,10 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
         try {
-          // nano-banana/edit for all shots.
-          // Clothing/wearable: image_urls = [modelUrl, productUrl] — model identity from img1, garment from img2.
-          // Non-worn: image_urls = [productUrl] — product reference only.
-          const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
-          const imageUrls = modelImageUrl ? [modelImageUrl, productImageUrl] : [productImageUrl];
-          const body      = { prompt: shot.image_generation_prompt, image_urls: imageUrls };
-          console.log(`[generate-images] shot=${shot.id} images=${imageUrls.length} modelImageUrl=${modelImageUrl ? "set" : "null"}`);
-          const falRes  = await fetch(endpoint, {
+          // nano-banana/edit with single reference (base image already has model + outfit or clean product)
+          const body = { prompt: shot.image_generation_prompt, image_urls: [referenceImageUrl] };
+          console.log(`[generate-images] shot=${shot.id} attempt=${attempt + 1} referenceImageUrl=${referenceImageUrl.slice(0, 60)}...`);
+          const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
             body:    JSON.stringify(body),
