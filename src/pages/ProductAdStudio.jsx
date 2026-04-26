@@ -206,14 +206,26 @@ export default function ProductAdStudio() {
 
   /* ── Step 2: analyze ── */
   async function fetchAndPickModel(category) {
-    if (category !== "clothing" && category !== "wearable") return null;
+    console.log("[fetchAndPickModel] category:", category);
+    if (category !== "clothing" && category !== "wearable") {
+      console.log("[fetchAndPickModel] skipping — not clothing/wearable");
+      return null;
+    }
     try {
       const res  = await serverFetch("/api/product-ad/models?gender=female");
       const data = await res.json();
-      if (!res.ok || !data.models?.length) return null;
+      console.log("[fetchAndPickModel] models fetched:", data.models?.length, "res.ok:", res.ok);
+      if (!res.ok || !data.models?.length) {
+        console.warn("[fetchAndPickModel] no models available");
+        return null;
+      }
       const picked = data.models[Math.floor(Math.random() * data.models.length)];
+      console.log("[fetchAndPickModel] picked id:", picked.id, "image_url:", picked.image_url);
       return picked.image_url;
-    } catch { return null; }
+    } catch (e) {
+      console.error("[fetchAndPickModel] error:", e.message);
+      return null;
+    }
   }
 
   async function runAnalysis(url) {
@@ -226,6 +238,7 @@ export default function ProductAdStudio() {
       setAnalysis(data);
       const modelUrl = await fetchAndPickModel(data.product_analysis?.category);
       pickedModelUrl.current = modelUrl || null;
+      console.log("[runAnalysis] pickedModelUrl set to:", pickedModelUrl.current);
     } catch (e) { setAnalyzeErr(e.message); }
     setAnalyzing(false);
   }
@@ -240,6 +253,8 @@ export default function ProductAdStudio() {
       return next;
     });
     try {
+      console.log("[runImages] pickedModelUrl.current:", pickedModelUrl.current);
+      console.log("[runImages] imageUrl:", imageUrl);
       const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl, modelImageUrl: pickedModelUrl.current }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Image generation failed");
