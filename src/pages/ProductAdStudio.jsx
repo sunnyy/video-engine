@@ -122,9 +122,10 @@ export default function ProductAdStudio() {
   const fileInputRef = useRef();
 
   // Step 2 state
-  const [analysis,   setAnalysis]   = useState(null);
-  const [analyzing,  setAnalyzing]  = useState(false);
-  const [analyzeErr, setAnalyzeErr] = useState("");
+  const [analysis,     setAnalysis]     = useState(null);
+  const [analyzing,    setAnalyzing]    = useState(false);
+  const [analyzeErr,   setAnalyzeErr]   = useState("");
+  const [hasMannequin, setHasMannequin] = useState(false);
 
   // Step 3 state — base image (model wearing product OR enhanced product)
   const [baseImage,   setBaseImage]   = useState(null);
@@ -239,23 +240,30 @@ export default function ProductAdStudio() {
     try {
       const res  = await serverFetch("/api/product-ad/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: src }) });
       const data = await res.json();
+      if (res.status === 422) {
+        setAnalyzeErr(data.error || "Image not suitable for ad generation.");
+        setAnalyzing(false);
+        setStep(1);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Analysis failed");
+      setHasMannequin(data.validation?.has_mannequin || false);
       setAnalysis(data);
       const modelUrl = await fetchAndPickModel(data.product_analysis?.category);
       pickedModelUrl.current = modelUrl || null;
-      console.log("[runAnalysis] pickedModelUrl set to:", pickedModelUrl.current);
+      console.log("[runAnalysis] pickedModelUrl set to:", pickedModelUrl.current, "hasMannequin:", data.validation?.has_mannequin);
     } catch (e) { setAnalyzeErr(e.message); }
     setAnalyzing(false);
   }
 
   /* ── Step 3a: generate base reference image ── */
-  async function runBaseImage(category, modelUrl) {
+  async function runBaseImage(category, modelUrl, mannequin) {
     setBaseLoading(true); setBaseErr("");
     try {
       const res  = await serverFetch("/api/product-ad/generate-base-image", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ productImageUrl: imageUrl, modelImageUrl: modelUrl, category }),
+        body:    JSON.stringify({ productImageUrl: imageUrl, modelImageUrl: modelUrl, category, hasMannequin: mannequin }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Base image failed");
@@ -274,7 +282,7 @@ export default function ProductAdStudio() {
   async function handleStartVisuals() {
     setStep(3);
     const category = analysis.product_analysis?.category;
-    const refUrl   = await runBaseImage(category, pickedModelUrl.current);
+    const refUrl   = await runBaseImage(category, pickedModelUrl.current, hasMannequin);
     if (!refUrl) return; // baseErr is set — user sees error + retry
     runImages(null, refUrl);
   }
@@ -713,7 +721,7 @@ export default function ProductAdStudio() {
                 <button onClick={createProject} disabled={creatingProject} style={{ ...C.btnP, fontSize: 14, padding: "12px 28px", opacity: creatingProject ? 0.6 : 1 }}>
                   {creatingProject ? "Opening…" : "Open in Editor →"}
                 </button>
-                <button onClick={() => { setStep(1); setAnalysis(null); setBaseImage(null); setBaseErr(""); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); generatingClips.current = false; pickedModelUrl.current = null; projectDbId.current = null; }} style={C.btnG}>
+                <button onClick={() => { setStep(1); setAnalysis(null); setBaseImage(null); setBaseErr(""); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); setHasMannequin(false); generatingClips.current = false; pickedModelUrl.current = null; projectDbId.current = null; }} style={C.btnG}>
                   ← New Product
                 </button>
               </div>

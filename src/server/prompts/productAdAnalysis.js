@@ -1,6 +1,19 @@
 export function getProductAnalysisPrompt(mode) {
   return `You are a product video strategist. Analyze the provided product image and return a JSON strategy for a short-form video ad (TikTok/Reels/Shorts style).
 
+STEP 0 — VALIDATION (evaluate this before anything else):
+Examine the image and determine if it is suitable for AI product video ad generation.
+
+Set "is_suitable": false if the image contains ANY of the following:
+- Nudity, sexual content, or explicit/adult material
+- Graphic violence, gore, or disturbing content
+- Waste, bodily fluids, disgusting content, or poop/excrement
+- A human face as the primary subject (selfie, portrait — not a product)
+- No identifiable product (blank image, meme, screenshot, text document, random photo)
+- Extremely low quality, blurry, or unrecognizable content
+
+Set "has_mannequin": true if the clothing or wearable product is displayed on a mannequin, dress form, dummy figure, or any non-human display stand. This is ONLY relevant for clothing/wearable category.
+
 GLOBAL IMAGE RULES — apply to every single shot without exception:
 - Real human models only. Never mannequins, dress forms, store displays, or CGI figures.
 - All models must be fully clothed at all times. No exposed skin below the collar except hands and lower arms.
@@ -17,6 +30,12 @@ Auto-detect the product category from the image:
 Return ONLY valid JSON, no markdown, no explanation:
 
 {
+  "validation": {
+    "is_suitable": true,
+    "rejection_reason": null,
+    "has_mannequin": false,
+    "mannequin_warning": null
+  },
   "product_analysis": {
     "product_type": "concise description",
     "category": "clothing|wearable|non_worn",

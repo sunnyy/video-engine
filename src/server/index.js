@@ -2540,6 +2540,14 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
     const raw     = response.choices[0].message.content;
     const cleaned = raw.replace(/```json\n?/gi, "").replace(/```\n?/gi, "").trim();
     const parsed  = JSON.parse(cleaned);
+
+    if (!parsed.validation?.is_suitable) {
+      return res.status(422).json({
+        error: parsed.validation?.rejection_reason || "This image is not suitable for product ad generation.",
+        rejected: true,
+      });
+    }
+
     res.json(parsed);
   } catch (e) {
     console.error("[product-ad/analyze]", e.message);
@@ -2552,22 +2560,45 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
 // Non-worn: Kontext with productUrl → cleaned studio product photo
 app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) => {
   try {
-    const { productImageUrl, modelImageUrl, category } = req.body;
+    const { productImageUrl, modelImageUrl, category, hasMannequin } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
     let falUrl;
 
     if ((category === "clothing" || category === "wearable") && modelImageUrl) {
-      // Pass model + product to nano-banana; instruct it to dress the model in the exact garment
-      const prompt = "Dress the person from image 1 in the exact outfit shown in image 2. Keep the person's face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce the garment from image 2 exactly — same colors, embroidery, fabric texture, cut, silhouette, and every design detail. Full body visible, natural confident pose, clean studio background, soft professional lighting. Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
+      let garmentUrl = productImageUrl;
+
+      if (hasMannequin) {
+        // Step 1: Extract clean garment reference from mannequin photo
+        console.log("[generate-base-image] mannequin detected — extracting garment first");
+        const extractPrompt = "Remove the mannequin and isolate only the outfit as a clean garment reference. Keep only the clothing: preserve exact fabric, embroidery, colors, neckline, sleeves, borders, silhouette, and all embellishments. Remove: mannequin face, skin, hands, body, hair, makeup, pose, and identity. Remove background distractions. Output as a clean apparel product reference image showing only the outfit, front-facing, centered. This is a garment extraction task, not a fashion redesign task.";
+        const extractRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+          method:  "POST",
+          headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+          body:    JSON.stringify({ image_urls: [productImageUrl], prompt: extractPrompt }),
+        });
+        const extractRaw = await extractRes.text();
+        console.log(`[generate-base-image] garment extraction status=${extractRes.status} body=${extractRaw.slice(0, 200)}`);
+        if (extractRes.ok) {
+          const extractData = JSON.parse(extractRaw);
+          const extractedUrl = extractData.images?.[0]?.url;
+          if (extractedUrl) garmentUrl = extractedUrl;
+        }
+        console.log("[generate-base-image] garmentUrl after extraction:", garmentUrl?.slice(0, 60));
+      }
+
+      // Step 2: Dress model with garment reference
+      const prompt = hasMannequin
+        ? "Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment-only product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, dupatta placement, borders and trims, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, expression, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer with exact outfit preservation. Full body visible, natural confident pose, clean studio background, soft professional lighting. Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait."
+        : "Dress the person from image 1 in the exact outfit shown in image 2. Keep the person's face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce the garment from image 2 exactly — same colors, embroidery, fabric texture, cut, silhouette, and every design detail. Full body visible, natural confident pose, clean studio background, soft professional lighting. Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
       const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
         method:  "POST",
         headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body:    JSON.stringify({ image_urls: [modelImageUrl, productImageUrl], prompt }),
+        body:    JSON.stringify({ image_urls: [modelImageUrl, garmentUrl], prompt }),
       });
       const raw = await falRes.text();
-      console.log(`[generate-base-image] clothing status=${falRes.status} body=${raw.slice(0, 300)}`);
+      console.log(`[generate-base-image] clothing try-on status=${falRes.status} body=${raw.slice(0, 300)}`);
       if (!falRes.ok) throw new Error(`nano-banana failed: ${raw.slice(0, 200)}`);
       const data = JSON.parse(raw);
       falUrl = data.images?.[0]?.url;
