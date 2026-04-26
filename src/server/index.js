@@ -2597,6 +2597,29 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
 
     if (!falUrl) throw new Error("No image URL returned from Fal.ai");
 
+    // Post-process: remove watermarks/logos via Kontext
+    try {
+      const cleanRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
+        method:  "POST",
+        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_url:           falUrl,
+          prompt:              "Remove any watermarks, text overlays, logos, copyright notices, or semi-transparent text from this image. Keep everything else completely unchanged — the person, outfit, pose, lighting, and background.",
+          guidance_scale:      3.5,
+          num_inference_steps: 20,
+          strength:            0.4,
+        }),
+      });
+      if (cleanRes.ok) {
+        const cleanData = await cleanRes.json();
+        const cleanedUrl = cleanData.images?.[0]?.url;
+        if (cleanedUrl) falUrl = cleanedUrl;
+        console.log("[generate-base-image] watermark removal done");
+      }
+    } catch (e) {
+      console.warn("[generate-base-image] watermark removal skipped:", e.message);
+    }
+
     // Proxy to permanent Supabase storage
     const imgRes   = await fetch(falUrl);
     const buffer   = Buffer.from(await imgRes.arrayBuffer());
@@ -2641,8 +2664,30 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
           });
           if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr.slice(0, 200)); continue; }
           const data   = await falRes.json();
-          const falUrl = data.images?.[0]?.url;
+          let falUrl = data.images?.[0]?.url;
           if (!falUrl) throw new Error("No image URL from Fal.ai");
+          // Post-process: remove watermarks/logos
+          try {
+            const cleanRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
+              method:  "POST",
+              headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                image_url:           falUrl,
+                prompt:              "Remove any watermarks, text overlays, logos, copyright notices, or semi-transparent text from this image. Keep everything else completely unchanged — the person, outfit, pose, lighting, and background.",
+                guidance_scale:      3.5,
+                num_inference_steps: 20,
+                strength:            0.4,
+              }),
+            });
+            if (cleanRes.ok) {
+              const cleanData = await cleanRes.json();
+              const cleanedUrl = cleanData.images?.[0]?.url;
+              if (cleanedUrl) falUrl = cleanedUrl;
+              console.log(`[generate-images] watermark removal done shot=${shot.id}`);
+            }
+          } catch (e) {
+            console.warn(`[generate-images] watermark removal skipped shot=${shot.id}:`, e.message);
+          }
           results.push({ shotId: shot.id, imageUrl: falUrl, ok: true });
           succeeded = true;
           break;
