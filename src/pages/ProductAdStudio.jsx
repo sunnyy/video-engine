@@ -551,10 +551,27 @@ export default function ProductAdStudio() {
         {/* ── STEP 4 — Production ── */}
         {step === 4 && (
           <div>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Producing Your Video</div>
-              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-                Bringing your scenes to life… this takes a few minutes
+            <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Producing Your Video</div>
+                <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+                  Bringing your scenes to life… this takes a few minutes
+                </div>
+              </div>
+              {/* Live progress counter */}
+              <div style={{ fontSize: 12, color: "#9494a8", textAlign: "right", flexShrink: 0 }}>
+                {(() => {
+                  const done   = analysis.shots.filter(s => clips[s.id]?.videoUrl).length;
+                  const failed = analysis.shots.filter(s => clips[s.id]?.error).length;
+                  const total  = analysis.shots.length;
+                  return (
+                    <>
+                      <span style={{ color: "#22c55e", fontWeight: 700 }}>{done}</span>
+                      {failed > 0 && <span style={{ color: "#f87171", fontWeight: 700 }}> · {failed} failed</span>}
+                      <span style={{ color: "#444" }}> / {total} clips</span>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -563,29 +580,59 @@ export default function ProductAdStudio() {
                 <ClipCard key={shot.id} index={i} clipData={clips[shot.id]} />
               ))}
             </div>
+
+            {/* All clips failed — show error + retry */}
+            {allClipsProcessed && !anyClipSucceeded && (
+              <div style={{ ...C.card, padding: 20, borderColor: "rgba(248,113,113,0.3)", textAlign: "center" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f87171", marginBottom: 6 }}>All clips failed to generate</div>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
+                  The video model returned errors for every scene. This is usually a temporary issue.
+                </div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <button onClick={() => { generatingClips.current = false; setClips({}); runClips(); }} style={C.btnP}>
+                    ↺ Retry All Clips
+                  </button>
+                  <button onClick={() => setStep(3)} style={C.btnG}>← Back to Images</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ── STEP 5 — Edit ── */}
-        {step === 5 && (
-          <div style={{ textAlign: "center", padding: "60px 0" }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>🎬</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Syne',sans-serif", marginBottom: 8 }}>
-              Your Ad is Ready
+        {step === 5 && (() => {
+          const succeeded = analysis.shots.filter(s => clips[s.id]?.videoUrl).length;
+          const failed    = analysis.shots.filter(s => clips[s.id]?.error).length;
+          const total     = analysis.shots.length;
+          return (
+            <div style={{ textAlign: "center", padding: "60px 0" }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>🎬</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Syne',sans-serif", marginBottom: 8 }}>
+                {failed === 0 ? "Your Ad is Ready" : `${succeeded} of ${total} Scenes Ready`}
+              </div>
+              <div style={{ fontSize: 14, color: "#666", maxWidth: 400, margin: "0 auto 16px" }}>
+                {succeeded} scene{succeeded !== 1 ? "s" : ""} produced for {analysis.product_analysis.product_type}.
+              </div>
+
+              {/* Partial failure warning */}
+              {failed > 0 && (
+                <div style={{ display: "inline-block", marginBottom: 20, padding: "8px 18px", borderRadius: 8, background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", fontSize: 12, color: "#f87171" }}>
+                  ⚠ {failed} clip{failed !== 1 ? "s" : ""} failed — only successful scenes will be added to the editor
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 16 }}>
+                <button onClick={createProject} disabled={creatingProject} style={{ ...C.btnP, fontSize: 14, padding: "12px 28px", opacity: creatingProject ? 0.6 : 1 }}>
+                  {creatingProject ? "Opening…" : "Open in Editor →"}
+                </button>
+                <button onClick={() => { setStep(1); setAnalysis(null); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); generatingClips.current = false; }} style={C.btnG}>
+                  ← New Product
+                </button>
+              </div>
             </div>
-            <div style={{ fontSize: 14, color: "#666", marginBottom: 32, maxWidth: 400, margin: "0 auto 32px" }}>
-              {analysis.shots.filter(s => clips[s.id]?.videoUrl).length} scenes produced for {analysis.product_analysis.product_type}. Open in editor to add text, adjust transitions, and export.
-            </div>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={createProject} disabled={creatingProject} style={{ ...C.btnP, fontSize: 14, padding: "12px 28px", opacity: creatingProject ? 0.6 : 1 }}>
-                {creatingProject ? "Opening…" : "Open in Editor →"}
-              </button>
-              <button onClick={() => { setStep(1); setAnalysis(null); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null); generatingClips.current = false; }} style={C.btnG}>
-                ← New Product
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
       </div>
     </AppLayout>
