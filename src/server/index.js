@@ -2680,7 +2680,7 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
         try {
           // Belt-and-suspenders identity anchor prepended to whatever prompt comes from analysis
-          const anchoredPrompt = `Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. ${shot.image_generation_prompt}`;
+          const anchoredPrompt = `Use the uploaded photo as the complete reference. Keep the person's face, identity, skin tone, hair, AND EXACT OUTFIT completely unchanged — do not alter the clothing in any way. Only change the scene environment, background, and lighting as described: ${shot.image_generation_prompt}`;
           const body = { prompt: anchoredPrompt, image_urls: [referenceImageUrl] };
           console.log(`[generate-images] shot=${shot.id} index=${index} attempt=${attempt + 1} prompt preview:`, shot.image_generation_prompt?.slice(0, 100));
           console.log(`[generate-images] shot=${shot.id} nano-banana ref:`, referenceImageUrl?.slice(0, 80));

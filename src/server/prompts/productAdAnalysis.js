@@ -70,11 +70,11 @@ FOR non_worn (bottles, cans, food, gadgets, furniture, serums, etc.):
   Shot 5 — Angled: product at a 45-degree angle showing depth and side profile, strong directional light, aspirational final frame
 
 FOR clothing:
-  Shot 1 — Walking toward camera, golden hour outdoor. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Full body shot, model walking confidently toward the camera on a sunlit outdoor street or garden path, warm golden hour light from the side, bokeh background of trees or architecture, natural stride, full garment visible from head to toe. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
-  Shot 2 — Waist-up lifestyle, indoor. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Waist-up framing, model looking slightly off-camera with a relaxed natural smile, seated or standing in a warm indoor lifestyle setting such as a boutique, café interior, or bright living room, soft diffused ambient light, shallow depth of field blurring the background. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
-  Shot 3 — Mid-stride, scenic outdoor. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Full body shot, model mid-stride walking through a scenic outdoor location such as a stone courtyard, flower market, or garden promenade, natural bright daylight, architectural or floral background, full garment visible with natural movement. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
-  Shot 4 — Seated lifestyle, warm indoor. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Model seated at a café table or lounge chair in a warm indoor setting, casual relaxed pose with hands resting naturally, warm golden artificial light from nearby lamp or window, background softly blurred with bokeh. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
-  Shot 5 — 3/4 rear angle, looking back. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Model in a 3/4 rear or side angle, turning head back to look over the shoulder toward the camera with a soft expression, outdoor location with natural light and softly blurred bokeh background, full outfit silhouette and back detail visible. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 1 — Walking toward camera, golden hour outdoor. Prompt: "Full body shot, model walking confidently toward the camera on a sunlit outdoor garden path, warm golden hour light from the side, soft bokeh background of trees and greenery, natural relaxed stride. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 2 — Waist-up, indoor lifestyle. Prompt: "Waist-up framing, model looking slightly off-camera with a relaxed natural smile, standing in a warmly lit boutique or bright café interior, soft diffused ambient light, shallow depth of field with blurred indoor background. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 3 — Mid-stride, scenic outdoor. Prompt: "Full body shot, model mid-stride walking through a scenic stone courtyard or garden promenade, natural bright daylight, architectural background with flowers and greenery, natural body movement. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 4 — Seated, warm indoor. Prompt: "Model seated at a café table or lounge chair in a warm cozy indoor setting, casual relaxed pose with hands resting naturally on the table, warm golden light from a nearby lamp or window, background softly blurred with bokeh. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 5 — 3/4 rear, looking back over shoulder. Prompt: "Model in a 3/4 rear or side angle, turning head back to look over the shoulder toward the camera with a soft expression, standing in a lush outdoor garden or courtyard, soft natural light, gently blurred bokeh background. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
 
 FOR wearable (watches, earphones, glasses, rings, etc.):
   Shot 1 — Hero product: product alone on a clean premium surface, dramatic directional studio light
@@ -85,11 +85,10 @@ FOR wearable (watches, earphones, glasses, rings, etc.):
 
 CRITICAL for image_generation_prompt (clothing/wearable):
 - One reference image is provided: the base image already shows the model wearing the exact garment.
-- Every clothing/wearable prompt MUST start with: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged."
-- Then describe the scene, environment, lighting, and camera angle.
-- End with: "Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
-- For detail/close-up shots: frame chest-up or waist-up so the person is still visible — do NOT describe fabric or embroidery in isolation without the person.
-- Do NOT describe the garment in text — the model sees the reference image directly.
+- DO NOT describe the outfit, garment, colors, fabric, embroidery, silhouette, or ANY clothing detail in the prompt. Describing clothing overrides the reference and changes the outfit.
+- ONLY describe: environment/location, pose and body position, lighting, camera angle, and mood/atmosphere.
+- End every prompt with: "Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+- For detail/close-up shots: frame chest-up or waist-up so the person is still visible.
 - Do NOT use dual-image instructions like "image 1" or "image 2" — there is only one reference.
 
 CRITICAL for image_generation_prompt (non_worn):
