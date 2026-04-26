@@ -146,13 +146,7 @@ export default function ProductAdStudio() {
   // Step 5 state
   const [creatingProject, setCreatingProject] = useState(false);
 
-  /* ── Auto-advance step 3 → 4 when all images ready ── */
   const allImagesReady = analysis?.shots?.every(s => images[s.id]?.url);
-  useEffect(() => {
-    if (allImagesReady && !imagesLoading && step === 3) {
-      setStep(4);
-    }
-  }, [allImagesReady, imagesLoading, step]);
 
   /* ── Auto-start clips when entering step 4 ── */
   useEffect(() => {
@@ -625,8 +619,12 @@ export default function ProductAdStudio() {
             {!baseLoading && !baseErr && (
               <>
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Creating Your Scenes</div>
-                  <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Generating high-quality product imagery…</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>
+                    {allImagesReady ? "Your Scenes Are Ready" : "Creating Your Scenes"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+                    {allImagesReady ? "Review and regenerate any scene, then proceed to video generation." : "Generating high-quality product imagery…"}
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
@@ -635,6 +633,12 @@ export default function ProductAdStudio() {
                   ))}
                 </div>
 
+                {allImagesReady && !imagesLoading && (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => setStep(4)} style={C.btnP}>Generate Videos →</button>
+                    <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
+                  </div>
+                )}
                 {!imagesLoading && !allImagesReady && (
                   <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
                 )}
