@@ -2564,29 +2564,13 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
         try {
-          let endpoint, body;
-          if (modelImageUrl) {
-            // Clothing/wearable: model is the sole image reference — do NOT pass mannequin product image.
-            // Garment is described entirely in the text prompt via garment_description.
-            endpoint = "https://fal.run/fal-ai/flux-pro/kontext/max";
-            body = {
-              prompt:              shot.image_generation_prompt,
-              image_url:           modelImageUrl,
-              guidance_scale:      3.5,
-              num_inference_steps: 28,
-            };
-          } else {
-            // Non-worn product: product image as single reference.
-            endpoint = "https://fal.run/fal-ai/flux-pro/kontext";
-            body = {
-              prompt:              shot.image_generation_prompt,
-              image_url:           productImageUrl,
-              guidance_scale:      3.5,
-              num_inference_steps: 28,
-              strength:            0.85,
-            };
-          }
-          console.log(`[generate-images] shot=${shot.id} endpoint=${endpoint} modelImageUrl=${modelImageUrl ? "set" : "null"}`);
+          // nano-banana/edit for all shots.
+          // Clothing/wearable: image_urls = [modelUrl, productUrl] — model identity from img1, garment from img2.
+          // Non-worn: image_urls = [productUrl] — product reference only.
+          const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
+          const imageUrls = modelImageUrl ? [modelImageUrl, productImageUrl] : [productImageUrl];
+          const body      = { prompt: shot.image_generation_prompt, image_urls: imageUrls };
+          console.log(`[generate-images] shot=${shot.id} images=${imageUrls.length} modelImageUrl=${modelImageUrl ? "set" : "null"}`);
           const falRes  = await fetch(endpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },

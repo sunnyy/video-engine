@@ -35,7 +35,7 @@ Return ONLY valid JSON, no markdown, no explanation:
       "narrative": "what this shot communicates to the viewer",
       "duration_seconds": 3,
       "camera_motion": "e.g. slow orbit, dolly in, static, gentle push",
-      "image_generation_prompt": "CLOTHING/WEARABLE: Start with 'The model from the reference image, wearing [garment_description verbatim]. ' — use garment_description exactly as written above. Then describe the scene, environment, lighting, and pose in detail. End with: 'Real human model only — not a mannequin or CGI figure. Keep the model face and identity exactly from the reference image. Fully clothed, modest pose. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.' NON_WORN: Start with 'Use the uploaded photo as the product reference. Keep the same branding, label, colors, and identity.' then describe ONLY the scene. End with: 'Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.'",
+      "image_generation_prompt": "CLOTHING/WEARABLE: Two reference images are provided — image 1 is the model, image 2 is the garment on a mannequin/hanger. Start the prompt with: 'Dress the person from image 1 in the exact outfit shown in image 2. Keep the person face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce the garment from image 2 exactly — same colors, embroidery, fabric texture, cut, silhouette, and every design detail.' Then describe the scene, environment, lighting, and pose. End with: 'Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.' NON_WORN: Start with 'Use the uploaded photo as the product reference. Keep the same branding, label, colors, and identity.' then describe ONLY the scene. End with: 'Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.'",
       "video_motion_prompt": "Describe ONLY camera movement and subject motion — not the product itself. Be specific to the shot type: for liquid/pour shots say 'amber liquid pours in slow motion, droplets catch the light'; for fabric/movement shots say 'fabric billows and flows gently, model walks with natural stride, modest movement'; for orbit shots say 'camera slowly orbits 180 degrees, studio light creates evolving reflections'; for lifestyle shots say 'gentle handheld push toward subject, natural ambient motion in background'."
     }
   ]
@@ -65,10 +65,11 @@ FOR wearable (watches, earphones, glasses, rings, etc.):
   Shot 5 — Aspirational: product in a premium aspirational environment — rooftop, luxury interior, golden hour outdoor
 
 CRITICAL for clothing image_generation_prompt:
-- The model image reference will be the ONLY image passed to the AI — there is no product image reference.
-- You MUST describe the garment completely in text using garment_description. Do not say "as shown" or "from the reference" for the garment.
-- Start every clothing prompt with: "The model from the reference image, wearing [full garment_description]. "
-- End every clothing prompt with: "Real human model only — not a mannequin or CGI figure. Keep the model face and identity exactly from the reference image. Fully clothed, modest pose. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+- Two images will be passed: image 1 = model avatar, image 2 = product/garment photo.
+- Every clothing prompt MUST start with: "Dress the person from image 1 in the exact outfit shown in image 2. Keep the person face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce the garment from image 2 exactly — same colors, embroidery, fabric texture, cut, silhouette, and every design detail."
+- Then describe the scene and pose.
+- End with: "Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+- Do NOT reference garment_description in the prompt — the model sees image 2 directly.
 
 IMPORTANT for image_generation_prompt (non_worn): always start with the product reference instruction, then describe ONLY the scene.
 IMPORTANT for video_motion_prompt: describe ONLY motion and camera behavior. Never describe the product appearance.`;
