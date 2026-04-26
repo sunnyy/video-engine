@@ -2395,7 +2395,7 @@ app.post("/api/admin/model-avatars/approve", requireAuth, async (req, res) => {
   try {
     const { imageUrl, gender, skin_tone, age_group, style_notes } = req.body;
     if (!imageUrl || !gender || !skin_tone || !age_group) return res.status(400).json({ error: "Missing required fields" });
-    const { data, error } = await supabaseAdmin.from("model_avatars").insert([{ image_url: imageUrl, gender, skin_tone, age_group, style_notes: style_notes || null }]).select().single();
+    const { data, error } = await supabaseAdmin.from("model_avatars").insert([{ url: imageUrl, gender, skin_tone, age_group, style_notes: style_notes || null }]).select().single();
     if (error) throw new Error(error.message);
     res.json({ avatar: data });
   } catch (e) {

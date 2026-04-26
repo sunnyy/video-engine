@@ -122,7 +122,7 @@ function AvatarCard({ avatar, onToggle, onDelete }) {
   return (
     <div style={{ ...C.card, opacity: avatar.is_active ? 1 : 0.5 }}>
       <div style={{ width: "100%", aspectRatio: "9/16", background: "#0b0b10", overflow: "hidden" }}>
-        <img src={avatar.image_url} alt={avatar.gender} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <img src={avatar.url} alt={avatar.gender} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </div>
       <div style={{ padding: 10 }}>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
