@@ -315,10 +315,10 @@
 - dist
   - assets
     - images
-      - gradient-dark.jpg
-      - office-vertical.jpg
-    - index-CIaaWadB.js
-    - index-H5xUB1W1.css
+      - favicon.png
+      - logo.png
+    - index-D-TUWefe.js
+    - index-DHTGdEco.css
     - videos
   - index.html
   - music
@@ -369,8 +369,8 @@
 - public
   - assets
     - images
-      - gradient-dark.jpg
-      - office-vertical.jpg
+      - favicon.png
+      - logo.png
     - videos
   - music
     - eliveta491190.mp3
@@ -402,7 +402,62 @@
     - whoosh.mp3
   - vite.svg
 - README.md
+- remotion-bundle
+  - 161.bundle.js
+  - 161.bundle.js.map
+  - 69.bundle.js
+  - 69.bundle.js.map
+  - 761.bundle.js
+  - 761.bundle.js.map
+  - 845.bundle.js
+  - 845.bundle.js.map
+  - 958.bundle.js
+  - 958.bundle.js.map
+  - 997.bundle.js
+  - 997.bundle.js.map
+  - bundle.js
+  - bundle.js.map
+  - favicon.ico
+  - index.html
+  - public
+    - assets
+      - images
+        - favicon.png
+        - logo.png
+      - videos
+    - music
+      - eliveta491190.mp3
+      - eliveta491224.mp3
+      - loksii.mp3
+      - mood_mode.mp3
+      - nastelbom.mp3
+      - the_mountain.mp3
+    - sfx
+      - cash-register.mp3
+      - cinematic_boom.mp3
+      - cinematic_impact.mp3
+      - classic_ding.mp3
+      - click.mp3
+      - countdown_beep.mp3
+      - crowd_cheer_short.mp3
+      - error_buzz.mp3
+      - glitch_long.mp3
+      - glitch_short.mp3
+      - great_success.mp3
+      - ground_impact.mp3
+      - impact.mp3
+      - notification_ding.mp3
+      - pop_hard.mp3
+      - pop_soft.mp3
+      - soft_hit.mp3
+      - tick_clock.mp3
+      - tick_digital.mp3
+      - whoosh.mp3
+    - vite.svg
+  - source-map-helper.wasm
 - SafeProject.txt
+- scripts
+  - prebundle.mjs
 - src
   - App.css
   - App.jsx
@@ -486,15 +541,19 @@
       - LayoutEditor.jsx
       - LayoutGenerator.jsx
       - LayoutManager.jsx
+      - Plans.jsx
       - PlansSales.jsx
+      - Sales.jsx
       - System.jsx
       - UserManager.jsx
     - AIGenerator.jsx
     - Assets.jsx
     - Auth.jsx
+    - Checkout.jsx
     - Credits.jsx
     - Dashboard.jsx
     - Editor.jsx
+    - Feedback.jsx
     - ImageGeneration.jsx
     - LandingPage.jsx
     - legal
@@ -506,6 +565,8 @@
     - Onboarding.jsx
     - ResetPassword.jsx
     - Settings.jsx
+    - Transcription.jsx
+    - Videos.jsx
   - remotion
     - avatarVideoSingleton.js
     - BeatRenderer.jsx
@@ -571,8 +632,12 @@
       - tts-1776548485256.mp3
   - services
     - ai
+      - classifier.js
+      - contentGenerator.js
       - generateStructuredShort.js
       - generateZoneContent.js
+      - patterns.js
+      - qualityValidator.js
     - assets
       - deleteUserAsset.js
       - getAssets.js
@@ -598,8 +663,10 @@
     - useProjectsStore.js
     - useProjectStore.js
   - ui
+    - AppLayout.jsx
     - components
       - CaptionStylePreview.jsx
+      - FeedbackModal.jsx
     - Editor
       - AudioSection.jsx
       - AvatarSection.jsx

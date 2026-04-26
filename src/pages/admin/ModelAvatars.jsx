@@ -21,7 +21,23 @@ const GENDER_COLORS = {
   child_boy:   "#34d399",
 };
 
-const DEFAULT_PROMPT = `Generate a professional model photo of a person. The person should look globally neutral in ethnicity — not distinctly from any specific country or region. Natural skin, natural hair, realistic proportions. Studio lighting, clean background, full body shot showing the person standing naturally. The face should be clearly visible with a neutral friendly expression. Photorealistic, 9:16 portrait orientation. Do not change the body type or height significantly from the reference. Do not copy the exact facial features — create a similar but different person.`;
+const DEFAULT_PROMPT = `Use the attached image only as loose inspiration for photographic quality, framing, realism level, and styling tone.
+
+Do not copy the face, identity, bone structure, eye shape, nose shape, lips, hairstyle, skin tone, ethnicity, or facial proportions from the reference.
+
+Generate a completely new person with a distinctly different identity, unique facial structure, different bone proportions, different features, and a clearly original appearance.
+
+The result must feel inspired only by the production quality of the reference — not the person.
+
+Avoid face similarity, identity carryover, same-person variations, or reference-face resemblance.
+
+Create a highly realistic commercial studio portrait of a real human with natural skin texture, realistic pores, authentic asymmetry, lifelike eyes, subtle imperfections, and natural facial detail.
+
+The person should look like a genuine photographed human, not AI-generated.
+
+Avoid plastic skin, over-smoothing, uncanny symmetry, synthetic beauty, exaggerated perfection, or fake facial features.
+
+Professional commercial lighting, premium studio portrait, waist-up framing, clean background, sharp focus, natural depth, photorealistic quality.`;
 
 const C = {
   card:  { background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, overflow: "hidden" },
