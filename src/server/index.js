@@ -2318,6 +2318,26 @@ app.post("/api/admin/generate-layout-preview", requireAuth, requireAdmin, async 
 
 
 /* ── Model Avatars ── */
+
+// File upload helper — admin uploads a local file directly to system-assets via supabaseAdmin
+app.post("/api/admin/upload-system-asset", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const { prefix = "models/uploads" } = req.body;
+    const ext = (req.file.originalname || "").split(".").pop() || "jpg";
+    const key = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const { error } = await supabaseAdmin.storage.from("system-assets").upload(key, fileBuffer, { contentType: req.file.mimetype, upsert: false });
+    fs.unlinkSync(req.file.path);
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("system-assets").getPublicUrl(key);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    console.error("[upload-system-asset]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/api/admin/model-avatars", requireAuth, async (_req, res) => {
   const { data, error } = await supabaseAdmin.from("model_avatars").select("*").order("created_at", { ascending: false });
   if (error) return res.status(500).json({ error: error.message });

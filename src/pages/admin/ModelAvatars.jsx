@@ -4,7 +4,6 @@
  */
 import { useState, useEffect, useRef } from "react";
 import { serverFetch } from "../../services/serverApi";
-import { supabase } from "../../lib/supabase";
 import AdminLayout from "./AdminLayout";
 
 const THUMB_W = 160;
@@ -171,14 +170,15 @@ export default function ModelAvatars() {
       .finally(() => setListLoading(false));
   }, []);
 
-  /* ── Client-side file upload to system-assets ── */
+  /* ── Server-side file upload to system-assets (bypasses client RLS) ── */
   async function uploadFileToStorage(file, prefix = "models/uploads") {
-    const ext = file.name.split(".").pop() || "jpg";
-    const key = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-    const { error } = await supabase.storage.from("system-assets").upload(key, file, { contentType: file.type, upsert: false });
-    if (error) throw new Error(error.message);
-    const { data: { publicUrl } } = supabase.storage.from("system-assets").getPublicUrl(key);
-    return publicUrl;
+    const form = new FormData();
+    form.append("file", file);
+    form.append("prefix", prefix);
+    const res = await serverFetch("/api/admin/upload-system-asset", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    return data.url;
   }
 
   /* ── Generate section handlers ── */
