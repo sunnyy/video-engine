@@ -2349,7 +2349,7 @@ app.post("/api/admin/model-avatars/generate", requireAuth, async (req, res) => {
     const { imageUrl, prompt } = req.body;
     if (!imageUrl || !prompt) return res.status(400).json({ error: "imageUrl and prompt required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    const falRes = await fetch("https://fal.run/fal-ai/nano-banana", {
+    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method: "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ image_url: imageUrl, prompt }),
