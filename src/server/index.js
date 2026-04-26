@@ -2598,15 +2598,15 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
     if (!imageUrl || !motionPrompt) return res.status(400).json({ error: "imageUrl and motionPrompt required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    const falRes  = await fetch("https://fal.run/fal-ai/ltxv-13b-098-distilled/image-to-video", {
+    const falRes  = await fetch("https://fal.run/fal-ai/pixverse/v4/image-to-video", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_url: imageUrl, prompt: motionPrompt, num_frames: durationSeconds * 24, fps: 24 }),
+      body:    JSON.stringify({ image_url: imageUrl, prompt: motionPrompt, duration: durationSeconds <= 4 ? 4 : 8, quality: "540p" }),
     });
 
     if (!falRes.ok) {
       const err = await falRes.text();
-      throw new Error(`Fal.ai LTX failed: ${err.slice(0, 200)}`);
+      throw new Error(`Fal.ai Pixverse failed: ${err.slice(0, 200)}`);
     }
 
     const data     = await falRes.json();
