@@ -61,15 +61,14 @@ function StepBar({ step }) {
 
 /* ── ImageCard (Step 3) ── */
 function ImageCard({ index, imageData, onRegenerate }) {
-  const THUMB_W = 160, THUMB_H = Math.round(160 * 16 / 9);
   return (
-    <div style={{ ...C.card, width: THUMB_W + 16, flexShrink: 0 }}>
-      <div style={{ width: THUMB_W, height: THUMB_H, margin: 8, borderRadius: 6, overflow: "hidden", background: "#0b0b10", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ ...C.card }}>
+      <div style={{ width: "100%", aspectRatio: "9/16", borderRadius: 6, overflow: "hidden", background: "#0b0b10", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {imageData?.loading && <div style={{ textAlign: "center", color: "#444", fontSize: 10 }}>⏳ generating…</div>}
         {imageData?.error   && <div style={{ textAlign: "center", color: "#f87171", fontSize: 9, padding: 4 }}>✕ {imageData.error.slice(0, 50)}</div>}
         {imageData?.url     && <img src={imageData.url} alt={`Scene ${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
       </div>
-      <div style={{ padding: "0 8px 8px" }}>
+      <div style={{ padding: "6px 8px 8px" }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9494a8", marginBottom: 4 }}>Scene {index + 1}</div>
         <button onClick={onRegenerate} disabled={imageData?.loading} style={{ ...C.btnG, padding: "4px 10px", fontSize: 10, width: "100%", opacity: imageData?.loading ? 0.4 : 1 }}>↺ Regen</button>
       </div>
@@ -679,7 +678,7 @@ export default function ProductAdStudio() {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 24 }}>
                   {analysis.shots.map((shot, i) => (
                     <ImageCard key={shot.id} index={i} imageData={images[shot.id]} onRegenerate={() => regenImage(shot)} />
                   ))}
