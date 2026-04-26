@@ -275,10 +275,10 @@ export default function ProductAdStudio() {
   /* Called by "Create Ad →" button — generates base image then all scenes */
   async function handleStartVisuals() {
     setStep(3);
+    setImages({});
     const category = analysis.product_analysis?.category;
-    const refUrl   = await runBaseImage(category, pickedModelUrl.current, hasMannequin);
-    if (!refUrl) return; // baseErr is set — user sees error + retry
-    runImages(null, refUrl);
+    await runBaseImage(category, pickedModelUrl.current, hasMannequin);
+    // User reviews base image before proceeding to scene generation
   }
 
   /* ── Step 3b: generate scene images using base reference ── */
@@ -615,8 +615,39 @@ export default function ProductAdStudio() {
               </div>
             )}
 
+            {/* Phase A result: base image ready — user confirms before scenes start */}
+            {baseImage && !baseLoading && !baseErr && !imagesLoading && Object.keys(images).length === 0 && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Base Image Ready</div>
+                  <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+                    {analysis.product_analysis?.category === "clothing" || analysis.product_analysis?.category === "wearable"
+                      ? "Review the model wearing your product. If it looks good, generate scenes."
+                      : "Review the enhanced product image. If it looks good, generate scenes."}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 20, alignItems: "flex-start", marginBottom: 24 }}>
+                  <div style={{ width: 180, flexShrink: 0 }}>
+                    <img src={baseImage} alt="Base reference" style={{ width: "100%", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", display: "block" }} />
+                    <div style={{ fontSize: 10, color: "#555", marginTop: 6, textAlign: "center" }}>Reference image</div>
+                  </div>
+                  <div style={{ paddingTop: 8 }}>
+                    <div style={{ fontSize: 13, color: "#9494a8", marginBottom: 16, lineHeight: 1.5 }}>
+                      This image will be used as the identity reference for all 5 scenes.<br />
+                      If the outfit or model doesn't look right, retry before proceeding.
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button onClick={() => runImages(null, baseImage)} style={C.btnP}>Generate Scenes →</button>
+                      <button onClick={() => handleStartVisuals()} style={C.btnG}>↺ Retry</button>
+                      <button onClick={() => setStep(2)} style={C.btnG}>← Back</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Phase B: scene shots */}
-            {!baseLoading && !baseErr && (
+            {!baseLoading && !baseErr && (imagesLoading || Object.keys(images).length > 0) && (
               <>
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>
@@ -627,7 +658,7 @@ export default function ProductAdStudio() {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24 }}>
                   {analysis.shots.map((shot, i) => (
                     <ImageCard key={shot.id} index={i} imageData={images[shot.id]} onRegenerate={() => regenImage(shot)} />
                   ))}
