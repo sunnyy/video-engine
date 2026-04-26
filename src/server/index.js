@@ -2556,16 +2556,18 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
     const endpoint = "https://fal.run/fal-ai/nano-banana/edit";
 
-    const results = await Promise.allSettled(shots.map(async (shot) => {
+    // Sequential with delay — avoids Fal.ai 429 rate limits under concurrent user load
+    const results = [];
+    const imageUrls = modelImageUrl ? [modelImageUrl, productImageUrl] : [productImageUrl];
+    for (const shot of shots) {
+      if (results.length > 0) await new Promise(r => setTimeout(r, 800));
       let lastErr = null;
+      let succeeded = false;
       for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
         try {
-          // nano-banana/edit uses image_urls (array); model first if provided, product always last
-          const imageUrls = modelImageUrl
-            ? [modelImageUrl, productImageUrl]
-            : [productImageUrl];
-          const body = { prompt: shot.image_generation_prompt, image_urls: imageUrls };
-          const falRes = await fetch(endpoint, {
+          const body    = { prompt: shot.image_generation_prompt, image_urls: imageUrls };
+          const falRes  = await fetch(endpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
             body:    JSON.stringify(body),
@@ -2574,13 +2576,15 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
           const data   = await falRes.json();
           const falUrl = data.images?.[0]?.url;
           if (!falUrl) throw new Error("No image URL from Fal.ai");
-          return { shotId: shot.id, imageUrl: falUrl, ok: true };
+          results.push({ shotId: shot.id, imageUrl: falUrl, ok: true });
+          succeeded = true;
+          break;
         } catch (e) { lastErr = e.message; }
       }
-      return { shotId: shot.id, error: lastErr, ok: false };
-    }));
+      if (!succeeded) results.push({ shotId: shot.id, error: lastErr, ok: false });
+    }
 
-    res.json({ results: results.map(r => r.status === "fulfilled" ? r.value : { ok: false, error: r.reason?.message }) });
+    res.json({ results });
   } catch (e) {
     console.error("[product-ad/generate-images]", e.message);
     res.status(500).json({ error: e.message });
