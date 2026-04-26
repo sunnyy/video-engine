@@ -2550,26 +2550,21 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
     if (!shots?.length || !productImageUrl) return res.status(400).json({ error: "shots and productImageUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    // Kontext pro supports image_url as array for multi-image; use standard endpoint for both
-    const kontextEndpoint = "https://fal.run/fal-ai/flux-pro/kontext";
+    const endpoint = "https://fal.run/fal-ai/nano-banana/edit";
 
     const results = await Promise.allSettled(shots.map(async (shot) => {
       let lastErr = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const kontextBody = {
-            prompt:              shot.image_generation_prompt,
-            guidance_scale:      3.5,
-            num_inference_steps: 28,
-            strength:            0.85,
-          };
-          // Kontext only accepts image_url as a string — single product reference for now
-          kontextBody.image_url = productImageUrl;
-          console.log(`[generate-images] shot=${shot.id} endpoint=${kontextEndpoint} modelImageUrl=${modelImageUrl || "none"} body=`, JSON.stringify(kontextBody).slice(0, 300));
-          const falRes = await fetch(kontextEndpoint, {
+          // nano-banana/edit uses image_urls (array); model first if provided, product always last
+          const imageUrls = modelImageUrl
+            ? [modelImageUrl, productImageUrl]
+            : [productImageUrl];
+          const body = { prompt: shot.image_generation_prompt, image_urls: imageUrls };
+          const falRes = await fetch(endpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-            body:    JSON.stringify(kontextBody),
+            body:    JSON.stringify(body),
           });
           if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr); continue; }
           const data   = await falRes.json();
