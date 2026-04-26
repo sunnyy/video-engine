@@ -2416,6 +2416,15 @@ app.delete("/api/admin/model-avatars/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/product-ad/models", requireAuth, async (req, res) => {
+  const { gender } = req.query;
+  let query = supabaseAdmin.from("model_avatars").select("id, url, gender, skin_tone, age_group").eq("is_active", true);
+  if (gender) query = query.eq("gender", gender);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ models: data || [] });
+});
+
 // POST /api/admin/remove-background — On-demand background removal via Fal.ai birefnet
 // Body: { imageUrl }
 app.post("/api/admin/remove-background", requireAuth, async (req, res) => {
@@ -2537,25 +2546,34 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
 // POST /api/product-ad/generate-images — Generate all shot images in parallel via Fal.ai
 app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
   try {
-    const { shots, productImageUrl, orientation = "9:16" } = req.body;
+    const { shots, productImageUrl, modelImageUrl, orientation = "9:16" } = req.body;
     if (!shots?.length || !productImageUrl) return res.status(400).json({ error: "shots and productImageUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    const kontextEndpoint = modelImageUrl
+      ? "https://fal.run/fal-ai/flux-pro/kontext/max"
+      : "https://fal.run/fal-ai/flux-pro/kontext";
 
     const results = await Promise.allSettled(shots.map(async (shot) => {
       let lastErr = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const falRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
+          const kontextBody = {
+            prompt:              shot.image_generation_prompt,
+            guidance_scale:      3.5,
+            num_inference_steps: 28,
+            strength:            0.85,
+          };
+          if (modelImageUrl) {
+            // Dual reference: model first (identity anchor), product second (garment reference)
+            kontextBody.image_urls = [modelImageUrl, productImageUrl];
+          } else {
+            kontextBody.image_url = productImageUrl;
+          }
+          const falRes = await fetch(kontextEndpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-            body:    JSON.stringify({
-              prompt:               shot.image_generation_prompt,
-              image_url:            productImageUrl,
-              guidance_scale:       3.5,
-              num_inference_steps:  28,
-              strength:             0.85,
-            }),
+            body:    JSON.stringify(kontextBody),
           });
           if (!falRes.ok) { lastErr = await falRes.text(); continue; }
           const data   = await falRes.json();

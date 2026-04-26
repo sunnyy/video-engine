@@ -126,6 +126,9 @@ export default function ProductAdStudio() {
   const [analyzing,  setAnalyzing]  = useState(false);
   const [analyzeErr, setAnalyzeErr] = useState("");
 
+  // Step 2 model selection (clothing/wearable only — internal, not shown in UI)
+  const [selectedModel, setSelectedModel] = useState(null);
+
   // Step 3 state
   const [images,        setImages]        = useState({});
   const [imagesLoading, setImagesLoading] = useState(false);
@@ -202,6 +205,18 @@ export default function ProductAdStudio() {
   }
 
   /* ── Step 2: analyze ── */
+  async function fetchAndPickModel(category) {
+    if (category !== "clothing" && category !== "wearable") return null;
+    try {
+      const res  = await serverFetch("/api/product-ad/models?gender=female");
+      const data = await res.json();
+      if (!res.ok || !data.models?.length) return null;
+      const picked = data.models[Math.floor(Math.random() * data.models.length)];
+      setSelectedModel(picked);
+      return picked.url;
+    } catch { return null; }
+  }
+
   async function runAnalysis(url) {
     const src = url || imageUrl;
     setAnalyzing(true); setAnalyzeErr("");
@@ -210,6 +225,7 @@ export default function ProductAdStudio() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       setAnalysis(data);
+      await fetchAndPickModel(data.product_analysis?.category);
     } catch (e) { setAnalyzeErr(e.message); }
     setAnalyzing(false);
   }
@@ -224,7 +240,7 @@ export default function ProductAdStudio() {
       return next;
     });
     try {
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl, modelImageUrl: selectedModel?.url || null }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Image generation failed");
       // Upload each generated image to Supabase for permanent storage
@@ -247,7 +263,7 @@ export default function ProductAdStudio() {
   async function regenImage(shot) {
     setImages(prev => ({ ...prev, [shot.id]: { loading: true } }));
     try {
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots: [shot], productImageUrl: imageUrl }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots: [shot], productImageUrl: imageUrl, modelImageUrl: selectedModel?.url || null }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       const r = data.results?.[0];
