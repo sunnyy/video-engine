@@ -2563,18 +2563,15 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
             num_inference_steps: 28,
             strength:            0.85,
           };
-          if (modelImageUrl) {
-            // Dual reference: model first (identity anchor), product second (garment reference)
-            kontextBody.image_url = [modelImageUrl, productImageUrl];
-          } else {
-            kontextBody.image_url = productImageUrl;
-          }
+          // Kontext only accepts image_url as a string — single product reference for now
+          kontextBody.image_url = productImageUrl;
+          console.log(`[generate-images] shot=${shot.id} endpoint=${kontextEndpoint} modelImageUrl=${modelImageUrl || "none"} body=`, JSON.stringify(kontextBody).slice(0, 300));
           const falRes = await fetch(kontextEndpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
             body:    JSON.stringify(kontextBody),
           });
-          if (!falRes.ok) { lastErr = await falRes.text(); continue; }
+          if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr); continue; }
           const data   = await falRes.json();
           const falUrl = data.images?.[0]?.url;
           if (!falUrl) throw new Error("No image URL from Fal.ai");
