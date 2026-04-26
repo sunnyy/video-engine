@@ -2568,7 +2568,7 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
 
     if ((category === "clothing" || category === "wearable") && modelImageUrl) {
       const prompt = hasMannequin
-        ? `Can you wear me exact same outfit as the mannequin is wearing?`
+        ? `Can you wear me (in black tshirt and blue jeabs) exact same outfit as the mannequin is wearing in 2nd image?`
         : `Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment-only product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, borders and trims, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer, 9:16 vertical portrait.`;
       const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
         method:  "POST",
