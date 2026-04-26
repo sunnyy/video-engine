@@ -214,13 +214,15 @@ export default function ProductAdStudio() {
     try {
       const res  = await serverFetch("/api/product-ad/models?gender=female");
       const data = await res.json();
-      console.log("[fetchAndPickModel] models fetched:", data.models?.length, "res.ok:", res.ok);
+      console.log("[fetchAndPickModel] ── called with category:", category);
+      console.log("[fetchAndPickModel] API response ok:", res.ok, "models count:", data.models?.length);
       if (!res.ok || !data.models?.length) {
         console.warn("[fetchAndPickModel] no models available");
         return null;
       }
       const picked = data.models[Math.floor(Math.random() * data.models.length)];
-      console.log("[fetchAndPickModel] picked id:", picked.id, "image_url:", picked.image_url);
+      console.log("[fetchAndPickModel] picked model id:", picked?.id, "image_url:", picked?.image_url?.slice(0, 80));
+      console.log("[fetchAndPickModel] returning url:", picked?.image_url?.slice(0, 80) || "NULL");
       return picked.image_url;
     } catch (e) {
       console.error("[fetchAndPickModel] error:", e.message);
@@ -241,11 +243,14 @@ export default function ProductAdStudio() {
         return;
       }
       if (!res.ok) throw new Error(data.error || "Analysis failed");
+      console.log("[runAnalysis] product category detected:", data.product_analysis?.category);
+      console.log("[runAnalysis] hasMannequin:", data.validation?.has_mannequin);
       setHasMannequin(data.validation?.has_mannequin || false);
       setAnalysis(data);
       const modelUrl = await fetchAndPickModel(data.product_analysis?.category);
       pickedModelUrl.current = modelUrl || null;
-      console.log("[runAnalysis] pickedModelUrl set to:", pickedModelUrl.current, "hasMannequin:", data.validation?.has_mannequin);
+      console.log("[runAnalysis] modelUrl from fetchAndPickModel:", modelUrl?.slice(0, 80) || "NULL");
+      console.log("[runAnalysis] pickedModelUrl.current set to:", pickedModelUrl.current?.slice(0, 80) || "NULL");
     } catch (e) { setAnalyzeErr(e.message); }
     setAnalyzing(false);
   }
@@ -253,6 +258,12 @@ export default function ProductAdStudio() {
   /* ── Step 3a: generate base reference image ── */
   async function runBaseImage(category, modelUrl, mannequin) {
     setBaseLoading(true); setBaseErr("");
+    console.log("[runBaseImage] ── called ──");
+    console.log("[runBaseImage] productImageUrl (imageUrl state):", imageUrl?.slice(0, 80));
+    console.log("[runBaseImage] modelUrl param:", modelUrl?.slice(0, 80) || "NULL");
+    console.log("[runBaseImage] category:", category);
+    console.log("[runBaseImage] hasMannequin:", mannequin);
+    console.log("[runBaseImage] sending to server body:", JSON.stringify({ productImageUrl: imageUrl, modelImageUrl: modelUrl, category, hasMannequin: mannequin }).slice(0, 300));
     try {
       const res  = await serverFetch("/api/product-ad/generate-base-image", {
         method:  "POST",
@@ -260,8 +271,11 @@ export default function ProductAdStudio() {
         body:    JSON.stringify({ productImageUrl: imageUrl, modelImageUrl: modelUrl, category, hasMannequin: mannequin }),
       });
       const data = await res.json();
+      console.log("[runBaseImage] server response ok:", res.ok, "status:", res.status);
+      console.log("[runBaseImage] returned imageUrl:", data.imageUrl?.slice(0, 80) || "NULL — check server logs");
       if (!res.ok) throw new Error(data.error || "Base image failed");
       const permanentUrl = await uploadImageToSupabase(data.imageUrl);
+      console.log("[runBaseImage] permanentUrl after Supabase proxy:", permanentUrl?.slice(0, 80));
       setBaseImage(permanentUrl);
       return permanentUrl;
     } catch (e) {
@@ -277,6 +291,9 @@ export default function ProductAdStudio() {
     setStep(3);
     setImages({});
     const category = analysis.product_analysis?.category;
+    console.log("[handleStartVisuals] category:", category);
+    console.log("[handleStartVisuals] pickedModelUrl.current:", pickedModelUrl.current?.slice(0, 80) || "NULL");
+    console.log("[handleStartVisuals] hasMannequin:", hasMannequin);
     await runBaseImage(category, pickedModelUrl.current, hasMannequin);
     // User reviews base image before proceeding to scene generation
   }
@@ -285,6 +302,9 @@ export default function ProductAdStudio() {
   async function runImages(shotsToRegen = null, refUrl = null) {
     const shots      = shotsToRegen || analysis.shots;
     const referenceImageUrl = refUrl || baseImage;
+    console.log("[runImages] ── called ──");
+    console.log("[runImages] referenceImageUrl:", referenceImageUrl?.slice(0, 80) || "NULL");
+    console.log("[runImages] shots count:", shots?.length);
     if (!referenceImageUrl) return;
     setImagesLoading(true);
     setImages(prev => {

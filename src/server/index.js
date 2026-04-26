@@ -2422,10 +2422,13 @@ app.delete("/api/admin/model-avatars/:id", requireAuth, async (req, res) => {
 
 app.get("/api/product-ad/models", requireAuth, async (req, res) => {
   const { gender } = req.query;
+  console.log("[product-ad/models] gender filter:", gender);
   let query = supabaseAdmin.from("model_avatars").select("id, url, gender, skin_tone, age_group").eq("is_active", true);
   if (gender) query = query.eq("gender", gender);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
+  console.log("[product-ad/models] models found:", data?.length || 0);
+  data?.forEach(m => console.log("[product-ad/models] model:", m.id, m.url?.slice(0, 80)));
   res.json({ models: data || [] });
 });
 
@@ -2564,11 +2567,18 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
+    console.log("[generate-base-image] ── INPUT ──────────────────────");
+    console.log("[generate-base-image] category:", category);
+    console.log("[generate-base-image] hasMannequin:", hasMannequin);
+    console.log("[generate-base-image] productImageUrl:", productImageUrl?.slice(0, 100));
+    console.log("[generate-base-image] modelImageUrl:", modelImageUrl?.slice(0, 100) || "NULL — no model provided");
+    console.log("[generate-base-image] ───────────────────────────────");
+
     let falUrl;
 
     if ((category === "clothing" || category === "wearable") && modelImageUrl) {
       const prompt = hasMannequin
-        ? `Can you wear me (in black tshirt and blue jeabs) exact same outfit as the mannequin is wearing in 2nd image?`
+        ? `Can you wear the exact same outfit as the mannequin is wearing in image 2? Keep your face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce every detail of the outfit exactly — same colors, fabric, embroidery, neckline, sleeves, silhouette, borders, and embellishments. Full body visible, natural confident pose, clean studio background, soft professional lighting. Photorealistic, 9:16 vertical portrait.`
         : `Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment-only product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, borders and trims, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer, 9:16 vertical portrait.`;
       const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
         method:  "POST",
@@ -2576,10 +2586,12 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
         body:    JSON.stringify({ image_urls: [modelImageUrl, productImageUrl], prompt }),
       });
       const raw = await falRes.text();
-      console.log(`[generate-base-image] clothing try-on status=${falRes.status} hasMannequin=${hasMannequin} body=${raw.slice(0, 300)}`);
+      console.log("[generate-base-image] nano-banana status:", falRes.status);
+      console.log("[generate-base-image] nano-banana response:", raw.slice(0, 300));
       if (!falRes.ok) throw new Error(`nano-banana failed: ${raw.slice(0, 200)}`);
       const data = JSON.parse(raw);
       falUrl = data.images?.[0]?.url;
+      console.log("[generate-base-image] extracted falUrl:", falUrl?.slice(0, 100) || "NULL — no URL in response");
     } else {
       // Enhance/clean product photo via Kontext
       const prompt = "Professional product photo enhancement. Replace the background with a pure white seamless studio backdrop. Improve lighting to clean directional studio light with soft shadows. Keep the product itself — including all branding, labels, colors, shape, and design — completely unchanged. No people, no props, no text additions. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
@@ -2589,10 +2601,12 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
         body:    JSON.stringify({ image_url: productImageUrl, prompt, guidance_scale: 3.5, num_inference_steps: 28, strength: 0.7 }),
       });
       const raw = await falRes.text();
-      console.log(`[generate-base-image] non_worn status=${falRes.status} body=${raw.slice(0, 300)}`);
+      console.log("[generate-base-image] kontext status:", falRes.status);
+      console.log("[generate-base-image] kontext response:", raw.slice(0, 300));
       if (!falRes.ok) throw new Error(`Kontext failed: ${raw.slice(0, 200)}`);
       const data = JSON.parse(raw);
       falUrl = data.images?.[0]?.url;
+      console.log("[generate-base-image] extracted falUrl:", falUrl?.slice(0, 100) || "NULL — no URL in response");
     }
 
     if (!falUrl) throw new Error("No image URL returned from Fal.ai");
@@ -2614,7 +2628,7 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
         const cleanData = await cleanRes.json();
         const cleanedUrl = cleanData.images?.[0]?.url;
         if (cleanedUrl) falUrl = cleanedUrl;
-        console.log("[generate-base-image] watermark removal done");
+        console.log("[generate-base-image] post-watermark-removal url:", falUrl?.slice(0, 100));
       }
     } catch (e) {
       console.warn("[generate-base-image] watermark removal skipped:", e.message);
@@ -2630,6 +2644,7 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
     const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    console.log("[generate-base-image] final publicUrl returned:", publicUrl?.slice(0, 100));
     res.json({ imageUrl: publicUrl });
   } catch (e) {
     console.error("[product-ad/generate-base-image]", e.message);
@@ -2645,9 +2660,14 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
+    console.log("[generate-images] ── INPUT ───────────────────────");
+    console.log("[generate-images] shots count:", shots?.length);
+    console.log("[generate-images] referenceImageUrl:", referenceImageUrl?.slice(0, 100) || "NULL");
+    console.log("[generate-images] ────────────────────────────────");
+
     // Sequential with delay — avoids Fal.ai 429 rate limits under concurrent user load
     const results = [];
-    for (const shot of shots) {
+    for (const [index, shot] of shots.entries()) {
       if (results.length > 0) await new Promise(r => setTimeout(r, 800));
       if (!referenceImageUrl) {
         results.push({ shotId: shot.id, error: "No reference image available", ok: false });
@@ -2661,7 +2681,8 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
           // Belt-and-suspenders identity anchor prepended to whatever prompt comes from analysis
           const anchoredPrompt = `Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. ${shot.image_generation_prompt}`;
           const body = { prompt: anchoredPrompt, image_urls: [referenceImageUrl] };
-          console.log(`[generate-images] shot=${shot.id} shotType=${shot.shot_type} attempt=${attempt + 1} ref=${referenceImageUrl?.slice(0, 80)}`);
+          console.log(`[generate-images] shot=${shot.id} index=${index} attempt=${attempt + 1} prompt preview:`, shot.image_generation_prompt?.slice(0, 100));
+          console.log(`[generate-images] shot=${shot.id} nano-banana ref:`, referenceImageUrl?.slice(0, 80));
           const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
@@ -2670,6 +2691,8 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
           if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr.slice(0, 200)); continue; }
           const data   = await falRes.json();
           let falUrl = data.images?.[0]?.url;
+          console.log(`[generate-images] shot=${shot.id} nano-banana status:`, falRes.status);
+          console.log(`[generate-images] shot=${shot.id} falUrl:`, falUrl?.slice(0, 100) || "NULL");
           if (!falUrl) throw new Error("No image URL from Fal.ai");
           // Post-process: remove watermarks/logos
           try {
