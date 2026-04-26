@@ -2601,7 +2601,7 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
     const falRes  = await fetch("https://fal.run/fal-ai/pixverse/v4/image-to-video", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_url: imageUrl, prompt: motionPrompt, duration: durationSeconds <= 4 ? 4 : 8, quality: "540p" }),
+      body:    JSON.stringify({ image_url: imageUrl, prompt: motionPrompt, duration: durationSeconds <= 5 ? 5 : 8 }),
     });
 
     if (!falRes.ok) {

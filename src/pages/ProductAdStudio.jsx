@@ -155,13 +155,14 @@ export default function ProductAdStudio() {
     }
   }, [step]);
 
-  /* ── Auto-advance to step 5 when all clips done ── */
-  const allClipsDone = analysis?.shots?.every(s => clips[s.id]?.videoUrl || clips[s.id]?.error);
+  /* ── Auto-advance to step 5 when all clips done and at least one succeeded ── */
+  const allClipsProcessed = analysis?.shots?.every(s => clips[s.id]?.videoUrl || clips[s.id]?.error);
+  const anyClipSucceeded  = analysis?.shots?.some(s => clips[s.id]?.videoUrl);
   useEffect(() => {
-    if (allClipsDone && clipsLoading === false && Object.keys(clips).length > 0) {
+    if (allClipsProcessed && anyClipSucceeded && !clipsLoading) {
       setStep(5);
     }
-  }, [allClipsDone, clipsLoading]);
+  }, [allClipsProcessed, anyClipSucceeded, clipsLoading]);
 
   /* ── Step 1: file pick ── */
   function handleFilePick(e) {
