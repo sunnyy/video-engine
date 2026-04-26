@@ -40,6 +40,7 @@ import Credits         from "./pages/admin/Credits";
 import Plans           from "./pages/admin/Plans";
 import Sales           from "./pages/admin/Sales";
 import System          from "./pages/admin/System";
+import ModelAvatars    from "./pages/admin/ModelAvatars";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -137,6 +138,7 @@ export default function App() {
                 <Route path="/admin/ai-generator"      element={<LayoutGenerator />} />
                 <Route path="/admin/layouts/:layoutId" element={<LayoutEditor />} />
                 <Route path="/admin/library"           element={<ImageLibrary />} />
+                <Route path="/admin/model-avatars"    element={<ModelAvatars />} />
               </>
             ) : (
               <Route path="/admin/*" element={<Navigate to="/dashboard" />} />

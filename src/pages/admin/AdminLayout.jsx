@@ -14,8 +14,9 @@ const NAV = [
   { to: "/admin/sales",      label: "Sales & Revenue", icon: "◈" },
   { to: "/admin/layouts",    label: "Layout Manager", icon: "⊞" },
   { to: "/admin/ai-generator",     label: "Layout Generator", icon: "✦" },
-  { to: "/admin/library",    label: "Image Library", icon: "⊟" },
-  { to: "/admin/system",     label: "System",        icon: "◉" },
+  { to: "/admin/library",        label: "Image Library",  icon: "⊟" },
+  { to: "/admin/model-avatars",  label: "Model Avatars",  icon: "◎" },
+  { to: "/admin/system",         label: "System",         icon: "◉" },
 ];
 
 export default function AdminLayout({ children, fullBleed = false }) {

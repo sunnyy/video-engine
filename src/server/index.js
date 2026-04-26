@@ -2317,6 +2317,85 @@ app.post("/api/admin/generate-layout-preview", requireAuth, requireAdmin, async 
 });
 
 
+/* ── Model Avatars ── */
+app.get("/api/admin/model-avatars", requireAuth, async (_req, res) => {
+  const { data, error } = await supabaseAdmin.from("model_avatars").select("*").order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ avatars: data || [] });
+});
+
+app.post("/api/admin/model-avatars/generate", requireAuth, async (req, res) => {
+  try {
+    const { imageUrl, prompt } = req.body;
+    if (!imageUrl || !prompt) return res.status(400).json({ error: "imageUrl and prompt required" });
+    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    const falRes = await fetch("https://fal.run/xai/grok-imagine-image/edit", {
+      method: "POST",
+      headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ image_url: imageUrl, prompt }),
+    });
+    if (!falRes.ok) throw new Error(await falRes.text());
+    const data = await falRes.json();
+    const generatedUrl = data.images?.[0]?.url || data.image?.url;
+    if (!generatedUrl) throw new Error("No image URL returned");
+    const imgRes = await fetch(generatedUrl);
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const ct     = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext    = ct.includes("png") ? "png" : "jpg";
+    const key    = `models/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("system-assets").upload(key, buffer, { contentType: ct, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("system-assets").getPublicUrl(key);
+    res.json({ imageUrl: publicUrl });
+  } catch (e) {
+    console.error("[model-avatars/generate]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/model-avatars/upload", requireAuth, async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
+    const imgRes = await fetch(imageUrl);
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const ct     = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext    = ct.includes("png") ? "png" : "jpg";
+    const key    = `models/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("system-assets").upload(key, buffer, { contentType: ct, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("system-assets").getPublicUrl(key);
+    res.json({ imageUrl: publicUrl });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/model-avatars/approve", requireAuth, async (req, res) => {
+  try {
+    const { imageUrl, gender, skin_tone, age_group, style_notes } = req.body;
+    if (!imageUrl || !gender || !skin_tone || !age_group) return res.status(400).json({ error: "Missing required fields" });
+    const { data, error } = await supabaseAdmin.from("model_avatars").insert([{ image_url: imageUrl, gender, skin_tone, age_group, style_notes: style_notes || null }]).select().single();
+    if (error) throw new Error(error.message);
+    res.json({ avatar: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.patch("/api/admin/model-avatars/:id", requireAuth, async (req, res) => {
+  const { is_active } = req.body;
+  const { error } = await supabaseAdmin.from("model_avatars").update({ is_active }).eq("id", req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+app.delete("/api/admin/model-avatars/:id", requireAuth, async (req, res) => {
+  const { error } = await supabaseAdmin.from("model_avatars").delete().eq("id", req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
 // POST /api/admin/remove-background — On-demand background removal via Fal.ai birefnet
 // Body: { imageUrl }
 app.post("/api/admin/remove-background", requireAuth, async (req, res) => {
