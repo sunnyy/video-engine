@@ -126,9 +126,6 @@ export default function ProductAdStudio() {
   const [analyzing,  setAnalyzing]  = useState(false);
   const [analyzeErr, setAnalyzeErr] = useState("");
 
-  // Step 2 model selection (clothing/wearable only — internal, not shown in UI)
-  const [selectedModel, setSelectedModel] = useState(null);
-
   // Step 3 state
   const [images,        setImages]        = useState({});
   const [imagesLoading, setImagesLoading] = useState(false);
@@ -137,6 +134,7 @@ export default function ProductAdStudio() {
   const [clips,        setClips]        = useState({});
   const [clipsLoading, setClipsLoading] = useState(false);
   const generatingClips = useRef(false);
+  const pickedModelUrl  = useRef(null);
 
   // Step 5 state
   const [creatingProject, setCreatingProject] = useState(false);
@@ -212,8 +210,7 @@ export default function ProductAdStudio() {
       const data = await res.json();
       if (!res.ok || !data.models?.length) return null;
       const picked = data.models[Math.floor(Math.random() * data.models.length)];
-      setSelectedModel(picked);
-      return picked.url;
+      return picked.image_url;
     } catch { return null; }
   }
 
@@ -225,7 +222,8 @@ export default function ProductAdStudio() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       setAnalysis(data);
-      await fetchAndPickModel(data.product_analysis?.category);
+      const modelUrl = await fetchAndPickModel(data.product_analysis?.category);
+      pickedModelUrl.current = modelUrl || null;
     } catch (e) { setAnalyzeErr(e.message); }
     setAnalyzing(false);
   }
@@ -240,7 +238,7 @@ export default function ProductAdStudio() {
       return next;
     });
     try {
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl, modelImageUrl: selectedModel?.url || null }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots, productImageUrl: imageUrl, modelImageUrl: pickedModelUrl.current }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Image generation failed");
       // Upload each generated image to Supabase for permanent storage
@@ -263,7 +261,7 @@ export default function ProductAdStudio() {
   async function regenImage(shot) {
     setImages(prev => ({ ...prev, [shot.id]: { loading: true } }));
     try {
-      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots: [shot], productImageUrl: imageUrl, modelImageUrl: selectedModel?.url || null }) });
+      const res  = await serverFetch("/api/product-ad/generate-images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shots: [shot], productImageUrl: imageUrl, modelImageUrl: pickedModelUrl.current }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       const r = data.results?.[0];
@@ -413,16 +411,19 @@ export default function ProductAdStudio() {
         rawAI:       {},
         safeProject: project,
       });
-      if (saved?.id) {
-        setDbId(saved.id);
-        await updateProject(saved.id, project);
+      if (!saved?.id) {
+        console.error("[ProductAd] DB save failed — no project ID");
+        setCreatingProject(false);
+        return;
       }
+      setDbId(saved.id);
+      await updateProject(saved.id, project);
+      setProject(project);
+      navigate(`/editor/${saved.id}`);
     } catch (e) {
       console.error("[ProductAd] DB save error:", e);
+      setCreatingProject(false);
     }
-
-    setProject(project);
-    navigate("/editor");
   }
 
   /* ══ Render ══════════════════════════════════════════════════ */
