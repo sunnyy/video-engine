@@ -43,18 +43,18 @@ Return ONLY valid JSON, no markdown, no explanation:
 Generate exactly 5 shots. Use the following structure based on the detected category:
 
 FOR non_worn (bottles, cans, food, gadgets, furniture, serums, etc.):
-  Shot 1 — Hero: product centered on an elegant surface, dramatic studio lighting, clean background
+  Shot 1 — Hero: product facing camera straight on, centered on an elegant surface, dramatic studio lighting, clean background
   Shot 2 — Macro detail: extreme close-up of label, texture, lid, opening, or key design element
   Shot 3 — Action: something dynamic happening TO or WITH the product — liquid being poured, product being opened, steam rising, condensation dripping, product being sprayed/applied
   Shot 4 — Lifestyle context: product in a real-world setting (kitchen counter, cafe table, gym bag, bathroom shelf) with natural props
-  Shot 5 — Brand/CTA: product with a strong brand-color background, bold and clean, aspirational final frame
+  Shot 5 — Angled: product at a 45-degree angle showing depth and side profile, strong directional light, aspirational final frame
 
 FOR clothing:
-  Shot 1 — Full body: open with model_description verbatim + "wearing the exact garment from the reference photo, full body visible, natural confident pose, modest styling". Establish the model clearly.
-  Shot 2 — Detail: close-up of fabric texture, embroidery, buttons, or key design element. Open with "The same Indian woman from shot 1, [model_description], wearing the exact same garment".
-  Shot 3 — Walk: model walking naturally in a bright indoor or outdoor setting, full garment visible, modest movement. Open with same model continuity line.
-  Shot 4 — Lifestyle: model in a real context (cafe, street market, outdoor setting) wearing the product naturally, modest pose. Open with same model continuity line.
-  Shot 5 — Back/side: rear or three-quarter view showing the full silhouette and fit. Open with same model continuity line.
+  Shot 1 — Full body: model facing camera, full body visible, natural confident pose, modest styling. Establish the model clearly.
+  Shot 2 — Detail: close-up of fabric texture, embroidery, buttons, or key design element on the garment as worn by the model.
+  Shot 3 — Walk: model walking naturally in a bright indoor or outdoor setting, full garment visible, modest movement.
+  Shot 4 — Lifestyle: model in a real context (cafe, street market, outdoor setting) wearing the product naturally, modest pose.
+  Shot 5 — Back/side view: model turned 3/4 or fully facing away from camera, showing the back design, rear hem, and overall silhouette. Same scene context as Shot 1.
 
 FOR wearable (watches, earphones, glasses, rings, etc.):
   Shot 1 — Hero product: product alone on a clean premium surface, dramatic directional studio light

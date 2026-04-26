@@ -165,7 +165,6 @@ function AssetCard({ asset, onDelete, deleting }) {
 }
 
 export default function FilesSection() {
-  const [scope,      setScope]      = useState("project"); // "global" | "project"
   const [typeFilter, setTypeFilter] = useState("All");
   const [uploading,  setUploading]  = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -174,19 +173,12 @@ export default function FilesSection() {
   const databaseId = useProjectStore(s => s.databaseId);
   const { myAssets, loadMyAssets, addMyAsset, removeMyAsset } = useAssetsStore();
 
-  // Load assets the first time this tab is opened (or when the project changes).
-  // The store guards against re-fetching if already loaded for this project this session.
   useEffect(() => {
     if (databaseId) loadMyAssets(databaseId);
   }, [databaseId]);
 
   const filtered = myAssets.filter(a => {
-    if (scope === "global") {
-      if (a.scope !== "global") return false;
-    } else {
-      if (a.scope === "global") return false;
-      if (a.project_id !== databaseId) return false;
-    }
+    if (a.project_id !== databaseId) return false;
     if (typeFilter === "Image") return a.type === "image";
     if (typeFilter === "Video") return a.type === "video";
     if (typeFilter === "Audio") return a.type === "audio";
@@ -203,8 +195,8 @@ export default function FilesSection() {
     try {
       const asset = await uploadUserAsset(
         file, null, null,
-        scope,
-        scope === "project" ? databaseId : null,
+        "project",
+        databaseId,
       );
       addMyAsset({
         id:         asset.id,
@@ -247,7 +239,7 @@ export default function FilesSection() {
             Files
           </h2>
           <p className="text-[13px] text-[#7070a0] mt-[2px]">
-            Manage your uploaded assets
+            Project assets — images, video clips, and audio
           </p>
         </div>
         <button
@@ -265,26 +257,6 @@ export default function FilesSection() {
           onChange={handleUpload}
           className="hidden"
         />
-      </div>
-
-      {/* Scope tabs */}
-      <div className="flex gap-[6px] p-[4px] rounded-[8px] bg-[#111118]">
-        {[
-          { key: "project", label: "This Project" },
-          { key: "global",  label: "My Library"   },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setScope(key)}
-            className="flex-1 py-[7px] rounded-[6px] text-[13px] font-bold transition-colors border-0"
-            style={scope === key
-              ? { background: "#7c5cfc", color: "#fff" }
-              : { background: "transparent", color: "#55556a" }
-            }
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       {/* Type filters */}
@@ -309,10 +281,7 @@ export default function FilesSection() {
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <div className="text-[32px]">📁</div>
           <p className="text-[13px] text-[#55556a] text-center">
-            No {typeFilter !== "All" ? typeFilter.toLowerCase() + " " : ""}files here.<br />
-            {scope === "global"
-              ? "Upload to My Library to reuse assets across all projects."
-              : "Upload assets for this project."}
+            No files in this project yet. Upload images, videos, or audio to use in your beats.
           </p>
         </div>
       )}
@@ -347,14 +316,6 @@ export default function FilesSection() {
           ))}
         </div>
       )}
-
-      {/* Footer */}
-      <div className="mt-auto pt-4 border-t border-[rgba(255,255,255,0.06)]">
-        <p className="text-[11px] text-[#55556a] leading-relaxed">
-          My Library assets are available across all projects.
-          Project assets are tied to this project only.
-        </p>
-      </div>
 
     </div>
   );

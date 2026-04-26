@@ -135,6 +135,7 @@ export default function ProductAdStudio() {
   const [clipsLoading, setClipsLoading] = useState(false);
   const generatingClips = useRef(false);
   const pickedModelUrl  = useRef(null);
+  const projectDbId     = useRef(null);
 
   // Step 5 state
   const [creatingProject, setCreatingProject] = useState(false);
@@ -304,7 +305,7 @@ export default function ProductAdStudio() {
       const res = await serverFetch("/api/proxy-image-upload", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ url: falUrl }),
+        body:    JSON.stringify({ url: falUrl, projectId: projectDbId.current }),
       });
       if (!res.ok) {
         const errText = await res.text().catch(() => "");
@@ -324,7 +325,7 @@ export default function ProductAdStudio() {
       const res  = await serverFetch("/api/proxy-video-upload", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ url: falUrl }),
+        body:    JSON.stringify({ url: falUrl, projectId: projectDbId.current }),
       });
       const data = await res.json();
       console.log("[uploadClip] status:", res.status, JSON.stringify(data).slice(0, 100));
@@ -416,6 +417,7 @@ export default function ProductAdStudio() {
         setCreatingProject(false);
         return;
       }
+      projectDbId.current = saved.id;
       setDbId(saved.id);
       await updateProject(saved.id, project);
       setProject(project);

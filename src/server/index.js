@@ -1187,7 +1187,7 @@ app.post("/api/render", requireAuth, async (req, res) => {
       inputProps:   { project },
       outputDir:    framesDir,
       imageFormat:  "jpeg",
-      concurrency:  2,
+      concurrency:  1,
       chromiumOptions: {
         gl: "angle",          // enables GPU compositing — required for mix-blend-mode, CSS masks, filters
       },
@@ -2614,7 +2614,7 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
 // POST /api/proxy-video-upload — Fetch a video URL server-side and upload to Supabase
 app.post("/api/proxy-video-upload", requireAuth, async (req, res) => {
   try {
-    const { url } = req.body;
+    const { url, projectId } = req.body;
     if (!url) return res.status(400).json({ error: "url required" });
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
@@ -2625,6 +2625,17 @@ app.post("/api/proxy-video-upload", requireAuth, async (req, res) => {
       .from("user-assets").upload(storageKey, buffer, { contentType: "video/mp4", upsert: false });
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+    await supabaseAdmin.from("user_assets").insert({
+      user_id:    req.user.id,
+      url:        publicUrl,
+      file_path:  storageKey,
+      type:       "video",
+      name:       fileName,
+      size:       buffer.byteLength,
+      scope:      "project",
+      project_id: projectId || null,
+      source:     "product_ad",
+    }).catch(() => {});
     res.json({ url: publicUrl });
   } catch (e) {
     console.error("[proxy-video-upload]", e.message);
@@ -2635,7 +2646,7 @@ app.post("/api/proxy-video-upload", requireAuth, async (req, res) => {
 // POST /api/proxy-image-upload — Fetch an image URL server-side and upload to Supabase
 app.post("/api/proxy-image-upload", requireAuth, async (req, res) => {
   try {
-    const { url } = req.body;
+    const { url, projectId } = req.body;
     if (!url) return res.status(400).json({ error: "url required" });
     const response    = await fetch(url);
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
@@ -2648,6 +2659,17 @@ app.post("/api/proxy-image-upload", requireAuth, async (req, res) => {
       .from("user-assets").upload(storageKey, buffer, { contentType, upsert: false });
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+    await supabaseAdmin.from("user_assets").insert({
+      user_id:    req.user.id,
+      url:        publicUrl,
+      file_path:  storageKey,
+      type:       "image",
+      name:       fileName,
+      size:       buffer.byteLength,
+      scope:      "project",
+      project_id: projectId || null,
+      source:     "product_ad",
+    }).catch(() => {});
     res.json({ url: publicUrl });
   } catch (e) {
     console.error("[proxy-image-upload]", e.message);
