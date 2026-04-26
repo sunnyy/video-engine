@@ -154,11 +154,13 @@ export default function ModelAvatars() {
   const genFileRef = useRef();
 
   // Upload section
-  const [uploadUrl,    setUploadUrl]    = useState("");
-  const [uploadMeta,   setUploadMeta]   = useState({ gender: "", skin_tone: "", age_group: "", style_notes: "" });
-  const [uploadPreview, setUploadPreview] = useState("");
-  const [uploadSaving, setUploadSaving] = useState(false);
-  const [uploadErr,    setUploadErr]    = useState("");
+  const [uploadUrl,      setUploadUrl]      = useState("");
+  const [uploadMeta,     setUploadMeta]     = useState({ gender: "", skin_tone: "", age_group: "", style_notes: "" });
+  const [uploadPreview,  setUploadPreview]  = useState("");
+  const [uploadSaving,   setUploadSaving]   = useState(false);
+  const [uploadUploading, setUploadUploading] = useState(false);  // file upload in progress
+  const [uploadIsStored, setUploadIsStored] = useState(false);    // already in our storage
+  const [uploadErr,      setUploadErr]      = useState("");
   const uploadFileRef = useRef();
 
   /* ── Fetch avatar list ── */
@@ -230,10 +232,14 @@ export default function ModelAvatars() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadPreview(URL.createObjectURL(file));
+    setUploadUrl(""); setUploadIsStored(false); setUploadErr("");
+    setUploadUploading(true);
     try {
       const url = await uploadFileToStorage(file);
       setUploadUrl(url);
+      setUploadIsStored(true);
     } catch (err) { setUploadErr(err.message); }
+    finally { setUploadUploading(false); }
   }
 
   async function handleUploadSave() {
@@ -241,24 +247,22 @@ export default function ModelAvatars() {
     if (!uploadUrl || !gender || !skin_tone || !age_group) { setUploadErr("Image and all metadata fields are required."); return; }
     setUploadSaving(true); setUploadErr("");
     try {
-      const proxyRes = await serverFetch("/api/admin/model-avatars/upload", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ imageUrl: uploadUrl }),
-      });
-      const proxyData = await proxyRes.json();
-      if (!proxyRes.ok) throw new Error(proxyData.error || "Upload failed");
+      // If not yet in our storage (pasted external URL), proxy it first
+      let finalUrl = uploadUrl;
+      if (!uploadIsStored) {
+        const proxyRes  = await serverFetch("/api/admin/model-avatars/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: uploadUrl }) });
+        const proxyData = await proxyRes.json();
+        if (!proxyRes.ok) throw new Error(proxyData.error || "Upload failed");
+        finalUrl = proxyData.imageUrl;
+      }
 
-      const approveRes = await serverFetch("/api/admin/model-avatars/approve", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ imageUrl: proxyData.imageUrl, ...uploadMeta }),
-      });
+      const approveRes  = await serverFetch("/api/admin/model-avatars/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: finalUrl, ...uploadMeta }) });
       const approveData = await approveRes.json();
       if (!approveRes.ok) throw new Error(approveData.error || "Save failed");
 
       setAvatars(prev => [approveData.avatar, ...prev]);
-      setUploadUrl(""); setUploadPreview(""); setUploadMeta({ gender: "", skin_tone: "", age_group: "", style_notes: "" });
+      setUploadUrl(""); setUploadPreview(""); setUploadIsStored(false);
+      setUploadMeta({ gender: "", skin_tone: "", age_group: "", style_notes: "" });
     } catch (e) { setUploadErr(e.message); }
     setUploadSaving(false);
   }
@@ -402,9 +406,10 @@ export default function ModelAvatars() {
 
               <MetadataForm value={uploadMeta} onChange={setUploadMeta} />
 
+              {uploadUploading && <div style={{ color: "#a78bfa", fontSize: 12, margin: "10px 0" }}>Uploading image…</div>}
               {uploadErr && <div style={{ color: "#f87171", fontSize: 12, margin: "10px 0" }}>✕ {uploadErr}</div>}
 
-              <button onClick={handleUploadSave} disabled={uploadSaving} style={{ ...C.btnP, marginTop: 14, opacity: uploadSaving ? 0.6 : 1 }}>
+              <button onClick={handleUploadSave} disabled={uploadSaving || uploadUploading} style={{ ...C.btnP, marginTop: 14, opacity: (uploadSaving || uploadUploading) ? 0.6 : 1 }}>
                 {uploadSaving ? "Saving…" : "Save Avatar"}
               </button>
             </div>
