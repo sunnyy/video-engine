@@ -2649,14 +2649,19 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
     const results = [];
     for (const shot of shots) {
       if (results.length > 0) await new Promise(r => setTimeout(r, 800));
+      if (!referenceImageUrl) {
+        results.push({ shotId: shot.id, error: "No reference image available", ok: false });
+        continue;
+      }
       let lastErr = null;
       let succeeded = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
         try {
-          // nano-banana/edit with single reference (base image already has model + outfit or clean product)
-          const body = { prompt: shot.image_generation_prompt, image_urls: [referenceImageUrl] };
-          console.log(`[generate-images] shot=${shot.id} attempt=${attempt + 1} referenceImageUrl=${referenceImageUrl.slice(0, 60)}...`);
+          // Belt-and-suspenders identity anchor prepended to whatever prompt comes from analysis
+          const anchoredPrompt = `Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. ${shot.image_generation_prompt}`;
+          const body = { prompt: anchoredPrompt, image_urls: [referenceImageUrl] };
+          console.log(`[generate-images] shot=${shot.id} shotType=${shot.shot_type} attempt=${attempt + 1} ref=${referenceImageUrl?.slice(0, 80)}`);
           const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },

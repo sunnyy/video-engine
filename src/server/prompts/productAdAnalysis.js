@@ -54,7 +54,7 @@ Return ONLY valid JSON, no markdown, no explanation:
       "narrative": "what this shot communicates to the viewer",
       "duration_seconds": 3,
       "camera_motion": "e.g. slow orbit, dolly in, static, gentle push",
-      "image_generation_prompt": "CLOTHING/WEARABLE: A single reference image is provided — it shows the model already wearing the exact garment. Start with: 'The model from the reference image in [scene/pose]. Keep her face, skin tone, hair, identity, and exact outfit from the reference unchanged.' Then describe the scene, environment, lighting, and pose. End with: 'Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.' NON_WORN: The reference image shows the cleaned product on a plain background. Start with: 'The product from the reference image in [scene]. Keep the exact same branding, label, colors, shape, and identity.' Then describe ONLY the scene. End with: 'Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.'",
+      "image_generation_prompt": "CLOTHING/WEARABLE: A single reference image is provided — it shows the model already wearing the exact garment. Every prompt MUST begin with: 'Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged.' Then describe the scene, environment, lighting, and pose. End with: 'Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.' For detail/close-up shots: still include the person — describe a chest-up or waist-up framing that focuses on the outfit detail while the model is still visible. NON_WORN: The reference image shows the cleaned product on a plain background. Start with: 'The product from the reference image in [scene]. Keep the exact same branding, label, colors, shape, and identity.' Then describe ONLY the scene. End with: 'Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.'",
       "video_motion_prompt": "Describe ONLY camera movement and subject motion — not the product itself. Be specific to the shot type: for liquid/pour shots say 'amber liquid pours in slow motion, droplets catch the light'; for fabric/movement shots say 'fabric billows and flows gently, model walks with natural stride, modest movement'; for orbit shots say 'camera slowly orbits 180 degrees, studio light creates evolving reflections'; for lifestyle shots say 'gentle handheld push toward subject, natural ambient motion in background'."
     }
   ]
@@ -70,11 +70,11 @@ FOR non_worn (bottles, cans, food, gadgets, furniture, serums, etc.):
   Shot 5 — Angled: product at a 45-degree angle showing depth and side profile, strong directional light, aspirational final frame
 
 FOR clothing:
-  Shot 1 — Full body: model facing camera, full body visible, natural confident pose, modest styling.
-  Shot 2 — Detail: close-up of the fabric texture, embroidery, or key design element of the garment as worn on the model's body (not isolated).
-  Shot 3 — Walk: model walking naturally in a bright indoor or outdoor setting, full garment visible, modest movement.
-  Shot 4 — Lifestyle: model in a real context (cafe, street market, outdoor setting) wearing the garment naturally, modest pose.
-  Shot 5 — Back/side view: model turned 3/4 or fully facing away from camera, showing the back design, rear hem, and overall silhouette.
+  Shot 1 — Full body: model facing camera, full body visible, natural confident pose, modest styling. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Full body studio portrait, model facing camera, natural confident pose, clean white/neutral studio background, soft professional lighting. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 2 — Detail: model chest-up or waist-up, focus on embroidery/neckline/key design element of the outfit while model's face remains visible. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Close-up shot from chest up, focusing on the intricate embroidery and neckline detail of the outfit. Soft directional studio lighting, shallow depth of field. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 3 — Walk: model walking naturally in a bright indoor or outdoor setting, full garment visible, modest movement. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Model walking confidently in a bright sunlit outdoor setting, full garment visible, natural stride, modest movement. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 4 — Lifestyle: model in a real context (cafe, street market, outdoor setting) wearing the garment naturally, modest pose. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged. Model seated at a café table in warm ambient light, natural relaxed pose, background softly blurred. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+  Shot 5 — Back/side view: model turned 3/4 or fully facing away from camera. Prompt: "Use the uploaded photo as the face and identity reference. Keep the same person's skin tone, hair, and exact outfit completely unchanged. Model turned 3/4 away from camera showing the back and side of the outfit, rear hem and silhouette fully visible, clean studio background. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
 
 FOR wearable (watches, earphones, glasses, rings, etc.):
   Shot 1 — Hero product: product alone on a clean premium surface, dramatic directional studio light
@@ -85,9 +85,10 @@ FOR wearable (watches, earphones, glasses, rings, etc.):
 
 CRITICAL for image_generation_prompt (clothing/wearable):
 - One reference image is provided: the base image already shows the model wearing the exact garment.
-- Every clothing/wearable prompt MUST start with: "The model from the reference image in [scene/pose]. Keep her face, skin tone, hair, identity, and exact outfit from the reference unchanged."
+- Every clothing/wearable prompt MUST start with: "Use the uploaded photo as the face and identity reference. Keep the same person's face, skin tone, hair, and exact outfit completely unchanged."
 - Then describe the scene, environment, lighting, and camera angle.
-- End with: "Real human model only — not a mannequin. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+- End with: "Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+- For detail/close-up shots: frame chest-up or waist-up so the person is still visible — do NOT describe fabric or embroidery in isolation without the person.
 - Do NOT describe the garment in text — the model sees the reference image directly.
 - Do NOT use dual-image instructions like "image 1" or "image 2" — there is only one reference.
 
