@@ -512,7 +512,7 @@ export default function ProductAdStudio() {
   /* ══ Render ══════════════════════════════════════════════════ */
   return (
     <AppLayout>
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "32px 24px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
 
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
