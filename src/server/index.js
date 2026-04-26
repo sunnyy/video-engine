@@ -2352,7 +2352,7 @@ app.post("/api/admin/model-avatars/generate", requireAuth, async (req, res) => {
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method: "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ image_url: imageUrl, prompt }),
+      body: JSON.stringify({ image_urls: [imageUrl], prompt }),
     });
     if (!falRes.ok) throw new Error(await falRes.text());
     const data = await falRes.json();
