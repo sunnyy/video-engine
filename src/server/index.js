@@ -2550,9 +2550,8 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
     if (!shots?.length || !productImageUrl) return res.status(400).json({ error: "shots and productImageUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    const kontextEndpoint = modelImageUrl
-      ? "https://fal.run/fal-ai/flux-pro/kontext/max"
-      : "https://fal.run/fal-ai/flux-pro/kontext";
+    // Kontext pro supports image_url as array for multi-image; use standard endpoint for both
+    const kontextEndpoint = "https://fal.run/fal-ai/flux-pro/kontext";
 
     const results = await Promise.allSettled(shots.map(async (shot) => {
       let lastErr = null;
@@ -2566,7 +2565,7 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
           };
           if (modelImageUrl) {
             // Dual reference: model first (identity anchor), product second (garment reference)
-            kontextBody.image_urls = [modelImageUrl, productImageUrl];
+            kontextBody.image_url = [modelImageUrl, productImageUrl];
           } else {
             kontextBody.image_url = productImageUrl;
           }
