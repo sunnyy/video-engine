@@ -20,23 +20,41 @@ const GENDER_COLORS = {
   child_boy:   "#34d399",
 };
 
-const DEFAULT_PROMPT = `Use the attached image only as loose inspiration for photographic quality, framing, realism level, and styling tone.
+const DEFAULT_PROMPT = `Use the attached image only as loose inspiration for photographic quality, framing, realism level, styling tone, and overall production standard.
 
-Do not copy the face, identity, bone structure, eye shape, nose shape, lips, hairstyle, skin tone, ethnicity, or facial proportions from the reference.
+Do not copy the face, identity, bone structure, eye shape, nose shape, lips, hairstyle, skin tone, ethnicity, facial proportions, or recognizable traits from the reference.
 
-Generate a completely new person with a distinctly different identity, unique facial structure, different bone proportions, different features, and a clearly original appearance.
+Generate a completely new person with a distinctly different identity, unique facial structure, different bone proportions, original facial features, and a clearly separate appearance.
 
-The result must feel inspired only by the production quality of the reference — not the person.
+The result must feel inspired only by the production quality and visual polish of the reference — never by the person in it.
 
-Avoid face similarity, identity carryover, same-person variations, or reference-face resemblance.
+Avoid face similarity, identity carryover, same-person variations, or resemblance to the reference subject.
 
-Create a highly realistic commercial studio portrait of a real human with natural skin texture, realistic pores, authentic asymmetry, lifelike eyes, subtle imperfections, and natural facial detail.
+Create a highly realistic commercial portrait of a real human with natural skin texture, realistic pores, authentic asymmetry, lifelike eyes, subtle imperfections, and believable facial detail.
 
 The person should look like a genuine photographed human, not AI-generated.
 
-Avoid plastic skin, over-smoothing, uncanny symmetry, synthetic beauty, exaggerated perfection, or fake facial features.
+Avoid plastic skin, over-smoothing, uncanny symmetry, synthetic beauty, exaggerated perfection, or artificial facial features.
 
-Professional commercial lighting, premium studio portrait, waist-up framing, clean background, sharp focus, natural depth, photorealistic quality.`;
+Professional commercial lighting, premium studio portrait, waist-up framing, clean composition, sharp focus, natural depth, photorealistic quality.
+
+This generated person becomes the fixed identity for the shot.
+
+Preserve the same identity consistently within this image: same face structure, same skin texture, same facial proportions, same hairstyle, same natural expression, and same overall appearance throughout the render.
+
+Create a hyper-realistic candid lifestyle portrait of this person sitting at a cozy modern café with warm ambient lighting and soft brick walls in the background.
+
+She is wearing a fitted black sleeveless top with beige trim detailing that naturally shows mild, realistic cleavage due to the fit of the garment, styled in a casual yet chic manner.
+
+Her long straight hair falls naturally over her shoulders, and she gently tucks it behind her ear with one hand while looking toward camera with a soft, content smile.
+
+Include subtle accessories like minimal bracelets for a natural everyday look.
+
+Background should feature softly blurred café tables, warm hanging lights, and a relaxed social atmosphere.
+
+Lighting should be warm and diffused, enhancing skin texture and maintaining realistic color tones.
+
+Photography style: high-resolution candid portrait, shallow depth of field, sharp focus on subject, natural color grading, cozy modern aesthetic, premium lifestyle photography.`;
 
 const C = {
   card:  { background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, overflow: "hidden" },
