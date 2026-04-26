@@ -1180,6 +1180,10 @@ app.post("/api/render", requireAuth, async (req, res) => {
 
     console.log("[render] Rendering frames...");
 
+    const hasVideoAssets = (project.beats || []).some(b =>
+      Object.values(b.zones || {}).some(z => z?.content?.asset?.type === "video")
+    );
+
     let rendered = 0;
     const { assetsInfo } = await renderFrames({
       composition:  comp,
@@ -1187,7 +1191,7 @@ app.post("/api/render", requireAuth, async (req, res) => {
       inputProps:   { project },
       outputDir:    framesDir,
       imageFormat:  "jpeg",
-      concurrency:  1,
+      concurrency:  hasVideoAssets ? 1 : 2,
       chromiumOptions: {
         gl: "angle",          // enables GPU compositing — required for mix-blend-mode, CSS masks, filters
       },
