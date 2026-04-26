@@ -2604,14 +2604,17 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
       body:    JSON.stringify({ image_url: imageUrl, prompt: motionPrompt, duration: durationSeconds <= 5 ? 5 : 8 }),
     });
 
-    if (!falRes.ok) {
-      const err = await falRes.text();
-      throw new Error(`Fal.ai Pixverse failed: ${err.slice(0, 200)}`);
-    }
+    const rawText = await falRes.text();
+    console.log(`[generate-clip] status=${falRes.status} body=${rawText.slice(0, 300)}`);
 
-    const data     = await falRes.json();
+    if (!falRes.ok) throw new Error(`Pixverse ${falRes.status}: ${rawText.slice(0, 200)}`);
+
+    let data;
+    try { data = JSON.parse(rawText); }
+    catch (_) { throw new Error(`Pixverse returned non-JSON: ${rawText.slice(0, 200)}`); }
+
     const videoUrl = data.video?.url || data.url;
-    if (!videoUrl) throw new Error("No video URL returned");
+    if (!videoUrl) throw new Error(`No video URL in response: ${rawText.slice(0, 200)}`);
     res.json({ videoUrl });
   } catch (e) {
     console.error("[product-ad/generate-clip]", e.message);
