@@ -2423,12 +2423,13 @@ app.delete("/api/admin/model-avatars/:id", requireAuth, async (req, res) => {
 app.get("/api/product-ad/models", requireAuth, async (req, res) => {
   const { gender } = req.query;
   console.log("[product-ad/models] gender filter:", gender);
-  let query = supabaseAdmin.from("model_avatars").select("id, url, gender, skin_tone, age_group").eq("is_active", true);
+  let query = supabaseAdmin.from("model_avatars").select("*").eq("is_active", true);
   if (gender) query = query.eq("gender", gender);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   console.log("[product-ad/models] models found:", data?.length || 0);
-  data?.forEach(m => console.log("[product-ad/models] model:", m.id, m.url?.slice(0, 80)));
+  console.log("[product-ad/models] first record keys:", data?.[0] ? Object.keys(data[0]) : "no data");
+  console.log("[product-ad/models] first record:", JSON.stringify(data?.[0]));
   res.json({ models: data || [] });
 });
 

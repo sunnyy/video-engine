@@ -221,6 +221,7 @@ export default function ProductAdStudio() {
         return null;
       }
       const picked = data.models[Math.floor(Math.random() * data.models.length)];
+      console.log("[fetchAndPickModel] full picked object:", JSON.stringify(picked));
       console.log("[fetchAndPickModel] picked model id:", picked?.id, "image_url:", picked?.image_url?.slice(0, 80));
       console.log("[fetchAndPickModel] returning url:", picked?.image_url?.slice(0, 80) || "NULL");
       return picked.image_url;
