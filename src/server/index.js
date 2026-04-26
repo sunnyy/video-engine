@@ -2669,7 +2669,6 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
     // Sequential with delay — avoids Fal.ai 429 rate limits under concurrent user load
     const results = [];
     for (const [index, shot] of shots.entries()) {
-      if (results.length > 0) await new Promise(r => setTimeout(r, 800));
       if (!referenceImageUrl) {
         results.push({ shotId: shot.id, error: "No reference image available", ok: false });
         continue;

@@ -298,9 +298,9 @@ export default function ProductAdStudio() {
     // User reviews base image before proceeding to scene generation
   }
 
-  /* ── Step 3b: generate scene images using base reference ── */
+  /* ── Step 3b: generate scene images one at a time, show each as it arrives ── */
   async function runImages(shotsToRegen = null, refUrl = null) {
-    const shots      = shotsToRegen || analysis.shots;
+    const shots = shotsToRegen || analysis.shots;
     const referenceImageUrl = refUrl || baseImage;
     console.log("[runImages] ── called ──");
     console.log("[runImages] referenceImageUrl:", referenceImageUrl?.slice(0, 80) || "NULL");
@@ -312,27 +312,28 @@ export default function ProductAdStudio() {
       shots.forEach(s => { next[s.id] = { loading: true }; });
       return next;
     });
-    try {
-      const res  = await serverFetch("/api/product-ad/generate-images", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ shots, referenceImageUrl }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Image generation failed");
-      const next = {};
-      await Promise.all(data.results.map(async r => {
-        if (r.ok) {
+
+    for (const shot of shots) {
+      try {
+        const res  = await serverFetch("/api/product-ad/generate-images", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ shots: [shot], referenceImageUrl }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Image generation failed");
+        const r = data.results?.[0];
+        if (r?.ok) {
           const permanentUrl = await uploadImageToSupabase(r.imageUrl);
-          next[r.shotId] = { url: permanentUrl };
+          setImages(prev => ({ ...prev, [shot.id]: { url: permanentUrl } }));
         } else {
-          next[r.shotId] = { error: r.error || "Failed" };
+          setImages(prev => ({ ...prev, [shot.id]: { error: r?.error || "Failed" } }));
         }
-      }));
-      setImages(prev => ({ ...prev, ...next }));
-    } catch (e) {
-      shots.forEach(s => setImages(prev => ({ ...prev, [s.id]: { error: e.message } })));
+      } catch (e) {
+        setImages(prev => ({ ...prev, [shot.id]: { error: e.message } }));
+      }
     }
+
     setImagesLoading(false);
   }
 
