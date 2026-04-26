@@ -20,7 +20,8 @@ Return ONLY valid JSON, no markdown, no explanation:
   "product_analysis": {
     "product_type": "concise description",
     "category": "clothing|wearable|non_worn",
-    "model_description": "For clothing/wearable: describe a real Indian woman model — specify skin tone (wheatish/dusky/fair), approximate age (20s-30s), hair (long black hair, straight or wavy), and build (slim/medium). Example: 'A real Indian woman in her mid-20s with wheatish skin, long straight black hair, slim build'. This exact description must appear verbatim at the start of every image_generation_prompt for this product. For non_worn: null.",
+    "garment_description": "For clothing/wearable ONLY: Write a detailed text description of the garment for use in image generation prompts. Include: color(s), fabric/material look, silhouette, length, neckline, sleeve style, any prints/embroidery/embellishments, and key design details. Example: 'A teal and gold embroidered lehenga choli set. The lehenga is floor-length with a wide flared skirt covered in dense golden zari embroidery on teal fabric. The choli is sleeveless with a sweetheart neckline and matching embroidery. A matching teal dupatta with gold border.' For non_worn: null.",
+    "model_description": "For clothing/wearable: describe a real Indian woman model — specify skin tone (wheatish/dusky/fair), approximate age (20s-30s), hair (long black hair, straight or wavy), and build (slim/medium). Example: 'A real Indian woman in her mid-20s with wheatish skin, long straight black hair, slim build'. For non_worn: null.",
     "key_features": ["feature 1", "feature 2", "feature 3"],
     "target_audience": "description",
     "aesthetic_style": "description",
@@ -34,7 +35,7 @@ Return ONLY valid JSON, no markdown, no explanation:
       "narrative": "what this shot communicates to the viewer",
       "duration_seconds": 3,
       "camera_motion": "e.g. slow orbit, dolly in, static, gentle push",
-      "image_generation_prompt": "For clothing/wearable Shot 1: start with 'Reference image 1 is the model — use her face, identity, and appearance exactly. Reference image 2 is the garment — dress the model in it exactly as shown.' then describe the scene, environment, lighting, and pose. End with 'Keep the garment design, colors, and details exactly as shown in reference image 2. Keep the model face and identity exactly from reference image 1. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.' For clothing/wearable Shot 2+: start with 'Reference image 1 is the model. Reference image 2 is the garment. Same model from shot 1 wearing the same garment.' then describe the scene. End with same closing line. For non_worn: start with 'Use the uploaded photo as the product reference. Keep the same branding, label, colors, and identity.' then describe ONLY the scene. End with: hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.",
+      "image_generation_prompt": "CLOTHING/WEARABLE: Start with 'The model from the reference image, wearing [garment_description verbatim]. ' — use garment_description exactly as written above. Then describe the scene, environment, lighting, and pose in detail. End with: 'Real human model only — not a mannequin or CGI figure. Keep the model face and identity exactly from the reference image. Fully clothed, modest pose. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.' NON_WORN: Start with 'Use the uploaded photo as the product reference. Keep the same branding, label, colors, and identity.' then describe ONLY the scene. End with: 'Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays.'",
       "video_motion_prompt": "Describe ONLY camera movement and subject motion — not the product itself. Be specific to the shot type: for liquid/pour shots say 'amber liquid pours in slow motion, droplets catch the light'; for fabric/movement shots say 'fabric billows and flows gently, model walks with natural stride, modest movement'; for orbit shots say 'camera slowly orbits 180 degrees, studio light creates evolving reflections'; for lifestyle shots say 'gentle handheld push toward subject, natural ambient motion in background'."
     }
   ]
@@ -50,20 +51,25 @@ FOR non_worn (bottles, cans, food, gadgets, furniture, serums, etc.):
   Shot 5 — Angled: product at a 45-degree angle showing depth and side profile, strong directional light, aspirational final frame
 
 FOR clothing:
-  Shot 1 — Full body: model facing camera, full body visible, natural confident pose, modest styling. Establish the model clearly.
-  Shot 2 — Detail: close-up of fabric texture, embroidery, buttons, or key design element on the garment as worn by the model.
+  Shot 1 — Full body: model facing camera, full body visible, natural confident pose, modest styling. Use garment_description to describe the outfit exactly.
+  Shot 2 — Detail: close-up of the fabric texture, embroidery, or key design element of the garment as worn on the model's body (not isolated).
   Shot 3 — Walk: model walking naturally in a bright indoor or outdoor setting, full garment visible, modest movement.
-  Shot 4 — Lifestyle: model in a real context (cafe, street market, outdoor setting) wearing the product naturally, modest pose.
-  Shot 5 — Back/side view: model turned 3/4 or fully facing away from camera, showing the back design, rear hem, and overall silhouette. Same scene context as Shot 1.
+  Shot 4 — Lifestyle: model in a real context (cafe, street market, outdoor setting) wearing the garment naturally, modest pose.
+  Shot 5 — Back/side view: model turned 3/4 or fully facing away from camera, showing the back design, rear hem, and overall silhouette.
 
 FOR wearable (watches, earphones, glasses, rings, etc.):
   Shot 1 — Hero product: product alone on a clean premium surface, dramatic directional studio light
-  Shot 2 — Worn close-up: product on wrist / in ear / on face, macro, natural skin visible. Open with model_description verbatim.
-  Shot 3 — Lifestyle worn: person actively using it in motion — running, working, commuting. Open with model continuity line.
+  Shot 2 — Worn close-up: product on wrist / in ear / on face, macro, natural skin visible. Use model_description verbatim.
+  Shot 3 — Lifestyle worn: person actively using it in motion — running, working, commuting.
   Shot 4 — Macro detail: extreme close-up of face/dial/mesh band/lens/engraving
   Shot 5 — Aspirational: product in a premium aspirational environment — rooftop, luxury interior, golden hour outdoor
 
-IMPORTANT for image_generation_prompt (clothing/wearable): always open with the dual-reference instruction ("Reference image 1 is the model... Reference image 2 is the garment..."), then the scene, then close with "Keep the garment design, colors, and details exactly as shown in reference image 2. Keep the model face and identity exactly from reference image 1. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+CRITICAL for clothing image_generation_prompt:
+- The model image reference will be the ONLY image passed to the AI — there is no product image reference.
+- You MUST describe the garment completely in text using garment_description. Do not say "as shown" or "from the reference" for the garment.
+- Start every clothing prompt with: "The model from the reference image, wearing [full garment_description]. "
+- End every clothing prompt with: "Real human model only — not a mannequin or CGI figure. Keep the model face and identity exactly from the reference image. Fully clothed, modest pose. Hyper-realistic, photorealistic, 9:16 vertical portrait, no text overlays."
+
 IMPORTANT for image_generation_prompt (non_worn): always start with the product reference instruction, then describe ONLY the scene.
 IMPORTANT for video_motion_prompt: describe ONLY motion and camera behavior. Never describe the product appearance.`;
 }

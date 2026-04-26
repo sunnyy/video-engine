@@ -2554,11 +2554,9 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
     if (!shots?.length || !productImageUrl) return res.status(400).json({ error: "shots and productImageUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    const endpoint = "https://fal.run/fal-ai/nano-banana/edit";
 
     // Sequential with delay — avoids Fal.ai 429 rate limits under concurrent user load
     const results = [];
-    const imageUrls = modelImageUrl ? [modelImageUrl, productImageUrl] : [productImageUrl];
     for (const shot of shots) {
       if (results.length > 0) await new Promise(r => setTimeout(r, 800));
       let lastErr = null;
@@ -2566,13 +2564,35 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
         try {
-          const body    = { prompt: shot.image_generation_prompt, image_urls: imageUrls };
+          let endpoint, body;
+          if (modelImageUrl) {
+            // Clothing/wearable: model is the sole image reference — do NOT pass mannequin product image.
+            // Garment is described entirely in the text prompt via garment_description.
+            endpoint = "https://fal.run/fal-ai/flux-pro/kontext/max";
+            body = {
+              prompt:              shot.image_generation_prompt,
+              image_url:           modelImageUrl,
+              guidance_scale:      3.5,
+              num_inference_steps: 28,
+            };
+          } else {
+            // Non-worn product: product image as single reference.
+            endpoint = "https://fal.run/fal-ai/flux-pro/kontext";
+            body = {
+              prompt:              shot.image_generation_prompt,
+              image_url:           productImageUrl,
+              guidance_scale:      3.5,
+              num_inference_steps: 28,
+              strength:            0.85,
+            };
+          }
+          console.log(`[generate-images] shot=${shot.id} endpoint=${endpoint} modelImageUrl=${modelImageUrl ? "set" : "null"}`);
           const falRes  = await fetch(endpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
             body:    JSON.stringify(body),
           });
-          if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr); continue; }
+          if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr.slice(0, 200)); continue; }
           const data   = await falRes.json();
           const falUrl = data.images?.[0]?.url;
           if (!falUrl) throw new Error("No image URL from Fal.ai");
