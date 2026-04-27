@@ -2821,44 +2821,12 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
       luxury:  "premium gold and black palette, elegant dark background, sophisticated luxury aesthetic",
     };
     const moodDesc  = colorMood === "auto" ? null : (moodMap[colorMood] || moodMap.luxury);
-    const brandLine = brandName ? `The brand name is "${brandName}".` : "";
-    const headLine  = headline  ? `Use this headline: "${headline}".` : "";
-    const tagLine   = tagline   ? `Use this tagline: "${tagline}".` : "";
+    const brandLine = brandName ? `Brand name: "${brandName}".` : "";
+    const headLine  = headline  ? `Main headline: "${headline}".` : "";
+    const tagLine   = tagline   ? `Tagline or supporting copy: "${tagline}".` : "";
 
-    // Step 1: GPT-4o analyzes the product image and writes a tailored generation prompt
-    const systemPrompt = `Analyze the attached product image and generate a single high-end commercial poster design prompt for image generation. The output should be one polished prompt that transforms this product into a premium standalone advertisement poster.
+    const prompt = `Create a premium commercial poster advertisement using the attached product image as the hero subject. Design a high-end modern poster ad with the product placed prominently as the main focus, styled like a luxury brand campaign. Build a visually striking composition around the product using elegant lighting, premium shadows, refined depth, and a polished advertising layout. Add premium supporting visual elements that match the product category, such as natural props, abstract shapes, ingredients, soft textures, or atmospheric accents to make the composition feel rich and intentional. Include stylish headline typography, short supporting copy, and clean negative space for branding and CTA placement. ${brandLine} ${headLine} ${tagLine} The design should feel like a complete standalone poster ad, not just a product mockup — premium, artistic, scroll-stopping, brand-worthy, and visually polished like a professional luxury campaign poster. Use cinematic composition, modern ad styling, premium color harmony, elegant hierarchy, and high-end commercial design aesthetics.${moodDesc ? ` Style: ${moodDesc}.` : ""} All text in the poster must be written in ${language}.`;
 
-The generated prompt must:
-- Treat the uploaded product as the hero subject
-- Design a complete poster ad, not a simple product mockup
-- Keep the product visually dominant and clearly recognizable
-- Build a premium ad composition around the product using elegant lighting, refined shadows, depth, and polished commercial styling
-- Add supporting visual elements relevant to the product category (such as ingredients, textures, abstract shapes, natural props, lifestyle accents, or futuristic design elements)
-- Include sophisticated headline typography, short supporting copy, and clean negative space for branding and CTA
-- Make the final output feel like a complete premium campaign poster, visually striking and ad-ready
-- Match the visual language to the product category (luxury, beauty, beverage, fashion, tech, wellness, etc.)
-- Focus on premium composition, cinematic layout, elegant hierarchy, and modern advertising aesthetics
-${moodDesc ? `- Visual style: ${moodDesc}` : ""}
-${brandLine} ${headLine} ${tagLine}
-- All text in the poster must be written in ${language}
-
-Return only one final prompt. The output should be a single clean paragraph. Do not explain. Do not add labels. Do not return multiple variations. Only return the final image-generation prompt.`;
-
-    console.log("[poster/generate] step 1 — generating prompt via GPT-4o vision");
-    const gptRes = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: systemPrompt },
-          { type: "image_url", image_url: { url: productImageUrl } },
-        ],
-      }],
-      max_tokens: 400,
-    });
-    const prompt = gptRes.choices[0]?.message?.content?.trim();
-    if (!prompt) throw new Error("GPT-4o failed to generate a prompt");
-    console.log("[poster/generate] generated prompt:", prompt);
     console.log("[poster/generate] productImageUrl:", productImageUrl);
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
