@@ -343,7 +343,7 @@ export default function PosterStudio() {
                       border: poster.url === posterUrl ? "2px solid #7c5cfc" : "2px solid rgba(255,255,255,0.06)",
                     }}
                   >
-                    <img src={poster.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img src={poster.url} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                   </div>
                   <button
                     onClick={() => deletePoster(poster)}
