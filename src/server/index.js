@@ -2807,7 +2807,7 @@ app.post("/api/poster/delete", requireAuth, async (req, res) => {
 app.post("/api/poster/upload", requireAuth, uploadMemory.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file" });
-    const key = `posters/${req.user.id}/upload-${Date.now()}.${req.file.mimetype.includes("png") ? "png" : "jpg"}`;
+    const key = `poster-uploads/${req.user.id}/${Date.now()}.${req.file.mimetype.includes("png") ? "png" : "jpg"}`;
     const { error } = await supabaseAdmin.storage.from("user-assets").upload(key, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
     if (error) throw new Error(error.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
