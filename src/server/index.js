@@ -2798,18 +2798,17 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
 
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName);
     console.log("[poster/generate] body:", JSON.stringify({ image_urls: [productImageUrl], prompt }).slice(0, 500));
-    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+    const falRes = await fetch("https://fal.run/xai/grok-imagine-image/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
       body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
     });
 
-    if (!falRes.ok) {
-      const err = await falRes.text();
-      throw new Error(`Fal.ai failed: ${err.slice(0, 200)}`);
-    }
+    const rawText = await falRes.text();
+    console.log("[poster/generate] fal status:", falRes.status, "body:", rawText.slice(0, 300));
+    if (!falRes.ok) throw new Error(`Fal.ai failed: ${rawText.slice(0, 200)}`);
 
-    const data   = await falRes.json();
+    const data   = JSON.parse(rawText);
     const falUrl = data.images?.[0]?.url;
     if (!falUrl) throw new Error("No image URL returned");
 
