@@ -2767,15 +2767,22 @@ const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSiz
 
 app.get("/api/poster/list", requireAuth, async (req, res) => {
   try {
-    const folder = `posters/${req.user.id}`;
-    const { data, error } = await supabaseAdmin.storage.from("user-assets").list(folder, { sortBy: { column: "created_at", order: "desc" } });
+    const { data, error } = await supabaseAdmin
+      .from("posters")
+      .select("id, poster_url, product_image_url, storage_key, brand_name, headline, color_mood, created_at")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    const posters = (data || [])
-      .filter(f => f.name && !f.name.startsWith("."))
-      .map(f => ({
-        key: `${folder}/${f.name}`,
-        url: supabaseAdmin.storage.from("user-assets").getPublicUrl(`${folder}/${f.name}`).data.publicUrl,
-      }));
+    const posters = (data || []).map(r => ({
+      id:              r.id,
+      url:             r.poster_url,
+      productImageUrl: r.product_image_url,
+      storageKey:      r.storage_key,
+      brandName:       r.brand_name,
+      headline:        r.headline,
+      colorMood:       r.color_mood,
+      createdAt:       r.created_at,
+    }));
     res.json({ posters });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2784,10 +2791,13 @@ app.get("/api/poster/list", requireAuth, async (req, res) => {
 
 app.post("/api/poster/delete", requireAuth, async (req, res) => {
   try {
-    const { key } = req.body;
-    if (!key || !key.startsWith(`posters/${req.user.id}/`)) return res.status(403).json({ error: "Forbidden" });
-    const { error } = await supabaseAdmin.storage.from("user-assets").remove([key]);
-    if (error) throw new Error(error.message);
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: "id required" });
+    const { data, error: fetchErr } = await supabaseAdmin
+      .from("posters").select("storage_key").eq("id", id).eq("user_id", req.user.id).single();
+    if (fetchErr || !data) return res.status(403).json({ error: "Not found" });
+    await supabaseAdmin.storage.from("user-assets").remove([data.storage_key]);
+    await supabaseAdmin.from("posters").delete().eq("id", id);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2851,6 +2861,18 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
     const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+
+    await supabaseAdmin.from("posters").insert({
+      user_id:           req.user.id,
+      product_image_url: productImageUrl,
+      poster_url:        publicUrl,
+      storage_key:       key,
+      brand_name:        brandName || null,
+      headline:          headline  || null,
+      tagline:           tagline   || null,
+      color_mood:        colorMood || null,
+      language:          language,
+    });
 
     console.log("[poster/generate] done:", publicUrl?.slice(0, 80));
     res.json({ posterUrl: publicUrl });
