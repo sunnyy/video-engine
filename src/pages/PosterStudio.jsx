@@ -48,8 +48,11 @@ export default function PosterStudio() {
     try {
       const res  = await serverFetch("/api/poster/list");
       const data = await res.json();
+      console.log("[poster/list] status:", res.status, "data:", data);
       if (res.ok) setHistory(data.posters || []);
-    } catch (_) {}
+    } catch (e) {
+      console.error("[poster/list] error:", e.message);
+    }
   }
 
   async function deletePoster(poster) {
