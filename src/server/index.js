@@ -2862,7 +2862,7 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
 
-    await supabaseAdmin.from("posters").insert({
+    const { error: dbErr } = await supabaseAdmin.from("posters").insert({
       user_id:           req.user.id,
       product_image_url: productImageUrl,
       poster_url:        publicUrl,
@@ -2873,6 +2873,8 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
       color_mood:        colorMood || null,
       language:          language,
     });
+    if (dbErr) console.error("[poster/generate] db insert error:", dbErr.message);
+    else console.log("[poster/generate] db insert ok");
 
     console.log("[poster/generate] done:", publicUrl?.slice(0, 80));
     res.json({ posterUrl: publicUrl });
