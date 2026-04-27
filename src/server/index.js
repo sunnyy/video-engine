@@ -2778,7 +2778,7 @@ app.post("/api/poster/upload", requireAuth, upload.single("image"), async (req, 
 
 app.post("/api/poster/generate", requireAuth, async (req, res) => {
   try {
-    const { productImageUrl, brandName, headline, tagline, colorMood } = req.body;
+    const { productImageUrl, brandName, headline, tagline, colorMood, language = "English" } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
@@ -2794,7 +2794,7 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
     const headLine  = headline  ? `Main headline: "${headline}".` : "";
     const tagLine   = tagline   ? `Tagline or supporting copy: "${tagline}".` : "";
 
-    const prompt = `Create a premium commercial poster advertisement using the attached product image as the hero subject. Design a high-end modern poster ad with the product placed prominently as the main focus, styled like a luxury brand campaign. Build a visually striking composition around the product using elegant lighting, premium shadows, refined depth, and a polished advertising layout. Add premium supporting visual elements that match the product category, such as natural props, abstract shapes, ingredients, soft textures, or atmospheric accents to make the composition feel rich and intentional. Include stylish headline typography, short supporting copy, and clean negative space for branding and CTA placement. ${brandLine} ${headLine} ${tagLine} The design should feel like a complete standalone poster ad — premium, artistic, scroll-stopping, brand-worthy, and visually polished like a professional luxury campaign poster. Use cinematic composition, modern ad styling, premium color harmony, elegant hierarchy, and high-end commercial design aesthetics. Style: ${moodDesc}. Vertical 9:16 portrait format, ultra high resolution, photorealistic.`;
+    const prompt = `Create a premium commercial poster advertisement using the attached product image as the hero subject. Design a high-end modern poster ad with the product placed prominently as the main focus, styled like a luxury brand campaign. Build a visually striking composition around the product using elegant lighting, premium shadows, refined depth, and a polished advertising layout. Add premium supporting visual elements that match the product category, such as natural props, abstract shapes, ingredients, soft textures, or atmospheric accents to make the composition feel rich and intentional. Include stylish headline typography, short supporting copy, and clean negative space for branding and CTA placement. ${brandLine} ${headLine} ${tagLine} The design should feel like a complete standalone poster ad — premium, artistic, scroll-stopping, brand-worthy, and visually polished like a professional luxury campaign poster. Use cinematic composition, modern ad styling, premium color harmony, elegant hierarchy, and high-end commercial design aesthetics. Style: ${moodDesc}. All text in the poster must be written in ${language}. Vertical 9:16 portrait format, ultra high resolution, photorealistic.`;
 
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName);
     console.log("[poster/generate] body:", JSON.stringify({ image_urls: [productImageUrl], prompt }).slice(0, 500));

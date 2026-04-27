@@ -16,6 +16,17 @@ const MOODS = [
   { id: "vibrant", label: "Vibrant" },
 ];
 
+const LANGUAGES = [
+  { id: "English",    label: "English"    },
+  { id: "Hindi",      label: "Hindi"      },
+  { id: "Arabic",     label: "Arabic"     },
+  { id: "French",     label: "French"     },
+  { id: "Spanish",    label: "Spanish"    },
+  { id: "Portuguese", label: "Portuguese" },
+  { id: "Urdu",       label: "Urdu"       },
+  { id: "Turkish",    label: "Turkish"    },
+];
+
 export default function PosterStudio() {
   const [imageUrl,   setImageUrl]   = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
@@ -25,6 +36,7 @@ export default function PosterStudio() {
   const [headline,   setHeadline]   = useState("");
   const [tagline,    setTagline]    = useState("");
   const [colorMood,  setColorMood]  = useState("luxury");
+  const [language,   setLanguage]   = useState("English");
   const [generating, setGenerating] = useState(false);
   const [posterUrl,  setPosterUrl]  = useState(null);
   const [genErr,     setGenErr]     = useState("");
@@ -84,7 +96,7 @@ export default function PosterStudio() {
       const res  = await serverFetch("/api/poster/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ productImageUrl: finalUrl, brandName, headline, tagline, colorMood }),
+        body:    JSON.stringify({ productImageUrl: finalUrl, brandName, headline, tagline, colorMood, language }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
@@ -208,6 +220,20 @@ export default function PosterStudio() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Language */}
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 18 }}>
+              <label style={C.lbl}>Text Language</label>
+              <select
+                value={language}
+                onChange={e => setLanguage(e.target.value)}
+                style={{ ...C.inp, cursor: "pointer" }}
+              >
+                {LANGUAGES.map(l => (
+                  <option key={l.id} value={l.id}>{l.label}</option>
+                ))}
+              </select>
             </div>
 
             {/* Generate */}
