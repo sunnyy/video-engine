@@ -2798,10 +2798,10 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
 
     console.log("[poster/generate] productImageUrl:", productImageUrl);
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName, "language:", language);
-    const falRes = await fetch("https://fal.run/fal-ai/stable-diffusion-v3-medium", {
+    const falRes = await fetch("https://fal.run/fal-ai/stable-diffusion-v3-medium/image-to-image", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ prompt, image_url: productImageUrl, strength: 0.8, aspect_ratio: "9:16" }),
+      body:    JSON.stringify({ prompt, image_url: productImageUrl, strength: 0.8 }),
     });
 
     const rawText = await falRes.text();
