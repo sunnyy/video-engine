@@ -2784,21 +2784,26 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
     const moodMap = {
-      dark:    "dark dramatic background, deep shadows, moody cinematic atmosphere, rich contrast",
-      light:   "bright airy background, soft natural light, clean minimal aesthetic, pastel tones",
-      vibrant: "vibrant bold colors, energetic composition, high saturation, striking color contrast",
-      luxury:  "premium gold and black palette, elegant dark background, sophisticated luxury aesthetic",
+      dark:    "dark moody background, deep shadows, cinematic lighting",
+      light:   "bright airy background, soft natural light, clean minimal aesthetic",
+      vibrant: "vibrant bold colors, high saturation, energetic composition",
+      luxury:  "elegant dark background, gold accents, premium luxury aesthetic",
     };
-    const moodDesc  = moodMap[colorMood] || moodMap.luxury;
-    const brandLine = brandName ? `Brand name: "${brandName}".` : "";
-    const headLine  = headline  ? `Main headline: "${headline}".` : "";
-    const tagLine   = tagline   ? `Tagline or supporting copy: "${tagline}".` : "";
-
-    const prompt = `Create a premium commercial poster advertisement using the attached product image as the hero subject. Design a high-end modern poster ad with the product placed prominently as the main focus, styled like a luxury brand campaign. Build a visually striking composition around the product using elegant lighting, premium shadows, refined depth, and a polished advertising layout. Add premium supporting visual elements that match the product category, such as natural props, abstract shapes, ingredients, soft textures, or atmospheric accents to make the composition feel rich and intentional. Include stylish headline typography, short supporting copy, and clean negative space for branding and CTA placement. ${brandLine} ${headLine} ${tagLine} The design should feel like a complete standalone poster ad — premium, artistic, scroll-stopping, brand-worthy, and visually polished like a professional luxury campaign poster. Use cinematic composition, modern ad styling, premium color harmony, elegant hierarchy, and high-end commercial design aesthetics. Style: ${moodDesc}. Vertical 9:16 portrait format, ultra high resolution, photorealistic.`;
+    const moodDesc = moodMap[colorMood] || moodMap.luxury;
+    const parts = [
+      "Premium product advertisement poster.",
+      "Place the product as the hero, centered and well-lit.",
+      moodDesc + ".",
+      brandName ? `Brand: ${brandName}.` : "",
+      headline  ? `Headline: "${headline}".` : "",
+      tagline   ? `Tagline: "${tagline}".` : "",
+      "Vertical 9:16 format. Photorealistic. High-end commercial design.",
+    ].filter(Boolean);
+    const prompt = parts.join(" ");
 
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName);
     console.log("[poster/generate] body:", JSON.stringify({ image_urls: [productImageUrl], prompt }).slice(0, 500));
-    const falRes = await fetch("https://fal.run/xai/grok-imagine-image/edit", {
+    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
       body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
