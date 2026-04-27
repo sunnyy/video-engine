@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { serverFetch } from "../services/serverApi";
 import AppLayout from "../ui/AppLayout";
 
@@ -41,6 +41,16 @@ export default function PosterStudio() {
   const [generating, setGenerating] = useState(false);
   const [posterUrl,  setPosterUrl]  = useState(null);
   const [history,    setHistory]    = useState([]);
+
+  useEffect(() => { fetchHistory(); }, []);
+
+  async function fetchHistory() {
+    try {
+      const res  = await serverFetch("/api/poster/list");
+      const data = await res.json();
+      if (res.ok) setHistory(data.urls || []);
+    } catch (_) {}
+  }
   const [genErr,     setGenErr]     = useState("");
   const [genTime,    setGenTime]    = useState(null);
   const [uploadErr,  setUploadErr]  = useState("");
@@ -106,8 +116,8 @@ export default function PosterStudio() {
       console.log("[poster] response status:", res.status, "data:", data);
       if (!res.ok) throw new Error(data.error || "Generation failed");
       setPosterUrl(data.posterUrl);
-      setHistory(h => [data.posterUrl, ...h]);
       setGenTime(((Date.now() - t0) / 1000).toFixed(1));
+      fetchHistory();
     } catch (e) { setGenErr(e.message); }
     setGenerating(false);
   }
@@ -298,29 +308,34 @@ export default function PosterStudio() {
               </div>
             )}
 
-            {history.length > 1 && (
-              <div style={{ width: "100%", maxWidth: 380 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>History</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {history.map((url, i) => (
-                    <div
-                      key={i}
-                      onClick={() => setPosterUrl(url)}
-                      style={{
-                        width: 64, aspectRatio: "9/16", borderRadius: 6, overflow: "hidden", cursor: "pointer",
-                        border: url === posterUrl ? "2px solid #7c5cfc" : "2px solid transparent",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
         </div>
+
+        {/* ── Poster Gallery ── */}
+        {history.length > 0 && (
+          <div style={{ marginTop: 48 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#9494a8", marginBottom: 16, fontFamily: "'Syne', sans-serif" }}>
+              Generated Posters
+            </h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+              {history.map((url, i) => (
+                <div
+                  key={i}
+                  onClick={() => setPosterUrl(url)}
+                  style={{
+                    aspectRatio: "9/16", borderRadius: 10, overflow: "hidden", cursor: "pointer",
+                    border: url === posterUrl ? "2px solid #7c5cfc" : "2px solid rgba(255,255,255,0.06)",
+                    transition: "border-color 0.15s",
+                  }}
+                >
+                  <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </AppLayout>
   );

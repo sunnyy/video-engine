@@ -2764,6 +2764,20 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
 
 /* ── Poster Studio ── */
 const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+app.get("/api/poster/list", requireAuth, async (req, res) => {
+  try {
+    const folder = `posters/${req.user.id}`;
+    const { data, error } = await supabaseAdmin.storage.from("user-assets").list(folder, { sortBy: { column: "created_at", order: "desc" } });
+    if (error) throw new Error(error.message);
+    const urls = (data || [])
+      .filter(f => f.name && !f.name.startsWith("."))
+      .map(f => supabaseAdmin.storage.from("user-assets").getPublicUrl(`${folder}/${f.name}`).data.publicUrl);
+    res.json({ urls });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 app.post("/api/poster/upload", requireAuth, uploadMemory.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file" });
