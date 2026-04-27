@@ -2800,10 +2800,10 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName, "language:", language);
     console.log("[poster/generate] prompt length:", prompt.length);
     console.log("[poster/generate] full prompt:", prompt);
-    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+    const falRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
+      body:    JSON.stringify({ image_url: productImageUrl, prompt, guidance_scale: 3.5, num_inference_steps: 28, strength: 0.85 }),
     });
 
     const rawText = await falRes.text();
