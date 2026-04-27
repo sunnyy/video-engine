@@ -2799,10 +2799,10 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
 
     console.log("[poster/generate] productImageUrl:", productImageUrl);
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName, "language:", language);
-    const falRes = await fetch("https://fal.run/fal-ai/xai/grok-imagine-image/edit", {
+    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ prompt, image_url: productImageUrl }),
+      body:    JSON.stringify({ prompt, image_urls: [productImageUrl] }),
     });
 
     const rawText = await falRes.text();
