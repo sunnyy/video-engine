@@ -48,7 +48,15 @@ export default function PosterStudio() {
     try {
       const res  = await serverFetch("/api/poster/list");
       const data = await res.json();
-      if (res.ok) setHistory(data.urls || []);
+      if (res.ok) setHistory(data.posters || []);
+    } catch (_) {}
+  }
+
+  async function deletePoster(poster) {
+    try {
+      await serverFetch(`/api/poster/${poster.key}`, { method: "DELETE" });
+      if (posterUrl === poster.url) setPosterUrl(null);
+      setHistory(h => h.filter(p => p.key !== poster.key));
     } catch (_) {}
   }
   const [genErr,     setGenErr]     = useState("");
@@ -319,17 +327,27 @@ export default function PosterStudio() {
               Generated Posters
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-              {history.map((url, i) => (
-                <div
-                  key={i}
-                  onClick={() => setPosterUrl(url)}
-                  style={{
-                    aspectRatio: "9/16", borderRadius: 10, overflow: "hidden", cursor: "pointer",
-                    border: url === posterUrl ? "2px solid #7c5cfc" : "2px solid rgba(255,255,255,0.06)",
-                    transition: "border-color 0.15s",
-                  }}
-                >
-                  <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              {history.map((poster, i) => (
+                <div key={i} style={{ position: "relative", aspectRatio: "9/16" }}>
+                  <div
+                    onClick={() => setPosterUrl(poster.url)}
+                    style={{
+                      width: "100%", height: "100%", borderRadius: 10, overflow: "hidden", cursor: "pointer",
+                      border: poster.url === posterUrl ? "2px solid #7c5cfc" : "2px solid rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <img src={poster.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                  <button
+                    onClick={() => deletePoster(poster)}
+                    style={{
+                      position: "absolute", top: 6, right: 6,
+                      background: "rgba(0,0,0,0.7)", border: "none", borderRadius: 4,
+                      color: "#f87171", fontSize: 11, cursor: "pointer", padding: "2px 6px", lineHeight: 1.4,
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
