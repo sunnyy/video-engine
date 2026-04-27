@@ -2767,22 +2767,18 @@ const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSiz
 
 app.get("/api/poster/list", requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("posters")
-      .select("id, poster_url, product_image_url, storage_key, brand_name, headline, color_mood, created_at")
-      .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false });
+    const folder = `posters/${req.user.id}`;
+    const { data, error } = await supabaseAdmin.storage
+      .from("user-assets")
+      .list(folder, { sortBy: { column: "created_at", order: "desc" } });
     if (error) throw new Error(error.message);
-    const posters = (data || []).map(r => ({
-      id:              r.id,
-      url:             r.poster_url,
-      productImageUrl: r.product_image_url,
-      storageKey:      r.storage_key,
-      brandName:       r.brand_name,
-      headline:        r.headline,
-      colorMood:       r.color_mood,
-      createdAt:       r.created_at,
-    }));
+    const posters = (data || [])
+      .filter(f => f.name && f.name.startsWith("poster-"))
+      .map(f => ({
+        id:  f.name,
+        url: supabaseAdmin.storage.from("user-assets").getPublicUrl(`${folder}/${f.name}`).data.publicUrl,
+        storageKey: `${folder}/${f.name}`,
+      }));
     res.json({ posters });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2791,13 +2787,10 @@ app.get("/api/poster/list", requireAuth, async (req, res) => {
 
 app.post("/api/poster/delete", requireAuth, async (req, res) => {
   try {
-    const { id } = req.body;
-    if (!id) return res.status(400).json({ error: "id required" });
-    const { data, error: fetchErr } = await supabaseAdmin
-      .from("posters").select("storage_key").eq("id", id).eq("user_id", req.user.id).single();
-    if (fetchErr || !data) return res.status(403).json({ error: "Not found" });
-    await supabaseAdmin.storage.from("user-assets").remove([data.storage_key]);
-    await supabaseAdmin.from("posters").delete().eq("id", id);
+    const { storageKey } = req.body;
+    if (!storageKey || !storageKey.startsWith(`posters/${req.user.id}/`)) return res.status(403).json({ error: "Forbidden" });
+    await supabaseAdmin.storage.from("user-assets").remove([storageKey]);
+    await supabaseAdmin.from("posters").delete().eq("storage_key", storageKey);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });

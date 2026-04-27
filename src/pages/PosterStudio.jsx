@@ -60,10 +60,10 @@ export default function PosterStudio() {
       await serverFetch("/api/poster/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: poster.id }),
+        body: JSON.stringify({ storageKey: poster.storageKey }),
       });
       if (posterUrl === poster.url) setPosterUrl(null);
-      setHistory(h => h.filter(p => p.id !== poster.id));
+      setHistory(h => h.filter(p => p.storageKey !== poster.storageKey));
     } catch (_) {}
   }
   const [genErr,     setGenErr]     = useState("");
