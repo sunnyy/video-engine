@@ -254,9 +254,9 @@ export default function PosterStudio() {
           </div>
 
           {/* ── RIGHT: Poster result ── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
             <div style={{
-              width: "100%", aspectRatio: "9/16",
+              width: "100%", maxWidth: 380, aspectRatio: "9/16",
               background: "#111118",
               border: posterUrl ? "1px solid rgba(255,255,255,0.08)" : "2px dashed rgba(255,255,255,0.07)",
               borderRadius: 12,
@@ -277,12 +277,12 @@ export default function PosterStudio() {
                 </div>
               )}
               {posterUrl && (
-                <img src={posterUrl} alt="Generated poster" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={posterUrl} alt="Generated poster" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
               )}
             </div>
 
             {posterUrl && (
-              <>
+              <div style={{ width: "100%", maxWidth: 380 }}>
                 <div style={{ display: "flex", gap: 10 }}>
                   <a href={posterUrl} download={`poster-${Date.now()}.jpg`} target="_blank" rel="noreferrer" style={{ flex: 1 }}>
                     <button style={{ ...C.btnY, fontSize: 13 }}>↓ Download</button>
@@ -291,8 +291,8 @@ export default function PosterStudio() {
                     ↺ Regenerate
                   </button>
                 </div>
-                {genTime && <div style={{ fontSize: 11, color: "#444", textAlign: "center" }}>Generated in {genTime}s</div>}
-              </>
+                {genTime && <div style={{ fontSize: 11, color: "#444", textAlign: "center", marginTop: 6 }}>Generated in {genTime}s</div>}
+              </div>
             )}
           </div>
 
