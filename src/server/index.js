@@ -2559,21 +2559,6 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
   }
 });
 
-async function uploadToFalStorage(imageUrl, FAL_KEY) {
-  const imgFetch = await fetch(imageUrl);
-  const imgBuffer = Buffer.from(await imgFetch.arrayBuffer());
-  const imgContentType = imgFetch.headers.get("content-type") || "image/jpeg";
-  const ext = imgContentType.includes("png") ? "png" : "jpg";
-  const falUploadRes = await fetch("https://fal.run/storage", {
-    method: "POST",
-    headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": imgContentType, "X-File-Name": `product.${ext}` },
-    body: imgBuffer,
-  });
-  if (!falUploadRes.ok) throw new Error("Failed to upload image to Fal.ai storage");
-  const falUploadData = await falUploadRes.json();
-  return falUploadData.url;
-}
-
 // POST /api/product-ad/generate-base-image — Generate one reference image before scene shots
 // Clothing/wearable: nano-banana/edit [modelUrl, productUrl] → model wearing the product
 // Non-worn: Kontext with productUrl → cleaned studio product photo
@@ -2813,12 +2798,10 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
 
     console.log("[poster/generate] productImageUrl:", productImageUrl);
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName, "language:", language);
-    const falImageUrl = await uploadToFalStorage(productImageUrl, FAL_KEY);
-    console.log("[poster/generate] fal storage url:", falImageUrl);
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_urls: [falImageUrl], prompt }),
+      body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
     });
 
     const rawText = await falRes.text();
