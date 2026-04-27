@@ -2559,6 +2559,21 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
   }
 });
 
+async function uploadToFalStorage(imageUrl, FAL_KEY) {
+  const imgFetch = await fetch(imageUrl);
+  const imgBuffer = Buffer.from(await imgFetch.arrayBuffer());
+  const imgContentType = imgFetch.headers.get("content-type") || "image/jpeg";
+  const ext = imgContentType.includes("png") ? "png" : "jpg";
+  const falUploadRes = await fetch("https://fal.run/storage", {
+    method: "POST",
+    headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": imgContentType, "X-File-Name": `product.${ext}` },
+    body: imgBuffer,
+  });
+  if (!falUploadRes.ok) throw new Error("Failed to upload image to Fal.ai storage");
+  const falUploadData = await falUploadRes.json();
+  return falUploadData.url;
+}
+
 // POST /api/product-ad/generate-base-image — Generate one reference image before scene shots
 // Clothing/wearable: nano-banana/edit [modelUrl, productUrl] → model wearing the product
 // Non-worn: Kontext with productUrl → cleaned studio product photo
@@ -2578,13 +2593,20 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
     let falUrl;
 
     if ((category === "clothing" || category === "wearable") && modelImageUrl) {
+      console.log("[generate-base-image] uploading images to Fal.ai storage...");
+      const [falModelUrl, falProductUrl] = await Promise.all([
+        uploadToFalStorage(modelImageUrl, FAL_KEY),
+        uploadToFalStorage(productImageUrl, FAL_KEY),
+      ]);
+      console.log("[generate-base-image] fal model url:", falModelUrl?.slice(0, 80));
+      console.log("[generate-base-image] fal product url:", falProductUrl?.slice(0, 80));
       const prompt = hasMannequin
         ? `Can you wear the exact same outfit as the mannequin is wearing in image 2? Keep your face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce every detail of the outfit exactly — same colors, fabric, embroidery, neckline, sleeves, silhouette, borders, and embellishments. Full body visible, natural confident pose, clean studio background, soft professional lighting. Photorealistic, 9:16 vertical portrait.`
         : `Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment-only product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, borders and trims, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer, 9:16 vertical portrait.`;
       const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
         method:  "POST",
         headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body:    JSON.stringify({ image_urls: [modelImageUrl, productImageUrl], prompt }),
+        body:    JSON.stringify({ image_urls: [falModelUrl, falProductUrl], prompt }),
       });
       const raw = await falRes.text();
       console.log("[generate-base-image] nano-banana status:", falRes.status);
@@ -2666,10 +2688,14 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
     console.log("[generate-images] referenceImageUrl:", referenceImageUrl?.slice(0, 100) || "NULL");
     console.log("[generate-images] ────────────────────────────────");
 
+    console.log("[generate-images] uploading reference to Fal.ai storage...");
+    const falReferenceUrl = await uploadToFalStorage(referenceImageUrl, FAL_KEY);
+    console.log("[generate-images] fal reference url:", falReferenceUrl?.slice(0, 80));
+
     // Sequential with delay — avoids Fal.ai 429 rate limits under concurrent user load
     const results = [];
     for (const [index, shot] of shots.entries()) {
-      if (!referenceImageUrl) {
+      if (!falReferenceUrl) {
         results.push({ shotId: shot.id, error: "No reference image available", ok: false });
         continue;
       }
@@ -2680,9 +2706,9 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
         try {
           // Belt-and-suspenders identity anchor prepended to whatever prompt comes from analysis
           const anchoredPrompt = `Use the uploaded photo as the complete reference. Keep the person's face, identity, skin tone, hair, AND EXACT OUTFIT completely unchanged — do not alter the clothing in any way. Only change the scene environment, background, and lighting as described: ${shot.image_generation_prompt}`;
-          const body = { prompt: anchoredPrompt, image_urls: [referenceImageUrl] };
+          const body = { prompt: anchoredPrompt, image_urls: [falReferenceUrl] };
           console.log(`[generate-images] shot=${shot.id} index=${index} attempt=${attempt + 1} prompt preview:`, shot.image_generation_prompt?.slice(0, 100));
-          console.log(`[generate-images] shot=${shot.id} nano-banana ref:`, referenceImageUrl?.slice(0, 80));
+          console.log(`[generate-images] shot=${shot.id} nano-banana ref:`, falReferenceUrl?.slice(0, 80));
           const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
@@ -2798,12 +2824,12 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
 
     console.log("[poster/generate] productImageUrl:", productImageUrl);
     console.log("[poster/generate] mood:", colorMood, "brand:", brandName, "language:", language);
-    console.log("[poster/generate] prompt length:", prompt.length);
-    console.log("[poster/generate] full prompt:", prompt);
+    const falImageUrl = await uploadToFalStorage(productImageUrl, FAL_KEY);
+    console.log("[poster/generate] fal storage url:", falImageUrl);
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
+      body:    JSON.stringify({ image_urls: [falImageUrl], prompt }),
     });
 
     const rawText = await falRes.text();
