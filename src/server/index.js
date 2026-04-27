@@ -2763,7 +2763,8 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
 });
 
 /* ── Poster Studio ── */
-app.post("/api/poster/upload", requireAuth, upload.single("image"), async (req, res) => {
+const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+app.post("/api/poster/upload", requireAuth, uploadMemory.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file" });
     const key = `posters/${req.user.id}/upload-${Date.now()}.${req.file.mimetype.includes("png") ? "png" : "jpg"}`;
