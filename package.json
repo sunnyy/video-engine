@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node src/server/index.js",
+    "server": "node --env-file=.env src/server/index.js",
     "prebundle": "node scripts/prebundle.mjs"
   },
   "dependencies": {
