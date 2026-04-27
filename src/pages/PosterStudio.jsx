@@ -10,6 +10,7 @@ const C = {
 };
 
 const MOODS = [
+  { id: "auto",    label: "Auto"    },
   { id: "luxury",  label: "Luxury"  },
   { id: "dark",    label: "Dark"    },
   { id: "light",   label: "Light"   },
@@ -35,10 +36,11 @@ export default function PosterStudio() {
   const [brandName,  setBrandName]  = useState("");
   const [headline,   setHeadline]   = useState("");
   const [tagline,    setTagline]    = useState("");
-  const [colorMood,  setColorMood]  = useState("luxury");
+  const [colorMood,  setColorMood]  = useState("auto");
   const [language,   setLanguage]   = useState("English");
   const [generating, setGenerating] = useState(false);
   const [posterUrl,  setPosterUrl]  = useState(null);
+  const [history,    setHistory]    = useState([]);
   const [genErr,     setGenErr]     = useState("");
   const [genTime,    setGenTime]    = useState(null);
   const [uploadErr,  setUploadErr]  = useState("");
@@ -104,6 +106,7 @@ export default function PosterStudio() {
       console.log("[poster] response status:", res.status, "data:", data);
       if (!res.ok) throw new Error(data.error || "Generation failed");
       setPosterUrl(data.posterUrl);
+      setHistory(h => [data.posterUrl, ...h]);
       setGenTime(((Date.now() - t0) / 1000).toFixed(1));
     } catch (e) { setGenErr(e.message); }
     setGenerating(false);
@@ -292,6 +295,27 @@ export default function PosterStudio() {
                   </button>
                 </div>
                 {genTime && <div style={{ fontSize: 11, color: "#444", textAlign: "center", marginTop: 6 }}>Generated in {genTime}s</div>}
+              </div>
+            )}
+
+            {history.length > 1 && (
+              <div style={{ width: "100%", maxWidth: 380 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>History</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {history.map((url, i) => (
+                    <div
+                      key={i}
+                      onClick={() => setPosterUrl(url)}
+                      style={{
+                        width: 64, aspectRatio: "9/16", borderRadius: 6, overflow: "hidden", cursor: "pointer",
+                        border: url === posterUrl ? "2px solid #7c5cfc" : "2px solid transparent",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
