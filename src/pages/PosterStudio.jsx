@@ -93,12 +93,15 @@ export default function PosterStudio() {
     setGenerating(true); setPosterUrl(null);
     const t0 = Date.now();
     try {
+      const payload = { productImageUrl: finalUrl, brandName, headline, tagline, colorMood, language };
+      console.log("[poster] sending payload:", payload);
       const res  = await serverFetch("/api/poster/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ productImageUrl: finalUrl, brandName, headline, tagline, colorMood, language }),
+        body:    JSON.stringify(payload),
       });
       const data = await res.json();
+      console.log("[poster] response status:", res.status, "data:", data);
       if (!res.ok) throw new Error(data.error || "Generation failed");
       setPosterUrl(data.posterUrl);
       setGenTime(((Date.now() - t0) / 1000).toFixed(1));
