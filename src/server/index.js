@@ -2796,8 +2796,10 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
 
     const prompt = `Create a premium commercial poster advertisement using the attached product image as the hero subject. Design a high-end modern poster ad with the product placed prominently as the main focus, styled like a luxury brand campaign. Build a visually striking composition around the product using elegant lighting, premium shadows, refined depth, and a polished advertising layout. Add premium supporting visual elements that match the product category, such as natural props, abstract shapes, ingredients, soft textures, or atmospheric accents to make the composition feel rich and intentional. Include stylish headline typography, short supporting copy, and clean negative space for branding and CTA placement. ${brandLine} ${headLine} ${tagLine} The design should feel like a complete standalone poster ad — premium, artistic, scroll-stopping, brand-worthy, and visually polished like a professional luxury campaign poster. Use cinematic composition, modern ad styling, premium color harmony, elegant hierarchy, and high-end commercial design aesthetics. Style: ${moodDesc}. All text in the poster must be written in ${language}. Vertical 9:16 portrait format, ultra high resolution, photorealistic.`;
 
-    console.log("[poster/generate] mood:", colorMood, "brand:", brandName);
-    console.log("[poster/generate] body:", JSON.stringify({ image_urls: [productImageUrl], prompt }).slice(0, 500));
+    console.log("[poster/generate] productImageUrl:", productImageUrl);
+    console.log("[poster/generate] mood:", colorMood, "brand:", brandName, "language:", language);
+    console.log("[poster/generate] prompt length:", prompt.length);
+    console.log("[poster/generate] full prompt:", prompt);
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
