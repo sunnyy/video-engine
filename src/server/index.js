@@ -2782,10 +2782,10 @@ app.get("/api/poster/list", requireAuth, async (req, res) => {
   }
 });
 
-app.delete("/api/poster/:key(*)", requireAuth, async (req, res) => {
+app.post("/api/poster/delete", requireAuth, async (req, res) => {
   try {
-    const key = req.params.key;
-    if (!key.startsWith(`posters/${req.user.id}/`)) return res.status(403).json({ error: "Forbidden" });
+    const { key } = req.body;
+    if (!key || !key.startsWith(`posters/${req.user.id}/`)) return res.status(403).json({ error: "Forbidden" });
     const { error } = await supabaseAdmin.storage.from("user-assets").remove([key]);
     if (error) throw new Error(error.message);
     res.json({ ok: true });
