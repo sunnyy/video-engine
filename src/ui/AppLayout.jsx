@@ -77,6 +77,14 @@ const Icons = {
       <line x1="8" y1="23" x2="16" y2="23"/>
     </svg>
   ),
+  poster: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="2" width="18" height="20" rx="2"/>
+      <line x1="7" y1="7" x2="17" y2="7"/>
+      <line x1="7" y1="11" x2="17" y2="11"/>
+      <line x1="7" y1="15" x2="13" y2="15"/>
+    </svg>
+  ),
 };
 
 function NavItem({ icon, label, active, onClick, soon }) {
@@ -146,6 +154,7 @@ export default function AppLayout({ children }) {
             <NavItem icon={Icons.mic}     label="Transcribe"   active={location.pathname === "/transcription"}     onClick={() => navigate("/transcription")} />
             <NavItem icon={Icons.voice}   label="Voice Studio" active={location.pathname === "/tts-studio"}        onClick={() => navigate("/tts-studio")} />
             <NavItem icon={Icons.ad}      label="Product Ads"  active={location.pathname === "/product-ad-studio"} onClick={() => navigate("/product-ad-studio")} />
+            <NavItem icon={Icons.poster}  label="Poster Studio" active={location.pathname === "/poster-studio"}    onClick={() => navigate("/poster-studio")} />
           </NavSection>
 
           <NavSection title="Account">

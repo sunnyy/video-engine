@@ -2762,6 +2762,74 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
   }
 });
 
+/* ── Poster Studio ── */
+app.post("/api/poster/upload", requireAuth, upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file" });
+    const key = `posters/${req.user.id}/upload-${Date.now()}.${req.file.mimetype.includes("png") ? "png" : "jpg"}`;
+    const { error } = await supabaseAdmin.storage.from("user-assets").upload(key, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/poster/generate", requireAuth, async (req, res) => {
+  try {
+    const { productImageUrl, brandName, headline, tagline, colorMood } = req.body;
+    if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
+
+    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+
+    const moodMap = {
+      dark:    "dark dramatic background, deep shadows, moody cinematic atmosphere, rich contrast",
+      light:   "bright airy background, soft natural light, clean minimal aesthetic, pastel tones",
+      vibrant: "vibrant bold colors, energetic composition, high saturation, striking color contrast",
+      luxury:  "premium gold and black palette, elegant dark background, sophisticated luxury aesthetic",
+    };
+    const moodDesc  = moodMap[colorMood] || moodMap.luxury;
+    const brandLine = brandName ? `Brand name: "${brandName}".` : "";
+    const headLine  = headline  ? `Main headline: "${headline}".` : "";
+    const tagLine   = tagline   ? `Tagline or supporting copy: "${tagline}".` : "";
+
+    const prompt = `Create a premium commercial poster advertisement using the attached product image as the hero subject. Design a high-end modern poster ad with the product placed prominently as the main focus, styled like a luxury brand campaign. Build a visually striking composition around the product using elegant lighting, premium shadows, refined depth, and a polished advertising layout. Add premium supporting visual elements that match the product category, such as natural props, abstract shapes, ingredients, soft textures, or atmospheric accents to make the composition feel rich and intentional. Include stylish headline typography, short supporting copy, and clean negative space for branding and CTA placement. ${brandLine} ${headLine} ${tagLine} The design should feel like a complete standalone poster ad — premium, artistic, scroll-stopping, brand-worthy, and visually polished like a professional luxury campaign poster. Use cinematic composition, modern ad styling, premium color harmony, elegant hierarchy, and high-end commercial design aesthetics. Style: ${moodDesc}. Vertical 9:16 portrait format, ultra high resolution, photorealistic.`;
+
+    console.log("[poster/generate] mood:", colorMood, "brand:", brandName);
+    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+      method:  "POST",
+      headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
+    });
+
+    if (!falRes.ok) {
+      const err = await falRes.text();
+      throw new Error(`Fal.ai failed: ${err.slice(0, 200)}`);
+    }
+
+    const data   = await falRes.json();
+    const falUrl = data.images?.[0]?.url;
+    if (!falUrl) throw new Error("No image URL returned");
+
+    const imgRes   = await fetch(falUrl);
+    const buffer   = Buffer.from(await imgRes.arrayBuffer());
+    const ct       = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext      = ct.includes("png") ? "png" : "jpg";
+    const fileName = `poster-${Date.now()}.${ext}`;
+    const key      = `posters/${req.user.id}/${fileName}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+
+    console.log("[poster/generate] done:", publicUrl?.slice(0, 80));
+    res.json({ posterUrl: publicUrl });
+  } catch (e) {
+    console.error("[poster/generate]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/proxy-video-upload — Fetch a video URL server-side and upload to Supabase
 app.post("/api/proxy-video-upload", requireAuth, async (req, res) => {
   try {
