@@ -2518,6 +2518,8 @@ app.post("/api/product-ad/upload", requireAuth, upload.single("image"), async (r
 // POST /api/product-ad/analyze — GPT-4o Vision analyses product image, returns shot strategy
 app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
   try {
+    const deduction = await deductCredits(req.user.id, 2, "product_ad_analyze", "Product Ad — strategy analysis");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { imageUrl } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
 
@@ -2564,6 +2566,8 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
 // Non-worn: Kontext with productUrl → cleaned studio product photo
 app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) => {
   try {
+    const deduction = await deductCredits(req.user.id, 5, "product_ad_base_image", "Product Ad — base model image");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { productImageUrl, modelImageUrl, category, hasMannequin } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
@@ -2656,6 +2660,8 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
 // POST /api/product-ad/generate-images — Generate scene shots using base image reference
 app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
   try {
+    const deduction = await deductCredits(req.user.id, 10, "product_ad_scenes", "Product Ad — scene images");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { shots, referenceImageUrl } = req.body;
     if (!shots?.length || !referenceImageUrl) return res.status(400).json({ error: "shots and referenceImageUrl required" });
 
@@ -2734,6 +2740,8 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
 // POST /api/product-ad/generate-clip — Image-to-video via Fal.ai LTX-Video 13B Distilled
 app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
   try {
+    const deduction = await deductCredits(req.user.id, 5, "product_ad_clip", "Product Ad — video clip");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { imageUrl, motionPrompt, durationSeconds = 3 } = req.body;
     if (!imageUrl || !motionPrompt) return res.status(400).json({ error: "imageUrl and motionPrompt required" });
 
@@ -2812,6 +2820,8 @@ app.post("/api/poster/upload", requireAuth, uploadMemory.single("image"), async 
 
 app.post("/api/poster/generate", requireAuth, async (req, res) => {
   try {
+    const deduction = await deductCredits(req.user.id, 5, "poster_generate", "Poster Studio — poster generation");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { productImageUrl, brandName, headline, tagline, colorMood, language = "English" } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
 

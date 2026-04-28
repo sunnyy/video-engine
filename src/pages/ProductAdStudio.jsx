@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { createProject as createDBProject, updateProject } from "../services/projects/projectService";
 import { useProjectStore } from "../store/useProjectStore";
+import { useCreditsStore } from "../store/useCreditsStore";
 import { MUSIC_LIBRARY } from "../core/registries/musicRegistry";
 import AppLayout from "../ui/AppLayout";
 
@@ -105,9 +106,10 @@ function ClipCard({ index, clipData }) {
 
 /* ══ Main Component ══════════════════════════════════════════════ */
 export default function ProductAdStudio() {
-  const navigate   = useNavigate();
-  const setProject = useProjectStore(s => s.setProject);
-  const setDbId    = useProjectStore(s => s.setDatabaseId);
+  const navigate     = useNavigate();
+  const setProject   = useProjectStore(s => s.setProject);
+  const setDbId      = useProjectStore(s => s.setDatabaseId);
+  const fetchCredits = useCreditsStore(s => s.fetchCredits);
 
   const [step, setStep] = useState(1);
 
@@ -243,6 +245,7 @@ export default function ProductAdStudio() {
         return;
       }
       if (!res.ok) throw new Error(data.error || "Analysis failed");
+      fetchCredits();
       console.log("[runAnalysis] product category detected:", data.product_analysis?.category);
       console.log("[runAnalysis] hasMannequin:", data.validation?.has_mannequin);
       setHasMannequin(data.validation?.has_mannequin || false);
@@ -274,6 +277,7 @@ export default function ProductAdStudio() {
       console.log("[runBaseImage] server response ok:", res.ok, "status:", res.status);
       console.log("[runBaseImage] returned imageUrl:", data.imageUrl?.slice(0, 80) || "NULL — check server logs");
       if (!res.ok) throw new Error(data.error || "Base image failed");
+      fetchCredits();
       const permanentUrl = await uploadImageToSupabase(data.imageUrl);
       console.log("[runBaseImage] permanentUrl after Supabase proxy:", permanentUrl?.slice(0, 80));
       setBaseImage(permanentUrl);
@@ -335,6 +339,7 @@ export default function ProductAdStudio() {
     }
 
     setImagesLoading(false);
+    fetchCredits();
   }
 
   async function regenImage(shot) {
@@ -379,6 +384,7 @@ export default function ProductAdStudio() {
     }
     setClipsLoading(false);
     generatingClips.current = false;
+    fetchCredits();
   }
 
   /* ── Upload helpers — proxy Fal.ai URLs to permanent Supabase storage ── */

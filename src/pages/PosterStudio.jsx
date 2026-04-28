@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { serverFetch } from "../services/serverApi";
+import { useCreditsStore } from "../store/useCreditsStore";
 import AppLayout from "../ui/AppLayout";
 
 const C = {
@@ -29,6 +30,7 @@ const LANGUAGES = [
 ];
 
 export default function PosterStudio() {
+  const fetchCredits = useCreditsStore(s => s.fetchCredits);
   const [imageUrl,   setImageUrl]   = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [imageFile,  setImageFile]  = useState(null);
@@ -133,6 +135,7 @@ export default function PosterStudio() {
       setPosterUrl(data.posterUrl);
       setGenTime(((Date.now() - t0) / 1000).toFixed(1));
       fetchHistory();
+      fetchCredits();
     } catch (e) { setGenErr(e.message); }
     setGenerating(false);
   }
