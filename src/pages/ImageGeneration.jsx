@@ -1,23 +1,11 @@
 /**
- * ImageGeneration.jsx — Unified AI Image Studio
- * Types: image (free), poster (9:16 enhanced), thumbnail (16:9 enhanced)
+ * ImageGeneration.jsx — AI Image Studio
  */
 import { useState, useEffect } from "react";
 import { serverFetch } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useImageLibraryStore } from "../store/useImageLibraryStore";
 import AppLayout from "../ui/AppLayout";
-
-/* ── Generation types ── */
-const GEN_TYPES = [
-  { id: "image",     label: "Image",     hint: "Free-form, full control" },
-  { id: "poster",    label: "Poster",    hint: "9:16 · AI-enhanced prompt" },
-  { id: "thumbnail", label: "Thumbnail", hint: "16:9 · AI-enhanced prompt" },
-];
-
-// Aspect ratio locked per type
-const TYPE_RATIO = { poster: "9:16", thumbnail: "16:9" };
-
 
 const ASPECT_RATIOS = [
   { id: "1:1",  label: "1 : 1"  },
@@ -162,7 +150,6 @@ function ImageCard({ img, onDelete }) {
 export default function ImageGeneration() {
   const { fetchCredits } = useCreditsStore();
 
-  const [genType,     setGenType]     = useState("image");
   const [prompt,      setPrompt]      = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [count,       setCount]       = useState(1);
@@ -177,12 +164,6 @@ export default function ImageGeneration() {
 
   useEffect(() => { fetchCredits(); }, []);
 
-  // When type changes, lock aspect ratio
-  useEffect(() => {
-    const locked = TYPE_RATIO[genType];
-    if (locked) setAspectRatio(locked);
-  }, [genType]);
-
   useEffect(() => {
     if (activeTab === "library" && !libraryFetched) loadLibrary(true);
   }, [activeTab]);
@@ -193,7 +174,6 @@ export default function ImageGeneration() {
   }, []);
 
   const creditCost = count * 2;
-  const lockedRatio = TYPE_RATIO[genType] || null;
 
   const handleGenerate = async () => {
     if (!prompt.trim() || generating) return;
@@ -203,7 +183,7 @@ export default function ImageGeneration() {
     try {
       const res  = await serverFetch("/api/image-generation/generate", {
         method: "POST",
-        body: JSON.stringify({ prompt: prompt.trim(), aspect_ratio: aspectRatio, count, type: genType }),
+        body: JSON.stringify({ prompt: prompt.trim(), aspect_ratio: aspectRatio, count, type: "image" }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Generation failed"); return; }
@@ -248,29 +228,6 @@ export default function ImageGeneration() {
             {/* ── Left controls ── */}
             <div className="w-[340px] shrink-0 flex flex-col gap-5">
 
-              {/* Generation type */}
-              <div>
-                <SectionLabel>Type</SectionLabel>
-                <div className="flex gap-0 bg-[#111118] rounded-[8px] p-[3px]">
-                  {GEN_TYPES.map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => setGenType(t.id)}
-                      className="flex-1 py-[7px] rounded-[6px] text-[13px] font-semibold border-0 cursor-pointer transition-all text-center"
-                      style={{
-                        background: genType === t.id ? "#f5c518" : "transparent",
-                        color:      genType === t.id ? "#0b0b10"  : "#9494a8",
-                      }}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="text-[11px] mt-1" style={{ color: "#55556a" }}>
-                  {GEN_TYPES.find(t => t.id === genType)?.hint}
-                </div>
-              </div>
-
               {/* Prompt */}
               <div>
                 <SectionLabel>Prompt</SectionLabel>
@@ -278,11 +235,7 @@ export default function ImageGeneration() {
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={
-                    genType === "poster"    ? "e.g. Fitness supplement launch, bold energy…" :
-                    genType === "thumbnail" ? "e.g. I tried the world's hottest pizza…" :
-                    "Describe the image you want to generate…"
-                  }
+                  placeholder="Describe the image you want to generate…"
                   rows={4}
                   className="w-[93%] bg-[#111118] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-3 text-[14px] text-[#e8e8f0] resize-none focus:outline-none focus:border-[#7c5cfc] transition-colors"
                   style={{ fontFamily: "inherit" }}
@@ -293,22 +246,10 @@ export default function ImageGeneration() {
 
               {/* Aspect ratio */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <SectionLabel>Aspect Ratio</SectionLabel>
-                  {lockedRatio && (
-                    <span className="text-[10px]" style={{ color: "#55556a" }}>
-                      Locked to {lockedRatio}
-                    </span>
-                  )}
-                </div>
+                <SectionLabel>Aspect Ratio</SectionLabel>
                 <div className="flex flex-wrap gap-2">
                   {ASPECT_RATIOS.map(r => (
-                    <Chip
-                      key={r.id}
-                      active={aspectRatio === r.id}
-                      disabled={!!lockedRatio && r.id !== lockedRatio}
-                      onClick={() => setAspectRatio(r.id)}
-                    >
+                    <Chip key={r.id} active={aspectRatio === r.id} onClick={() => setAspectRatio(r.id)}>
                       {r.label}
                     </Chip>
                   ))}
@@ -372,7 +313,7 @@ export default function ImageGeneration() {
                 <div className="flex flex-col items-center justify-center h-[400px] border border-[rgba(255,255,255,0.05)] rounded-[14px]"
                   style={{ background: "rgba(255,255,255,0.01)" }}>
                   <div className="w-8 h-8 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin mb-4" />
-                  <div className="text-[14px] text-[#7c5cfc]">Generating your {genType}{count > 1 ? "s" : ""}…</div>
+                  <div className="text-[14px] text-[#7c5cfc]">Generating your image{count > 1 ? "s" : ""}…</div>
                   <div className="text-[11px] mt-1" style={{ color: "#44444f" }}>This may take 10–30 seconds</div>
                 </div>
               )}
@@ -380,7 +321,7 @@ export default function ImageGeneration() {
               {results.length > 0 && (
                 <div>
                   <div className="text-[12px] mb-3" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
-                    {results.length} {genType}{results.length !== 1 ? "s" : ""} generated
+                    {results.length} image{results.length !== 1 ? "s" : ""} generated
                   </div>
                   <div className="grid gap-3"
                     style={{ gridTemplateColumns: `repeat(${Math.min(results.length, 2)}, 1fr)` }}>

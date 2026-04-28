@@ -19,11 +19,6 @@ const GOALS = [
   { value: "Educate and Inform",        label: "🎓 Educate and Inform" },
   { value: "Entertain People",          label: "🎭 Entertain People" },
 ];
-const DURATIONS = [
-  { value: "short",  label: "Short  (15–30 sec)" },
-  { value: "medium", label: "Medium (30–60 sec)" },
-  { value: "long",   label: "Long   (60+ sec)" },
-];
 const LANGUAGES = [
   { value: "english",  label: "English" },
   { value: "hindi",    label: "Hindi" },
@@ -86,19 +81,30 @@ export default function Settings() {
 
   const [prefNiche,    setPrefNiche]    = useState("");
   const [prefGoal,     setPrefGoal]     = useState("");
-  const [prefDuration, setPrefDuration] = useState("short");
   const [prefLanguage, setPrefLanguage] = useState("english");
   const [prefSaving,   setPrefSaving]   = useState(false);
   const [prefSaved,    setPrefSaved]    = useState(false);
 
   const [notifExport,  setNotifExport]  = useState(true);
   const [notifLow,     setNotifLow]     = useState(true);
-  const [notifUpdates, setNotifUpdates] = useState(false);
+  const [notifUpdates, setNotifUpdates] = useState(true);
 
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [confirmText, setConfirmText] = useState("");
-  const [deleting,    setDeleting]    = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const [deleteStep,        setDeleteStep]        = useState("idle"); // "idle" | "reason" | "confirm"
+  const [deleteReason,      setDeleteReason]      = useState("");
+  const [deleteReasonOther, setDeleteReasonOther] = useState("");
+  const [confirmText,       setConfirmText]       = useState("");
+  const [deleting,          setDeleting]          = useState(false);
+  const [deleteError,       setDeleteError]       = useState("");
+
+  const DELETE_REASONS = [
+    "Too expensive / not worth it",
+    "Missing features I need",
+    "Found a better tool",
+    "Only needed it temporarily",
+    "Too complicated to use",
+    "Video quality didn't meet expectations",
+    "Other",
+  ];
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -106,7 +112,6 @@ export default function Settings() {
     serverFetch("/api/user/profile").then(r => r.json()).then(d => {
       if (d.niche)            setPrefNiche(Array.isArray(d.niche) ? d.niche[0] || "" : d.niche);
       if (d.goal)             setPrefGoal(d.goal);
-      if (d.default_duration) setPrefDuration(d.default_duration);
       if (d.default_language) setPrefLanguage(d.default_language);
     }).catch(() => {});
   }, []);
@@ -117,7 +122,7 @@ export default function Settings() {
     try {
       await serverFetch("/api/user/profile", {
         method: "POST",
-        body: JSON.stringify({ niche: prefNiche || null, goal: prefGoal || null, default_duration: prefDuration, default_language: prefLanguage }),
+        body: JSON.stringify({ niche: prefNiche || null, goal: prefGoal || null, default_language: prefLanguage }),
       });
       setPrefSaved(true);
       setTimeout(() => setPrefSaved(false), 2500);
@@ -126,12 +131,18 @@ export default function Settings() {
     }
   }
 
+  function resetDelete() {
+    setDeleteStep("idle"); setDeleteReason(""); setDeleteReasonOther(""); setConfirmText(""); setDeleteError("");
+  }
+
   async function handleDeleteAccount() {
     if (confirmText !== "DELETE") return;
     setDeleting(true);
     setDeleteError("");
     try {
-      await deleteUserAccount();
+      const reason       = deleteReason;
+      const reasonDetail = deleteReason === "Other" ? deleteReasonOther : "";
+      await deleteUserAccount({ reason, reasonDetail });
       await signOut();
       navigate("/");
     } catch (err) {
@@ -182,10 +193,9 @@ export default function Settings() {
           <section>
             <SectionLabel>Preferences</SectionLabel>
             <Card>
-              <SelectField label="Default Niche"          value={prefNiche}    onChange={setPrefNiche}    options={NICHES} />
-              <SelectField label="Default Goal"           value={prefGoal}     onChange={setPrefGoal}     options={GOALS} />
-              <SelectField label="Default Video Duration" value={prefDuration} onChange={setPrefDuration} options={DURATIONS} />
-              <SelectField label="Default Language"       value={prefLanguage} onChange={setPrefLanguage} options={LANGUAGES} />
+              <SelectField label="Default Niche"    value={prefNiche}    onChange={setPrefNiche}    options={NICHES} />
+              <SelectField label="Default Goal"     value={prefGoal}     onChange={setPrefGoal}     options={GOALS} />
+              <SelectField label="Default Language" value={prefLanguage} onChange={setPrefLanguage} options={LANGUAGES} />
               <button onClick={handleSavePrefs} disabled={prefSaving}
                 className="self-start px-5 py-2 rounded-[8px] text-[14px] font-bold border-0 cursor-pointer transition-all"
                 style={{ background: prefSaved ? "rgba(34,197,94,0.2)" : "#f5c518", color: prefSaved ? "#22c55e" : "#0b0b10", opacity: prefSaving ? 0.7 : 1, fontFamily: "'Outfit',sans-serif" }}>
@@ -211,7 +221,7 @@ export default function Settings() {
                   <Toggle checked={item.checked} onChange={item.set} />
                 </div>
               ))}
-              <div className="text-[11px] mt-1" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>NOTIFICATION BACKEND COMING SOON</div>
+              
             </Card>
           </section>
 
@@ -224,23 +234,79 @@ export default function Settings() {
                 <div className="text-[13px] mb-4" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
                   Permanently deletes your account, all videos, images, credits, and data. This action is irreversible and cannot be undone.
                 </div>
-                {!showConfirm ? (
-                  <button onClick={() => setShowConfirm(true)}
+                {deleteStep === "idle" && (
+                  <button onClick={() => setDeleteStep("reason")}
                     className="px-4 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer border transition-all"
                     style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)", color: "#f87171", fontFamily: "'Outfit',sans-serif" }}>
                     Delete My Account
                   </button>
-                ) : (
-                  <div className="flex flex-col gap-3 p-4 rounded-[10px] border" style={{ background: "rgba(239,68,68,0.05)", borderColor: "rgba(239,68,68,0.2)" }}>
+                )}
+
+                {/* Step 1 — Reason */}
+                {deleteStep === "reason" && (
+                  <div className="flex flex-col gap-3 p-4 rounded-[10px] border" style={{ background: "rgba(239,68,68,0.04)", borderColor: "rgba(239,68,68,0.2)" }}>
                     <div className="text-[13px] font-semibold" style={{ color: "#f87171", fontFamily: "'Outfit',sans-serif" }}>
-                      Type <span className="font-mono font-bold">DELETE</span> to confirm
+                      Before you go — why are you leaving?
+                    </div>
+                    <div className="text-[12px]" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
+                      Your feedback helps us improve. Please select a reason.
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {DELETE_REASONS.map(r => (
+                        <button key={r} onClick={() => setDeleteReason(r)}
+                          className="w-full text-left px-3 py-[9px] rounded-[8px] text-[13px] border transition-all"
+                          style={{
+                            background:   deleteReason === r ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.03)",
+                            borderColor:  deleteReason === r ? "rgba(239,68,68,0.5)"  : "rgba(255,255,255,0.08)",
+                            color:        deleteReason === r ? "#f87171"              : "#8888a8",
+                            fontFamily:   "'Outfit',sans-serif",
+                            cursor:       "pointer",
+                          }}>
+                          {deleteReason === r ? "● " : "○ "}{r}
+                        </button>
+                      ))}
+                    </div>
+                    {deleteReason === "Other" && (
+                      <textarea value={deleteReasonOther} onChange={e => setDeleteReasonOther(e.target.value)}
+                        placeholder="Tell us more (optional)…" rows={2}
+                        className="w-full rounded-[8px] px-3 py-2 text-[13px] outline-none resize-none"
+                        style={{ background: "#0b0b10", border: "1px solid rgba(239,68,68,0.2)", color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }} />
+                    )}
+                    <div className="flex gap-2 mt-1">
+                      <button onClick={resetDelete}
+                        className="px-4 py-2 rounded-[7px] text-[13px] font-semibold cursor-pointer border transition-all"
+                        style={{ background: "transparent", borderColor: "rgba(255,255,255,0.1)", color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
+                        Cancel
+                      </button>
+                      <button onClick={() => setDeleteStep("confirm")} disabled={!deleteReason}
+                        className="px-4 py-2 rounded-[7px] text-[13px] font-bold border-0 transition-all"
+                        style={{
+                          background: deleteReason ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.05)",
+                          color:      deleteReason ? "#f87171"              : "#444",
+                          cursor:     deleteReason ? "pointer"              : "not-allowed",
+                          fontFamily: "'Outfit',sans-serif",
+                        }}>
+                        Continue →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2 — Final confirmation */}
+                {deleteStep === "confirm" && (
+                  <div className="flex flex-col gap-3 p-4 rounded-[10px] border" style={{ background: "rgba(239,68,68,0.05)", borderColor: "rgba(239,68,68,0.2)" }}>
+                    <div className="text-[12px] px-3 py-2 rounded-[7px]" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", fontFamily: "'Outfit',sans-serif" }}>
+                      Reason: <span className="font-semibold">{deleteReason}</span>
+                    </div>
+                    <div className="text-[13px] font-semibold" style={{ color: "#f87171", fontFamily: "'Outfit',sans-serif" }}>
+                      Type <span className="font-mono font-bold">DELETE</span> to permanently delete your account
                     </div>
                     <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)}
                       placeholder="DELETE" className="w-full rounded-[8px] px-3 py-[9px] text-[14px] outline-none"
                       style={{ background: "#0b0b10", border: "1px solid rgba(239,68,68,0.3)", color: "#e8e8f0", fontFamily: "'JetBrains Mono',monospace" }} />
                     {deleteError && <div className="text-[12px]" style={{ color: "#f87171" }}>{deleteError}</div>}
                     <div className="flex gap-2">
-                      <button onClick={() => { setShowConfirm(false); setConfirmText(""); setDeleteError(""); }}
+                      <button onClick={resetDelete}
                         className="px-4 py-2 rounded-[7px] text-[13px] font-semibold cursor-pointer border transition-all"
                         style={{ background: "transparent", borderColor: "rgba(255,255,255,0.1)", color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
                         Cancel
@@ -249,7 +315,7 @@ export default function Settings() {
                         className="px-4 py-2 rounded-[7px] text-[13px] font-bold border-0 transition-all"
                         style={{
                           background: confirmText === "DELETE" ? "#ef4444" : "rgba(239,68,68,0.2)",
-                          color:      confirmText === "DELETE" ? "#fff" : "#f87171",
+                          color:      confirmText === "DELETE" ? "#fff"    : "#f87171",
                           opacity:    deleting ? 0.6 : 1,
                           cursor:     confirmText !== "DELETE" || deleting ? "not-allowed" : "pointer",
                           fontFamily: "'Outfit',sans-serif",

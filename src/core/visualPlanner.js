@@ -122,17 +122,27 @@ function pickLayout({
   textDensity      = null, // "simple" | "medium" | "rich"
   visualHint       = null, // "text_only" | "stat" | "comparison" | "list" | "faces" | "scene" | "product"
   beatType         = null, // hook|item|fact|stat|reveal|explanation|cta|contrast|tension
+  lastBeatType     = null, // beatType of the immediately preceding beat
 }) {
   console.log("[pickLayout] called with beatType:", beatType, "intent:", intent, "orientation:", orientation);
 
   const level = energyLevel(energy);
-  const layoutIntent = AI_TO_LAYOUT_INTENT[intent] || intent;
+  let resolvedBeatType = beatType;
+
+  // No two CTA layouts back-to-back — if the previous beat was also CTA,
+  // downgrade this beat to an explanation/visual_rest layout pick.
+  if (resolvedBeatType === "cta" && lastBeatType === "cta") {
+    console.log("[pickLayout] double-CTA guard: downgrading beatType to explanation");
+    resolvedBeatType = "explanation";
+  }
+
+  const layoutIntent = AI_TO_LAYOUT_INTENT[resolvedBeatType || intent] || (AI_TO_LAYOUT_INTENT[intent] || intent);
 
   // PRIMARY: beatType filter on structural 'layout' type rows
   // When structural layouts exist in DB, this gives the most accurate zone-structure match.
   // Falls back to intent-based matching when no structural layouts exist yet.
-  let candidates = beatType
-    ? findLayouts({ beatType, type: "layout", orientation })
+  let candidates = resolvedBeatType
+    ? findLayouts({ beatType: resolvedBeatType, type: "layout", orientation })
     : [];
 
   console.log("[pickLayout] step1 structural candidates:", candidates.length, candidates.slice(0,3).map(l => l.id + '/' + (l.name || l.id)));
@@ -258,12 +268,19 @@ function pickLayout({
 
   // Hard guard: never use the same layout as the immediately preceding beat.
   // Applied last — after all other filters — so it overrides every relaxation path.
+  // If the matched pool has only one option (same as last), widen to ALL orientation
+  // layouts before giving up, so we never silently repeat.
   const lastLayoutId = usedLayoutIds.length ? usedLayoutIds[usedLayoutIds.length - 1] : null;
   if (lastLayoutId) {
     const withoutLast = candidates.filter(l => l.id !== lastLayoutId);
-    if (withoutLast.length) candidates = withoutLast;
-    // If no alternative exists in the matched pool, leave candidates as-is rather than
-    // repeat — caller can relax further on next beat.
+    if (withoutLast.length) {
+      candidates = withoutLast;
+    } else {
+      // Pool exhausted — pull from all orientation layouts and exclude only the last one
+      const anyExceptLast = findLayouts({ orientation }).filter(l => l.id !== lastLayoutId);
+      if (anyExceptLast.length) candidates = anyExceptLast;
+      // absolute last resort: keep original candidates (repeat is better than a crash)
+    }
   }
 
   const pickedId = candidates[Math.floor(Math.random() * candidates.length)]?.id || "DuoStackHook";
@@ -470,6 +487,7 @@ export function planBeatVisual({
   textDensity              = null,
   visualHint               = null,
   beatType                 = null,
+  lastBeatType             = null,
 }) {
   const layout = pickLayout({
     intent,
@@ -485,6 +503,7 @@ export function planBeatVisual({
     textDensity,
     visualHint,
     beatType,
+    lastBeatType,
   });
 
   const zones = buildZones({

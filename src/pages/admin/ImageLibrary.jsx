@@ -2,7 +2,7 @@
  * ImageLibrary.jsx
  * Two tabs: User Uploads (user_assets) + AI Generated (ai_image_library).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AdminLayout from "./AdminLayout";
 import { serverFetch } from "../../services/serverApi";
 
@@ -31,14 +31,22 @@ function UserUploads() {
   const [error,    setError]    = useState("");
   const [preview,  setPreview]  = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const cache = useRef({});
 
   async function load(p = page, t = type) {
+    const key = `${t}-${p}`;
+    if (cache.current[key]) {
+      const hit = cache.current[key];
+      setAssets(hit.assets); setTotal(hit.total);
+      return;
+    }
     setLoading(true); setError("");
     try {
       const res = await serverFetch(`/api/admin/user-assets?page=${p}&type=${t}`);
       const d   = await safeJson(res);
-      setAssets(d.assets || []);
-      setTotal(d.total ?? 0);
+      const assets = d.assets || [], total = d.total ?? 0;
+      cache.current[key] = { assets, total };
+      setAssets(assets); setTotal(total);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -52,6 +60,7 @@ function UserUploads() {
     setDeleting(a.id);
     try {
       await safeJson(await serverFetch(`/api/admin/user-assets/${a.id}`, { method: "DELETE" }));
+      cache.current = {};
       setAssets(p => p.filter(x => x.id !== a.id));
       setTotal(t => t - 1);
       if (preview?.id === a.id) setPreview(null);
@@ -153,6 +162,7 @@ function AIImages() {
   const [error,      setError]      = useState("");
   const [preview,    setPreview]    = useState(null);
   const [deleting,   setDeleting]   = useState(null);
+  const cache = useRef({});
 
   useEffect(() => {
     serverFetch("/api/admin/ai-images/filters")
@@ -160,13 +170,20 @@ function AIImages() {
   }, []);
 
   async function load(p = page, n = niche, v = visualType, o = orient) {
+    const key = `${n}-${v}-${o}-${p}`;
+    if (cache.current[key]) {
+      const hit = cache.current[key];
+      setImages(hit.images); setTotal(hit.total);
+      return;
+    }
     setLoading(true); setError("");
     try {
       const params = new URLSearchParams({ page: p, niche: n, visual_type: v, orientation: o });
       const res = await serverFetch(`/api/admin/ai-images?${params}`);
       const d   = await safeJson(res);
-      setImages(d.images || []);
-      setTotal(d.total ?? 0);
+      const images = d.images || [], total = d.total ?? 0;
+      cache.current[key] = { images, total };
+      setImages(images); setTotal(total);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -185,6 +202,7 @@ function AIImages() {
     setDeleting(img.id);
     try {
       await safeJson(await serverFetch(`/api/admin/ai-images/${img.id}`, { method: "DELETE" }));
+      cache.current = {};
       setImages(p => p.filter(x => x.id !== img.id));
       setTotal(t => t - 1);
       if (preview?.id === img.id) setPreview(null);
@@ -248,12 +266,18 @@ function AIImages() {
                     {deleting === img.id ? "…" : "Delete"}
                   </button>
                 </div>
-                <div className="px-2.5 py-2">
-                  <div className="text-xs text-[#aaa] truncate">{img.subject || img.niche || "—"}</div>
-                  <div className="flex gap-1 mt-1 flex-wrap">
+                <div className="px-2.5 py-2 flex flex-col gap-1">
+                  <div className="text-xs text-[#ccc] font-medium truncate">{img.subject || "—"}</div>
+                  {img.niche && <div className="text-[10px] text-[#555] truncate">{img.niche} {img.orientation ? `· ${img.orientation}` : ""}</div>}
+                  <div className="flex gap-1 flex-wrap">
                     {img.visual_type && <span className="text-[10px] text-[#7c5cfc] bg-[#7c5cfc]/10 px-1.5 py-0.5 rounded-full">{img.visual_type}</span>}
                     {img.energy && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ color: energyColor(img.energy), background: energyColor(img.energy) + "22" }}>{img.energy}</span>}
                   </div>
+                  {img.tags?.length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
+                      {img.tags.slice(0, 3).map(t => <span key={t} className="text-[9px] text-[#555] bg-white/[0.04] px-1.5 py-px rounded-full">{t}</span>)}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -267,13 +291,16 @@ function AIImages() {
           onDelete={() => handleDelete(preview)} deleting={deleting === preview?.id}
           renderMedia={() => <img src={preview.src} alt="" className="max-w-full max-h-[50vh] object-contain rounded-lg" />}
           details={[
-            preview.niche       && ["Niche",       preview.niche],
-            preview.visual_type && ["Visual type", preview.visual_type],
-            preview.orientation && ["Orientation", preview.orientation],
-            preview.mood        && ["Mood",        preview.mood],
-            preview.energy      && ["Energy",      preview.energy],
-            preview.width       && ["Size",        `${preview.width}×${preview.height}`],
-            preview.generator   && ["Generator",   preview.generator],
+            preview.subject      && ["Subject",      preview.subject],
+            preview.niche        && ["Niche",        preview.niche],
+            preview.orientation  && ["Orientation",  preview.orientation],
+            preview.visual_type  && ["Visual type",  preview.visual_type],
+            preview.mood         && ["Mood",         preview.mood],
+            preview.energy       && ["Energy",       preview.energy],
+            preview.search_query && ["Search query", preview.search_query],
+            preview.context      && ["Context",      preview.context],
+            preview.width        && ["Size",         `${preview.width}×${preview.height}`],
+            preview.generator    && ["Generator",    preview.generator],
             preview.reuse_count != null && ["Reused", `×${preview.reuse_count}`],
             ["Created", new Date(preview.created_at).toLocaleString()],
           ].filter(Boolean)}
@@ -281,13 +308,13 @@ function AIImages() {
             <>
               {preview.prompt && (
                 <div className="mb-3">
-                  <div className="text-xs text-[#555] uppercase tracking-wider mb-1">Prompt</div>
-                  <div className="text-sm text-[#888] leading-relaxed">{preview.prompt}</div>
+                  <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Prompt</div>
+                  <div className="text-sm text-[#bbb] leading-relaxed">{preview.prompt}</div>
                 </div>
               )}
               {preview.tags?.length > 0 && (
                 <div className="flex gap-1.5 flex-wrap mt-2">
-                  {preview.tags.map(t => <span key={t} className="text-[10px] bg-white/[0.05] text-[#666] px-2 py-0.5 rounded-full">{t}</span>)}
+                  {preview.tags.map(t => <span key={t} className="text-[10px] bg-white/[0.05] text-[#999] px-2 py-0.5 rounded-full">{t}</span>)}
                 </div>
               )}
             </>
@@ -316,6 +343,12 @@ function Pagination({ page, totalPages, total, onPage }) {
 }
 
 function AssetPreviewModal({ asset, onClose, onDelete, deleting, renderMedia, details, extraContent }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-6"
       onClick={e => e.target === e.currentTarget && onClose()}>
@@ -329,9 +362,9 @@ function AssetPreviewModal({ asset, onClose, onDelete, deleting, renderMedia, de
         </div>
         <div className="px-5 py-4 border-t border-white/[0.06] overflow-y-auto" style={{ maxHeight: 200 }}>
           {extraContent}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-[#555]">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-[#888]">
             {details.map(([label, val]) => (
-              <div key={label}>{label}: <span className="text-[#888]">{val}</span></div>
+              <div key={label}>{label}: <span className="text-[#ccc]">{val}</span></div>
             ))}
           </div>
         </div>
@@ -366,7 +399,7 @@ export default function ImageLibrary() {
           { id: "ai",      label: "AI Generated" },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-5 py-2.5 text-sm font-medium cursor-pointer border-b-2 transition-colors -mb-px
+            className={`px-5 py-2.5 text-sm font-medium cursor-pointer border-b-2 bg-black text-[#aaa] transition-colors -mb-px
               ${tab === t.id
                 ? "border-[#7c5cfc] text-white"
                 : "border-transparent text-[#555] hover:text-[#aaa]"}`}>
@@ -375,7 +408,8 @@ export default function ImageLibrary() {
         ))}
       </div>
 
-      {tab === "uploads" ? <UserUploads /> : <AIImages />}
+      <div style={{ display: tab === "uploads" ? "block" : "none" }}><UserUploads /></div>
+      <div style={{ display: tab === "ai"      ? "block" : "none" }}><AIImages /></div>
     </AdminLayout>
   );
 }

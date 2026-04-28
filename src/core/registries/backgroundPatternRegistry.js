@@ -760,11 +760,13 @@ export function getBackgroundForIntent(intent, brightness = null, colorFamily = 
     candidates = Object.keys(backgroundPatternRegistry);
   }
 
-  // colorFamily filter: always apply when a family is specified (not random 40%).
-  // Strong preference — only falls back to full pool if fewer than 2 family matches exist.
+  // colorFamily filter: always apply when a family is specified.
+  // Requires only 1 match so the DNA color family is always honoured — even when the
+  // intent+niche pool is small. Prevents warm-family (red) backgrounds being picked
+  // for videos whose DNA accent is cool or electric.
   if (colorFamily && COLOR_FAMILY_KEYS[colorFamily]) {
     const familyCandidates = candidates.filter(k => COLOR_FAMILY_KEYS[colorFamily].has(k));
-    if (familyCandidates.length >= 2) candidates = familyCandidates;
+    if (familyCandidates.length >= 1) candidates = familyCandidates;
   }
 
   const key = candidates[Math.floor(Math.random() * candidates.length)];

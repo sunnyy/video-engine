@@ -33,11 +33,25 @@ function chooseMotion(beatIndex, zoneIndex) {
   return motions[(beatIndex + zoneIndex) % motions.length];
 }
 
+const STOP_WORDS_MATCHER = new Set([
+  "the","a","an","and","or","but","in","on","at","to","for","of","with","is","are","was",
+  "were","be","been","have","has","had","do","does","did","will","would","could","should",
+  "you","your","we","our","they","their","it","its","this","that","what","how","when",
+  "where","who","not","no","so","just","very","really","one","two","three","like","more",
+]);
+
+function extractKeywords(text) {
+  return [...new Set(
+    (text || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+      .filter(w => w.length > 2 && !STOP_WORDS_MATCHER.has(w))
+  )].slice(0, 5);
+}
+
 /* ── Main export ── */
 export async function autoMatchAssets(
   beats,
   orientation,
-  { assetSource = "ai", uploadedAssets = [], topic = "", language = "english" } = {},
+  { assetSource = "ai", uploadedAssets = [], topic = "", language = "english", dna = null } = {},
 ) {
 
   /* ── User uploaded assets — full priority ── */
@@ -82,20 +96,27 @@ export async function autoMatchAssets(
   beats.forEach((beat, beatIndex) => {
     const assetZones = findAssetZones(beat.layout, beat.zones);
     assetZones.forEach(zoneId => {
+      const spoken     = beat.spoken || topic;
+      const visualHint = beat.visual_hint || "none";
+      const keywords   = extractKeywords(`${spoken} ${topic}`);
+      const assetHint  = keywords.length ? { keywords, visual_type: visualHint } : null;
       zoneJobs.push({
         beatIndex,
         zoneId,
-        spoken:      beat.spoken      || topic,
-        intent:      beat.intent      || "explanation",
-        visual_hint: beat.visual_hint || "none",
+        spoken,
+        intent:      beat.intent || "explanation",
+        visual_hint: visualHint,
         topic,
+        assetHint,
+        dna,
+        beat,
       });
     });
   });
 
   if (!zoneJobs.length) return beats;
 
-  console.log(`[assetAutoMatcher] Generating ${zoneJobs.length} images via Fal.ai...`);
+  console.log(`[assetAutoMatcher] Generating ${zoneJobs.length} images via Fal.ai (library reuse enabled: ${!!dna?.niche})...`);
 
   const images = await generateImages({
     prompts:     zoneJobs,

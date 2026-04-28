@@ -4,7 +4,7 @@
  * Usage: wrap page content with <AppLayout>{children}</AppLayout>
  */
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
 
@@ -87,30 +87,47 @@ const Icons = {
   ),
 };
 
-function NavItem({ icon, label, active, onClick, soon }) {
+function NavItem({ icon, label, to, href, active, soon }) {
   const [hov, setHov] = useState(false);
-  return (
-    <button
-      onClick={soon ? undefined : onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      className="w-full flex items-center gap-[10px] px-3 py-[7px] rounded-[8px] text-left border-0 transition-all"
-      style={{
-        cursor:     soon ? "default" : "pointer",
-        background: active ? "rgba(124,92,252,0.15)" : hov && !soon ? "rgba(255,255,255,0.04)" : "transparent",
-        color:      active ? "#a78bfa" : soon ? "#44444f" : hov ? "#d8d8ea" : "#9494a8",
-      }}
-    >
+
+  const sharedStyle = {
+    display:        "flex",
+    alignItems:     "center",
+    gap:            10,
+    padding:        "7px 12px",
+    borderRadius:   8,
+    textDecoration: "none",
+    border:         "none",
+    transition:     "all 0.15s",
+    cursor:         soon ? "default" : "pointer",
+    background:     active ? "rgba(124,92,252,0.15)" : hov && !soon ? "rgba(255,255,255,0.04)" : "transparent",
+    color:          active ? "#a78bfa" : soon ? "#44444f" : hov ? "#d8d8ea" : "#9494a8",
+    width:          "100%",
+    boxSizing:      "border-box",
+    fontFamily:     "inherit",
+  };
+
+  const inner = (
+    <>
       <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</span>
-      <span className="text-[15px] font-medium flex-1" style={{ fontFamily: "'Syne',sans-serif" }}>{label}</span>
+      <span style={{ fontSize: 15, fontWeight: 500, flex: 1, fontFamily: "'Syne',sans-serif" }}>{label}</span>
       {soon && (
-        <span className="text-[10px] font-bold tracking-wider px-[5px] py-[2px] rounded-[3px]"
-          style={{ background: "rgba(255,255,255,0.05)", color: "#55556a" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 5px", borderRadius: 3, background: "rgba(255,255,255,0.05)", color: "#55556a" }}>
           SOON
         </span>
       )}
-    </button>
+    </>
   );
+
+  const events = {
+    onMouseEnter: () => setHov(true),
+    onMouseLeave: () => setHov(false),
+    style: sharedStyle,
+  };
+
+  if (soon)  return <div {...events}>{inner}</div>;
+  if (href)  return <a href={href} {...events}>{inner}</a>;
+  return <Link to={to} {...events}>{inner}</Link>;
 }
 
 function NavSection({ title, children }) {
@@ -126,7 +143,6 @@ function NavSection({ title, children }) {
 }
 
 export default function AppLayout({ children }) {
-  const navigate  = useNavigate();
   const location  = useLocation();
   const { balance, fetchCredits } = useCreditsStore();
 
@@ -148,21 +164,20 @@ export default function AppLayout({ children }) {
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           <NavSection title="Generate">
-            <NavItem icon={Icons.home}    label="Dashboard"  active={location.pathname === "/dashboard"}        onClick={() => navigate("/dashboard")} />
-            <NavItem icon={Icons.folder}  label="Videos"     active={location.pathname === "/videos"}           onClick={() => navigate("/videos")} />
-            <NavItem icon={Icons.gallery} label="Images"     active={location.pathname === "/image-generation"} onClick={() => navigate("/image-generation")} />
-            <NavItem icon={Icons.mic}     label="Transcribe"   active={location.pathname === "/transcription"}     onClick={() => navigate("/transcription")} />
-            <NavItem icon={Icons.voice}   label="Voice Studio" active={location.pathname === "/tts-studio"}        onClick={() => navigate("/tts-studio")} />
-            <NavItem icon={Icons.ad}      label="Product Ads"  active={location.pathname === "/product-ad-studio"} onClick={() => navigate("/product-ad-studio")} />
-            <NavItem icon={Icons.poster}  label="Poster Studio" active={location.pathname === "/poster-studio"}    onClick={() => navigate("/poster-studio")} />
+            <NavItem icon={Icons.home}    label="Dashboard"      to="/dashboard"         active={location.pathname === "/dashboard"} />
+            <NavItem icon={Icons.folder}  label="Videos"         to="/videos"            active={location.pathname === "/videos"} />
+            <NavItem icon={Icons.gallery} label="Images"         to="/image-generation"  active={location.pathname === "/image-generation"} />
+            <NavItem icon={Icons.mic}     label="Speech to Text" to="/transcription"     active={location.pathname === "/transcription"} />
+            <NavItem icon={Icons.voice}   label="Voiceover"      to="/tts-studio"        active={location.pathname === "/tts-studio"} />
+            <NavItem icon={Icons.ad}      label="Product Ads"    to="/product-ads"       active={location.pathname.startsWith("/product-ads")} />
+            <NavItem icon={Icons.poster}  label="Poster"         to="/poster-studio"     active={location.pathname === "/poster-studio"} />
           </NavSection>
 
           <NavSection title="Account">
-            <NavItem icon={Icons.credits}  label="Credits"   active={location.pathname === "/credits"}  onClick={() => navigate("/credits")} />
-            <NavItem icon={Icons.star}     label="Upgrade"   active={false}                             onClick={() => { window.location.href = "/#pricing"; }} />
-            <NavItem icon={Icons.box}      label="My Files"  active={location.pathname === "/assets"}   onClick={() => navigate("/assets")} />
-            <NavItem icon={Icons.settings} label="Settings"  active={location.pathname === "/settings"} onClick={() => navigate("/settings")} />
-            <NavItem icon={Icons.message}  label="Feedback"  active={location.pathname === "/feedback"} onClick={() => navigate("/feedback")} />
+            <NavItem icon={Icons.credits}  label="Credits"  to="/credits"  active={location.pathname === "/credits"} />
+            <NavItem icon={Icons.star}     label="Upgrade"  href="/#pricing" active={false} />
+            <NavItem icon={Icons.settings} label="Settings" to="/settings" active={location.pathname === "/settings"} />
+            <NavItem icon={Icons.message}  label="Feedback" to="/feedback" active={location.pathname === "/feedback"} />
           </NavSection>
         </nav>
 
@@ -176,7 +191,7 @@ export default function AppLayout({ children }) {
             <span className="font-bold">{balance ?? "—"}</span>
           </div>
           <button
-            onClick={async () => { await signOut(); navigate("/"); }}
+            onClick={async () => { await signOut(); window.location.href = "/"; }}
             className="w-full flex items-center gap-2 px-3 py-[7px] rounded-[8px] text-[15px] border-0 cursor-pointer transition-all text-left"
             style={{ background: "transparent", color: "#f87171", fontFamily: "'Syne',sans-serif" }}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.08)"}

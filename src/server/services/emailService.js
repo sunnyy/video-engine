@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sunny17jpr@gmail.com";
-const FROM_EMAIL  = "Vidquence <onboarding@resend.dev>";
+const FROM_EMAIL  = process.env.FROM_EMAIL || "Vidquence <no-reply@vidquence.com>";
 
 /* ── Base senders ──────────────────────────────────────────── */
 
@@ -192,6 +192,91 @@ export function userLowCreditsEmail(name, balance) {
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">You have <strong style="color:#f97316">${balance} credits</strong> remaining. Top up to keep creating without interruption.</p>
       <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Top Up Credits →</a>
+    `),
+  };
+}
+
+export function userAccountDeletedEmail(name) {
+  return {
+    subject: "Your Vidquence account has been deleted",
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#e8e8f0">Account Deleted</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your Vidquence account and all associated data have been permanently deleted. We're sorry to see you go.</p>
+      <p style="color:#c8c8d8;margin:0">If this was a mistake or you'd like to come back, you're always welcome to create a new account.</p>
+    `),
+  };
+}
+
+export function userPlanUpgradeEmail(name, fromPlan, toPlan, credits) {
+  return {
+    subject: `You've upgraded to ${toPlan}`,
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#a78bfa">Plan Upgraded ⬆️</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your plan has been upgraded from <strong style="color:#e8e8f0">${fromPlan}</strong> to <strong style="color:#a78bfa">${toPlan}</strong>. ${credits} credits have been added to your account.</p>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
+    `),
+  };
+}
+
+export function userPlanRenewalEmail(name, plan, credits, nextRenewal) {
+  return {
+    subject: `Your ${plan} plan has been renewed`,
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#34d399">Plan Renewed 🔁</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan has been renewed and <strong style="color:#34d399">${credits} credits</strong> have been added to your account.</p>
+      <p style="color:#c8c8d8;margin:0 0 24px">Next renewal: <strong style="color:#e8e8f0">${nextRenewal}</strong></p>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
+    `),
+  };
+}
+
+export function userPaymentFailedEmail(name, plan) {
+  return {
+    subject: "Payment failed — action required",
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#ef4444">Payment Failed ❌</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">We were unable to process your payment for the <strong style="color:#e8e8f0">${plan}</strong> plan. Please update your payment method to keep your subscription active.</p>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#ef4444;color:#fff;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Update Payment →</a>
+    `),
+  };
+}
+
+export function userPlanExpiringEmail(name, plan, expiryDate) {
+  return {
+    subject: `Your ${plan} plan expires soon`,
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#f97316">Plan Expiring Soon ⏳</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan expires on <strong style="color:#f97316">${expiryDate}</strong>. Renew now to keep access to all your features and credits.</p>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Renew Plan →</a>
+    `),
+  };
+}
+
+export function userPlanExpiredEmail(name, plan) {
+  return {
+    subject: `Your ${plan} plan has expired`,
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#ef4444">Plan Expired</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan has expired. Resubscribe to unlock all features and get fresh credits.</p>
+      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Resubscribe →</a>
+    `),
+  };
+}
+
+export function userRenderCompleteEmail(name, videoUrl) {
+  return {
+    subject: "Your video is ready 🎬",
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Video Ready! 🎬</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 24px">Your video has finished rendering and is ready to download.</p>
+      <a href="${videoUrl || (process.env.APP_URL || "https://vidquence.com")}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">View Video →</a>
     `),
   };
 }

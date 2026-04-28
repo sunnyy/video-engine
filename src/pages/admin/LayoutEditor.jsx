@@ -196,6 +196,10 @@ export default function LayoutEditor() {
   const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? false);
   const [metaTransitionType, setMetaTransitionType] = useState(layout?.defaultTransition?.type ?? "");
   const [metaTransitionDur,  setMetaTransitionDur]  = useState(layout?.defaultTransition?.duration ?? 12);
+  const [metaThumbnailUrl,   setMetaThumbnailUrl]   = useState(layout?.thumbnail_url ?? "");
+  const [thumbUploading,     setThumbUploading]     = useState(false);
+  const [thumbErr,           setThumbErr]           = useState("");
+  const thumbInputRef = useRef(null);
   /* UI state */
   const [registryReady,   setRegistryReady]   = useState(false);
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
@@ -246,7 +250,7 @@ export default function LayoutEditor() {
         setMetaShowCaption(entry.showCaption ?? true);
         setMetaTransitionType(entry.defaultTransition?.type ?? "");
         setMetaTransitionDur(entry.defaultTransition?.duration ?? 12);
-
+        setMetaThumbnailUrl(entry.thumbnail_url ?? "");
       }
     });
   }, []);
@@ -335,6 +339,20 @@ export default function LayoutEditor() {
     );
   };
 
+  const handleThumbnailUpload = async (file) => {
+    if (!file) return;
+    setThumbUploading(true); setThumbErr("");
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const res  = await serverFetch("/api/admin/layouts/upload-thumbnail", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setMetaThumbnailUrl(data.url);
+    } catch (e) { setThumbErr(e.message); }
+    finally { setThumbUploading(false); }
+  };
+
   const handleSave = async () => {
     if (!metaName.trim() || !metaLabel.trim()) {
       setSaveMsg({ ok:false, text:"Name and label are required" });
@@ -360,6 +378,7 @@ export default function LayoutEditor() {
       visibility:       metaVisibility,
       show_caption:        metaShowCaption,
       default_transition: metaTransitionType ? { type: metaTransitionType, duration: metaTransitionDur } : null,
+      thumbnail_url: metaThumbnailUrl || null,
       // Persist the layout background inside generation_meta (no standalone DB column exists).
       // Merge with any existing generation_meta so we don't clobber other keys.
       generation_meta: {
@@ -641,6 +660,56 @@ export default function LayoutEditor() {
                 </div>
               </div>
             )}
+
+            {/* Thumbnail */}
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>THUMBNAIL</label>
+              <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                {/* Preview */}
+                <div style={{
+                  width: 40, height: 72, borderRadius: 5, overflow:"hidden", flexShrink: 0,
+                  background:"#1a1a26", border:"1px solid rgba(255,255,255,0.1)",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                }}>
+                  {metaThumbnailUrl
+                    ? <img src={metaThumbnailUrl} alt="thumb" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                    : <span style={{ fontSize:16, opacity:0.3 }}>🖼</span>
+                  }
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                  <button
+                    onClick={() => thumbInputRef.current?.click()}
+                    disabled={thumbUploading}
+                    style={{
+                      padding:"5px 12px", borderRadius:5, fontSize:11, fontWeight:700,
+                      background:"rgba(124,92,252,0.15)", border:"1px solid rgba(124,92,252,0.3)",
+                      color:"#a78bfa", cursor:thumbUploading ? "not-allowed" : "pointer",
+                      opacity: thumbUploading ? 0.6 : 1,
+                    }}>
+                    {thumbUploading ? "Uploading…" : metaThumbnailUrl ? "Replace" : "Upload"}
+                  </button>
+                  {metaThumbnailUrl && (
+                    <button
+                      onClick={() => setMetaThumbnailUrl("")}
+                      style={{
+                        padding:"4px 10px", borderRadius:5, fontSize:10, fontWeight:600,
+                        background:"transparent", border:"1px solid rgba(248,113,113,0.3)",
+                        color:"#f87171", cursor:"pointer",
+                      }}>
+                      Remove
+                    </button>
+                  )}
+                  {thumbErr && <div style={{ fontSize:9, color:"#f87171" }}>{thumbErr}</div>}
+                </div>
+              </div>
+              <input
+                ref={thumbInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display:"none" }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleThumbnailUpload(f); e.target.value = ""; }}
+              />
+            </div>
 
           </div>
         </div>

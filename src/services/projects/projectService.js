@@ -1,6 +1,6 @@
 import { supabase } from "../../lib/supabase";
 
-export async function createProject({ name, rawAI, safeProject }) {
+export async function createProject({ name, rawAI, safeProject = null, source = "ai_generated", stepsCompleted = null }) {
   const {
     data: { user },
     error: userError,
@@ -18,8 +18,10 @@ export async function createProject({ name, rawAI, safeProject }) {
         name,
         raw_ai_json: rawAI,
         safe_project_json: safeProject,
-        orientation: safeProject.meta.orientation,
-        mode: safeProject.meta.mode,
+        orientation: safeProject?.meta?.orientation || "9:16",
+        mode: safeProject?.meta?.mode || "faceless",
+        source,
+        steps_completed: stepsCompleted,
       },
     ])
     .select()
@@ -49,7 +51,7 @@ export async function getUserProjects() {
 
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, created_at, updated_at")
+    .select("id, name, created_at, updated_at, source")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 
@@ -57,7 +59,22 @@ export async function getUserProjects() {
   return data;
 }
 
-export async function updateProject(id, safeProject) {
+export async function getProductAdProjects() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, updated_at, steps_completed, raw_ai_json")
+    .eq("user_id", user.id)
+    .eq("source", "product_ad")
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateProject(id, safeProject, extra = {}) {
   const { error } = await supabase
     .from("projects")
     .update({
@@ -65,9 +82,17 @@ export async function updateProject(id, safeProject) {
       orientation: safeProject.meta.orientation,
       mode: safeProject.meta.mode,
       updated_at: new Date().toISOString(),
+      ...extra,
     })
     .eq("id", id);
 
+  if (error) throw error;
+}
+
+export async function updateProjectProgress(id, stepsCompleted, rawAI) {
+  const updates = { steps_completed: stepsCompleted, updated_at: new Date().toISOString() };
+  if (rawAI !== undefined) updates.raw_ai_json = rawAI;
+  const { error } = await supabase.from("projects").update(updates).eq("id", id);
   if (error) throw error;
 }
 

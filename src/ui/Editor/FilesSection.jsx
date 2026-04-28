@@ -5,7 +5,7 @@
  * File manager panel: Global assets (cross-project) + Project-specific assets.
  * Upload, preview, delete. Audio shown as list rows, images/videos as grid.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAssetsStore }   from "../../store/useAssetsStore";
 import { useProjectStore }  from "../../store/useProjectStore";
 import { uploadUserAsset }  from "../../services/assets/uploadUserAsset";
@@ -171,14 +171,48 @@ export default function FilesSection() {
   const fileInputRef = useRef();
 
   const databaseId = useProjectStore(s => s.databaseId);
+  const project    = useProjectStore(s => s.project);
   const { myAssets, loadMyAssets, addMyAsset, removeMyAsset } = useAssetsStore();
 
   useEffect(() => {
     if (databaseId) loadMyAssets(databaseId);
   }, [databaseId]);
 
-  const filtered = myAssets.filter(a => {
-    if (a.project_id !== databaseId) return false;
+  // Extract assets directly from beat zones as fallback for projects
+  // where clips were uploaded before the project was created (project_id: null)
+  const beatAssets = useMemo(() => {
+    if (!project?.beats) return [];
+    const seen = new Set();
+    const assets = [];
+    project.beats.forEach((beat, i) => {
+      Object.values(beat.zones || {}).forEach(zone => {
+        const src  = zone?.content?.asset?.src || zone?.asset?.src;
+        const type = zone?.content?.asset?.type || zone?.asset?.type || "video";
+        if (src && !seen.has(src) && (type === "video" || type === "image")) {
+          seen.add(src);
+          assets.push({
+            id:         `beat-${i}-${src.slice(-8)}`,
+            url:        src,
+            type,
+            name:       `Scene ${i + 1}`,
+            size:       0,
+            project_id: databaseId,
+            scope:      "project",
+            source:     "beat",
+          });
+        }
+      });
+    });
+    return assets;
+  }, [project, databaseId]);
+
+  const allAssets = useMemo(() => {
+    const dbUrls  = new Set(myAssets.map(a => a.url));
+    const beatOnly = beatAssets.filter(a => !dbUrls.has(a.url));
+    return [...myAssets.filter(a => a.project_id === databaseId), ...beatOnly];
+  }, [myAssets, beatAssets, databaseId]);
+
+  const filtered = allAssets.filter(a => {
     if (typeFilter === "Image") return a.type === "image";
     if (typeFilter === "Video") return a.type === "video";
     if (typeFilter === "Audio") return a.type === "audio";

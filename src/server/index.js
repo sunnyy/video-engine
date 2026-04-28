@@ -18,6 +18,9 @@ import {
   adminNewUserEmail, adminUserDeletedEmail, adminCreditsTopupEmail,
   adminNewSaleEmail, adminPlanRenewalEmail, adminPlanUpgradeEmail,
   userWelcomeEmail, userCreditsPurchasedEmail, userLowCreditsEmail,
+  userAccountDeletedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
+  userPaymentFailedEmail, userPlanExpiringEmail, userPlanExpiredEmail,
+  userRenderCompleteEmail,
 } from "./services/emailService.js";
 import axios from "axios";
 import https   from "node:https";
@@ -978,6 +981,7 @@ app.get("/api/proxy-video", (req, res) => {
 
 /* ---------------- COMPRESSION VIDEO ---------------- */
 const upload = multer({ dest: TEMP_DIR });
+const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 /* ── Upload + compress avatar video → Supabase (bypasses client bucket size limit) ── */
 app.post("/api/upload-avatar", requireAuth, upload.single("video"), async (req, res) => {
@@ -1245,6 +1249,14 @@ app.post("/api/render", requireAuth, async (req, res) => {
           created_at: new Date().toISOString(),
         }]);
         console.log("[render] Saved to storage + DB:", videoUrl);
+
+        // Render complete email (fire-and-forget)
+        supabaseAdmin.auth.admin.getUserById(req.user.id).then(({ data: { user } }) => {
+          if (!user?.email) return;
+          const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+          const { subject, html } = userRenderCompleteEmail(name, publicUrl);
+          sendUserEmail(user.email, subject, html);
+        }).catch(() => {});
       }
     } catch (e) {
       console.warn("[render] Post-render save failed:", e.message);
@@ -1428,8 +1440,15 @@ app.post("/api/admin/delete-user", requireAuth, requireAdmin, async (req, res) =
     if (error) throw error;
 
     // Admin alert
-    const { subject, html } = adminUserDeletedEmail({ id: userId, email: deletedUser?.email || "unknown" });
-    await sendAdminAlert(subject, html);
+    const adminEmail = adminUserDeletedEmail({ id: userId, email: deletedUser?.email || "unknown" });
+    sendAdminAlert(adminEmail.subject, adminEmail.html);
+
+    // Farewell email to user
+    if (deletedUser?.email) {
+      const name = deletedUser.user_metadata?.full_name || deletedUser.user_metadata?.name || "";
+      const farewellEmail = userAccountDeletedEmail(name);
+      sendUserEmail(deletedUser.email, farewellEmail.subject, farewellEmail.html);
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -1771,6 +1790,24 @@ app.put("/api/admin/layouts/:id", requireAuth, requireAdmin, async (req, res) =>
   }
 });
 
+// POST upload a layout thumbnail image
+app.post("/api/admin/layouts/upload-thumbnail", requireAuth, requireAdmin, uploadMemory.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file" });
+    const ext = req.file.mimetype.includes("png") ? "png" : "jpg";
+    const key = `layouts/thumbnails/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("user-assets")
+      .upload(key, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    console.error("[admin/layouts/upload-thumbnail]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // DELETE a layout (soft-delete via is_active=false)
 app.delete("/api/admin/layouts/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -1879,6 +1916,7 @@ app.get("/api/admin/user-assets", requireAuth, requireAdmin, async (req, res) =>
     let query = supabaseAdmin
       .from("user_assets")
       .select("id, url, type, name, size, created_at, user_id", { count: "exact" })
+      .not("name", "ilike", "ai-gen-%")
       .order("created_at", { ascending: false })
       .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -2520,7 +2558,7 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
   try {
     const deduction = await deductCredits(req.user.id, 2, "product_ad_analyze", "Product Ad — strategy analysis");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    const { imageUrl } = req.body;
+    const { imageUrl, targetMarket } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
 
     const { getProductAnalysisPrompt } = await import("./prompts/productAdAnalysis.js");
@@ -2538,7 +2576,7 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
         role: "user",
         content: [
           { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
-          { type: "text", text: getProductAnalysisPrompt("auto") },
+          { type: "text", text: getProductAnalysisPrompt({ targetMarket }) },
         ],
       }],
     });
@@ -2562,26 +2600,27 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
 });
 
 // POST /api/product-ad/generate-base-image — Generate one reference image before scene shots
-// Clothing/wearable: nano-banana/edit [modelUrl, productUrl] → model wearing the product
-// Non-worn: Kontext with productUrl → cleaned studio product photo
+// Clothing: nano-banana try-on [model + product] → model wearing the product
+// Wearable + non_worn: nano-banana [product only] → cleaned studio product photo
 app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) => {
   try {
     const deduction = await deductCredits(req.user.id, 5, "product_ad_base_image", "Product Ad — base model image");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    const { productImageUrl, modelImageUrl, category, hasMannequin } = req.body;
+    const { productImageUrl, modelImageUrl, category, hasMannequin, hasWatermark } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
     console.log("[generate-base-image] ── INPUT ──────────────────────");
     console.log("[generate-base-image] category:", category);
     console.log("[generate-base-image] hasMannequin:", hasMannequin);
+    console.log("[generate-base-image] hasWatermark:", hasWatermark);
     console.log("[generate-base-image] productImageUrl:", productImageUrl?.slice(0, 100));
     console.log("[generate-base-image] modelImageUrl:", modelImageUrl?.slice(0, 100) || "NULL — no model provided");
     console.log("[generate-base-image] ───────────────────────────────");
 
     let falUrl;
 
-    if ((category === "clothing" || category === "wearable") && modelImageUrl) {
+    if (category === "clothing" && modelImageUrl) {
       const prompt = hasMannequin
         ? `Can you wear the exact same outfit as the mannequin is wearing in image 2? Keep your face, skin tone, hair, and identity from image 1 completely unchanged. Reproduce every detail of the outfit exactly — same colors, fabric, embroidery, neckline, sleeves, silhouette, borders, and embellishments. Full body visible, natural confident pose, clean studio background, soft professional lighting. Photorealistic, 9:16 vertical portrait.`
         : `Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment-only product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, borders and trims, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer, 9:16 vertical portrait.`;
@@ -2598,17 +2637,17 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
       falUrl = data.images?.[0]?.url;
       console.log("[generate-base-image] extracted falUrl:", falUrl?.slice(0, 100) || "NULL — no URL in response");
     } else {
-      // Enhance/clean product photo via Kontext
-      const prompt = "Professional product photo enhancement. Replace the background with a pure white seamless studio backdrop. Improve lighting to clean directional studio light with soft shadows. Keep the product itself — including all branding, labels, colors, shape, and design — completely unchanged. No people, no props, no text additions. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
-      const falRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
+      // Enhance/clean product photo via nano-banana
+      const prompt = "Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, labels, and shape — completely unchanged. Replace the background with a pure white seamless studio backdrop. Improve lighting to clean directional studio light with soft shadows. Remove any props, clutter, or distractions. No people, no text additions. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
+      const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
         method:  "POST",
         headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body:    JSON.stringify({ image_url: productImageUrl, prompt, guidance_scale: 3.5, num_inference_steps: 28, strength: 0.7 }),
+        body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
       });
       const raw = await falRes.text();
-      console.log("[generate-base-image] kontext status:", falRes.status);
-      console.log("[generate-base-image] kontext response:", raw.slice(0, 300));
-      if (!falRes.ok) throw new Error(`Kontext failed: ${raw.slice(0, 200)}`);
+      console.log("[generate-base-image] nano-banana status:", falRes.status);
+      console.log("[generate-base-image] nano-banana response:", raw.slice(0, 300));
+      if (!falRes.ok) throw new Error(`nano-banana failed: ${raw.slice(0, 200)}`);
       const data = JSON.parse(raw);
       falUrl = data.images?.[0]?.url;
       console.log("[generate-base-image] extracted falUrl:", falUrl?.slice(0, 100) || "NULL — no URL in response");
@@ -2616,27 +2655,26 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
 
     if (!falUrl) throw new Error("No image URL returned from Fal.ai");
 
-    // Post-process: remove watermarks/logos via Kontext
-    try {
-      const cleanRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
-        method:  "POST",
-        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_url:           falUrl,
-          prompt:              "Remove any watermarks, text overlays, logos, copyright notices, or semi-transparent text from this image. Keep everything else completely unchanged — the person, outfit, pose, lighting, and background.",
-          guidance_scale:      3.5,
-          num_inference_steps: 20,
-          strength:            0.4,
-        }),
-      });
-      if (cleanRes.ok) {
-        const cleanData = await cleanRes.json();
-        const cleanedUrl = cleanData.images?.[0]?.url;
-        if (cleanedUrl) falUrl = cleanedUrl;
-        console.log("[generate-base-image] post-watermark-removal url:", falUrl?.slice(0, 100));
+    // Remove watermarks only when the analysis flagged the original product image as having one
+    if (hasWatermark && category !== "clothing") {
+      try {
+        const cleanRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+          method:  "POST",
+          headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_urls: [falUrl],
+            prompt:     "Use the uploaded photo as the product reference. Remove any watermarks, stock-photo text overlays, copyright notices, or semi-transparent text. Keep the product itself — including all branding, labels, colors, shape, and design — completely unchanged.",
+          }),
+        });
+        if (cleanRes.ok) {
+          const cleanData = await cleanRes.json();
+          const cleanedUrl = cleanData.images?.[0]?.url;
+          if (cleanedUrl) falUrl = cleanedUrl;
+          console.log("[generate-base-image] watermark removed, url:", falUrl?.slice(0, 100));
+        }
+      } catch (e) {
+        console.warn("[generate-base-image] watermark removal skipped:", e.message);
       }
-    } catch (e) {
-      console.warn("[generate-base-image] watermark removal skipped:", e.message);
     }
 
     // Proxy to permanent Supabase storage
@@ -2658,18 +2696,24 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
 });
 
 // POST /api/product-ad/generate-images — Generate scene shots using base image reference
+// Routing:
+//   clothing         → nano-banana with model anchor for ALL shots
+//   wearable         → nano-banana with product reference for ALL shots (worn shots described in text prompt)
+//   non_worn         → nano-banana with product reference for ALL shots
 app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
   try {
     const deduction = await deductCredits(req.user.id, 10, "product_ad_scenes", "Product Ad — scene images");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    const { shots, referenceImageUrl } = req.body;
+    const { shots, referenceImageUrl, category, modelImageUrl } = req.body;
     if (!shots?.length || !referenceImageUrl) return res.status(400).json({ error: "shots and referenceImageUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
     console.log("[generate-images] ── INPUT ───────────────────────");
     console.log("[generate-images] shots count:", shots?.length);
+    console.log("[generate-images] category:", category);
     console.log("[generate-images] referenceImageUrl:", referenceImageUrl?.slice(0, 100) || "NULL");
+    console.log("[generate-images] modelImageUrl:", modelImageUrl?.slice(0, 100) || "NULL");
     console.log("[generate-images] ────────────────────────────────");
 
     // Sequential with delay — avoids Fal.ai 429 rate limits under concurrent user load
@@ -2679,49 +2723,50 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
         results.push({ shotId: shot.id, error: "No reference image available", ok: false });
         continue;
       }
+
+      // Determine routing: clothing uses model anchor; everything else uses product reference only
+      const isClothing    = category === "clothing";
+      const hasModelRef   = !!modelImageUrl;
+      const useNanoBanana = isClothing && hasModelRef;
+
+      console.log(`[generate-images] shot=${shot.id} category=${category} useNanoBanana=${useNanoBanana}`);
+
       let lastErr = null;
       let succeeded = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
         try {
-          // Belt-and-suspenders identity anchor prepended to whatever prompt comes from analysis
-          const anchoredPrompt = `Use the uploaded photo as the complete reference. Keep the person's face, identity, skin tone, hair, AND EXACT OUTFIT completely unchanged — do not alter the clothing in any way. Only change the scene environment, background, and lighting as described: ${shot.image_generation_prompt}`;
-          const body = { prompt: anchoredPrompt, image_urls: [referenceImageUrl] };
+          let endpoint, reqBody;
+
+          if (useNanoBanana) {
+            // Clothing (all shots) or wearable worn shots: nano-banana with model reference
+            const anchoredPrompt = isClothing
+              ? `Use the uploaded photo as the complete reference. Keep the person's face, identity, skin tone, hair, and exact outfit completely unchanged — do not alter the clothing in any way. Only change the scene environment, background, and lighting as described: ${shot.image_generation_prompt}`
+              : `Use the uploaded photo as the identity reference. Keep the person's face, skin tone, hair, and identity completely unchanged. ${shot.image_generation_prompt}`;
+            endpoint = "https://fal.run/fal-ai/nano-banana/edit";
+            reqBody  = { prompt: anchoredPrompt, image_urls: [modelImageUrl] };
+            console.log(`[generate-images] shot=${shot.id} → nano-banana (model anchor)`);
+          } else {
+            // Non-worn all shots + wearable product-only shots: nano-banana with product reference
+            endpoint = "https://fal.run/fal-ai/nano-banana/edit";
+            reqBody  = {
+              image_urls: [referenceImageUrl],
+              prompt:     `Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, and shape — completely unchanged. Only change the scene, environment, surface, and lighting as described: ${shot.image_generation_prompt}`,
+            };
+            console.log(`[generate-images] shot=${shot.id} → nano-banana (product-only)`);
+          }
+
           console.log(`[generate-images] shot=${shot.id} index=${index} attempt=${attempt + 1} prompt preview:`, shot.image_generation_prompt?.slice(0, 100));
-          console.log(`[generate-images] shot=${shot.id} nano-banana ref:`, referenceImageUrl?.slice(0, 80));
-          const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+          const falRes = await fetch(endpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-            body:    JSON.stringify(body),
+            body:    JSON.stringify(reqBody),
           });
           if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr.slice(0, 200)); continue; }
-          const data   = await falRes.json();
+          const data = await falRes.json();
           let falUrl = data.images?.[0]?.url;
-          console.log(`[generate-images] shot=${shot.id} nano-banana status:`, falRes.status);
           console.log(`[generate-images] shot=${shot.id} falUrl:`, falUrl?.slice(0, 100) || "NULL");
           if (!falUrl) throw new Error("No image URL from Fal.ai");
-          // Post-process: remove watermarks/logos
-          try {
-            const cleanRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
-              method:  "POST",
-              headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-              body: JSON.stringify({
-                image_url:           falUrl,
-                prompt:              "Remove any watermarks, text overlays, logos, copyright notices, or semi-transparent text from this image. Keep everything else completely unchanged — the person, outfit, pose, lighting, and background.",
-                guidance_scale:      3.5,
-                num_inference_steps: 20,
-                strength:            0.4,
-              }),
-            });
-            if (cleanRes.ok) {
-              const cleanData = await cleanRes.json();
-              const cleanedUrl = cleanData.images?.[0]?.url;
-              if (cleanedUrl) falUrl = cleanedUrl;
-              console.log(`[generate-images] watermark removal done shot=${shot.id}`);
-            }
-          } catch (e) {
-            console.warn(`[generate-images] watermark removal skipped shot=${shot.id}:`, e.message);
-          }
           results.push({ shotId: shot.id, imageUrl: falUrl, ok: true });
           succeeded = true;
           break;
@@ -2771,7 +2816,6 @@ app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
 });
 
 /* ── Poster Studio ── */
-const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 app.get("/api/poster/list", requireAuth, async (req, res) => {
   try {
@@ -4557,6 +4601,20 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
     const periodDays = billingCycle === "annual" ? 365 : 30;
     const periodEnd  = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
 
+    // Detect upgrade vs renewal: check for existing active subscription
+    const { data: existingSub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, plan_id, plans(name, slug)")
+      .eq("user_id", req.user.id)
+      .eq("status", "active")
+      .order("current_period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const isRenewal = existingSub?.plans?.slug === planSlug;
+    const isUpgrade = existingSub && !isRenewal;
+    const prevPlanName = existingSub?.plans?.name || null;
+
     // Insert subscription record
     await supabaseAdmin.from("subscriptions").insert({
       user_id:                req.user.id,
@@ -4581,10 +4639,25 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
     supabaseAdmin.auth.admin.getUserById(req.user.id).then(({ data: { user } }) => {
       if (!user) return;
       const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
-      const adminEmail = adminNewSaleEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2), credits: plan.credits });
-      sendAdminAlert(adminEmail.subject, adminEmail.html);
-      const userEmail = userCreditsPurchasedEmail(name, plan.credits, newBalance);
-      sendUserEmail(user.email, userEmail.subject, userEmail.html);
+      const nextRenewal = periodEnd.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+      if (isRenewal) {
+        const adminEmail = adminPlanRenewalEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2) });
+        sendAdminAlert(adminEmail.subject, adminEmail.html);
+        const userEmail = userPlanRenewalEmail(name, plan.name, plan.credits, nextRenewal);
+        sendUserEmail(user.email, userEmail.subject, userEmail.html);
+      } else if (isUpgrade) {
+        const adminEmail = adminPlanUpgradeEmail({ userEmail: user.email, fromPlan: prevPlanName, toPlan: plan.name, amount: amountINR.toFixed(2) });
+        sendAdminAlert(adminEmail.subject, adminEmail.html);
+        const userEmail = userPlanUpgradeEmail(name, prevPlanName, plan.name, plan.credits);
+        sendUserEmail(user.email, userEmail.subject, userEmail.html);
+      } else {
+        // New subscription
+        const adminEmail = adminNewSaleEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2), credits: plan.credits });
+        sendAdminAlert(adminEmail.subject, adminEmail.html);
+        const userEmail = userCreditsPurchasedEmail(name, plan.credits, newBalance);
+        sendUserEmail(user.email, userEmail.subject, userEmail.html);
+      }
     }).catch(() => {});
 
     res.json({ success: true, credits: plan.credits, balance: newBalance });
@@ -4646,5 +4719,56 @@ app.use(express.static(path.join(PROJECT_ROOT, "dist")));
 app.use((req, res) => {
   res.sendFile(path.join(PROJECT_ROOT, "dist", "index.html"));
 });
+
+/* ── Daily plan expiry check ─────────────────────────────────────────────── */
+async function checkPlanExpiry() {
+  try {
+    const now = new Date();
+    const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const in2Days = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+    // 1. Mark expired subscriptions
+    const { data: expired } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, user_id, plans(name)")
+      .eq("status", "active")
+      .lt("current_period_end", now.toISOString());
+
+    for (const sub of expired || []) {
+      await supabaseAdmin.from("subscriptions").update({ status: "expired" }).eq("id", sub.id);
+      const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(sub.user_id);
+      if (user?.email) {
+        const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+        const { subject, html } = userPlanExpiredEmail(name, sub.plans?.name || "your");
+        sendUserEmail(user.email, subject, html);
+      }
+    }
+    if (expired?.length) console.log(`[expiry] Marked ${expired.length} subscriptions as expired`);
+
+    // 2. Warn subscriptions expiring in 2–3 days (fires once per sub)
+    const { data: expiring } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, user_id, current_period_end, plans(name)")
+      .eq("status", "active")
+      .gte("current_period_end", in2Days.toISOString())
+      .lt("current_period_end", in3Days.toISOString());
+
+    for (const sub of expiring || []) {
+      const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(sub.user_id);
+      if (user?.email) {
+        const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+        const expiryDate = new Date(sub.current_period_end).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+        const { subject, html } = userPlanExpiringEmail(name, sub.plans?.name || "your", expiryDate);
+        sendUserEmail(user.email, subject, html);
+      }
+    }
+    if (expiring?.length) console.log(`[expiry] Sent expiry warnings for ${expiring.length} subscriptions`);
+  } catch (err) {
+    console.error("[expiry] checkPlanExpiry failed:", err.message);
+  }
+}
+
+checkPlanExpiry();
+setInterval(checkPlanExpiry, 24 * 60 * 60 * 1000);
 
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));

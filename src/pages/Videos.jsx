@@ -255,7 +255,8 @@ export default function Videos() {
     }
   };
 
-  const filtered = projects.filter(p =>
+  const videoProjects = projects.filter(p => p.source !== "product_ad");
+  const filtered = videoProjects.filter(p =>
     (p.name || "").toLowerCase().includes(search.toLowerCase())
   );
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
@@ -285,11 +286,11 @@ export default function Videos() {
         <h1 className="text-[20px] font-bold text-[#f5c518]" style={{ fontFamily: "'Syne',sans-serif" }}>
           Videos
           {!loading && (
-            <span className="ml-2 text-[15px] font-normal text-[#77777f]">({projects.length})</span>
+            <span className="ml-2 text-[15px] font-normal text-[#77777f]">({videoProjects.length})</span>
           )}
         </h1>
         <div className="flex items-center gap-3">
-          {projects.length > 4 && (
+          {videoProjects.length > 4 && (
             <input
               value={search}
               onChange={e => handleSearch(e.target.value)}
@@ -315,7 +316,7 @@ export default function Videos() {
           </div>
         )}
 
-        {!loading && projects.length === 0 && (
+        {!loading && videoProjects.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <div className="text-[48px]">🎬</div>
             <div className="text-[20px] font-bold text-[#e8e8f0]">No projects yet</div>
@@ -330,7 +331,7 @@ export default function Videos() {
           </div>
         )}
 
-        {!loading && filtered.length === 0 && projects.length > 0 && (
+        {!loading && filtered.length === 0 && videoProjects.length > 0 && (
           <div className="text-center py-16 text-[15px] text-[#77777f]">No projects match "{search}"</div>
         )}
 

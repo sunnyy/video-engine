@@ -18,7 +18,7 @@ import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
 import Videos         from "./pages/Videos";
-import AIGenerator     from "./pages/AIGenerator";
+import VideoGenerator  from "./pages/VideoGenerator";
 import Editor          from "./pages/Editor";
 import AdminDashboard  from "./pages/admin/AdminDashboard";
 import UserManager     from "./pages/admin/UserManager";
@@ -32,7 +32,8 @@ import Checkout        from "./pages/Checkout";
 import Assets          from "./pages/Assets";
 import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
-import ProductAdStudio from "./pages/ProductAdStudio";
+import ProductAds      from "./pages/ProductAds";
+import NewProductAd    from "./pages/NewProductAd";
 import PosterStudio    from "./pages/PosterStudio";
 import TTSStudio       from "./pages/TTSStudio";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
@@ -114,7 +115,7 @@ export default function App() {
           <>
             <Route path="/dashboard"        element={<Dashboard />} />
             <Route path="/videos"           element={<Videos />} />
-            <Route path="/new"              element={<AIGenerator />} />
+            <Route path="/new"              element={<VideoGenerator />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/transcription"    element={<Transcription />} />
             <Route path="/feedback"         element={<Feedback />} />
@@ -123,7 +124,9 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/editor/:id"       element={<Editor />} />
-            <Route path="/product-ad-studio" element={<ProductAdStudio />} />
+            <Route path="/product-ads"       element={<ProductAds />} />
+            <Route path="/product-ads/new"   element={<NewProductAd />} />
+            <Route path="/product-ad-studio" element={<ProductAds />} />
             <Route path="/poster-studio"     element={<PosterStudio />} />
             <Route path="/tts-studio"        element={<TTSStudio />} />
 

@@ -113,7 +113,7 @@ function buildAdvancedSummary({ tone, audience, brandColor }) {
 
 /* ── Main component ───────────────────────────────────────── */
 
-export default function AIGenerator() {
+export default function VideoGenerator() {
   const navigate = useNavigate();
 
   // Visible fields
@@ -172,7 +172,7 @@ export default function AIGenerator() {
         beats: [defaultBeat],
         workflow: { script_completed: false, avatar_completed: false, beats_initialized: false },
       });
-      const saved = await createProject({ name: "Untitled Project", rawAI: {}, safeProject });
+      const saved = await createProject({ name: "Untitled Project", rawAI: {}, safeProject, source: "scratch" });
       navigate(`/editor/${saved.id}`);
     } catch (err) {
       setError(err.message || "Failed to create project.");
@@ -256,7 +256,7 @@ export default function AIGenerator() {
         dna: null, audio: { tts: null, music: null }, beats: [],
         workflow: { script_completed: false, avatar_completed: false, beats_initialized: false },
       });
-      const saved = await createProject({ name: projectName, rawAI: {}, safeProject: placeholder });
+      const saved = await createProject({ name: projectName, rawAI: {}, safeProject: placeholder, source: "ai_generated" });
       projectId = saved.id;
 
       /* Script + images (no TTS for talking head — audio comes from uploaded video) */

@@ -23,6 +23,7 @@ import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
 import { validateAIOutputs }  from "./ai/aiOutputValidator";
 import { getTypographyForRole } from "./videoDNA.js";
 import { getPattern } from "../services/ai/patterns";
+import { serverFetch } from "../services/serverApi";
 
 /* ── Helpers ── */
 function words(text) {
@@ -235,7 +236,7 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
           kind: "asset",
           asset: { src: null, type: "image", objectFit: "cover" },
         },
-        style: {},
+        style: { ...(zoneDef.style ?? {}) },
       };
     } else if (zoneDef.type === "decorative") {
       const br      = zoneDef.style?.borderRadius ?? 0;
@@ -478,11 +479,22 @@ function fillTextZones(beats, colorOptions = {}) {
 // Applies the DNA accent/primary color to decorative zones whose color was NOT
 // explicitly set by the layout designer (i.e. they were left at the default white).
 // Designer-pinned colors are always respected.
+// Maps background works_with tokens → actual hex values usable as shape colors
+const WORKS_WITH_HEX = {
+  white:  "#ffffff",
+  yellow: "#f5c518",
+  gold:   "#f59e0b",
+  black:  "#111118",
+  dark:   "#1a1a2e",
+  navy:   "#1e293b",
+};
+
 function fillDecorativeZones(beats, colorOptions = {}) {
-  const accent  = colorOptions.colorStory?.primary
+  const dnaAccent = colorOptions.colorStory?.primary
     || colorOptions.dna?.colorStory?.primary
     || "#7c5cfc";
-  const accent2 = colorOptions.brandColor || accent;
+  const brandAccent = colorOptions.brandColor || dnaAccent;
+  const lockedBgKey = colorOptions.lockedBgKey || null;
 
   return beats.map(beat => {
     const def = getLayoutDef(beat.layout);
@@ -493,13 +505,25 @@ function fillDecorativeZones(beats, colorOptions = {}) {
 
     const zones = { ...beat.zones };
 
+    // Derive a shape color that works with this beat's actual background
+    const bgKey   = (beat.layoutBackground?.type === "pattern" ? beat.layoutBackground.value : null) || lockedBgKey;
+    const bgEntry = bgKey ? backgroundPatternRegistry[bgKey] : null;
+    const worksWith = bgEntry?.works_with || [];
+
+    // Prefer a color from the background's works_with list; fall back to DNA accent
+    let accent  = dnaAccent;
+    let accent2 = brandAccent;
+    if (worksWith.length) {
+      const mapped = worksWith.map(w => WORKS_WITH_HEX[w]).filter(Boolean);
+      if (mapped.length >= 1) accent  = mapped[0];
+      if (mapped.length >= 2) accent2 = mapped[1];
+      else                    accent2 = accent;
+    }
+
     decorativeZones.forEach((zoneDef, idx) => {
       const existing = zones[zoneDef.id];
-      // Only skip if user explicitly pinned a color in the editor.
-      // Never skip based on the layout's baked color — DNA always recolors decoratives.
       if (existing?.style?._userColor) return;
 
-      // Alternate between accent and accent2 for visual variety when multiple decoratives exist
       const themeColor = idx % 2 === 0 ? accent : accent2;
 
       zones[zoneDef.id] = {
@@ -642,6 +666,48 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
   return { backgroundKey: lockedBg.key, ctaBackgroundKey: ctaBg.key, layoutFamily: finalFamily, colorLocked };
 }
 
+/* ── Remove background for zones with transparentAsset flag ── */
+async function applyTransparentAssets(beats) {
+  const jobs = [];
+  beats.forEach((beat, beatIndex) => {
+    const layoutDef = getLayoutDef(beat.layout);
+    if (!layoutDef) return;
+    layoutDef.zones.forEach(defZone => {
+      if (!defZone.style?.transparentAsset) return;
+      const bz  = beat.zones?.[defZone.id];
+      const src = bz?.content?.asset?.src;
+      if (!src) return;
+      jobs.push({ beatIndex, zoneId: defZone.id, src });
+    });
+  });
+  if (!jobs.length) return beats;
+
+  const updatedBeats = beats.map(b => ({ ...b, zones: { ...b.zones } }));
+  await Promise.all(jobs.map(async ({ beatIndex, zoneId, src }) => {
+    try {
+      const res  = await serverFetch("/api/admin/remove-background", {
+        method: "POST",
+        body:   JSON.stringify({ imageUrl: src }),
+      });
+      const data = await res.json();
+      if (data.transparentUrl) {
+        const beat = updatedBeats[beatIndex];
+        const zone = beat.zones[zoneId];
+        updatedBeats[beatIndex].zones[zoneId] = {
+          ...zone,
+          content: {
+            ...zone.content,
+            asset: { ...(zone.content?.asset ?? {}), src: data.transparentUrl },
+          },
+        };
+      }
+    } catch (e) {
+      console.warn("[buildBeats] transparentAsset rembg failed:", zoneId, e.message);
+    }
+  }));
+  return updatedBeats;
+}
+
 /* ── Main pipeline ── */
 export async function buildBeatsFromScript({
   script           = "",
@@ -704,6 +770,7 @@ export async function buildBeatsFromScript({
   let usedLayoutIds = [];
   let lastMotion    = null;
   let lastSFXKey    = null;
+  let lastBeatType  = null;
 
   /* ── VIDEO-LEVEL VISUAL SYSTEM — locked once for the whole video ── */
   const visualSystem = planVideoVisualSystem(sourceBeats, dna, orientation);
@@ -749,6 +816,7 @@ export async function buildBeatsFromScript({
       textDensity:      item.text_density       ?? null,
       visualHint:       item.visual_hint        ?? null,
       beatType:         item.beatType           ?? null,
+      lastBeatType,
     });
 
     const isLastBeat = index === total - 1;
@@ -760,6 +828,7 @@ export async function buildBeatsFromScript({
     };
 
     usedLayoutIds = [...usedLayoutIds, visual.layout];
+    lastBeatType  = item.beatType ?? null;
     const z1Motion = visual.zones?.z1?.content?.asset?.motion;
     if (z1Motion) lastMotion = z1Motion;
 
@@ -875,6 +944,7 @@ export async function buildBeatsFromScript({
     dna,
     colorStory:  dna?.colorStory  || null,
     brandColor:  brandColor       || null,
+    lockedBgKey: visualSystem.backgroundKey || null,
   });
 
   /* ── Assign asset zone visual styling: border radius, animated border, shine ── */
@@ -894,7 +964,8 @@ export async function buildBeatsFromScript({
   });
 
 
-  beats = await autoMatchAssets(beats, orientation, { assetSource, uploadedAssets, topic, language });
+  beats = await autoMatchAssets(beats, orientation, { assetSource, uploadedAssets, topic, language, dna });
+  beats = await applyTransparentAssets(beats);
   beats = applyBeatVariation(beats);
   beats = applyCaptionEmphasis(beats);
 
