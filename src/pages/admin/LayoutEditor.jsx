@@ -610,7 +610,7 @@ export default function LayoutEditor() {
                   <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                     {[["Top", 10], ["Center", 50], ["Bottom", 80]].map(([lbl, val]) => (
                       <button key={lbl} onClick={() => setMetaCaptionPosition(val)}
-                        style={{ padding:"4px 10px", borderRadius:4, border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                        style={{ padding:"4px 10px", borderRadius:4, cursor:"pointer", fontSize:11, fontWeight:600,
                           background: metaCaptionPosition === val ? "#7c5cfc" : "#0d0d18",
                           color: metaCaptionPosition === val ? "#fff" : "#666",
                           border: "1px solid rgba(255,255,255,0.1)" }}>
