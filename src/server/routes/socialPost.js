@@ -61,16 +61,16 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    // Step 3 — gpt-image-2/edit when image provided, gpt-image-2 for text-only
-    const GPT_SIZE = { "1:1": "1024x1024", "4:5": "1024x1536", "9:16": "1024x1536" };
-    const imageSize = GPT_SIZE[aspectRatio] || "1024x1024";
+    // Step 3 — flux-pro/v2/edit when image provided, flux-pro/v2 for text-only
+    const FLUX_SIZE = { "1:1": "square_hd", "4:5": { width: 1024, height: 1280 }, "9:16": "portrait_16_9" };
+    const imageSize = FLUX_SIZE[aspectRatio] || "square_hd";
 
     const hasImage  = !!(referenceImageUrl || logoUrl);
     const imageUrl  = referenceImageUrl || logoUrl;
-    const endpoint  = hasImage ? "https://fal.run/openai/gpt-image-2/edit" : "https://fal.run/openai/gpt-image-2";
+    const endpoint  = hasImage ? "https://fal.run/fal-ai/flux-pro/v2/edit" : "https://fal.run/fal-ai/flux-pro/v2";
     const finalBody = hasImage
-      ? { image_urls: [imageUrl], prompt: optimizedPrompt, size: imageSize }
-      : { prompt: optimizedPrompt, size: imageSize };
+      ? { image_url: imageUrl, prompt: optimizedPrompt, image_size: imageSize }
+      : { prompt: optimizedPrompt, image_size: imageSize };
 
     console.log("[social-post/generate] calling fal:", endpoint, "size:", imageSize, "hasImage:", hasImage);
     const falAbort = new AbortController();
