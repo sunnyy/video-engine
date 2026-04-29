@@ -72,15 +72,26 @@ router.post("/generate", requireAuth, async (req, res) => {
       ? { image_urls: [imageUrl], prompt: optimizedPrompt, size: imageSize }
       : { prompt: optimizedPrompt, size: imageSize };
 
-    const falRes = await fetch(endpoint, {
-      method:  "POST",
-      headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify(finalBody),
-    });
+    console.log("[social-post/generate] calling fal:", endpoint, "size:", imageSize, "hasImage:", hasImage);
+    const falAbort = new AbortController();
+    const falTimeout = setTimeout(() => falAbort.abort(), 90_000);
+    let falRes;
+    try {
+      falRes = await fetch(endpoint, {
+        method:  "POST",
+        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body:    JSON.stringify(finalBody),
+        signal:  falAbort.signal,
+      });
+    } finally {
+      clearTimeout(falTimeout);
+    }
+    console.log("[social-post/generate] fal status:", falRes.status);
     if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
     const data   = await falRes.json();
+    console.log("[social-post/generate] fal response keys:", Object.keys(data));
     const falUrl = data.images?.[0]?.url;
-    if (!falUrl) throw new Error("No image returned");
+    if (!falUrl) throw new Error(`No image returned. Response: ${JSON.stringify(data).slice(0, 200)}`);
 
     // Proxy to Supabase
     const imgRes = await fetch(falUrl);
