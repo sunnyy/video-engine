@@ -69,7 +69,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     const imageUrl  = referenceImageUrl || logoUrl;
     const endpoint  = hasImage ? "https://fal.run/openai/gpt-image-2/edit" : "https://fal.run/openai/gpt-image-2";
     const finalBody = hasImage
-      ? { image_url: imageUrl, prompt: optimizedPrompt, size: imageSize }
+      ? { image_urls: [imageUrl], prompt: optimizedPrompt, size: imageSize }
       : { prompt: optimizedPrompt, size: imageSize };
 
     const falRes = await fetch(endpoint, {
