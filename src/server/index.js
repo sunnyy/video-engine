@@ -31,14 +31,6 @@ import { fileURLToPath } from "url";
 
 console.log("Server starting...", new Date().toISOString());
 
-try {
-  const { execSync } = await import("node:child_process");
-  const v = execSync("ffmpeg -version").toString().split("\n")[0];
-  console.log("[startup] ffmpeg:", v);
-} catch (e) {
-  console.log("[startup] ffmpeg NOT found:", e.message);
-}
-
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
   process.exit(1);
