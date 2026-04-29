@@ -77,12 +77,33 @@ const Icons = {
       <line x1="8" y1="23" x2="16" y2="23"/>
     </svg>
   ),
+  outfit: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/>
+    </svg>
+  ),
   poster: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="2" width="18" height="20" rx="2"/>
       <line x1="7" y1="7" x2="17" y2="7"/>
       <line x1="7" y1="11" x2="17" y2="11"/>
       <line x1="7" y1="15" x2="13" y2="15"/>
+    </svg>
+  ),
+  thumbnail: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2"/>
+      <circle cx="8.5" cy="11" r="1.5"/>
+      <polyline points="14 9 22 9"/>
+      <polyline points="14 13 22 13"/>
+      <polyline points="14 17 18 17"/>
+    </svg>
+  ),
+  captions: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <line x1="6" y1="10" x2="18" y2="10"/>
+      <line x1="6" y1="14" x2="14" y2="14"/>
     </svg>
   ),
 };
@@ -167,10 +188,13 @@ export default function AppLayout({ children }) {
             <NavItem icon={Icons.home}    label="Dashboard"      to="/dashboard"         active={location.pathname === "/dashboard"} />
             <NavItem icon={Icons.folder}  label="Videos"         to="/videos"            active={location.pathname === "/videos"} />
             <NavItem icon={Icons.gallery} label="Images"         to="/image-generation"  active={location.pathname === "/image-generation"} />
-            <NavItem icon={Icons.mic}     label="Speech to Text" to="/transcription"     active={location.pathname === "/transcription"} />
+            <NavItem icon={Icons.mic}      label="Speech to Text" to="/transcription"     active={location.pathname === "/transcription"} />
+            <NavItem icon={Icons.captions} label="Captions"       to="/captions"          active={location.pathname === "/captions"} />
             <NavItem icon={Icons.voice}   label="Voiceover"      to="/tts-studio"        active={location.pathname === "/tts-studio"} />
             <NavItem icon={Icons.ad}      label="Product Ads"    to="/product-ads"       active={location.pathname.startsWith("/product-ads")} />
-            <NavItem icon={Icons.poster}  label="Poster"         to="/poster-studio"     active={location.pathname === "/poster-studio"} />
+            <NavItem icon={Icons.outfit}  label="Outfit Studio"  to="/outfit-studio"     active={location.pathname === "/outfit-studio"} />
+            <NavItem icon={Icons.poster}     label="Poster"     to="/poster-studio" active={location.pathname === "/poster-studio"} />
+            <NavItem icon={Icons.thumbnail}  label="Thumbnail"  to="/thumbnail"     active={location.pathname.startsWith("/thumbnail")} />
           </NavSection>
 
           <NavSection title="Account">

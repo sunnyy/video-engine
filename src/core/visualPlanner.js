@@ -123,6 +123,7 @@ function pickLayout({
   visualHint       = null, // "text_only" | "stat" | "comparison" | "list" | "faces" | "scene" | "product"
   beatType         = null, // hook|item|fact|stat|reveal|explanation|cta|contrast|tension
   lastBeatType     = null, // beatType of the immediately preceding beat
+  talkingHead      = undefined,
 }) {
   console.log("[pickLayout] called with beatType:", beatType, "intent:", intent, "orientation:", orientation);
 
@@ -142,7 +143,7 @@ function pickLayout({
   // When structural layouts exist in DB, this gives the most accurate zone-structure match.
   // Falls back to intent-based matching when no structural layouts exist yet.
   let candidates = resolvedBeatType
-    ? findLayouts({ beatType: resolvedBeatType, type: "layout", orientation })
+    ? findLayouts({ beatType: resolvedBeatType, type: "layout", orientation, talkingHead })
     : [];
 
   console.log("[pickLayout] step1 structural candidates:", candidates.length, candidates.slice(0,3).map(l => l.id + '/' + (l.name || l.id)));
@@ -150,39 +151,39 @@ function pickLayout({
 
   // beatType + orientation yielded nothing — try type='layout' with intent
   if (!candidates.length) {
-    candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, type: "layout" });
+    candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, type: "layout", talkingHead });
     if (candidates.length) console.log("[pickLayout] falling back to step2a (intent+energy+layout type):", candidates.length);
   }
   if (!candidates.length) {
-    candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout" });
+    candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout", talkingHead });
     if (candidates.length) console.log("[pickLayout] falling back to step2b (intent+layout type):", candidates.length);
   }
   if (!candidates.length) {
-    candidates = findLayouts({ orientation, type: "layout" });
+    candidates = findLayouts({ orientation, type: "layout", talkingHead });
     if (candidates.length) console.log("[pickLayout] falling back to step2c (orientation+layout type):", candidates.length);
   }
 
   // No structural layouts in DB yet — fall back to all layouts (templates) by intent
   if (!candidates.length) {
-    candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, niche });
+    candidates = findLayouts({ intent: layoutIntent, energy: level, orientation, niche, talkingHead });
     if (candidates.length) console.log("[pickLayout] falling back to step3a (intent+energy+niche):", candidates.length);
   }
   if (!candidates.length) {
-    candidates = findLayouts({ intent: layoutIntent, orientation, niche });
+    candidates = findLayouts({ intent: layoutIntent, orientation, niche, talkingHead });
     if (candidates.length) console.log("[pickLayout] falling back to step3b (intent+niche):", candidates.length);
   }
   if (!candidates.length) {
-    candidates = findLayouts({ intent: layoutIntent, orientation });
+    candidates = findLayouts({ intent: layoutIntent, orientation, talkingHead });
     if (candidates.length) console.log("[pickLayout] falling back to step3c (intent only):", candidates.length);
   }
   if (!candidates.length) {
-    candidates = findLayouts({ orientation });
+    candidates = findLayouts({ orientation, talkingHead });
     if (candidates.length) console.log("[pickLayout] falling back to step3d (orientation only):", candidates.length);
   }
 
   // Last resort — any layout
   if (!candidates.length) {
-    candidates = findLayouts({});
+    candidates = findLayouts({ talkingHead });
     console.log("[pickLayout] falling back to step4 (any):", candidates.length);
   }
 
@@ -193,7 +194,7 @@ function pickLayout({
     if (withAsset.length) candidates = withAsset;
     // If no intent-matched layout has an asset zone, fall back to all asset-zone layouts
     else {
-      const allAsset = findLayouts({}).filter(l => (l.def?.assetCount ?? 0) >= 1);
+      const allAsset = findLayouts({ talkingHead }).filter(l => (l.def?.assetCount ?? 0) >= 1);
       if (allAsset.length) candidates = allAsset;
     }
   }
@@ -302,7 +303,7 @@ function buildZones({ layoutId, energy, lastMotion, beatIndex, motionStyle, inte
 
 
   def.zones.forEach((zone, i) => {
-    if (zone.type === "asset") {
+    if (zone.type === "asset" || zone.type === "avatar") {
       const motion = pickMotion(energy, beatIndex + i, lastMotion, motionStyle);
       zones[zone.id] = {
         content: {
@@ -489,6 +490,7 @@ export function planBeatVisual({
   beatType                 = null,
   lastBeatType             = null,
 }) {
+  const talkingHead = _mode === "talking_head" ? true : false;
   const layout = pickLayout({
     intent,
     energy,
@@ -504,6 +506,7 @@ export function planBeatVisual({
     visualHint,
     beatType,
     lastBeatType,
+    talkingHead,
   });
 
   const zones = buildZones({

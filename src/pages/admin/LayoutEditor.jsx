@@ -194,6 +194,7 @@ export default function LayoutEditor() {
   const [metaBeatType,     setMetaBeatType]     = useState(layout?.beatType    ?? "");
   const [metaVisibility,   setMetaVisibility]   = useState(layout?.visibility  ?? "active");
   const [metaShowCaption,    setMetaShowCaption]    = useState(layout?.showCaption ?? false);
+  const [metaCaptionPosition, setMetaCaptionPosition] = useState(layout?.captionPosition ?? 80);
   const [metaTransitionType, setMetaTransitionType] = useState(layout?.defaultTransition?.type ?? "");
   const [metaTransitionDur,  setMetaTransitionDur]  = useState(layout?.defaultTransition?.duration ?? 12);
   const [metaThumbnailUrl,   setMetaThumbnailUrl]   = useState(layout?.thumbnail_url ?? "");
@@ -248,6 +249,7 @@ export default function LayoutEditor() {
         setMetaBeatType(entry.beatType ?? "");
         setMetaVisibility(entry.visibility ?? "active");
         setMetaShowCaption(entry.showCaption ?? true);
+        setMetaCaptionPosition(entry.captionPosition ?? 80);
         setMetaTransitionType(entry.defaultTransition?.type ?? "");
         setMetaTransitionDur(entry.defaultTransition?.duration ?? 12);
         setMetaThumbnailUrl(entry.thumbnail_url ?? "");
@@ -377,6 +379,7 @@ export default function LayoutEditor() {
       beat_type:        metaType === "layout" && metaBeatType ? metaBeatType : null,
       visibility:       metaVisibility,
       show_caption:        metaShowCaption,
+      caption_position:    metaCaptionPosition,
       default_transition: metaTransitionType ? { type: metaTransitionType, duration: metaTransitionDur } : null,
       thumbnail_url: metaThumbnailUrl || null,
       // Persist the layout background inside generation_meta (no standalone DB column exists).
@@ -585,7 +588,7 @@ export default function LayoutEditor() {
             </div>
 
             {/* Captions */}
-            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
               <label style={{ fontSize:14, color:"#555", fontFamily:"monospace" }}>CAPTIONS</label>
               <div style={{ display:"flex", background:"#0d0d18", borderRadius:5, overflow:"hidden",
                 border:"1px solid rgba(255,255,255,0.1)" }}>
@@ -601,6 +604,29 @@ export default function LayoutEditor() {
                   );
                 })}
               </div>
+              {metaShowCaption && (
+                <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                  <label style={{ fontSize:11, color:"#444", fontFamily:"monospace" }}>POSITION (% from top)</label>
+                  <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                    {[["Top", 10], ["Center", 50], ["Bottom", 80]].map(([lbl, val]) => (
+                      <button key={lbl} onClick={() => setMetaCaptionPosition(val)}
+                        style={{ padding:"4px 10px", borderRadius:4, border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                          background: metaCaptionPosition === val ? "#7c5cfc" : "#0d0d18",
+                          color: metaCaptionPosition === val ? "#fff" : "#666",
+                          border: "1px solid rgba(255,255,255,0.1)" }}>
+                        {lbl}
+                      </button>
+                    ))}
+                    <input
+                      type="number" min={0} max={100}
+                      value={metaCaptionPosition}
+                      onChange={e => setMetaCaptionPosition(Number(e.target.value))}
+                      style={{ width:54, padding:"3px 6px", background:"#0d0d18", border:"1px solid rgba(255,255,255,0.1)",
+                        borderRadius:4, color:"#e8e8f0", fontSize:11, textAlign:"center", outline:"none" }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Default transition */}

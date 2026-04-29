@@ -154,9 +154,9 @@ export const textStylePresets = [
       fontSize: 96,
       fontWeight: 900,
       fontFamily: "'Unbounded', sans-serif",
-      color: "#00f2ea",
+      color: "#f5c518",
       textAlign: "center",
-      textShadow: "0 0 20px rgba(0,242,234,0.9), 0 0 60px rgba(0,242,234,0.4)",
+      textShadow: "0 0 20px rgba(245,197,24,0.9), 0 0 60px rgba(245,197,24,0.4)",
       letterSpacing: "-1px",
       lineHeight: 1.0,
     }
@@ -682,9 +682,9 @@ export const textStylePresets = [
       fontSize:      56,
       fontWeight:    900,
       fontFamily:    "'Unbounded', sans-serif",
-      color:         "#00f2ea",
+      color:         "#f5c518",
       textAlign:     "center",
-      textShadow:    "0 0 20px rgba(0,242,234,0.8), 0 0 40px rgba(0,242,234,0.4)",
+      textShadow:    "0 0 20px rgba(245,197,24,0.8), 0 0 40px rgba(245,197,24,0.4)",
       letterSpacing: "-1px",
       lineHeight:    1.0,
     }

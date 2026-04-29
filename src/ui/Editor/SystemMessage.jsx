@@ -54,12 +54,6 @@ function analyzeProject(project) {
     messages.push({ type: "tip", icon: "🎙️", text: "No voice/TTS uploaded. Add one in the Audio tab for best results." });
   }
 
-  // All same layout
-  const layouts = beats.map(b => b.layout);
-  const uniqueLayouts = new Set(layouts);
-  if (uniqueLayouts.size === 1 && beats.length > 2) {
-    messages.push({ type: "tip", icon: "🎨", text: "All beats use the same layout. Consider varying them for more visual interest." });
-  }
 
   // Useless background (scale 100% + colored bg = bg invisible)
   const hiddenBg = beats.filter(b =>

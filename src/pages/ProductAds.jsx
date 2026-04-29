@@ -19,15 +19,19 @@ function AdCard({ project, onDelete }) {
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
 
-  const isComplete  = (project.steps_completed ?? 5) >= 5;
-  const stepLabel   = STEP_LABELS[project.steps_completed] ?? "Complete";
+  const isComplete  = (project.steps_completed ?? 0) >= 5;
+  const stepLabel   = STEP_LABELS[project.steps_completed] ?? "In Progress";
   const productType = project.raw_ai_json?.analysis?.product_analysis?.product_type;
+
+  const d = project.raw_ai_json || {};
+  const firstSceneImg = d.images ? Object.values(d.images).find(v => v?.url)?.url : null;
+  const previewImg = d.base_image_url || firstSceneImg || d.product_image_url || null;
 
   function handleClick() {
     if (isComplete) {
       navigate(`/editor/${project.id}`);
     } else {
-      navigate("/product-ads/new");
+      navigate(`/product-ads/new?resume=${project.id}`);
     }
   }
 
@@ -53,10 +57,13 @@ function AdCard({ project, onDelete }) {
         boxShadow:    hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
       }}
     >
-      {/* Thumbnail placeholder */}
+      {/* Thumbnail */}
       <div style={{ paddingTop: "56.25%", position: "relative", background: "linear-gradient(135deg,#1a0a1a,#2d0d2d,#4a1a4a)" }}>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontSize: 32, opacity: 0.4 }}>🎬</span>
+          {previewImg
+            ? <img src={previewImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            : <span style={{ fontSize: 32, opacity: 0.4 }}>🎬</span>
+          }
         </div>
         {/* Status badge */}
         <div style={{ position: "absolute", top: 8, left: 8 }}>
@@ -138,8 +145,8 @@ export default function ProductAds() {
     }
   }
 
-  const incomplete = projects.filter(p => (p.steps_completed ?? 5) < 5);
-  const complete   = projects.filter(p => (p.steps_completed ?? 5) >= 5);
+  const incomplete = projects.filter(p => (p.steps_completed ?? 0) < 5);
+  const complete   = projects.filter(p => (p.steps_completed ?? 0) >= 5);
 
   return (
     <AppLayout>

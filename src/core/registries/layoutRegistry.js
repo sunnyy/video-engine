@@ -95,7 +95,7 @@ function normalize(row) {
     // Old code reads layoutRegistry[id].zones as an array of zone-ID strings
     zones:           zones.map(z => z.id),
     supportsAvatar:  zones.some(z => z.content?.kind === "avatar"),
-    captionPosition: 80,
+    captionPosition: row.caption_position ?? 80,
     structure:       { heading: true, blocks: true, caption: true },
     // def = full row (def.zones = full zone objects — used by LayoutRenderer, visualPlanner, etc.)
     def: row,
@@ -174,8 +174,8 @@ export function getLayoutsByNiche(niche) {
   return _rows.filter(l => !l.niche.length || l.niche.includes(niche));
 }
 
-export function findLayouts({ intent, energy, orientation, assetCount, textCount, niche, type, beatType, includeInactive = false } = {}) {
-  console.log("[findLayouts] called with:", JSON.stringify({ intent, energy, orientation, niche, type, beatType }));
+export function findLayouts({ intent, energy, orientation, assetCount, textCount, niche, type, beatType, talkingHead, includeInactive = false } = {}) {
+  console.log("[findLayouts] called with:", JSON.stringify({ intent, energy, orientation, niche, type, beatType, talkingHead }));
   console.log("[findLayouts] total registry size:", _rows.length, "| type=layout count:", _rows.filter(l => l.type === "layout").length);
   return _rows.filter(l => {
     if (!includeInactive && !l.isActive)                                  return false; // skip inactive unless explicitly requested
@@ -187,6 +187,8 @@ export function findLayouts({ intent, energy, orientation, assetCount, textCount
     if (assetCount  !== undefined && l.assetCount !== assetCount)         return false;
     if (textCount   !== undefined && l.textCount  !== textCount)          return false;
     if (niche && l.niche.length > 0 && !l.niche.includes(niche))         return false;
+    if (talkingHead === true  && !l.tags.includes("talking_head"))        return false;
+    if (talkingHead === false &&  l.tags.includes("talking_head"))        return false;
     return true;
   });
 }

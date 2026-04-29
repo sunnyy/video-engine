@@ -33,7 +33,7 @@ export default function Caption({ caption, beat, project }) {
   const brandColor = project?.meta?.brand?.color
     ?? project?.meta?.brand_color
     ?? project?.visualIdentity?.colorStory?.accent
-    ?? "#00F2EA";
+    ?? "#f5c518";
 
   const brandFont = project?.meta?.brand?.font ?? null;
 

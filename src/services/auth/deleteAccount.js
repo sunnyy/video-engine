@@ -1,8 +1,12 @@
-import { supabase } from "../../lib/supabase";
+import { serverFetch } from "../serverApi";
 
 export async function deleteUserAccount({ reason = "", reasonDetail = "" } = {}) {
-  const { error } = await supabase.functions.invoke("delete-user", {
-    body: { reason, reasonDetail },
+  const res = await serverFetch("/api/account/delete", {
+    method: "POST",
+    body: JSON.stringify({ reason, reasonDetail }),
   });
-  if (error) throw error;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "Failed to delete account");
+  }
 }

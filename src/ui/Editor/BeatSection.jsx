@@ -284,8 +284,8 @@ export default function BeatSection({ beat }) {
       </div>
         
       
-      {/* Transition */}
-      <Card>
+      {/* Transition — hidden for continuous-avatar (Caption Studio) projects */}
+      {!project?.meta?.continuous_avatar && <Card>
         <Label>{isFirstBeat ? "Opening" : "Transition"}</Label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
           {TRANSITION_OPTIONS.map((opt) => {
@@ -330,7 +330,7 @@ export default function BeatSection({ beat }) {
             />
           </div>
         )}
-      </Card>
+      </Card>}
 
       {pickerOpen && (
         <ZonePicker

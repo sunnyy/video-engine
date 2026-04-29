@@ -7,6 +7,7 @@ import {
   interpolate,
   Easing,
   Audio,
+  OffthreadVideo,
 } from "remotion";
 
 import { preloadVideo, preloadImage } from "@remotion/preload";
@@ -166,14 +167,19 @@ export default function VideoComposition({ project, previewMode = false }) {
         const speed         = Math.min(5.0, Math.max(0.2, beat.transition?.speed     ?? 1.0));
         // Minimum 5-frame overlap on every non-first beat: old beat stays visible while
         // new beat mounts, preventing any black flash from React/asset first-paint delay.
-        const inOverlap     = index === 0 ? 0 : Math.max(5, Math.round((transition.duration || 0) * intensity / speed));
+        // continuous_avatar projects skip all transitions — video plays underneath uninterrupted.
+        const inOverlap     = (index === 0 || meta?.continuous_avatar)
+          ? 0
+          : Math.max(5, Math.round((transition.duration || 0) * intensity / speed));
 
         const nextBeat       = beats[index + 1];
         const nextTransKey   = nextBeat?.transition?.type || "cut";
         const nextTransition = nextBeat ? (transitionsRegistry.beat[nextTransKey]?.() || transitionsRegistry.beat.cut()) : null;
         const nextIntensity  = Math.min(5.0, Math.max(0.3, nextBeat?.transition?.intensity ?? 1.0));
         const nextSpeed      = Math.min(3.0, Math.max(0.2, nextBeat?.transition?.speed     ?? 1.0));
-        const outOverlap     = nextBeat ? Math.round((nextTransition?.duration || 0) * nextIntensity / nextSpeed) : 0;
+        const outOverlap     = (meta?.continuous_avatar || !nextBeat)
+          ? 0
+          : Math.round((nextTransition?.duration || 0) * nextIntensity / nextSpeed);
 
         const startFrame     = index === 0 ? baseStart : baseStart - inOverlap;
         const durationFrames = baseDuration + (index === 0 ? 0 : inOverlap) + outOverlap;
@@ -256,7 +262,7 @@ export default function VideoComposition({ project, previewMode = false }) {
 
         return (
           <Sequence key={beat.id} from={startFrame} durationInFrames={durationFrames} premountFor={fps}>
-            <AbsoluteFill style={{ ...finalStyle, zIndex: index + 1 }}>
+            <AbsoluteFill style={{ ...finalStyle, zIndex: meta?.continuous_avatar ? 60 + index : index + 1 }}>
               <BeatRenderer beat={beat} project={project} previewMode={previewMode} sequenceStartFrame={startFrame} />
               {dipNode}
               {inDipNode}
@@ -268,6 +274,20 @@ export default function VideoComposition({ project, previewMode = false }) {
       {/* Avatar audio — single persistent Audio element so audio never restarts on beat change. */}
       {talkMode && avatar?.src && (
         <Audio key={`avatar-audio-${avatar.src}`} src={avatar.src} volume={1} />
+      )}
+
+      {/* Continuous avatar video — Caption Studio projects only.
+          Rendered outside beats so OffthreadVideo stays mounted for the full
+          duration with no per-beat remount, eliminating black flashes. */}
+      {talkMode && avatar?.src && meta?.continuous_avatar && (
+        <AbsoluteFill style={{ zIndex: 50 }}>
+          <OffthreadVideo
+            src={avatar.src}
+            muted
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={e => console.warn("[VideoComposition] continuous avatar error", e)}
+          />
+        </AbsoluteFill>
       )}
 
       {videoOverlays.length > 0 && (
@@ -294,6 +314,26 @@ export default function VideoComposition({ project, previewMode = false }) {
           src={audio.music.src}
           volume={() => musicVolume}
         />
+      )}
+
+      {!previewMode && meta?.showWatermark && (
+        <AbsoluteFill style={{ pointerEvents: "none", zIndex: 9999 }}>
+          <div style={{
+            position:   "absolute",
+            bottom:     20,
+            right:      20,
+            background: "rgba(0,0,0,0.45)",
+            color:      "#ffffff",
+            fontSize:   Math.round((meta.width || 1080) * 0.018),
+            fontFamily: "sans-serif",
+            fontWeight: 600,
+            padding:    "5px 10px",
+            borderRadius: 4,
+            letterSpacing: "0.03em",
+          }}>
+            Created on Vidquence.com
+          </div>
+        </AbsoluteFill>
       )}
 
     </AbsoluteFill>

@@ -99,7 +99,7 @@ function calculateDuration(spoken, intent, energy = 0.5) {
   base -= (energy - 0.5) * 0.4;
 
   const variance = Math.random() * 0.4 - 0.2;
-  return Number(Math.min(8.0, Math.max(1.4, base + variance)).toFixed(1));
+  return Number(Math.min(4.0, Math.max(1.4, base + variance)).toFixed(1));
 }
 
 /* ── Caption ── */
@@ -200,6 +200,7 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
       const kindMatches =
         (zoneDef.type === "text"       && existingKind === "text")       ||
         (zoneDef.type === "asset"      && existingKind === "asset")      ||
+        (zoneDef.type === "avatar"     && existingKind === "asset")      ||
         (zoneDef.type === "decorative" && existingKind === "shape")      ||
         (zoneDef.type === "icon"       && existingKind === "icon")       ||
         (!existingKind); // no content yet — let it fall through to the empty-zone path
@@ -230,7 +231,7 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
         // guard in fillTextZones can see it and derive a readable text color.
         ...(zoneDef.background ? { background: zoneDef.background } : {}),
       };
-    } else if (zoneDef.type === "asset") {
+    } else if (zoneDef.type === "asset" || zoneDef.type === "avatar") {
       fixed[zoneDef.id] = {
         content: {
           kind: "asset",
@@ -563,7 +564,7 @@ const INTENT_TO_LAYOUT_INTENT_LOCAL = {
   punchline: "cta", stat: "proof", hook: "hook",
 };
 
-function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
+function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16", mode = "faceless") {
   const niche      = dna?.niche       || null;
   const colorStory = dna?.colorStory  || null;
 
@@ -591,13 +592,14 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
   );
 
   // 3. Pick 2–3 layout IDs for the whole video
-  const layoutIntent = INTENT_TO_LAYOUT_INTENT_LOCAL[dominantIntent] || "hook";
+  const layoutIntent  = INTENT_TO_LAYOUT_INTENT_LOCAL[dominantIntent] || "hook";
+  const talkingHead   = mode === "talking_head" ? true : false;
   // Prefer structural 'layout' type rows; fall back to all layouts when none exist yet
-  let candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout" });
-  if (!candidates.length) candidates = findLayouts({ orientation, type: "layout" });
-  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation, niche });
-  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation });
-  if (!candidates.length) candidates = findLayouts({ orientation });
+  let candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout", talkingHead });
+  if (!candidates.length) candidates = findLayouts({ orientation, type: "layout", talkingHead });
+  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation, niche, talkingHead });
+  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation, talkingHead });
+  if (!candidates.length) candidates = findLayouts({ orientation, talkingHead });
 
   // Prefer layouts that have at least one asset zone (visual richness)
   const withAsset = candidates.filter(l => (l.def?.assetCount ?? 0) >= 1);
@@ -626,9 +628,9 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
       if (family.length >= 3) break;
       // Prefer structural layouts; fall back to all
       const fallbackCandidates =
-        findLayouts({ intent: fallbackIntent, orientation, type: "layout" }).length
-          ? findLayouts({ intent: fallbackIntent, orientation, type: "layout" })
-          : findLayouts({ intent: fallbackIntent, orientation });
+        findLayouts({ intent: fallbackIntent, orientation, type: "layout", talkingHead }).length
+          ? findLayouts({ intent: fallbackIntent, orientation, type: "layout", talkingHead })
+          : findLayouts({ intent: fallbackIntent, orientation, talkingHead });
       for (const l of fallbackCandidates) {
         if (family.length >= 3) break;
         if (!usedIds.has(l.id)) {
@@ -648,7 +650,7 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16") {
   const finalFamily = uniqueFamily.slice(0, 3);
   // Last resort: if still only 1, grab any other available layout
   if (finalFamily.length === 1) {
-    const anyOther = findLayouts({ orientation }).find(l => l.id !== finalFamily[0]);
+    const anyOther = findLayouts({ orientation, talkingHead }).find(l => l.id !== finalFamily[0]);
     if (anyOther) finalFamily.push(anyOther.id);
   }
   if (!finalFamily.length) finalFamily.push("DuoStackHook");
@@ -773,7 +775,7 @@ export async function buildBeatsFromScript({
   let lastBeatType  = null;
 
   /* ── VIDEO-LEVEL VISUAL SYSTEM — locked once for the whole video ── */
-  const visualSystem = planVideoVisualSystem(sourceBeats, dna, orientation);
+  const visualSystem = planVideoVisualSystem(sourceBeats, dna, orientation, mode);
 
   /* ── Build beats ── */
   let beats = sourceBeats.map((item, index) => {
@@ -841,19 +843,22 @@ export async function buildBeatsFromScript({
       const retry = pickBeatSFX(intent, energy, 0.4);
       if (retry?.key !== lastSFXKey) sfxCue = retry;
     }
-    if (sfxCue) { lastSFXKey = sfxCue.key; sfxCue = { ...sfxCue, volume: 0.2 }; }
+    if (sfxCue) { lastSFXKey = sfxCue.key; sfxCue = { ...sfxCue, volume: 0.3 }; }
 
     const finalLayout = visual.layout;
     const zones = enforceLayoutZones(finalLayout, visual.zones || {});
 
     // Talking head: avatarZone determines which zone shows the talking head video.
     // showAvatar=false → avatarZone=null (beat shows an image instead of the face).
-    // showAvatar=true (or unset) → avatarZone = first asset zone in the layout.
+    // showAvatar=true (or unset) → avatarZone = explicit "avatar"-typed zone, or first "asset" zone.
     let avatarZone = null;
     if (mode === "talking_head" && item.showAvatar !== false) {
       const layoutDef = getLayoutDef(finalLayout);
-      const avatarZoneDef = layoutDef?.zones?.find(z => z.type === "asset");
-      // Only assign avatarZone if the layout actually has an asset zone.
+      // Prefer zones explicitly typed "avatar" (designed for talking-head video).
+      // Fall back to first "asset" zone for layouts without explicit avatar zones.
+      const avatarZoneDef = layoutDef?.zones?.find(z => z.type === "avatar")
+        ?? layoutDef?.zones?.find(z => z.type === "asset");
+      // Only assign avatarZone if the layout actually has a suitable zone.
       // null means no avatar shown this beat (e.g. text-only layouts like CenterHook).
       avatarZone = avatarZoneDef?.id ?? null;
     }

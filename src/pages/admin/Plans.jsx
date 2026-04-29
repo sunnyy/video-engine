@@ -117,8 +117,8 @@ function PlanModal({ plan, onClose, onSaved }) {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col">
-            <label className={L}>Discount %</label>
-            <input className={F} type="number" value={form.discount_percent} onChange={e => set("discount_percent", e.target.value)} placeholder="0" />
+            <label className={L}>Annual Discount %</label>
+            <input className={F} type="number" min="0" max="100" value={form.discount_percent} onChange={e => set("discount_percent", e.target.value)} placeholder="0" />
           </div>
           <div className="flex flex-col">
             <label className={L}>Sort Order</label>
@@ -202,7 +202,9 @@ function PlanCard({ plan, onEdit, onToggle, onDelete }) {
             ${plan.price_monthly}<span className="text-sm font-normal text-[#666]">/mo</span>
           </div>
           {plan.price_annual && (
-            <div className="text-xs text-[#555]">${plan.price_annual}/yr {plan.discount_percent > 0 ? `(${plan.discount_percent}% off)` : ""}</div>
+            <div className="text-xs text-[#555]">
+              ${plan.price_annual}/yr {plan.discount_percent > 0 ? <span style={{ color: "#f5c518" }}>· {plan.discount_percent}% annual discount</span> : ""}
+            </div>
           )}
         </div>
         <div className="text-xs px-2.5 py-1 rounded-full font-semibold border shrink-0"

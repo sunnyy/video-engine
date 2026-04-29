@@ -432,8 +432,10 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
 
         {/* Avatar zone — singleton <video> is appended to this container in preview
             mode; OffthreadVideo used for render. The singleton never remounts between
-            beats so there is no seek and no A/V sync break on beat change. */}
-        {isAvatarZone && project?.avatar?.src && (() => {
+            beats so there is no seek and no A/V sync break on beat change.
+            continuous_avatar projects skip this entirely — video is rendered at
+            composition level in VideoComposition as a persistent layer. */}
+        {isAvatarZone && project?.avatar?.src && !project?.meta?.continuous_avatar && (() => {
           // Auto-detect objectFit when the user hasn't explicitly set one.
           // Compares the zone's pixel aspect ratio to the avatar video's aspect ratio.
           // A portrait video (9:16) in a wide/short zone needs 'contain' to avoid
@@ -471,7 +473,7 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
             <div style={avatarInsetStyle}>
               <AvatarVideoZone
                 src={project.avatar.src}
-                trimBefore={sequenceStartFrame}
+                trimBefore={project.meta?.continuous_avatar ? 0 : sequenceStartFrame}
                 objectFit={resolvedObjectFit}
                 isRendering={isRendering}
                 style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit }}
@@ -1015,7 +1017,10 @@ export default function LayoutRenderer({ beat, project, layoutDef, previewMode =
 
   // Sort by zIndex so DOM order matches visual stacking — required because transform
   // (rotation, animations) creates stacking contexts that ignore CSS z-index across siblings.
-  const allZones     = [...defZones, ...extraZones].sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
+  const isContinuousAvatar = !!project?.meta?.continuous_avatar;
+  const allZones     = [...defZones, ...extraZones]
+    .filter(z => !(isContinuousAvatar && z.type === "text"))
+    .sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
   const contentZones = allZones.filter(z => z.type !== "element");
   const elementZones = allZones.filter(z => z.type === "element");
 

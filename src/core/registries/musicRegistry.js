@@ -12,6 +12,7 @@
  *   freesound.org
  */
 import { staticFile } from "remotion";
+import { supabase } from "../../lib/supabase";
 
 export const MUSIC_LIBRARY = {
 
@@ -422,7 +423,57 @@ export const MUSIC_PREVIEW_URLS = {
   the_mountain: "/music/the_mountain.mp3",
 };
 
-/* ── Smart picker ── */
+/* ── DB-backed music library ── */
+
+const MOOD_FALLBACK = {
+  energetic: "eliveta_1",
+  calm:      "the_mountain",
+  luxury:    "nastelbom",
+  playful:   "eliveta_2",
+  dramatic:  "mood_mode",
+};
+
+/**
+ * Load music tracks from Supabase, grouped by mood.
+ * Returns {} if DB is unavailable or empty — callers should fall back to MUSIC_LIBRARY.
+ */
+export async function loadMusicLibrary() {
+  if (!supabase) return {};
+  try {
+    const { data, error } = await supabase
+      .from("music_tracks")
+      .select("id, title, artist, mood, public_url, bpm, duration")
+      .eq("is_active", true);
+    if (error || !data?.length) return {};
+    return data.reduce((acc, track) => {
+      if (!acc[track.mood]) acc[track.mood] = [];
+      acc[track.mood].push(track);
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Pick a random track for the given mood from a library returned by loadMusicLibrary().
+ * Falls back to a static MUSIC_LIBRARY track when the DB library is empty.
+ * Returns { src, label }.
+ */
+export function pickMusicByMood(mood, library = {}) {
+  const tracks = library[mood] || [];
+  if (tracks.length) {
+    const track = tracks[Math.floor(Math.random() * tracks.length)];
+    return { src: track.public_url, label: track.title };
+  }
+  const key = MOOD_FALLBACK[mood] || "eliveta_2";
+  return {
+    src:   MUSIC_LIBRARY[key]?.file || MUSIC_LIBRARY["eliveta_2"].file,
+    label: MUSIC_LIBRARY[key]?.label || "Music",
+  };
+}
+
+/* ── Smart picker (used for non-product-ad video types) ── */
 export function pickAutoMusic(videoType = "viral", tone = "bold", niche = null, energy = "medium") {
   const available = MUSIC_KEYS; // only tracks with actual files
 

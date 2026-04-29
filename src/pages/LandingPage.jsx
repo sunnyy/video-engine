@@ -288,12 +288,16 @@ export default function LandingPage() {
   const tickerItems = ["AI Video Studio", "17 Niches", "Voice Generation", "Smart Visuals", "Auto Scripting", "Full Edit Control", "Export Ready", "Background Music"];
 
   const faqs = [
-    { q: "How is Vidquence different from other AI video tools?", a: "Most tools give you plain text-over-broll with auto captions. Vidquence is a full production studio — every moment of your video is individually crafted with its own visual design, pacing, and narrative intent. The output looks like a human editor made deliberate decisions." },
-    { q: "What are credits and how are they used?", a: "Credits power the AI features. A typical 30-second video uses 17–20 credits — covering script generation, visual production, voice synthesis, and image generation. Basic videos using your own assets cost far fewer credits." },
-    { q: "Can I use my own footage and images?", a: "Yes. Upload your own images, videos, or talking head footage. The AI features are optional — the production engine works with whatever you bring." },
-    { q: "What niches are supported?", a: "17 niches including entertainment, gaming, finance, spiritual, food, sports, tech, lifestyle, education, travel, health, skincare, comedy, motivational, news, music, and business. Each gets its own visual identity." },
-    { q: "Can I edit the video after it's generated?", a: "Fully. Every element of every moment is editable. Change text, swap visuals, adjust timing, add effects. The AI produces a starting point — you have complete control from there." },
-    { q: "Is there a free trial?", a: "Yes. New accounts get free credits to generate your first video at no cost. No credit card required to start." },
+    { q: "How is Vidquence different from other AI video tools?", a: "Most tools give you plain text over stock footage. Vidquence is a full AI production studio — every beat of your video gets its own layout, visual design, pacing, and narrative intent. Beyond auto-generated videos, you get a complete creative suite: Product Ad Studio for AI video ads from a single product photo, Poster Studio, Thumbnail Generator, Voice Studio, and Transcription — all in one platform." },
+    { q: "What are credits and how are they used?", a: "Credits power every AI action on the platform. A complete auto-generated short-form video costs around 39 credits (script, images, voiceover, and export). A full Product Ad campaign with 5 cinematic scenes and video clips costs around 303 credits. Simpler actions like generating a poster or thumbnail cost 10 credits each. Your plan renews credits monthly — unused credits don't roll over." },
+    { q: "What services are included?", a: "Vidquence includes: AI Video Generator (faceless and talking head modes), Product Ad Studio (photo → full video ad), Poster Studio (product poster ads), Thumbnail Generator (YouTube/Reels thumbnails), Voice Studio (TTS voiceovers in 9 voices), and Transcription (audio/video to text with beat conversion). All services are accessible from your dashboard." },
+    { q: "What niches and languages are supported?", a: "17 niches including entertainment, gaming, finance, spiritual, food, sports, tech, lifestyle, education, travel, health, skincare, comedy, motivational, news, music, and business — each with its own visual identity and color palette. Videos support multilingual scripts and voiceovers including Hindi, English, Arabic, French, Spanish, Portuguese, Urdu, and Turkish." },
+    { q: "Can I use my own footage and images?", a: "Yes. Upload your own images, videos, or talking head footage directly in the editor. For talking head videos, upload your recorded clip and the AI builds the full video around it with captions, layouts, and music. The AI features are optional — the editor works with whatever assets you bring." },
+    { q: "Can I edit the video after it's generated?", a: "Fully. Every element of every beat is editable — change text, swap visuals, adjust timing, change transitions, add overlays, update captions, swap background music, and add sound effects. The AI produces a production-ready starting point. You have complete control from there." },
+    { q: "Does Product Ad Studio work for any product?", a: "Yes — clothing, fashion, wearables (watches, earphones, shoes), beauty products, food, gadgets, and more. For clothing, the system uses AI model avatars to show the product being worn. For other products, it generates cinematic product photography shots. Upload one product photo and get a full video ad with multiple scenes, transitions, and background music." },
+    { q: "Is there a free trial?", a: "New accounts get 200 free credits — enough to generate several regular videos, posters, and thumbnails without a credit card. Product Ad Studio requires an active plan. Paid plans start at $15/month with no long-term commitment." },
+    { q: "What are the plan limits?", a: "Starter ($15/mo) includes 1,800 credits — roughly 46 full videos or 5 Product Ad campaigns per month. Pro ($29/mo) includes 3,500 credits. Agency ($50/mo) includes 6,000 credits. All plans include access to every service on the platform with no feature restrictions except Product Ads which require any paid plan." },
+    { q: "Can I cancel anytime?", a: "Yes. Cancel from your account settings at any time. You keep your remaining credits until the end of your billing period. No cancellation fees." },
   ];
 
   return (
@@ -600,21 +604,52 @@ export default function LandingPage() {
                 <div key={i} className="plan" style={{ opacity: 0.3, minHeight: 320 }} />
               ))
             ) : plans.map(plan => {
-              const base  = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
-              const usd   = calcDiscounted(base, plan.discount_percent);
-              const inr   = toINR(usd, rate);
-              const feats = Array.isArray(plan.features) ? plan.features : [];
+              const monthly     = plan.price_monthly;
+              const discount    = plan.discount_percent || 0;
+              // Annual: compute per-month equivalent from monthly * 12 with discount applied
+              const annualTotal = Math.round(monthly * 12 * (1 - discount / 100));
+              const annualPerMo = Math.round(annualTotal / 12);
+              // Displayed price is always per-month (annual shows monthly equivalent)
+              const usd         = cycle === "annual" ? annualPerMo : monthly;
+              const hasDiscount = cycle === "annual" && discount > 0;
+              const inr         = toINR(usd, rate);
+              const feats       = Array.isArray(plan.features) ? plan.features : [];
               return (
                 <div key={plan.id} className={`plan${plan.is_popular ? " plan-hot" : ""}`}>
                   {plan.is_popular && <div className="plan-hot-badge">Most Popular</div>}
                   <div className="plan-name">{plan.name}</div>
 
                   {/* Price */}
-                  <div className="plan-price"><span>$</span>{usd}</div>
-                  <div className="plan-cycle" style={{ marginBottom: 2 }}>
-                    per {cycle === "annual" ? "year" : "month"}
-                  </div>
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)", marginBottom: 16 }}>≈ ₹{inr}/{cycle === "annual" ? "yr" : "mo"}</div>
+                  {cycle === "annual" ? (
+                    <div style={{ marginBottom: 16 }}>
+                      {/* Annual: big yearly total is the hero number */}
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                        <div className="plan-price"><span>$</span>{annualTotal}</div>
+                        {hasDiscount && (
+                          <div style={{ fontFamily: "var(--font-mono)", fontSize: 18, color: "var(--dim)", textDecoration: "line-through" }}>
+                            ${monthly * 12}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                        <div className="plan-cycle" style={{ marginBottom: 0 }}>per year</div>
+                        {hasDiscount && (
+                          <div style={{ display: "inline-block", background: "rgba(245,197,24,0.15)", color: "var(--yellow)", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", padding: "2px 8px", borderRadius: 4 }}>
+                            {discount}% OFF
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)", marginTop: 4 }}>
+                        ≈ ₹{toINR(annualTotal, rate)}/yr · ${annualPerMo}/mo
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: 16 }}>
+                      <div className="plan-price"><span>$</span>{monthly}</div>
+                      <div className="plan-cycle" style={{ marginBottom: 2 }}>per month</div>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)" }}>≈ ₹{inr}/mo</div>
+                    </div>
+                  )}
 
                   <div className="plan-hr" />
                   <ul className="plan-feats">{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>

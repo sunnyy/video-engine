@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sunny17jpr@gmail.com";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "hello@vidquence.com";
 const FROM_EMAIL  = process.env.FROM_EMAIL || "Vidquence <no-reply@vidquence.com>";
 
 /* ── Base senders ──────────────────────────────────────────── */
@@ -24,18 +24,34 @@ export async function sendUserEmail(to, subject, html) {
 
 /* ── Shared style ─────────────────────────────────────────── */
 
+const APP_URL = process.env.APP_URL || "https://vidquence.com";
+
 function wrap(body) {
   return `
     <div style="font-family:'Segoe UI',Arial,sans-serif;background:#0b0b10;padding:40px 0;min-height:100vh">
       <div style="max-width:520px;margin:0 auto;background:#111118;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden">
-        <div style="background:#f5c518;padding:18px 32px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px;font-weight:900;color:#0b0b10;letter-spacing:-0.5px">Vidquence</span>
+        <div style="background:#f5c518;padding:18px 32px">
+          <a href="${APP_URL}" style="text-decoration:none"><span style="font-size:18px;font-weight:900;color:#0b0b10;letter-spacing:-0.5px">Vidquence</span></a>
         </div>
         <div style="padding:32px;color:#e8e8f0;line-height:1.6">
           ${body}
         </div>
-        <div style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);font-size:12px;color:#55556a">
-          Vidquence · This is an automated message.
+        <div style="padding:24px 32px;border-top:1px solid rgba(255,255,255,0.06)">
+          <div style="margin-bottom:14px">
+            <a href="${APP_URL}" style="font-size:12px;color:#7c5cfc;text-decoration:none;margin-right:16px">Dashboard</a>
+            <a href="${APP_URL}/credits" style="font-size:12px;color:#7c5cfc;text-decoration:none;margin-right:16px">Credits</a>
+            <a href="${APP_URL}/settings" style="font-size:12px;color:#7c5cfc;text-decoration:none;margin-right:16px">Settings</a>
+            <a href="${APP_URL}/feedback" style="font-size:12px;color:#7c5cfc;text-decoration:none">Feedback</a>
+          </div>
+          <div style="margin-bottom:14px">
+            <a href="${APP_URL}/privacy" style="font-size:11px;color:#55556a;text-decoration:none;margin-right:16px">Privacy Policy</a>
+            <a href="${APP_URL}/terms" style="font-size:11px;color:#55556a;text-decoration:none;margin-right:16px">Terms of Service</a>
+            <a href="${APP_URL}/refunds" style="font-size:11px;color:#55556a;text-decoration:none">Refund Policy</a>
+          </div>
+          <p style="font-size:11px;color:#44444f;margin:0;line-height:1.5">
+            You are receiving this email because you have an account on Vidquence.<br>
+            © ${new Date().getFullYear()} Vidquence. All rights reserved.
+          </p>
         </div>
       </div>
     </div>
@@ -81,7 +97,8 @@ export function adminNewUserEmail({ id, email, name }) {
   };
 }
 
-export function adminUserDeletedEmail({ id, email }) {
+export function adminUserDeletedEmail({ id, email, reason = "", reasonDetail = "" }) {
+  const reasonText = reason ? (reasonDetail ? `${reason} — ${reasonDetail}` : reason) : "—";
   return {
     subject: `Account Deleted — ${email}`,
     html: adminWrap(`
@@ -90,6 +107,7 @@ export function adminUserDeletedEmail({ id, email }) {
       <table style="width:100%;border-collapse:collapse">
         ${row("Email", email || "—")}
         ${row("User ID", `<span style="font-family:monospace;font-size:12px">${id}</span>`)}
+        ${row("Reason", reasonText)}
       </table>
     `),
   };
@@ -162,7 +180,7 @@ export function userWelcomeEmail(name) {
       <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Welcome, ${name || "Creator"}!</h2>
       <p style="color:#c8c8d8;margin:0 0 16px">Your account is ready. You've got <strong style="color:#f5c518">50 free credits</strong> to get started — enough to create several AI-powered videos.</p>
       <p style="color:#c8c8d8;margin:0 0 24px">Head to your dashboard and create your first short.</p>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Go to Dashboard →</a>
+      <a href="${APP_URL}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Go to Dashboard →</a>
     `),
   };
 }
@@ -179,7 +197,7 @@ export function userCreditsPurchasedEmail(name, amount, balance) {
         <div style="font-size:36px;font-weight:900;color:#f5c518">${balance}</div>
         <div style="font-size:13px;color:#8888a8">credits</div>
       </div>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
+      <a href="${APP_URL}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
     `),
   };
 }
@@ -191,7 +209,7 @@ export function userLowCreditsEmail(name, balance) {
       <h2 style="margin:0 0 12px;font-size:22px;color:#f97316">Low Credits ⚠️</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">You have <strong style="color:#f97316">${balance} credits</strong> remaining. Top up to keep creating without interruption.</p>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Top Up Credits →</a>
+      <a href="${APP_URL}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Top Up Credits →</a>
     `),
   };
 }
@@ -215,7 +233,7 @@ export function userPlanUpgradeEmail(name, fromPlan, toPlan, credits) {
       <h2 style="margin:0 0 12px;font-size:22px;color:#a78bfa">Plan Upgraded ⬆️</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">Your plan has been upgraded from <strong style="color:#e8e8f0">${fromPlan}</strong> to <strong style="color:#a78bfa">${toPlan}</strong>. ${credits} credits have been added to your account.</p>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
+      <a href="${APP_URL}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
     `),
   };
 }
@@ -228,7 +246,7 @@ export function userPlanRenewalEmail(name, plan, credits, nextRenewal) {
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan has been renewed and <strong style="color:#34d399">${credits} credits</strong> have been added to your account.</p>
       <p style="color:#c8c8d8;margin:0 0 24px">Next renewal: <strong style="color:#e8e8f0">${nextRenewal}</strong></p>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
+      <a href="${APP_URL}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Start Creating →</a>
     `),
   };
 }
@@ -240,7 +258,7 @@ export function userPaymentFailedEmail(name, plan) {
       <h2 style="margin:0 0 12px;font-size:22px;color:#ef4444">Payment Failed ❌</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">We were unable to process your payment for the <strong style="color:#e8e8f0">${plan}</strong> plan. Please update your payment method to keep your subscription active.</p>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#ef4444;color:#fff;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Update Payment →</a>
+      <a href="${APP_URL}/pricing" style="display:inline-block;background:#ef4444;color:#fff;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Update Payment →</a>
     `),
   };
 }
@@ -252,7 +270,7 @@ export function userPlanExpiringEmail(name, plan, expiryDate) {
       <h2 style="margin:0 0 12px;font-size:22px;color:#f97316">Plan Expiring Soon ⏳</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan expires on <strong style="color:#f97316">${expiryDate}</strong>. Renew now to keep access to all your features and credits.</p>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Renew Plan →</a>
+      <a href="${APP_URL}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Renew Plan →</a>
     `),
   };
 }
@@ -264,19 +282,22 @@ export function userPlanExpiredEmail(name, plan) {
       <h2 style="margin:0 0 12px;font-size:22px;color:#ef4444">Plan Expired</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
       <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan has expired. Resubscribe to unlock all features and get fresh credits.</p>
-      <a href="${process.env.APP_URL || "https://vidquence.com"}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Resubscribe →</a>
+      <a href="${APP_URL}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Resubscribe →</a>
     `),
   };
 }
 
-export function userRenderCompleteEmail(name, videoUrl) {
+export function userRenderCompleteEmail(name, videoUrl, projectName) {
+  const trimmed = projectName ? (projectName.length > 40 ? projectName.slice(0, 38).trimEnd() + "…" : projectName) : null;
+  const subject = trimmed ? `${trimmed} — render complete 🎬` : "Your video is ready 🎬";
   return {
-    subject: "Your video is ready 🎬",
+    subject,
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Video Ready! 🎬</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
-      <p style="color:#c8c8d8;margin:0 0 24px">Your video has finished rendering and is ready to download.</p>
-      <a href="${videoUrl || (process.env.APP_URL || "https://vidquence.com")}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">View Video →</a>
+      ${projectName ? `<p style="color:#c8c8d8;margin:0 0 4px">Your video <strong style="color:#e8e8f0">${projectName}</strong> has finished rendering and is ready to download.</p>` : `<p style="color:#c8c8d8;margin:0 0 24px">Your video has finished rendering and is ready to download.</p>`}
+      ${projectName ? `<p style="color:#77777f;font-size:12px;margin:0 0 24px">Render complete · Vidquence</p>` : ""}
+      <a href="${videoUrl || APP_URL}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">View Video →</a>
     `),
   };
 }

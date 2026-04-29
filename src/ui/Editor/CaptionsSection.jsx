@@ -29,7 +29,7 @@ function CaptionPreview({ styleKey, brandColor }) {
     text: PREVIEW_TEXT,
     frame,
     fps: FPS,
-    brandColor: brandColor || "#00F2EA",
+    brandColor: brandColor || "#f5c518",
   });
 
   return (
@@ -75,7 +75,7 @@ export default function CaptionsSection({ beat }) {
   const brandColor = project?.meta?.brand?.color
     ?? project?.meta?.brand_color
     ?? project?.visualIdentity?.colorStory?.accent
-    ?? "#00F2EA";
+    ?? "#f5c518";
 
   const update = (key, value) => {
     updateBeat(beat.id, { caption: { ...caption, [key]: value } });

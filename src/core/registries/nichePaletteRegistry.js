@@ -24,7 +24,7 @@ export const nichePaletteRegistry = {
     palettes: [
       { bg: "#0a0a12", text: "#ffffff", primary: "#ff4500", accent: "#fbbf24", mood: "viral", energy: ["high"] },
       { bg: "#0f0500", text: "#ffffff", primary: "#ff6b00", accent: "#ffffff", mood: "fire", energy: ["high"] },
-      { bg: "#050510", text: "#ffffff", primary: "#7c5cfc", accent: "#00f2ea", mood: "electric", energy: ["high"] },
+      { bg: "#050510", text: "#ffffff", primary: "#7c5cfc", accent: "#f5c518", mood: "electric", energy: ["high"] },
       { bg: "#0a0a0a", text: "#ffffff", primary: "#ec4899", accent: "#fbbf24", mood: "pop", energy: ["medium"] },
       { bg: "#111118", text: "#ffffff", primary: "#f59e0b", accent: "#ffffff", mood: "premium", energy: ["medium"] },
     ],
@@ -35,9 +35,9 @@ export const nichePaletteRegistry = {
     colorFamily: "electric",
     avoid: ["light", "neutral"],
     palettes: [
-      { bg: "#050510", text: "#ffffff", primary: "#7c3aed", accent: "#00f2ea", mood: "neon", energy: ["high"] },
+      { bg: "#050510", text: "#ffffff", primary: "#7c3aed", accent: "#f5c518", mood: "neon", energy: ["high"] },
       { bg: "#0a0014", text: "#ffffff", primary: "#ec4899", accent: "#fbbf24", mood: "cyberpunk", energy: ["high"] },
-      { bg: "#000a05", text: "#ffffff", primary: "#39ff14", accent: "#00f2ea", mood: "matrix", energy: ["high"] },
+      { bg: "#000a05", text: "#ffffff", primary: "#39ff14", accent: "#f5c518", mood: "matrix", energy: ["high"] },
       { bg: "#0f0f1a", text: "#ffffff", primary: "#6366f1", accent: "#c026d3", mood: "galaxy", energy: ["medium"] },
       { bg: "#1a0000", text: "#ffffff", primary: "#dc2626", accent: "#f59e0b", mood: "danger", energy: ["high"] },
     ],
@@ -141,7 +141,7 @@ export const nichePaletteRegistry = {
     palettes: [
       { bg: "#050510", text: "#ffffff", primary: "#06b6d4", accent: "#7c5cfc", mood: "futuristic", energy: ["high"] },
       { bg: "#0f172a", text: "#ffffff", primary: "#6366f1", accent: "#06b6d4", mood: "digital", energy: ["medium"] },
-      { bg: "#000a0a", text: "#00f2ea", primary: "#00f2ea", accent: "#7c5cfc", mood: "matrix", energy: ["high"] },
+      { bg: "#000a0a", text: "#f5c518", primary: "#f5c518", accent: "#7c5cfc", mood: "matrix", energy: ["high"] },
       { bg: "#f8fafc", text: "#0f172a", primary: "#4f46e5", accent: "#06b6d4", mood: "clean", energy: ["low"] },
       { bg: "#09090b", text: "#ffffff", primary: "#a855f7", accent: "#06b6d4", mood: "dark", energy: ["medium"] },
     ],

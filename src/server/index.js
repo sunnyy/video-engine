@@ -31,6 +31,14 @@ import { fileURLToPath } from "url";
 
 console.log("Server starting...", new Date().toISOString());
 
+try {
+  const { execSync } = await import("node:child_process");
+  const v = execSync("ffmpeg -version").toString().split("\n")[0];
+  console.log("[startup] ffmpeg:", v);
+} catch (e) {
+  console.log("[startup] ffmpeg NOT found:", e.message);
+}
+
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
   process.exit(1);
@@ -325,7 +333,7 @@ app.get("/api/user/credits", requireAuth, async (req, res) => {
 app.post("/api/generate", requireAuth, async (req, res) => {
   try {
     const { prompt, projectId, model: reqModel } = req.body;
-    const deduction = await deductCredits(req.user.id, 8, "base_generation", "Video generation", projectId);
+    const deduction = await deductCredits(req.user.id, 10, "base_generation", "Video generation", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const completion = await openai.chat.completions.create({
       model: reqModel || "gpt-4o",
@@ -461,7 +469,7 @@ app.post("/api/generate-content", requireAuth, async (req, res) => {
     const { prompt, expectedBeats } = req.body;
     if (!prompt) return res.status(400).json({ error: "prompt required" });
 
-    const deduction = await deductCredits(req.user.id, 8, "base_generation", "Video generation");
+    const deduction = await deductCredits(req.user.id, 10, "base_generation", "Video generation");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
     const completion = await openai.chat.completions.create({
@@ -979,6 +987,15 @@ app.get("/api/proxy-video", (req, res) => {
   upstream.end();
 });
 
+/* ── Diagnostics ── */
+app.get("/api/diag/ffmpeg", async (_req, res) => {
+  const { execFile } = await import("node:child_process");
+  execFile("ffmpeg", ["-version"], (err, stdout, stderr) => {
+    const output = (stdout || "") + (stderr || "");
+    res.json({ ok: !err, version: output.split("\n")[0] || null, error: err?.message || null });
+  });
+});
+
 /* ---------------- COMPRESSION VIDEO ---------------- */
 const upload = multer({ dest: TEMP_DIR });
 const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -1054,7 +1071,7 @@ app.post("/api/compress-audio", requireAuth, upload.single("audio"), async (req,
 const renderJobs = {};
 
 app.post("/api/render", requireAuth, async (req, res) => {
-  const deduction = await deductCredits(req.user.id, 2, "export_local", "Local render export", req.body.project?.id);
+  const deduction = await deductCredits(req.user.id, 8, "export_local", "Local render export", req.body.project?.id);
   if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
   const jobId = uuidv4();
@@ -1169,6 +1186,22 @@ app.post("/api/render", requireAuth, async (req, res) => {
       console.warn("[render] Failed to embed layout defs:", e.message);
     }
 
+    /* ── 3.6. Watermark for free users ── */
+    try {
+      const { data: sub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("id")
+        .eq("user_id", req.user.id)
+        .eq("status", "active")
+        .maybeSingle();
+      if (!sub) {
+        project = { ...project, meta: { ...project.meta, showWatermark: true } };
+        console.log("[render] Free user — watermark enabled");
+      }
+    } catch (e) {
+      console.warn("[render] Subscription check failed:", e.message);
+    }
+
     /* ── 4. Get cached bundle ── */
     const serveUrl = await getBundle();
 
@@ -1251,10 +1284,13 @@ app.post("/api/render", requireAuth, async (req, res) => {
         console.log("[render] Saved to storage + DB:", videoUrl);
 
         // Render complete email (fire-and-forget)
-        supabaseAdmin.auth.admin.getUserById(req.user.id).then(({ data: { user } }) => {
+        Promise.all([
+          supabaseAdmin.auth.admin.getUserById(req.user.id),
+          projectId ? supabaseAdmin.from("projects").select("name").eq("id", projectId).single() : Promise.resolve({ data: null }),
+        ]).then(([{ data: { user } }, { data: proj }]) => {
           if (!user?.email) return;
           const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
-          const { subject, html } = userRenderCompleteEmail(name, publicUrl);
+          const { subject, html } = userRenderCompleteEmail(name, publicUrl, proj?.name || null);
           sendUserEmail(user.email, subject, html);
         }).catch(() => {});
       }
@@ -1453,6 +1489,38 @@ app.post("/api/admin/delete-user", requireAuth, requireAdmin, async (req, res) =
     res.json({ success: true });
   } catch (err) {
     console.error("[admin/delete-user]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Self-service: delete own account ── */
+app.post("/api/account/delete", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { reason = "", reasonDetail = "" } = req.body || {};
+    const { data: { user: deletedUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+    await supabaseAdmin.from("profiles").delete().eq("id", userId);
+    await supabaseAdmin.from("user_credits").delete().eq("user_id", userId);
+    await supabaseAdmin.from("subscriptions").delete().eq("user_id", userId);
+    await supabaseAdmin.from("projects").delete().eq("user_id", userId);
+    await supabaseAdmin.from("generated_images").delete().eq("user_id", userId);
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (error) throw error;
+
+    const adminEmail = adminUserDeletedEmail({ id: userId, email: deletedUser?.email || "unknown", reason, reasonDetail });
+    sendAdminAlert(adminEmail.subject, adminEmail.html);
+
+    if (deletedUser?.email) {
+      const name = deletedUser.user_metadata?.full_name || deletedUser.user_metadata?.name || "";
+      const farewellEmail = userAccountDeletedEmail(name);
+      sendUserEmail(deletedUser.email, farewellEmail.subject, farewellEmail.html);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[account/delete]", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2230,6 +2298,27 @@ app.delete("/api/transcription/:id", requireAuth, async (req, res) => {
   }
 });
 
+/* ── Caption Studio: permanent video upload ── */
+app.post("/api/caption/upload-video", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file" });
+    const ext    = req.file.originalname.split(".").pop() || "mp4";
+    const key    = `captions/${req.user.id}/video-${Date.now()}.${ext}`;
+    const buffer = fs.readFileSync(req.file.path);
+    const { error } = await supabaseAdmin.storage
+      .from("user-assets")
+      .upload(key, buffer, { contentType: req.file.mimetype, upsert: false });
+    try { fs.unlinkSync(req.file.path); } catch {}
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    console.log("[caption/upload-video] publicUrl:", publicUrl);
+    res.json({ url: publicUrl, key });
+  } catch (e) {
+    console.error("[caption/upload-video]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 /* ── Admin: AI Layout Generation ─────────────────────────────────── */
 
 // POST /api/admin/generate-concepts — GPT-4o generates layout concept sketches
@@ -2556,7 +2645,9 @@ app.post("/api/product-ad/upload", requireAuth, upload.single("image"), async (r
 // POST /api/product-ad/analyze — GPT-4o Vision analyses product image, returns shot strategy
 app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 2, "product_ad_analyze", "Product Ad — strategy analysis");
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
+    const deduction = await deductCredits(req.user.id, 5, "product_ad_analyze", "Product Ad — strategy analysis");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { imageUrl, targetMarket } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
@@ -2604,7 +2695,9 @@ app.post("/api/product-ad/analyze", requireAuth, async (req, res) => {
 // Wearable + non_worn: nano-banana [product only] → cleaned studio product photo
 app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 5, "product_ad_base_image", "Product Ad — base model image");
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
+    const deduction = await deductCredits(req.user.id, 8, "product_ad_base_image", "Product Ad — base model image");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { productImageUrl, modelImageUrl, category, hasMannequin, hasWatermark } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
@@ -2702,7 +2795,9 @@ app.post("/api/product-ad/generate-base-image", requireAuth, async (req, res) =>
 //   non_worn         → nano-banana with product reference for ALL shots
 app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 10, "product_ad_scenes", "Product Ad — scene images");
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
+    const deduction = await deductCredits(req.user.id, 40, "product_ad_scenes", "Product Ad — scene images");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { shots, referenceImageUrl, category, modelImageUrl } = req.body;
     if (!shots?.length || !referenceImageUrl) return res.status(400).json({ error: "shots and referenceImageUrl required" });
@@ -2785,7 +2880,9 @@ app.post("/api/product-ad/generate-images", requireAuth, async (req, res) => {
 // POST /api/product-ad/generate-clip — Image-to-video via Fal.ai LTX-Video 13B Distilled
 app.post("/api/product-ad/generate-clip", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 5, "product_ad_clip", "Product Ad — video clip");
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
+    const deduction = await deductCredits(req.user.id, 50, "product_ad_clip", "Product Ad — video clip");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { imageUrl, motionPrompt, durationSeconds = 3 } = req.body;
     if (!imageUrl || !motionPrompt) return res.status(400).json({ error: "imageUrl and motionPrompt required" });
@@ -2864,7 +2961,7 @@ app.post("/api/poster/upload", requireAuth, uploadMemory.single("image"), async 
 
 app.post("/api/poster/generate", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 5, "poster_generate", "Poster Studio — poster generation");
+    const deduction = await deductCredits(req.user.id, 10, "poster_generate", "Poster Studio — poster generation");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { productImageUrl, brandName, headline, tagline, colorMood, language = "English" } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
@@ -2929,6 +3026,224 @@ app.post("/api/poster/generate", requireAuth, async (req, res) => {
     console.error("[poster/generate]", e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+/* ── Outfit Studio ── */
+
+app.post("/api/outfit/upload", requireAuth, uploadMemory.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file" });
+    const ext = req.file.mimetype.includes("png") ? "png" : "jpg";
+    const key = `outfit-studio/${req.user.id}/upload-${Date.now()}.${ext}`;
+    const { error } = await supabaseAdmin.storage.from("user-assets").upload(key, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    res.json({ url: publicUrl });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get("/api/outfit/models", requireAuth, async (_req, res) => {
+  const { data, error } = await supabaseAdmin.from("model_avatars").select("id, url, gender, skin_tone, age_group").eq("is_active", true).order("created_at");
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ models: data || [] });
+});
+
+app.post("/api/outfit/generate", requireAuth, async (req, res) => {
+  try {
+    const deduction = await deductCredits(req.user.id, 8, "outfit_tryon", "Outfit Studio — virtual try-on");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+    const { garmentUrl, modelUrl, hasMannequin } = req.body;
+    if (!garmentUrl || !modelUrl) return res.status(400).json({ error: "garmentUrl and modelUrl required" });
+
+    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+
+    const prompt = hasMannequin
+      ? `The person in image 1 should wear the exact same outfit as the mannequin in image 2. Keep the person from image 1's face, skin tone, hair, and identity completely unchanged. Reproduce every detail of the outfit exactly — same colors, fabric, embroidery, neckline, sleeves, silhouette, borders, and embellishments. Full body visible, natural confident pose, clean studio background, soft professional lighting. Photorealistic, 9:16 vertical portrait.`
+      : `Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer, 9:16 vertical portrait.`;
+
+    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+      method:  "POST",
+      headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ image_urls: [modelUrl, garmentUrl], prompt }),
+    });
+    if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
+    const data   = await falRes.json();
+    const falUrl = data.images?.[0]?.url;
+    if (!falUrl) throw new Error("No image URL returned");
+
+    const imgRes = await fetch(falUrl);
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const ct     = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext    = ct.includes("png") ? "png" : "jpg";
+    const key    = `outfit-studio/${req.user.id}/result-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+
+    const { error: dbErr } = await supabaseAdmin.from("outfit_tryons").insert({
+      user_id: req.user.id, result_url: publicUrl, storage_key: key,
+      garment_url: garmentUrl, model_url: modelUrl,
+    });
+    if (dbErr) console.error("[outfit/generate] db insert:", dbErr.message);
+
+    res.json({ resultUrl: publicUrl });
+  } catch (e) {
+    console.error("[outfit/generate]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/outfit/list", requireAuth, async (req, res) => {
+  const { data, error } = await supabaseAdmin.from("outfit_tryons").select("id, result_url, storage_key, created_at").eq("user_id", req.user.id).order("created_at", { ascending: false }).limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ tryons: data || [] });
+});
+
+app.post("/api/outfit/delete", requireAuth, async (req, res) => {
+  try {
+    const { id, storageKey } = req.body;
+    if (storageKey?.startsWith(`outfit-studio/${req.user.id}`)) await supabaseAdmin.storage.from("user-assets").remove([storageKey]);
+    if (id) await supabaseAdmin.from("outfit_tryons").delete().eq("id", id).eq("user_id", req.user.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/* ── Thumbnail Generator ── */
+app.post("/api/thumbnail/upload", requireAuth, uploadMemory.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file" });
+    const ext = req.file.mimetype.includes("png") ? "png" : "jpg";
+    const key = `thumbnails/${req.user.id}/upload-${Date.now()}.${ext}`;
+    const { error } = await supabaseAdmin.storage.from("user-assets").upload(key, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    res.json({ url: publicUrl });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/thumbnail/generate", requireAuth, async (req, res) => {
+  try {
+    const deduction = await deductCredits(req.user.id, 10, "thumbnail_generate", "Thumbnail Generator");
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+    const { imageUrl, headline, subtext, style, niche } = req.body;
+    if (!headline || !niche) return res.status(400).json({ error: "headline and niche required" });
+
+    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+
+    // Step 1 — GPT-4o generates an optimized nano-banana prompt
+    const { getThumbnailAnalysisPrompt } = await import("./prompts/thumbnailAnalysis.js");
+    const analysisPrompt = getThumbnailAnalysisPrompt({ headline, subtext, niche, style, hasImage: !!imageUrl });
+
+    let optimizedPrompt;
+    try {
+      const messages = [{ role: "user", content: [] }];
+      if (imageUrl) {
+        const imgFetch  = await fetch(imageUrl);
+        const imgBuffer = Buffer.from(await imgFetch.arrayBuffer());
+        const base64    = imgBuffer.toString("base64");
+        const mimeType  = imgFetch.headers.get("content-type") || "image/jpeg";
+        messages[0].content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } });
+      }
+      messages[0].content.push({ type: "text", text: analysisPrompt });
+
+      const gptRes = await openai.chat.completions.create({ model: "gpt-4o", max_tokens: 400, messages });
+      optimizedPrompt = gptRes.choices[0].message.content?.trim();
+    } catch (e) {
+      console.warn("[thumbnail/generate] GPT-4o failed, using fallback prompt:", e.message);
+      const STYLE_MAP = { bold: "bold dramatic high-contrast", minimal: "clean minimal elegant", vibrant: "vibrant energetic saturated", dark: "dark moody cinematic" };
+      optimizedPrompt = `${STYLE_MAP[style] || "bold dramatic"} YouTube thumbnail for ${niche} niche. Headline text: "${headline}". ${subtext ? `Subtext: "${subtext}".` : ""} 16:9 horizontal landscape, high contrast, ultra-sharp, professional thumbnail quality, no watermarks.`;
+    }
+    console.log("[thumbnail/generate] prompt:", optimizedPrompt?.slice(0, 150));
+
+    // Step 2 — Upload image to Fal.ai storage (best effort — fallback to direct URL)
+    let falImageUrl = imageUrl || null;
+    if (imageUrl) {
+      try {
+        const imgFetch       = await fetch(imageUrl);
+        const imgBuffer      = Buffer.from(await imgFetch.arrayBuffer());
+        const imgContentType = imgFetch.headers.get("content-type") || "image/jpeg";
+        const ext            = imgContentType.includes("png") ? "png" : "jpg";
+        const falUploadRes   = await fetch("https://fal.run/storage", {
+          method:  "POST",
+          headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": imgContentType, "X-File-Name": `thumb.${ext}` },
+          body:    imgBuffer,
+        });
+        if (falUploadRes.ok) {
+          const uploaded = await falUploadRes.json();
+          falImageUrl = uploaded.url;
+        }
+      } catch (e) {
+        console.warn("[thumbnail/generate] Fal.ai storage upload failed, using direct URL:", e.message);
+      }
+    }
+
+    // Step 3 — Generate via nano-banana
+    const endpoint = falImageUrl
+      ? "https://fal.run/fal-ai/nano-banana/edit"
+      : "https://fal.run/fal-ai/nano-banana";
+    const falBody = falImageUrl
+      ? { image_urls: [falImageUrl], prompt: optimizedPrompt }
+      : { prompt: optimizedPrompt };
+
+    const falRes = await fetch(endpoint, {
+      method:  "POST",
+      headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+      body:    JSON.stringify(falBody),
+    });
+    if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
+
+    const data   = await falRes.json();
+    const falUrl = data.images?.[0]?.url;
+    if (!falUrl) throw new Error("No image URL returned");
+
+    // Step 4 — Proxy to Supabase permanent storage
+    const imgRes = await fetch(falUrl);
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const ct     = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext2   = ct.includes("png") ? "png" : "jpg";
+    const key    = `thumbnails/${req.user.id}/thumb-${Date.now()}.${ext2}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+
+    // Step 5 — Save metadata (silently skipped if table doesn't exist)
+    try {
+      await supabaseAdmin.from("thumbnails").insert({
+        user_id: req.user.id, thumbnail_url: publicUrl, storage_key: key,
+        headline: headline || null, subtext: subtext || null, niche: niche || null, style: style || null,
+      });
+    } catch (_) {}
+
+    res.json({ thumbnailUrl: publicUrl });
+  } catch (e) {
+    console.error("[thumbnail/generate]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/thumbnail/list", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin.storage.from("user-assets").list(`thumbnails/${req.user.id}`, { limit: 50, sortBy: { column: "created_at", order: "desc" } });
+    if (error) throw new Error(error.message);
+    const files = (data || [])
+      .filter(f => !f.name.startsWith("upload-"))
+      .map(f => {
+        const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(`thumbnails/${req.user.id}/${f.name}`);
+        return { url: publicUrl, storageKey: `thumbnails/${req.user.id}/${f.name}`, name: f.name };
+      });
+    res.json({ thumbnails: files });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/thumbnail/delete", requireAuth, async (req, res) => {
+  try {
+    const { storageKey } = req.body;
+    if (!storageKey?.startsWith(`thumbnails/${req.user.id}`)) return res.status(403).json({ error: "Forbidden" });
+    await supabaseAdmin.storage.from("user-assets").remove([storageKey]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/proxy-video-upload — Fetch a video URL server-side and upload to Supabase
@@ -4698,6 +5013,9 @@ app.post("/api/webhooks/user-created", async (req, res) => {
 
     const { id, email, raw_user_meta_data } = record;
     const name = raw_user_meta_data?.full_name || raw_user_meta_data?.name || "";
+
+    // Free signup credits
+    await addCredits(id, 200, "bonus", "signup_bonus", "Welcome bonus — free credits");
 
     // Admin alert (fire-and-forget)
     const adminEmail = adminNewUserEmail({ id, email, name });

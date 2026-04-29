@@ -4,12 +4,12 @@
  * Fancy animated timeline replaces step pills
  */
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { createProject as createDBProject, updateProject, updateProjectProgress, getProductAdProjects, deleteProject } from "../services/projects/projectService";
 import { useProjectStore } from "../store/useProjectStore";
 import { useCreditsStore } from "../store/useCreditsStore";
-import { MUSIC_LIBRARY } from "../core/registries/musicRegistry";
+import { loadMusicLibrary, pickMusicByMood } from "../core/registries/musicRegistry";
 import AppLayout from "../ui/AppLayout";
 
 const DRAFT_KEY = "vidquence_product_ad_draft";
@@ -187,8 +187,9 @@ function ClipRow({ index, data }) {
 
 /* ══ Main ══ */
 export default function NewProductAd() {
-  const navigate     = useNavigate();
-  const setProject   = useProjectStore(s => s.setProject);
+  const navigate       = useNavigate();
+  const [searchParams] = useSearchParams();
+  const setProject     = useProjectStore(s => s.setProject);
   const setDbId      = useProjectStore(s => s.setDatabaseId);
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
 
@@ -222,6 +223,7 @@ export default function NewProductAd() {
 
   const [creatingProject, setCreatingProject] = useState(false);
   const [savedDraft,      setSavedDraft]      = useState(null);
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
 
   const allImagesReady    = analysis?.shots?.every(s => images[s.id]?.url);
   const allClipsProcessed = analysis?.shots?.every(s => clips[s.id]?.videoUrl || clips[s.id]?.error);
@@ -229,8 +231,11 @@ export default function NewProductAd() {
 
   useEffect(() => {
     localStorage.removeItem(DRAFT_KEY); // superseded by DB tracking
+    const resumeId = searchParams.get("resume");
     getProductAdProjects().then(projects => {
-      const incomplete = projects.find(p => (p.steps_completed ?? 5) > 1 && (p.steps_completed ?? 5) < 5 && p.raw_ai_json?.analysis);
+      const incomplete = resumeId
+        ? projects.find(p => p.id === resumeId)
+        : projects.find(p => (p.steps_completed ?? 0) > 1 && (p.steps_completed ?? 0) < 5 && p.raw_ai_json?.analysis);
       if (incomplete) setSavedDraft(incomplete);
     }).catch(() => {});
   }, []);
@@ -280,6 +285,7 @@ export default function NewProductAd() {
     try {
       const res = await serverFetch("/api/product-ad/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: src, targetMarket }) });
       const data = await res.json();
+      if (res.status === 403) { setUpgradeRequired(true); setAnalyzing(false); return; }
       if (res.status === 422) { setAnalyzeErr(data.error || "Image not suitable."); setAnalyzing(false); setStep(1); return; }
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       fetchCredits(); setHasMannequin(data.validation?.has_mannequin || false); setAnalysis(data);
@@ -288,7 +294,7 @@ export default function NewProductAd() {
       // Create project record in DB at step 2 so progress is trackable
       try {
         const saved = await createDBProject({
-          name: `${data.product_analysis?.product_type || "Product"} Ad`,
+          name: `${(data.product_analysis?.product_type || "Product").replace(/^\w/, c => c.toUpperCase())} Ad`,
           rawAI: { analysis: data, product_image_url: src, has_mannequin: data.validation?.has_mannequin || false, category: data.product_analysis?.category || null, target_market: targetMarket },
           safeProject: null,
           source: "product_ad",
@@ -399,20 +405,19 @@ export default function NewProductAd() {
     let currentTime = 0; const beats = [];
     successfulShots.forEach((shot, index) => {
       const clipUrl = clips[shot.id].videoUrl, duration = shot.duration_seconds || 3, start = currentTime; currentTime += duration;
-      beats.push({ id: crypto.randomUUID(), order: index, layout: "blank", layoutBackground: { type: "color", value: "#000000" }, zones: { z1: { type: "asset", x: 0, y: 0, width: 100, height: 100, zIndex: 0, content: { kind: "asset", asset: { src: clipUrl, type: "video", objectFit: "cover", motion: "none", enterTransition: "none", exitTransition: "none" } }, style: { objectFit: "cover" }, background: {} } }, overlays: [], audio_cues: [], caption: { show: false, text: "", style: "wordBlaze", position: 80 }, transition: index < successfulShots.length - 1 ? TRANSITIONS[index % TRANSITIONS.length] : { type: "fade", duration: 14 }, spoken: "", intent: "hook", energy: 0.8, beatType: null, duration_sec: duration, start_sec: start, end_sec: currentTime });
+      beats.push({ id: crypto.randomUUID(), order: index, layout: "blank", layoutBackground: { type: "color", value: "#000000" }, zones: { z1: { type: "asset", x: 0, y: 0, width: 100, height: 100, zIndex: 0, content: { kind: "asset", asset: { src: clipUrl, type: "video", objectFit: "cover", motion: "none", enterTransition: "none", exitTransition: "none" } }, style: { objectFit: "cover" }, background: {} } }, deletedZones: ["z2"], overlays: [], audio_cues: [], caption: { show: false, text: "", style: "wordBlaze", position: 80 }, transition: index < successfulShots.length - 1 ? TRANSITIONS[index % TRANSITIONS.length] : { type: "fade", duration: 14 }, spoken: "", intent: "hook", energy: 0.8, beatType: null, duration_sec: duration, start_sec: start, end_sec: currentTime });
     });
-    const MOOD_TO_MUSIC = { energetic: "eliveta_1", luxury: "nastelbom", playful: "eliveta_2", calm: "the_mountain", dramatic: "mood_mode" };
-    const musicKey = MOOD_TO_MUSIC[analysis.product_analysis.recommended_music_mood] || "eliveta_2";
-    const musicSrc = MUSIC_LIBRARY[musicKey]?.file || MUSIC_LIBRARY["eliveta_2"].file;
+    const musicLib = await loadMusicLibrary();
+    const { src: musicSrc } = pickMusicByMood(analysis.product_analysis.recommended_music_mood, musicLib);
     const project = { id: crypto.randomUUID(), meta: { width: 1080, height: 1920, fps: 25, orientation: "9:16", mode: "faceless" }, beats, duration_sec: currentTime, audio: { music: { src: musicSrc, volume: 0.4 } }, avatar: null, dna: null };
     try {
       let finalId = projectDbId.current;
       if (finalId) {
         // Update the project record created at step 2
-        await updateProject(finalId, project, { name: `${analysis.product_analysis.product_type} Ad`, raw_ai_json: {}, steps_completed: 5 });
+        await updateProject(finalId, project, { name: `${analysis.product_analysis.product_type.replace(/^\w/, c => c.toUpperCase())} Ad`, raw_ai_json: {}, steps_completed: 5 });
       } else {
         // Fallback: create fresh (shouldn't normally happen)
-        const saved = await createDBProject({ name: `${analysis.product_analysis.product_type} Ad`, rawAI: {}, safeProject: project, source: "product_ad", stepsCompleted: 5 });
+        const saved = await createDBProject({ name: `${analysis.product_analysis.product_type.replace(/^\w/, c => c.toUpperCase())} Ad`, rawAI: {}, safeProject: project, source: "product_ad", stepsCompleted: 5 });
         if (!saved?.id) { setCreatingProject(false); return; }
         finalId = saved.id;
         projectDbId.current = finalId;
@@ -488,6 +493,20 @@ export default function NewProductAd() {
               <button onClick={() => handleResume(savedDraft)} style={{ ...S.btnPrimary, padding: "8px 18px", fontSize: 12 }}>Resume →</button>
               <button onClick={() => { deleteProject(savedDraft.id).catch(() => {}); setSavedDraft(null); }} style={{ ...S.btnGhost, padding: "8px 14px", fontSize: 12 }}>Discard</button>
             </div>
+          </div>
+        )}
+
+        {/* Upgrade gate */}
+        {upgradeRequired && (
+          <div style={{ margin: "0 0 24px", padding: "28px 32px", borderRadius: 16, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.25)", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: T.text, marginBottom: 8, fontFamily: "'Syne',sans-serif" }}>Paid Plan Required</div>
+            <div style={{ fontSize: 13, color: T.dim, marginBottom: 20, maxWidth: 360, margin: "0 auto 20px" }}>
+              Product Ad Studio is available on all paid plans. Upgrade to create AI-powered video ads for your products.
+            </div>
+            <button onClick={() => navigate("/#pricing")} style={{ ...S.btnPrimary, padding: "12px 28px", fontSize: 14 }}>
+              View Plans →
+            </button>
           </div>
         )}
 

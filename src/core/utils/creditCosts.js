@@ -7,15 +7,23 @@
  */
 
 export const CREDIT_COSTS = {
-  base_generation:  8,   // script + beats + layouts + zone content
+  base_generation:  10,  // script + beats + layouts + zone content
   ai_image:         2,   // per image generated via Fal.ai
   image_reuse:      0,   // reused from library — free
   tts_generation:   5,   // full video TTS
-  export_local:     2,   // local render export
-  export_lambda:    8,   // cloud render export (future)
+  export_local:     8,   // local render export
+  export_lambda:    8,   // cloud render export
   layout_swap:      1,   // swap layout on a beat
   individual_tts:   2,   // single beat TTS regeneration
   transcription:    3,   // Fal.ai Whisper video transcription
+  // Product Ad breakdown
+  product_ad_analyze:    5,   // GPT-4o strategy analysis
+  product_ad_base_image: 8,   // base model image (Fal.ai)
+  product_ad_scenes:     40,  // 5 scene images
+  product_ad_clip:       50,  // video clip (LTX per clip)
+  // Other tools
+  poster_generate:       10,  // Poster Studio
+  thumbnail_generate:    10,  // Thumbnail Generator
 };
 
 /**
@@ -34,8 +42,8 @@ export function estimateCreditCost(duration, options = {}) {
 }
 
 export const PLANS = {
-  starter: { price: 29, credits: 300,  label: "Starter"        },
-  creator: { price: 49, credits: 600,  label: "Creator"        },
-  pro:     { price: 79, credits: 1200, label: "Pro"            },
+  starter: { price: 15, credits: 1800, label: "Starter"        },
+  pro:     { price: 29, credits: 3500, label: "Pro"            },
+  agency:  { price: 50, credits: 6000, label: "Agency"         },
   payg:    { price: 9,  credits: 80,   label: "Pay As You Go"  },
 };

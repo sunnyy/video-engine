@@ -34,8 +34,12 @@ import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
 import ProductAds      from "./pages/ProductAds";
 import NewProductAd    from "./pages/NewProductAd";
-import PosterStudio    from "./pages/PosterStudio";
+import PosterStudio         from "./pages/PosterStudio";
+import Thumbnails           from "./pages/Thumbnails";
+import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
 import TTSStudio       from "./pages/TTSStudio";
+import CaptionStudio  from "./pages/CaptionStudio";
+import OutfitStudio   from "./pages/OutfitStudio";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
@@ -118,6 +122,7 @@ export default function App() {
             <Route path="/new"              element={<VideoGenerator />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/transcription"    element={<Transcription />} />
+            <Route path="/captions"         element={<CaptionStudio />} />
             <Route path="/feedback"         element={<Feedback />} />
             <Route path="/checkout"         element={<Checkout />} />
             <Route path="/assets"           element={<Assets />} />
@@ -128,7 +133,10 @@ export default function App() {
             <Route path="/product-ads/new"   element={<NewProductAd />} />
             <Route path="/product-ad-studio" element={<ProductAds />} />
             <Route path="/poster-studio"     element={<PosterStudio />} />
+            <Route path="/thumbnail"           element={<Thumbnails />} />
+            <Route path="/thumbnail/new"       element={<ThumbnailGenerator />} />
             <Route path="/tts-studio"        element={<TTSStudio />} />
+            <Route path="/outfit-studio"     element={<OutfitStudio />} />
 
             {/* Admin routes */}
             {isAdmin ? (

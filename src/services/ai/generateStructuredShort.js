@@ -433,7 +433,7 @@ export async function generateStructuredShort({
     if (!isEntity && !hasZoneEntityOverride && !generateImages) return;
 
     let defAssetZones = (def?.zones || [])
-      .filter(z => z.type === "asset")
+      .filter(z => z.type === "asset")   // only image-type zones; avatar-typed zones are never image targets
       .filter(z => beat.zones[z.id]?.content?.kind !== "block")
       .filter(z => !beat.zones[z.id]?.content?.asset?.src)
       .filter(z => z.id !== beat.avatarZone);
