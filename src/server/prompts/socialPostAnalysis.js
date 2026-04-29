@@ -50,5 +50,5 @@ Your task:
 4. Include the actual text content in the prompt: headline "${headline || "[compelling headline]"}", subtext "${subtext || "[supporting text]"}", brand "${brandName || "[brand name]"}"
 5. Text must be clearly readable, professionally styled, and prominently placed
 
-Output ONLY the image generation prompt — no explanation, no JSON, no markdown. Single paragraph under 400 words. End with: "Professional social media graphic, high resolution, ${ratioDesc}, no watermarks."`;
+Output ONLY the image generation prompt — no explanation, no JSON, no markdown. Single paragraph, STRICTLY under 900 characters total. Be concise. End with: "Professional social media graphic, high resolution, ${ratioDesc}, no watermarks."`;
 }

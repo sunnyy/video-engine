@@ -52,11 +52,11 @@ router.post("/generate", requireAuth, async (req, res) => {
       const promptText = getSocialPostPrompt({ headline, subtext, brandName, niche, style, aspectRatio, hasReferenceImage: !!referenceImageUrl, hasLogo: !!logoUrl, brandColor });
       messages[0].content.push({ type: "text", text: promptText });
       const gptRes = await openai.chat.completions.create({ model: "gpt-4o", max_tokens: 500, messages });
-      optimizedPrompt = gptRes.choices[0].message.content?.trim();
+      optimizedPrompt = gptRes.choices[0].message.content?.trim().slice(0, 1000);
     } catch (e) {
       console.warn("[social-post/generate] GPT-4o failed, using fallback:", e.message);
       const ratioLabel = aspectRatio === "4:5" ? "Portrait 4:5 format" : aspectRatio === "9:16" ? "Story 9:16 format" : "Square 1:1 format";
-      optimizedPrompt = `Professional social media post for ${niche} niche. ${headline ? `Headline: "${headline}".` : ""} ${subtext ? `Subtext: "${subtext}".` : ""} ${brandName ? `Brand: "${brandName}".` : ""} Modern clean design, bold typography, high contrast. ${ratioLabel}. High resolution, no watermarks.`;
+      optimizedPrompt = `Professional social media post for ${niche} niche. ${headline ? `Headline: "${headline}".` : ""} ${subtext ? `Subtext: "${subtext}".` : ""} ${brandName ? `Brand: "${brandName}".` : ""} Modern clean design, bold typography, high contrast. ${ratioLabel}. High resolution, no watermarks.`.slice(0, 1000);
     }
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
