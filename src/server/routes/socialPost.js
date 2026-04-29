@@ -61,37 +61,14 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    // Step 2 — Upload images to Fal.ai storage (reference + logo if provided)
-    async function uploadToFal(url, filename) {
-      try {
-        const imgFetch  = await fetch(url);
-        const imgBuffer = Buffer.from(await imgFetch.arrayBuffer());
-        const imgCt     = imgFetch.headers.get("content-type") || "image/jpeg";
-        const falUp     = await fetch("https://fal.run/storage", {
-          method:  "POST",
-          headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": imgCt, "X-File-Name": filename },
-          body:    imgBuffer,
-        });
-        if (falUp.ok) { const d = await falUp.json(); return d.url; }
-      } catch {}
-      return url;
-    }
-
-    // Reference takes priority; logo is fallback for the single image_url slot
-    const falImageUrl = referenceImageUrl
-      ? await uploadToFal(referenceImageUrl, "ref.jpg")
-      : logoUrl
-        ? await uploadToFal(logoUrl, "logo.png")
-        : null;
-
-    // Step 3 — grok-imagine-image/edit when image provided, nano-banana for text-only
-    const useEdit  = !!falImageUrl;
-    const endpoint = useEdit ? "https://fal.run/xai/grok-imagine-image/edit" : "https://fal.run/fal-ai/nano-banana";
-
-    const FAL_NANO_SIZE = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": "portrait_16_9" };
-    const finalBody = useEdit
-      ? { image_url: falImageUrl, prompt: optimizedPrompt, aspect_ratio: aspectRatio || "1:1" }
-      : { prompt: optimizedPrompt, image_size: FAL_NANO_SIZE[aspectRatio] || "square_hd" };
+    // Step 3 — recraft-v3 for all cases (GPT-4o already analysed any reference/logo)
+    const RECRAFT_SIZE = {
+      "1:1":  { width: 1024, height: 1024 },
+      "4:5":  { width: 1024, height: 1280 },
+      "9:16": { width: 1024, height: 1820 },
+    };
+    const endpoint  = "https://fal.run/fal-ai/recraft-v3";
+    const finalBody = { prompt: optimizedPrompt, image_size: RECRAFT_SIZE[aspectRatio] || RECRAFT_SIZE["1:1"] };
 
     const falRes = await fetch(endpoint, {
       method:  "POST",
