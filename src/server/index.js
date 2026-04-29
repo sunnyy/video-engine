@@ -979,15 +979,6 @@ app.get("/api/proxy-video", (req, res) => {
   upstream.end();
 });
 
-/* ── Diagnostics ── */
-app.get("/api/diag/ffmpeg", async (_req, res) => {
-  const { execFile } = await import("node:child_process");
-  execFile("ffmpeg", ["-version"], (err, stdout, stderr) => {
-    const output = (stdout || "") + (stderr || "");
-    res.json({ ok: !err, version: output.split("\n")[0] || null, error: err?.message || null });
-  });
-});
-
 /* ---------------- COMPRESSION VIDEO ---------------- */
 const upload = multer({ dest: TEMP_DIR });
 const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
