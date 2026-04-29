@@ -27,6 +27,7 @@ export default function Editor() {
   const [activeTab, setActiveTab] = useState("beats");
   const [beatTab, setBeatTab] = useState("layout");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -43,6 +44,11 @@ export default function Editor() {
   useEffect(() => {
     setSelectedZoneIds(new Set());
   }, [activeBeatId]);
+
+  // Reset cancelling state when render finishes/is dismissed
+  useEffect(() => {
+    if (renderProgress === null) setCancelling(false);
+  }, [renderProgress]);
 
   if (loading || !project) return null;
 
@@ -124,7 +130,8 @@ export default function Editor() {
           {/* Cancel button */}
           <button
             onClick={async () => {
-              if (!currentJobId) return;
+              if (!currentJobId || cancelling) return;
+              setCancelling(true);
               try {
                 await serverFetch("/api/render/cancel", {
                   method: "POST",
@@ -132,19 +139,20 @@ export default function Editor() {
                 });
               } catch {}
             }}
+            disabled={cancelling}
             style={{
               marginTop: 8,
               padding: "7px 20px",
               fontSize: 13,
               fontWeight: 600,
-              color: "#f87171",
-              background: "rgba(248,113,113,0.12)",
-              border: "1px solid rgba(248,113,113,0.3)",
+              color: cancelling ? "#9494a8" : "#f87171",
+              background: cancelling ? "rgba(148,148,168,0.08)" : "rgba(248,113,113,0.12)",
+              border: `1px solid ${cancelling ? "rgba(148,148,168,0.2)" : "rgba(248,113,113,0.3)"}`,
               borderRadius: 8,
-              cursor: "pointer",
+              cursor: cancelling ? "default" : "pointer",
             }}
           >
-            Cancel
+            {cancelling ? "Cancelling…" : "Cancel"}
           </button>
         </div>
       )}
