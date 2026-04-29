@@ -84,9 +84,9 @@ router.post("/generate", requireAuth, async (req, res) => {
         ? await uploadToFal(logoUrl, "logo.png")
         : null;
 
-    // Step 3 — ideogram/v2a/remix when image provided, nano-banana for text-only
+    // Step 3 — grok-imagine-image/edit when image provided, nano-banana for text-only
     const useEdit  = !!falImageUrl;
-    const endpoint = useEdit ? "https://fal.run/fal-ai/ideogram/v2a/remix" : "https://fal.run/fal-ai/nano-banana";
+    const endpoint = useEdit ? "https://fal.run/fal-ai/grok-imagine-image/edit" : "https://fal.run/fal-ai/nano-banana";
 
     const FAL_NANO_SIZE = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": "portrait_16_9" };
     const finalBody = useEdit
