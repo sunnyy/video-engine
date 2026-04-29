@@ -90,7 +90,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
     const data   = await falRes.json();
     console.log("[social-post/generate] fal response keys:", Object.keys(data));
-    const falUrl = data.images?.[0]?.url;
+    const falUrl = data.images?.[0]?.url || data.image?.url;
     if (!falUrl) throw new Error(`No image returned. Response: ${JSON.stringify(data).slice(0, 200)}`);
 
     // Proxy to Supabase
