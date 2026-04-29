@@ -3053,19 +3053,21 @@ app.post("/api/outfit/generate", requireAuth, async (req, res) => {
     const deduction = await deductCredits(req.user.id, 8, "outfit_tryon", "Outfit Studio — virtual try-on");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
-    const { garmentUrl, modelUrl, hasMannequin } = req.body;
+    const { garmentUrl, modelUrl, hasMannequin, useMyPhoto } = req.body;
     if (!garmentUrl || !modelUrl) return res.status(400).json({ error: "garmentUrl and modelUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
     const prompt = hasMannequin
       ? `The person in image 1 should wear the exact same outfit as the mannequin in image 2. Keep the person from image 1's face, skin tone, hair, and identity completely unchanged. Reproduce every detail of the outfit exactly — same colors, fabric, embroidery, neckline, sleeves, silhouette, borders, and embellishments. Full body visible, natural confident pose, clean studio background, soft professional lighting. Photorealistic, 9:16 vertical portrait.`
+      : useMyPhoto
+      ? `Use the first uploaded image as the garment reference and the second uploaded image as the person reference. Dress the person in the exact garment from the first image and transfer it naturally onto their body while preserving the original garment design exactly as shown. Do not redesign, reinterpret, restyle, or simplify the clothing. Keep the same fabric, color, embroidery, print, stitching, sleeve style, neckline, fit, proportions, hemline, garment length, and silhouette exactly unchanged. The garment must look like the same real piece of clothing, only worn by the person. Preserve all embroidery placement, motifs, borders, textures, folds, and fabric behavior accurately. Fit the garment naturally to the person's body and pose without altering its actual cut or dimensions. Do not crop, shorten, tighten, lengthen, reshape, or modernize the garment. Do not change the garment category. If the garment is topwear only (shirt, blouse, kurti, top), keep the original upper garment unchanged and add a clean, realistic, matching bottom (such as plain trousers, palazzo, skirt, or jeans depending on style) that complements the garment without distracting from it. If the bottom is not visible in the garment reference, generate a simple matching bottom in a neutral coordinated style. Keep the person's face, hairstyle, pose, body shape, expression, jewelry, and environment unchanged unless required for realistic garment fitting. Maintain realistic draping, natural lighting, correct body proportions, and photorealistic textile detail. Final output should look like a real fashion photo of the same person wearing the exact same garment from the reference image.`
       : `Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer, 9:16 vertical portrait.`;
 
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_urls: [modelUrl, garmentUrl], prompt }),
+      body:    JSON.stringify({ image_urls: useMyPhoto ? [garmentUrl, modelUrl] : [modelUrl, garmentUrl], prompt }),
     });
     if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
     const data   = await falRes.json();

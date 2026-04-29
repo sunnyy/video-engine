@@ -146,7 +146,7 @@ export default function OutfitStudio() {
       const res  = await serverFetch("/api/outfit/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ garmentUrl: finalGarmentUrl, modelUrl: finalModelUrl, hasMannequin }),
+        body:    JSON.stringify({ garmentUrl: finalGarmentUrl, modelUrl: finalModelUrl, hasMannequin, useMyPhoto: modelTab === "mine" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
