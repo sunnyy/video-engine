@@ -23,7 +23,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     const deduction = await deductCredits(req.user.id, 10, "social_post", "Social Media Post Generator");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
-    const { referenceImageUrl, headline, subtext, brandName, niche, style, aspectRatio } = req.body;
+    const { referenceImageUrl, logoUrl, brandColor, headline, subtext, brandName, niche, style, aspectRatio } = req.body;
     if (!niche) return res.status(400).json({ error: "niche required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
@@ -42,7 +42,14 @@ router.post("/generate", requireAuth, async (req, res) => {
         const mimeType  = imgFetch.headers.get("content-type") || "image/jpeg";
         messages[0].content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } });
       }
-      const promptText = getSocialPostPrompt({ headline, subtext, brandName, niche, style, aspectRatio, hasReferenceImage: !!referenceImageUrl });
+      if (logoUrl) {
+        const logoFetch  = await fetch(logoUrl);
+        const logoBuffer = Buffer.from(await logoFetch.arrayBuffer());
+        const logoBase64 = logoBuffer.toString("base64");
+        const logoMime   = logoFetch.headers.get("content-type") || "image/png";
+        messages[0].content.push({ type: "image_url", image_url: { url: `data:${logoMime};base64,${logoBase64}` } });
+      }
+      const promptText = getSocialPostPrompt({ headline, subtext, brandName, niche, style, aspectRatio, hasReferenceImage: !!referenceImageUrl, hasLogo: !!logoUrl, brandColor });
       messages[0].content.push({ type: "text", text: promptText });
       const gptRes = await openai.chat.completions.create({ model: "gpt-4o", max_tokens: 500, messages });
       optimizedPrompt = gptRes.choices[0].message.content?.trim();

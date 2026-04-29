@@ -1,4 +1,4 @@
-export function getSocialPostPrompt({ headline, subtext, brandName, niche, style, aspectRatio, hasReferenceImage }) {
+export function getSocialPostPrompt({ headline, subtext, brandName, niche, style, aspectRatio, hasReferenceImage, hasLogo, brandColor }) {
   const textBlock = [
     headline  ? `Headline: "${headline}"` : "",
     subtext   ? `Subtext: "${subtext}"` : "",
@@ -19,12 +19,22 @@ export function getSocialPostPrompt({ headline, subtext, brandName, niche, style
     : "9:16 vertical story format (1080x1920px)";
 
   const referenceInstruction = hasReferenceImage
-    ? `A reference image is provided. Analyze its visual style, layout, color palette, composition, and design language. Generate a SIMILAR but original design — same aesthetic direction but with the new content.`
+    ? `A reference image is provided as the first image. Analyze its visual style, layout, color palette, composition, and design language. Generate a SIMILAR but original design — same aesthetic direction but with the new content.`
     : `No reference image provided. Generate an original design based on the niche and style.`;
+
+  const logoInstruction = hasLogo
+    ? `A logo image is also provided${hasReferenceImage ? " as the second image" : ""}. Incorporate this logo prominently in the design — place it in a natural position such as top-left corner, bottom center, or wherever it best fits the layout. Describe its exact placement and size in the prompt.`
+    : "";
+
+  const colorInstruction = brandColor
+    ? `Primary brand color is ${brandColor} — use this as the dominant accent color, headline color, button color, or background element throughout the design. Build the entire color palette around this color.`
+    : "";
 
   return `You are an expert social media graphic designer and AI image prompt engineer.
 
 ${referenceInstruction}
+${logoInstruction ? "\n" + logoInstruction : ""}
+${colorInstruction ? "\n" + colorInstruction : ""}
 
 Create a detailed image generation prompt for a ${ratioDesc} social media post for the ${niche} niche.
 

@@ -44,6 +44,9 @@ export default function SocialPostGenerator() {
   const [refUrl,      setRefUrl]      = useState("");
   const [refPreview,  setRefPreview]  = useState("");
   const [uploading,   setUploading]   = useState(false);
+  const [logoFile,    setLogoFile]    = useState(null);
+  const [logoUrl,     setLogoUrl]     = useState("");
+  const [brandColor,  setBrandColor]  = useState("");
   const [brandName,   setBrandName]   = useState("");
   const [headline,    setHeadline]    = useState("");
   const [subtext,     setSubtext]     = useState("");
@@ -59,6 +62,7 @@ export default function SocialPostGenerator() {
   const [showUrl,     setShowUrl]     = useState(false);
 
   const fileInputRef = useRef();
+  const logoInputRef = useRef();
 
   useEffect(() => { fetchHistory(); }, []);
 
@@ -117,10 +121,19 @@ export default function SocialPostGenerator() {
         setUploading(false);
       }
 
+      let finalLogoUrl = logoUrl;
+      if (logoFile && !logoUrl) {
+        const form = new FormData();
+        form.append("image", logoFile);
+        const res  = await serverFetch("/api/social-post/upload", { method: "POST", body: form });
+        const data = await res.json();
+        if (res.ok) { finalLogoUrl = data.url; setLogoUrl(data.url); }
+      }
+
       const res  = await serverFetch("/api/social-post/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ referenceImageUrl: finalRefUrl || null, headline, subtext, brandName, niche, style, aspectRatio }),
+        body:    JSON.stringify({ referenceImageUrl: finalRefUrl || null, logoUrl: finalLogoUrl || null, brandColor: brandColor || null, headline, subtext, brandName, niche, style, aspectRatio }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
@@ -195,10 +208,48 @@ export default function SocialPostGenerator() {
 
             {/* Content fields */}
             <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+
+              {/* Logo upload */}
+              <div>
+                <label style={C.lbl}>Logo <span style={{ color: "#444", fontWeight: 400, textTransform: "none" }}>(optional)</span></label>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {logoUrl || logoFile ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <img
+                        src={logoFile ? URL.createObjectURL(logoFile) : logoUrl}
+                        style={{ width: 48, height: 48, objectFit: "contain", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "#0d0d14" }}
+                      />
+                      <button onClick={() => { setLogoFile(null); setLogoUrl(""); }} style={{ ...C.btnG, fontSize: 11, padding: "4px 10px" }}>Remove</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => logoInputRef.current?.click()} style={{ ...C.btnG, fontSize: 12 }}>↑ Upload Logo</button>
+                  )}
+                  <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setLogoFile(f); setLogoUrl(""); } e.target.value = ""; }} />
+                </div>
+              </div>
+
               <div>
                 <label style={C.lbl}>Brand Name <span style={{ color: "#333", textTransform: "none", fontWeight: 400 }}>(optional)</span></label>
                 <input style={C.inp} placeholder="e.g. GrowthHive" value={brandName} onChange={e => setBrandName(e.target.value)} />
               </div>
+              {/* Brand color */}
+              <div>
+                <label style={C.lbl}>Brand Color <span style={{ color: "#444", fontWeight: 400, textTransform: "none" }}>(optional)</span></label>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="color" value={brandColor || "#7c5cfc"} onChange={e => setBrandColor(e.target.value)}
+                    style={{ width: 40, height: 36, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "none", cursor: "pointer", padding: 2 }} />
+                  <input type="text" placeholder="#FF0000" value={brandColor} onChange={e => setBrandColor(e.target.value)}
+                    style={{ ...C.inp, width: 100 }} maxLength={7} />
+                  {brandColor && <button onClick={() => setBrandColor("")} style={{ ...C.btnG, fontSize: 11, padding: "4px 10px" }}>Clear</button>}
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                  {["#FF0000","#0066FF","#00AA44","#FF6600","#9900CC","#FFD700","#000000","#FFFFFF"].map(c => (
+                    <div key={c} onClick={() => setBrandColor(c)} style={{ width: 22, height: 22, borderRadius: 4, background: c, cursor: "pointer", border: brandColor === c ? "2px solid #7c5cfc" : "1px solid rgba(255,255,255,0.15)" }} />
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label style={C.lbl}>Headline <span style={{ color: "#333", textTransform: "none", fontWeight: 400 }}>(optional)</span></label>
                 <input style={C.inp} placeholder="e.g. Grow Your Business 10x" value={headline} onChange={e => setHeadline(e.target.value)} />
