@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
+import { serverFetch } from "../services/serverApi";
 import { useProjectStore } from "../store/useProjectStore";
 import { getProjectById } from "../services/projects/projectService";
 
@@ -119,6 +120,32 @@ export default function Editor() {
               transition: "width 0.4s ease",
             }} />
           </div>
+
+          {/* Cancel button */}
+          <button
+            onClick={async () => {
+              if (!currentJobId) return;
+              try {
+                await serverFetch("/api/render/cancel", {
+                  method: "POST",
+                  body: JSON.stringify({ jobId: currentJobId }),
+                });
+              } catch {}
+            }}
+            style={{
+              marginTop: 8,
+              padding: "7px 20px",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#f87171",
+              background: "rgba(248,113,113,0.12)",
+              border: "1px solid rgba(248,113,113,0.3)",
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
         </div>
       )}
 
