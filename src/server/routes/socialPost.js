@@ -82,9 +82,18 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (logoUrl)           falImageUrls.push(await uploadToFal(logoUrl, "logo.png"));
 
     // Step 3 — Generate with nano-banana
+    const FAL_SIZE = {
+      "1:1":  "square_hd",
+      "4:5":  { width: 864, height: 1080 },
+      "9:16": "portrait_16_9",
+    };
+    const imageSize = FAL_SIZE[aspectRatio] || "square_hd";
+
     const useEdit   = falImageUrls.length > 0;
     const endpoint  = useEdit ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
-    const finalBody = useEdit ? { image_urls: falImageUrls, prompt: optimizedPrompt } : { prompt: optimizedPrompt };
+    const finalBody = useEdit
+      ? { image_urls: falImageUrls, prompt: optimizedPrompt, image_size: imageSize }
+      : { prompt: optimizedPrompt, image_size: imageSize };
 
     const falRes = await fetch(endpoint, {
       method:  "POST",
