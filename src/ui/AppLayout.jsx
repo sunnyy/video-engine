@@ -77,6 +77,13 @@ const Icons = {
       <line x1="8" y1="23" x2="16" y2="23"/>
     </svg>
   ),
+  instagram: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5"/>
+      <circle cx="12" cy="12" r="4"/>
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
   outfit: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/>
@@ -193,7 +200,8 @@ export default function AppLayout({ children }) {
             <NavItem icon={Icons.voice}   label="Voiceover"      to="/tts-studio"        active={location.pathname === "/tts-studio"} />
             <NavItem icon={Icons.ad}      label="Product Ads"    to="/product-ads"       active={location.pathname.startsWith("/product-ads")} />
             <NavItem icon={Icons.outfit}  label="Outfit Studio"  to="/outfit-studio"     active={location.pathname === "/outfit-studio"} />
-            <NavItem icon={Icons.poster}     label="Poster"     to="/poster-studio" active={location.pathname === "/poster-studio"} />
+            <NavItem icon={Icons.poster}     label="Poster"       to="/poster-studio"  active={location.pathname === "/poster-studio"} />
+            <NavItem icon={Icons.instagram}  label="Instagram"    to="/instagram"      active={location.pathname === "/instagram"} />
             <NavItem icon={Icons.thumbnail}  label="Thumbnail"  to="/thumbnail"     active={location.pathname.startsWith("/thumbnail")} />
           </NavSection>
 
