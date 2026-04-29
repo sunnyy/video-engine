@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "start": "node src/server/index.js",
     "server": "node --env-file=.env src/server/index.js",
-    "prebundle": "node scripts/prebundle.mjs"
+    "prebundle": "node scripts/prebundle.mjs",
+    "fetch-music": "node --env-file=.env scripts/fetchMusic.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -12,7 +12,7 @@ import { serverFetch } from "../../services/serverApi";
 import { useCreditsStore } from "../../store/useCreditsStore";
 
 
-export default function Header({ progress, setProgress }) {
+export default function Header({ progress, setProgress, currentJobId, setCurrentJobId }) {
   const navigate = useNavigate();
   const project = useProjectStore((s) => s.project);
   const databaseId = useProjectStore((s) => s.databaseId);
@@ -120,23 +120,36 @@ export default function Header({ progress, setProgress }) {
         body: JSON.stringify({ project: clampedProject, resolution, projectId: databaseId }),
       });
       const { jobId } = await res.json();
+      setCurrentJobId(jobId);
 
       const interval = setInterval(async () => {
-        const statusRes = await serverFetch(`/api/render-status/${jobId}`);
+        const statusRes = await serverFetch(`/api/render/status/${jobId}`);
         const status = await statusRes.json();
         setProgress(status.progress);
         if (status.done) {
           clearInterval(interval);
           setProgress(null);
-          if (databaseId) fetchRenders(databaseId);
-          fetchCredits();
+          setCurrentJobId(null);
+          if (!status.cancelled && databaseId) fetchRenders(databaseId);
+          if (!status.cancelled) fetchCredits();
         }
       }, 500);
     } catch (err) {
       console.error(err);
       setProgress(null);
+      setCurrentJobId(null);
       alert("Render failed");
     }
+  };
+
+  const handleCancelRender = async () => {
+    if (!currentJobId) return;
+    try {
+      await serverFetch("/api/render/cancel", {
+        method: "POST",
+        body: JSON.stringify({ jobId: currentJobId }),
+      });
+    } catch {}
   };
 
   /* ── Avatar assignment handlers ── */
@@ -396,7 +409,7 @@ export default function Header({ progress, setProgress }) {
           ⚡ {balance ?? "—"}
         </div>
 
-        {/* Export */}
+        {/* Export / Cancel */}
         <button
           onClick={handleExport}
           disabled={progress !== null}
@@ -404,6 +417,14 @@ export default function Header({ progress, setProgress }) {
         >
           {progress !== null ? `${progress}%` : "Export"}
         </button>
+        {progress !== null && (
+          <button
+            onClick={handleCancelRender}
+            className="flex items-center gap-2 bg-[rgba(248,113,113,0.12)] text-[#f87171] border border-[rgba(248,113,113,0.3)] font-semibold text-[13px] px-3 py-[6px] rounded-[6px] transition hover:bg-[rgba(248,113,113,0.2)] cursor-pointer"
+          >
+            Cancel
+          </button>
+        )}
 
         {/* Renders — persists across refreshes */}
         {renders.length > 0 && (

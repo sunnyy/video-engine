@@ -22,6 +22,7 @@ export default function Editor() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [renderProgress, setRenderProgress] = useState(null); // null = idle, 0-100 = rendering
+  const [currentJobId, setCurrentJobId] = useState(null);
   const [activeTab, setActiveTab] = useState("beats");
   const [beatTab, setBeatTab] = useState("layout");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
@@ -78,7 +79,7 @@ export default function Editor() {
 
   return (
     <div className="flex flex-col h-screen bg-[#13131f] text-[#e8e8f0] overflow-hidden">
-      <Header progress={renderProgress} setProgress={setRenderProgress} />
+      <Header progress={renderProgress} setProgress={setRenderProgress} currentJobId={currentJobId} setCurrentJobId={setCurrentJobId} />
 
       {/* Render lock overlay */}
       {renderProgress !== null && (
