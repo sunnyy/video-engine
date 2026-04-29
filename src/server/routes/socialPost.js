@@ -77,23 +77,21 @@ router.post("/generate", requireAuth, async (req, res) => {
       return url;
     }
 
-    const falImageUrls = [];
-    if (referenceImageUrl) falImageUrls.push(await uploadToFal(referenceImageUrl, "ref.jpg"));
-    if (logoUrl)           falImageUrls.push(await uploadToFal(logoUrl, "logo.png"));
+    // Reference takes priority; logo is fallback for the single image_url slot
+    const falImageUrl = referenceImageUrl
+      ? await uploadToFal(referenceImageUrl, "ref.jpg")
+      : logoUrl
+        ? await uploadToFal(logoUrl, "logo.png")
+        : null;
 
-    // Step 3 — Generate with nano-banana
-    const FAL_SIZE = {
-      "1:1":  "square_hd",
-      "4:5":  { width: 864, height: 1080 },
-      "9:16": "portrait_16_9",
-    };
-    const imageSize = FAL_SIZE[aspectRatio] || "square_hd";
+    // Step 3 — ideogram/v2a/remix when image provided, nano-banana for text-only
+    const useEdit  = !!falImageUrl;
+    const endpoint = useEdit ? "https://fal.run/fal-ai/ideogram/v2a/remix" : "https://fal.run/fal-ai/nano-banana";
 
-    const useEdit   = falImageUrls.length > 0;
-    const endpoint  = useEdit ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
+    const FAL_NANO_SIZE = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": "portrait_16_9" };
     const finalBody = useEdit
-      ? { image_urls: falImageUrls, prompt: optimizedPrompt, image_size: imageSize }
-      : { prompt: optimizedPrompt, image_size: imageSize };
+      ? { image_url: falImageUrl, prompt: optimizedPrompt, aspect_ratio: aspectRatio || "1:1" }
+      : { prompt: optimizedPrompt, image_size: FAL_NANO_SIZE[aspectRatio] || "square_hd" };
 
     const falRes = await fetch(endpoint, {
       method:  "POST",
