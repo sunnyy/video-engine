@@ -201,7 +201,7 @@ export default function AppLayout({ children }) {
             <NavItem icon={Icons.ad}      label="Product Ads"    to="/product-ads"       active={location.pathname.startsWith("/product-ads")} />
             <NavItem icon={Icons.outfit}  label="Outfit Studio"  to="/outfit-studio"     active={location.pathname === "/outfit-studio"} />
             <NavItem icon={Icons.poster}     label="Poster"       to="/poster-studio"  active={location.pathname === "/poster-studio"} />
-            <NavItem icon={Icons.instagram}  label="Instagram"    to="/instagram"      active={location.pathname === "/instagram"} />
+            <NavItem icon={Icons.instagram}  label="Social Post"  to="/social-post"    active={location.pathname === "/social-post"} />
             <NavItem icon={Icons.thumbnail}  label="Thumbnail"  to="/thumbnail"     active={location.pathname.startsWith("/thumbnail")} />
           </NavSection>
 

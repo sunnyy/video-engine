@@ -40,7 +40,7 @@ import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
 import TTSStudio       from "./pages/TTSStudio";
 import CaptionStudio  from "./pages/CaptionStudio";
 import OutfitStudio              from "./pages/OutfitStudio";
-import InstagramPostGenerator    from "./pages/InstagramPostGenerator";
+import SocialPostGenerator       from "./pages/SocialPostGenerator";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
@@ -138,7 +138,7 @@ export default function App() {
             <Route path="/thumbnail/new"       element={<ThumbnailGenerator />} />
             <Route path="/tts-studio"        element={<TTSStudio />} />
             <Route path="/outfit-studio"     element={<OutfitStudio />} />
-            <Route path="/instagram"         element={<InstagramPostGenerator />} />
+            <Route path="/social-post"       element={<SocialPostGenerator />} />
 
             {/* Admin routes */}
             {isAdmin ? (
