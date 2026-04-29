@@ -61,25 +61,30 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    // Step 2 — Upload reference to Fal.ai storage if provided
-    let falRefUrl = referenceImageUrl;
-    if (referenceImageUrl) {
+    // Step 2 — Upload images to Fal.ai storage (reference + logo if provided)
+    async function uploadToFal(url, filename) {
       try {
-        const imgFetch  = await fetch(referenceImageUrl);
+        const imgFetch  = await fetch(url);
         const imgBuffer = Buffer.from(await imgFetch.arrayBuffer());
         const imgCt     = imgFetch.headers.get("content-type") || "image/jpeg";
         const falUp     = await fetch("https://fal.run/storage", {
           method:  "POST",
-          headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": imgCt, "X-File-Name": "ref.jpg" },
+          headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": imgCt, "X-File-Name": filename },
           body:    imgBuffer,
         });
-        if (falUp.ok) { const d = await falUp.json(); falRefUrl = d.url; }
+        if (falUp.ok) { const d = await falUp.json(); return d.url; }
       } catch {}
+      return url;
     }
 
+    const falImageUrls = [];
+    if (referenceImageUrl) falImageUrls.push(await uploadToFal(referenceImageUrl, "ref.jpg"));
+    if (logoUrl)           falImageUrls.push(await uploadToFal(logoUrl, "logo.png"));
+
     // Step 3 — Generate with nano-banana
-    const endpoint  = referenceImageUrl ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
-    const finalBody = referenceImageUrl ? { image_urls: [falRefUrl], prompt: optimizedPrompt } : { prompt: optimizedPrompt };
+    const useEdit   = falImageUrls.length > 0;
+    const endpoint  = useEdit ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
+    const finalBody = useEdit ? { image_urls: falImageUrls, prompt: optimizedPrompt } : { prompt: optimizedPrompt };
 
     const falRes = await fetch(endpoint, {
       method:  "POST",
