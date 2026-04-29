@@ -61,14 +61,16 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    // Step 3 — recraft-v3 for all cases (GPT-4o already analysed any reference/logo)
-    const RECRAFT_SIZE = {
-      "1:1":  { width: 1024, height: 1024 },
-      "4:5":  { width: 1024, height: 1280 },
-      "9:16": { width: 1024, height: 1820 },
-    };
-    const endpoint  = "https://fal.run/fal-ai/recraft-v3";
-    const finalBody = { prompt: optimizedPrompt, image_size: RECRAFT_SIZE[aspectRatio] || RECRAFT_SIZE["1:1"] };
+    // Step 3 — gpt-image-2/edit when image provided, gpt-image-2 for text-only
+    const GPT_SIZE = { "1:1": "1024x1024", "4:5": "1024x1536", "9:16": "1024x1536" };
+    const imageSize = GPT_SIZE[aspectRatio] || "1024x1024";
+
+    const hasImage  = !!(referenceImageUrl || logoUrl);
+    const imageUrl  = referenceImageUrl || logoUrl;
+    const endpoint  = hasImage ? "https://fal.run/openai/gpt-image-2/edit" : "https://fal.run/openai/gpt-image-2";
+    const finalBody = hasImage
+      ? { image_url: imageUrl, prompt: optimizedPrompt, size: imageSize }
+      : { prompt: optimizedPrompt, size: imageSize };
 
     const falRes = await fetch(endpoint, {
       method:  "POST",
