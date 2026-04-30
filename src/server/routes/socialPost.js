@@ -1,8 +1,38 @@
 import express from "express";
+import { deflateSync } from "zlib";
 import {
   supabaseAdmin, requireAuth, deductCredits,
   uploadMemory,
 } from "../middleware/shared.js";
+
+/* ── Generate a solid-black PNG of exact dimensions (no external deps) ── */
+function createBlankPNG(width, height) {
+  const crcTable = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    crcTable[i] = c >>> 0;
+  }
+  const crc32 = (buf) => {
+    let c = 0xFFFFFFFF;
+    for (const b of buf) c = crcTable[(c ^ b) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const t = Buffer.from(type, "ascii");
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([t, data])));
+    return Buffer.concat([len, t, data, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; ihdr[9] = 2; // 8-bit RGB
+  const scanline = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3)]); // filter=None, RGB=0,0,0
+  const raw = Buffer.concat(Array.from({ length: height }, () => scanline));
+  const idat = deflateSync(raw);
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  return Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))]);
+}
 
 export const router = express.Router();
 
@@ -62,17 +92,29 @@ router.post("/generate", requireAuth, async (req, res) => {
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
     // Step 3 — flux-pro/v2/edit when image provided, flux-pro/v2 for text-only
-    const FLUX_SIZE = { "1:1": "square_hd", "4:5": { width: 1024, height: 1280 }, "9:16": "portrait_16_9" };
-    const imageSize = FLUX_SIZE[aspectRatio] || "square_hd";
+    // Always nano-banana/edit with a blank PNG sized to the target aspect ratio.
+    // GPT-4o already analysed the real reference/logo for the prompt.
+    // The blank PNG forces nano-banana to output at the correct dimensions.
+    const BLANK_SIZES = { "1:1": [1024, 1024], "4:5": [864, 1080], "9:16": [608, 1080] };
+    const [bw, bh] = BLANK_SIZES[aspectRatio] || BLANK_SIZES["1:1"];
+    const blankPng = createBlankPNG(bw, bh);
 
-    const hasImage  = !!(referenceImageUrl || logoUrl);
-    const imageUrl  = referenceImageUrl || logoUrl;
-    const endpoint  = hasImage ? "https://fal.run/fal-ai/flux-2/klein/9b/base/edit" : "https://fal.run/fal-ai/nano-banana";
-    const finalBody = hasImage
-      ? { image_urls: [imageUrl], prompt: optimizedPrompt, image_size: imageSize }
-      : { prompt: optimizedPrompt, image_size: imageSize };
+    let blankUrl = null;
+    try {
+      const falUp = await fetch("https://fal.run/storage", {
+        method:  "POST",
+        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "image/png", "X-File-Name": "blank.png" },
+        body:    blankPng,
+      });
+      if (falUp.ok) ({ url: blankUrl } = await falUp.json());
+    } catch (e) { console.warn("[social-post] blank PNG upload failed:", e.message); }
 
-    console.log("[social-post/generate] calling fal:", endpoint, "size:", imageSize, "hasImage:", hasImage);
+    const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
+    const finalBody = blankUrl
+      ? { image_urls: [blankUrl], prompt: optimizedPrompt }
+      : { prompt: optimizedPrompt };
+
+    console.log("[social-post/generate] calling fal:", endpoint, "blank:", `${bw}x${bh}`, "blankUrl:", !!blankUrl);
     const falAbort = new AbortController();
     const falTimeout = setTimeout(() => falAbort.abort(), 90_000);
     let falRes;
