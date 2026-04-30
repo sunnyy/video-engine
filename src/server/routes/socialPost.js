@@ -4,11 +4,6 @@ import {
   uploadMemory,
 } from "../middleware/shared.js";
 
-const BLANK_URLS = {
-  "1:1":  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/1024x1024.png",
-  "4:5":  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/864x1080.png",
-  "9:16": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/680x1080.png",
-};
 
 export const router = express.Router();
 
@@ -67,15 +62,14 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    // Step 3 — flux-pro/v2/edit when image provided, flux-pro/v2 for text-only
-    const blankUrl = BLANK_URLS[aspectRatio] || BLANK_URLS["1:1"];
-
-    const endpoint  = blankUrl ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
-    const finalBody = blankUrl
-      ? { image_urls: [blankUrl], prompt: optimizedPrompt }
+    const hasImage  = !!(referenceImageUrl || logoUrl);
+    const imageUrl  = referenceImageUrl || logoUrl;
+    const endpoint  = hasImage ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
+    const finalBody = hasImage
+      ? { image_urls: [imageUrl], prompt: optimizedPrompt }
       : { prompt: optimizedPrompt };
 
-    console.log("[social-post/generate] calling fal:", endpoint, "aspectRatio:", aspectRatio, "blankUrl:", !!blankUrl);
+    console.log("[social-post/generate] calling fal:", endpoint, "aspectRatio:", aspectRatio, "hasImage:", hasImage);
     const falAbort = new AbortController();
     const falTimeout = setTimeout(() => falAbort.abort(), 90_000);
     let falRes;
