@@ -123,7 +123,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       ? { image_urls: [blankUrl], prompt: optimizedPrompt }
       : { prompt: optimizedPrompt };
 
-    console.log("[social-post/generate] calling fal:", endpoint, "blank:", `${bw}x${bh}`, "blankUrl:", !!blankUrl);
+    console.log("[social-post/generate] calling fal:", endpoint, "aspectRatio:", aspectRatio, "blankUrl:", !!blankUrl);
     const falAbort = new AbortController();
     const falTimeout = setTimeout(() => falAbort.abort(), 90_000);
     let falRes;
