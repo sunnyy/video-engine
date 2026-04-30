@@ -36,6 +36,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       const { default: OpenAI } = await import("openai");
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const messages = [{ role: "user", content: [] }];
+      // Reference image → GPT-4o only (for style/layout analysis)
       if (referenceImageUrl) {
         const imgFetch  = await fetch(referenceImageUrl);
         const imgBuffer = Buffer.from(await imgFetch.arrayBuffer());
@@ -43,13 +44,7 @@ router.post("/generate", requireAuth, async (req, res) => {
         const mimeType  = imgFetch.headers.get("content-type") || "image/jpeg";
         messages[0].content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } });
       }
-      if (logoUrl) {
-        const logoFetch  = await fetch(logoUrl);
-        const logoBuffer = Buffer.from(await logoFetch.arrayBuffer());
-        const logoBase64 = logoBuffer.toString("base64");
-        const logoMime   = logoFetch.headers.get("content-type") || "image/png";
-        messages[0].content.push({ type: "image_url", image_url: { url: `data:${logoMime};base64,${logoBase64}` } });
-      }
+      // Logo → never sent to GPT-4o; goes to nano-banana/edit instead
       const promptText = getSocialPostPrompt({ headline, subtext, brandName, niche, style, aspectRatio, hasReferenceImage: !!referenceImageUrl, hasLogo: !!logoUrl, brandColor });
       messages[0].content.push({ type: "text", text: promptText });
       const gptRes = await openai.chat.completions.create({ model: "gpt-4o", max_tokens: 500, messages });
@@ -62,10 +57,13 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    const endpoint  = "https://fal.run/fal-ai/nano-banana";
-    const finalBody = { prompt: optimizedPrompt };
+    // Logo → nano-banana/edit (as image input). No logo → nano-banana base.
+    const endpoint  = logoUrl ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
+    const finalBody = logoUrl
+      ? { image_urls: [logoUrl], prompt: optimizedPrompt }
+      : { prompt: optimizedPrompt };
 
-    console.log("[social-post/generate] calling fal:", endpoint, "aspectRatio:", aspectRatio);
+    console.log("[social-post/generate] calling fal:", endpoint, "hasLogo:", !!logoUrl, "hasRef:", !!referenceImageUrl);
     const falAbort = new AbortController();
     const falTimeout = setTimeout(() => falAbort.abort(), 90_000);
     let falRes;
