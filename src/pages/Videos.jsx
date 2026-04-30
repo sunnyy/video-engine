@@ -212,7 +212,7 @@ function ProjectCard({ project, onDelete }) {
   );
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 15;
 
 /* ── Videos ── */
 export default function Videos() {
@@ -390,7 +390,7 @@ export default function Videos() {
 
         {!loading && filtered.length > 0 && (
           <>
-            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
               {paginated.map(p => (
                 <ProjectCard key={p.id} project={p} onDelete={handleDelete} />
               ))}
