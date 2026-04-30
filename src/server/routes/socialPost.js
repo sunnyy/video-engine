@@ -64,11 +64,12 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    // Always nano-banana/edit: blank PNG anchors aspect ratio, logo included if provided
+    // Always nano-banana/edit: blank PNG + explicit image_size both anchor aspect ratio
+    const NANO_SIZE = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": { width: 680, height: 1080 } };
     const blankUrl  = BLANK_URLS[aspectRatio] || BLANK_URLS["1:1"];
     const imageUrls = logoUrl ? [blankUrl, logoUrl] : [blankUrl];
     const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
-    const finalBody = { image_urls: imageUrls, prompt: optimizedPrompt };
+    const finalBody = { image_urls: imageUrls, prompt: optimizedPrompt, image_size: NANO_SIZE[aspectRatio] || "square_hd" };
 
     console.log("[social-post/generate] calling fal:", endpoint, "hasLogo:", !!logoUrl, "hasRef:", !!referenceImageUrl);
     const falAbort = new AbortController();
