@@ -67,9 +67,9 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     const hasImage  = !!(referenceImageUrl || logoUrl);
     const imageUrl  = referenceImageUrl || logoUrl;
-    const endpoint  = hasImage ? "https://fal.run/fal-ai/bytedance/seedream/v5/lite/edit" : "https://fal.run/fal-ai/nano-banana";
+    const endpoint  = hasImage ? "https://fal.run/fal-ai/flux-2/klein/9b/base/edit" : "https://fal.run/fal-ai/nano-banana";
     const finalBody = hasImage
-      ? { image_urls: [imageUrl], prompt: optimizedPrompt, image_size: imageSize }
+      ? { image_url: imageUrl, prompt: optimizedPrompt, image_size: imageSize }
       : { prompt: optimizedPrompt, image_size: imageSize };
 
     console.log("[social-post/generate] calling fal:", endpoint, "size:", imageSize, "hasImage:", hasImage);
