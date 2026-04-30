@@ -67,9 +67,11 @@ router.post("/generate", requireAuth, async (req, res) => {
     // Always nano-banana/edit: blank PNG + explicit image_size both anchor aspect ratio
     const NANO_SIZE = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": { width: 680, height: 1080 } };
     const blankUrl  = BLANK_URLS[aspectRatio] || BLANK_URLS["1:1"];
-    const imageUrls = logoUrl ? [blankUrl, logoUrl] : [blankUrl];
+    const imageUrls = logoUrl ? [logoUrl, blankUrl] : [blankUrl];
     const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
-    const sizeNote  = `[The first image is a blank canvas that defines the required output dimensions and aspect ratio — use it ONLY as a size reference. Do not use it for any visual content.${logoUrl ? " The second image is the brand logo to incorporate in the design." : ""}] `;
+    const sizeNote  = logoUrl
+      ? `[The first image is the brand logo to incorporate in the design. The second image is a blank canvas — use it ONLY as the size/aspect ratio reference for the output.] `
+      : `[The first image is a blank canvas — use it ONLY as the size/aspect ratio reference for the output.] `;
     const finalBody = { image_urls: imageUrls, prompt: sizeNote + optimizedPrompt, image_size: NANO_SIZE[aspectRatio] || "square_hd" };
 
     console.log("[social-post/generate] calling fal:", endpoint, "hasLogo:", !!logoUrl, "hasRef:", !!referenceImageUrl);
