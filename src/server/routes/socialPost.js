@@ -34,6 +34,29 @@ function createBlankPNG(width, height) {
   return Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))]);
 }
 
+/* ── Cache blank PNG URLs — uploaded once at startup, reused for every request ── */
+const BLANK_SIZES = { "1:1": [1024, 1024], "4:5": [864, 1080], "9:16": [608, 1080] };
+const blankUrlCache = {};
+
+async function getBlankUrl(aspectRatio, falKey) {
+  if (blankUrlCache[aspectRatio]) return blankUrlCache[aspectRatio];
+  const [bw, bh] = BLANK_SIZES[aspectRatio] || BLANK_SIZES["1:1"];
+  try {
+    const falUp = await fetch("https://fal.run/storage", {
+      method:  "POST",
+      headers: { "Authorization": `Key ${falKey}`, "Content-Type": "image/png", "X-File-Name": "blank.png" },
+      body:    createBlankPNG(bw, bh),
+    });
+    if (falUp.ok) {
+      const { url } = await falUp.json();
+      blankUrlCache[aspectRatio] = url;
+      console.log(`[social-post] cached blank PNG ${bw}x${bh} for ${aspectRatio}:`, url);
+      return url;
+    }
+  } catch (e) { console.warn("[social-post] blank PNG upload failed:", e.message); }
+  return null;
+}
+
 export const router = express.Router();
 
 router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, res) => {
@@ -92,22 +115,8 @@ router.post("/generate", requireAuth, async (req, res) => {
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
     // Step 3 — flux-pro/v2/edit when image provided, flux-pro/v2 for text-only
-    // Always nano-banana/edit with a blank PNG sized to the target aspect ratio.
-    // GPT-4o already analysed the real reference/logo for the prompt.
-    // The blank PNG forces nano-banana to output at the correct dimensions.
-    const BLANK_SIZES = { "1:1": [1024, 1024], "4:5": [864, 1080], "9:16": [608, 1080] };
-    const [bw, bh] = BLANK_SIZES[aspectRatio] || BLANK_SIZES["1:1"];
-    const blankPng = createBlankPNG(bw, bh);
-
-    let blankUrl = null;
-    try {
-      const falUp = await fetch("https://fal.run/storage", {
-        method:  "POST",
-        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "image/png", "X-File-Name": "blank.png" },
-        body:    blankPng,
-      });
-      if (falUp.ok) ({ url: blankUrl } = await falUp.json());
-    } catch (e) { console.warn("[social-post] blank PNG upload failed:", e.message); }
+    // Always nano-banana/edit with a cached blank PNG sized to the target aspect ratio.
+    const blankUrl = await getBlankUrl(aspectRatio, FAL_KEY);
 
     const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
     const finalBody = blankUrl
