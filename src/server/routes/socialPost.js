@@ -67,7 +67,7 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     const hasImage  = !!(referenceImageUrl || logoUrl);
     const imageUrl  = referenceImageUrl || logoUrl;
-    const endpoint  = hasImage ? "https://fal.run/fal-ai/gemini-flash-edit" : "https://fal.run/fal-ai/nano-banana";
+    const endpoint  = hasImage ? "https://fal.run/fal-ai/bytedance/seedream/v5/lite/edit" : "https://fal.run/fal-ai/nano-banana";
     const finalBody = hasImage
       ? { image_url: imageUrl, prompt: optimizedPrompt, image_size: imageSize }
       : { prompt: optimizedPrompt, image_size: imageSize };
