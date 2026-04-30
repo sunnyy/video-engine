@@ -19,7 +19,9 @@ export function getSocialPostPrompt({ headline, subtext, brandName, niche, style
     : "9:16 vertical story format (1080x1920px)";
 
   const referenceInstruction = hasReferenceImage
-    ? `A reference image is provided as the first image. Analyze its visual style, layout, color palette, composition, and design language. Generate a SIMILAR but original design — same aesthetic direction but with the new content.`
+    ? brandColor
+      ? `A reference image is provided. Analyze its layout, composition, typography placement, and visual structure ONLY — do NOT adopt its color palette. The user's brand color overrides all reference colors.`
+      : `A reference image is provided. Analyze its visual style, layout, color palette, composition, and design language. Generate a SIMILAR but original design — same aesthetic direction but with the new content.`
     : `No reference image provided. Generate an original design based on the niche and style.`;
 
   const logoInstruction = hasLogo
@@ -27,7 +29,7 @@ export function getSocialPostPrompt({ headline, subtext, brandName, niche, style
     : "";
 
   const colorInstruction = brandColor
-    ? `Primary brand color is ${brandColor} — use this as the dominant accent color, headline color, button color, or background element throughout the design. Build the entire color palette around this color.`
+    ? `BRAND COLOR OVERRIDE: The user's brand color is ${brandColor}. This takes absolute priority — ignore any colors from the reference image. Use ${brandColor} as the dominant color throughout: backgrounds, accents, headlines, buttons, and graphic elements. Build the entire palette around this color.`
     : "";
 
   return `You are an expert social media graphic designer and AI image prompt engineer.
@@ -44,7 +46,7 @@ ${textBlock || "No specific text provided — create compelling placeholder text
 Design style: ${styleDesc}
 
 Your task:
-1. Analyze the reference image (if provided) and extract: layout composition, color palette, typography placement, visual elements, overall mood
+1. Analyze the reference image (if provided) and extract: layout composition, typography placement, visual elements, overall mood${brandColor ? " — extract structure ONLY, ignore colors" : ", color palette"}
 2. Generate a single comprehensive image generation prompt that will produce a professional social media post
 3. The prompt must specify: exact layout, background design, color palette, where text appears, visual elements/icons/graphics, lighting, overall aesthetic
 4. Include the actual text content in the prompt: headline "${headline || "[compelling headline]"}", subtext "${subtext || "[supporting text]"}", brand "${brandName || "[brand name]"}"
