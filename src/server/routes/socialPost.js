@@ -62,14 +62,10 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    const hasImage  = !!(referenceImageUrl || logoUrl);
-    const imageUrl  = referenceImageUrl || logoUrl;
-    const endpoint  = hasImage ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
-    const finalBody = hasImage
-      ? { image_urls: [imageUrl], prompt: optimizedPrompt }
-      : { prompt: optimizedPrompt };
+    const endpoint  = "https://fal.run/fal-ai/nano-banana";
+    const finalBody = { prompt: optimizedPrompt };
 
-    console.log("[social-post/generate] calling fal:", endpoint, "aspectRatio:", aspectRatio, "hasImage:", hasImage);
+    console.log("[social-post/generate] calling fal:", endpoint, "aspectRatio:", aspectRatio);
     const falAbort = new AbortController();
     const falTimeout = setTimeout(() => falAbort.abort(), 90_000);
     let falRes;
