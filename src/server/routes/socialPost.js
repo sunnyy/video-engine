@@ -1,4 +1,11 @@
 import express from "express";
+
+const BLANK_URLS = {
+  "1:1":  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/1024x1024.png",
+  "4:5":  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/864x1080.png",
+  "9:16": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/680x1080.png",
+};
+
 import {
   supabaseAdmin, requireAuth, deductCredits,
   uploadMemory,
@@ -57,11 +64,11 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
-    // Logo → nano-banana/edit (as image input). No logo → nano-banana base.
-    const endpoint  = logoUrl ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
-    const finalBody = logoUrl
-      ? { image_urls: [logoUrl], prompt: optimizedPrompt }
-      : { prompt: optimizedPrompt };
+    // Always nano-banana/edit: blank PNG anchors aspect ratio, logo included if provided
+    const blankUrl  = BLANK_URLS[aspectRatio] || BLANK_URLS["1:1"];
+    const imageUrls = logoUrl ? [blankUrl, logoUrl] : [blankUrl];
+    const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
+    const finalBody = { image_urls: imageUrls, prompt: optimizedPrompt };
 
     console.log("[social-post/generate] calling fal:", endpoint, "hasLogo:", !!logoUrl, "hasRef:", !!referenceImageUrl);
     const falAbort = new AbortController();
