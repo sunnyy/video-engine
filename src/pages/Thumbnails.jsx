@@ -1,6 +1,11 @@
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { getCredits } from "../services/credits/creditService";
+import { SERVICE_COSTS } from "../core/utils/creditCosts";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
+import GeneratingLoader from "../ui/GeneratingLoader";
 import AppLayout from "../ui/AppLayout";
 
 const PAGE_SIZE = 12;
@@ -92,7 +97,9 @@ function ThumbnailCard({ thumb, onDelete }) {
 }
 
 export default function Thumbnails() {
+  const navigate     = useNavigate();
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
+  const [creditModal, setCreditModal] = useState(null);
 
   const [activeTab, setActiveTab] = useState("generate");
   const [gallPage,  setGallPage]  = useState(0);
@@ -169,6 +176,12 @@ export default function Thumbnails() {
     }
   }
 
+  async function handleGenerateClick() {
+    const credits = await getCredits();
+    const { total, breakdown } = SERVICE_COSTS.thumbnail;
+    setCreditModal({ total, breakdown, balance: credits?.balance ?? 0 });
+  }
+
   async function handleGenerate() {
     setGenErr("");
     let finalUrl = null;
@@ -223,7 +236,7 @@ export default function Thumbnails() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
         style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Thumbnails</h1>
+        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#f5c518" }}>Thumbnails</h1>
         <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
           {[["generate", "Thumbnail Generator"], ["gallery", "My Generated Thumbnails"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -310,7 +323,7 @@ export default function Thumbnails() {
 
               {/* Generate */}
               <div>
-                <button onClick={handleGenerate} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.45 }}>
+                <button onClick={handleGenerateClick} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.45 }}>
                   {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Generate Thumbnail"}
                 </button>
                 <div style={{ textAlign: "center", fontSize: 11, color: "#444", marginTop: 6 }}>~5 credits</div>
@@ -325,13 +338,7 @@ export default function Thumbnails() {
             {/* ── RIGHT: Result ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ width: "100%", aspectRatio: "16/9", background: "#111118", border: thumbnailUrl ? "1px solid rgba(255,255,255,0.08)" : "2px dashed rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {generating && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.4 }}>✦</div>
-                    <div style={{ fontSize: 13, color: "#9494a8" }}>Generating your thumbnail…</div>
-                    <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>20–30 seconds</div>
-                  </div>
-                )}
+                {generating && <GeneratingLoader message="Generating your thumbnail" hint="20–30 seconds" />}
                 {!generating && !thumbnailUrl && (
                   <div style={{ textAlign: "center", color: "#2a2a3a" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>🖼</div>
@@ -362,7 +369,7 @@ export default function Thumbnails() {
         {activeTab === "gallery" && (
           <div>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#e8e8f0" }}>My Generated Thumbnails</h2>
+              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#e8e8f0" }}>My Generated Thumbnails</h2>
               <button onClick={loadThumbnails} className="text-[12px] text-[#7c5cfc] bg-transparent border-0 cursor-pointer hover:opacity-80">Refresh</button>
             </div>
 
@@ -414,6 +421,17 @@ export default function Thumbnails() {
 
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {creditModal && (
+        <CreditConfirmModal
+          service="Thumbnail Generator"
+          breakdown={creditModal.breakdown}
+          total={creditModal.total}
+          balance={creditModal.balance}
+          onConfirm={() => { setCreditModal(null); handleGenerate(); }}
+          onCancel={() => setCreditModal(null)}
+          onTopUp={() => { setCreditModal(null); navigate("/credits"); }}
+        />
+      )}
     </AppLayout>
   );
 }

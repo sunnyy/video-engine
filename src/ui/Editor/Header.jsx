@@ -226,7 +226,7 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
                 setNameVal(projectName);
               }}
               className="flex items-center gap-1 text-[15px] font-bold text-[#e8e8f0] bg-transparent border-0 cursor-pointer hover:text-[#a78fff] transition-colors"
-              style={{ fontFamily: "'Syne',sans-serif" }}
+              style={{ fontFamily: "'Outfit',sans-serif" }}
             >
               {projectName}
               <span className="text-[#55556a] text-[12px] ml-1">▾</span>

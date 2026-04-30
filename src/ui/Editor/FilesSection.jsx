@@ -269,7 +269,7 @@ export default function FilesSection() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[22px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>
+          <h2 className="text-[22px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit', sans-serif" }}>
             Files
           </h2>
           <p className="text-[13px] text-[#7070a0] mt-[2px]">

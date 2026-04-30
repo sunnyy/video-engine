@@ -374,7 +374,7 @@ export default function VideoGenerator() {
           </button>
           <div className="w-[1px] h-[18px] bg-[rgba(255,255,255,0.08)]" />
           <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
-          <span className="text-[15px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif" }}>
+          <span className="text-[15px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit',sans-serif" }}>
             Create Video
           </span>
         </div>
@@ -461,7 +461,7 @@ export default function VideoGenerator() {
                 fontSize: 30,
                 fontWeight: 700,
                 color: "#e8e8f0",
-                fontFamily: "'Syne', sans-serif",
+                fontFamily: "'Outfit', sans-serif",
                 marginBottom: 10,
                 animation: "ai-fade-msg 3s ease forwards",
               }}
@@ -499,7 +499,7 @@ export default function VideoGenerator() {
 
         {/* Header */}
         <div>
-          <h2 className="text-[22px] font-bold text-[#e8e8f0] mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>
+          <h2 className="text-[22px] font-bold text-[#e8e8f0] mb-1" style={{ fontFamily: "'Outfit', sans-serif" }}>
             Create New Video
           </h2>
         </div>
@@ -574,15 +574,17 @@ export default function VideoGenerator() {
         )}
 
         {/* ── Step 3: Basic settings ── */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${mode === "talking_head" ? "grid-cols-1" : "grid-cols-2"}`}>
           <div>
             <Label>Orientation</Label>
             <Select value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
           </div>
-          <div>
-            <Label>Language</Label>
-            <Select value={language} onChange={setLanguage} options={LANGUAGES} />
-          </div>
+          {mode !== "talking_head" && (
+            <div>
+              <Label>Language</Label>
+              <Select value={language} onChange={setLanguage} options={LANGUAGES} />
+            </div>
+          )}
         </div>
 
         {/* ── Step 4: AI Options (faceless only) ── */}
@@ -698,7 +700,7 @@ export default function VideoGenerator() {
             <button onClick={handlePreFlight} disabled={disabled}
               className="w-full rounded-[10px] py-[13px] text-[14px] font-bold transition-all"
               style={{
-                fontFamily: "'Syne', sans-serif",
+                fontFamily: "'Outfit', sans-serif",
                 background: disabled ? "#252540" : "#f0e040",
                 color:      disabled ? "#8888a8" : "#0f0f18",
                 cursor:     disabled ? "not-allowed" : "pointer",
@@ -814,7 +816,7 @@ export default function VideoGenerator() {
                   style={{
                     flex: 2, padding: "11px 0", borderRadius: 9, fontSize: 14, fontWeight: 700,
                     background: "#f0e040", border: "none", color: "#0f0f18", cursor: "pointer",
-                    fontFamily: "'Syne', sans-serif",
+                    fontFamily: "'Outfit', sans-serif",
                   }}
                 >
                   Generate — ⚡ {creditModal.estimate.total}

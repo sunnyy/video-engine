@@ -20,7 +20,14 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git commit *)",
-      "Bash(git revert *)"
+      "Bash(git revert *)",
+      "Bash(ffmpeg -version)",
+      "Bash(git -C \"c:/Users/Sunny/Desktop/video-engine\" add src/server/index.js)",
+      "Bash(git -C \"c:/Users/Sunny/Desktop/video-engine\" diff --cached --stat)",
+      "Bash(git -C \"c:/Users/Sunny/Desktop/video-engine\" status --short)",
+      "Bash(git -C \"c:/Users/Sunny/Desktop/video-engine\" add src/)",
+      "Bash(git -C \"c:/Users/Sunny/Desktop/video-engine\" commit -m \"outfit studio, caption studio fixes, ffmpeg startup check\")",
+      "Bash(git -C \"c:/Users/Sunny/Desktop/video-engine\" push)"
     ]
   }
 }

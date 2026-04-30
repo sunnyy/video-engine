@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { getCredits } from "../services/credits/creditService";
+import { SERVICE_COSTS } from "../core/utils/creditCosts";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
+import GeneratingLoader from "../ui/GeneratingLoader";
 import AppLayout from "../ui/AppLayout";
 
 const C = {
@@ -63,7 +68,9 @@ function PostCard({ post, onDelete }) {
 }
 
 export default function SocialPostGenerator() {
+  const navigate     = useNavigate();
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
+  const [creditModal, setCreditModal] = useState(null);
 
   const [activeTab, setActiveTab] = useState("generate");
 
@@ -133,6 +140,12 @@ export default function SocialPostGenerator() {
     setRefUrl(url); setRefPreview(url); setRefFile(null); setUploadErr("");
   }
 
+  async function handleGenerateClick() {
+    const credits = await getCredits();
+    const { total, breakdown } = SERVICE_COSTS.social_post;
+    setCreditModal({ total, breakdown, balance: credits?.balance ?? 0 });
+  }
+
   async function handleGenerate() {
     setGenErr(""); setPostUrl(null); setGenerating(true);
     const t0 = Date.now();
@@ -182,7 +195,7 @@ export default function SocialPostGenerator() {
     <AppLayout>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Syne',sans-serif" }}>Banner Design</h1>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Banner Design</h1>
         <div style={{ display: "flex", gap: 4, background: "#111118", borderRadius: 8, padding: 3 }}>
           {[["generate", "Banner Generator"], ["history", "My Generated Banners"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -320,7 +333,7 @@ export default function SocialPostGenerator() {
 
               {/* Generate */}
               <div>
-                <button onClick={handleGenerate} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.45 }}>
+                <button onClick={handleGenerateClick} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.45 }}>
                   {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Generate Banner"}
                 </button>
                 <div style={{ textAlign: "center", fontSize: 11, color: "#444", marginTop: 6 }}>~10 credits</div>
@@ -331,13 +344,7 @@ export default function SocialPostGenerator() {
             {/* ── RIGHT: Result ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
               <div style={{ width: "100%", maxWidth: resultMaxW, aspectRatio: resultRatio, background: "#111118", border: postUrl ? "1px solid rgba(255,255,255,0.08)" : "2px dashed rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {generating && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.4 }}>✦</div>
-                    <div style={{ fontSize: 13, color: "#9494a8" }}>Generating your banner…</div>
-                    <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>20–30 seconds</div>
-                  </div>
-                )}
+                {generating && <GeneratingLoader message="Generating your banner" hint="20–30 seconds" />}
                 {!generating && !postUrl && (
                   <div style={{ textAlign: "center", color: "#2a2a3a" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>📱</div>
@@ -412,6 +419,17 @@ export default function SocialPostGenerator() {
 
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {creditModal && (
+        <CreditConfirmModal
+          service="Social Post Generator"
+          breakdown={creditModal.breakdown}
+          total={creditModal.total}
+          balance={creditModal.balance}
+          onConfirm={() => { setCreditModal(null); handleGenerate(); }}
+          onCancel={() => setCreditModal(null)}
+          onTopUp={() => { setCreditModal(null); navigate("/credits"); }}
+        />
+      )}
     </AppLayout>
   );
 }

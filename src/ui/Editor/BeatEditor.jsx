@@ -11,7 +11,7 @@ if (typeof document !== "undefined" && !document.getElementById("editor-fonts"))
   link.id = "editor-fonts";
   link.rel = "stylesheet";
   link.href =
-    "https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
+    "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
   document.head.appendChild(link);
 }
 
@@ -52,7 +52,7 @@ export default function BeatEditor({ selectedZoneId, selectedZoneIds, onSelectZo
             <button key={key} onClick={() => setTab(key)}
               className="relative px-4 py-[9px] text-[18px] font-bold transition-all"
               style={{
-                fontFamily: "'Syne', sans-serif",
+                fontFamily: "'Outfit', sans-serif",
                 background: "none", border: "none", cursor: "pointer",
                 color: isActive ? "#ffffff" : "#66666a",
                 borderBottom: isActive ? `4px solid ${color}` : "2px solid transparent",

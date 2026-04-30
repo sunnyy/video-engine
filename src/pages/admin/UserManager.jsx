@@ -19,7 +19,7 @@ function fmtDateTime(iso) {
 
 /* ── Edit User Modal ── */
 function EditUserModal({ user, onClose, onUpdated }) {
-  const [tab, setTab]           = useState("profile"); // "profile" | "credits" | "history"
+  const [tab, setTab]           = useState("profile"); // "profile" | "credits" | "history" | "plan"
   const [role, setRole]         = useState(user.role || "user");
   const [addAmt, setAddAmt]     = useState("");
   const [setAmt, setSetAmt]     = useState("");
@@ -29,6 +29,14 @@ function EditUserModal({ user, onClose, onUpdated }) {
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
   const [success, setSuccess]   = useState("");
+
+  // Plan tab state
+  const [plans,        setPlans]        = useState([]);
+  const [currentSub,   setCurrentSub]   = useState(undefined); // undefined=loading, null=none
+  const [planLoading,  setPlanLoading]  = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [billCycle,    setBillCycle]    = useState("monthly");
+  const [grantCreds,   setGrantCreds]   = useState(true);
 
   // Load transaction history when tab switches to history
   useEffect(() => {
@@ -43,6 +51,26 @@ function EditUserModal({ user, onClose, onUpdated }) {
       .then(data => setHistory(Array.isArray(data) ? data : []))
       .catch(e => setError(e.message))
       .finally(() => setHistLoading(false));
+  }, [tab, user.id]);
+
+  // Load plans + current subscription when tab switches to plan
+  useEffect(() => {
+    if (tab !== "plan") return;
+    setPlanLoading(true);
+    Promise.all([
+      serverFetch("/api/admin/plans").then(r => r.json()),
+      serverFetch(`/api/admin/user-subscription/${user.id}`).then(r => r.json()),
+    ])
+      .then(([plansData, subData]) => {
+        const ps = Array.isArray(plansData) ? plansData.filter(p => p.is_active) : [];
+        setPlans(ps);
+        const sub = subData.subscription || null;
+        setCurrentSub(sub);
+        if (sub?.plans?.id) setSelectedPlan(sub.plans.id);
+        else if (ps.length > 0) setSelectedPlan(ps[0].id);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setPlanLoading(false));
   }, [tab, user.id]);
 
   function clearMessages() { setError(""); setSuccess(""); }
@@ -110,6 +138,30 @@ function EditUserModal({ user, onClose, onUpdated }) {
     }
   }
 
+  async function handleChangePlan() {
+    if (!selectedPlan) return;
+    clearMessages();
+    setSaving(true);
+    try {
+      const res = await serverFetch("/api/admin/change-user-plan", {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id, planId: selectedPlan, billingCycle: billCycle, grantCredits: grantCreds }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed");
+      const msg = grantCreds
+        ? `Plan set to "${d.plan}". +${d.credits} credits granted.`
+        : `Plan set to "${d.plan}". No credits granted.`;
+      setSuccess(msg);
+      setCurrentSub({ plans: { id: selectedPlan, name: d.plan } });
+      if (grantCreds && d.balance !== null) onUpdated({ ...user, balance: d.balance });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const txColor = (type) => {
     if (type === "debit" || type === "deduction") return "#f97316";
     if (type?.includes("admin")) return "#e879f9";
@@ -119,6 +171,7 @@ function EditUserModal({ user, onClose, onUpdated }) {
   const TABS = [
     { id: "profile", label: "Profile" },
     { id: "credits", label: "Credits" },
+    { id: "plan",    label: "Plan"    },
     { id: "history", label: "History" },
   ];
 
@@ -231,6 +284,100 @@ function EditUserModal({ user, onClose, onUpdated }) {
                   {saving ? "…" : "Set Balance"}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Plan tab */}
+          {tab === "plan" && (
+            <div className="flex flex-col gap-5">
+              {planLoading ? (
+                <div className="text-[#555] text-sm animate-pulse">Loading…</div>
+              ) : (
+                <>
+                  {/* Current subscription */}
+                  <div className="bg-white/[0.03] rounded-xl p-4">
+                    <div className="text-xs text-[#555] mb-1.5 uppercase tracking-wider">Current Plan</div>
+                    {currentSub ? (
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold text-white">{currentSub.plans?.name || "Unknown"}</div>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#22c55e]/15 text-[#22c55e]">ACTIVE</span>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-[#555]">No active plan</div>
+                    )}
+                  </div>
+
+                  {/* Plan selector */}
+                  <div className="flex flex-col gap-2">
+                    <div className="text-sm font-semibold text-[#ccc]">Assign Plan</div>
+                    <div className="flex flex-col gap-2">
+                      {plans.map(p => {
+                        const isCurrent  = currentSub?.plans?.id === p.id;
+                        const isSelected = selectedPlan === p.id;
+                        return (
+                          <button key={p.id} onClick={() => setSelectedPlan(p.id)}
+                            className="w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer"
+                            style={{
+                              background:   isSelected ? "rgba(124,92,252,0.12)" : "rgba(255,255,255,0.03)",
+                              borderColor:  isSelected ? "rgba(124,92,252,0.5)"  : "rgba(255,255,255,0.08)",
+                            }}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-sm font-semibold text-white">{p.name}</span>
+                                {isCurrent && <span className="ml-2 text-[10px] text-[#22c55e] font-bold">current</span>}
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xs text-[#f5c518] font-semibold">{p.credits.toLocaleString()} cr/mo</div>
+                                <div className="text-[11px] text-[#555]">${p.price_monthly}/mo</div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Billing cycle */}
+                  <div className="flex flex-col gap-2">
+                    <div className="text-sm font-semibold text-[#ccc]">Billing Cycle</div>
+                    <div className="flex gap-2">
+                      {["monthly", "annual"].map(c => (
+                        <button key={c} onClick={() => setBillCycle(c)}
+                          className="flex-1 py-2 rounded-lg text-sm font-medium border transition-all cursor-pointer capitalize"
+                          style={{
+                            background:  billCycle === c ? "rgba(124,92,252,0.15)" : "rgba(255,255,255,0.03)",
+                            borderColor: billCycle === c ? "rgba(124,92,252,0.5)"  : "rgba(255,255,255,0.08)",
+                            color:       billCycle === c ? "#a78bfa" : "#666",
+                          }}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Grant credits toggle */}
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className={`w-10 h-5 rounded-full transition-colors relative ${grantCreds ? "bg-[#7c5cfc]" : "bg-white/10"}`}
+                      onClick={() => setGrantCreds(v => !v)}>
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${grantCreds ? "translate-x-5" : "translate-x-0.5"}`} />
+                    </div>
+                    <div>
+                      <div className="text-sm text-[#ccc]">Grant plan credits now</div>
+                      <div className="text-xs text-[#555]">
+                        {grantCreds
+                          ? `Will add ${plans.find(p => p.id === selectedPlan)?.credits?.toLocaleString() ?? "?"} credits to balance`
+                          : "Subscription only — no credits added"}
+                      </div>
+                    </div>
+                  </label>
+
+                  <button onClick={handleChangePlan} disabled={saving || !selectedPlan}
+                    className="w-full py-2.5 rounded-lg text-white font-semibold text-sm cursor-pointer disabled:opacity-50 transition-colors"
+                    style={{ background: saving ? "rgba(124,92,252,0.4)" : "#7c5cfc" }}>
+                    {saving ? "Saving…" : currentSub ? "Change Plan" : "Assign Plan"}
+                  </button>
+                </>
+              )}
             </div>
           )}
 

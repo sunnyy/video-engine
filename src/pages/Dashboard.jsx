@@ -127,7 +127,7 @@ function ServiceCard({ service }) {
       </div>
 
       <div className="relative z-10">
-        <div className="text-[18px] font-bold mb-2" style={{ color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>
+        <div className="text-[18px] font-bold mb-2" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>
           {service.title}
         </div>
         <div className="text-[13px] leading-relaxed" style={{ color: "#7070a0" }}>
@@ -179,7 +179,7 @@ function MiniVideoCard({ project }) {
         }
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold truncate" style={{ color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>
+        <div className="text-[14px] font-semibold truncate" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>
           {project.name || "Untitled"}
         </div>
         <div className="text-[11px] mt-0.5" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
@@ -257,7 +257,7 @@ export default function Dashboard() {
 
           {/* ── Greeting ── */}
           <div className="mb-8">
-            <h1 className="text-[30px] font-bold leading-tight" style={{ color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>
+            <h1 className="text-[30px] font-bold leading-tight" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>
               {userName ? `Hey, ${userName}! 👋` : "Welcome back! 👋"}
             </h1>
             <p className="text-[15px] mt-2" style={{ color: "#7070a0" }}>
@@ -277,7 +277,7 @@ export default function Dashboard() {
               <span style={{ fontSize: 22 }}>⚡</span>
               <div>
                 <div className="text-[12px] uppercase tracking-wider" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>Credits</div>
-                <div className="text-[24px] font-bold leading-none mt-1" style={{ color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'Syne',sans-serif" }}>
+                <div className="text-[24px] font-bold leading-none mt-1" style={{ color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'Outfit',sans-serif" }}>
                   {balance ?? "—"}
                 </div>
               </div>

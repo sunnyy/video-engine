@@ -9,7 +9,10 @@ import { serverFetch } from "../services/serverApi";
 import { createProject as createDBProject, updateProject, updateProjectProgress, getProductAdProjects, deleteProject } from "../services/projects/projectService";
 import { useProjectStore } from "../store/useProjectStore";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { getCredits } from "../services/credits/creditService";
+import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import { loadMusicLibrary, pickMusicByMood } from "../core/registries/musicRegistry";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 
 const DRAFT_KEY = "vidquence_product_ad_draft";
@@ -224,6 +227,7 @@ export default function NewProductAd() {
   const [creatingProject, setCreatingProject] = useState(false);
   const [savedDraft,      setSavedDraft]      = useState(null);
   const [upgradeRequired, setUpgradeRequired] = useState(false);
+  const [creditModal,     setCreditModal]     = useState(null);
 
   const allImagesReady    = analysis?.shots?.every(s => images[s.id]?.url);
   const allClipsProcessed = analysis?.shots?.every(s => clips[s.id]?.videoUrl || clips[s.id]?.error);
@@ -250,6 +254,12 @@ export default function NewProductAd() {
   }
 
   function handleUrlPaste(e) { setImageUrl(e.target.value); setPreviewUrl(e.target.value); setImageFile(null); setUploadErr(""); }
+
+  async function handleUploadClick() {
+    const credits = await getCredits();
+    const { total, breakdown } = SERVICE_COSTS.product_ad_full;
+    setCreditModal({ total, breakdown, balance: credits?.balance ?? 0 });
+  }
 
   async function handleUpload() {
     setUploadErr("");
@@ -472,7 +482,7 @@ export default function NewProductAd() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, margin: 0, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.3px" }}>Ad Studio</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, margin: 0, fontFamily: "'Outfit',sans-serif", letterSpacing: "-0.3px" }}>Ad Studio</h1>
             <p style={{ fontSize: 13, color: T.dim, marginTop: 4, marginBottom: 0 }}>Upload a product photo and let AI craft your video ad.</p>
           </div>
           {step > 1 && <button onClick={resetAll} style={{ ...S.btnGhost, fontSize: 12, padding: "7px 14px" }}>← New Product</button>}
@@ -500,7 +510,7 @@ export default function NewProductAd() {
         {upgradeRequired && (
           <div style={{ margin: "0 0 24px", padding: "28px 32px", borderRadius: 16, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.25)", textAlign: "center" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: T.text, marginBottom: 8, fontFamily: "'Syne',sans-serif" }}>Paid Plan Required</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: T.text, marginBottom: 8, fontFamily: "'Outfit',sans-serif" }}>Paid Plan Required</div>
             <div style={{ fontSize: 13, color: T.dim, marginBottom: 20, maxWidth: 360, margin: "0 auto 20px" }}>
               Product Ad Studio is available on all paid plans. Upgrade to create AI-powered video ads for your products.
             </div>
@@ -545,7 +555,7 @@ export default function NewProductAd() {
               </Section>
               <Section style={{ borderBottom: "none" }}>
                 {uploadErr && <div style={{ color: T.danger, fontSize: 12, marginBottom: 12 }}>✕ {uploadErr}</div>}
-                <button onClick={handleUpload} disabled={uploading || (!imageFile && !imageUrl)} style={{ ...S.btnYellow, width: "100%", opacity: (!imageFile && !imageUrl) ? 0.4 : 1 }}>
+                <button onClick={handleUploadClick} disabled={uploading || (!imageFile && !imageUrl)} style={{ ...S.btnYellow, width: "100%", opacity: (!imageFile && !imageUrl) ? 0.4 : 1 }}>
                   {uploading ? "Uploading…" : "Create Ad →"}
                 </button>
               </Section>
@@ -713,7 +723,7 @@ export default function NewProductAd() {
               right={
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 480, padding: 48, textAlign: "center" }}>
                   <div style={{ fontSize: 64, marginBottom: 20, animation: "fadeIn 0.5s ease" }}>🎬</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: T.text, fontFamily: "'Syne',sans-serif", marginBottom: 10, letterSpacing: "-0.5px", animation: "fadeIn 0.5s ease 0.1s both" }}>{failed === 0 ? "Your Ad is Ready" : `${succeeded} of ${total} Scenes Ready`}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", marginBottom: 10, letterSpacing: "-0.5px", animation: "fadeIn 0.5s ease 0.1s both" }}>{failed === 0 ? "Your Ad is Ready" : `${succeeded} of ${total} Scenes Ready`}</div>
                   <div style={{ fontSize: 14, color: T.dim, maxWidth: 380, lineHeight: 1.7, animation: "fadeIn 0.5s ease 0.2s both" }}>
                     {succeeded} scene{succeeded !== 1 ? "s" : ""} produced.{failed > 0 && ` ${failed} failed — only successful scenes added.`}{" "}Open in the editor to add text, adjust transitions, and export.
                   </div>
@@ -727,6 +737,17 @@ export default function NewProductAd() {
         })()}
 
       </div>
+      {creditModal && (
+        <CreditConfirmModal
+          service="Product Ad Studio"
+          breakdown={creditModal.breakdown}
+          total={creditModal.total}
+          balance={creditModal.balance}
+          onConfirm={() => { setCreditModal(null); handleUpload(); }}
+          onCancel={() => setCreditModal(null)}
+          onTopUp={() => { setCreditModal(null); navigate("/credits"); }}
+        />
+      )}
     </AppLayout>
   );
 }

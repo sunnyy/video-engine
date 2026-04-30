@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { getCredits } from "../services/credits/creditService";
+import { SERVICE_COSTS } from "../core/utils/creditCosts";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
+import GeneratingLoader from "../ui/GeneratingLoader";
 import AppLayout from "../ui/AppLayout";
 
 const PAGE_SIZE = 12;
@@ -118,7 +123,9 @@ function TryOnCard({ tryon, active, onSelect, onDelete }) {
 }
 
 export default function VirtualTryOn() {
+  const navigate     = useNavigate();
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
+  const [creditModal, setCreditModal] = useState(null);
 
   const [activeTab, setActiveTab] = useState("generate");
   const [gallPage,  setGallPage]  = useState(0);
@@ -172,6 +179,12 @@ export default function VirtualTryOn() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Upload failed");
     return data.url;
+  }
+
+  async function handleGenerateClick() {
+    const credits = await getCredits();
+    const { total, breakdown } = SERVICE_COSTS.outfit_tryon;
+    setCreditModal({ total, breakdown, balance: credits?.balance ?? 0 });
   }
 
   async function handleGenerate() {
@@ -234,7 +247,7 @@ export default function VirtualTryOn() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
         style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Virtual Tryon</h1>
+        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#f5c518" }}>Virtual Tryon</h1>
         <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
           {[["generate", "Try-On Studio"], ["history", "My Generated Try-Ons"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -343,7 +356,7 @@ export default function VirtualTryOn() {
               </div>
 
               <div>
-                <button onClick={handleGenerate} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.4 }}>
+                <button onClick={handleGenerateClick} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.4 }}>
                   {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Try On"}
                 </button>
                 <div style={{ textAlign: "center", fontSize: 11, color: "#444", marginTop: 6 }}>~8 credits</div>
@@ -358,13 +371,7 @@ export default function VirtualTryOn() {
             {/* ── RIGHT: Result ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
               <div style={{ width: "100%", aspectRatio: "9/16", background: "#111118", border: resultUrl ? "1px solid rgba(255,255,255,0.08)" : "2px dashed rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {generating && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ width: 36, height: 36, border: "3px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
-                    <div style={{ fontSize: 13, color: "#9494a8" }}>Generating try-on…</div>
-                    <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>20–40 seconds</div>
-                  </div>
-                )}
+                {generating && <GeneratingLoader message="Generating try-on" hint="20–40 seconds" />}
                 {!generating && !resultUrl && (
                   <div style={{ textAlign: "center", color: "#2a2a3a" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>👗</div>
@@ -395,7 +402,7 @@ export default function VirtualTryOn() {
         {activeTab === "history" && (
           <div>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#e8e8f0" }}>My Generated Try-Ons</h2>
+              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#e8e8f0" }}>My Generated Try-Ons</h2>
               <button onClick={fetchHistory} className="text-[12px] text-[#7c5cfc] bg-transparent border-0 cursor-pointer hover:opacity-80">Refresh</button>
             </div>
 
@@ -447,6 +454,17 @@ export default function VirtualTryOn() {
 
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {creditModal && (
+        <CreditConfirmModal
+          service="Outfit Studio"
+          breakdown={creditModal.breakdown}
+          total={creditModal.total}
+          balance={creditModal.balance}
+          onConfirm={() => { setCreditModal(null); handleGenerate(); }}
+          onCancel={() => setCreditModal(null)}
+          onTopUp={() => { setCreditModal(null); navigate("/credits"); }}
+        />
+      )}
     </AppLayout>
   );
 }

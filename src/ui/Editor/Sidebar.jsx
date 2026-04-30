@@ -20,7 +20,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             ? "bg-[#1c1c28] border-[#7c5cfc] text-[#e8e8f0]"
             : "bg-transparent border-transparent text-[#55556a] hover:text-[#9494a8] hover:bg-[#111118]"
           }`}
-        style={{ fontFamily: "'Syne',sans-serif" }}
+        style={{ fontFamily: "'Outfit',sans-serif" }}
       >
         <span className="text-[20px] leading-none">{icon}</span>
         <span className="text-[14px] font-bold uppercase tracking-[0.06em] leading-tight text-center">{label}</span>
@@ -37,7 +37,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       <Item id="videoOverlays"icon="✨" label="Overlays" />
       <Item id="branding"     icon="🎨" label="Brand"    />
       <Item id="files"        icon="📁" label="Files"    />
-      <Item id="myRules"      icon="📋" label="Rules"    />
     </div>
   );
 }

@@ -28,7 +28,6 @@ function loadCaptionFonts() {
     "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap",
     "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap",
     "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap",
-    "https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap",
     "https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap",
     "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap",
     "https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&display=swap",

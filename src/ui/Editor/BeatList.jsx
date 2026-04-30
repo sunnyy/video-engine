@@ -236,7 +236,7 @@ export default function BeatList({ setActiveTab, setBeatTab }) {
       <div className="flex items-center justify-between px-2 mb-3">
         <h3
           className="m-0 text-[15px] font-bold tracking-[0.1em] uppercase text-[#bbb]"
-          style={{ fontFamily: "'Syne', sans-serif" }}
+          style={{ fontFamily: "'Outfit', sans-serif" }}
         >
           Timeline
         </h3>

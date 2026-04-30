@@ -173,7 +173,7 @@ export default function Settings() {
                   </div>
                 )}
                 <div className="flex flex-col gap-1 min-w-0">
-                  <div className="text-[18px] font-bold text-[#e8e8f0] truncate" style={{ fontFamily: "'Syne',sans-serif" }}>{name}</div>
+                  <div className="text-[18px] font-bold text-[#e8e8f0] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{name}</div>
                   <div className="text-[14px] truncate" style={{ color: "#8888a8" }}>{email}</div>
                   <div className="flex items-center gap-2 mt-1">
                     <svg width="13" height="13" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
@@ -230,7 +230,7 @@ export default function Settings() {
             <SectionLabel>Danger Zone</SectionLabel>
             <Card danger>
               <div>
-                <div className="text-[15px] font-bold mb-1" style={{ color: "#f87171", fontFamily: "'Syne',sans-serif" }}>Delete Account</div>
+                <div className="text-[15px] font-bold mb-1" style={{ color: "#f87171", fontFamily: "'Outfit',sans-serif" }}>Delete Account</div>
                 <div className="text-[13px] mb-4" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
                   Permanently deletes your account, all videos, images, credits, and data. This action is irreversible and cannot be undone.
                 </div>

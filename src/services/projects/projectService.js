@@ -51,7 +51,7 @@ export async function getUserProjects() {
 
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, created_at, updated_at, source")
+    .select("id, name, created_at, updated_at, source, safe_project_json")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 
@@ -65,7 +65,7 @@ export async function getProductAdProjects() {
 
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, updated_at, steps_completed, raw_ai_json")
+    .select("id, name, updated_at, steps_completed, raw_ai_json, safe_project_json")
     .eq("user_id", user.id)
     .eq("source", "product_ad")
     .order("updated_at", { ascending: false });

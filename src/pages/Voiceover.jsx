@@ -47,7 +47,7 @@ function VoiceCard({ voice, selected, onSelect, onPlay, playing }) {
         <div style={{ position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: "50%", background: "#7c5cfc" }} />
       )}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>{voice.label}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>{voice.label}</span>
         <button
           onClick={e => { e.stopPropagation(); onPlay(voice); }}
           disabled={!voice.sampleUrl}
@@ -212,7 +212,7 @@ export default function TTSStudio() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
         style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Voiceover / TTS</h1>
+        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#f5c518" }}>Voiceover / TTS</h1>
         <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
           {[["generate", "Voiceover Generator"], ["history", "My Generated Voiceovers"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -290,7 +290,7 @@ export default function TTSStudio() {
             <button
               onClick={handleGenerate}
               disabled={!script.trim() || generating}
-              style={{ width: "100%", padding: "14px 0", background: !script.trim() || generating ? "rgba(245,197,24,0.3)" : "#f5c518", color: !script.trim() || generating ? "rgba(0,0,0,0.4)" : "#000", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: !script.trim() || generating ? "not-allowed" : "pointer", fontFamily: "'Syne',sans-serif", letterSpacing: "0.02em", marginBottom: 16 }}
+              style={{ width: "100%", padding: "14px 0", background: !script.trim() || generating ? "rgba(245,197,24,0.3)" : "#f5c518", color: !script.trim() || generating ? "rgba(0,0,0,0.4)" : "#000", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: !script.trim() || generating ? "not-allowed" : "pointer", fontFamily: "'Outfit',sans-serif", letterSpacing: "0.02em", marginBottom: 16 }}
             >
               {generating ? "⏳ Generating…" : "Generate Voiceover · 5 credits"}
             </button>
@@ -321,7 +321,7 @@ export default function TTSStudio() {
         {activeTab === "history" && (
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Syne',sans-serif", color: "#e8e8f0" }}>My Generated Voiceovers</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Outfit',sans-serif", color: "#e8e8f0" }}>My Generated Voiceovers</h2>
               <button onClick={loadHistory} style={{ fontSize: 12, color: "#7c5cfc", background: "transparent", border: "none", cursor: "pointer" }}>Refresh</button>
             </div>
 

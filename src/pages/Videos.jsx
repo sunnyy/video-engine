@@ -82,20 +82,26 @@ function ProjectCard({ project, onDelete }) {
     ? `${Math.round(project.safe_project_json.duration_sec)}s`
     : null;
 
-  let thumb   = null;
-  let thumbBg = null;
+  let thumb      = null;
+  let thumbIsVid = false;
+  let thumbBg    = null;
 
-  if (meta.thumbnail) thumb = meta.thumbnail;
+  if (meta.thumbnail) { thumb = meta.thumbnail; }
+  if (!thumb && firstBeat) {
+    const bg = firstBeat.layoutBackground;
+    if (bg?.type === "image" && bg.value) { thumb = bg.value; }
+    else if (bg?.type === "video" && bg.value) { thumb = bg.value; thumbIsVid = true; }
+  }
   if (!thumb && firstBeat) {
     const zones = firstBeat.zones || {};
     for (const zone of Object.values(zones)) {
-      const src = zone.content?.asset?.src;
-      if (src) { thumb = src; break; }
+      const asset = zone.content?.asset;
+      if (asset?.src) { thumb = asset.src; thumbIsVid = asset.type === "video"; break; }
     }
   }
-  if (!thumb && firstBeat) {
-    const bg = firstBeat.layoutBackground;
-    if (bg?.type === "image" || bg?.type === "video") thumb = bg.value;
+  if (!thumb) {
+    const avatarSrc = project.safe_project_json?.avatar?.src;
+    if (avatarSrc) { thumb = avatarSrc; thumbIsVid = true; }
   }
   if (!thumb && firstBeat?.layoutBackground?.type === "color") {
     thumbBg = firstBeat.layoutBackground.value;
@@ -131,7 +137,12 @@ function ProjectCard({ project, onDelete }) {
     >
       {/* Thumbnail */}
       <div className="relative overflow-hidden" style={{ paddingTop: "56.25%", background: thumbBg || "#111118" }}>
-        {thumb ? (
+        {thumb && thumbIsVid ? (
+          <video src={thumb} preload="metadata" muted playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            onLoadedMetadata={e => { e.target.currentTime = 0.1; }}
+            onError={e => { e.target.style.display = "none"; }} />
+        ) : thumb ? (
           <img src={thumb} className="absolute inset-0 w-full h-full object-cover"
             onError={e => { e.target.style.display = "none"; }} />
         ) : (
@@ -169,7 +180,7 @@ function ProjectCard({ project, onDelete }) {
       {/* Info row */}
       <div className="px-3 py-3 flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-bold text-[#e8e8f0] truncate" style={{ fontFamily: "'Syne',sans-serif" }}>
+          <div className="text-[15px] font-bold text-[#e8e8f0] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>
             {project.name || "Untitled"}
           </div>
           <div className="flex items-center gap-2 mt-[4px]">
@@ -207,6 +218,7 @@ const PAGE_SIZE = 12;
 export default function Videos() {
   const navigate = useNavigate();
   const [search,         setSearch]         = useState("");
+  const [modeFilter,     setModeFilter]     = useState("all"); // "all" | "faceless" | "talking_head"
   const [page,           setPage]           = useState(1);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showFeedback,   setShowFeedback]   = useState(false);
@@ -255,15 +267,22 @@ export default function Videos() {
     }
   };
 
-  const videoProjects = projects.filter(p => p.source !== "product_ad");
-  const filtered = videoProjects.filter(p =>
-    (p.name || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const videoProjects = projects.filter(p => p.source !== "product_ad" && p.source !== "caption_studio");
+
+  const facelessCount     = videoProjects.filter(p => p.safe_project_json?.meta?.mode === "faceless").length;
+  const talkingHeadCount  = videoProjects.filter(p => p.safe_project_json?.meta?.mode === "talking_head").length;
+
+  const filtered = videoProjects.filter(p => {
+    if (modeFilter === "faceless")     return p.safe_project_json?.meta?.mode === "faceless";
+    if (modeFilter === "talking_head") return p.safe_project_json?.meta?.mode === "talking_head";
+    return true;
+  }).filter(p => (p.name || "").toLowerCase().includes(search.toLowerCase()));
+
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Reset to page 1 when search changes
-  const handleSearch = (val) => { setSearch(val); setPage(1); };
+  const handleSearch     = (val) => { setSearch(val);     setPage(1); };
+  const handleModeFilter = (val) => { setModeFilter(val); setPage(1); };
 
   return (
     <AppLayout>
@@ -283,7 +302,7 @@ export default function Videos() {
         className="flex items-center justify-between px-6 py-4 border-b shrink-0"
         style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}
       >
-        <h1 className="text-[20px] font-bold text-[#f5c518]" style={{ fontFamily: "'Syne',sans-serif" }}>
+        <h1 className="text-[20px] font-bold text-[#f5c518]" style={{ fontFamily: "'Outfit',sans-serif" }}>
           AI Videos
           {!loading && (
             <span className="ml-2 text-[15px] font-normal text-[#77777f]">({videoProjects.length})</span>
@@ -307,6 +326,38 @@ export default function Videos() {
           </button>
         </div>
       </div>
+
+      {/* Mode filter tabs */}
+      {!loading && videoProjects.length > 0 && (
+        <div className="flex items-center gap-1 px-6 pt-4 pb-0 shrink-0">
+          {[
+            { id: "all",           label: "All",          count: videoProjects.length },
+            { id: "faceless",      label: "Faceless",     count: facelessCount        },
+            { id: "talking_head",  label: "Talking Head", count: talkingHeadCount     },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => handleModeFilter(tab.id)}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold border-0 cursor-pointer transition-all"
+              style={{
+                background: modeFilter === tab.id ? "#f5c518"              : "rgba(255,255,255,0.05)",
+                color:      modeFilter === tab.id ? "#0b0b10"              : "#7070a0",
+              }}
+            >
+              {tab.label}
+              <span
+                className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
+                style={{
+                  background: modeFilter === tab.id ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.06)",
+                  color:      modeFilter === tab.id ? "#0b0b10"           : "#55556a",
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Grid area */}
       <div className="flex-1 px-6 py-6 overflow-y-auto">
@@ -332,7 +383,9 @@ export default function Videos() {
         )}
 
         {!loading && filtered.length === 0 && videoProjects.length > 0 && (
-          <div className="text-center py-16 text-[15px] text-[#77777f]">No projects match "{search}"</div>
+          <div className="text-center py-16 text-[15px] text-[#77777f]">
+            {search ? `No projects match "${search}"` : `No ${modeFilter === "talking_head" ? "Talking Head" : "Faceless"} videos yet`}
+          </div>
         )}
 
         {!loading && filtered.length > 0 && (

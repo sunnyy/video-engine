@@ -9,7 +9,7 @@
 /* ─── Font stacks ─────────────────────────────────────────── */
 export const BLOCK_FONTS = {
   bebas:     "'Bebas Neue', sans-serif",
-  syne:      "'Syne', sans-serif",
+  outfit:    "'Outfit', sans-serif",
   outfit:    "'Outfit', sans-serif",
   playfair:  "'Playfair Display', serif",
   mono:      "'JetBrains Mono', monospace",

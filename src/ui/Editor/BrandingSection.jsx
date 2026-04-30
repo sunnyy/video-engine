@@ -17,7 +17,7 @@ function Label({ children }) {
 
 const FONT_OPTIONS = [
   { value: "Bebas Neue",        label: "Bebas Neue",        preview: "IMPACT STYLE"   },
-  { value: "Syne",              label: "Syne",              preview: "Modern Bold"    },
+  { value: "Outfit",            label: "Outfit",            preview: "Modern Bold"    },
   { value: "Outfit",            label: "Outfit",            preview: "Clean Sans"     },
   { value: "Playfair Display",  label: "Playfair Display",  preview: "Editorial"      },
   { value: "JetBrains Mono",    label: "JetBrains Mono",    preview: "CODE MONO"      },
@@ -34,7 +34,7 @@ export default function BrandingSection() {
   const brand        = project.meta?.brand || {};
   const brandColor   = brand.color   || "#7c5cfc";
   const brandColor2  = brand.color2  || "#f5c518";
-  const brandFont    = brand.font    || "Syne";
+  const brandFont    = brand.font    || "Outfit";
 
   const update = (key, value) => {
     const newBrand = { ...brand, [key]: value };
@@ -51,7 +51,7 @@ export default function BrandingSection() {
     <div className="flex-1 overflow-y-auto bg-[#0b0b10] px-6 py-6 flex flex-col gap-6">
 
       <h3 className="text-[16px] font-bold text-[#e8e8f0] mb-2"
-        style={{ fontFamily:"'Syne',sans-serif" }}>Branding</h3>
+        style={{ fontFamily:"'Outfit',sans-serif" }}>Branding</h3>
 
       {/* Brand Color — Primary */}
       <div>

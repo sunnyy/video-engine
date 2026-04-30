@@ -19,13 +19,16 @@ function AdCard({ project, onDelete }) {
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
 
-  const isComplete  = (project.steps_completed ?? 0) >= 5;
+  const isComplete  = (project.steps_completed ?? 0) >= 5 || project.safe_project_json != null;
   const stepLabel   = STEP_LABELS[project.steps_completed] ?? "In Progress";
   const productType = project.raw_ai_json?.analysis?.product_analysis?.product_type;
 
   const d = project.raw_ai_json || {};
   const firstSceneImg = d.images ? Object.values(d.images).find(v => v?.url)?.url : null;
-  const previewImg = d.base_image_url || firstSceneImg || d.product_image_url || null;
+  const rawPreview = d.base_image_url || firstSceneImg || d.product_image_url || null;
+  const firstBeatVideoSrc = project.safe_project_json?.beats?.[0]?.zones?.z1?.content?.asset?.src || null;
+  const previewImg    = rawPreview || null;
+  const previewVideo  = !rawPreview ? firstBeatVideoSrc : null;
 
   function handleClick() {
     if (isComplete) {
@@ -62,6 +65,11 @@ function AdCard({ project, onDelete }) {
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {previewImg
             ? <img src={previewImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            : previewVideo
+            ? <video src={previewVideo} preload="metadata" muted playsInline
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                onLoadedMetadata={e => { e.target.currentTime = 0.1; }}
+                onError={e => { e.target.style.display = "none"; }} />
             : <span style={{ fontSize: 32, opacity: 0.4 }}>🎬</span>
           }
         </div>
@@ -84,7 +92,7 @@ function AdCard({ project, onDelete }) {
       {/* Info row */}
       <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Syne',sans-serif" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Outfit',sans-serif" }}>
             {project.name}
           </div>
           <div style={{ fontSize: 11, color: "#77777f", marginTop: 3, display: "flex", gap: 8, alignItems: "center" }}>
@@ -145,8 +153,9 @@ export default function ProductAds() {
     }
   }
 
-  const incomplete = projects.filter(p => (p.steps_completed ?? 0) < 5);
-  const complete   = projects.filter(p => (p.steps_completed ?? 0) >= 5);
+  const isProjectComplete = p => (p.steps_completed ?? 0) >= 5 || p.safe_project_json != null;
+  const incomplete = projects.filter(p => !isProjectComplete(p));
+  const complete   = projects.filter(p =>  isProjectComplete(p));
 
   return (
     <AppLayout>
@@ -154,7 +163,7 @@ export default function ProductAds() {
       <div
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}
       >
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Syne',sans-serif" }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
           Product Video Ad
           {!loading && (
             <span style={{ marginLeft: 8, fontSize: 15, fontWeight: 400, color: "#77777f" }}>

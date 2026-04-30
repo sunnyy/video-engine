@@ -121,7 +121,7 @@ export function HookImpactThumb() {
     <div style={{ ...BASE, background: "#050509", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, rgba(255,77,109,0.15) 0%, transparent 70%)" }} />
       <div style={{ fontSize: 7, color: "rgba(255,255,255,0.4)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>Stop scrolling</div>
-      <div style={{ fontSize: 13, fontWeight: 900, color: "#fff", textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.5px", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
+      <div style={{ fontSize: 13, fontWeight: 900, color: "#fff", textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.5px", textTransform: "uppercase", fontFamily: "'Outfit', sans-serif" }}>
         THIS CHANGES<br />EVERYTHING
       </div>
       <div style={{ marginTop: 6, fontSize: 7, color: "#ff4d6d", border: "1px solid rgba(255,77,109,0.4)", padding: "2px 8px", borderRadius: 3 }}>Watch Now →</div>
@@ -161,7 +161,7 @@ export function SlideshowThumb() {
 export function HeadlineTextThumb() {
   return (
     <div style={{ ...BASE }}>
-      <div style={{ fontSize: 16, fontWeight: 900, color: "#ffffff", textTransform: "uppercase", textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.5px", fontFamily: "'Syne', sans-serif" }}>
+      <div style={{ fontSize: 16, fontWeight: 900, color: "#ffffff", textTransform: "uppercase", textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.5px", fontFamily: "'Outfit', sans-serif" }}>
         THIS IS A<br />HEADLINE
       </div>
     </div>

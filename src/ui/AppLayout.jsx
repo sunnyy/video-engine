@@ -4,7 +4,7 @@
  * Usage: wrap page content with <AppLayout>{children}</AppLayout>
  */
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
 
@@ -138,7 +138,7 @@ function NavItem({ icon, label, to, href, active, soon }) {
   const inner = (
     <>
       <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</span>
-      <span style={{ fontSize: 15, fontWeight: 500, flex: 1, fontFamily: "'Syne',sans-serif" }}>{label}</span>
+      <span style={{ fontSize: 15, fontWeight: 500, flex: 1, fontFamily: "'Outfit',sans-serif" }}>{label}</span>
       {soon && (
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 5px", borderRadius: 3, background: "rgba(255,255,255,0.05)", color: "#55556a" }}>
           SOON
@@ -172,6 +172,7 @@ function NavSection({ title, children }) {
 
 export default function AppLayout({ children }) {
   const location  = useLocation();
+  const navigate  = useNavigate();
   const { balance, fetchCredits } = useCreditsStore();
 
   useEffect(() => { fetchCredits(); }, []);
@@ -192,6 +193,33 @@ export default function AppLayout({ children }) {
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           <div className="mb-3">
+            <button
+              onClick={() => navigate("/credits")}
+              className="w-full border-0 cursor-pointer mb-2"
+              style={{ background: "transparent", padding: 0 }}
+            >
+              <div style={{
+                background: balance !== null && balance < 10
+                  ? "linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.06))"
+                  : "linear-gradient(135deg, rgba(124,92,252,0.15), rgba(124,92,252,0.07))",
+                border: `1px solid ${balance !== null && balance < 10 ? "rgba(249,115,22,0.25)" : "rgba(124,92,252,0.25)"}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#55556a", fontFamily: "'JetBrains Mono',monospace", marginBottom: 5 }}>
+                  Credits
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 20, lineHeight: 1 }}>⚡</span>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "-0.02em" }}>
+                    {balance ?? "—"}
+                  </span>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 10, color: balance !== null && balance < 10 ? "rgba(249,115,22,0.7)" : "rgba(124,92,252,0.6)", fontWeight: 600 }}>
+                  {balance !== null && balance < 10 ? "Low — top up →" : "Top up →"}
+                </div>
+              </div>
+            </button>
             <NavItem icon={Icons.home} label="Dashboard" to="/dashboard" active={location.pathname === "/dashboard"} />
           </div>
 
@@ -215,26 +243,19 @@ export default function AppLayout({ children }) {
           </NavSection>
 
           <NavSection title="Account">
-            <NavItem icon={Icons.credits}  label="Credits"  to="/credits"  active={location.pathname === "/credits"} />
             <NavItem icon={Icons.star}     label="Upgrade"  href="/#pricing" active={false} />
-            <NavItem icon={Icons.settings} label="Settings" to="/settings" active={location.pathname === "/settings"} />
-            <NavItem icon={Icons.message}  label="Feedback" to="/feedback" active={location.pathname === "/feedback"} />
+            <NavItem icon={Icons.credits}  label="Credits"  to="/credits"   active={location.pathname === "/credits"} />
+            <NavItem icon={Icons.settings} label="Settings" to="/settings"  active={location.pathname === "/settings"} />
+            <NavItem icon={Icons.message}  label="Feedback" to="/feedback"  active={location.pathname === "/feedback"} />
           </NavSection>
         </nav>
 
-        {/* Credits + sign out */}
+        {/* Sign out */}
         <div className="px-3 py-4 border-t flex flex-col gap-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <div
-            className="flex items-center justify-between px-3 py-[7px] rounded-[8px] text-[14px] font-mono"
-            style={{ background: "rgba(255,255,255,0.04)", color: balance !== null && balance < 10 ? "#f97316" : "#7c5cfc" }}
-          >
-            <span>⚡ Credits</span>
-            <span className="font-bold">{balance ?? "—"}</span>
-          </div>
           <button
             onClick={async () => { await signOut(); window.location.href = "/"; }}
             className="w-full flex items-center gap-2 px-3 py-[7px] rounded-[8px] text-[15px] border-0 cursor-pointer transition-all text-left"
-            style={{ background: "transparent", color: "#f87171", fontFamily: "'Syne',sans-serif" }}
+            style={{ background: "transparent", color: "#f87171", fontFamily: "'Outfit',sans-serif" }}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.08)"}
             onMouseLeave={e => e.currentTarget.style.background = "transparent"}
           >

@@ -2,9 +2,13 @@
  * ImageGeneration.jsx — AI Image Studio
  */
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useImageLibraryStore } from "../store/useImageLibraryStore";
+import { getCredits } from "../services/credits/creditService";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
+import GeneratingLoader from "../ui/GeneratingLoader";
 import AppLayout from "../ui/AppLayout";
 
 const ASPECT_RATIOS = [
@@ -148,7 +152,9 @@ function ImageCard({ img, onDelete }) {
 
 /* ── Main page ── */
 export default function ImageGeneration() {
+  const navigate       = useNavigate();
   const { fetchCredits } = useCreditsStore();
+  const [creditModal, setCreditModal] = useState(null);
 
   const [prompt,      setPrompt]      = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -174,6 +180,17 @@ export default function ImageGeneration() {
   }, []);
 
   const creditCost = count * 2;
+
+  const handleGenerateClick = async () => {
+    if (!prompt.trim() || generating) return;
+    const credits = await getCredits();
+    const cost = count * 2;
+    setCreditModal({
+      total: cost,
+      breakdown: { [`Generate ${count} image${count !== 1 ? "s" : ""}`]: cost },
+      balance: credits?.balance ?? 0,
+    });
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim() || generating) return;
@@ -208,7 +225,7 @@ export default function ImageGeneration() {
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
           style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-          <h1 className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>AI Images</h1>
+          <h1 className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit',sans-serif", color: "#f5c518" }}>AI Images</h1>
           <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
             {[["generate", "Image Generator"], ["library", "My Generated Images"]].map(([id, label]) => (
               <button key={id} onClick={() => setActiveTab(id)}
@@ -277,7 +294,7 @@ export default function ImageGeneration() {
 
               {/* Generate button */}
               <button
-                onClick={handleGenerate}
+                onClick={handleGenerateClick}
                 disabled={!prompt.trim() || generating}
                 className="w-full py-[10px] rounded-[8px] text-[14px] font-bold border-0 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ background: "#f5c518", color: "#0b0b10" }}
@@ -312,9 +329,7 @@ export default function ImageGeneration() {
               {generating && (
                 <div className="flex flex-col items-center justify-center h-[400px] border border-[rgba(255,255,255,0.05)] rounded-[14px]"
                   style={{ background: "rgba(255,255,255,0.01)" }}>
-                  <div className="w-8 h-8 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin mb-4" />
-                  <div className="text-[14px] text-[#7c5cfc]">Generating your image{count > 1 ? "s" : ""}…</div>
-                  <div className="text-[11px] mt-1" style={{ color: "#44444f" }}>This may take 10–30 seconds</div>
+                  <GeneratingLoader message={`Generating your image${count > 1 ? "s" : ""}`} hint="10–30 seconds" />
                 </div>
               )}
 
@@ -340,7 +355,7 @@ export default function ImageGeneration() {
         {activeTab === "library" && (
           <div>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Syne',sans-serif" }}>
+              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Outfit',sans-serif" }}>
                 My Generated Images
               </h2>
               <button onClick={() => loadLibrary(true)}
@@ -396,6 +411,17 @@ export default function ImageGeneration() {
         )}
 
         </div>
+      {creditModal && (
+        <CreditConfirmModal
+          service="AI Images"
+          breakdown={creditModal.breakdown}
+          total={creditModal.total}
+          balance={creditModal.balance}
+          onConfirm={() => { setCreditModal(null); handleGenerate(); }}
+          onCancel={() => setCreditModal(null)}
+          onTopUp={() => { setCreditModal(null); navigate("/credits"); }}
+        />
+      )}
     </AppLayout>
   );
 }

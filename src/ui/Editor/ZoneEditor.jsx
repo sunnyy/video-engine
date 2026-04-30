@@ -23,7 +23,7 @@ import { serverFetch }        from "../../../src/services/serverApi";
 const FONT_FAMILIES = [
   { label: "Default",          value: "inherit" },
   { label: "Bebas Neue",       value: "'Bebas Neue', sans-serif" },
-  { label: "Syne",             value: "'Syne', sans-serif" },
+  { label: "Outfit",           value: "'Outfit', sans-serif" },
   { label: "Outfit",           value: "'Outfit', sans-serif" },
   { label: "Playfair Display", value: "'Playfair Display', serif" },
   { label: "JetBrains Mono",   value: "'JetBrains Mono', monospace" },

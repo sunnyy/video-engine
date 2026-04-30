@@ -297,7 +297,7 @@ function GlitchStamp({ text, frame, fps, brandColor, beatDuration }) {
             style={{
               display: "inline-block",
               position: "relative",
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "'Outfit', sans-serif",
               fontSize: 64,
               fontWeight: 800,
               letterSpacing: -1,
@@ -593,7 +593,7 @@ function LuxuryGold({ text, frame, fps, brandColor, beatDuration }) {
             style={{
               display: "inline-block",
               margin: "0 6px",
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "'Outfit', sans-serif",
               fontSize: 52,
               fontWeight: 800,
               letterSpacing: -1,

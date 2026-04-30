@@ -10,7 +10,6 @@ import AvatarSection       from "./AvatarSection";
 import VideoOverlaySection from "./VideoOverlaySection";
 import BrandingSection     from "./BrandingSection";
 import FilesSection        from "./FilesSection";
-import MyRulesSection      from "./MyRulesSection";
 
 function ScriptPanel() {
   const project = useProjectStore((s) => s.project);
@@ -126,14 +125,6 @@ export default function EditorPanel({
     return (
       <div className="flex-1 flex flex-col h-full min-h-0">
         <FilesSection />
-      </div>
-    );
-  }
-
-  if (activeTab === "myRules") {
-    return (
-      <div className="flex-1 flex flex-col h-full min-h-0">
-        <MyRulesSection />
       </div>
     );
   }

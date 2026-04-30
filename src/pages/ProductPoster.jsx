@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { getCredits } from "../services/credits/creditService";
+import { SERVICE_COSTS } from "../core/utils/creditCosts";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
+import GeneratingLoader from "../ui/GeneratingLoader";
 import AppLayout from "../ui/AppLayout";
 
 const C = {
@@ -75,7 +80,9 @@ function PosterCard({ poster, onDelete }) {
 }
 
 export default function PosterStudio() {
+  const navigate     = useNavigate();
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
+  const [creditModal, setCreditModal] = useState(null);
 
   // tabs
   const [activeTab, setActiveTab] = useState("generate");
@@ -157,6 +164,12 @@ export default function PosterStudio() {
     }
   }
 
+  async function handleGenerateClick() {
+    const credits = await getCredits();
+    const { total, breakdown } = SERVICE_COSTS.poster;
+    setCreditModal({ total, breakdown, balance: credits?.balance ?? 0 });
+  }
+
   async function handleGenerate() {
     setGenErr("");
     let finalUrl = imageUrl;
@@ -193,7 +206,7 @@ export default function PosterStudio() {
     <AppLayout>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Syne',sans-serif" }}>Product Poster</h1>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Product Poster</h1>
         <div style={{ display: "flex", gap: 4, background: "#111118", borderRadius: 8, padding: 3 }}>
           {[["generate", "Poster Generator"], ["history", "My Generated Posters"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -272,7 +285,7 @@ export default function PosterStudio() {
               </div>
 
               <div>
-                <button onClick={handleGenerate} disabled={!canGen} style={{ ...C.btnY, opacity: canGen ? 1 : 0.45 }}>
+                <button onClick={handleGenerateClick} disabled={!canGen} style={{ ...C.btnY, opacity: canGen ? 1 : 0.45 }}>
                   {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Generate Poster"}
                 </button>
                 <div style={{ textAlign: "center", fontSize: 11, color: "#444", marginTop: 6 }}>~5 credits</div>
@@ -283,13 +296,7 @@ export default function PosterStudio() {
             {/* ── RIGHT: Result ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
               <div style={{ width: "100%", maxWidth: 380, aspectRatio: "9/16", background: "#111118", border: posterUrl ? "1px solid rgba(255,255,255,0.08)" : "2px dashed rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {generating && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.4 }}>✦</div>
-                    <div style={{ fontSize: 13, color: "#9494a8" }}>Generating your poster…</div>
-                    <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>20–30 seconds</div>
-                  </div>
-                )}
+                {generating && <GeneratingLoader message="Generating your poster" hint="20–30 seconds" />}
                 {!generating && !posterUrl && (
                   <div style={{ textAlign: "center", color: "#2a2a3a" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>🖼️</div>
@@ -364,6 +371,17 @@ export default function PosterStudio() {
 
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {creditModal && (
+        <CreditConfirmModal
+          service="Poster Studio"
+          breakdown={creditModal.breakdown}
+          total={creditModal.total}
+          balance={creditModal.balance}
+          onConfirm={() => { setCreditModal(null); handleGenerate(); }}
+          onCancel={() => setCreditModal(null)}
+          onTopUp={() => { setCreditModal(null); navigate("/credits"); }}
+        />
+      )}
     </AppLayout>
   );
 }

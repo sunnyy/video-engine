@@ -276,6 +276,78 @@ router.post("/assign-plan", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/** GET /api/admin/user-subscription/:userId — active subscription for one user */
+router.get("/user-subscription/:userId", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, status, billing_cycle, price_paid, credits_granted, current_period_start, current_period_end, plans(id, name, slug, credits)")
+      .eq("user_id", req.params.userId)
+      .eq("status", "active")
+      .order("current_period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    res.json({ subscription: data || null });
+  } catch (err) {
+    console.error("[admin/user-subscription]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** POST /api/admin/change-user-plan — assign/change a plan for any user */
+router.post("/change-user-plan", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, planId, billingCycle = "monthly", grantCredits = true } = req.body;
+    if (!userId || !planId) return res.status(400).json({ error: "userId and planId required" });
+
+    const { data: plan, error: planErr } = await supabaseAdmin
+      .from("plans")
+      .select("id, name, slug, credits, price_monthly, price_annual")
+      .eq("id", planId)
+      .single();
+    if (planErr || !plan) return res.status(404).json({ error: "Plan not found" });
+
+    // Deactivate any existing active subscriptions
+    await supabaseAdmin
+      .from("subscriptions")
+      .update({ status: "admin_changed" })
+      .eq("user_id", userId)
+      .eq("status", "active");
+
+    const now        = new Date();
+    const periodDays = billingCycle === "annual" ? 365 : 30;
+    const periodEnd  = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
+    const price      = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
+
+    await supabaseAdmin.from("subscriptions").insert({
+      user_id:              userId,
+      plan_id:              planId,
+      status:               "active",
+      billing_cycle:        billingCycle,
+      price_paid:           price || 0,
+      credits_granted:      plan.credits,
+      current_period_start: now.toISOString(),
+      current_period_end:   periodEnd.toISOString(),
+      razorpay_payment_id:  "admin_assigned",
+    });
+
+    let newBalance = null;
+    if (grantCredits) {
+      const result = await addCredits(
+        userId, plan.credits, "plan_assign", "admin_plan_change",
+        `Plan changed to ${plan.name} by admin`,
+      );
+      newBalance = result.balance;
+    }
+
+    res.json({ success: true, plan: plan.name, credits: grantCredits ? plan.credits : 0, balance: newBalance });
+  } catch (err) {
+    console.error("[admin/change-user-plan]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/plan-assignments", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { data, error } = await supabaseAdmin.from("credit_transactions").select("user_id, amount, description, created_at").eq("action", "plan_assign").order("created_at", { ascending: false }).limit(100);
@@ -853,7 +925,7 @@ STYLE RULES by type:
   TEXT zones:
     fontSize:   pixels on 1920px canvas — be bold: headline 130–220, subtext 50–80, label 30–50, cta 48–70, stat 100–170
     fontWeight: "400"|"600"|"700"|"800"|"900"
-    fontFamily: "Bebas Neue"|"Anton"|"Unbounded"|"Oswald"|"Montserrat"|"Outfit"|"Barlow Condensed"|"Poppins"|"Inter"|"Raleway"|"Lato"|"Playfair Display"|"Dancing Script"|"Syne"|"JetBrains Mono"|"Nunito"|"Roboto"
+    fontFamily: "Bebas Neue"|"Anton"|"Unbounded"|"Oswald"|"Montserrat"|"Outfit"|"Barlow Condensed"|"Poppins"|"Inter"|"Raleway"|"Lato"|"Playfair Display"|"Dancing Script"|"JetBrains Mono"|"Nunito"|"Roboto"
     color:      "#hex"
     textAlign:  "center" if element appears centered on canvas, "left" if left-aligned, "right" if right-aligned
     backgroundColor: "#hex" (only if text has a visible pill/badge background, else null)

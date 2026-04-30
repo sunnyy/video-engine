@@ -307,7 +307,7 @@ export default function VideoOverlaySection() {
 
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>Video Overlays</span>
+          <span className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit', sans-serif" }}>Video Overlays</span>
           <div className="text-[14px] text-[#666] mt-[2px]">Persist across all beats</div>
         </div>
         <button onClick={() => setPickerOpen(true)}

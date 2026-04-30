@@ -5,6 +5,7 @@ import {
   supabaseAdmin, requireAuth, requireAdmin, addCredits, uuidv4,
   sendAdminAlert, sendUserEmail,
   adminNewSaleEmail, adminPlanRenewalEmail, adminPlanUpgradeEmail,
+  adminCreditsTopupEmail,
   userCreditsPurchasedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
 } from "../middleware/shared.js";
 
@@ -235,6 +236,102 @@ router.get("/payments/subscription", requireAuth, async (req, res) => {
     res.json({ subscription: data || null });
   } catch (err) {
     console.error("[payments/subscription]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Credit top-up packages ── */
+const CREDIT_PACKAGES = [
+  { id: "topup_500",   credits: 500,   priceUSD: 5,  label: "500 Credits"    },
+  { id: "topup_1200",  credits: 1200,  priceUSD: 10, label: "1,200 Credits"  },
+  { id: "topup_2500",  credits: 2500,  priceUSD: 20, label: "2,500 Credits"  },
+  { id: "topup_5000",  credits: 5000,  priceUSD: 35, label: "5,000 Credits"  },
+  { id: "topup_10000", credits: 10000, priceUSD: 50, label: "10,000 Credits" },
+];
+
+router.get("/credits/packages", async (_req, res) => {
+  res.json({ packages: CREDIT_PACKAGES });
+});
+
+router.post("/credits/topup/create-order", requireAuth, async (req, res) => {
+  try {
+    const { packageId, exchangeRate: clientRate } = req.body;
+    if (!packageId) return res.status(400).json({ error: "packageId required" });
+
+    const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);
+    if (!pkg) return res.status(404).json({ error: "Package not found" });
+
+    const { data: sub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", req.user.id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (!sub) return res.status(403).json({ error: "Active plan required to purchase credits", code: "SUBSCRIPTION_REQUIRED" });
+
+    if (pkg.priceUSD > 50) return res.status(400).json({ error: "Maximum top-up is $50" });
+
+    const rate = (typeof clientRate === "number" && clientRate >= 50 && clientRate <= 150)
+      ? clientRate : await getUSDtoINR();
+
+    const amountPaise = Math.round(pkg.priceUSD * rate * 100);
+
+    const razorpay = getRazorpay();
+    const order = await razorpay.orders.create({
+      amount:   amountPaise,
+      currency: "INR",
+      receipt:  `topup_${uuidv4().slice(0, 8)}`,
+      notes: { user_id: req.user.id, package_id: packageId, type: "credit_topup" },
+    });
+
+    res.json({
+      orderId:   order.id,
+      amount:    amountPaise,
+      currency:  "INR",
+      keyId:     process.env.RAZORPAY_KEY_ID,
+      packageId,
+      credits:   pkg.credits,
+      label:     pkg.label,
+    });
+  } catch (err) {
+    console.error("[credits/topup/create-order]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/credits/topup/verify", requireAuth, async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, packageId } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !packageId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const expected = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
+    if (expected !== razorpay_signature) return res.status(400).json({ error: "Payment verification failed" });
+
+    const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);
+    if (!pkg) return res.status(404).json({ error: "Package not found" });
+
+    const { balance: newBalance } = await addCredits(
+      req.user.id, pkg.credits, "purchase", "credit_topup",
+      `Credit Top-up — ${pkg.label}`, razorpay_payment_id,
+    );
+
+    supabaseAdmin.auth.admin.getUserById(req.user.id).then(({ data: { user } }) => {
+      if (!user?.email) return;
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+      const adminEmail = adminCreditsTopupEmail({ userEmail: user.email, amount: pkg.credits, balance: newBalance });
+      sendAdminAlert(adminEmail.subject, adminEmail.html);
+      const userEmail = userCreditsPurchasedEmail(name, pkg.credits, newBalance);
+      sendUserEmail(user.email, userEmail.subject, userEmail.html);
+    }).catch(() => {});
+
+    res.json({ success: true, credits: pkg.credits, balance: newBalance });
+  } catch (err) {
+    console.error("[credits/topup/verify]", err.message);
     res.status(500).json({ error: err.message });
   }
 });

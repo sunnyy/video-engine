@@ -315,7 +315,7 @@ export default function ModelAvatars() {
 
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#e8e8f0", margin: 0, fontFamily: "'Syne',sans-serif" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#e8e8f0", margin: 0, fontFamily: "'Outfit',sans-serif" }}>
             Model Avatars
           </h1>
           <p style={{ fontSize: 13, color: "#666", marginTop: 6 }}>

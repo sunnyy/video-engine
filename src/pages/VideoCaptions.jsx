@@ -8,7 +8,8 @@ import { useNavigate } from "react-router-dom";
 import { serverFetch, SERVER } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useProjectStore } from "../store/useProjectStore";
-import { createProject } from "../services/projects/projectService";
+import { useProjectsStore } from "../store/useProjectsStore";
+import { createProject, deleteProject } from "../services/projects/projectService";
 import { captionStyleRegistry, captionStyleKeys } from "../core/registries/captionStyleRegistry.jsx";
 import AppLayout from "../ui/AppLayout";
 
@@ -61,7 +62,7 @@ const PREVIEWS = {
     </div>
   ),
   glitchStamp: () => (
-    <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 15, fontWeight: 800, textAlign: "center", lineHeight: 1.1 }}>
+    <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 800, textAlign: "center", lineHeight: 1.1 }}>
       <span style={{ color: "rgba(255,255,255,0.25)", margin: "0 3px" }}>GLITCH</span>
       <span style={{ position: "relative", display: "inline-block", color: "#fff", margin: "0 3px" }}>
         <span style={{ position: "absolute", inset: 0, color: "#ff003c", opacity: 0.7, transform: "translateX(-2px)" }}>STAMP</span>
@@ -104,9 +105,9 @@ const PREVIEWS = {
   ),
   luxuryGold: () => (
     <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(201,155,60,0.2)", borderRadius: 4, padding: "5px 8px", textAlign: "center" }}>
-      <span style={{ fontFamily: "'Syne',sans-serif", fontSize: 13, fontWeight: 800, color: "#ffd700", textShadow: "0 0 8px rgba(255,215,0,0.4)", letterSpacing: -0.5 }}>LUXURY</span>
+      <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 800, color: "#ffd700", textShadow: "0 0 8px rgba(255,215,0,0.4)", letterSpacing: -0.5 }}>LUXURY</span>
       {" "}
-      <span style={{ fontFamily: "'Syne',sans-serif", fontSize: 13, fontWeight: 800, color: "#c9a84c", letterSpacing: -0.5 }}>GOLD</span>
+      <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 800, color: "#c9a84c", letterSpacing: -0.5 }}>GOLD</span>
     </div>
   ),
 };
@@ -161,12 +162,49 @@ function formatTime(s) {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+function CaptionCard({ project, onDelete }) {
+  const [hov,  setHov]  = useState(false);
+  const [conf, setConf] = useState(false);
+  const avatarSrc = project.safe_project_json?.avatar?.src || null;
+  return (
+    <a href={`/editor/${project.id}`}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => { setHov(false); setConf(false); }}
+      style={{ display: "block", textDecoration: "none", background: "#111118", border: `1px solid ${hov ? "rgba(124,92,252,0.4)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, overflow: "hidden", transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none" }}>
+      <div style={{ aspectRatio: "9/16", background: "linear-gradient(135deg,#111118,#1a1a28)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+        {avatarSrc ? (
+          <video src={avatarSrc} preload="metadata" muted playsInline
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            onLoadedMetadata={e => { e.target.currentTime = 0.1; }}
+            onError={e => { e.target.style.display = "none"; }} />
+        ) : (
+          <span style={{ fontSize: 32, opacity: 0.3 }}>🎬</span>
+        )}
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation(); if (conf) onDelete(project.id); else { setConf(true); setTimeout(() => setConf(false), 2500); } }}
+          style={{ position: "absolute", top: 6, right: 6, background: conf ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.6)", border: "none", borderRadius: 4, color: conf ? "#fff" : "#f87171", fontSize: 11, cursor: "pointer", padding: "2px 6px", lineHeight: 1.4, zIndex: 1 }}>
+          {conf ? "Sure?" : "✕"}
+        </button>
+      </div>
+      <div style={{ padding: "10px 12px" }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#e8e8f0", fontFamily: "'Outfit',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project.name || "Untitled"}</div>
+        <div style={{ fontSize: 11, color: "#55556a", marginTop: 3, fontFamily: "'JetBrains Mono',monospace" }}>
+          {new Date(project.updated_at).toLocaleDateString()}
+        </div>
+      </div>
+    </a>
+  );
+}
+
 export default function CaptionStudio() {
-  const navigate     = useNavigate();
-  const fetchCredits = useCreditsStore(s => s.fetchCredits);
-  const setProject   = useProjectStore(s => s.setProject);
+  const navigate      = useNavigate();
+  const fetchCredits  = useCreditsStore(s => s.fetchCredits);
+  const setProject    = useProjectStore(s => s.setProject);
   const setDatabaseId = useProjectStore(s => s.setDatabaseId);
-  const fileInputRef = useRef();
+  const { projects, fetchProjects, removeProject } = useProjectsStore();
+  const fileInputRef  = useRef();
+
+  const [activeTab,    setActiveTab]    = useState("generate");
 
   const [file,         setFile]         = useState(null);
   const [localPreview, setLocalPreview] = useState(null);
@@ -308,6 +346,14 @@ export default function CaptionStudio() {
     } catch (e) { setError(e.message); setCreating(false); }
   }
 
+  useEffect(() => { fetchProjects(); }, []);
+
+  const captionProjects = projects.filter(p => p.source === "caption_studio");
+
+  const handleDelete = async (id) => {
+    try { await deleteProject(id); removeProject(id); } catch (_) {}
+  };
+
   const done = !!segments;
 
   return (
@@ -316,14 +362,46 @@ export default function CaptionStudio() {
 
         {/* Top bar */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Syne',sans-serif" }}>Video Captions</h1>
-            <p style={{ margin: 0, fontSize: 12, color: "#55556a", marginTop: 2 }}>Add styled captions to your talking-head video</p>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Video Captions</h1>
+          <div style={{ display: "flex", gap: 4, background: "#111118", borderRadius: 8, padding: 3 }}>
+            {[["generate", "Caption Generator"], ["history", "My Caption Videos"]].map(([id, label]) => (
+              <button key={id} onClick={() => setActiveTab(id)}
+                style={{ padding: "6px 20px", borderRadius: 6, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.15s", background: activeTab === id ? "#f5c518" : "transparent", color: activeTab === id ? "#0b0b10" : "#55556a" }}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Body */}
-        <div style={{ display: "flex", flex: 1, overflow: "hidden", flexDirection: "row-reverse" }}>
+        {activeTab === "history" && (
+          <div style={{ flex: 1, overflowY: "auto", padding: "32px 24px" }}>
+            {captionProjects.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 16, textAlign: "center" }}>
+                <div style={{ fontSize: 48 }}>🎬</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0" }}>No caption videos yet</div>
+                <div style={{ fontSize: 14, color: "#77777f" }}>Upload a talking-head video to add styled captions</div>
+                <button onClick={() => setActiveTab("generate")}
+                  style={{ marginTop: 8, padding: "10px 24px", background: "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  Add Captions →
+                </button>
+              </div>
+            ) : (
+              <div style={{ maxWidth: 960, margin: "0 auto" }}>
+                <div style={{ fontSize: 12, color: "#55556a", marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
+                  {captionProjects.length} video{captionProjects.length !== 1 ? "s" : ""}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+                  {captionProjects.map(p => (
+                    <CaptionCard key={p.id} project={p} onDelete={handleDelete} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Body — generator */}
+        {activeTab === "generate" && <div style={{ display: "flex", flex: 1, overflow: "hidden", flexDirection: "row-reverse" }}>
 
           {/* ── Left panel — controls ── */}
           <div style={{ width: 380, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", overflowY: "auto", padding: "20px 20px", display: "flex", flexDirection: "column", gap: 20 }}>
@@ -517,7 +595,8 @@ export default function CaptionStudio() {
               </>
             )}
           </div>
-        </div>
+        </div>}
+
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

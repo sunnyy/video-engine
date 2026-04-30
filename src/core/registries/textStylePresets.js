@@ -745,7 +745,7 @@ export const textStylePresets = [
     style: {
       fontSize:      52,
       fontWeight:    800,
-      fontFamily:    "'Syne', sans-serif",
+      fontFamily:    "'Outfit', sans-serif",
       color:         "#f5c518",
       textAlign:     "center",
       textShadow:    "0 2px 12px rgba(245,197,24,0.4)",

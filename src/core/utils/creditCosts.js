@@ -24,6 +24,42 @@ export const CREDIT_COSTS = {
   // Other tools
   poster_generate:       10,  // Poster Studio
   thumbnail_generate:    10,  // Thumbnail Generator
+  outfit_tryon:           8,  // Virtual Try-On
+  social_post:           10,  // Banner Design / Social Post
+  caption_studio:         8,  // Caption Studio (render)
+};
+
+// Full cost estimates per service — used by CreditConfirmModal
+export const SERVICE_COSTS = {
+  product_ad_full: {
+    total: 303,
+    breakdown: {
+      "Analyze product":    5,
+      "Base scene image":   8,
+      "Scene images (5)":  40,
+      "Video clips (5)":  250,
+    },
+  },
+  poster: {
+    total: 10,
+    breakdown: { "Generate poster": 10 },
+  },
+  thumbnail: {
+    total: 10,
+    breakdown: { "Generate thumbnail": 10 },
+  },
+  outfit_tryon: {
+    total: 8,
+    breakdown: { "Virtual try-on": 8 },
+  },
+  social_post: {
+    total: 10,
+    breakdown: { "Generate banner": 10 },
+  },
+  caption_render: {
+    total: 8,
+    breakdown: { "Render captions": 8 },
+  },
 };
 
 /**

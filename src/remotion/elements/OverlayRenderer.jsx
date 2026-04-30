@@ -49,7 +49,7 @@ function HeadlineText({ overlay, motionStyle }) {
   return (
     <div style={{
       ...motionStyle,
-      fontFamily: "'Bebas Neue', 'Syne', sans-serif",
+      fontFamily: "'Bebas Neue', sans-serif",
       fontSize:   overlay.size || 72,
       fontWeight: 900,
       color:      overlay.color || "#ffffff",

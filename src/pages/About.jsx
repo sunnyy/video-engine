@@ -100,7 +100,7 @@ export default function About() {
         <section style={{ marginBottom: 96 }}>
           <SectionLabel>Our Mission</SectionLabel>
           <h2 style={{
-            fontFamily: "'Syne', sans-serif",
+            fontFamily: "'Outfit', sans-serif",
             fontSize: "clamp(26px, 4vw, 38px)",
             fontWeight: 800,
             color: "#e8e8f0",
@@ -133,7 +133,7 @@ export default function About() {
                 padding: "28px 24px",
               }}>
                 <div style={{ fontSize: 32, marginBottom: 16 }}>{item.emoji}</div>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, color: "#e8e8f0", marginBottom: 10 }}>
+                <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 700, color: "#e8e8f0", marginBottom: 10 }}>
                   {item.title}
                 </div>
                 <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#8888a8", lineHeight: 1.65 }}>
@@ -156,7 +156,7 @@ export default function About() {
                 borderRadius: 12,
                 padding: "24px 24px",
               }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, color: "#e8e8f0", marginBottom: 8 }}>
+                <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 700, color: "#e8e8f0", marginBottom: 8 }}>
                   {v.title}
                 </div>
                 <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#8888a8", lineHeight: 1.65 }}>

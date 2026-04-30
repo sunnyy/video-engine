@@ -124,12 +124,12 @@ export default function ThumbnailGenerator() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button
             onClick={() => navigate("/thumbnail")}
-            style={{ background: "transparent", border: "none", color: "#77777f", fontSize: 13, cursor: "pointer", padding: "4px 0", fontFamily: "'Syne',sans-serif" }}
+            style={{ background: "transparent", border: "none", color: "#77777f", fontSize: 13, cursor: "pointer", padding: "4px 0", fontFamily: "'Outfit',sans-serif" }}
           >
             ← Thumbnails
           </button>
           <span style={{ color: "#2a2a3a" }}>/</span>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Syne',sans-serif" }}>
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>
             New Thumbnail
           </h1>
         </div>

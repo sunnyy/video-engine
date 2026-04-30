@@ -299,7 +299,7 @@ export default function Transcription() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
         style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Speech to Text</h1>
+        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#f5c518" }}>Speech to Text</h1>
         <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
           {[["generate", "Transcribe"], ["history", "My Transcriptions"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -397,7 +397,7 @@ export default function Transcription() {
         {activeTab === "history" && (
           <div className="max-w-[860px]">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#e8e8f0" }}>My Transcriptions</h2>
+              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#e8e8f0" }}>My Transcriptions</h2>
               <button onClick={loadHistory} className="text-[12px] text-[#7c5cfc] bg-transparent border-0 cursor-pointer hover:opacity-80">Refresh</button>
             </div>
 

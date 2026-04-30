@@ -136,7 +136,7 @@ export default function AvatarSection() {
       {/* Header */}
       <div>
         <div className="text-[15px] font-bold text-[#e8e8f0] mb-[2px]"
-          style={{ fontFamily: "'Syne', sans-serif" }}>
+          style={{ fontFamily: "'Outfit', sans-serif" }}>
           Talking Head
         </div>
         <div className="text-[12px] text-[#55556a]">

@@ -5,7 +5,7 @@ export default function Auth() {
     <div className="flex h-screen items-center justify-center bg-[#0b0b10]">
       <div className="w-[380px] rounded-[14px] bg-[#13131f] border border-[rgba(255,255,255,0.08)] p-8 shadow-2xl">
 
-        <h2 className="mb-1 text-[22px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne', sans-serif" }}>
+        <h2 className="mb-1 text-[22px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit', sans-serif" }}>
           Welcome
         </h2>
         <p className="mb-6 text-[13px] text-[#55556a]">
