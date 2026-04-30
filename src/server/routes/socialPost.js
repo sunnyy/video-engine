@@ -52,8 +52,10 @@ async function getBlankUrl(aspectRatio, falKey) {
       blankUrlCache[aspectRatio] = url;
       console.log(`[social-post] cached blank PNG ${bw}x${bh} for ${aspectRatio}:`, url);
       return url;
+    } else {
+      console.warn("[social-post] blank PNG upload failed:", falUp.status, await falUp.text());
     }
-  } catch (e) { console.warn("[social-post] blank PNG upload failed:", e.message); }
+  } catch (e) { console.warn("[social-post] blank PNG upload error:", e.message); }
   return null;
 }
 
@@ -118,7 +120,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     // Always nano-banana/edit with a cached blank PNG sized to the target aspect ratio.
     const blankUrl = await getBlankUrl(aspectRatio, FAL_KEY);
 
-    const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
+    const endpoint  = blankUrl ? "https://fal.run/fal-ai/nano-banana/edit" : "https://fal.run/fal-ai/nano-banana";
     const finalBody = blankUrl
       ? { image_urls: [blankUrl], prompt: optimizedPrompt }
       : { prompt: optimizedPrompt };
