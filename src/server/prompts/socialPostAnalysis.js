@@ -25,7 +25,7 @@ export function getSocialPostPrompt({ headline, subtext, brandName, niche, style
     : `No reference image provided. Generate an original design based on the niche and style.`;
 
   const logoInstruction = hasLogo
-    ? `A logo image is also provided${hasReferenceImage ? " as the second image" : ""}. Incorporate this logo prominently in the design — place it in a natural position such as top-left corner, bottom center, or wherever it best fits the layout. Describe its exact placement and size in the prompt.`
+    ? `The user has a brand logo. Reserve a prominent placement for it in the design (e.g. top-left corner, bottom center) — describe the logo area clearly in the prompt so it appears as a distinct branded element.`
     : "";
 
   const colorInstruction = brandColor
