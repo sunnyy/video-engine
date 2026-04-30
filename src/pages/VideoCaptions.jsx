@@ -317,7 +317,7 @@ export default function CaptionStudio() {
         {/* Top bar */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Syne',sans-serif" }}>Caption Studio</h1>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Syne',sans-serif" }}>Video Captions</h1>
             <p style={{ margin: 0, fontSize: 12, color: "#55556a", marginTop: 2 }}>Add styled captions to your talking-head video</p>
           </div>
         </div>

@@ -191,18 +191,27 @@ export default function AppLayout({ children }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          <NavSection title="Generate">
-            <NavItem icon={Icons.home}    label="Dashboard"      to="/dashboard"         active={location.pathname === "/dashboard"} />
-            <NavItem icon={Icons.folder}  label="Videos"         to="/videos"            active={location.pathname === "/videos"} />
-            <NavItem icon={Icons.gallery} label="Images"         to="/image-generation"  active={location.pathname === "/image-generation"} />
-            <NavItem icon={Icons.mic}      label="Speech to Text" to="/transcription"     active={location.pathname === "/transcription"} />
-            <NavItem icon={Icons.captions} label="Captions"       to="/captions"          active={location.pathname === "/captions"} />
-            <NavItem icon={Icons.voice}   label="Voiceover"      to="/tts-studio"        active={location.pathname === "/tts-studio"} />
-            <NavItem icon={Icons.ad}      label="Product Ads"    to="/product-ads"       active={location.pathname.startsWith("/product-ads")} />
-            <NavItem icon={Icons.outfit}  label="Outfit Studio"  to="/outfit-studio"     active={location.pathname === "/outfit-studio"} />
-            <NavItem icon={Icons.poster}     label="Poster"       to="/poster-studio"  active={location.pathname === "/poster-studio"} />
-            <NavItem icon={Icons.instagram}  label="Social Post"  to="/social-post"    active={location.pathname === "/social-post"} />
-            <NavItem icon={Icons.thumbnail}  label="Thumbnail"  to="/thumbnail"     active={location.pathname.startsWith("/thumbnail")} />
+          <div className="mb-3">
+            <NavItem icon={Icons.home} label="Dashboard" to="/dashboard" active={location.pathname === "/dashboard"} />
+          </div>
+
+          <NavSection title="Create Videos">
+            <NavItem icon={Icons.folder}   label="AI Videos"        to="/videos"         active={location.pathname === "/videos"} />
+            <NavItem icon={Icons.ad}       label="Product Video Ad" to="/product-ads"    active={location.pathname.startsWith("/product-ads")} />
+            <NavItem icon={Icons.captions} label="Video Captions"   to="/video-captions" active={location.pathname === "/video-captions"} />
+          </NavSection>
+
+          <NavSection title="Create Images">
+            <NavItem icon={Icons.gallery}    label="AI Images"      to="/image-generation" active={location.pathname === "/image-generation"} />
+            <NavItem icon={Icons.poster}     label="Product Poster" to="/product-poster"   active={location.pathname === "/product-poster"} />
+            <NavItem icon={Icons.instagram}  label="Banner Design"  to="/banner-design"    active={location.pathname === "/banner-design"} />
+            <NavItem icon={Icons.thumbnail}  label="Thumbnail"      to="/thumbnail"        active={location.pathname.startsWith("/thumbnail")} />
+            <NavItem icon={Icons.outfit}     label="Virtual Try-On" to="/virtual-tryon"    active={location.pathname === "/virtual-tryon"} />
+          </NavSection>
+
+          <NavSection title="Audio Tools">
+            <NavItem icon={Icons.voice} label="Voiceover / TTS"  to="/voiceover"      active={location.pathname === "/voiceover"} />
+            <NavItem icon={Icons.mic}   label="Speech to Text"   to="/speech-to-text" active={location.pathname === "/speech-to-text"} />
           </NavSection>
 
           <NavSection title="Account">

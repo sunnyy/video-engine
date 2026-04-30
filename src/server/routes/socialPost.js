@@ -65,14 +65,16 @@ router.post("/generate", requireAuth, async (req, res) => {
     console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
     // Always nano-banana/edit: blank PNG + explicit image_size both anchor aspect ratio
-    const NANO_SIZE = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": { width: 680, height: 1080 } };
-    const blankUrl  = BLANK_URLS[aspectRatio] || BLANK_URLS["1:1"];
-    const imageUrls = logoUrl ? [logoUrl, blankUrl] : [blankUrl];
-    const endpoint  = "https://fal.run/fal-ai/nano-banana/edit";
-    const sizeNote  = logoUrl
-      ? `[The first image is the brand logo to incorporate in the design. The second image is a blank canvas — use it ONLY as the size/aspect ratio reference for the output.] `
-      : `[The first image is a blank canvas — use it ONLY as the size/aspect ratio reference for the output.] `;
-    const finalBody = { image_urls: imageUrls, prompt: sizeNote + optimizedPrompt, image_size: NANO_SIZE[aspectRatio] || "square_hd" };
+    const NANO_SIZE  = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": { width: 680, height: 1080 } };
+    const NANO_DIMS  = { "1:1": "1024x1024px (square)", "4:5": "864x1080px (portrait 4:5)", "9:16": "680x1080px (story 9:16)" };
+    const blankUrl   = BLANK_URLS[aspectRatio] || BLANK_URLS["1:1"];
+    const imageUrls  = logoUrl ? [logoUrl, blankUrl] : [blankUrl];
+    const endpoint   = "https://fal.run/fal-ai/nano-banana/edit";
+    const dimLabel   = NANO_DIMS[aspectRatio] || NANO_DIMS["1:1"];
+    const sizeNote   = logoUrl
+      ? `[CRITICAL: Output must be exactly ${dimLabel}. The first image is the brand logo — incorporate it prominently. The last image is a blank canvas showing the exact required output dimensions — match its size precisely.] `
+      : `[CRITICAL: Output must be exactly ${dimLabel}. The last image is a blank canvas showing the exact required output dimensions — match its size precisely.] `;
+    const finalBody  = { image_urls: imageUrls, prompt: sizeNote + optimizedPrompt, image_size: NANO_SIZE[aspectRatio] || "square_hd" };
 
     console.log("[social-post/generate] calling fal:", endpoint, "hasLogo:", !!logoUrl, "hasRef:", !!referenceImageUrl);
     const falAbort = new AbortController();

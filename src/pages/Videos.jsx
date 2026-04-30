@@ -284,7 +284,7 @@ export default function Videos() {
         style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}
       >
         <h1 className="text-[20px] font-bold text-[#f5c518]" style={{ fontFamily: "'Syne',sans-serif" }}>
-          Videos
+          AI Videos
           {!loading && (
             <span className="ml-2 text-[15px] font-normal text-[#77777f]">({videoProjects.length})</span>
           )}

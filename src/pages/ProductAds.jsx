@@ -155,7 +155,7 @@ export default function ProductAds() {
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}
       >
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Syne',sans-serif" }}>
-          Product Ads
+          Product Video Ad
           {!loading && (
             <span style={{ marginLeft: 8, fontSize: 15, fontWeight: 400, color: "#77777f" }}>
               ({complete.length})

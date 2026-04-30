@@ -208,7 +208,7 @@ export default function ImageGeneration() {
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
           style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-          <h1 className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Images</h1>
+          <h1 className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>AI Images</h1>
           <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
             {[["generate", "Image Generator"], ["library", "My Generated Images"]].map(([id, label]) => (
               <button key={id} onClick={() => setActiveTab(id)}

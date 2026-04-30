@@ -8,7 +8,8 @@ import { useCreditsStore } from "../store/useCreditsStore";
 import { supabase } from "../lib/supabase";
 import AppLayout from "../ui/AppLayout";
 
-/* ── Helpers ── */
+const PAGE_SIZE = 12;
+
 function formatTime(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -66,7 +67,6 @@ function TranscriptResult({ result, onClose }) {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Meta bar */}
       <div className="flex items-center gap-4 flex-wrap">
         <span className="text-[12px] font-mono px-2 py-[3px] rounded-[5px]" style={{ background: "rgba(245,197,24,0.12)", color: "#f5c518" }}>
           ⚡ {result.credits_used} credits used
@@ -79,7 +79,6 @@ function TranscriptResult({ result, onClose }) {
         </button>
       </div>
 
-      {/* Action buttons */}
       <div className="flex gap-2 flex-wrap">
         <button onClick={copy}
           className="px-4 py-[7px] rounded-[7px] text-[12px] font-semibold border cursor-pointer transition-all"
@@ -100,7 +99,6 @@ function TranscriptResult({ result, onClose }) {
         )}
       </div>
 
-      {/* Segments view */}
       {result.segments?.length > 0 && (
         <div className="flex flex-col gap-0 max-h-[340px] overflow-y-auto rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[#111118]">
           {result.segments.map((seg, i) => (
@@ -112,7 +110,6 @@ function TranscriptResult({ result, onClose }) {
         </div>
       )}
 
-      {/* Full transcript */}
       <div>
         <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
           Full Transcript
@@ -155,7 +152,6 @@ function HistoryItem({ item, onDelete }) {
 
   return (
     <div className="rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[#111118] overflow-hidden">
-      {/* Header row */}
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[rgba(255,255,255,0.02)] transition-colors"
         onClick={() => setExpanded(e => !e)}
@@ -192,7 +188,6 @@ function HistoryItem({ item, onDelete }) {
         </div>
       </div>
 
-      {/* Expanded content */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-[rgba(255,255,255,0.05)]">
           {item.segments?.length > 0 && (
@@ -221,26 +216,34 @@ function HistoryItem({ item, onDelete }) {
 export default function Transcription() {
   const { fetchCredits } = useCreditsStore();
 
-  const [file,       setFile]       = useState(null);
-  const [dragging,   setDragging]   = useState(false);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState(null);
-  const [result,     setResult]     = useState(null);
-  const [history,    setHistory]    = useState([]);
-  const [loadingHist, setLoadingHist] = useState(true);
+  const [activeTab, setActiveTab] = useState("generate");
+  const [histPage,  setHistPage]  = useState(0);
+
+  const [file,     setFile]     = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState(null);
+  const [result,   setResult]   = useState(null);
+
+  const [history,     setHistory]     = useState([]);
+  const [loadingHist, setLoadingHist] = useState(false);
 
   const fileInputRef = useRef(null);
   const ACCEPTED = ".mp4,.mov,.avi,.webm,.mkv,.mp3,.wav,.m4a,.ogg,.flac";
 
-  useEffect(() => { fetchCredits(); }, []);
-
   useEffect(() => {
+    fetchCredits();
+    loadHistory();
+  }, []);
+
+  function loadHistory() {
+    setLoadingHist(true);
     serverFetch("/api/transcription/history")
       .then(r => r.json())
       .then(d => setHistory(d.transcriptions || []))
       .catch(() => {})
       .finally(() => setLoadingHist(false));
-  }, []);
+  }
 
   const pickFile = (f) => {
     if (!f) return;
@@ -279,21 +282,7 @@ export default function Transcription() {
       const resultWithName = { ...data, file_name: file.name };
       setResult(resultWithName);
       fetchCredits();
-
-      // Prepend to history
-      if (data.id) {
-        setHistory(prev => [{
-          id:               data.id,
-          file_name:        file.name,
-          duration_seconds: data.duration_seconds,
-          credits_used:     data.credits_used,
-          transcript:       data.transcript,
-          segments:         data.segments,
-          language:         data.language,
-          created_at:       new Date().toISOString(),
-        }, ...prev]);
-      }
-
+      loadHistory();
       setFile(null);
     } catch (e) {
       setError(e.message || "Upload failed");
@@ -302,129 +291,163 @@ export default function Transcription() {
     }
   };
 
+  const totalPages   = Math.ceil(history.length / PAGE_SIZE);
+  const pagedHistory = history.slice(histPage * PAGE_SIZE, (histPage + 1) * PAGE_SIZE);
+
   return (
     <AppLayout>
-
-        {/* Top bar */}
-        <div className="flex items-center px-6 py-4 border-b shrink-0"
-          style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-          <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Transcribe</h1>
-          <span className="ml-3 text-[12px] text-[#55556a]">2 credits / minute · min 2 credits</span>
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
+        style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
+        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#f5c518" }}>Speech to Text</h1>
+        <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
+          {[["generate", "Transcribe"], ["history", "My Transcriptions"]].map(([id, label]) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              className="px-5 py-[6px] rounded-[6px] text-[13px] font-semibold border-0 cursor-pointer transition-all"
+              style={{ background: activeTab === id ? "#f5c518" : "transparent", color: activeTab === id ? "#0b0b10" : "#55556a" }}>
+              {label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-8 flex flex-col gap-8 max-w-[860px]">
+      <div className="flex-1 overflow-y-auto px-6 py-8">
 
-          {/* Upload zone */}
-          {!result && (
-            <div>
-              <div
-                onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => !file && fileInputRef.current?.click()}
-                className="rounded-[14px] border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 py-14 px-6 cursor-pointer"
-                style={{
-                  borderColor: dragging ? "#f5c518" : file ? "rgba(124,92,252,0.5)" : "rgba(255,255,255,0.1)",
-                  background:  dragging ? "rgba(245,197,24,0.04)" : "rgba(255,255,255,0.01)",
-                }}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={ACCEPTED}
-                  className="hidden"
-                  onChange={e => pickFile(e.target.files[0])}
-                />
-                {!file ? (
-                  <>
-                    <div className="text-[40px]">🎙</div>
-                    <div className="text-[15px] font-semibold text-[#e8e8f0]">Drop a video or audio file</div>
-                    <div className="text-[12px] text-[#55556a] text-center">MP4, MOV, AVI, WebM, MKV · MP3, WAV, M4A, OGG, FLAC · up to 500 MB</div>
-                    <div className="text-[11px] text-[#33333f]">or click to browse</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-[32px]">📄</div>
-                    <div className="text-[14px] font-semibold text-[#e8e8f0]">{file.name}</div>
-                    <div className="text-[12px] text-[#55556a]">{formatFileSize(file.size)}</div>
-                    <div className="text-[11px] text-[#55556a]">Duration and credit cost will be calculated on upload</div>
-                    <button
-                      onClick={e => { e.stopPropagation(); setFile(null); }}
-                      className="text-[11px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer mt-1">
-                      Remove file
-                    </button>
-                  </>
-                )}
-              </div>
+        {activeTab === "generate" && (
+          <div className="flex flex-col gap-8 max-w-[860px]">
 
-              {error && (
-                <div className="mt-3 px-4 py-3 rounded-[8px] text-[13px] text-[#f87171]"
-                  style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)" }}>
-                  {error}
+            {/* Upload zone */}
+            {!result && (
+              <div>
+                <div
+                  onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => !file && fileInputRef.current?.click()}
+                  className="rounded-[14px] border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 py-14 px-6 cursor-pointer"
+                  style={{
+                    borderColor: dragging ? "#f5c518" : file ? "rgba(124,92,252,0.5)" : "rgba(255,255,255,0.1)",
+                    background:  dragging ? "rgba(245,197,24,0.04)" : "rgba(255,255,255,0.01)",
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ACCEPTED}
+                    className="hidden"
+                    onChange={e => pickFile(e.target.files[0])}
+                  />
+                  {!file ? (
+                    <>
+                      <div className="text-[40px]">🎙</div>
+                      <div className="text-[15px] font-semibold text-[#e8e8f0]">Drop a video or audio file</div>
+                      <div className="text-[12px] text-[#55556a] text-center">MP4, MOV, AVI, WebM, MKV · MP3, WAV, M4A, OGG, FLAC · up to 500 MB</div>
+                      <div className="text-[11px] text-[#33333f]">or click to browse</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-[32px]">📄</div>
+                      <div className="text-[14px] font-semibold text-[#e8e8f0]">{file.name}</div>
+                      <div className="text-[12px] text-[#55556a]">{formatFileSize(file.size)}</div>
+                      <div className="text-[11px] text-[#55556a]">Duration and credit cost will be calculated on upload</div>
+                      <button
+                        onClick={e => { e.stopPropagation(); setFile(null); }}
+                        className="text-[11px] text-[#55556a] hover:text-[#f87171] bg-transparent border-0 cursor-pointer mt-1">
+                        Remove file
+                      </button>
+                    </>
+                  )}
                 </div>
-              )}
 
-              <button
-                onClick={handleUpload}
-                disabled={!file || loading}
-                className="mt-4 w-full py-[11px] rounded-[10px] text-[14px] font-bold border-0 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: "#f5c518", color: "#0b0b10" }}
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-[#0b0b10] border-t-transparent rounded-full animate-spin inline-block" />
-                    Transcribing… this may take a minute
-                  </span>
-                ) : "Transcribe"}
-              </button>
-            </div>
-          )}
+                {error && (
+                  <div className="mt-3 px-4 py-3 rounded-[8px] text-[13px] text-[#f87171]"
+                    style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)" }}>
+                    {error}
+                  </div>
+                )}
 
-          {/* Result */}
-          {result && (
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider mb-4" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
-                Result — {result.file_name}
+                <button
+                  onClick={handleUpload}
+                  disabled={!file || loading}
+                  className="mt-4 w-full py-[11px] rounded-[10px] text-[14px] font-bold border-0 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: "#f5c518", color: "#0b0b10" }}
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-[#0b0b10] border-t-transparent rounded-full animate-spin inline-block" />
+                      Transcribing… this may take a minute
+                    </span>
+                  ) : "Transcribe · 2 credits / minute"}
+                </button>
               </div>
-              <TranscriptResult result={result} onClose={() => setResult(null)} />
-            </div>
-          )}
+            )}
 
-          {/* History */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
-                History
+            {/* Result */}
+            {result && (
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider mb-4" style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+                  Result — {result.file_name}
+                </div>
+                <TranscriptResult result={result} onClose={() => setResult(null)} />
               </div>
-              {history.length > 0 && (
-                <span className="text-[11px] text-[#33333f]">{history.length} transcription{history.length !== 1 ? "s" : ""}</span>
-              )}
+            )}
+          </div>
+        )}
+
+        {activeTab === "history" && (
+          <div className="max-w-[860px]">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[18px] font-bold" style={{ fontFamily: "'Syne',sans-serif", color: "#e8e8f0" }}>My Transcriptions</h2>
+              <button onClick={loadHistory} className="text-[12px] text-[#7c5cfc] bg-transparent border-0 cursor-pointer hover:opacity-80">Refresh</button>
             </div>
 
-            {loadingHist && (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-5 h-5 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />
+            {loadingHist && history.length === 0 && (
+              <div className="flex items-center justify-center py-24">
+                <div className="w-6 h-6 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />
               </div>
             )}
 
             {!loadingHist && history.length === 0 && (
-              <div className="text-[13px] text-[#33333f] py-8 text-center">No transcriptions yet</div>
+              <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+                <div className="text-[48px]">🎙</div>
+                <div className="text-[20px] font-bold text-[#e8e8f0]">No transcriptions yet</div>
+                <div className="text-[14px] text-[#77777f]">Upload audio or video to get an accurate transcript</div>
+                <button onClick={() => setActiveTab("generate")}
+                  className="mt-2 px-6 py-[10px] rounded-[10px] text-[14px] font-bold border-0 cursor-pointer"
+                  style={{ background: "#f5c518", color: "#0b0b10" }}>
+                  Transcribe First File →
+                </button>
+              </div>
             )}
 
             {history.length > 0 && (
-              <div className="flex flex-col gap-2">
-                {history.map(item => (
-                  <HistoryItem
-                    key={item.id}
-                    item={item}
-                    onDelete={id => setHistory(prev => prev.filter(i => i.id !== id))}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="flex flex-col gap-2">
+                  {pagedHistory.map(item => (
+                    <HistoryItem key={item.id} item={item} onDelete={id => setHistory(prev => prev.filter(i => i.id !== id))} />
+                  ))}
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-6">
+                    <button onClick={() => setHistPage(p => Math.max(0, p - 1))} disabled={histPage === 0}
+                      className="px-4 py-[7px] rounded-[8px] text-[13px] border cursor-pointer transition-all disabled:opacity-40"
+                      style={{ background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.08)", color: "#9494a8" }}>
+                      ← Prev
+                    </button>
+                    <span className="text-[12px] px-3" style={{ color: "#55556a" }}>{histPage + 1} / {totalPages}</span>
+                    <button onClick={() => setHistPage(p => Math.min(totalPages - 1, p + 1))} disabled={histPage === totalPages - 1}
+                      className="px-4 py-[7px] rounded-[8px] text-[13px] border cursor-pointer transition-all disabled:opacity-40"
+                      style={{ background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.08)", color: "#9494a8" }}>
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
+        )}
 
-        </div>
+      </div>
     </AppLayout>
   );
 }

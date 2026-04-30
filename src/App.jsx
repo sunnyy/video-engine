@@ -26,7 +26,7 @@ import LayoutManager   from "./pages/admin/LayoutManager";
 import LayoutEditor    from "./pages/admin/LayoutEditor";
 import LayoutGenerator from "./pages/admin/LayoutGenerator";
 import ImageGeneration from "./pages/ImageGeneration";
-import Transcription   from "./pages/Transcription";
+import Transcription   from "./pages/SpeechToText";
 import Feedback        from "./pages/Feedback";
 import Checkout        from "./pages/Checkout";
 import Assets          from "./pages/Assets";
@@ -34,13 +34,13 @@ import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
 import ProductAds      from "./pages/ProductAds";
 import NewProductAd    from "./pages/NewProductAd";
-import PosterStudio         from "./pages/PosterStudio";
+import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
-import TTSStudio       from "./pages/TTSStudio";
-import CaptionStudio  from "./pages/CaptionStudio";
-import OutfitStudio              from "./pages/OutfitStudio";
-import SocialPostGenerator       from "./pages/SocialPostGenerator";
+import TTSStudio       from "./pages/Voiceover";
+import CaptionStudio  from "./pages/VideoCaptions";
+import OutfitStudio              from "./pages/VirtualTryOn";
+import SocialPostGenerator       from "./pages/BannerDesign";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
 import Analytics       from "./pages/admin/Analytics";
 import Credits         from "./pages/admin/Credits";
@@ -122,8 +122,8 @@ export default function App() {
             <Route path="/videos"           element={<Videos />} />
             <Route path="/new"              element={<VideoGenerator />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
-            <Route path="/transcription"    element={<Transcription />} />
-            <Route path="/captions"         element={<CaptionStudio />} />
+            <Route path="/speech-to-text"   element={<Transcription />} />
+            <Route path="/video-captions"   element={<CaptionStudio />} />
             <Route path="/feedback"         element={<Feedback />} />
             <Route path="/checkout"         element={<Checkout />} />
             <Route path="/assets"           element={<Assets />} />
@@ -133,12 +133,12 @@ export default function App() {
             <Route path="/product-ads"       element={<ProductAds />} />
             <Route path="/product-ads/new"   element={<NewProductAd />} />
             <Route path="/product-ad-studio" element={<ProductAds />} />
-            <Route path="/poster-studio"     element={<PosterStudio />} />
+            <Route path="/product-poster"    element={<PosterStudio />} />
             <Route path="/thumbnail"           element={<Thumbnails />} />
             <Route path="/thumbnail/new"       element={<ThumbnailGenerator />} />
-            <Route path="/tts-studio"        element={<TTSStudio />} />
-            <Route path="/outfit-studio"     element={<OutfitStudio />} />
-            <Route path="/social-post"       element={<SocialPostGenerator />} />
+            <Route path="/voiceover"         element={<TTSStudio />} />
+            <Route path="/virtual-tryon"     element={<OutfitStudio />} />
+            <Route path="/banner-design"     element={<SocialPostGenerator />} />
 
             {/* Admin routes */}
             {isAdmin ? (
