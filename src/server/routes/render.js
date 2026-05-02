@@ -54,25 +54,15 @@ async function getBundle() {
   return result;
 }
 
-/* ── Download external image to local temp ── */
-async function cacheExternalImage(url) {
+/* ── Sanitise asset URL for Remotion's Chrome subprocess ──
+   Chrome runs sandboxed and cannot reach the Express server on localhost.
+   Supabase / CDN HTTPS URLs are fetched directly by Chrome — no local caching needed.
+   blob: URLs are unusable; return null so the zone renders without an asset. */
+function resolveAssetUrl(url) {
   if (!url) return url;
   if (url.startsWith("blob:")) return null;
-  if (url.startsWith("http://localhost")) return url;
-  if (!url.startsWith("http")) return url;
-  try {
-    const res    = await fetch(url);
-    if (!res.ok) return url;
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const ext    = url.split("?")[0].split(".").pop()?.split("/")[0] || "jpg";
-    const safe   = ["jpg","jpeg","png","webp","mp4","webm"].includes(ext) ? ext : "jpg";
-    const fname  = `img-${Date.now()}-${Math.random().toString(36).slice(2)}.${safe}`;
-    fs.writeFileSync(path.join(TEMP_DIR, fname), buffer);
-    return `http://localhost:${process.env.PORT || 5000}/renders/${fname}`;
-  } catch (e) {
-    console.warn("[render] Failed to cache:", url, e.message);
-    return url;
-  }
+  // Already a safe external or relative URL — pass through unchanged
+  return url;
 }
 
 /* ── Music key to filename map ── */
@@ -113,77 +103,51 @@ router.post("/", requireAuth, async (req, res) => {
       };
     }
 
-    console.log("[render] Job", jobId, "— caching external assets...");
-    const tempFiles = []; // track all temp files to clean up after render
+    console.log("[render] Job", jobId, "— resolving asset URLs...");
+    const tempFiles = []; // track temp files to clean up after render
 
-    /* ── 1. Cache all external images locally ── */
+    /* ── 1. Sanitise asset URLs (blob: → null; HTTPS passed directly to Chrome) ── */
     if (project?.beats) {
-      project.beats = await Promise.all(project.beats.map(async (beat) => {
+      project.beats = project.beats.map((beat) => {
         const zones = { ...beat.zones };
-        await Promise.all(Object.keys(zones).map(async (key) => {
+        for (const key of Object.keys(zones)) {
           const zone = zones[key];
           const src  = zone?.content?.asset?.src;
-          if (src && src.startsWith("http") && !src.startsWith("http://localhost")) {
-            const cached = await cacheExternalImage(src);
-            if (cached !== src) {
-              const fname = cached.split("/renders/")[1];
-              if (fname) tempFiles.push(path.join(TEMP_DIR, fname));
+          if (src) {
+            const resolved = resolveAssetUrl(src);
+            if (resolved !== src) {
+              zones[key] = { ...zone, content: { ...zone.content, asset: { ...zone.content.asset, src: resolved } } };
             }
-            zones[key] = {
-              ...zone,
-              content: { ...zone.content, asset: { ...zone.content.asset, src: cached } }
-            };
           }
-        }));
+        }
         return { ...beat, zones };
-      }));
+      });
     }
 
     console.log("[render] audio.music:", JSON.stringify(project?.audio?.music));
 
-    /* ── 2. Cache local music/sfx files to temp so Remotion can serve them ── */
+    /* ── 2. Resolve music src — use relative /music/ paths served by Remotion's bundle server ── */
     if (project?.audio?.music) {
       const musicKey = project.audio.music.musicKey;
       if (musicKey) {
-        // Library music — copy from public/music/ to temp and use localhost URL
         const musicFilename = getMusicFilename(musicKey);
         const musicFile = path.join(PUBLIC_DIR, "music", musicFilename);
-        console.log("[render] Copying music:", musicFile, "exists:", fs.existsSync(musicFile));
         if (fs.existsSync(musicFile)) {
-          const fname = `music-${Date.now()}.mp3`;
-          const destPath = path.join(TEMP_DIR, fname);
-          fs.copyFileSync(musicFile, destPath);
-          project.audio.music = {
-            ...project.audio.music,
-            src:      `http://localhost:${process.env.PORT || 5000}/renders/${fname}`,
-            musicKey: null,
-          };
-          tempFiles.push(path.join(TEMP_DIR, fname));
-          console.log("[render] Music copied to:", project.audio.music.src);
+          project.audio.music = { ...project.audio.music, src: `/music/${musicFilename}`, musicKey: null };
+          console.log("[render] Music resolved to:", project.audio.music.src);
         } else {
           console.warn("[render] Music file not found:", musicFile);
-          project.audio.music = null; // remove broken music
+          project.audio.music = null;
         }
-      } else if (project.audio.music.src?.includes("/music/")) {
-        // src still points to /music/ path — also copy
-        const musicFilename = path.basename(project.audio.music.src);
-        const musicFile = path.join(PUBLIC_DIR, "music", musicFilename);
-        if (fs.existsSync(musicFile)) {
-          const fname = `music-${Date.now()}.mp3`;
-          fs.copyFileSync(musicFile, path.join(TEMP_DIR, fname));
-          project.audio.music.src = `http://localhost:${process.env.PORT || 5000}/renders/${fname}`;
-          tempFiles.push(path.join(TEMP_DIR, fname));
-          console.log("[render] Music (by src) copied to:", project.audio.music.src);
-        }
+      } else if (project.audio.music.src?.startsWith("blob:")) {
+        project.audio.music = null;
       }
+      // /music/... relative paths and HTTPS URLs are passed as-is — Remotion's bundle server
+      // serves publicDir (which contains /music/) so relative paths resolve correctly.
     }
 
-    /* ── 3. Clean blob URLs ── */
-    const clean = (url) => (typeof url === "string" && url.startsWith("blob:") ? null : url);
-    if (project?.audio?.music?.src && !project.audio.music.musicKey) {
-      project.audio.music.src = clean(project.audio.music.src);
-    }
-    if (project?.avatar?.src) project.avatar.src = clean(project.avatar.src);
+    /* ── 3. Clean blob URLs from avatar ── */
+    if (project?.avatar?.src?.startsWith("blob:")) project.avatar.src = null;
 
     /* ── 3.5. Embed layout definitions so Remotion never needs Supabase inside Chromium ── */
     try {
