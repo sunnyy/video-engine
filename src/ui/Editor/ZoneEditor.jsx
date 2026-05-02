@@ -24,7 +24,6 @@ const FONT_FAMILIES = [
   { label: "Default",          value: "inherit" },
   { label: "Bebas Neue",       value: "'Bebas Neue', sans-serif" },
   { label: "Outfit",           value: "'Outfit', sans-serif" },
-  { label: "Outfit",           value: "'Outfit', sans-serif" },
   { label: "Playfair Display", value: "'Playfair Display', serif" },
   { label: "JetBrains Mono",   value: "'JetBrains Mono', monospace" },
   { label: "Unbounded",        value: "'Unbounded', sans-serif" },
