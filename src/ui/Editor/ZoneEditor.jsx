@@ -666,13 +666,7 @@ export default function ZoneEditor({
           <div>
             <Label>Size</Label>
             <CompactInput icon="T" value={Math.round(parseFloat(style.fontSize ?? 32))}
-              onChange={v => {
-                const curFont = parseFloat(style.fontSize ?? 32);
-                const ratio   = curFont > 0 ? v / curFont : 1;
-                const curW    = safeZone.width ?? zoneDef?.width ?? 50;
-                const newW    = Math.max(5, Math.round(curW * ratio * 10) / 10);
-                patchZoneSilent(slot, { width: newW }, { fontSize: v });
-              }}
+              onChange={v => setStyleSilent("fontSize", v)}
               onCommit={commit} min={10} max={300} unit="px" />
           </div>
         </div>
