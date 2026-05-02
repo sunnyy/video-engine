@@ -11,6 +11,29 @@ export const router = express.Router();
 
 const renderJobs = {};
 
+/* ── Persist job state to disk so status survives server restarts / multi-instance ── */
+function jobPath(jobId) { return path.join(TEMP_DIR, `job-${jobId}.json`); }
+
+function writeJob(jobId, state) {
+  renderJobs[jobId] = state;
+  try { fs.writeFileSync(jobPath(jobId), JSON.stringify({ ...state, _ts: Date.now() })); } catch {}
+}
+
+function readJob(jobId) {
+  if (renderJobs[jobId]) return renderJobs[jobId];
+  try {
+    const data = JSON.parse(fs.readFileSync(jobPath(jobId), "utf8"));
+    // In-progress job whose heartbeat is stale (>3 min) = server restart killed the render
+    if (!data.done && data._ts && Date.now() - data._ts > 180_000) {
+      return { ...data, done: true, error: "Render was interrupted — please try again" };
+    }
+    renderJobs[jobId] = data;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 /* ── Bundle — rebuilt on every render so code changes are always picked up ── */
 async function getBundle() {
   // Prefer the pre-built bundle (generated locally via `npm run prebundle`).
@@ -69,7 +92,7 @@ router.post("/", requireAuth, async (req, res) => {
   if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
   const jobId = uuidv4();
-  renderJobs[jobId] = { progress: 0, done: false, url: null, error: null, cancelled: false };
+  writeJob(jobId, { progress: 0, done: false, url: null, error: null, cancelled: false });
   res.json({ success: true, jobId });
 
   try {
@@ -229,7 +252,10 @@ router.post("/", requireAuth, async (req, res) => {
       onFrameUpdate: () => {
         if (renderJobs[jobId]?.cancelled) throw new Error("RENDER_CANCELLED");
         rendered++;
-        renderJobs[jobId].progress = Math.round((rendered / comp.durationInFrames) * 90);
+        const pct = Math.round((rendered / comp.durationInFrames) * 90);
+        renderJobs[jobId].progress = pct;
+        // Write to disk every 10% so status survives restarts
+        if (pct % 10 === 0) writeJob(jobId, renderJobs[jobId]);
       },
     });
 
@@ -293,35 +319,36 @@ router.post("/", requireAuth, async (req, res) => {
       console.warn("[render] Post-render save failed:", e.message);
     }
 
-    renderJobs[jobId] = {
+    writeJob(jobId, {
       progress:  100,
       done:      true,
       url:       `http://localhost:${process.env.PORT || 5000}/api/render/download/${jobId}`,
       video_url: videoUrl,
       error:     null,
-    };
+    });
     console.log("[render] Done:", jobId);
 
   } catch (err) {
     if (err.message === "RENDER_CANCELLED") {
       console.log("[render] Cancelled:", jobId);
-      renderJobs[jobId] = { progress: 0, done: true, url: null, error: null, cancelled: true };
+      writeJob(jobId, { progress: 0, done: true, url: null, error: null, cancelled: true });
     } else {
       console.error("[render] Failed:", err.message);
-      renderJobs[jobId] = { progress: 0, done: true, url: null, error: err.message };
+      writeJob(jobId, { progress: 0, done: true, url: null, error: err.message });
     }
   }
 });
 
 router.post("/cancel", requireAuth, (req, res) => {
   const { jobId } = req.body;
-  if (!jobId || !renderJobs[jobId]) return res.status(404).json({ error: "Job not found" });
-  renderJobs[jobId].cancelled = true;
+  const job = readJob(jobId);
+  if (!jobId || !job) return res.status(404).json({ error: "Job not found" });
+  writeJob(jobId, { ...job, cancelled: true });
   res.json({ success: true });
 });
 
 router.get("/status/:jobId", requireAuth, (req, res) => {
-  const job = renderJobs[req.params.jobId];
+  const job = readJob(req.params.jobId);
   if (!job) return res.status(404).json({ error: "Job not found" });
   res.json(job);
 });
@@ -337,6 +364,8 @@ router.get("/download/:jobId", requireAuth, (req, res) => {
   stream.pipe(res);
   res.on("finish", () => {
     try { fs.unlinkSync(filePath); } catch {}
+    try { fs.unlinkSync(jobPath(jobId)); } catch {}
+    delete renderJobs[jobId];
     console.log("[render] Deleted output after download:", `render-${jobId}.mp4`);
   });
 });
