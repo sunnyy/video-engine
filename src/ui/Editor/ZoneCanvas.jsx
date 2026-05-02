@@ -430,16 +430,6 @@ export default function ZoneCanvas({
                   style={{ border: "1.5px dashed rgba(255,255,255,0.35)", borderRadius: zone.style?.borderRadius || 0, zIndex: 99 }}
                 />
               )}
-              {isText && (
-                <TextAutoHeight
-                  zone={zone}
-                  canvasW={canvasW - (beat?.layoutPadding || 0) * canvasScale * 2}
-                  canvasH={canvasH - (beat?.layoutPadding || 0) * canvasScale * 2}
-                  canvasScale={canvasScale}
-                  onUpdate={(upd) => handleUpdate(zone.id, upd)}
-                  typographySystem={typographySystem}
-                />
-              )}
             </div>
           );
         })}
