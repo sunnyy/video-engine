@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.*
+remotion-bundle
+temp
+*.log
+.git
+.claude
