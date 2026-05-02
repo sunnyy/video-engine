@@ -9,10 +9,11 @@ import VideoComposition from "../../remotion/VideoComposition";
 import ZoneCanvas from "./ZoneCanvas";
 import { getLayoutDef, initLayoutRegistry } from "../../core/registries/layoutRegistry";
 
-function nextZoneId(layoutDef, beatZones) {
+function nextZoneId(layoutDef, beatZones, deletedZones = []) {
   const allIds = [
     ...(layoutDef?.zones || []).map(z => z.id),
     ...Object.keys(beatZones || {}),
+    ...(deletedZones || []),
   ];
   let max = 0;
   for (const id of allIds) {
@@ -360,7 +361,7 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           const srcDef      = layoutDef?.zones?.find(z => z.id === srcId) || {};
           const x           = srcOverride.x ?? srcDef.x ?? 0;
           const y           = srcOverride.y ?? srcDef.y ?? 0;
-          const newId       = nextZoneId(layoutDef, newZones);
+          const newId       = nextZoneId(layoutDef, newZones, liveBeat.deletedZones);
           const { id: _ignored, ...defRest } = srcDef;
           const mergedStyle = { ...(defRest.style || {}), ...(srcOverride.style || {}) };
           if (mergedStyle.fontFamily && mergedStyle.fontFamily !== "inherit") mergedStyle._userFontFamily = true;

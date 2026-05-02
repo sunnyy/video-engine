@@ -45,7 +45,7 @@ async function cacheExternalImage(url) {
     const safe   = ["jpg","jpeg","png","webp","mp4","webm"].includes(ext) ? ext : "jpg";
     const fname  = `img-${Date.now()}-${Math.random().toString(36).slice(2)}.${safe}`;
     fs.writeFileSync(path.join(TEMP_DIR, fname), buffer);
-    return `http://localhost:5000/renders/${fname}`;
+    return `http://localhost:${process.env.PORT || 5000}/renders/${fname}`;
   } catch (e) {
     console.warn("[render] Failed to cache:", url, e.message);
     return url;
@@ -132,7 +132,7 @@ router.post("/", requireAuth, async (req, res) => {
           fs.copyFileSync(musicFile, destPath);
           project.audio.music = {
             ...project.audio.music,
-            src:      `http://localhost:5000/renders/${fname}`,
+            src:      `http://localhost:${process.env.PORT || 5000}/renders/${fname}`,
             musicKey: null,
           };
           tempFiles.push(path.join(TEMP_DIR, fname));
@@ -148,7 +148,7 @@ router.post("/", requireAuth, async (req, res) => {
         if (fs.existsSync(musicFile)) {
           const fname = `music-${Date.now()}.mp3`;
           fs.copyFileSync(musicFile, path.join(TEMP_DIR, fname));
-          project.audio.music.src = `http://localhost:5000/renders/${fname}`;
+          project.audio.music.src = `http://localhost:${process.env.PORT || 5000}/renders/${fname}`;
           tempFiles.push(path.join(TEMP_DIR, fname));
           console.log("[render] Music (by src) copied to:", project.audio.music.src);
         }
@@ -296,7 +296,7 @@ router.post("/", requireAuth, async (req, res) => {
     renderJobs[jobId] = {
       progress:  100,
       done:      true,
-      url:       `http://localhost:5000/api/render/download/${jobId}`,
+      url:       `http://localhost:${process.env.PORT || 5000}/api/render/download/${jobId}`,
       video_url: videoUrl,
       error:     null,
     };

@@ -11,10 +11,11 @@ import ZoneEditor from "./ZoneEditor";
 import OverlayEditor from "./OverlayEditor";
 
 /* ── Generate the next sequential zone id (z1, z2, …) ── */
-function nextZoneId(layoutDef, beatZones) {
+function nextZoneId(layoutDef, beatZones, deletedZones = []) {
   const allIds = [
     ...(layoutDef?.zones || []).map(z => z.id),
     ...Object.keys(beatZones || {}),
+    ...(deletedZones || []),
   ];
   let max = 0;
   for (const id of allIds) {
@@ -227,7 +228,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     }
 
     // ── Zone-based content ──
-    const id = nextZoneId(layoutDef, zones);
+    const id = nextZoneId(layoutDef, zones, beat.deletedZones);
     let zoneData;
     if (data?.kind === "text") {
       zoneData = {

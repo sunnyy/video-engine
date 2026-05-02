@@ -41,7 +41,7 @@ function FAQItem({ q, a }) {
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
         <span
-          style={{ fontFamily: "var(--font-body)", fontSize: 15, color: "#c8c8d8", fontWeight: 500, lineHeight: 1.5 }}
+          style={{ fontFamily: "var(--font-body)", fontSize: 15, color: "var(--text)", fontWeight: 500, lineHeight: 1.5 }}
         >
           {q}
         </span>
@@ -61,7 +61,7 @@ function FAQItem({ q, a }) {
       </div>
       {open && (
         <div
-          style={{ marginTop: 14, fontFamily: "var(--font-body)", fontSize: 15, color: "#8888a8", lineHeight: 1.75 }}
+          style={{ marginTop: 14, fontFamily: "var(--font-body)", fontSize: 15, color: "var(--muted)", lineHeight: 1.75 }}
         >
           {a}
         </div>
@@ -77,11 +77,11 @@ const CSS = `
     --bg: #0b0b10; --bg2: #0f0f16; --card: #111118; --card2: #13131c;
     --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.04);
     --yellow: #f5c518; --yellow-dim: rgba(245,197,24,0.10); --yellow-glow: rgba(245,197,24,0.06);
-    --text: #e8e8f0; --muted: #8888a8; --dim: #606078;
+    --text: #f5f5fb; --muted: #c4c4d4; --dim: #9a9aae;
     --font-display: 'Bebas Neue', sans-serif;
     --font-body: 'Outfit', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
-    --radius: 16px; --container: 1160px;
+    --radius: 16px; --container: 1380px;
   }
   body { background: var(--bg); color: var(--text); font-family: var(--font-body); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
   .container { max-width: var(--container); margin: 0 auto; padding: 0 40px; }
@@ -99,11 +99,11 @@ const CSS = `
   .btn-yellow:hover { opacity: 0.85; }
 
   /* HERO */
-  .hero { padding: 150px 0 100px; position: relative; overflow: hidden; }
+  .hero { padding: 138px 0 64px; position: relative; overflow: hidden; }
   .hero-grid-bg { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(var(--border2) 1px, transparent 1px), linear-gradient(90deg, var(--border2) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%); }
   .hero-glow { position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 900px; height: 900px; pointer-events: none; background: radial-gradient(circle, rgba(245,197,24,0.06) 0%, transparent 65%); }
   .hero-inner { position: relative; z-index: 1; text-align: center; max-width: 860px; margin: 0 auto; }
-  .hero-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--yellow-dim); border: 1px solid rgba(245,197,24,0.2); border-radius: 100px; padding: 6px 16px; margin-bottom: 36px; font-family: var(--font-mono); font-size: 11px; color: var(--yellow); letter-spacing: 2px; text-transform: uppercase; }
+  .hero-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--yellow-dim); border: 1px solid rgba(245,197,24,0.2); border-radius: 100px; padding: 6px 16px; margin-bottom: 36px; font-family: var(--font-mono); font-size: 12px; color: var(--yellow); letter-spacing: 2px; text-transform: uppercase; }
   .hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .hero-h1 { font-family: var(--font-display); font-size: clamp(52px, 8vw, 110px); line-height: 0.9; letter-spacing: -1px; color: var(--text); margin-bottom: 28px; }
@@ -115,52 +115,98 @@ const CSS = `
   .hero-cta:hover { opacity: 0.85; }
   .hero-cta-ghost { font-family: var(--font-body); font-size: 15px; font-weight: 600; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 15px 28px; cursor: pointer; transition: border-color 0.2s; }
   .hero-cta-ghost:hover { border-color: rgba(255,255,255,0.3); }
-  .hero-proof { margin-top: 20px; font-family: var(--font-mono); font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+  .hero-proof { margin-top: 20px; font-family: var(--font-mono); font-size: 12px; color: var(--dim); letter-spacing: 1px; }
+  @media (max-width: 700px) { .hero { padding: 118px 0 48px; } }
 
   /* TICKER */
-  .ticker-section { padding: 32px 0; border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); overflow: hidden; background: black; }
-  .ticker-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); text-align: center; margin-bottom: 16px; }
-  .ticker-track { display: flex; align-items: center; gap: 18px; width: max-content; animation: ticker 32s linear infinite;}
-.ticker-track:hover { animation-play-state: paused;}
-.ticker-item { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 18px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; background: black; backdrop-filter: blur(8px); white-space: nowrap; flex-shrink: 0;}
-.ticker-icon { width: 70px; height: 70px; object-fit: contain; flex-shrink: 0;}
-.ticker-item span { font-family: var(--font-mono); font-size: 14px; font-weight:  500; color: white; letter-spacing: 0.8px;  line-height: 1;}
-.ticker-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--yellow); opacity: 0.5; flex-shrink: 0;}
-@keyframes ticker { from { transform: translateX(0);}  to { transform: translateX(-50%);}}
+  .ticker-section { padding: 46px 0 52px; border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); overflow: hidden; background: radial-gradient(circle at 50% 0%, rgba(245,197,24,0.09), transparent 34%), linear-gradient(180deg, #050506 0%, #0c0c12 100%); position: relative; }
+  .ticker-section::before,
+  .ticker-section::after { content: ''; position: absolute; top: 0; bottom: 0; width: 120px; z-index: 2; pointer-events: none; }
+  .ticker-section::before { left: 0; background: linear-gradient(90deg, #050506 0%, transparent 100%); }
+  .ticker-section::after { right: 0; background: linear-gradient(270deg, #050506 0%, transparent 100%); }
+  .ticker-head { text-align: center; margin-bottom: 24px; position: relative; z-index: 3; }
+  .ticker-label { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--yellow); background: var(--yellow-dim); border: 1px solid rgba(245,197,24,0.2); border-radius: 999px; padding: 7px 14px; margin-bottom: 14px; }
+  .ticker-label::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 18px rgba(245,197,24,0.6); }
+  .ticker-title { font-family: var(--font-display); font-size: clamp(36px, 4vw, 64px); line-height: 0.95; color: var(--text); }
+  .ticker-sub { margin-top: 8px; font-family: var(--font-body); font-size: 15px; color: var(--muted); }
+  .ticker-lanes { display: flex; flex-direction: column; gap: 14px; transform: rotate(-1deg); }
+  .ticker-track { display: flex; align-items: center; gap: 14px; width: max-content; animation: ticker 34s linear infinite; will-change: transform; }
+  .ticker-track.reverse { animation-name: ticker-reverse; animation-duration: 40s; transform: translateX(-50%); }
+  .ticker-lanes:hover .ticker-track { animation-play-state: paused; }
+  .ticker-item { display: flex; align-items: center; gap: 12px; min-width: 190px; padding: 12px 16px 12px 12px; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 16px; background: linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); box-shadow: 0 16px 42px rgba(0,0,0,0.32); backdrop-filter: blur(8px); white-space: nowrap; flex-shrink: 0; }
+  .ticker-icon-wrap { width: 58px; height: 58px; border-radius: 13px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.34); border: 1px solid rgba(245,197,24,0.12); flex-shrink: 0; }
+  .ticker-icon { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 8px 18px rgba(245,197,24,0.16));}
+  .ticker-item span { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: white; letter-spacing: 0; line-height: 1.15;}
+  @keyframes ticker { from { transform: translateX(0);} to { transform: translateX(-50%);} }
+  @keyframes ticker-reverse { from { transform: translateX(-50%);} to { transform: translateX(0);} }
+  @media (max-width: 600px) {
+    .ticker-section { padding: 36px 0 42px; }
+    .ticker-section::before,
+    .ticker-section::after { width: 52px; }
+    .ticker-lanes { gap: 10px; }
+    .ticker-item { min-width: 160px; padding: 10px 12px 10px 10px; }
+    .ticker-icon-wrap { width: 48px; height: 48px; }
+    .ticker-icon { width: 36px; height: 36px; }
+  }
 
   /* STATS */
   .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; }
   @media (max-width: 700px) { .stats-row { grid-template-columns: 1fr 1fr; } }
   .stat-cell { background: var(--card); padding: 40px 32px; text-align: center; }
   .stat-num { font-family: var(--font-display); font-size: 56px; color: var(--yellow); line-height: 1; letter-spacing: -2px; margin-bottom: 8px; }
-  .stat-label { font-family: var(--font-body); font-size: 14px; color: var(--muted); }
+  .stat-label { font-family: var(--font-body); font-size: 15px; color: var(--muted); }
 
   /* SECTION */
   .section { padding: 90px 0; }
-  .section-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--yellow); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .section-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--yellow); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
   .section-label::before { content: ''; width: 24px; height: 1px; background: var(--yellow); }
-  .section-h { font-family: var(--font-display); font-size: clamp(36px, 5vw, 64px); line-height: 0.93; color: var(--text); letter-spacing: -0.5px; margin-bottom: 16px; }
+  .section-h { font-family: var(--font-display); font-size: clamp(46px, 5vw, 104px); line-height: 0.93; color: var(--text); letter-spacing: -0.5px; margin-bottom: 16px; }
   .section-h .yellow { color: var(--yellow); }
   .section-sub { font-family: var(--font-body); font-size: 17px; color: var(--muted); line-height: 1.7; max-width: 520px; }
 
-  /* SERVICES GRID */
-  .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 60px; }
-  @media (max-width: 900px) { .services-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 600px) { .services-grid { grid-template-columns: 1fr; } }
-  .service-card { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; transition: border-color 0.25s, transform 0.25s; cursor: default; }
+  /* SERVICES */
+  .services-grid { display: flex; flex-direction: column; gap: 70px; margin-top: 70px; }
+  .service-section { display: flex; flex-direction: column; gap: 24px; }
+  .service-header { max-width: 90%; }
+  .service-heading-row { display: flex; align-items: center; gap: 18px; margin-bottom: 16px; }
+  .service-heading-icon { width: 58px; height: 58px; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--card); font-size: 28px; flex-shrink: 0; }
+  .service-tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--yellow); margin-bottom: 16px; }
+  .service-title { font-family: var(--font-display); font-size: clamp(24px, 3vw, 48px); font-weight: 400; color: var(--text); line-height: 0.95; }
+  .service-desc { font-family: var(--font-body); font-size: 17px; color: var(--muted); line-height: 1.75; max-width: 100%; }
+  .service-card { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; padding: 18px; transition: border-color 0.25s, transform 0.25s; cursor: default; }
   .service-card:hover { border-color: rgba(245,197,24,0.25); transform: translateY(-3px); }
-  .service-card-preview { height: 180px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-  .service-card-body { padding: 20px 24px 24px; }
-  .service-tag { font-family: var(--font-mono); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--yellow); margin-bottom: 8px; }
-  .service-title { font-family: var(--font-body); font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
-  .service-desc { font-family: var(--font-body); font-size: 13px; color: var(--muted); line-height: 1.65; }
-  .service-card-wide { grid-column: span 2; }
-  @media (max-width: 600px) { .service-card-wide { grid-column: span 1; } }
+  .service-samples-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 14px; min-height: 300px; }
+  .sample-slot { min-height: 300px; border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; background: rgba(0,0,0,0.18); }
+  .service-card img,
+  .service-card video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  @media (max-width: 900px) {
+    .services-grid { gap: 56px; }
+    .service-samples-row { gap: 10px; min-height: 220px; }
+    .sample-slot { min-height: 220px; border-radius: 10px; }
+  }
+  @media (max-width: 600px) {
+    .services-grid { gap: 44px; margin-top: 42px; }
+    .service-card { padding: 12px; }
+    .service-heading-row { gap: 12px; margin-bottom: 12px; }
+    .service-heading-icon { width: 48px; height: 48px; border-radius: 12px; font-size: 24px; }
+    .service-samples-row { gap: 6px; min-height: 120px; }
+    .sample-slot { min-height: 120px; border-radius: 8px; }
+    .service-desc { font-size: 15px; }
+  }
 
   /* SAMPLE PLACEHOLDER */
-  .sample-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #13131f, #0e0e18); }
-  .sample-icon { font-size: 32px; opacity: 0.5; }
-  .sample-label { font-family: var(--font-mono); font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+  .sample-placeholder { width: 100%; min-height: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: linear-gradient(135deg, rgba(19,19,31,0.72), rgba(14,14,24,0.94)); }
+  .sample-icon { font-size: 46px; opacity: 0.38; }
+  .sample-label { font-family: var(--font-mono); font-size: 11px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+  @media (max-width: 900px) {
+    .sample-icon { font-size: 32px; }
+    .sample-label { font-size: 9px; letter-spacing: 0.5px; text-align: center; padding: 0 4px; }
+  }
+  @media (max-width: 600px) {
+    .sample-placeholder { gap: 0; }
+    .sample-icon { font-size: 18px; }
+    .sample-label { display: none; }
+  }
 
   /* HOW IT WORKS */
   .process { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; margin-top: 60px; }
@@ -180,41 +226,75 @@ const CSS = `
   .audience-card:hover { border-color: rgba(245,197,24,0.2); }
   .audience-icon { font-size: 28px; margin-bottom: 14px; }
   .audience-title { font-family: var(--font-body); font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-  .audience-desc { font-family: var(--font-body); font-size: 14px; color: var(--muted); line-height: 1.65; }
+  .audience-desc { font-family: var(--font-body); font-size: 15px; color: var(--muted); line-height: 1.65; }
   .audience-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-  .audience-tag { font-family: var(--font-mono); font-size: 10px; color: var(--yellow); background: var(--yellow-dim); border: 1px solid rgba(245,197,24,0.15); border-radius: 100px; padding: 3px 10px; }
+  .audience-tag { font-family: var(--font-mono); font-size: 11px; color: var(--yellow); background: var(--yellow-dim); border: 1px solid rgba(245,197,24,0.15); border-radius: 100px; padding: 3px 10px; }
 
   /* COMPARE */
-  .compare-table { margin-top: 50px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .compare-layout { display: grid; grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr); gap: 56px; align-items: start; }
+  .compare-intro { position: sticky; top: 92px; }
+  .compare-intro .section-sub { max-width: 460px; }
+  .compare-table { margin-top: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
   .compare-row { display: grid; grid-template-columns: 1fr 120px 120px; border-bottom: 1px solid var(--border2); }
   .compare-row:last-child { border-bottom: none; }
   .compare-row.header { background: var(--card2); }
-  .compare-cell { padding: 16px 20px; font-family: var(--font-body); font-size: 14px; color: var(--muted); display: flex; align-items: center; }
-  .compare-cell.header { font-family: var(--font-mono); font-size: 11px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+  .compare-cell { padding: 12px 20px; font-family: var(--font-body); font-size: 15px; color: var(--muted); display: flex; align-items: center; }
+  .compare-cell.header { font-family: var(--font-mono); font-size: 12px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
   .compare-cell.center { justify-content: center; text-align: center; }
   .compare-cell.vidquence { color: var(--yellow); font-weight: 700; }
   .check { color: #22c55e; font-size: 16px; }
   .cross { color: #444; font-size: 16px; }
+  @media (max-width: 980px) {
+    .compare-layout { grid-template-columns: 1fr; gap: 36px; }
+    .compare-intro { position: static; }
+    .compare-intro .section-sub { max-width: 620px; }
+  }
+  @media (max-width: 600px) {
+    .compare-row { grid-template-columns: minmax(0, 1fr) 82px 92px; }
+    .compare-cell { padding: 14px 12px; font-size: 14px; }
+    .compare-cell.header { font-size: 11px; }
+  }
 
   /* PRICING */
   .pricing-grid { display: grid; gap: 16px; margin-top: 50px; }
-  .plan { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); padding: 36px 32px; position: relative; transition: border-color 0.2s, transform 0.2s; }
-  .plan:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
-  .plan-hot { border-color: rgba(245,197,24,0.35) !important; }
-  .plan-hot-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0b0b10; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 4px 16px; border-radius: 100px; white-space: nowrap; }
-  .plan-name { font-family: var(--font-body); font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+  .plan { background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(17,17,24,0.98)); border: 1px solid var(--border2); border-radius: var(--radius); padding: 28px; position: relative; overflow: hidden; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s; }
+  .plan::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 78% 12%, rgba(245,197,24,0.09), transparent 34%); opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+  .plan:hover { border-color: rgba(245,197,24,0.28); transform: translateY(-6px); box-shadow: 0 24px 80px rgba(0,0,0,0.38); }
+  .plan:hover::before { opacity: 1; }
+  .plan-hot { border-color: rgba(245,197,24,0.45) !important; box-shadow: 0 0 0 1px rgba(245,197,24,0.12) inset; }
+  .plan-hot-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0b0b10; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 5px 18px; border-radius: 100px; white-space: nowrap; z-index: 2; }
+  .plan-visual { height: 98px; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; margin-bottom: 24px; padding: 14px; position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(245,197,24,0.12), rgba(255,255,255,0.03)); }
+  .plan-visual::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.055) 1px, transparent 1px); background-size: 22px 22px; opacity: 0.45; }
+  .plan-visual-bars { position: absolute; left: 14px; right: 14px; bottom: 14px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 54px; }
+  .plan-visual-bars span { display: block; border-radius: 999px 999px 5px 5px; background: linear-gradient(180deg, var(--yellow), rgba(245,197,24,0.18)); min-height: 14px; opacity: 0.86; transform-origin: bottom; transition: transform 0.25s, opacity 0.25s; }
+  .plan:hover .plan-visual-bars span { transform: scaleY(1.08); opacity: 1; }
+  .plan-visual-pill { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 6px 10px; background: rgba(0,0,0,0.34); border: 1px solid rgba(245,197,24,0.16); font-family: var(--font-mono); font-size: 11px; color: var(--yellow); letter-spacing: 1px; text-transform: uppercase; }
+  .plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
+  .plan-name { font-family: var(--font-body); font-size: 14px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+  .plan-mini-chip { border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 5px 9px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); white-space: nowrap; background: rgba(255,255,255,0.035); }
   .plan-price { font-family: var(--font-display); font-size: 64px; color: var(--text); line-height: 1; letter-spacing: -2px; }
   .plan-price span { font-size: 28px; color: var(--muted); vertical-align: top; margin-top: 12px; display: inline-block; }
-  .plan-cycle { font-family: var(--font-body); font-size: 13px; color: var(--dim); margin-bottom: 4px; }
-  .plan-hr { border: none; border-top: 1px solid var(--border2); margin: 24px 0; }
+  .plan-cycle { font-family: var(--font-body); font-size: 14px; color: var(--dim); margin-bottom: 4px; }
+  .plan-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 18px 0; }
+  .plan-stat { border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px; background: rgba(255,255,255,0.035); }
+  .plan-stat strong { display: block; font-family: var(--font-body); font-size: 15px; color: var(--text); line-height: 1.1; }
+  .plan-stat span { display: block; margin-top: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+  .plan-meter { height: 9px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 8px 0 24px; }
+  .plan-meter-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(245,197,24,0.58), var(--yellow)); transition: width 0.25s; }
+  .plan-hr { border: none; border-top: 1px solid var(--border2); margin: 22px 0; }
   .plan-feats { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-  .plan-feats li { font-family: var(--font-body); font-size: 14px; color: var(--muted); display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
+  .plan-feats li { font-family: var(--font-body); font-size: 15px; color: var(--muted); display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
   .plan-feats li::before { content: '✓'; color: var(--yellow); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
-  .plan-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; cursor: pointer; font-family: var(--font-body); font-size: 14px; font-weight: 700; transition: opacity 0.2s; }
+  .plan-btn { width: 100%; padding: 15px; border-radius: 10px; border: none; cursor: pointer; font-family: var(--font-body); font-size: 15px; font-weight: 800; transition: transform 0.2s, opacity 0.2s, background 0.2s; position: relative; z-index: 1; }
+  .plan:hover .plan-btn { transform: translateY(-1px); }
   .plan-btn-default { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
   .plan-btn-default:hover { background: rgba(255,255,255,0.1); }
   .plan-btn-hot { background: var(--yellow); color: #0b0b10; }
   .plan-btn-hot:hover { opacity: 0.85; }
+  @media (max-width: 760px) {
+    .pricing-grid { grid-template-columns: 1fr !important; }
+    .plan { padding: 24px; }
+  }
 
   /* FAQ */
   .faq-section { padding: 90px 0; background: var(--bg2); border-top: 1px solid var(--border2); }
@@ -233,9 +313,9 @@ const CSS = `
   .footer { border-top: 1px solid var(--border2); padding: 48px 0; }
   .footer-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
   .footer-links { display: flex; gap: 28px; flex-wrap: wrap; }
-  .footer-link { font-family: var(--font-body); font-size: 13px; color: var(--dim); text-decoration: none; transition: color 0.2s; }
+  .footer-link { font-family: var(--font-body); font-size: 14px; color: var(--dim); text-decoration: none; transition: color 0.2s; }
   .footer-link:hover { color: var(--muted); }
-  .footer-copy { font-family: var(--font-mono); font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+  .footer-copy { font-family: var(--font-mono); font-size: 12px; color: var(--dim); letter-spacing: 1px; }
 
   [data-reveal] { opacity: 0; transform: translateY(20px) scale(0.99); transition: opacity 0.65s ease, transform 0.65s ease; }
 `;
@@ -304,6 +384,16 @@ export default function LandingPage() {
     { icon: "/icons/speech-to-text.png", text: "Speech to Text" },
   ];
 
+  const defaultServiceSamples = [
+    { type: "image", src: "/samples/image1.jpg" },
+    { type: "video", src: "/samples/video1.mp4", poster: "/samples/image1.jpg" },
+    { type: "image", src: "/samples/image1.jpg" },
+    { type: "video", src: "/samples/video1.mp4", poster: "/samples/image1.jpg" },
+    { type: "image", src: "/samples/image1.jpg" },
+    { type: "video", src: "/samples/video1.mp4", poster: "/samples/image1.jpg" },
+    { type: "image", src: "/samples/image1.jpg" },
+  ];
+
   const faqs = [
     {
       q: "How is Vidquence different from other AI video tools?",
@@ -351,10 +441,9 @@ export default function LandingPage() {
     {
       tag: "Video",
       title: "AI Video Generator",
-      desc: "Type a topic. Get a fully produced short-form video — scripted, visualized, voiced, and scored. 17 niches, 90+ layouts.",
+      desc: "Type a topic. Get a fully produced short-form video — scripted, visualized, voiced, edit or export ready.",
       icon: "🎬",
       bg: "linear-gradient(135deg, rgba(245,197,24,0.08), rgba(245,197,24,0.02))",
-      wide: false,
     },
     {
       tag: "Advertising",
@@ -362,7 +451,6 @@ export default function LandingPage() {
       desc: "Upload one product photo. Get a cinematic 5-scene video ad with AI model, transitions, and background music.",
       icon: "🛍️",
       bg: "linear-gradient(135deg, rgba(124,92,252,0.1), rgba(124,92,252,0.02))",
-      wide: false,
     },
     {
       tag: "Try-On",
@@ -370,7 +458,6 @@ export default function LandingPage() {
       desc: "Upload a garment and a model photo. AI dresses the model in your outfit instantly. Perfect for fashion brands.",
       icon: "👗",
       bg: "linear-gradient(135deg, rgba(236,72,153,0.08), rgba(236,72,153,0.02))",
-      wide: false,
     },
     {
       tag: "Social Media",
@@ -378,7 +465,6 @@ export default function LandingPage() {
       desc: "Generate ready-to-post graphics for Instagram, Facebook, and LinkedIn. Upload your brand logo and pick your colors.",
       icon: "📱",
       bg: "linear-gradient(135deg, rgba(56,189,248,0.08), rgba(56,189,248,0.02))",
-      wide: false,
     },
     {
       tag: "Thumbnails",
@@ -386,7 +472,6 @@ export default function LandingPage() {
       desc: "AI-generated clickbait-style thumbnails for YouTube and Reels. GPT-4o crafts the perfect visual strategy first.",
       icon: "🖼",
       bg: "linear-gradient(135deg, rgba(251,146,60,0.08), rgba(251,146,60,0.02))",
-      wide: false,
     },
     {
       tag: "Branding",
@@ -394,7 +479,6 @@ export default function LandingPage() {
       desc: "Turn any product photo into a premium commercial poster ad. Luxury brand quality in seconds.",
       icon: "🎨",
       bg: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.02))",
-      wide: false,
     },
     {
       tag: "Audio",
@@ -402,7 +486,6 @@ export default function LandingPage() {
       desc: "9 natural AI voices. Generate voiceovers for any content in seconds. Multilingual support.",
       icon: "🎙",
       bg: "linear-gradient(135deg, rgba(245,197,24,0.06), rgba(245,197,24,0.01))",
-      wide: false,
     },
     {
       tag: "Captions",
@@ -410,7 +493,6 @@ export default function LandingPage() {
       desc: "Upload your talking head video. Transcribe, style, and export with viral caption overlays in 10 styles.",
       icon: "💬",
       bg: "linear-gradient(135deg, rgba(124,92,252,0.07), rgba(124,92,252,0.01))",
-      wide: false,
     },
     {
       tag: "Transcription",
@@ -418,7 +500,6 @@ export default function LandingPage() {
       desc: "Upload any audio or video. Get an accurate transcript with timestamps. Export as SRT or plain text.",
       icon: "📝",
       bg: "linear-gradient(135deg, rgba(56,189,248,0.06), rgba(56,189,248,0.01))",
-      wide: false,
     },
   ];
 
@@ -489,20 +570,38 @@ export default function LandingPage() {
 
       {/* TICKER */}
       <div className="ticker-section">
-        <div className="ticker-label">What's inside</div>
+        <div className="ticker-head">
+          <div className="ticker-label">What's inside</div>
+          <div className="ticker-title">One Studio. Every Format.</div>
+          <div className="ticker-sub">Video, design, voice, captions, product ads, and launch-ready visuals.</div>
+        </div>
 
-        <div className="ticker-track">
-          {[...tickerItems, ...tickerItems, ...tickerItems].map((item, i) => (
-            <div key={i} className="ticker-item">
-              <img src={item.icon} alt={item.text} className="ticker-icon" />
-              <span>{item.text}</span>
-            </div>
-          ))}
+        <div className="ticker-lanes" aria-label="Vidquence creative tools">
+          <div className="ticker-track">
+            {[...tickerItems, ...tickerItems, ...tickerItems].map((item, i) => (
+              <div key={i} className="ticker-item">
+                <div className="ticker-icon-wrap">
+                  <img src={item.icon} alt="" className="ticker-icon" />
+                </div>
+                <span>{item.text}</span>
+              </div>
+            ))}
+          </div>
+          <div className="ticker-track reverse" aria-hidden="true">
+            {[...tickerItems].reverse().concat([...tickerItems].reverse(), [...tickerItems].reverse()).map((item, i) => (
+              <div key={i} className="ticker-item">
+                <div className="ticker-icon-wrap">
+                  <img src={item.icon} alt="" className="ticker-icon" />
+                </div>
+                <span>{item.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* STATS */}
-      <section className="section" style={{ paddingBottom: 0 }}>
+      <section className="section hidden" style={{ paddingBottom: 0 }}>
         <div className="container">
           <div className="stats-row" data-reveal>
             <div className="stat-cell">
@@ -540,18 +639,45 @@ export default function LandingPage() {
 
           <div className="services-grid" data-reveal>
             {services.map((svc, i) => (
-              <div key={i} className={`service-card${svc.wide ? " service-card-wide" : ""}`}>
-                <div className="service-card-preview" style={{ background: svc.bg }}>
-                  {/* Sample placeholder — replace with actual sample images/videos */}
-                  <div className="sample-placeholder">
-                    <div className="sample-icon">{svc.icon}</div>
-                    <div className="sample-label">Sample coming soon</div>
-                  </div>
-                </div>
-                <div className="service-card-body">
+              <div key={i} className="service-section">
+                <div className="service-header">
                   <div className="service-tag">{svc.tag}</div>
-                  <div className="service-title">{svc.title}</div>
+                  <div className="service-heading-row">
+                    <div className="service-heading-icon">{svc.icon}</div>
+                    <div className="service-title">{svc.title}</div>
+                  </div>
                   <div className="service-desc">{svc.desc}</div>
+                </div>
+                <div className="service-card" style={{ background: svc.bg }}>
+                  {/* Sample placeholder — replace with actual sample images/videos */}
+                  <div className="service-samples-row">
+                    {(svc.samples || defaultServiceSamples).map((media, sample) => (
+                      <div key={sample} className="sample-slot">
+                        {media.type === "video" ? (
+                          <video
+                            src={media.src}
+                            poster={media.poster}
+                            muted
+                            loop
+                            playsInline
+                            preload="metadata"
+                            onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.pause();
+                              e.currentTarget.currentTime = 0;
+                            }}
+                          />
+                        ) : media.type === "image" ? (
+                          <img src={media.src} alt={`${svc.title} sample ${sample + 1}`} loading="lazy" />
+                        ) : (
+                          <div className="sample-placeholder">
+                            <div className="sample-icon">{svc.icon}</div>
+                            <div className="sample-label">Sample coming soon</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
@@ -667,26 +793,29 @@ export default function LandingPage() {
       {/* VS COMPETITORS */}
       <section className="section">
         <div className="container">
-          <div className="section-label">Why Vidquence</div>
-          <h2 className="section-h">
-            One tool.
-            <br />
-            <span className="yellow">Not six.</span>
-          </h2>
-          <p className="section-sub">
-            Most teams spend $200+/mo on separate tools for video, design, voice, and captions. Vidquence replaces all
-            of them.
-          </p>
-
-          <div className="compare-table" data-reveal>
-            <div className="compare-row header">
-              <div className="compare-cell header">Feature</div>
-              <div className="compare-cell header center">Others</div>
-              <div className="compare-cell header center" style={{ color: "var(--yellow)" }}>
-                Vidquence
-              </div>
+          <div className="compare-layout">
+            <div className="compare-intro">
+              <div className="section-label">Why Vidquence</div>
+              <h2 className="section-h">
+                One tool.
+                <br />
+                <span className="yellow">Not 10.</span>
+              </h2>
+              <p className="section-sub">
+                Most teams spend $200+/mo on separate tools for video, design, voice, and captions. Vidquence replaces
+                all of them.
+              </p>
             </div>
-            {[
+
+            <div className="compare-table" data-reveal>
+              <div className="compare-row header">
+                <div className="compare-cell header">Feature</div>
+                <div className="compare-cell header center">Others</div>
+                <div className="compare-cell header center" style={{ color: "var(--yellow)" }}>
+                  Vidquence
+                </div>
+              </div>
+              {[
               ["AI Video Generation", false, true],
               ["Product Video Ads", false, true],
               ["Virtual Try-On for Clothing", false, true],
@@ -700,14 +829,14 @@ export default function LandingPage() {
               ["All in one dashboard", false, true],
             ].map(([feat, others, ours], i) => (
               <div key={i} className="compare-row">
-                <div className="compare-cell" style={{ color: "var(--muted)", fontSize: 14 }}>
+                <div className="compare-cell" style={{ color: "var(--muted)", fontSize: 15 }}>
                   {feat}
                 </div>
                 <div className="compare-cell center">
                   {others === false ? (
                     <span className="cross">✕</span>
                   ) : (
-                    <span style={{ fontSize: 12, color: "var(--dim)" }}>{others}</span>
+                    <span style={{ fontSize: 13, color: "var(--dim)" }}>{others}</span>
                   )}
                 </div>
                 <div className="compare-cell center vidquence">
@@ -717,6 +846,7 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
+      </div>
       </section>
 
       {/* PRICING */}
@@ -754,7 +884,7 @@ export default function LandingPage() {
                     borderRadius: 7,
                     border: "none",
                     cursor: "pointer",
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 700,
                     fontFamily: "var(--font-body)",
                     background: cycle === c ? "var(--yellow)" : "transparent",
@@ -765,7 +895,7 @@ export default function LandingPage() {
                   {c === "monthly" ? "Monthly" : "Annual"}
                   {c === "annual" && (
                     <span
-                      style={{ fontSize: 10, marginLeft: 5, color: cycle === "annual" ? "#0b0b10" : "var(--yellow)" }}
+                      style={{ fontSize: 11, marginLeft: 5, color: cycle === "annual" ? "#0b0b10" : "var(--yellow)" }}
                     >
                       Save more
                     </span>
@@ -773,7 +903,7 @@ export default function LandingPage() {
                 </button>
               ))}
             </div>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)" }}>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--dim)" }}>
               Live rate: 1 USD = ₹{rate.toFixed(2)}
             </div>
           </div>
@@ -781,11 +911,11 @@ export default function LandingPage() {
           <div
             className="pricing-grid"
             data-reveal
-            style={{ gridTemplateColumns: `repeat(${Math.min(plans.length || 3, 3)}, 1fr)` }}
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}
           >
             {plans.length === 0
               ? [0, 1, 2].map((i) => <div key={i} className="plan" style={{ opacity: 0.3, minHeight: 320 }} />)
-              : plans.map((plan) => {
+              : plans.map((plan, planIndex) => {
                   const monthly = plan.price_monthly;
                   const discount = plan.discount_percent || 0;
                   const annualTotal = Math.round(monthly * 12 * (1 - discount / 100));
@@ -794,10 +924,26 @@ export default function LandingPage() {
                   const hasDiscount = cycle === "annual" && discount > 0;
                   const inr = toINR(usd, rate);
                   const feats = Array.isArray(plan.features) ? plan.features : [];
+                  const creditsText = feats.find((f) => /credits/i.test(f)) || "All services";
+                  const videosText = feats.find((f) => /videos?/i.test(f)) || "Fast exports";
+                  const productText = feats.find((f) => /product/i.test(f)) || "Creative tools";
+                  const meterWidth = `${Math.min(100, 42 + planIndex * 24)}%`;
+                  const barHeights = [28, 42, 34, 56, 46, 64, 38].map((h) => `${Math.min(88, h + planIndex * 7)}%`);
                   return (
                     <div key={plan.id} className={`plan${plan.is_popular ? " plan-hot" : ""}`}>
                       {plan.is_popular && <div className="plan-hot-badge">Most Popular</div>}
-                      <div className="plan-name">{plan.name}</div>
+                      <div className="plan-visual" aria-hidden="true">
+                        <div className="plan-visual-pill">{plan.is_popular ? "Best value" : "Creator stack"}</div>
+                        <div className="plan-visual-bars">
+                          {barHeights.map((height, i) => (
+                            <span key={i} style={{ height }} />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="plan-head">
+                        <div className="plan-name">{plan.name}</div>
+                        <div className="plan-mini-chip">{cycle === "annual" ? "Annual" : "Monthly"}</div>
+                      </div>
                       {cycle === "annual" ? (
                         <div style={{ marginBottom: 16 }}>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
@@ -829,7 +975,7 @@ export default function LandingPage() {
                                   background: "rgba(245,197,24,0.15)",
                                   color: "var(--yellow)",
                                   fontFamily: "var(--font-mono)",
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: 700,
                                   letterSpacing: "0.05em",
                                   padding: "2px 8px",
@@ -841,7 +987,7 @@ export default function LandingPage() {
                             )}
                           </div>
                           <div
-                            style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)", marginTop: 4 }}
+                            style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--dim)", marginTop: 4 }}
                           >
                             ≈ ₹{toINR(annualTotal, rate)}/yr · ${annualPerMo}/mo
                           </div>
@@ -855,11 +1001,27 @@ export default function LandingPage() {
                           <div className="plan-cycle" style={{ marginBottom: 2 }}>
                             per month
                           </div>
-                          <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--dim)" }}>
+                          <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--dim)" }}>
                             ≈ ₹{inr}/mo
                           </div>
                         </div>
                       )}
+                      <div className="plan-stats">
+                        <div className="plan-stat">
+                          <strong>{creditsText.replace("/month", "/mo")}</strong>
+                          <span>Included</span>
+                        </div>
+                        <div className="plan-stat">
+                          <strong>{videosText}</strong>
+                          <span>Output</span>
+                        </div>
+                      </div>
+                      <div className="plan-meter" aria-hidden="true">
+                        <div className="plan-meter-fill" style={{ width: meterWidth }} />
+                      </div>
+                      <div className="plan-mini-chip" style={{ display: "inline-flex", marginBottom: 4 }}>
+                        {productText}
+                      </div>
                       <div className="plan-hr" />
                       <ul className="plan-feats">
                         {feats.map((f, i) => (
@@ -882,7 +1044,7 @@ export default function LandingPage() {
               marginTop: 24,
               textAlign: "center",
               fontFamily: "var(--font-mono)",
-              fontSize: 11,
+              fontSize: 12,
               color: "var(--dim)",
               letterSpacing: 1,
             }}

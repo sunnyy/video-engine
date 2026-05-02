@@ -10,7 +10,7 @@
 export const BLOCK_FONTS = {
   bebas:     "'Bebas Neue', sans-serif",
   outfit:    "'Outfit', sans-serif",
-  outfit:    "'Outfit', sans-serif",
+  syne:      "'Outfit', sans-serif",
   playfair:  "'Playfair Display', serif",
   mono:      "'JetBrains Mono', monospace",
   dm:        "'DM Sans', sans-serif",
