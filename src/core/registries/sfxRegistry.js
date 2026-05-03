@@ -3,13 +3,14 @@
  * src/core/registries/sfxRegistry.js
  *
  * Full metadata on every SFX so the director picks by intent + energy + niche.
- * Tracks marked file: null are placeholders — source audio and drop into /public/sfx/
+ * Audio files are stored in Supabase Storage (media/sfx/) and managed via /admin/sfx.
  *
  * Sources:
  *   freesound.org
  *   pixabay.com/sound-effects
  *   zapsplat.com
  */
+import { supabase } from "../../lib/supabase";
 
 export const SFX_LIBRARY = {
 
@@ -17,7 +18,6 @@ export const SFX_LIBRARY = {
 
   cash_register: {
     label:    "Cash Register",
-    file:     "cash-register.mp3",
     duration: 1.2,
     energy:   "medium",
     mood:     "positive",
@@ -26,7 +26,6 @@ export const SFX_LIBRARY = {
   },
   cinematic_boom: {
     label:    "Cinematic Boom",
-    file:     "cinematic_boom.mp3",
     duration: 2.0,
     energy:   "high",
     mood:     "dramatic",
@@ -35,7 +34,6 @@ export const SFX_LIBRARY = {
   },
   cinematic_impact: {
     label:    "Cinematic Impact",
-    file:     "cinematic_impact.mp3",
     duration: 1.5,
     energy:   "high",
     mood:     "dramatic",
@@ -44,7 +42,6 @@ export const SFX_LIBRARY = {
   },
   classic_ding: {
     label:    "Classic Ding",
-    file:     "classic_ding.mp3",
     duration: 0.8,
     energy:   "low",
     mood:     "positive",
@@ -53,7 +50,6 @@ export const SFX_LIBRARY = {
   },
   click: {
     label:    "Click",
-    file:     "click.mp3",
     duration: 0.2,
     energy:   "low",
     mood:     "neutral",
@@ -62,7 +58,6 @@ export const SFX_LIBRARY = {
   },
   countdown_beep: {
     label:    "Countdown Beep",
-    file:     "countdown_beep.mp3",
     duration: 0.5,
     energy:   "medium",
     mood:     "tense",
@@ -71,7 +66,6 @@ export const SFX_LIBRARY = {
   },
   crowd_cheer: {
     label:    "Crowd Cheer",
-    file:     "crowd_cheer_short.mp3",
     duration: 1.5,
     energy:   "high",
     mood:     "positive",
@@ -80,7 +74,6 @@ export const SFX_LIBRARY = {
   },
   error_buzz: {
     label:    "Error Buzz",
-    file:     "error_buzz.mp3",
     duration: 0.6,
     energy:   "medium",
     mood:     "negative",
@@ -89,7 +82,6 @@ export const SFX_LIBRARY = {
   },
   glitch_long: {
     label:    "Glitch Long",
-    file:     "glitch_long.mp3",
     duration: 1.2,
     energy:   "high",
     mood:     "chaotic",
@@ -98,7 +90,6 @@ export const SFX_LIBRARY = {
   },
   glitch_short: {
     label:    "Glitch Short",
-    file:     "glitch_short.mp3",
     duration: 0.4,
     energy:   "medium",
     mood:     "chaotic",
@@ -107,7 +98,6 @@ export const SFX_LIBRARY = {
   },
   great_success: {
     label:    "Great Success",
-    file:     "great_success.mp3",
     duration: 2.0,
     energy:   "high",
     mood:     "positive",
@@ -116,7 +106,6 @@ export const SFX_LIBRARY = {
   },
   ground_impact: {
     label:    "Ground Impact",
-    file:     "ground_impact.mp3",
     duration: 1.0,
     energy:   "high",
     mood:     "dramatic",
@@ -125,7 +114,6 @@ export const SFX_LIBRARY = {
   },
   impact: {
     label:    "Impact",
-    file:     "impact.mp3",
     duration: 0.8,
     energy:   "high",
     mood:     "dramatic",
@@ -134,7 +122,6 @@ export const SFX_LIBRARY = {
   },
   notification: {
     label:    "Notification",
-    file:     "notification_ding.mp3",
     duration: 0.6,
     energy:   "low",
     mood:     "neutral",
@@ -143,7 +130,6 @@ export const SFX_LIBRARY = {
   },
   pop_hard: {
     label:    "Pop Hard",
-    file:     "pop_hard.mp3",
     duration: 0.3,
     energy:   "medium",
     mood:     "playful",
@@ -152,7 +138,6 @@ export const SFX_LIBRARY = {
   },
   pop_soft: {
     label:    "Pop Soft",
-    file:     "pop_soft.mp3",
     duration: 0.3,
     energy:   "low",
     mood:     "playful",
@@ -161,7 +146,6 @@ export const SFX_LIBRARY = {
   },
   soft_hit: {
     label:    "Soft Hit",
-    file:     "soft_hit.mp3",
     duration: 0.5,
     energy:   "low",
     mood:     "neutral",
@@ -170,7 +154,6 @@ export const SFX_LIBRARY = {
   },
   tick_clock: {
     label:    "Tick Clock",
-    file:     "tick_clock.mp3",
     duration: 0.2,
     energy:   "low",
     mood:     "tense",
@@ -179,7 +162,6 @@ export const SFX_LIBRARY = {
   },
   tick_digital: {
     label:    "Tick Digital",
-    file:     "tick_digital.mp3",
     duration: 0.2,
     energy:   "low",
     mood:     "neutral",
@@ -188,7 +170,6 @@ export const SFX_LIBRARY = {
   },
   whoosh: {
     label:    "Whoosh",
-    file:     "whoosh.mp3",
     duration: 0.7,
     energy:   "medium",
     mood:     "kinetic",
@@ -196,14 +177,10 @@ export const SFX_LIBRARY = {
     intent:   ["hook", "reveal", "escalate"],
   },
 
-  // ── NEW SFX PLACEHOLDERS ──────────────────────────────────
-  // Source these from freesound.org or pixabay.com/sound-effects
-  // Drop files into /public/sfx/ with matching filename
+  // ── SPIRITUAL / DEVOTIONAL ────────────────────────────────
 
-  // ── Spiritual / Devotional ────────────────────────────────
   bell_temple: {
     label:    "Temple Bell",
-    file:     null, // source: freesound.org — search "temple bell"
     duration: 2.5,
     energy:   "low",
     mood:     "peaceful",
@@ -212,7 +189,6 @@ export const SFX_LIBRARY = {
   },
   om_bell: {
     label:    "Om Bell",
-    file:     null, // source: freesound.org — search "singing bowl"
     duration: 3.0,
     energy:   "low",
     mood:     "transcendent",
@@ -221,7 +197,6 @@ export const SFX_LIBRARY = {
   },
   chime_soft: {
     label:    "Soft Chime",
-    file:     null, // source: pixabay.com/sound-effects — search "soft chime"
     duration: 1.0,
     energy:   "low",
     mood:     "peaceful",
@@ -229,10 +204,10 @@ export const SFX_LIBRARY = {
     intent:   ["visual_rest", "empathy", "proof"],
   },
 
-  // ── Finance / Business ────────────────────────────────────
+  // ── FINANCE / BUSINESS ────────────────────────────────────
+
   stock_up: {
     label:    "Stock Up",
-    file:     null, // source: freesound.org — search "stock market up"
     duration: 0.8,
     energy:   "medium",
     mood:     "positive",
@@ -241,7 +216,6 @@ export const SFX_LIBRARY = {
   },
   coin_drop: {
     label:    "Coin Drop",
-    file:     null, // source: freesound.org — search "coin drop"
     duration: 0.6,
     energy:   "low",
     mood:     "positive",
@@ -250,7 +224,6 @@ export const SFX_LIBRARY = {
   },
   keyboard_type: {
     label:    "Keyboard Type",
-    file:     null, // source: freesound.org — search "keyboard typing"
     duration: 0.4,
     energy:   "low",
     mood:     "neutral",
@@ -258,10 +231,10 @@ export const SFX_LIBRARY = {
     intent:   ["explanation", "proof", "stat"],
   },
 
-  // ── Gaming ────────────────────────────────────────────────
+  // ── GAMING ────────────────────────────────────────────────
+
   game_win: {
     label:    "Game Win",
-    file:     null, // source: freesound.org — search "game win jingle"
     duration: 1.5,
     energy:   "high",
     mood:     "triumphant",
@@ -270,7 +243,6 @@ export const SFX_LIBRARY = {
   },
   game_over: {
     label:    "Game Over",
-    file:     null, // source: freesound.org — search "game over"
     duration: 1.2,
     energy:   "medium",
     mood:     "negative",
@@ -279,7 +251,6 @@ export const SFX_LIBRARY = {
   },
   power_up: {
     label:    "Power Up",
-    file:     null, // source: pixabay.com/sound-effects — search "power up"
     duration: 0.8,
     energy:   "high",
     mood:     "positive",
@@ -288,7 +259,6 @@ export const SFX_LIBRARY = {
   },
   laser: {
     label:    "Laser",
-    file:     null, // source: freesound.org — search "laser zap"
     duration: 0.3,
     energy:   "medium",
     mood:     "futuristic",
@@ -296,10 +266,10 @@ export const SFX_LIBRARY = {
     intent:   ["hook", "contrast", "shock"],
   },
 
-  // ── Food / Lifestyle ──────────────────────────────────────
+  // ── FOOD / LIFESTYLE ──────────────────────────────────────
+
   sizzle: {
     label:    "Sizzle",
-    file:     null, // source: freesound.org — search "cooking sizzle"
     duration: 1.5,
     energy:   "medium",
     mood:     "appetizing",
@@ -308,7 +278,6 @@ export const SFX_LIBRARY = {
   },
   bite_crunch: {
     label:    "Bite Crunch",
-    file:     null, // source: freesound.org — search "food crunch"
     duration: 0.4,
     energy:   "medium",
     mood:     "playful",
@@ -317,7 +286,6 @@ export const SFX_LIBRARY = {
   },
   cork_pop: {
     label:    "Cork Pop",
-    file:     null, // source: freesound.org — search "cork pop"
     duration: 0.5,
     energy:   "medium",
     mood:     "celebratory",
@@ -325,10 +293,10 @@ export const SFX_LIBRARY = {
     intent:   ["reveal", "proof", "cta"],
   },
 
-  // ── Motivational / Sports ─────────────────────────────────
+  // ── MOTIVATIONAL / SPORTS ─────────────────────────────────
+
   crowd_roar: {
     label:    "Crowd Roar",
-    file:     null, // source: freesound.org — search "crowd roar stadium"
     duration: 2.0,
     energy:   "high",
     mood:     "triumphant",
@@ -337,7 +305,6 @@ export const SFX_LIBRARY = {
   },
   whistle_start: {
     label:    "Whistle Start",
-    file:     null, // source: freesound.org — search "sports whistle"
     duration: 0.6,
     energy:   "high",
     mood:     "energetic",
@@ -346,7 +313,6 @@ export const SFX_LIBRARY = {
   },
   heartbeat: {
     label:    "Heartbeat",
-    file:     null, // source: freesound.org — search "heartbeat tense"
     duration: 1.0,
     energy:   "medium",
     mood:     "tense",
@@ -354,10 +320,10 @@ export const SFX_LIBRARY = {
     intent:   ["urgency", "escalate", "hook"],
   },
 
-  // ── Comedy ────────────────────────────────────────────────
+  // ── COMEDY ────────────────────────────────────────────────
+
   sad_trombone: {
     label:    "Sad Trombone",
-    file:     null, // source: freesound.org — search "sad trombone"
     duration: 1.5,
     energy:   "low",
     mood:     "comedic",
@@ -366,7 +332,6 @@ export const SFX_LIBRARY = {
   },
   boing: {
     label:    "Boing",
-    file:     null, // source: freesound.org — search "cartoon boing"
     duration: 0.5,
     energy:   "medium",
     mood:     "silly",
@@ -375,7 +340,6 @@ export const SFX_LIBRARY = {
   },
   rimshot: {
     label:    "Rimshot",
-    file:     null, // source: freesound.org — search "rimshot drum"
     duration: 0.8,
     energy:   "medium",
     mood:     "comedic",
@@ -383,10 +347,10 @@ export const SFX_LIBRARY = {
     intent:   ["irony", "hook", "contrast"],
   },
 
-  // ── News / Drama ──────────────────────────────────────────
+  // ── NEWS / DRAMA ──────────────────────────────────────────
+
   news_sting: {
     label:    "News Sting",
-    file:     null, // source: freesound.org — search "news sting"
     duration: 1.5,
     energy:   "high",
     mood:     "urgent",
@@ -395,7 +359,6 @@ export const SFX_LIBRARY = {
   },
   tension_riser: {
     label:    "Tension Riser",
-    file:     null, // source: freesound.org — search "tension riser"
     duration: 2.0,
     energy:   "high",
     mood:     "tense",
@@ -404,7 +367,6 @@ export const SFX_LIBRARY = {
   },
   dramatic_sting: {
     label:    "Dramatic Sting",
-    file:     null, // source: pixabay.com/sound-effects — search "dramatic sting"
     duration: 1.2,
     energy:   "high",
     mood:     "dramatic",
@@ -412,10 +374,10 @@ export const SFX_LIBRARY = {
     intent:   ["shock", "reveal", "hook"],
   },
 
-  // ── Tech / Futuristic ─────────────────────────────────────
+  // ── TECH / FUTURISTIC ─────────────────────────────────────
+
   digital_blip: {
     label:    "Digital Blip",
-    file:     null, // source: freesound.org — search "digital blip"
     duration: 0.3,
     energy:   "low",
     mood:     "futuristic",
@@ -424,7 +386,6 @@ export const SFX_LIBRARY = {
   },
   scan_beep: {
     label:    "Scan Beep",
-    file:     null, // source: freesound.org — search "scan beep"
     duration: 0.4,
     energy:   "low",
     mood:     "futuristic",
@@ -433,7 +394,6 @@ export const SFX_LIBRARY = {
   },
   data_swoosh: {
     label:    "Data Swoosh",
-    file:     null, // source: freesound.org — search "data swoosh"
     duration: 0.6,
     energy:   "medium",
     mood:     "futuristic",
@@ -443,21 +403,63 @@ export const SFX_LIBRARY = {
 
 };
 
-export const SFX_KEYS = Object.keys(SFX_LIBRARY).filter(k => SFX_LIBRARY[k].file !== null);
+export const SFX_KEYS     = Object.keys(SFX_LIBRARY);
 export const ALL_SFX_KEYS = Object.keys(SFX_LIBRARY);
 
-/* ── Preview URL resolver ── */
-const FILENAME_OVERRIDES = {
+/* ── Module-level URL cache populated by loadSFXLibrary() ── */
+let _sfxUrlCache = {};
+
+/**
+ * Load all active SFX tracks from Supabase, returns a map keyed by track key.
+ * Also populates the module-level cache used by getSFXPreviewUrl().
+ * Returns {} if DB is unavailable or empty.
+ */
+export async function loadSFXLibrary() {
+  if (!supabase) return {};
+  try {
+    const { data, error } = await supabase
+      .from("sfx_tracks")
+      .select("*")
+      .eq("is_active", true);
+    if (error || !data?.length) return {};
+    const map = Object.fromEntries(data.map(t => [t.key, t]));
+    _sfxUrlCache = map;
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Async lookup of a single track's public_url from sfx_tracks.
+ * Returns null if not found or DB is unavailable.
+ */
+export async function getSFXUrl(key) {
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase
+      .from("sfx_tracks")
+      .select("public_url")
+      .eq("key", key)
+      .eq("is_active", true)
+      .maybeSingle();
+    return data?.public_url || null;
+  } catch {
+    return null;
+  }
+}
+
+/* ── Local filename overrides for keys whose filename differs from the key ── */
+const LOCAL_FILENAME = {
   cash_register: "cash-register.mp3",
   crowd_cheer:   "crowd_cheer_short.mp3",
   notification:  "notification_ding.mp3",
 };
 
+/* ── Preview URL resolver — Supabase cache first, then local static fallback ── */
 export function getSFXPreviewUrl(key) {
-  const entry = SFX_LIBRARY[key];
-  if (!entry?.file) return null;
-  const filename = FILENAME_OVERRIDES[key] || entry.file;
-  return `/sfx/${filename}`;
+  if (_sfxUrlCache[key]?.public_url) return _sfxUrlCache[key].public_url;
+  return `/sfx/${LOCAL_FILENAME[key] || `${key}.mp3`}`;
 }
 
 /* ── Overlay default SFX ── */
@@ -474,7 +476,7 @@ export const OVERLAY_SFX_DEFAULTS = {
 /* ── Smart picker — matches intent + energy + niche ── */
 export function pickBeatSFX(intent, energy = 0.5, niche = null, volume = 1.0) {
   const energyLevel = energy >= 0.75 ? "high" : energy >= 0.4 ? "medium" : "low";
-  const available = SFX_KEYS; // only tracks with actual files
+  const available = ALL_SFX_KEYS;
 
   // Most specific — niche + intent + energy
   const byAll = niche

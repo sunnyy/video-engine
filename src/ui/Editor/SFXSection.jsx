@@ -3,9 +3,9 @@
  * src/ui/Editor/SFXSection.jsx
  * Beat-level SFX — Library tab + search, selected sound panel at top, playable rows.
  */
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useProjectStore } from "../../store/useProjectStore";
-import { SFX_LIBRARY, SFX_KEYS, pickBeatSFX, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
+import { SFX_LIBRARY, SFX_KEYS, pickBeatSFX, getSFXPreviewUrl, loadSFXLibrary } from "../../core/registries/sfxRegistry";
 
 function Label({ children }) {
   return (
@@ -31,26 +31,8 @@ function Slider({ label, value, onChange, min = 0, max = 1, step = 0.05, unit = 
 }
 
 /* ── SFX library row ── */
-function SFXRow({ sfxKey, isSelected, onSelect }) {
-  const [playing, setPlaying] = useState(false);
-  const audioRef = useRef(null);
+function SFXRow({ sfxKey, isSelected, isPlaying, onSelect, onTogglePlay }) {
   const sfx = SFX_LIBRARY[sfxKey];
-
-  const togglePlay = (e) => {
-    e.stopPropagation();
-    const url = getSFXPreviewUrl(sfxKey);
-    if (playing) {
-      audioRef.current?.pause();
-      setPlaying(false);
-    } else {
-      if (audioRef.current) audioRef.current.pause();
-      audioRef.current = new window.Audio(url);
-      audioRef.current.volume = 0.5;
-      audioRef.current.play();
-      audioRef.current.onended = () => setPlaying(false);
-      setPlaying(true);
-    }
-  };
 
   return (
     <div
@@ -61,10 +43,10 @@ function SFXRow({ sfxKey, isSelected, onSelect }) {
           : "border-[rgba(255,255,255,0.06)] bg-[#111118] hover:border-[rgba(255,255,255,0.15)]"
         }`}
     >
-      <button onClick={togglePlay}
+      <button onClick={e => { e.stopPropagation(); onTogglePlay(sfxKey); }}
         className={`w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 border-0 text-[12px] transition-all cursor-pointer
-          ${isSelected ? "bg-[#7c5cfc] text-white" : "bg-[#1c1c28] text-[#9494a8] hover:bg-[#7c5cfc] hover:text-white"}`}>
-        {playing ? "■" : "▶"}
+          ${isPlaying ? "bg-[#7c5cfc] text-white" : isSelected ? "bg-[#7c5cfc] text-white" : "bg-[#1c1c28] text-[#9494a8] hover:bg-[#7c5cfc] hover:text-white"}`}>
+        {isPlaying ? "■" : "▶"}
       </button>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-semibold text-[#e8e8f0] truncate">{sfx.label}</div>
@@ -78,8 +60,28 @@ function SFXRow({ sfxKey, isSelected, onSelect }) {
 
 export default function SFXSection({ beat }) {
   const updateBeat = useProjectStore((s) => s.updateBeat);
-  const [tab, setTab] = useState("library");
-  const [search, setSearch] = useState("");
+  const [tab,        setTab]        = useState("library");
+  const [search,     setSearch]     = useState("");
+  const [playingKey, setPlayingKey] = useState(null);
+  const audioRef = useRef(null);
+
+  useEffect(() => { loadSFXLibrary(); }, []);
+
+  const togglePlay = (key) => {
+    if (playingKey === key) {
+      audioRef.current?.pause();
+      setPlayingKey(null);
+      return;
+    }
+    if (audioRef.current) audioRef.current.pause();
+    setPlayingKey(key);
+    const url = getSFXPreviewUrl(key);
+    if (!url) return;
+    audioRef.current = new window.Audio(url);
+    audioRef.current.volume = 0.5;
+    audioRef.current.play().catch(() => setPlayingKey(null));
+    audioRef.current.onended = () => setPlayingKey(null);
+  };
 
   if (!beat) return null;
 
@@ -96,7 +98,7 @@ export default function SFXSection({ beat }) {
         id:       `sfx_${Date.now()}`,
         key,
         label:    sfx.label,
-        volume:   0.15,
+        volume:   0.4,
         position: 0,
         source:   "beat",
       }]
@@ -114,7 +116,7 @@ export default function SFXSection({ beat }) {
   };
 
   const autoAssign = () => {
-    const cue = pickBeatSFX(beat.intent || "explanation", beat.energy || 0.5, 0.15);
+    const cue = pickBeatSFX(beat.intent || "explanation", beat.energy || 0.5, 0.4);
     if (!cue) return;
     updateBeat(beat.id, { audio_cues: [...cues.filter(c => c.source !== "beat"), cue] });
   };
@@ -137,7 +139,7 @@ export default function SFXSection({ beat }) {
               Remove
             </button>
           </div>
-          <Slider label="Volume" value={beatCue.volume ?? 0.15}
+          <Slider label="Volume" value={beatCue.volume ?? 0.4}
             onChange={v => updateCue("volume", v)} unit="%" />
           <div className="flex flex-col gap-[3px]">
             <div className="flex justify-between">
@@ -182,7 +184,9 @@ export default function SFXSection({ beat }) {
         {(tab === "library" ? SFX_KEYS : filtered).map(key => (
           <SFXRow key={key} sfxKey={key}
             isSelected={selectedKey === key}
-            onSelect={selectSFX} />
+            isPlaying={playingKey === key}
+            onSelect={selectSFX}
+            onTogglePlay={togglePlay} />
         ))}
       </div>
 

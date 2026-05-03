@@ -2,10 +2,10 @@
  * AudioSection.jsx
  * src/ui/Editor/AudioSection.jsx
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProjectStore }  from "../../store/useProjectStore";
 import { uploadUserAsset }  from "../../services/assets/uploadUserAsset";
-import { MUSIC_LIBRARY, MUSIC_KEYS, MUSIC_PREVIEW_URLS } from "../../core/registries/musicRegistry";
+import { loadMusicLibrary } from "../../core/registries/musicRegistry";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
 import { serverFetch } from "../../services/serverApi";
 
@@ -160,7 +160,7 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
             className={`w-full py-[11px] rounded-[10px] text-[14px] font-bold transition-all cursor-pointer border-0
               ${showGenerate
                 ? "bg-[#7c5cfc] text-white"
-                : "bg-[rgba(124,92,252,0.12)] text-[#a78fff] hover:bg-[rgba(124,92,252,0.2)]"}`}>
+                : "bg-[rgba(124,92,252,0.6)] text-[#a78fff] hover:bg-[rgba(124,92,252,0.2)]"}`}>
             ✨ Generate Voice with AI
           </button>
 
@@ -273,29 +273,35 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
 
 /* ── Background Music track ── */
 function MusicTrack({ audio, onSelectLibrary, onUpload, onRemove, onVolumeChange, uploading, progress }) {
-  const [playing, setPlaying] = useState(false);
-  const [tab, setTab]         = useState("library");
+  const [playingUrl, setPlayingUrl] = useState(null);
+  const [tab,        setTab]        = useState("library");
+  const [dbLibrary,  setDbLibrary]  = useState({});
   const audioRef = useRef(null);
   const fileRef  = useRef(null);
 
-  const currentKey = audio?.musicKey || null;
+  useEffect(() => { loadMusicLibrary().then(setDbLibrary); }, []);
 
-  const togglePlay = (src) => {
-    const url = src || audio?.src;
+  const allTracks = Object.values(dbLibrary).flat();
+
+  const togglePlay = (url) => {
     if (!url) return;
-    if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
+    if (playingUrl === url) {
+      audioRef.current?.pause();
+      setPlayingUrl(null);
+      return;
+    }
     if (audioRef.current) audioRef.current.pause();
     audioRef.current = new window.Audio(url);
-    audioRef.current.volume = audio?.volume ?? 0.12;
-    audioRef.current.play();
-    audioRef.current.onended = () => setPlaying(false);
-    setPlaying(true);
+    audioRef.current.volume = audio?.volume ?? 0.6;
+    audioRef.current.play().catch(() => {});
+    audioRef.current.onended = () => setPlayingUrl(null);
+    setPlayingUrl(url);
   };
 
   const handleRemove = () => {
     audioRef.current?.pause();
     audioRef.current = null;
-    setPlaying(false);
+    setPlayingUrl(null);
     onRemove();
   };
 
@@ -311,38 +317,52 @@ function MusicTrack({ audio, onSelectLibrary, onUpload, onRemove, onVolumeChange
         )}
       </div>
 
+      {audio?.src && (
+        <div className="p-3 rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#111118]">
+          <div className="flex justify-between mb-[4px]">
+            <Label>Volume</Label>
+            <span className="text-[12px] font-mono text-[#7070a0]">{Math.round((audio.volume ?? 0.6) * 100)}%</span>
+          </div>
+          <input type="range" min={0} max={1} step={0.01} value={audio.volume ?? 0.6}
+            onChange={e => onVolumeChange(Number(e.target.value))}
+            className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 2 }} />
+        </div>
+      )}
+
       <div className="flex gap-[3px] bg-[#111118] border border-[rgba(255,255,255,0.07)] rounded-[8px] p-[3px]">
-        {[["library","Library"],["upload","Upload"]].map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)}
+        {[["library","Library"],["upload","Upload"]].map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)}
             className={`flex-1 py-[6px] rounded-[6px] text-[13px] font-semibold transition-all
-              ${tab === key ? "bg-[#1c1c28] text-[#e8e8f0]" : "text-[#55556a] hover:text-[#9494a8]"}`}>
+              ${tab === k ? "bg-[#1c1c28] text-[#e8e8f0]" : "text-[#55556a] hover:text-[#9494a8]"}`}>
             {label}
           </button>
         ))}
       </div>
 
       {tab === "library" && (
-        <div className="flex flex-col gap-[6px]">
-          {MUSIC_KEYS.map(key => {
-            const track      = MUSIC_LIBRARY[key];
-            const isActive   = currentKey === key;
-            const previewUrl = MUSIC_PREVIEW_URLS[key];
+        <div className="flex flex-col gap-[6px] max-h-[320px] overflow-y-auto pr-[2px]">
+          {allTracks.length === 0 && (
+            <div className="text-[12px] text-[#55556a] py-4 text-center">Loading tracks…</div>
+          )}
+          {allTracks.map(track => {
+            const previewUrl = track.preview_url || track.public_url;
+            const isActive   = audio?.src === track.public_url;
+            const isPlaying  = playingUrl === previewUrl;
             return (
-              <div key={key}
+              <div key={track.id}
                 className={`flex items-center gap-3 px-3 py-[10px] rounded-[10px] border cursor-pointer transition-all
                   ${isActive ? "border-[#7c5cfc] bg-[#16163a]" : "border-[rgba(255,255,255,0.07)] bg-[#111118] hover:border-[rgba(255,255,255,0.15)]"}`}
-                onClick={() => onSelectLibrary(key)}>
+                onClick={() => onSelectLibrary(track.public_url)}>
                 <button onClick={e => { e.stopPropagation(); togglePlay(previewUrl); }}
                   className={`w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0 cursor-pointer border-0 text-[13px] transition-all
                     ${isActive ? "bg-[#7c5cfc] text-white" : "bg-[#1c1c28] text-[#9494a8] hover:bg-[#7c5cfc] hover:text-white"}`}>
-                  {playing && isActive ? "■" : "▶"}
+                  {isPlaying ? "■" : "▶"}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[14px] font-semibold text-[#e8e8f0] truncate">{track.label}</div>
-                  <div className="flex gap-1 mt-[3px] flex-wrap">
-                    {track.vibe.map(v => (
-                      <span key={v} className="text-[10px] px-[6px] py-[1px] rounded-full bg-[rgba(124,92,252,0.12)] text-[#a78fff]">{v}</span>
-                    ))}
+                  <div className="text-[13px] font-semibold text-[#e8e8f0] truncate">{track.title}</div>
+                  <div className="flex gap-1 mt-[2px] flex-wrap">
+                    <span className="text-[10px] px-[6px] py-[1px] rounded-full bg-[rgba(124,92,252,0.6)] text-[#a78fff]">{track.mood}</span>
+                    {track.artist && <span className="text-[10px] text-[#55556a]">{track.artist}</span>}
                   </div>
                 </div>
                 {isActive && <div className="w-[8px] h-[8px] rounded-full bg-[#7c5cfc] shrink-0" />}
@@ -368,17 +388,6 @@ function MusicTrack({ audio, onSelectLibrary, onUpload, onRemove, onVolumeChange
         </div>
       )}
 
-      {audio?.src && (
-        <div className="p-3 rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#111118]">
-          <div className="flex justify-between mb-[4px]">
-            <Label>Volume</Label>
-            <span className="text-[12px] font-mono text-[#7070a0]">{Math.round((audio.volume ?? 0.12) * 100)}%</span>
-          </div>
-          <input type="range" min={0} max={1} step={0.01} value={audio.volume ?? 0.12}
-            onChange={e => onVolumeChange(Number(e.target.value))}
-            className="w-full accent-[#7c5cfc] cursor-pointer" style={{ height: 2 }} />
-        </div>
-      )}
     </div>
   );
 }
@@ -425,7 +434,7 @@ export default function AudioSection() {
       const compressedFile = new File([blob], "compressed.m4a", { type: "audio/mp4" });
       const uploaded = await uploadUserAsset(compressedFile, null, pct => setProgress(p => ({ ...p, [type]: pct })));
 
-      const newAudio = { ...audio, [type]: { src: uploaded.url, volume: type === "music" ? 0.12 : 1 } };
+      const newAudio = { ...audio, [type]: { src: uploaded.url, volume: type === "music" ? 0.6 : 1 } };
       updateProjectMeta({ audio: newAudio });
 
       // Auto-sync beats when TTS is uploaded
@@ -449,11 +458,10 @@ export default function AudioSection() {
     }
   };
 
-  const selectLibraryMusic = (key) => {
-    const track = MUSIC_LIBRARY[key];
-    if (!track) return;
+  const selectLibraryMusic = (src) => {
+    if (!src) return;
     updateProjectMeta({
-      audio: { ...audio, music: { src: MUSIC_PREVIEW_URLS[key], musicKey: key, volume: 0.12 } },
+      audio: { ...audio, music: { src, volume: 0.6 } },
     });
   };
 

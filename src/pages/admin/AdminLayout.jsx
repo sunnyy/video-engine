@@ -15,6 +15,8 @@ const NAV = [
   { to: "/admin/layouts",    label: "Layout Manager", icon: "⊞" },
   { to: "/admin/ai-generator",     label: "Layout Generator", icon: "✦" },
   { to: "/admin/library",        label: "Image Library",  icon: "⊟" },
+  { to: "/admin/music",          label: "Music Library",  icon: "♫" },
+  { to: "/admin/sfx",            label: "SFX Library",    icon: "◈" },
   { to: "/admin/model-avatars",  label: "Model Avatars",  icon: "◎" },
   { to: "/admin/feedback",       label: "Feedback",       icon: "◎" },
   { to: "/admin/system",         label: "System",         icon: "◉" },

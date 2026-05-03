@@ -65,16 +65,6 @@ function resolveAssetUrl(url) {
   return url;
 }
 
-/* ── Music key to filename map ── */
-const MUSIC_FILENAMES = {
-  eliveta_1:    "eliveta491190.mp3",
-  eliveta_2:    "eliveta491224.mp3",
-  loksii:       "loksii.mp3",
-  mood_mode:    "mood_mode.mp3",
-  nastelbom:    "nastelbom.mp3",
-  the_mountain: "the_mountain.mp3",
-};
-function getMusicFilename(key) { return MUSIC_FILENAMES[key] || `${key}.mp3`; }
 
 /* ---------------- RENDER ---------------- */
 router.post("/", requireAuth, async (req, res) => {
@@ -126,24 +116,65 @@ router.post("/", requireAuth, async (req, res) => {
 
     console.log("[render] audio.music:", JSON.stringify(project?.audio?.music));
 
-    /* ── 2. Resolve music src — use relative /music/ paths served by Remotion's bundle server ── */
+    /* ── 2. Resolve music src ── */
     if (project?.audio?.music) {
-      const musicKey = project.audio.music.musicKey;
-      if (musicKey) {
-        const musicFilename = getMusicFilename(musicKey);
-        const musicFile = path.join(PUBLIC_DIR, "music", musicFilename);
-        if (fs.existsSync(musicFile)) {
-          project.audio.music = { ...project.audio.music, src: `/music/${musicFilename}`, musicKey: null };
-          console.log("[render] Music resolved to:", project.audio.music.src);
-        } else {
-          console.warn("[render] Music file not found:", musicFile);
+      const { src, musicKey } = project.audio.music;
+      if (src?.startsWith("blob:")) {
+        // Blob URLs can't be fetched by Chrome — drop the music
+        project.audio.music = null;
+      } else if (musicKey) {
+        // Legacy: project stored a key instead of a URL — look it up in DB
+        try {
+          const { data: track } = await supabaseAdmin
+            .from("music_tracks")
+            .select("public_url")
+            .eq("key", musicKey)
+            .eq("is_active", true)
+            .maybeSingle();
+          if (track?.public_url) {
+            project.audio.music = { ...project.audio.music, src: track.public_url, musicKey: null };
+            console.log("[render] Music (legacy key) resolved to:", track.public_url);
+          } else {
+            console.warn("[render] Legacy music key not found in DB:", musicKey);
+            project.audio.music = null;
+          }
+        } catch (e) {
+          console.warn("[render] Legacy music DB lookup failed:", e.message);
           project.audio.music = null;
         }
-      } else if (project.audio.music.src?.startsWith("blob:")) {
-        project.audio.music = null;
       }
-      // /music/... relative paths and HTTPS URLs are passed as-is — Remotion's bundle server
-      // serves publicDir (which contains /music/) so relative paths resolve correctly.
+      // HTTPS src passes through as-is — Chrome fetches it directly.
+    }
+
+    /* ── 2.5. Resolve SFX keys in beats from Supabase DB ── */
+    if (project?.beats?.length) {
+      const sfxKeys = [...new Set(
+        project.beats.flatMap(b => (b.sfx || []).map(s => s.key).filter(Boolean))
+      )];
+      if (sfxKeys.length) {
+        try {
+          const { data: sfxRows } = await supabaseAdmin
+            .from("sfx_tracks")
+            .select("key, public_url")
+            .in("key", sfxKeys)
+            .eq("is_active", true);
+          const sfxMap = Object.fromEntries((sfxRows || []).map(r => [r.key, r.public_url]));
+          project.beats = project.beats.map(beat => {
+            if (!beat.sfx?.length) return beat;
+            return {
+              ...beat,
+              sfx: beat.sfx.map(sfxItem =>
+                sfxItem.key && sfxMap[sfxItem.key]
+                  ? { ...sfxItem, src: sfxMap[sfxItem.key] }
+                  : sfxItem
+              ),
+            };
+          });
+          console.log(`[render] Resolved ${sfxKeys.length} SFX keys`);
+        } catch (e) {
+          console.warn("[render] SFX resolution failed:", e.message);
+        }
+      }
     }
 
     /* ── 3. Clean blob URLs from avatar ── */

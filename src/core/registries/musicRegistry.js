@@ -3,7 +3,7 @@
  * src/core/registries/musicRegistry.js
  *
  * Full metadata on every track so the director picks by niche + videoType + tone + energy.
- * Tracks marked with file: null are placeholders — source audio and drop into /public/music/
+ * Audio files are stored in Supabase Storage (media/music/) and managed via /admin/music.
  *
  * Sources for free commercial music:
  *   pixabay.com/music
@@ -11,7 +11,6 @@
  *   uppbeat.io
  *   freesound.org
  */
-import { staticFile } from "remotion";
 import { supabase } from "../../lib/supabase";
 
 export const MUSIC_LIBRARY = {
@@ -20,7 +19,6 @@ export const MUSIC_LIBRARY = {
 
   eliveta_1: {
     label:     "Eliveta I",
-    file:      staticFile("music/eliveta491190.mp3"),
     energy:    "high",
     mood:      "upbeat",
     bpm:       128,
@@ -32,7 +30,6 @@ export const MUSIC_LIBRARY = {
   },
   eliveta_2: {
     label:     "Eliveta II",
-    file:      staticFile("music/eliveta491224.mp3"),
     energy:    "high",
     mood:      "upbeat",
     bpm:       124,
@@ -44,7 +41,6 @@ export const MUSIC_LIBRARY = {
   },
   loksii: {
     label:     "Loksii",
-    file:      staticFile("music/loksii.mp3"),
     energy:    "medium",
     mood:      "chill",
     bpm:       98,
@@ -56,7 +52,6 @@ export const MUSIC_LIBRARY = {
   },
   mood_mode: {
     label:     "Mood Mode",
-    file:      staticFile("music/mood_mode.mp3"),
     energy:    "medium",
     mood:      "cinematic",
     bpm:       95,
@@ -68,7 +63,6 @@ export const MUSIC_LIBRARY = {
   },
   nastelbom: {
     label:     "Nastelbom",
-    file:      staticFile("music/nastelbom.mp3"),
     energy:    "medium",
     mood:      "playful",
     bpm:       110,
@@ -80,7 +74,6 @@ export const MUSIC_LIBRARY = {
   },
   the_mountain: {
     label:     "The Mountain",
-    file:      staticFile("music/the_mountain.mp3"),
     energy:    "medium",
     mood:      "epic",
     bpm:       90,
@@ -95,7 +88,6 @@ export const MUSIC_LIBRARY = {
 
   gaming_hype: {
     label:     "Gaming Hype",
-    file:      null, // source: pixabay.com/music — search "gaming hype"
     energy:    "high",
     mood:      "aggressive",
     bpm:       140,
@@ -107,7 +99,6 @@ export const MUSIC_LIBRARY = {
   },
   trap_beat: {
     label:     "Trap Beat",
-    file:      null, // source: pixabay.com/music — search "trap beat"
     energy:    "high",
     mood:      "dark",
     bpm:       145,
@@ -119,7 +110,6 @@ export const MUSIC_LIBRARY = {
   },
   sports_pump: {
     label:     "Sports Pump",
-    file:      null, // source: mixkit.co/free-music — search "sports"
     energy:    "high",
     mood:      "energetic",
     bpm:       135,
@@ -134,7 +124,6 @@ export const MUSIC_LIBRARY = {
 
   spiritual_ambient: {
     label:     "Spiritual Ambient",
-    file:      null, // source: pixabay.com/music — search "spiritual ambient india"
     energy:    "low",
     mood:      "peaceful",
     bpm:       60,
@@ -146,7 +135,6 @@ export const MUSIC_LIBRARY = {
   },
   tabla_beats: {
     label:     "Tabla Beats",
-    file:      null, // source: freesound.org — search "tabla loop"
     energy:    "medium",
     mood:      "devotional",
     bpm:       80,
@@ -158,7 +146,6 @@ export const MUSIC_LIBRARY = {
   },
   om_chant_ambient: {
     label:     "Om Chant Ambient",
-    file:      null, // source: pixabay.com/music — search "om chant"
     energy:    "low",
     mood:      "transcendent",
     bpm:       55,
@@ -173,7 +160,6 @@ export const MUSIC_LIBRARY = {
 
   warm_acoustic: {
     label:     "Warm Acoustic",
-    file:      null, // source: mixkit.co/free-music — search "acoustic warm"
     energy:    "low",
     mood:      "warm",
     bpm:       85,
@@ -185,7 +171,6 @@ export const MUSIC_LIBRARY = {
   },
   upbeat_kitchen: {
     label:     "Upbeat Kitchen",
-    file:      null, // source: pixabay.com/music — search "upbeat cooking"
     energy:    "medium",
     mood:      "cheerful",
     bpm:       115,
@@ -197,7 +182,6 @@ export const MUSIC_LIBRARY = {
   },
   lofi_chill: {
     label:     "Lo-Fi Chill",
-    file:      null, // source: pixabay.com/music — search "lofi chill"
     energy:    "low",
     mood:      "chill",
     bpm:       75,
@@ -212,7 +196,6 @@ export const MUSIC_LIBRARY = {
 
   corporate_minimal: {
     label:     "Corporate Minimal",
-    file:      null, // source: mixkit.co/free-music — search "corporate minimal"
     energy:    "low",
     mood:      "professional",
     bpm:       100,
@@ -224,7 +207,6 @@ export const MUSIC_LIBRARY = {
   },
   tech_pulse: {
     label:     "Tech Pulse",
-    file:      null, // source: pixabay.com/music — search "technology electronic"
     energy:    "medium",
     mood:      "futuristic",
     bpm:       120,
@@ -236,7 +218,6 @@ export const MUSIC_LIBRARY = {
   },
   confident_corporate: {
     label:     "Confident Corporate",
-    file:      null, // source: uppbeat.io — search "corporate confident"
     energy:    "medium",
     mood:      "confident",
     bpm:       108,
@@ -251,7 +232,6 @@ export const MUSIC_LIBRARY = {
 
   adventure_epic: {
     label:     "Adventure Epic",
-    file:      null, // source: mixkit.co/free-music — search "adventure epic"
     energy:    "high",
     mood:      "epic",
     bpm:       125,
@@ -263,7 +243,6 @@ export const MUSIC_LIBRARY = {
   },
   world_music_chill: {
     label:     "World Music Chill",
-    file:      null, // source: freesound.org — search "world music ambient"
     energy:    "low",
     mood:      "wanderlust",
     bpm:       80,
@@ -278,7 +257,6 @@ export const MUSIC_LIBRARY = {
 
   light_background: {
     label:     "Light Background",
-    file:      null, // source: pixabay.com/music — search "light background education"
     energy:    "low",
     mood:      "neutral",
     bpm:       90,
@@ -290,7 +268,6 @@ export const MUSIC_LIBRARY = {
   },
   curious_upbeat: {
     label:     "Curious Upbeat",
-    file:      null, // source: mixkit.co/free-music — search "curious upbeat"
     energy:    "medium",
     mood:      "curious",
     bpm:       105,
@@ -305,7 +282,6 @@ export const MUSIC_LIBRARY = {
 
   quirky_fun: {
     label:     "Quirky Fun",
-    file:      null, // source: pixabay.com/music — search "quirky fun comedy"
     energy:    "medium",
     mood:      "quirky",
     bpm:       118,
@@ -317,7 +293,6 @@ export const MUSIC_LIBRARY = {
   },
   cartoon_bounce: {
     label:     "Cartoon Bounce",
-    file:      null, // source: mixkit.co/free-music — search "cartoon bounce"
     energy:    "high",
     mood:      "silly",
     bpm:       130,
@@ -332,7 +307,6 @@ export const MUSIC_LIBRARY = {
 
   rise_up: {
     label:     "Rise Up",
-    file:      null, // source: pixabay.com/music — search "motivational rise"
     energy:    "high",
     mood:      "inspirational",
     bpm:       132,
@@ -344,7 +318,6 @@ export const MUSIC_LIBRARY = {
   },
   hustle_beat: {
     label:     "Hustle Beat",
-    file:      null, // source: pixabay.com/music — search "hustle hip hop"
     energy:    "high",
     mood:      "driven",
     bpm:       138,
@@ -359,7 +332,6 @@ export const MUSIC_LIBRARY = {
 
   elegant_soft: {
     label:     "Elegant Soft",
-    file:      null, // source: uppbeat.io — search "elegant soft beauty"
     energy:    "low",
     mood:      "elegant",
     bpm:       70,
@@ -371,7 +343,6 @@ export const MUSIC_LIBRARY = {
   },
   soft_pop: {
     label:     "Soft Pop",
-    file:      null, // source: mixkit.co/free-music — search "soft pop"
     energy:    "medium",
     mood:      "fresh",
     bpm:       100,
@@ -386,7 +357,6 @@ export const MUSIC_LIBRARY = {
 
   tense_news: {
     label:     "Tense News",
-    file:      null, // source: pixabay.com/music — search "news tense"
     energy:    "medium",
     mood:      "tense",
     bpm:       95,
@@ -398,7 +368,6 @@ export const MUSIC_LIBRARY = {
   },
   breaking_dramatic: {
     label:     "Breaking Dramatic",
-    file:      null, // source: mixkit.co/free-music — search "dramatic news"
     energy:    "high",
     mood:      "dramatic",
     bpm:       110,
@@ -411,38 +380,22 @@ export const MUSIC_LIBRARY = {
 
 };
 
-export const MUSIC_KEYS = Object.keys(MUSIC_LIBRARY).filter(k => MUSIC_LIBRARY[k].file !== null);
+export const MUSIC_KEYS     = Object.keys(MUSIC_LIBRARY);
 export const ALL_MUSIC_KEYS = Object.keys(MUSIC_LIBRARY);
-
-export const MUSIC_PREVIEW_URLS = {
-  eliveta_1:    "/music/eliveta491190.mp3",
-  eliveta_2:    "/music/eliveta491224.mp3",
-  loksii:       "/music/loksii.mp3",
-  mood_mode:    "/music/mood_mode.mp3",
-  nastelbom:    "/music/nastelbom.mp3",
-  the_mountain: "/music/the_mountain.mp3",
-};
 
 /* ── DB-backed music library ── */
 
-const MOOD_FALLBACK = {
-  energetic: "eliveta_1",
-  calm:      "the_mountain",
-  luxury:    "nastelbom",
-  playful:   "eliveta_2",
-  dramatic:  "mood_mode",
-};
 
 /**
- * Load music tracks from Supabase, grouped by mood.
- * Returns {} if DB is unavailable or empty — callers should fall back to MUSIC_LIBRARY.
+ * Load all active music tracks from Supabase, grouped by mood.
+ * Returns {} if DB is unavailable or empty.
  */
 export async function loadMusicLibrary() {
   if (!supabase) return {};
   try {
     const { data, error } = await supabase
       .from("music_tracks")
-      .select("id, title, artist, mood, public_url, bpm, duration")
+      .select("id, key, title, artist, mood, public_url, preview_url, bpm, duration")
       .eq("is_active", true);
     if (error || !data?.length) return {};
     return data.reduce((acc, track) => {
@@ -456,9 +409,21 @@ export async function loadMusicLibrary() {
 }
 
 /**
+ * Map videoType + tone to one of the DB moods: energetic, calm, playful, dramatic, luxury.
+ */
+export function pickAutoMood(videoType = "viral", tone = "bold", energy = "medium") {
+  if (tone === "funny" || videoType === "entertainment") return "playful";
+  if (tone === "emotional" && energy === "high") return "dramatic";
+  if (tone === "emotional" || videoType === "story") return "calm";
+  if (videoType === "news" || videoType === "opinion") return "dramatic";
+  if (energy === "low") return "calm";
+  return "energetic";
+}
+
+/**
  * Pick a random track for the given mood from a library returned by loadMusicLibrary().
- * Falls back to a static MUSIC_LIBRARY track when the DB library is empty.
- * Returns { src, label }.
+ * Falls back to adjacent moods when the target mood has no tracks.
+ * Returns { src, label } or null.
  */
 export function pickMusicByMood(mood, library = {}) {
   const tracks = library[mood] || [];
@@ -466,47 +431,11 @@ export function pickMusicByMood(mood, library = {}) {
     const track = tracks[Math.floor(Math.random() * tracks.length)];
     return { src: track.public_url, label: track.title };
   }
-  const key = MOOD_FALLBACK[mood] || "eliveta_2";
-  return {
-    src:   MUSIC_LIBRARY[key]?.file || MUSIC_LIBRARY["eliveta_2"].file,
-    label: MUSIC_LIBRARY[key]?.label || "Music",
-  };
-}
-
-/* ── Smart picker (used for non-product-ad video types) ── */
-export function pickAutoMusic(videoType = "viral", tone = "bold", niche = null, energy = "medium") {
-  const available = MUSIC_KEYS; // only tracks with actual files
-
-  // Match niche + energy first (most specific)
-  const byNicheEnergy = niche
-    ? available.filter(k =>
-        MUSIC_LIBRARY[k].niche?.includes(niche) &&
-        MUSIC_LIBRARY[k].energy === energy
-      )
-    : [];
-
-  // Match niche only
-  const byNiche = niche
-    ? available.filter(k => MUSIC_LIBRARY[k].niche?.includes(niche))
-    : [];
-
-  // Match videoType + tone
-  const byBoth = available.filter(k =>
-    MUSIC_LIBRARY[k].videoType.includes(videoType) &&
-    MUSIC_LIBRARY[k].tone.includes(tone)
-  );
-
-  // Match videoType only
-  const byType = available.filter(k =>
-    MUSIC_LIBRARY[k].videoType.includes(videoType)
-  );
-
-  // Priority: niche+energy > niche > videoType+tone > videoType > all
-  const pool = byNicheEnergy.length ? byNicheEnergy
-    : byNiche.length ? byNiche
-    : byBoth.length  ? byBoth
-    : byType.length  ? byType
-    : available;
-
-  return pool[Math.floor(Math.random() * pool.length)];
+  // Fallback: any mood
+  const all = Object.values(library).flat();
+  if (all.length) {
+    const track = all[Math.floor(Math.random() * all.length)];
+    return { src: track.public_url, label: track.title };
+  }
+  return null;
 }

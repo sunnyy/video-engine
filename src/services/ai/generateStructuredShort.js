@@ -9,7 +9,7 @@
 
 import { buildBeatsFromScript } from "../../core/buildBeatsFromScript";
 import { serverFetch } from "../serverApi";
-import { pickAutoMusic, MUSIC_PREVIEW_URLS } from "../../core/registries/musicRegistry";
+import { loadMusicLibrary, pickAutoMood, pickMusicByMood } from "../../core/registries/musicRegistry";
 import { generateZoneImage } from "../../server/assets/falService";
 import { getLayoutDef, refreshCache } from "../../core/registries/layoutRegistry";
 import { measureAudioDuration, syncBeatsToTTS } from "../../core/syncBeatsToTTs";
@@ -585,12 +585,14 @@ export async function generateStructuredShort({
     }
   }
 
-  const autoMusicKey = pickAutoMusic(videoType, tone);
+  const dbMusicLibrary = await loadMusicLibrary();
+  const autoMood       = pickAutoMood(videoType, tone);
+  const autoMusic      = pickMusicByMood(autoMood, dbMusicLibrary);
 
   return {
     script, beats,
     meta: { videoType: parsedScript.videoType, language: parsedScript.language, emotionalArc: parsedScript.emotionalArc, brandColor, audience, tone, dna },
-    audio: { tts: ttsAudio, music: autoMusicKey ? { musicKey: autoMusicKey, src: MUSIC_PREVIEW_URLS[autoMusicKey], volume: 0.12 } : null },
+    audio: { tts: ttsAudio, music: autoMusic?.src ? { src: autoMusic.src, volume: 0.12 } : null },
     talkingHead: talkingHead ? { type: talkingHead.type, videoFileName: talkingHead.videoFileName || null } : null,
   };
 }
