@@ -4,6 +4,7 @@
  * Replaces static Supabase gallery.
  */
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { serverFetch } from "../../../../services/serverApi";
 
 const API_KEY  = import.meta.env.VITE_PIXABAY_API_KEY;
 const PER_PAGE = 18;
@@ -52,13 +53,12 @@ async function searchPixabay(query, mediaType, orientation, page) {
 
   return data.hits.map(hit => {
     if (isVideo) {
-      const video = hit.videos?.medium || hit.videos?.small || hit.videos?.large;
+      const video  = hit.videos?.medium || hit.videos?.small || hit.videos?.large;
       const rawUrl = video?.url;
-      const proxiedUrl = rawUrl ? `/api/proxy-video?url=${encodeURIComponent(rawUrl)}` : null;
       return {
         id:     hit.id,
         type:   "video",
-        src:    proxiedUrl,
+        src:    rawUrl,   // raw Pixabay URL — uploaded to Supabase on select
         thumb:  hit.picture_id
           ? `https://i.vimeocdn.com/video/${hit.picture_id}_295x166.jpg`
           : null,
@@ -88,6 +88,7 @@ export default function GalleryTab({ onSelect }) {
   const [page,        setPage]        = useState(1);
   const [hasMore,     setHasMore]     = useState(false);
   const [error,       setError]       = useState(null);
+  const [selecting,   setSelecting]   = useState(null); // video id being uploaded
   const searchTimeout = useRef(null);
 
   const doSearch = useCallback(async (q, type, orient, pg) => {
@@ -140,15 +141,25 @@ export default function GalleryTab({ onSelect }) {
     setPage(1);
   };
 
-  const handleSelect = (asset) => {
-    onSelect({
-      kind:  "asset",
-      asset: {
-        src:       asset.src,
-        type:      asset.type,
-        objectFit: "cover",
-      },
-    });
+  const handleSelect = async (asset) => {
+    if (asset.type === "video") {
+      setSelecting(asset.id);
+      try {
+        const res  = await serverFetch("/api/proxy-video-upload", {
+          method: "POST",
+          body:   JSON.stringify({ url: asset.src }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Upload failed");
+        onSelect({ kind: "asset", asset: { src: data.url, type: "video", objectFit: "cover" } });
+      } catch (e) {
+        setError("Video upload failed: " + e.message);
+      } finally {
+        setSelecting(null);
+      }
+    } else {
+      onSelect({ kind: "asset", asset: { src: asset.src, type: "image", objectFit: "cover" } });
+    }
   };
 
   // Aspect ratio for result cards — landscape vs portrait
@@ -247,25 +258,21 @@ export default function GalleryTab({ onSelect }) {
             <div className={`grid gap-2 content-start ${orientation === "horizontal" ? "grid-cols-3" : "grid-cols-6"}`}>
               {results.map(asset => (
                 <div key={`${asset.type}_${asset.id}`}
-                  onClick={() => handleSelect(asset)}
-                  className="cursor-pointer rounded-[8px] overflow-hidden border border-[rgba(255,255,255,0.06)] hover:border-[#7c5cfc] transition-colors relative group"
+                  onClick={() => selecting ? null : handleSelect(asset)}
+                  className={`rounded-[8px] overflow-hidden border border-[rgba(255,255,255,0.06)] transition-colors relative group ${selecting ? "cursor-wait" : "cursor-pointer hover:border-[#7c5cfc]"}`}
                   style={{ aspectRatio: cardRatio, background: "#0e0e1a" }}
                 >
-                  {asset.type === "video" ? (
-                    <video
-                      src={asset.src}
-                      muted playsInline preload="none"
-                      className="w-full h-full object-cover"
-                      onMouseEnter={e => e.target.play()}
-                      onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0; }}
-                    />
+                  <img src={asset.thumb || asset.src} className="w-full h-full object-cover" />
+                  {selecting === asset.id ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
                   ) : (
-                    <img src={asset.thumb || asset.src} className="w-full h-full object-cover" />
+                    <div className="absolute top-1.5 left-1.5 px-[5px] py-[2px] rounded-[4px] text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ background: asset.type === "video" ? "#f59e0b" : "#7c5cfc" }}>
+                      {asset.type === "video" ? "▶ VIDEO" : "IMG"}
+                    </div>
                   )}
-                  <div className="absolute top-1.5 left-1.5 px-[5px] py-[2px] rounded-[4px] text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ background: asset.type === "video" ? "#f59e0b" : "#7c5cfc" }}>
-                    {asset.type === "video" ? "▶ VIDEO" : "IMG"}
-                  </div>
                 </div>
               ))}
             </div>
