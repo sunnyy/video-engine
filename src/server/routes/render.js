@@ -61,7 +61,13 @@ async function getBundle() {
 function resolveAssetUrl(url) {
   if (!url) return url;
   if (url.startsWith("blob:")) return null;
-  // Already a safe external or relative URL — pass through unchanged
+  // Unwrap legacy proxy URLs — Chrome can fetch Pixabay CDN directly over HTTPS
+  if (url.includes("/api/proxy-video?url=")) {
+    try {
+      const inner = new URL(url, "http://localhost").searchParams.get("url");
+      return inner || null;
+    } catch { return null; }
+  }
   return url;
 }
 
