@@ -9,8 +9,7 @@ import { supabase } from "../../lib/supabase";
 async function fetchTracks() {
   const { data, error } = await supabase
     .from("music_tracks")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*");
   if (error) throw new Error(error.message);
   return data || [];
 }
