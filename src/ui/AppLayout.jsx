@@ -178,7 +178,7 @@ export default function AppLayout({ children }) {
   useEffect(() => { fetchCredits(); }, []);
 
   return (
-    <div className="flex min-h-screen text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
+    <div className="flex h-screen overflow-hidden text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
 
       {/* ── Sidebar ── */}
       <aside
@@ -224,13 +224,13 @@ export default function AppLayout({ children }) {
           </div>
 
           <NavSection title="Create Videos">
-            <NavItem icon={Icons.folder}   label="AI Videos"        to="/videos"         active={location.pathname === "/videos"} />
+            <NavItem icon={Icons.folder}   label="Videos"           to="/videos"         active={location.pathname === "/videos"} />
             <NavItem icon={Icons.ad}       label="Product Video Ad" to="/product-ads"    active={location.pathname.startsWith("/product-ads")} />
             <NavItem icon={Icons.captions} label="Video Captions"   to="/video-captions" active={location.pathname === "/video-captions"} />
           </NavSection>
 
           <NavSection title="Create Images">
-            <NavItem icon={Icons.gallery}    label="AI Images"      to="/image-generation" active={location.pathname === "/image-generation"} />
+            <NavItem icon={Icons.gallery}    label="Images"         to="/image-generation" active={location.pathname === "/image-generation"} />
             <NavItem icon={Icons.poster}     label="Product Poster" to="/product-poster"   active={location.pathname === "/product-poster"} />
             <NavItem icon={Icons.instagram}  label="Banner Design"  to="/banner-design"    active={location.pathname === "/banner-design"} />
             <NavItem icon={Icons.thumbnail}  label="Thumbnail"      to="/thumbnail"        active={location.pathname.startsWith("/thumbnail")} />
