@@ -1398,3 +1398,94 @@ router.get("/feedback", requireAuth, requireAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+/* ── Admin: service samples ── */
+router.get("/samples", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const serviceKey = req.query.service_key;
+    let query = supabaseAdmin.from("samples").select("*").order("created_at", { ascending: false }).limit(limit);
+    if (serviceKey) query = query.eq("service_key", serviceKey);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json({ samples: data || [] });
+  } catch (err) {
+    console.error("[admin/samples GET]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Public endpoint for landing page samples
+router.get("/samples/public", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const serviceKey = req.query.service_key;
+    let query = supabaseAdmin.from("samples").select("*").order("created_at", { ascending: false }).limit(limit);
+    if (serviceKey) query = query.eq("service_key", serviceKey);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json({ samples: data || [] });
+  } catch (err) {
+    console.error("[samples/public GET]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Upload sample file to storage
+router.post("/samples/upload", requireAuth, uploadMemory.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const { service_key, type } = req.body;
+    const ext = (req.file.originalname || "").split(".").pop() || (type === "video" ? "mp4" : "jpg");
+    const key = `samples/${service_key}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("system-assets").upload(key, req.file.buffer, {
+      contentType: req.file.mimetype,
+      upsert: false,
+    });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("system-assets").getPublicUrl(key);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    console.error("[admin/samples/upload]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/samples", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { type, src, poster, service_key, orientation } = req.body;
+    if (!type || !src || !service_key) return res.status(400).json({ error: "type, src, and service_key required" });
+    if (type === "video" && !poster) return res.status(400).json({ error: "poster required for video samples" });
+    const { data, error } = await supabaseAdmin.from("samples").insert({ type, src, poster: poster || null, service_key, orientation: orientation || "horizontal" }).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("[admin/samples POST]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put("/samples/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, src, poster, service_key, orientation } = req.body;
+    if (!type || !src || !service_key) return res.status(400).json({ error: "type, src, and service_key required" });
+    const { data, error } = await supabaseAdmin.from("samples").update({ type, src, poster: poster || null, service_key, orientation: orientation || "horizontal" }).eq("id", id).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("[admin/samples PUT]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/samples/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin.from("samples").delete().eq("id", req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[admin/samples DELETE]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});

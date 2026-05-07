@@ -140,7 +140,7 @@ export default function ZoneHandle({
     e.preventDefault();
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     onPushHistory();
-    const origFontSize = zone.type === "text" ? parseFloat(zone.style?.fontSize ?? 0) : 0;
+    const origFontSize = zone.type === "text" ? (parseFloat(zone.style?.fontSize) || 0) : 0;
     resizeStart.current = {
       mouseX: e.clientX, mouseY: e.clientY,
       origX: zone.x, origY: zone.y, origW: zone.width, origH: zone.height,
@@ -157,9 +157,10 @@ export default function ZoneHandle({
 
       let x = origX, y = origY, w = origW, h = origH;
 
-      const isCorner   = handle.length === 2;
-      const fromCenter = me.altKey;
-      const lockRatio  = me.shiftKey && isCorner;
+      const isCorner    = handle.length === 2;
+      const fromCenter  = me.altKey;
+      // Ctrl+Shift = fixed-ratio resize, Shift alone = boundary-only resize (no font scale)
+      const lockRatio   = me.ctrlKey && me.shiftKey;
       const aspectRatio = origW / origH;
 
       if (fromCenter) {
@@ -202,18 +203,13 @@ export default function ZoneHandle({
         x: Math.round(x*10)/10, y: Math.round(y*10)/10,
         width: Math.round(w*10)/10, height: Math.round(h*10)/10,
       };
-      if (zone.type === "text" && origFontSize > 0) {
+      // Default (no Shift): font scales with zone size so text stays proportional.
+      // Shift alone: resize boundary only, keep font size.
+      // Ctrl+Shift: fixed-ratio resize (lockRatio above), keep font size.
+      if (zone.type === "text" && origFontSize > 0 && !me.shiftKey) {
         const isVertOnly = !handle.includes("e") && !handle.includes("w");
-        if (isVertOnly) {
-          if (!me.shiftKey) {
-            update.style = { fontSize: Math.max(8, Math.round(origFontSize * (h / origH))) };
-          }
-        } else {
-          delete update.height;
-          if (!me.shiftKey) {
-            update.style = { fontSize: Math.max(8, Math.round(origFontSize * (w / origW))) };
-          }
-        }
+        const ratio = isVertOnly ? (h / origH) : (w / origW);
+        update.style = { fontSize: Math.max(8, Math.round(origFontSize * ratio)) };
       }
       onUpdate(zone.id, update);
     };

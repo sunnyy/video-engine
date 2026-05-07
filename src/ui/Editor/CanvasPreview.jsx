@@ -79,7 +79,8 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
   const videoH         = project.meta.height || 1920;
   const is169          = project.meta.orientation === "16:9";
   const durationFrames = Math.max(1, Math.floor((project.duration_sec || 1) * fps));
-  const activeBeat     = project.beats.find(b => b.id === activeBeatId);
+   const activeBeat     = project.beats.find(b => b.id === activeBeatId);
+   const previewProject = activeBeat ? { ...project, beats: [activeBeat] } : project;
 
   // Compute canvas dimensions to fit container maintaining aspect ratio.
   // For 16:9 (landscape): scale to full available width — container scrolls vertically.
@@ -536,7 +537,9 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
               { key: "⇧ + arrows",   desc: "Nudge zone 1%" },
               { key: "⌘D",           desc: "Duplicate zone" },
               { key: "Del / ⌫",      desc: "Remove / hide zone" },
-              { key: "⇧ + drag",     desc: "Lock aspect ratio while resizing" },
+              { key: "drag (text)",   desc: "Resize text zone + font together" },
+              { key: "⇧ + drag (text)", desc: "Resize text boundary only, keep font" },
+              { key: "⌃⇧ + drag",   desc: "Fixed-ratio resize" },
               { section: "Zoom" },
               { key: "⌘=  /  ⌘+",   desc: "Zoom in" },
               { key: "⌘-",           desc: "Zoom out" },
@@ -633,12 +636,12 @@ export default function CanvasPreview({ selectedZoneIds, onSelectZone }) {
           >
             {/* Canvas */}
             <div style={{ position: "relative", width: effectiveCanvasW, height: effectiveCanvasH, outline: "2px solid rgba(255,255,255,0.18)", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-              <Thumbnail
-                key={`thumb-${videoW}x${videoH}`}
-                acknowledgeRemotionLicense
-                component={VideoComposition}
-                inputProps={{ project, previewMode: true }}
-                frameToDisplay={(() => {
+               <Thumbnail
+                 key={`thumb-${videoW}x${videoH}-${activeBeat?.id}`}
+                 acknowledgeRemotionLicense
+                 component={VideoComposition}
+                 inputProps={{ project: previewProject, previewMode: true }}
+                 frameToDisplay={(() => {
                   const beatStart    = Math.floor((activeBeat.start_sec || 0) * fps);
                   const beatEnd      = Math.floor((activeBeat.end_sec   || 0) * fps) - 1;
                   // After pausing: clamp to active beat's range to avoid showing two beats at once

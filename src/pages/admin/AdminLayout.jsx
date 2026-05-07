@@ -6,20 +6,21 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { signOut } from "../../services/auth/authService";
 
 const NAV = [
-  { to: "/admin",            label: "Dashboard",     icon: "▦" },
-  { to: "/admin/analytics",  label: "Analytics",     icon: "◈" },
-  { to: "/admin/users",      label: "Users",         icon: "◎" },
-  { to: "/admin/credits",    label: "Credits",        icon: "⊕" },
-  { to: "/admin/plans",      label: "Plans & Pricing", icon: "◇" },
-  { to: "/admin/sales",      label: "Sales & Revenue", icon: "◈" },
-  { to: "/admin/layouts",    label: "Layout Manager", icon: "⊞" },
-  { to: "/admin/ai-generator",     label: "Layout Generator", icon: "✦" },
-  { to: "/admin/library",        label: "Image Library",  icon: "⊟" },
-  { to: "/admin/music",          label: "Music Library",  icon: "♫" },
-  { to: "/admin/sfx",            label: "SFX Library",    icon: "◈" },
-  { to: "/admin/model-avatars",  label: "Model Avatars",  icon: "◎" },
-  { to: "/admin/feedback",       label: "Feedback",       icon: "◎" },
-  { to: "/admin/system",         label: "System",         icon: "◉" },
+   { to: "/admin",            label: "Dashboard",     icon: "▦" },
+   { to: "/admin/analytics",  label: "Analytics",     icon: "◈" },
+   { to: "/admin/users",      label: "Users",         icon: "◎" },
+   { to: "/admin/credits",    label: "Credits",        icon: "⊕" },
+   { to: "/admin/plans",      label: "Plans & Pricing", icon: "◇" },
+   { to: "/admin/sales",      label: "Sales & Revenue", icon: "◈" },
+   { to: "/admin/layouts",    label: "Layout Manager", icon: "⊞" },
+   { to: "/admin/ai-generator",     label: "Layout Generator", icon: "✦" },
+   { to: "/admin/library",        label: "Image Library",  icon: "⊟" },
+   { to: "/admin/music",          label: "Music Library",  icon: "♫" },
+   { to: "/admin/sfx",            label: "SFX Library",    icon: "◈" },
+   { to: "/admin/model-avatars",  label: "Model Avatars",  icon: "◎" },
+   { to: "/admin/samples",        label: "Samples",        icon: "🖼" },
+   { to: "/admin/feedback",       label: "Feedback",       icon: "◎" },
+   { to: "/admin/system",         label: "System",         icon: "◉" },
 ];
 
 export default function AdminLayout({ children, fullBleed = false }) {

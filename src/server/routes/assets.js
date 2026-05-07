@@ -729,11 +729,14 @@ router.post("/transcription/transcribe", requireAuth, uploadTranscription.single
 
 router.get("/transcription/history", requireAuth, async (req, res) => {
   try {
+    const limit  = Math.min(parseInt(req.query.limit)  || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0,  0);
     const { data, error } = await supabaseAdmin
       .from("transcriptions")
       .select("id, file_name, duration_seconds, credits_used, transcript, segments, language, created_at")
       .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) throw error;
     res.json({ transcriptions: data || [] });
   } catch (err) {

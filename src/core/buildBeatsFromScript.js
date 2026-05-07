@@ -891,21 +891,19 @@ export async function buildBeatsFromScript({
       transition: chooseTransition(visual.layout, index, energy, isLast, null /* anti-repeat applied below */),
 
       spoken, intent, energy, visual_hint, language, role,
-      beatType: item.beatType ?? null,
+      beatType:   item.beatType   ?? null,
+      itemNumber: item.itemNumber ?? null,
+      itemTitle:  item.itemTitle  ?? null,
+      itemBody:   item.itemBody   ?? null,
       asset_hint: item.asset_hint || null,
-      // Pre-generated zone content seeds from the script director
-      // These are passed through to generateZoneContent as creative seeds.
-      // For item beats: beat.cta holds the hook type tag ("NEGATIVE", "FOMO", etc.)
-      // and beat.label holds the ordinal ("HOOK #3"). Item layouts use a stat zone
-      // for the number and a label zone for the type tag — remap accordingly.
+      // Pre-generated zone content seeds passed through to generateZoneContent.
       headline: item.headline || null,
       subtext:  item.subtext  || null,
-      label:    item.beatType === "item" ? (item.cta    || null) : (item.label || null),
-      stat:     item.beatType === "item" ? null                 : (item.stat  || null),
+      label:    item.label    || null,
+      stat:     item.stat     || null,
       tagline:  item.tagline  || null,
       quote:    item.quote    || null,
-      cta:      item.beatType === "item" ? null
-              : (item.beatType === "cta" && ["FOMO","STORY","CURIOSITY","NEGATIVE","CONTRAST","EMPATHY","PERSONAL","URGENCY"].includes((item.cta || "").toUpperCase()))
+      cta:      (item.beatType === "cta" && ["FOMO","STORY","CURIOSITY","NEGATIVE","CONTRAST","EMPATHY","PERSONAL","URGENCY"].includes((item.cta || "").toUpperCase()))
                 ? null  // hook types leaked into the cta beat field — strip them
                 : (item.cta || null),
       duration_sec: end_sec - start_sec,

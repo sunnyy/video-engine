@@ -99,17 +99,6 @@ export const TYPOGRAPHY_SYSTEMS = {
     weightDisplay: 700,
     weightBody:    400,
   },
-  handwritten: {
-    label:         "Handwritten",
-    display:       "'Dancing Script', cursive",
-    headline:      "'Dancing Script', cursive",
-    subtext:       "'Nunito', sans-serif",
-    label:         "'Nunito', sans-serif",
-    quote:         "'Great Vibes', cursive",
-    stat:          "'Bebas Neue', sans-serif",
-    weightDisplay: 700,
-    weightBody:    400,
-  },
   playful: {
     label:         "Playful",
     display:       "'Fredoka One', cursive",
@@ -171,7 +160,7 @@ export const TYPOGRAPHY_SYSTEMS = {
 const NICHE_TYPOGRAPHY_MAP = {
   spiritual:     "editorial",   // Playfair — devotional, not Bebas
   skincare:      "fashion",     // Raleway + Josefin Sans — lean, elegant
-  food:          "handwritten", // Dancing Script — warm, personal, appetizing
+  food:          "warm",        // Approachable, personal, appetizing
   travel:        "cinematic",   // Bebas + Outfit — adventure feel
   lifestyle:     "fashion",     // Raleway — chic, personal
   finance:       "minimal",     // Clean Outfit — trustworthy, professional

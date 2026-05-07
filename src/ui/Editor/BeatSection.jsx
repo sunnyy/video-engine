@@ -260,8 +260,8 @@ export default function BeatSection({ beat }) {
         <Card>
           <SliderRow
             label="Beat Duration"
-            min={1}
-            max={60}
+            min={0.1}
+            max={10}
             step={0.1}
             value={duration}
             onChange={(v) => updateBeat(targetBeat.id, { duration_sec: Math.round(v * 10) / 10 })}

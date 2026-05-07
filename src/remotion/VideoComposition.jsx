@@ -189,38 +189,37 @@ export default function VideoComposition({ project, previewMode = false }) {
         let inDipOverlay = null;
 
         if (inOverlap > 0) {
-          const progress = interpolate(localFrame, [0, inOverlap], [0, 1], {
-            extrapolateLeft: "clamp", extrapolateRight: "clamp",
-            easing: Easing.out(Easing.cubic),
-          });
-          switch (transition.type) {
-            case "fade": case "dissolve": inStyle.opacity = progress; break;
-            case "slideLeft":  inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width,0])}px)`); break;
-            case "slideRight": inTransformParts.push(`translateX(${interpolate(progress,[0,1],[-meta.width,0])}px)`); break;
-            case "slideUp":    inTransformParts.push(`translateY(${interpolate(progress,[0,1],[meta.height,0])}px)`); break;
-            case "slideDown":  inTransformParts.push(`translateY(${interpolate(progress,[0,1],[-meta.height,0])}px)`); break;
-            case "zoom":
-              // No opacity — full visibility so the scale animation is seen from frame 0 (like slides)
-              inTransformParts.push(`scale(${1 + (1 - progress) * 0.9 * intensity})`);
-              break;
-            case "dipBlack": inDipOverlay = `rgba(0,0,0,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
-            case "dipWhite": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
-            case "whipPan":
-              inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width * 0.4 * intensity, 0])}px)`);
-              inStyle.opacity = interpolate(progress,[0,0.3,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
-              break;
-            case "spin":
-              inTransformParts.push(`rotate(${interpolate(progress,[0,1],[180 * intensity, 0])}deg)`);
-              inStyle.opacity = progress;
-              break;
-            case "glitch":
-              inTransformParts.push(`scale(${interpolate(progress,[0,0.5,1],[1.08,1.02,1])})`);
-              inStyle.opacity = interpolate(progress,[0,0.2,0.4,0.6,0.8,1],[0,1,0.6,1,0.8,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
-              break;
-            case "flash": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,0.55,1],[1,0,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
-            default: inStyle.opacity = progress; break; // crossfade for cut/unknown: new beat fades in so old beat shows through
-          }
-        }
+           const progress = interpolate(localFrame, [0, inOverlap], [0, 1], {
+             extrapolateLeft: "clamp", extrapolateRight: "clamp",
+             easing: Easing.out(Easing.cubic),
+           });
+           switch (transition.type) {
+             case "fade": case "dissolve": inStyle.opacity = progress; break;
+             case "slideLeft":  inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width,0])}px)`); break;
+             case "slideRight": inTransformParts.push(`translateX(${interpolate(progress,[0,1],[-meta.width,0])}px)`); break;
+             case "slideUp":    inTransformParts.push(`translateY(${interpolate(progress,[0,1],[meta.height,0])}px)`); break;
+             case "slideDown":  inTransformParts.push(`translateY(${interpolate(progress,[0,1],[-meta.height,0])}px)`); break;
+             case "zoom":
+               inTransformParts.push(`scale(${1 + (1 - progress) * 0.9 * intensity})`);
+               break;
+             case "dipBlack": inDipOverlay = `rgba(0,0,0,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
+             case "dipWhite": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,1],[1,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
+             case "whipPan":
+               inTransformParts.push(`translateX(${interpolate(progress,[0,1],[meta.width * 0.4 * intensity, 0])}px)`);
+               inStyle.opacity = interpolate(progress,[0,0.3,1],[0,1,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
+               break;
+             case "spin":
+               inTransformParts.push(`rotate(${interpolate(progress,[0,1],[180 * intensity, 0])}deg)`);
+               inStyle.opacity = progress;
+               break;
+             case "glitch":
+               inTransformParts.push(`scale(${interpolate(progress,[0,0.5,1],[1.08,1.02,1])})`);
+               inStyle.opacity = interpolate(progress,[0,0.2,0.4,0.6,0.8,1],[0,1,0.6,1,0.8,1],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" });
+               break;
+             case "flash": inDipOverlay = `rgba(255,255,255,${interpolate(progress,[0,0.55,1],[1,0,0],{ extrapolateLeft:"clamp", extrapolateRight:"clamp" })})`; break;
+             default: inStyle.opacity = progress; break; // crossfade for cut/unknown: new beat fades in so old beat shows through
+           }
+         }
         if (inTransformParts.length) inStyle.transform = inTransformParts.join(" ");
 
         let outStyle = {};

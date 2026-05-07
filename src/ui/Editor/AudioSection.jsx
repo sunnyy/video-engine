@@ -57,7 +57,11 @@ function TTSTrack({ audio, script, onUpload, onRemove, onVolumeChange, onGenerat
     sourceRef.current = null;
     ctxRef.current?.close();
     ctxRef.current = null;
+    setPlaying(false);
   };
+
+  // Stop audio when tab changes away from Audio panel
+  useEffect(() => () => stopAudio(), []);
 
   const togglePlay = async () => {
     if (!audio?.src) return;
@@ -280,6 +284,9 @@ function MusicTrack({ audio, onSelectLibrary, onUpload, onRemove, onVolumeChange
   const fileRef  = useRef(null);
 
   useEffect(() => { loadMusicLibrary().then(setDbLibrary); }, []);
+
+  // Stop audio when tab changes away from Audio panel
+  useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null; }, []);
 
   const allTracks = Object.values(dbLibrary).flat();
 

@@ -20,41 +20,15 @@ const GENDER_COLORS = {
   child_boy:   "#34d399",
 };
 
-const DEFAULT_PROMPT = `Use the attached image only as loose inspiration for photographic quality, framing, realism level, styling tone, and overall production standard.
+const DEFAULT_PROMPT = `Use the attached image only as loose inspiration for photographic quality, framing, realism level, styling tone, and overall production standard. Do not copy the face, identity, bone structure, facial proportions, eye shape, nose shape, lips, hairstyle, skin tone, ethnicity, or any recognizable traits from the reference. Generate a completely new person with a clearly different identity, unique facial structure, distinct bone proportions, and original facial features. The result must borrow only the production quality and visual polish of the reference, never the person. Avoid resemblance, identity carryover, same-person variations, or facial similarity to the reference subject.
 
-Do not copy the face, identity, bone structure, eye shape, nose shape, lips, hairstyle, skin tone, ethnicity, facial proportions, or recognizable traits from the reference.
+Create a highly realistic commercial studio portrait of a completely different real human. The subject must look genuinely photographed, with natural skin texture, visible pores, subtle asymmetry, lifelike eyes, realistic facial detail, and small natural imperfections. Avoid plastic skin, over-smoothing, uncanny symmetry, synthetic beauty, exaggerated perfection, or any AI-generated look.
 
-Generate a completely new person with a distinctly different identity, unique facial structure, different bone proportions, original facial features, and a clearly separate appearance.
+The subject has a neutral calm expression and naturally styled hair appropriate to the face, with no gender-specific styling bias. Camera is positioned at precise eye level, straight-on, centered for a clean studio portrait. Framing is a mid-shot from head to upper thighs with the subject centered in frame. Perspective is natural with accurate body proportions and no distortion. The subject is standing upright facing directly toward the camera with arms relaxed naturally at the sides, posture neutral and balanced.
 
-The result must feel inspired only by the production quality and visual polish of the reference — never by the person in it.
+The subject is wearing a fitted solid black short-sleeve crew-neck t-shirt and blue straight-fit jeans with realistic fabric texture, natural fit, and clean proportions. Background is a clean light grey seamless studio backdrop with no visible objects. Lighting is soft even professional studio lighting with balanced illumination across the face and body, subtle contour shadows, realistic skin texture, and sharp focus.
 
-Avoid face similarity, identity carryover, same-person variations, or resemblance to the reference subject.
-
-Create a highly realistic commercial portrait of a real human with natural skin texture, realistic pores, authentic asymmetry, lifelike eyes, subtle imperfections, and believable facial detail.
-
-The person should look like a genuine photographed human, not AI-generated.
-
-Avoid plastic skin, over-smoothing, uncanny symmetry, synthetic beauty, exaggerated perfection, or artificial facial features.
-
-Professional commercial lighting, premium studio portrait, waist-up framing, clean composition, sharp focus, natural depth, photorealistic quality.
-
-This generated person becomes the fixed identity for the shot.
-
-Preserve the same identity consistently within this image: same face structure, same skin texture, same facial proportions, same hairstyle, same natural expression, and same overall appearance throughout the render.
-
-Create a hyper-realistic candid lifestyle portrait of this person sitting at a cozy modern café with warm ambient lighting and soft brick walls in the background.
-
-She is wearing a fitted black sleeveless top with beige trim detailing that naturally shows mild, realistic cleavage due to the fit of the garment, styled in a casual yet chic manner.
-
-Her long straight hair falls naturally over her shoulders, and she gently tucks it behind her ear with one hand while looking toward camera with a soft, content smile.
-
-Include subtle accessories like minimal bracelets for a natural everyday look.
-
-Background should feature softly blurred café tables, warm hanging lights, and a relaxed social atmosphere.
-
-Lighting should be warm and diffused, enhancing skin texture and maintaining realistic color tones.
-
-Photography style: high-resolution candid portrait, shallow depth of field, sharp focus on subject, natural color grading, cozy modern aesthetic, premium lifestyle photography.`;
+Photography style is high-resolution commercial studio portrait, clean minimal composition, realistic tones, natural color grading, and premium studio realism.`;
 
 const C = {
   card:  { background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, overflow: "hidden" },

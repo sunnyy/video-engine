@@ -1,7 +1,7 @@
 /**
  * ZoneEditor.jsx — grouped, collapsible zone editor
  */
-import { useState, useEffect, useContext, createContext } from "react";
+import { useState, useEffect, useRef, useContext, createContext } from "react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -96,16 +96,29 @@ function Slider({ label, value, onChangeSilent, onCommit, onStart, min = 0, max 
 }
 
 function ColorRow({ label, value, onChange, onClear }) {
+  const [hex, setHex] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setHex(value); }, [value]);
+  const handleText = (v) => {
+    setHex(v);
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v);
+  };
   return (
     <div>
       {label && <Label>{label}</Label>}
-      <div className="flex items-center gap-2 bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[8px]">
-        <input type="color" value={value} onChange={e => onChange(e.target.value)}
-          className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0" />
-        <span className="text-[12px] font-mono text-[#b0b0c8] flex-1 truncate">{value}</span>
+      <div className="flex items-center gap-1.5 bg-[#0e0e1a] rounded-[6px] px-2 h-[28px]">
+        <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(hex) ? hex : value}
+          onChange={e => { onChange(e.target.value); setHex(e.target.value); }}
+          className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent shrink-0" />
+        <input type="text" value={hex}
+          onFocus={() => { focused.current = true; }}
+          onBlur={() => { focused.current = false; setHex(value); }}
+          onChange={e => handleText(e.target.value)}
+          className="w-full bg-transparent border-0 text-[11px] font-mono text-[#b0b0c8] outline-none min-w-0"
+          spellCheck={false} />
         {onClear && (
           <button onClick={onClear}
-            className="text-[11px] text-[#7070a0] hover:text-[#f87171] bg-transparent border-0 cursor-pointer">clear</button>
+            className="text-[10px] text-[#7070a0] hover:text-[#f87171] bg-transparent border-0 cursor-pointer shrink-0">×</button>
         )}
       </div>
     </div>
@@ -117,8 +130,8 @@ function Sel({ label, value, onChange, options }) {
     <div>
       {label && <Label>{label}</Label>}
       <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[9px] text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer appearance-none"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239494a8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}>
+        className="w-full bg-[#0e0e1a] border-0 rounded-[6px] px-2 text-[13px] text-[#e8e8f0] focus:outline-none cursor-pointer appearance-none"
+        style={{ height: 28, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239494a8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}>
         {options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
       </select>
     </div>
@@ -128,15 +141,15 @@ function Sel({ label, value, onChange, options }) {
 /* ── Compact number input with icon prefix (for LH, LS, Size, Opacity) ── */
 function CompactInput({ icon, value, onChange, onCommit, min, max, step = 1, unit }) {
   return (
-    <div className="flex items-center gap-[5px] bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-[8px] py-[7px]">
-      {icon && <span className="text-[10px] text-[#55556a] shrink-0 select-none">{icon}</span>}
+    <div className="flex items-center gap-[4px] bg-[#0e0e1a] rounded-[6px] px-[6px] h-[28px]">
+      {icon && <span className="text-[9px] text-[#55556a] shrink-0 select-none">{icon}</span>}
       <input type="number" value={value} min={min} max={max} step={step}
         onChange={e => onChange(Number(e.target.value))}
         onBlur={onCommit} onKeyDown={e => e.key === "Enter" && onCommit?.()}
-        className="w-full bg-transparent text-[12px] text-[#e8e8f0] outline-none min-w-0 font-mono"
+        className="w-full bg-transparent border-0 text-[13px] text-[#e8e8f0] outline-none min-w-0 font-mono"
         style={{ MozAppearance: "textfield", appearance: "textfield" }}
       />
-      {unit && <span className="text-[10px] text-[#55556a] shrink-0 select-none">{unit}</span>}
+      {unit && <span className="text-[9px] text-[#55556a] shrink-0 select-none">{unit}</span>}
     </div>
   );
 }
@@ -144,17 +157,28 @@ function CompactInput({ icon, value, onChange, onCommit, min, max, step = 1, uni
 /* ── Accordion context ── */
 const AccordionCtx = createContext(null);
 
-function Accordion({ defaultSection, children }) {
-  const [openSection, setOpenSection] = useState(defaultSection ?? null);
+// Persists the last-opened section across zone switches so the user
+// doesn't lose their place when clicking between zones.
+let _persistedSection = "Content";
+
+function Accordion({ defaultSection, children, persist = false }) {
+  const [openSection, setOpenSection] = useState(
+    persist ? _persistedSection : (defaultSection ?? null)
+  );
+  const set = (val) => {
+    const next = typeof val === "function" ? val(openSection) : val;
+    if (persist) _persistedSection = next ?? "Content";
+    setOpenSection(next);
+  };
   return (
-    <AccordionCtx.Provider value={{ openSection, setOpenSection }}>
+    <AccordionCtx.Provider value={{ openSection, setOpenSection: set }}>
       {children}
     </AccordionCtx.Provider>
   );
 }
 
 /* ── Collapsible section wrapper ── */
-function Section({ title, children, defaultOpen = true, badge }) {
+function Section({ title, children, defaultOpen = true, badge, compact = false }) {
   const accordion = useContext(AccordionCtx);
   // Controlled by accordion if inside one, otherwise local state
   const [localOpen, setLocalOpen] = useState(defaultOpen);
@@ -172,7 +196,9 @@ function Section({ title, children, defaultOpen = true, badge }) {
         className="w-full flex items-center justify-between py-[8px] px-0 group bg-transparent border-0 cursor-pointer"
       >
         <span className="flex items-center gap-[6px]">
-          <span className="text-[13px] font-bold tracking-[0.10em] uppercase text-[#7878a0] group-hover:text-[#b0b0cc] transition-colors"
+          <span className={compact
+            ? "text-[10px] font-medium tracking-[0.06em] text-[#55556a] group-hover:text-[#8080a0] transition-colors"
+            : "text-[13px] font-bold tracking-[0.10em] uppercase text-[#7878a0] group-hover:text-[#b0b0cc] transition-colors"}
             style={{ fontFamily: "'JetBrains Mono', monospace" }}>{title}</span>
           {badge && <span className="text-[9px] px-[5px] py-[1px] rounded-[4px] bg-[rgba(124,92,252,0.15)] text-[#7c5cfc] font-bold">{badge}</span>}
         </span>
@@ -420,7 +446,7 @@ export default function ZoneEditor({
   const content  = safeZone.content || {};
   const style    = safeZone.style   || {};
 
-  const isText       = zoneType === "text";
+  const isText       = zoneType === "text" || content.kind === "text";
   const isDecorative = zoneType === "decorative" || zoneType === "icon";
   const isBlock      = content.kind === "block";
   const isGradientOverlay = zoneType === "decorative" && !content.decorativeId && !content.iconId && !content.shape;
@@ -436,8 +462,8 @@ export default function ZoneEditor({
 
   const start   = safeZone.start          ?? zoneDef?.start          ?? 0;
   const end     = safeZone.end            !== undefined ? safeZone.end : (zoneDef?.end ?? null);
-  const enter   = safeZone.enterAnimation ?? zoneDef?.enterAnimation ?? "fadeIn";
-  const exit    = safeZone.exitAnimation  ?? zoneDef?.exitAnimation  ?? "none";
+   const enter   = safeZone.enterAnimation ?? zoneDef?.enterAnimation ?? "fadeIn";
+   const exit    = safeZone.exitAnimation  ?? zoneDef?.exitAnimation  ?? "none";
   const radius  = style.borderRadius  ?? 0;
   const shadow  = style.shadowBlur    ?? 0;
   const padding = style.contentPadding ?? 0;
@@ -527,7 +553,7 @@ export default function ZoneEditor({
   /* ── TEXT ── */
   if (isText) return (
     <div className="pb-6">
-    <Accordion defaultSection="Content">
+    <Accordion defaultSection="Content" persist>
 
       {/* Content */}
       <Section title="Content" icon="✏️">
@@ -545,7 +571,8 @@ export default function ZoneEditor({
             className="flex-1 bg-[#0e0e1a] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-2 text-[13px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none resize-none placeholder-[#55556a]"
           />
         </div>
-        {/* AI Role */}
+        {/* AI Role — admin only */}
+        {isAdmin && (
         <div className="mb-4">
           <Label>AI Role</Label>
           <div className="flex gap-[4px] flex-wrap">
@@ -564,8 +591,10 @@ export default function ZoneEditor({
             })}
           </div>
         </div>
+        )}
 
-        {/* Lock zone — AI / seed injection won't overwrite this zone's content */}
+        {/* Lock zone — admin only */}
+        {isAdmin && (
         <div className="mb-4 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-[#9494a8]"
@@ -592,6 +621,7 @@ export default function ZoneEditor({
             />
           </button>
         </div>
+        )}
 
         {/* Style Presets */}
         <Label>Presets</Label>
@@ -644,118 +674,112 @@ export default function ZoneEditor({
       </Section>
 
       {/* Typography */}
-      <Section title="Typography" icon="Aa">
-        {/* Row 1 — Font Family */}
-        <div className="mb-2">
-          <Label>Font Family</Label>
-          <Sel value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyleBulk(slot, { fontFamily: v, _userFontFamily: true })} options={FONT_FAMILIES} />
-        </div>
+      <Section title="Typography">
 
-        {/* Row 2 — Weight | Size */}
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <Label>Weight</Label>
+        {/* Family + Weight + I/U/S — one row */}
+        <div style={{ display: "flex", gap: 5, alignItems: "flex-end", marginBottom: 7 }}>
+          <div style={{ flex: 2, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Family</div>
+            <Sel value={style.fontFamily ?? "inherit"} onChange={v => updateTextStyleBulk(slot, { fontFamily: v, _userFontFamily: true })} options={FONT_FAMILIES} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Weight</div>
             <select
               value={style.fontWeight ?? 700}
               onChange={e => updateTextStyle(slot, "fontWeight", Number(e.target.value))}
-              className="w-full bg-[#0e0e1a] border border-[rgba(255,255,255,0.1)] rounded-[8px] px-3 py-[7px] text-[12px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none cursor-pointer appearance-none"
-              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239494a8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}>
+              className="w-full bg-[#0e0e1a] border-0 rounded-[6px] px-2 text-[13px] text-[#e8e8f0] focus:outline-none cursor-pointer appearance-none"
+              style={{ height: 28, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239494a8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}>
               {FONT_WEIGHTS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
             </select>
           </div>
+          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+            {[
+              { label: "I", title: "Italic",        prop: "fontStyle",      val: "italic",       off: "normal", s: { fontStyle: "italic" } },
+              { label: "U", title: "Underline",     prop: "textDecoration", val: "underline",    off: "none",   s: { textDecoration: "underline" } },
+              { label: "S", title: "Strikethrough", prop: "textDecoration", val: "line-through", off: "none",   s: { textDecoration: "line-through" } },
+            ].map(({ label, title, prop, val, off, s }) => (
+              <button key={title} title={title}
+                onClick={() => updateTextStyle(slot, prop, style[prop] === val ? off : val)}
+                style={{ ...(style[prop] === val ? ACTIVE_BTN : INACTIVE_BTN), width: 26, height: 28, borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", ...s }}>
+                <span style={s}>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Size + Line H + Spacing + Opacity */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 5, marginBottom: 7 }}>
           <div>
-            <Label>Size</Label>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Size</div>
             <CompactInput icon="T" value={Math.round(parseFloat(style.fontSize ?? 32))}
               onChange={v => setStyleSilent("fontSize", v)}
               onCommit={commit} min={10} max={300} unit="px" />
           </div>
-        </div>
-
-        {/* Row 3 — Line Height | Letter Spacing | Opacity */}
-        <div className="grid grid-cols-3 gap-2 mb-2">
           <div>
-            <Label>Line H</Label>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Line H</div>
             <CompactInput icon="↕" value={Math.round(parseFloat(style.lineHeight ?? 1.15) * 100) / 100}
               onChange={v => setStyleSilent("lineHeight", v)}
               onCommit={commit} min={0.7} max={3} step={0.05} unit="×" />
           </div>
           <div>
-            <Label>Spacing</Label>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Space</div>
             <CompactInput icon="↔" value={Math.round(parseFloat(style.letterSpacing ?? 0) * 10) / 10}
               onChange={v => setStyleSilent("letterSpacing", v)}
               onCommit={commit} min={-10} max={50} step={0.5} unit="px" />
           </div>
           <div>
-            <Label>Opacity</Label>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Opacity</div>
             <CompactInput icon="◎" value={Math.round(opacity * 100)}
               onChange={v => setStyleSilent("opacity", v / 100)}
               onCommit={commit} min={0} max={100} unit="%" />
           </div>
         </div>
 
-        {/* Row 4 — Style | Align | Case — all three groups in one labeled row */}
-        <div className="flex gap-2 mb-2">
-          <div className="shrink-0">
-            <Label>Style</Label>
-            <div className="flex gap-[3px]">
-              {[
-                { label: "I", title: "Italic",        prop: "fontStyle",      val: "italic",       off: "normal", style: { fontStyle: "italic" } },
-                { label: "U", title: "Underline",     prop: "textDecoration", val: "underline",    off: "none",   style: { textDecoration: "underline" } },
-                { label: "S", title: "Strikethrough", prop: "textDecoration", val: "line-through", off: "none",   style: { textDecoration: "line-through" } },
-              ].map(({ label, title, prop, val, off, style: s }) => (
-                <ToggleBtn key={title} title={title}
-                  active={style[prop] === val}
-                  onClick={() => updateTextStyle(slot, prop, style[prop] === val ? off : val)}
-                  style={s}
-                ><span style={s}>{label}</span></ToggleBtn>
-              ))}
-            </div>
-          </div>
-          <div className="flex-1">
-            <Label>Align</Label>
-            <div className="flex gap-[3px]">
-              {[
-                { v: "left",    label: "⬦", title: "Left"    },
-                { v: "center",  label: "◈", title: "Center"  },
-                { v: "right",   label: "⬧", title: "Right"   },
-                { v: "justify", label: "≡", title: "Justify" },
-              ].map(({ v, label, title }) => (
-                <button key={v} title={title}
-                  onClick={() => updateTextStyle(slot, "textAlign", v)}
-                  className="flex-1 py-[6px] rounded-[6px] text-[13px] border cursor-pointer transition-all"
-                  style={(style.textAlign ?? "center") === v ? ACTIVE_BTN : INACTIVE_BTN}
-                >{label}</button>
-              ))}
-            </div>
-          </div>
-          <div className="flex-1">
-            <Label>Case</Label>
-            <div className="flex gap-[3px]">
-              {[
-                { v: "none",       label: "Ag",  title: "None"       },
-                { v: "uppercase",  label: "AG",  title: "Uppercase"  },
-                { v: "lowercase",  label: "ag",  title: "Lowercase"  },
-                { v: "capitalize", label: "Ag↑", title: "Capitalize" },
-              ].map(({ v, label, title }) => (
-                <button key={v} title={title}
-                  onClick={() => updateTextStyle(slot, "textTransform", v)}
-                  className="flex-1 py-[6px] rounded-[6px] text-[10px] font-bold border cursor-pointer transition-all"
-                  style={(style.textTransform ?? "none") === v ? ACTIVE_BTN : INACTIVE_BTN}>
-                  {label}
-                </button>
-              ))}
-            </div>
+        {/* Align + Case */}
+        <div style={{ marginBottom: 7 }}>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Align / Case</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            {[
+              { v: "left",    label: "⬦", title: "Left"    },
+              { v: "center",  label: "◈", title: "Center"  },
+              { v: "right",   label: "⬧", title: "Right"   },
+              { v: "justify", label: "≡", title: "Justify" },
+            ].map(({ v, label, title }) => (
+              <button key={v} title={title}
+                onClick={() => updateTextStyle(slot, "textAlign", v)}
+                style={{ ...((style.textAlign ?? "center") === v ? ACTIVE_BTN : INACTIVE_BTN), width: 26, height: 26, borderRadius: 5, border: "none", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {label}
+              </button>
+            ))}
+            <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.1)", margin: "0 3px", flexShrink: 0 }} />
+            {[
+              { v: "none",       label: "Ag",  title: "None"       },
+              { v: "uppercase",  label: "AG",  title: "Uppercase"  },
+              { v: "lowercase",  label: "ag",  title: "Lowercase"  },
+              { v: "capitalize", label: "Ag↑", title: "Capitalize" },
+            ].map(({ v, label, title }) => (
+              <button key={v} title={title}
+                onClick={() => updateTextStyle(slot, "textTransform", v)}
+                style={{ ...((style.textTransform ?? "none") === v ? ACTIVE_BTN : INACTIVE_BTN), height: 26, padding: "0 5px", borderRadius: 5, border: "none", cursor: "pointer", fontSize: 10, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Row 5 — Color | Background */}
-        <div className="grid grid-cols-2 gap-2">
-          <ColorRow label="Color" value={style.color ?? "#ffffff"}
-            onChange={v => updateTextStyle(slot, "color", v)} />
-          <ColorRow label="Background"
-            value={!style.background || style.background === "transparent" ? "#000000" : style.background}
-            onChange={v => updateTextStyle(slot, "background", v)}
-            onClear={() => updateTextStyle(slot, "background", "transparent")} />
+        {/* Color + Background */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Color</div>
+            <ColorRow value={style.color ?? "#ffffff"} onChange={v => updateTextStyle(slot, "color", v)} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginBottom: 3 }}>Background</div>
+            <ColorRow
+              value={!style.background || style.background === "transparent" ? "#000000" : style.background}
+              onChange={v => updateTextStyle(slot, "background", v)}
+              onClear={() => updateTextStyle(slot, "background", "transparent")} />
+          </div>
         </div>
       </Section>
 
@@ -866,7 +890,7 @@ export default function ZoneEditor({
         <div className="grid grid-cols-2 gap-3">
           <Slider label="Start" value={Number(start.toFixed(1))}
             onChangeSilent={v => setLayoutSilent("start", v)}
-            onCommit={commit} min={0} max={30} step={0.1} unit="s" />
+            onCommit={commit} min={0} max={2} step={0.1} unit="s" />
           <div>
             <div className="flex justify-between items-center mb-[5px]">
               <Label>End</Label>
@@ -1610,7 +1634,7 @@ export default function ZoneEditor({
 
   return (
     <div className="pb-6">
-      <Accordion defaultSection="Content">
+      <Accordion defaultSection="Content" persist>
 
       {/* Content */}
       <Section title="Content" icon="🖼">
@@ -1863,7 +1887,8 @@ export default function ZoneEditor({
         </div>
       </Section>
 
-      {/* Flags */}
+      {/* Flags — admin only */}
+      {isAdmin && (
       <Section title="Flags">
         {[
           ["animatedBorder", "Apply Animated Border"],
@@ -1884,8 +1909,10 @@ export default function ZoneEditor({
           );
         })}
       </Section>
+      )}
 
-      {/* Frame & Mask — clip shapes only */}
+      {/* Frame & Mask — clip shapes only, asset zones only */}
+      {!isText && (
       <Section title="Frame & Mask" icon="⬡" defaultOpen={false}>
         <div>
           <div className="flex items-center justify-between mb-[6px]">
@@ -1913,6 +1940,7 @@ export default function ZoneEditor({
           </div>
         </div>
       </Section>
+      )}
 
       {/* Static Border */}
       <Section title="Border" badge={style.borderWidth > 0 ? "on" : undefined}>
@@ -1957,7 +1985,8 @@ export default function ZoneEditor({
 
       </Section>
 
-      {/* Animated Border */}
+      {/* Animated Border — asset zones only */}
+      {!isText && (
       <Section title="Animated Border" badge={style.animatedBorder ? "on" : undefined}>
         <div className="flex items-center justify-between mb-[6px]">
           <Label>Style</Label>
@@ -1991,8 +2020,10 @@ export default function ZoneEditor({
           </div>
         )}
       </Section>
+      )}
 
-      {/* Shine Effect */}
+      {/* Shine Effect — asset zones only */}
+      {!isText && (
       <Section title="Shine Effect" badge={style.shineEffect ? "on" : undefined}>
         <div className="flex items-center justify-between mb-[6px]">
           <Label>Style</Label>
@@ -2021,6 +2052,7 @@ export default function ZoneEditor({
           </div>
         )}
       </Section>
+      )}
 
       {/* Transform */}
       <Section title="Transform" icon="⟳" defaultOpen={false}>

@@ -19,8 +19,8 @@ export default function LayoutBackgroundRenderer({ background, beat }) {
   const value = background?.value;
   const fit = background?.objectFit || "cover";
 
-  const enterKey = background?.enterTransition || "fadeIn";
-  const exitKey = background?.exitTransition || "none";
+   const enterKey = background?.enterTransition || "fadeIn";
+   const exitKey = background?.exitTransition || "none";
   const motionKey = background?.motion || "none";
 
   const enter =

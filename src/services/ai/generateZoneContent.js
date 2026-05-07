@@ -132,13 +132,17 @@ function buildBeatSection(bp) {
   }
 
   const seedLines = [];
-  if (pg.headline && roleToZoneId['headline']) seedLines.push(`  → Zone ${roleToZoneId['headline']} (headline): USE THIS EXACT TEXT: "${pg.headline}"`);
-  if (pg.subtext  && roleToZoneId['subtext'])  seedLines.push(`  → Zone ${roleToZoneId['subtext']}  (subtext):  USE THIS EXACT TEXT: "${pg.subtext}"`);
-  if (pg.label    && roleToZoneId['label'])    seedLines.push(`  → Zone ${roleToZoneId['label']}    (label):    USE THIS EXACT TEXT: "${pg.label}"`);
-  if (pg.stat     && roleToZoneId['stat'])     seedLines.push(`  → Zone ${roleToZoneId['stat']}     (stat):     USE THIS EXACT TEXT: "${pg.stat}"`);
-  if (pg.tagline  && roleToZoneId['tagline'])  seedLines.push(`  → Zone ${roleToZoneId['tagline']} (tagline):  USE THIS EXACT TEXT: "${pg.tagline}"`);
-  if (pg.quote    && roleToZoneId['quote'])    seedLines.push(`  → Zone ${roleToZoneId['quote']}    (quote):    USE THIS EXACT TEXT: "${pg.quote}"`);
-  if (pg.cta      && roleToZoneId['cta'])      seedLines.push(`  → Zone ${roleToZoneId['cta']}      (cta):      USE THIS EXACT TEXT: "${pg.cta}"`);
+  if (pg.headline    && roleToZoneId['headline'])    seedLines.push(`  → Zone ${roleToZoneId['headline']}    (headline):    USE THIS EXACT TEXT: "${pg.headline}"`);
+  if (pg.subtext     && roleToZoneId['subtext'])     seedLines.push(`  → Zone ${roleToZoneId['subtext']}     (subtext):     USE THIS EXACT TEXT: "${pg.subtext}"`);
+  if (pg.label       && roleToZoneId['label'])       seedLines.push(`  → Zone ${roleToZoneId['label']}       (label):       USE THIS EXACT TEXT: "${pg.label}"`);
+  if (pg.stat        && roleToZoneId['stat'])        seedLines.push(`  → Zone ${roleToZoneId['stat']}        (stat):        USE THIS EXACT TEXT: "${pg.stat}"`);
+  if (pg.tagline     && roleToZoneId['tagline'])     seedLines.push(`  → Zone ${roleToZoneId['tagline']}     (tagline):     USE THIS EXACT TEXT: "${pg.tagline}"`);
+  if (pg.quote       && roleToZoneId['quote'])       seedLines.push(`  → Zone ${roleToZoneId['quote']}       (quote):       USE THIS EXACT TEXT: "${pg.quote}"`);
+  if (pg.cta         && roleToZoneId['cta'])         seedLines.push(`  → Zone ${roleToZoneId['cta']}         (cta):         USE THIS EXACT TEXT: "${pg.cta}"`);
+  // Item beat zone direct injection
+  if (pg.number     && roleToZoneId['number'])     seedLines.push(`  → Zone ${roleToZoneId['number']}     (number):     USE THIS EXACT TEXT: "${pg.number}"`);
+  if (pg.item_title && roleToZoneId['item_title']) seedLines.push(`  → Zone ${roleToZoneId['item_title']} (item_title): USE THIS EXACT TEXT: "${pg.item_title}"`);
+  if (pg.item_body  && roleToZoneId['item_body'])  seedLines.push(`  → Zone ${roleToZoneId['item_body']}  (item_body):  USE THIS EXACT TEXT: "${pg.item_body}"`);
 
 
   const seedBlock = seedLines.length
@@ -325,17 +329,19 @@ export async function generateZoneContent({ beats, layoutDefs, topic, videoDNA }
 
     // Pre-generated zone content from the script director (headline, subtext, label, etc.)
     // These serve as high-quality seeds — the AI uses them as starting points per role.
-    // For item beats, beat.label = ordinal ("HOOK #3") and beat.cta = hook type tag
-    // ("NEGATIVE", "FOMO"). Item layouts use stat for the ordinal and label for the tag.
     const isItemBeat = beat.beatType === "item";
     const preGenerated = {
-      headline: beat.headline || null,
-      subtext:  beat.subtext  || null,
-      label:    isItemBeat ? (beat.cta   || null) : (beat.label || null),
-      stat:     isItemBeat ? null : (beat.stat  || null),
-      tagline:  beat.tagline  || null,
-      quote:    beat.quote    || null,
-      cta:      isItemBeat ? null : (beat.cta || null),
+      headline:   isItemBeat ? null : (beat.headline || null),
+      subtext:    isItemBeat ? null : (beat.subtext  || null),
+      label:      beat.label   || null,
+      stat:       beat.stat    || null,
+      tagline:    beat.tagline || null,
+      quote:      beat.quote   || null,
+      cta:        beat.cta     || null,
+      // Item-specific fields — mapped directly to zone roles, no AI generation needed
+      number:     isItemBeat && beat.itemNumber ? String(beat.itemNumber).padStart(2, "0") : null,
+      item_title: isItemBeat ? (beat.itemTitle || null) : null,
+      item_body:  isItemBeat ? (beat.itemBody  || null) : null,
     };
 
     console.log(`[zoneContent] beat ${i} (id:${beat.id || i}) path:${layoutDef?.zones?.length ? "layoutDef" : "fallback"} textZones:`, textZones.map(z => z.id));

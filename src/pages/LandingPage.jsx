@@ -175,22 +175,22 @@ const CSS = `
   .service-desc { font-family: var(--font-body); font-size: 17px; color: var(--muted); line-height: 1.75; max-width: 100%; }
   .service-card { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; padding: 18px; transition: border-color 0.25s, transform 0.25s; cursor: default; }
   .service-card:hover { border-color: rgba(245,197,24,0.25); transform: translateY(-3px); }
-  .service-samples-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 14px; min-height: 300px; }
-  .sample-slot { min-height: 300px; border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; background: rgba(0,0,0,0.18); }
+  .service-samples-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .sample-slot { aspect-ratio: 9/16; border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; background: rgba(0,0,0,0.18); }
   .service-card img,
-  .service-card video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .service-card video { width: 100%; height: 100%; object-fit: contain; display: block; }
   @media (max-width: 900px) {
     .services-grid { gap: 56px; }
-    .service-samples-row { gap: 10px; min-height: 220px; }
-    .sample-slot { min-height: 220px; border-radius: 10px; }
+    .service-samples-row { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    .sample-slot { border-radius: 10px; }
   }
   @media (max-width: 600px) {
     .services-grid { gap: 44px; margin-top: 42px; }
     .service-card { padding: 12px; }
     .service-heading-row { gap: 12px; margin-bottom: 12px; }
     .service-heading-icon { width: 48px; height: 48px; border-radius: 12px; font-size: 24px; }
-    .service-samples-row { gap: 6px; min-height: 120px; }
-    .sample-slot { min-height: 120px; border-radius: 8px; }
+    .service-samples-row { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; }
+    .sample-slot { border-radius: 8px; }
     .service-desc { font-size: 15px; }
   }
 
@@ -263,12 +263,7 @@ const CSS = `
   .plan:hover::before { opacity: 1; }
   .plan-hot { border-color: rgba(245,197,24,0.45) !important; box-shadow: 0 0 0 1px rgba(245,197,24,0.12) inset; }
   .plan-hot-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0b0b10; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 5px 18px; border-radius: 100px; white-space: nowrap; z-index: 2; }
-  .plan-visual { height: 98px; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; margin-bottom: 24px; padding: 14px; position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(245,197,24,0.12), rgba(255,255,255,0.03)); }
-  .plan-visual::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.055) 1px, transparent 1px); background-size: 22px 22px; opacity: 0.45; }
-  .plan-visual-bars { position: absolute; left: 14px; right: 14px; bottom: 14px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 54px; }
-  .plan-visual-bars span { display: block; border-radius: 999px 999px 5px 5px; background: linear-gradient(180deg, var(--yellow), rgba(245,197,24,0.18)); min-height: 14px; opacity: 0.86; transform-origin: bottom; transition: transform 0.25s, opacity 0.25s; }
-  .plan:hover .plan-visual-bars span { transform: scaleY(1.08); opacity: 1; }
-  .plan-visual-pill { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 6px 10px; background: rgba(0,0,0,0.34); border: 1px solid rgba(245,197,24,0.16); font-family: var(--font-mono); font-size: 11px; color: var(--yellow); letter-spacing: 1px; text-transform: uppercase; }
+
   .plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
   .plan-name { font-family: var(--font-body); font-size: 14px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
   .plan-mini-chip { border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 5px 9px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); white-space: nowrap; background: rgba(255,255,255,0.035); }
@@ -328,6 +323,7 @@ export default function LandingPage() {
   const [plans, setPlans] = useState([]);
   const [rate, setRate] = useState(FALLBACK_RATE);
   const [cycle, setCycle] = useState("monthly");
+  const [samples, setSamples] = useState([]);
 
   useEffect(() => {
     getSession()
@@ -342,6 +338,10 @@ export default function LandingPage() {
       .then((d) => {
         if (d?.rate) setRate(d.rate);
       })
+      .catch(() => {});
+    fetch(`${SERVER}/api/admin/samples/public`)
+      .then((r) => r.json())
+      .then((d) => setSamples(Array.isArray(d.samples) ? d.samples : []))
       .catch(() => {});
   }, []);
 
@@ -384,15 +384,27 @@ export default function LandingPage() {
     { icon: "/icons/speech-to-text.png", text: "Speech to Text" },
   ];
 
-  const defaultServiceSamples = [
-    { type: "image", src: "/samples/image1.jpg" },
-    { type: "video", src: "/samples/video1.mp4", poster: "/samples/image1.jpg" },
-    { type: "image", src: "/samples/image1.jpg" },
-    { type: "video", src: "/samples/video1.mp4", poster: "/samples/image1.jpg" },
-    { type: "image", src: "/samples/image1.jpg" },
-    { type: "video", src: "/samples/video1.mp4", poster: "/samples/image1.jpg" },
-    { type: "image", src: "/samples/image1.jpg" },
-  ];
+
+
+  // Map services to sample service keys
+  const serviceKeyMap = {
+    "AI Video Generator": "ai_videos",
+    "Product Video Ads": "product_ads",
+    "Virtual Try-On": "virtual_tryon",
+    "Social Post Generator": "social_posts",
+    "Thumbnail Generator": "thumbnails",
+    "Poster Studio": "posters",
+    "Voice Studio": "voiceover",
+    "Caption Studio": "captions",
+    "Speech to Text": "transcription",
+  };
+
+  // Group samples by service
+  const samplesByService = {};
+  samples.forEach((s) => {
+    if (!samplesByService[s.service_key]) samplesByService[s.service_key] = [];
+    samplesByService[s.service_key].push(s);
+  });
 
   const faqs = [
     {
@@ -541,7 +553,7 @@ export default function LandingPage() {
           <div className="hero-inner">
             <div className="hero-badge">
               <div className="hero-badge-dot" />
-              AI-Powered Creative Production Studio
+              Creative Production Studio
             </div>
             <h1 className="hero-h1">
               One Platform.
@@ -638,7 +650,10 @@ export default function LandingPage() {
           </p>
 
           <div className="services-grid" data-reveal>
-            {services.map((svc, i) => (
+            {services.map((svc, i) => {
+              const serviceKey = serviceKeyMap[svc.title] || "";
+              const serviceSamples = samplesByService[serviceKey] || [];
+              return (
               <div key={i} className="service-section">
                 <div className="service-header">
                   <div className="service-tag">{svc.tag}</div>
@@ -651,8 +666,8 @@ export default function LandingPage() {
                 <div className="service-card" style={{ background: svc.bg }}>
                   {/* Sample placeholder — replace with actual sample images/videos */}
                   <div className="service-samples-row">
-                    {(svc.samples || defaultServiceSamples).map((media, sample) => (
-                      <div key={sample} className="sample-slot">
+                    {serviceSamples.map((media, sample) => (
+                      <div key={media.id} className="sample-slot" data-orientation={media.orientation || "horizontal"}>
                         {media.type === "video" ? (
                           <video
                             src={media.src}
@@ -667,20 +682,15 @@ export default function LandingPage() {
                               e.currentTarget.currentTime = 0;
                             }}
                           />
-                        ) : media.type === "image" ? (
-                          <img src={media.src} alt={`${svc.title} sample ${sample + 1}`} loading="lazy" />
                         ) : (
-                          <div className="sample-placeholder">
-                            <div className="sample-icon">{svc.icon}</div>
-                            <div className="sample-label">Sample coming soon</div>
-                          </div>
+                          <img src={media.src} alt={`${svc.title} sample ${sample + 1}`} loading="lazy" />
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </section>
@@ -928,18 +938,9 @@ export default function LandingPage() {
                   const videosText = feats.find((f) => /videos?/i.test(f)) || "Fast exports";
                   const productText = feats.find((f) => /product/i.test(f)) || "Creative tools";
                   const meterWidth = `${Math.min(100, 42 + planIndex * 24)}%`;
-                  const barHeights = [28, 42, 34, 56, 46, 64, 38].map((h) => `${Math.min(88, h + planIndex * 7)}%`);
                   return (
                     <div key={plan.id} className={`plan${plan.is_popular ? " plan-hot" : ""}`}>
                       {plan.is_popular && <div className="plan-hot-badge">Most Popular</div>}
-                      <div className="plan-visual" aria-hidden="true">
-                        <div className="plan-visual-pill">{plan.is_popular ? "Best value" : "Creator stack"}</div>
-                        <div className="plan-visual-bars">
-                          {barHeights.map((height, i) => (
-                            <span key={i} style={{ height }} />
-                          ))}
-                        </div>
-                      </div>
                       <div className="plan-head">
                         <div className="plan-name">{plan.name}</div>
                         <div className="plan-mini-chip">{cycle === "annual" ? "Annual" : "Monthly"}</div>

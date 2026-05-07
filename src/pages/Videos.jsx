@@ -269,9 +269,6 @@ export default function Videos() {
 
   const videoProjects = projects.filter(p => p.source !== "product_ad" && p.source !== "caption_studio");
 
-  const facelessCount     = videoProjects.filter(p => p.safe_project_json?.meta?.mode === "faceless").length;
-  const talkingHeadCount  = videoProjects.filter(p => p.safe_project_json?.meta?.mode === "talking_head").length;
-
   const filtered = videoProjects.filter(p => {
     if (modeFilter === "faceless")     return p.safe_project_json?.meta?.mode === "faceless";
     if (modeFilter === "talking_head") return p.safe_project_json?.meta?.mode === "talking_head";
@@ -292,75 +289,56 @@ export default function Videos() {
           setShowOnboarding(false);
         }} />
       )}
-
       {showFeedback && (
         <FeedbackModal context="post_visit" onClose={() => setShowFeedback(false)} />
       )}
 
-      {/* Top bar */}
-      <div
-        className="flex items-center justify-between px-6 py-4 border-b shrink-0"
-        style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}
-      >
-        <h1 className="text-[20px] font-bold text-[#f5c518]" style={{ fontFamily: "'Outfit',sans-serif" }}>
-          AI Videos
-          {!loading && (
-            <span className="ml-2 text-[15px] font-normal text-[#77777f]">({videoProjects.length})</span>
-          )}
-        </h1>
+      {/* Header */}
+      <div className="flex items-center justify-between px-8 py-5 border-b shrink-0"
+        style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        <div>
+          <h1 className="text-[22px] font-bold" style={{ color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Videos</h1>
+          <div className="text-[12px] mt-0.5" style={{ color: "#44444f" }}>
+            {loading ? "Loading…" : `${videoProjects.length} project${videoProjects.length !== 1 ? "s" : ""}`}
+          </div>
+        </div>
         <div className="flex items-center gap-3">
-          {videoProjects.length > 4 && (
-            <input
-              value={search}
-              onChange={e => handleSearch(e.target.value)}
-              placeholder="Search videos…"
-              className="bg-[#111118] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-3 py-[6px] text-[15px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none w-[200px]"
-            />
-          )}
-          <button
-            onClick={() => navigate("/new")}
-            className="flex items-center gap-2 px-4 py-[7px] rounded-[8px] text-[15px] font-bold text-[#0b0b10] border-0 cursor-pointer hover:opacity-90 transition-opacity"
-            style={{ background: "#f5c518" }}
-          >
+          {/* Search */}
+          <input
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+            placeholder="Search videos…"
+            className="rounded-[8px] px-3 py-[7px] text-[13px] text-[#e8e8f0] focus:outline-none transition-colors"
+            style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", width: 200 }}
+          />
+          {/* Type filter */}
+          <div className="flex gap-1">
+            {[
+              { id: "all",          label: "All"          },
+              { id: "faceless",     label: "Faceless"     },
+              { id: "talking_head", label: "Talking Head" },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => handleModeFilter(tab.id)}
+                className="px-3 py-[6px] rounded-[7px] text-[12px] font-semibold border-0 cursor-pointer transition-all"
+                style={{
+                  background: modeFilter === tab.id ? "rgba(245,197,24,0.12)" : "rgba(255,255,255,0.05)",
+                  color:      modeFilter === tab.id ? "#f5c518" : "#7070a0",
+                  outline:    modeFilter === tab.id ? "1px solid rgba(245,197,24,0.3)" : "1px solid transparent",
+                }}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => navigate("/new")}
+            className="px-4 py-[8px] rounded-[8px] text-[13px] font-bold border-0 cursor-pointer hover:opacity-90 transition-opacity"
+            style={{ background: "#f5c518", color: "#0b0b10" }}>
             + New Video
           </button>
         </div>
       </div>
 
-      {/* Mode filter tabs */}
-      {!loading && videoProjects.length > 0 && (
-        <div className="flex items-center gap-1 px-6 pt-4 pb-0 shrink-0">
-          {[
-            { id: "all",           label: "All",          count: videoProjects.length },
-            { id: "faceless",      label: "Faceless",     count: facelessCount        },
-            { id: "talking_head",  label: "Talking Head", count: talkingHeadCount     },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => handleModeFilter(tab.id)}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold border-0 cursor-pointer transition-all"
-              style={{
-                background: modeFilter === tab.id ? "#f5c518"              : "rgba(255,255,255,0.05)",
-                color:      modeFilter === tab.id ? "#0b0b10"              : "#7070a0",
-              }}
-            >
-              {tab.label}
-              <span
-                className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{
-                  background: modeFilter === tab.id ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.06)",
-                  color:      modeFilter === tab.id ? "#0b0b10"           : "#55556a",
-                }}
-              >
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Grid area */}
-      <div className="flex-1 px-6 py-6 overflow-y-auto">
+      {/* Grid */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
         {loading && (
           <div className="flex items-center justify-center py-24">
             <div className="w-6 h-6 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />
@@ -371,26 +349,24 @@ export default function Videos() {
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <div className="text-[48px]">🎬</div>
             <div className="text-[20px] font-bold text-[#e8e8f0]">No projects yet</div>
-            <div className="text-[16px] text-[#77777f]">Create your first AI video to get started</div>
-            <button
-              onClick={() => navigate("/new")}
-              className="mt-2 px-6 py-[10px] rounded-[10px] text-[16px] font-bold text-[#0b0b10] border-0 cursor-pointer"
-              style={{ background: "#f5c518" }}
-            >
+            <div className="text-[15px] text-[#77777f]">Create your first AI video to get started</div>
+            <button onClick={() => navigate("/new")}
+              className="mt-2 px-6 py-[10px] rounded-[10px] text-[15px] font-bold border-0 cursor-pointer"
+              style={{ background: "#f5c518", color: "#0b0b10" }}>
               + Create First Project
             </button>
           </div>
         )}
 
         {!loading && filtered.length === 0 && videoProjects.length > 0 && (
-          <div className="text-center py-16 text-[15px] text-[#77777f]">
+          <div className="text-center py-16 text-[14px]" style={{ color: "#77777f" }}>
             {search ? `No projects match "${search}"` : `No ${modeFilter === "talking_head" ? "Talking Head" : "Faceless"} videos yet`}
           </div>
         )}
 
         {!loading && filtered.length > 0 && (
           <>
-            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
               {paginated.map(p => (
                 <ProjectCard key={p.id} project={p} onDelete={handleDelete} />
               ))}
@@ -398,35 +374,21 @@ export default function Videos() {
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-8">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-[6px] rounded-[7px] text-[13px] font-semibold border-0 cursor-pointer transition-all disabled:opacity-30 disabled:cursor-default"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "#a0a0b8" }}
-                >
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="px-3 py-[6px] rounded-[7px] text-[13px] font-semibold border-0 cursor-pointer transition-all disabled:opacity-30"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "#a0a0b8" }}>
                   ← Prev
                 </button>
-
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setPage(n)}
+                  <button key={n} onClick={() => setPage(n)}
                     className="w-[32px] h-[32px] rounded-[7px] text-[13px] font-bold border-0 cursor-pointer transition-all"
-                    style={{
-                      background: n === page ? "#7c5cfc" : "rgba(255,255,255,0.06)",
-                      color:      n === page ? "#fff"     : "#a0a0b8",
-                    }}
-                  >
+                    style={{ background: n === page ? "#7c5cfc" : "rgba(255,255,255,0.06)", color: n === page ? "#fff" : "#a0a0b8" }}>
                     {n}
                   </button>
                 ))}
-
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-[6px] rounded-[7px] text-[13px] font-semibold border-0 cursor-pointer transition-all disabled:opacity-30 disabled:cursor-default"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "#a0a0b8" }}
-                >
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="px-3 py-[6px] rounded-[7px] text-[13px] font-semibold border-0 cursor-pointer transition-all disabled:opacity-30"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "#a0a0b8" }}>
                   Next →
                 </button>
               </div>

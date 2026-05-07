@@ -186,7 +186,11 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
   const selectedZoneDef  = zoneDefs.find(z => z.id === selectedZoneId) || null;
   // Merge layout def defaults so ZoneEditor sees the effective values (e.g. zIndex from layout def)
   const selectedZoneData = { ...(selectedZoneDef || {}), ...(zones[selectedZoneId] || {}) };
-  const selectedZoneType = selectedZoneData.type || selectedZoneDef?.type || "asset";
+  // content.kind is ground truth — if it says "text", the zone IS a text zone
+  // even if type was accidentally stored as "asset" (data corruption)
+  const selectedZoneType = selectedZoneData.content?.kind === "text"
+    ? "text"
+    : (selectedZoneData.type || selectedZoneDef?.type || "asset");
 
   const beatOverlays = Array.isArray(beat.overlays) ? beat.overlays : [];
 
@@ -230,53 +234,53 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     // ── Zone-based content ──
     const id = nextZoneId(layoutDef, zones, beat.deletedZones);
     let zoneData;
-    if (data?.kind === "text") {
-      zoneData = {
-        type: "text", x: 5, y: 35, width: 90, height: 5,
-        zIndex: 10, start: 0, end: null,
-        enterAnimation: "fadeIn", exitAnimation: "none",
-        content: { kind: "text", text: data.text || "Your text here" },
-        style: { fontSize: 36, fontWeight: 700, color: "#ffffff", textAlign: "center", ...(data.style || {}) },
-        background: {},
-      };
-    } else if (data?.kind === "decorative") {
-      // Make the initial zone a square in pixel terms.
-      // width% * videoW = height% * videoH  →  height% = width% * (videoW / videoH)
-      const vW = project.meta.width  || 1080;
-      const vH = project.meta.height || 1920;
-      const wPct = 30;
-      const hPct = Math.round((wPct * vW / vH) * 10) / 10;
-      zoneData = {
-        type: "decorative", x: 10, y: 10, width: wPct, height: hPct,
-        zIndex: 10, start: 0, end: null,
-        enterAnimation: "fadeIn", exitAnimation: "none",
-        content: { decorativeId: data.decorativeId || null },
-        style: { color: "#ffffff", opacity: 1, strokeWidth: 3, filled: true },
-        background: {},
-      };
-    } else if (data?.kind === "icon") {
-      const def = data.defaults || {};
-      // Phosphor icon (from Iconify) or local registry
-      const iconContent = data.iconify
-        ? { iconify: data.iconify, ...(data.iconId ? { iconId: data.iconId } : {}) }
-        : { iconId: data.iconId };
-      zoneData = {
-        type: "icon", x: 30, y: 35, width: 40, height: 30,
-        zIndex: 10, start: 0, end: null,
-        enterAnimation: "fadeIn", exitAnimation: "none",
-        content: iconContent,
-        style: { color: def.color || "#ffffff", opacity: 1, filled: true, strokeWidth: 0 },
-        background: {},
-      };
-    } else {
-      zoneData = {
-        type: "asset", x: 10, y: 10, width: 80, height: 30,
-        zIndex: 10, start: 0, end: null,
-        enterAnimation: "fadeIn", exitAnimation: "none",
-        content: data?.kind ? data : { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
-        style: {}, background: {},
-      };
-    }
+     if (data?.kind === "text") {
+       zoneData = {
+         type: "text", x: 5, y: 35, width: 90, height: 5,
+         zIndex: 10, start: 0, end: null,
+         enterAnimation: "fadeIn", exitAnimation: "none",
+         content: { kind: "text", text: data.text || "Your text here" },
+         style: { fontSize: 36, fontWeight: 700, color: "#ffffff", textAlign: "center", ...(data.style || {}) },
+         background: {},
+       };
+     } else if (data?.kind === "decorative") {
+       // Make the initial zone a square in pixel terms.
+       // width% * videoW = height% * videoH  →  height% = width% * (videoW / videoH)
+       const vW = project.meta.width  || 1080;
+       const vH = project.meta.height || 1920;
+       const wPct = 30;
+       const hPct = Math.round((wPct * vW / vH) * 10) / 10;
+       zoneData = {
+         type: "decorative", x: 10, y: 10, width: wPct, height: hPct,
+         zIndex: 10, start: 0, end: null,
+         enterAnimation: "fadeIn", exitAnimation: "none",
+         content: { decorativeId: data.decorativeId || null },
+         style: { color: "#ffffff", opacity: 1, strokeWidth: 3, filled: true },
+         background: {},
+       };
+     } else if (data?.kind === "icon") {
+       const def = data.defaults || {};
+       // Phosphor icon (from Iconify) or local registry
+       const iconContent = data.iconify
+         ? { iconify: data.iconify, ...(data.iconId ? { iconId: data.iconId } : {}) }
+         : { iconId: data.iconId };
+       zoneData = {
+         type: "icon", x: 30, y: 35, width: 40, height: 30,
+         zIndex: 10, start: 0, end: null,
+         enterAnimation: "fadeIn", exitAnimation: "none",
+         content: iconContent,
+         style: { color: def.color || "#ffffff", opacity: 1, filled: true, strokeWidth: 0 },
+         background: {},
+       };
+     } else {
+       zoneData = {
+         type: "asset", x: 10, y: 10, width: 80, height: 30,
+         zIndex: 10, start: 0, end: null,
+         enterAnimation: "fadeIn", exitAnimation: "none",
+         content: data?.kind ? data : { kind: "asset", asset: { src: null, type: "image", objectFit: "cover" } },
+         style: {}, background: {},
+       };
+     }
 
     const newZones = { ...zones, [id]: zoneData };
     updateBeat(beat.id, { zones: newZones });
@@ -303,7 +307,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
 
   const updateTextContent  = (slot, text) => {
     const zone = zones[slot] || {};
-    updateZone(slot, { content: { ...zone.content, kind: "text", text } });
+    updateZone(slot, { type: "text", content: { ...zone.content, kind: "text", text } });
   };
 
   const updateTextStyle     = (slot, key, value) =>
@@ -434,12 +438,12 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
     // Layout-defined zones (excluding ones without ids, deleted, or hidden)
     ...zoneDefs.filter(z => z.id && !deletedZonesSet.has(z.id) && !zones[z.id]?.hidden).map(z => {
       const zData = zones[z.id] || {};
-      const type  = zData.type || z.type || "asset";
+      const type  = zData.content?.kind === "text" ? "text" : (zData.type || z.type || "asset");
       return { id: z.id, name: z.label || z.id, type, isCustom: false, isOverlay: false };
     }),
     // Custom zones added by the pipeline or user (not in the layout def, not hidden, not deleted)
     ...Object.entries(zones).filter(([id]) => !defZoneIds.has(id) && !zones[id]?.hidden && !deletedZonesSet.has(id)).map(([id, z]) => {
-      const type = z.type || "asset";
+      const type = z.content?.kind === "text" ? "text" : (z.type || "asset");
       const name = type === "text"
         ? (z.content?.text?.slice(0, 16) || "Text")
         : type === "decorative"

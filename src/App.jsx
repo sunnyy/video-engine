@@ -51,6 +51,7 @@ import ModelAvatars    from "./pages/admin/ModelAvatars";
 import AdminFeedback   from "./pages/admin/Feedback";
 import MusicLibrary   from "./pages/admin/MusicLibrary";
 import SFXLibrary     from "./pages/admin/SFXLibrary";
+import Samples        from "./pages/admin/Samples";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -160,6 +161,7 @@ export default function App() {
                 <Route path="/admin/feedback"         element={<AdminFeedback />} />
                 <Route path="/admin/music"            element={<MusicLibrary />} />
                 <Route path="/admin/sfx"              element={<SFXLibrary />} />
+                <Route path="/admin/samples"          element={<Samples />} />
               </>
             ) : (
               <Route path="/admin/*" element={<Navigate to="/dashboard" />} />

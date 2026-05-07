@@ -278,26 +278,6 @@ export const textStylePresets = [
     }
   },
  
-  {
-    id: "italic-script-tag",
-    label: "Script Tag",
-    roles: ["tagline"],
-    suitable_on: "both",
-    niche: ["lifestyle", "travel", "food"],
-    intent: ["visual_rest", "reveal"],
-    energy: ["low", "medium"],
-    preview: { text: "Travel vlog", bg: "#0a0805" },
-    style: {
-      fontSize: 56,
-      fontWeight: 400,
-      fontFamily: "'Dancing Script', cursive",
-      color: "#f5c518",
-      textAlign: "left",
-      textShadow: "0 2px 12px rgba(0,0,0,0.5)",
-      letterSpacing: "1px",
-      lineHeight: 1.2,
-    }
-  },
  
   {
     id: "spaced-caps-tag",

@@ -1,5 +1,5 @@
 function normalizeDuration(duration) {
-  const MIN = 1.2;
+  const MIN = 0.1;
   const MAX = 300.0; // 5 minutes — no practical cap for manual edits
   let d = duration ?? MIN;
   if (d < MIN) d = MIN;

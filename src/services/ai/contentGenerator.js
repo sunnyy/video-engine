@@ -52,6 +52,9 @@ Return ONLY a valid JSON array of beat objects — no markdown, no explanation:
     "tagline": null,
     "quote": null,
     "cta": null,
+    "itemNumber": null,
+    "itemTitle": null,
+    "itemBody": null,
     "intent": "shock|curiosity|proof|reveal|empathy|urgency|explanation|contrast|punchline|irony",
     "energy": 0.9,
     "visual_hint": "text_only|faces|stat|comparison|list|scene|product|none",
@@ -105,11 +108,14 @@ ${expandedSequence.map((type, i) => {
 }).join("\n")}
 
 For item beats:
-- label: "HOOK #N" where N is the item number (e.g. "HOOK #1")
-- headline: the item/hook condensed to max 5 words in ALL CAPS
-- cta: hook type in one word ALL CAPS (CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY/STORY/FOMO)
-- spoken: the full item stated naturally as voiceover
-- stat: MUST be null — never put hook types (STORY/FOMO/CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY) in stat. stat is ONLY for real numbers/metrics (e.g. "40%", "$10M", "3X"). Item beats have no stats — always null.
+- itemNumber = the sequential item number (1 for first item, 2 for second, etc.)
+- itemTitle = the item name/title condensed to 2-5 words Title Case
+- itemBody = one specific supporting sentence about this item, max 15 words
+- label = short category tag 1-3 words ALL CAPS (e.g. "FUN FACT", "KEY MOVE", "TOP PICK") — NOT a hook type like FOMO/STORY/CURIOSITY/NEGATIVE/URGENCY/EMPATHY/PERSONAL
+- headline = null for item beats — itemTitle replaces it
+- subtext = null for item beats — itemBody replaces it
+- stat = null always for item beats
+- cta = null always for item beats — hook types (FOMO, CURIOSITY, NEGATIVE, STORY, URGENCY, EMPATHY, PERSONAL, CONTRAST) must NEVER appear in any field of an item beat
 
 For cta beats: the cta field MUST be a real call to action like "Follow for more", "Subscribe now", "Share this video". NEVER put hook types (FOMO, STORY, CURIOSITY, NEGATIVE, PERSONAL, URGENCY, EMPATHY) in the cta field of a cta beat.
 
@@ -142,7 +148,7 @@ ${expandedSequence.map((type, i) => {
   return `Beat ${i} (${type})`;
 }).join("\n")}
 
-For item beats: label="HOOK #N", headline=item condensed to 5 words ALL CAPS, cta=hook type (CURIOSITY/NEGATIVE/PERSONAL/URGENCY/EMPATHY/STORY/FOMO), stat=null (NEVER put hook types in stat)
+For item beats: itemNumber=sequential number (1-based), itemTitle=item name/title in 2-5 words Title Case, itemBody=one supporting sentence max 15 words, label=short category tag 1-3 words ALL CAPS (NOT a hook type like FOMO/STORY/CURIOSITY/NEGATIVE), headline=null, subtext=null, stat=null, cta=null — hook types (FOMO, CURIOSITY, NEGATIVE, STORY, URGENCY, EMPATHY, PERSONAL, CONTRAST) must NEVER appear in any field of an item beat
 For fact beats: label="THE PROOF", visual_hint="stat", stat=the key number, image_count_needed=0
 For cta beats: the cta field MUST be a real call to action like "Follow for more", "Subscribe now", "Share this video". NEVER put hook types (FOMO, STORY, CURIOSITY, NEGATIVE, PERSONAL, URGENCY, EMPATHY) in the cta field of a cta beat.
 
@@ -178,6 +184,7 @@ ${expandedSequence.map((type, i) => {
 }).join("\n")}
 
 For fact beats: label="FACT #N", stat=the key number if any, visual_hint="stat", image_count_needed=0
+For item beats (if any): itemNumber=sequential number (1-based), itemTitle=item name/title in 2-5 words Title Case, itemBody=one supporting sentence max 15 words, label=short category tag 1-3 words ALL CAPS (NOT a hook type like FOMO/STORY/CURIOSITY/NEGATIVE), headline=null, subtext=null, stat=null, cta=null
 
 ${BEAT_OUTPUT_SCHEMA}
 `,
@@ -214,6 +221,8 @@ ${expandedSequence.map((type, i) => {
   if (type === "cta")    return `Beat ${i} (cta): Earned CTA.`;
   return `Beat ${i} (${type})`;
 }).join("\n")}
+
+For item beats (if any): itemNumber=sequential number (1-based), itemTitle=item name/title in 2-5 words Title Case, itemBody=one supporting sentence max 15 words, label=short category tag 1-3 words ALL CAPS (NOT a hook type like FOMO/STORY/CURIOSITY/NEGATIVE), headline=null, subtext=null, stat=null, cta=null
 
 ${BEAT_OUTPUT_SCHEMA}
 `,

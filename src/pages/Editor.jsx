@@ -3,6 +3,7 @@ import { useParams, useLocation } from "react-router-dom";
 import { serverFetch } from "../services/serverApi";
 import { useProjectStore } from "../store/useProjectStore";
 import { getProjectById } from "../services/projects/projectService";
+import { getLayoutDef } from "../core/registries/layoutRegistry.js";
 
 import Header from "../ui/Editor/Header";
 import SystemMessage from "../ui/Editor/SystemMessage";
@@ -25,7 +26,7 @@ export default function Editor() {
   const [renderProgress, setRenderProgress] = useState(null); // null = idle, 0-100 = rendering
   const [currentJobId, setCurrentJobId] = useState(null);
   const [activeTab, setActiveTab] = useState("beats");
-  const [beatTab, setBeatTab] = useState("layout");
+  const [beatTab, setBeatTab] = useState("zones");
   const [selectedZoneIds, setSelectedZoneIds] = useState(new Set());
   const [cancelling, setCancelling] = useState(false);
 
@@ -40,9 +41,24 @@ export default function Editor() {
     load();
   }, [id]);
 
-  // Clear zone selection when active beat changes
+  // Auto-select first zone when active beat changes
   useEffect(() => {
-    setSelectedZoneIds(new Set());
+    if (!activeBeatId || !project) { setSelectedZoneIds(new Set()); return; }
+    const beat = project.beats.find(b => b.id === activeBeatId);
+    if (!beat) { setSelectedZoneIds(new Set()); return; }
+
+    const deletedSet = new Set(beat.deletedZones || []);
+    const zones      = beat.zones || {};
+    const zoneDefs   = (getLayoutDef(beat.layout)?.zones) || [];
+
+    const firstDef = zoneDefs.find(z => z.id && !deletedSet.has(z.id) && !zones[z.id]?.hidden);
+    const firstCustomId = !firstDef
+      ? Object.keys(zones).find(id => !zoneDefs.some(z => z.id === id) && !zones[id]?.hidden && !deletedSet.has(id))
+      : null;
+    const firstId = firstDef?.id || firstCustomId;
+
+    setSelectedZoneIds(firstId ? new Set([firstId]) : new Set());
+    setBeatTab("zones");
   }, [activeBeatId]);
 
   // Reset cancelling state when render finishes/is dismissed

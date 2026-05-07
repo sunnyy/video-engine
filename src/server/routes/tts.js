@@ -127,12 +127,14 @@ router.get("/tts/voices", requireAuth, async (_req, res) => {
 });
 
 router.get("/tts/history", requireAuth, async (req, res) => {
+  const limit  = Math.min(parseInt(req.query.limit)  || 50, 100);
+  const offset = Math.max(parseInt(req.query.offset) || 0,  0);
   const { data, error } = await supabaseAdmin
     .from("tts_generations")
     .select("*")
     .eq("user_id", req.user.id)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ history: data || [] });
 });

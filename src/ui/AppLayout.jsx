@@ -1,64 +1,58 @@
-/**
- * AppLayout.jsx
- * Shared sidebar + page shell for all authenticated app pages.
- * Usage: wrap page content with <AppLayout>{children}</AppLayout>
- */
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
 
 /* ── Icons ── */
 const Icons = {
+  assets: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+    </svg>
+  ),
   home: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
       <path d="M9 21V12h6v9"/>
     </svg>
   ),
   folder: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
     </svg>
   ),
   gallery: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="2" width="9" height="9" rx="1.5"/><rect x="13" y="2" width="9" height="9" rx="1.5"/>
       <rect x="2" y="13" width="9" height="9" rx="1.5"/><rect x="13" y="13" width="9" height="9" rx="1.5"/>
     </svg>
   ),
   mic: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="9" y="2" width="6" height="11" rx="3"/>
       <path d="M5 10a7 7 0 0014 0"/>
       <line x1="12" y1="21" x2="12" y2="17"/><line x1="9" y1="21" x2="15" y2="21"/>
     </svg>
   ),
-  box: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-      <line x1="12" y1="22.08" x2="12" y2="12"/>
-    </svg>
-  ),
   credits: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
     </svg>
   ),
   star: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
     </svg>
   ),
   settings: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/>
       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
     </svg>
   ),
   message: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
     </svg>
   ),
@@ -113,59 +107,117 @@ const Icons = {
       <line x1="6" y1="14" x2="14" y2="14"/>
     </svg>
   ),
+  signout: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+      <polyline points="16 17 21 12 16 7"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+  ),
 };
 
+/* ── NavItem: used inside flyout panels ── */
 function NavItem({ icon, label, to, href, active, soon }) {
   const [hov, setHov] = useState(false);
-
   const sharedStyle = {
-    display:        "flex",
-    alignItems:     "center",
-    gap:            10,
-    padding:        "7px 12px",
-    borderRadius:   8,
-    textDecoration: "none",
-    border:         "none",
-    transition:     "all 0.15s",
-    cursor:         soon ? "default" : "pointer",
-    background:     active ? "rgba(124,92,252,0.15)" : hov && !soon ? "rgba(255,255,255,0.04)" : "transparent",
-    color:          active ? "#a78bfa" : soon ? "#44444f" : hov ? "#d8d8ea" : "#9494a8",
-    width:          "100%",
-    boxSizing:      "border-box",
-    fontFamily:     "inherit",
+    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+    borderRadius: 8, textDecoration: "none", border: "none", transition: "all 0.15s",
+    cursor: soon ? "default" : "pointer", fontFamily: "inherit", fontSize: "20px",
+    background: active ? "rgba(124,92,252,0.15)" : hov && !soon ? "rgba(255,255,255,0.05)" : "transparent",
+    color: active ? "#a78bfa" : soon ? "#44444f" : hov ? "#d8d8ea" : "#9494a8",
+    width: "100%", boxSizing: "border-box",
   };
-
   const inner = (
     <>
       <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</span>
       <span style={{ fontSize: 15, fontWeight: 500, flex: 1, fontFamily: "'Outfit',sans-serif" }}>{label}</span>
-      {soon && (
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 5px", borderRadius: 3, background: "rgba(255,255,255,0.05)", color: "#55556a" }}>
-          SOON
-        </span>
-      )}
+      {soon && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 5px", borderRadius: 3, background: "rgba(255,255,255,0.05)", color: "#55556a" }}>SOON</span>}
     </>
   );
-
-  const events = {
-    onMouseEnter: () => setHov(true),
-    onMouseLeave: () => setHov(false),
-    style: sharedStyle,
-  };
-
+  const events = { onMouseEnter: () => setHov(true), onMouseLeave: () => setHov(false), style: sharedStyle };
   if (soon)  return <div {...events}>{inner}</div>;
   if (href)  return <a href={href} {...events}>{inner}</a>;
   return <Link to={to} {...events}>{inner}</Link>;
 }
 
-function NavSection({ title, children }) {
+/* ── IconBtn: narrow column icon + label ── */
+function IconBtn({ icon, label, to, href, onClick, active }) {
+  const [hov, setHov] = useState(false);
+  const style = {
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+    padding: "9px 4px", borderRadius: 10, cursor: "pointer", gap: 5, width: "100%",
+    background: active ? "rgba(124,92,252,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
+    color: active ? "#a78bfa" : hov ? "#d0d0e8" : "#6e6e88",
+    transition: "all 0.15s", textDecoration: "none", border: "none", fontFamily: "inherit", boxSizing: "border-box",
+  };
+  const inner = (
+    <>
+      <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
+      <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "center", width: "100%" }}>{label}</span>
+    </>
+  );
+  const events = { onMouseEnter: () => setHov(true), onMouseLeave: () => setHov(false), style };
+  if (onClick) return <button onClick={onClick} {...events}>{inner}</button>;
+  if (href)    return <a href={href} {...events}>{inner}</a>;
+  return <Link to={to} {...events}>{inner}</Link>;
+}
+
+/* ── FlyoutGroup: icon trigger + portal flyout panel ── */
+function FlyoutGroup({ icon, label, active, children }) {
+  const [open, setOpen] = useState(false);
+  const [hov, setHov]   = useState(false);
+  const [pos, setPos]   = useState({ top: 0, left: 0 });
+  const triggerRef      = useRef(null);
+  const timer           = useRef(null);
+
+  const enter = () => {
+    clearTimeout(timer.current);
+    if (triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      setPos({ top: r.top, left: r.right + 6 });
+    }
+    setOpen(true);
+  };
+  const leave = () => { timer.current = setTimeout(() => setOpen(false), 120); };
+
   return (
-    <div className="mb-5">
-      <div className="px-3 mb-1 text-[11px] font-bold tracking-[0.12em] uppercase"
-        style={{ color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
-        {title}
+    <div ref={triggerRef} onMouseEnter={enter} onMouseLeave={leave} style={{ width: "100%" }}>
+      <div
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "9px 4px", borderRadius: 10, cursor: "pointer", gap: 5, width: "100%",
+          background: active || open ? "rgba(124,92,252,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
+          color: active || open ? "#a78bfa" : hov ? "#d0d0e8" : "#6e6e88",
+          transition: "all 0.15s", fontFamily: "inherit", boxSizing: "border-box",
+        }}
+      >
+        <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
+        <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "center", width: "100%" }}>{label}</span>
       </div>
-      <div className="flex flex-col gap-[2px]">{children}</div>
+
+      {open && createPortal(
+        <div
+          onMouseEnter={() => clearTimeout(timer.current)}
+          onMouseLeave={leave}
+          style={{
+            position: "fixed", top: pos.top, left: pos.left, zIndex: 9999,
+            background: "#111118", border: "1px solid rgba(255,255,255,0.09)",
+            borderRadius: 14, padding: "6px", minWidth: 230,
+            boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+            animation: "flyoutIn 0.14s ease",
+          }}
+        >
+          <div style={{ padding: "5px 10px 7px", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#55556a", fontFamily: "'JetBrains Mono',monospace" }}>
+            {label}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {children}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -174,101 +226,99 @@ export default function AppLayout({ children }) {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { balance, fetchCredits } = useCreditsStore();
+  const path = location.pathname;
+
+  const inAssets  = path === "/assets";
+  const inVideos  = path === "/videos" || path.startsWith("/product-ads") || path === "/video-captions";
+  const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
+  const inAudio   = path === "/voiceover" || path === "/speech-to-text";
+  const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
 
   useEffect(() => { fetchCredits(); }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
+    <>
+      <style>{`@keyframes flyoutIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }`}</style>
+      <div className="flex h-screen overflow-hidden text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
 
-      {/* ── Sidebar ── */}
-      <aside
-        className="flex flex-col shrink-0 border-r"
-        style={{ width: 220, borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}
-      >
-        {/* Logo */}
-        <div className="px-4 py-5 flex items-center gap-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
-        </div>
+        {/* ── Narrow sidebar ── */}
+        <aside
+          className="flex flex-col shrink-0 border-r"
+          style={{ width: 84, borderColor: "rgba(255,255,255,0.06)", background: "#13131e" }}
+        >
+          {/* Logo */}
+          <Link to="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 6px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)", textDecoration: "none" }}>
+            <img src="/assets/images/favicon.png" alt="Vidquence" style={{ height: 56, width: "auto" }} />
+          </Link>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          <div className="mb-3">
+          {/* Top nav */}
+          <nav style={{ flex: 1, padding: "8px 6px", display: "flex", flexDirection: "column", gap: 2 }}>
+            <IconBtn icon={Icons.home} label="Home" to="/dashboard" active={path === "/dashboard"} />
+            <IconBtn icon={Icons.assets} label="Assets" to="/assets" active={inAssets} />
+
+            <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
+
+            <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
+              <NavItem icon={Icons.folder}   label="Videos"           to="/videos"         active={path === "/videos"} />
+              <NavItem icon={Icons.ad}       label="Product Video Ad" to="/product-ads"    active={path.startsWith("/product-ads")} />
+              <NavItem icon={Icons.captions} label="Video Captions"   to="/video-captions" active={path === "/video-captions"} />
+            </FlyoutGroup>
+
+            <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>
+              <NavItem icon={Icons.gallery}   label="Images"         to="/image-generation" active={path === "/image-generation"} />
+              <NavItem icon={Icons.poster}    label="Product Poster" to="/product-poster"   active={path === "/product-poster"} />
+              <NavItem icon={Icons.instagram} label="Banner Design"  to="/banner-design"    active={path === "/banner-design"} />
+              <NavItem icon={Icons.thumbnail} label="Thumbnail"      to="/thumbnail"        active={path.startsWith("/thumbnail")} />
+              <NavItem icon={Icons.outfit}    label="Virtual Try-On" to="/virtual-tryon"    active={path === "/virtual-tryon"} />
+            </FlyoutGroup>
+
+            <FlyoutGroup icon={Icons.mic} label="Audio" active={inAudio}>
+              <NavItem icon={Icons.voice} label="Voiceover / TTS" to="/voiceover"      active={path === "/voiceover"} />
+              <NavItem icon={Icons.mic}   label="Speech to Text"  to="/speech-to-text" active={path === "/speech-to-text"} />
+            </FlyoutGroup>
+          </nav>
+
+          {/* Bottom: credits + account + signout */}
+          <div style={{ padding: "6px 6px 10px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Credits */}
             <button
               onClick={() => navigate("/credits")}
-              className="w-full border-0 cursor-pointer mb-2"
-              style={{ background: "transparent", padding: 0 }}
+              style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, width: "100%" }}
             >
               <div style={{
-                background: balance !== null && balance < 10
-                  ? "linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.06))"
-                  : "linear-gradient(135deg, rgba(124,92,252,0.15), rgba(124,92,252,0.07))",
-                border: `1px solid ${balance !== null && balance < 10 ? "rgba(249,115,22,0.25)" : "rgba(124,92,252,0.25)"}`,
-                borderRadius: 10,
-                padding: "10px 12px",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                padding: "8px 4px", borderRadius: 10,
+                background: balance !== null && balance < 10 ? "rgba(249,115,22,0.1)" : "rgba(124,92,252,0.1)",
               }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#55556a", fontFamily: "'JetBrains Mono',monospace", marginBottom: 5 }}>
-                  Credits
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 20, lineHeight: 1 }}>⚡</span>
-                  <span style={{ fontSize: 22, fontWeight: 800, color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "-0.02em" }}>
-                    {balance ?? "—"}
-                  </span>
-                </div>
-                <div style={{ marginTop: 6, fontSize: 10, color: balance !== null && balance < 10 ? "rgba(249,115,22,0.7)" : "rgba(124,92,252,0.6)", fontWeight: 600 }}>
-                  {balance !== null && balance < 10 ? "Low — top up →" : "Top up →"}
-                </div>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>⚡</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'JetBrains Mono',monospace" }}>
+                  {balance ?? "—"}
+                </span>
               </div>
             </button>
-            <NavItem icon={Icons.home} label="Dashboard" to="/dashboard" active={location.pathname === "/dashboard"} />
+
+            <FlyoutGroup icon={Icons.settings} label="Account" active={inAccount}>
+              <NavItem icon={Icons.star}     label="Upgrade"  href="/#pricing" active={false} />
+              <NavItem icon={Icons.credits}  label="Credits"  to="/credits"    active={path === "/credits"} />
+              <NavItem icon={Icons.settings} label="Settings" to="/settings"   active={path === "/settings"} />
+              <NavItem icon={Icons.message}  label="Feedback" to="/feedback"   active={path === "/feedback"} />
+            </FlyoutGroup>
+
+            <IconBtn
+              icon={Icons.signout}
+              label="Out"
+              onClick={async () => { await signOut(); window.location.href = "/"; }}
+              active={false}
+            />
           </div>
+        </aside>
 
-          <NavSection title="Create Videos">
-            <NavItem icon={Icons.folder}   label="Videos"           to="/videos"         active={location.pathname === "/videos"} />
-            <NavItem icon={Icons.ad}       label="Product Video Ad" to="/product-ads"    active={location.pathname.startsWith("/product-ads")} />
-            <NavItem icon={Icons.captions} label="Video Captions"   to="/video-captions" active={location.pathname === "/video-captions"} />
-          </NavSection>
-
-          <NavSection title="Create Images">
-            <NavItem icon={Icons.gallery}    label="Images"         to="/image-generation" active={location.pathname === "/image-generation"} />
-            <NavItem icon={Icons.poster}     label="Product Poster" to="/product-poster"   active={location.pathname === "/product-poster"} />
-            <NavItem icon={Icons.instagram}  label="Banner Design"  to="/banner-design"    active={location.pathname === "/banner-design"} />
-            <NavItem icon={Icons.thumbnail}  label="Thumbnail"      to="/thumbnail"        active={location.pathname.startsWith("/thumbnail")} />
-            <NavItem icon={Icons.outfit}     label="Virtual Try-On" to="/virtual-tryon"    active={location.pathname === "/virtual-tryon"} />
-          </NavSection>
-
-          <NavSection title="Audio Tools">
-            <NavItem icon={Icons.voice} label="Voiceover / TTS"  to="/voiceover"      active={location.pathname === "/voiceover"} />
-            <NavItem icon={Icons.mic}   label="Speech to Text"   to="/speech-to-text" active={location.pathname === "/speech-to-text"} />
-          </NavSection>
-
-          <NavSection title="Account">
-            <NavItem icon={Icons.star}     label="Upgrade"  href="/#pricing" active={false} />
-            <NavItem icon={Icons.credits}  label="Credits"  to="/credits"   active={location.pathname === "/credits"} />
-            <NavItem icon={Icons.settings} label="Settings" to="/settings"  active={location.pathname === "/settings"} />
-            <NavItem icon={Icons.message}  label="Feedback" to="/feedback"  active={location.pathname === "/feedback"} />
-          </NavSection>
-        </nav>
-
-        {/* Sign out */}
-        <div className="px-3 py-4 border-t flex flex-col gap-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <button
-            onClick={async () => { await signOut(); window.location.href = "/"; }}
-            className="w-full flex items-center gap-2 px-3 py-[7px] rounded-[8px] text-[15px] border-0 cursor-pointer transition-all text-left"
-            style={{ background: "transparent", color: "#f87171", fontFamily: "'Outfit',sans-serif" }}
-            onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.08)"}
-            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-          >
-            <span>↩</span> Sign out
-          </button>
+        {/* ── Main content ── */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {children}
         </div>
-      </aside>
 
-      {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {children}
       </div>
-
-    </div>
+    </>
   );
 }
