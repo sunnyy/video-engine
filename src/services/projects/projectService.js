@@ -75,6 +75,7 @@ export async function getProductAdProjects() {
 }
 
 export async function updateProject(id, safeProject, extra = {}) {
+  const { raw_ai_json, ...restExtra } = extra;
   const { error } = await supabase
     .from("projects")
     .update({
@@ -82,7 +83,8 @@ export async function updateProject(id, safeProject, extra = {}) {
       orientation: safeProject.meta.orientation,
       mode: safeProject.meta.mode,
       updated_at: new Date().toISOString(),
-      ...extra,
+      ...(raw_ai_json !== undefined ? { raw_ai_json } : {}),
+      ...restExtra,
     })
     .eq("id", id);
 

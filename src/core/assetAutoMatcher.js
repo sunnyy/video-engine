@@ -2,28 +2,28 @@
  * assetAutoMatcher.js
  * src/core/assetAutoMatcher.js
  *
- * Generates images via Fal.ai (per asset zone, per beat context).
- * Only fills zones where type === "asset" in the layout definition.
- * Never fills text zones.
+ * Routes asset generation per beat based on asset_hint:
+ *   entity != null          → /api/search-image with entity as query
+ *   entity == null && image_needed → Fal.ai with asset_prompt
+ *   image_needed == false   → skip
  */
 
 import { getLayoutDef } from "./registries/layoutRegistry";
 import { generateImages } from "../server/assets/falService";
+import { serverFetch }    from "../services/serverApi";
 
-/* ── Get asset-type zones from layout definition ── */
 function getAssetZoneIds(layoutId) {
   const def = getLayoutDef(layoutId);
   if (!def) return ["z1"];
   return def.zones.filter(z => z.type === "asset").map(z => z.id);
 }
 
-/* ── Find which asset zones still need a src filled ── */
 function findAssetZones(layoutId, zones) {
   return getAssetZoneIds(layoutId).filter(zId => {
     const zone = zones?.[zId];
-    if (!zone) return true; // missing — needs asset
-    if (zone.content?.kind === "block") return false; // block zone — skip
-    if (zone.content?.asset?.src) return false; // already has asset — skip
+    if (!zone) return true;
+    if (zone.content?.kind === "block") return false;
+    if (zone.content?.asset?.src) return false;
     return true;
   });
 }
@@ -33,123 +33,138 @@ function chooseMotion(beatIndex, zoneIndex) {
   return motions[(beatIndex + zoneIndex) % motions.length];
 }
 
-const STOP_WORDS_MATCHER = new Set([
-  "the","a","an","and","or","but","in","on","at","to","for","of","with","is","are","was",
-  "were","be","been","have","has","had","do","does","did","will","would","could","should",
-  "you","your","we","our","they","their","it","its","this","that","what","how","when",
-  "where","who","not","no","so","just","very","really","one","two","three","like","more",
-]);
-
-function extractKeywords(text) {
-  return [...new Set(
-    (text || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
-      .filter(w => w.length > 2 && !STOP_WORDS_MATCHER.has(w))
-  )].slice(0, 5);
+function makeAssetZone(src, beatIndex, zoneIndex) {
+  return {
+    content: {
+      kind: "asset",
+      asset: {
+        src,
+        type:            "image",
+        objectFit:       "cover",
+        motion:          chooseMotion(beatIndex, zoneIndex),
+        enterTransition: "none",
+        exitTransition:  "none",
+      },
+    },
+  };
 }
 
-/* ── Main export ── */
 export async function autoMatchAssets(
   beats,
   orientation,
-  { assetSource = "ai", uploadedAssets = [], topic = "", language = "english", dna = null } = {},
+  { assetSource = "ai", uploadedAssets = [], topic = "", language: _language = "english", dna = null } = {},
 ) {
-
-  /* ── User uploaded assets — full priority ── */
+  /* ── User uploaded assets ── */
   if (assetSource === "user" && uploadedAssets.length) {
-    const assets = uploadedAssets.map(a => ({
-      url:  a.url,
-      type: a.type || "image",
-    }));
-
+    const assets = uploadedAssets.map(a => ({ url: a.url, type: a.type || "image" }));
     return beats.map((beat, beatIndex) => {
       const zones      = { ...beat.zones };
       const assetZones = findAssetZones(beat.layout, zones);
-
       assetZones.forEach((zoneId, zoneIndex) => {
         const asset = assets[(beatIndex + zoneIndex) % assets.length];
-        zones[zoneId] = {
-          ...zones[zoneId],
-          content: {
-            kind: "asset",
-            asset: {
-              src:             asset.url,
-              type:            asset.type,
-              objectFit:       "cover",
-              motion:          chooseMotion(beatIndex, zoneIndex),
-              enterTransition: "none",
-              exitTransition:  "none",
-            },
-          },
-        };
+        zones[zoneId] = { ...zones[zoneId], ...makeAssetZone(asset.url, beatIndex, zoneIndex) };
       });
-
       return { ...beat, zones };
     });
   }
 
-  /* ── Only generate AI images when explicitly requested ── */
   if (assetSource !== "ai") return beats;
 
-  /* ── AI image generation — one prompt per asset zone per beat ── */
-  const zoneJobs = [];
+  /* ── Route beats: entity → search, image_needed → Fal.ai ── */
+  const entityJobs = []; // { beatIndex, zoneId, entity }
+  const falJobs    = []; // prompts array for generateImages
 
   beats.forEach((beat, beatIndex) => {
+    const hint = beat.asset_hint;
+    if (!hint) return;
+
     const assetZones = findAssetZones(beat.layout, beat.zones);
-    assetZones.forEach(zoneId => {
-      const spoken     = beat.spoken || topic;
-      const visualHint = beat.visual_hint || "none";
-      const keywords   = extractKeywords(`${spoken} ${topic}`);
-      const assetHint  = keywords.length ? { keywords, visual_type: visualHint } : null;
-      zoneJobs.push({
+    if (!assetZones.length) return;
+
+    const zoneId = assetZones[0];
+
+    if (hint.entity) {
+      // Store asset_prompt too so we can fall back to scene generation if search fails
+      entityJobs.push({ beatIndex, zoneId, entity: hint.entity, assetPrompt: hint.prompt || null, beat });
+    } else if (hint.image_needed) {
+      falJobs.push({
         beatIndex,
         zoneId,
-        spoken,
-        intent:      beat.intent || "explanation",
-        visual_hint: visualHint,
+        spoken:         beat.spoken || topic,
+        intent:         beat.intent || "explanation",
+        visual_hint:    "none",
         topic,
-        assetHint,
+        promptOverride: hint.prompt || null,
+        assetHint:      hint.prompt ? { prompt: hint.prompt } : null,
         dna,
         beat,
       });
-    });
-  });
-
-  if (!zoneJobs.length) return beats;
-
-  console.log(`[assetAutoMatcher] Generating ${zoneJobs.length} images via Fal.ai (library reuse enabled: ${!!dna?.niche})...`);
-
-  const images = await generateImages({
-    prompts:     zoneJobs,
-    orientation,
-    concurrency: 3,
+    }
   });
 
   const updatedBeats = beats.map(b => ({ ...b, zones: { ...b.zones } }));
-  let imageIndex = 0;
 
-  beats.forEach((beat, beatIndex) => {
-    const assetZones = findAssetZones(beat.layout, beat.zones);
+  /* ── Entity image search, with scene-generation fallback ── */
+  const entityFallbackJobs = [];
 
-    assetZones.forEach((zoneId, zoneIndex) => {
-      const image = images[imageIndex++];
-      if (!image) return;
+  await Promise.allSettled(
+    entityJobs.map(async ({ beatIndex, zoneId, entity, assetPrompt, beat: entityBeat }) => {
+      let found = false;
+      try {
+        const res = await serverFetch("/api/search-image", {
+          method: "POST",
+          body:   JSON.stringify({ query: entity }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            updatedBeats[beatIndex].zones[zoneId] = {
+              ...updatedBeats[beatIndex].zones[zoneId],
+              ...makeAssetZone(data.url, beatIndex, 0),
+            };
+            found = true;
+          }
+        }
+      } catch (e) {
+        console.warn("[assetAutoMatcher] entity search failed:", entity, e.message);
+      }
 
+      if (!found) {
+        // Never pass the entity name to Fal.ai — use asset_prompt (scene description) instead
+        if (assetPrompt) {
+          entityFallbackJobs.push({
+            beatIndex,
+            zoneId,
+            spoken:         entityBeat.spoken || topic,
+            intent:         entityBeat.intent || "explanation",
+            visual_hint:    "none",
+            topic,
+            promptOverride: assetPrompt,
+            assetHint:      { prompt: assetPrompt },
+            dna,
+            beat:           entityBeat,
+          });
+        }
+        // If no assetPrompt, leave src null — no image for this beat
+      }
+    })
+  );
+
+  /* ── Fal.ai generation (initial + entity fallbacks) ── */
+  const allFalJobs = [...falJobs, ...entityFallbackJobs];
+  if (allFalJobs.length) {
+    console.log(`[assetAutoMatcher] Generating ${allFalJobs.length} images via Fal.ai...`);
+    const images = await generateImages({ prompts: allFalJobs, orientation, concurrency: 3 });
+
+    allFalJobs.forEach(({ beatIndex, zoneId }, i) => {
+      const image = images[i];
+      if (!image?.url) return;
       updatedBeats[beatIndex].zones[zoneId] = {
         ...updatedBeats[beatIndex].zones[zoneId],
-        content: {
-          kind: "asset",
-          asset: {
-            src:             image.url,
-            type:            "image",
-            objectFit:       "cover",
-            motion:          chooseMotion(beatIndex, zoneIndex),
-            enterTransition: "none",
-            exitTransition:  "none",
-          },
-        },
+        ...makeAssetZone(image.url, beatIndex, 0),
       };
     });
-  });
+  }
 
   return updatedBeats;
 }

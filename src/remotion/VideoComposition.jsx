@@ -15,7 +15,6 @@ import BeatRenderer from "./BeatRenderer";
 import Caption from "./elements/Caption";
 import OverlayRenderer from "./elements/OverlayRenderer";
 import { transitionsRegistry } from "../core/registries/transitionsRegistry";
-import { buildVisualIdentity } from "../core/visualIdentityEngine";
 import { syncAvatarVideoFrame } from "./avatarVideoSingleton.js";
 
 /* FONT LOADER */
@@ -73,8 +72,6 @@ export default function VideoComposition({ project, previewMode = false }) {
   const { fps } = useVideoConfig();
 
   const { beats, meta, audio, overlays } = project;
-
-  const visualIdentity = buildVisualIdentity(project);
 
   const videoOverlays = overlays || [];
 
@@ -147,7 +144,7 @@ export default function VideoComposition({ project, previewMode = false }) {
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: visualIdentity.colorStory.dominant,
+        backgroundColor: project?.meta?.backgroundColor || "#0b0b10",
         width: meta.width,
         height: meta.height,
         overflow: "hidden",

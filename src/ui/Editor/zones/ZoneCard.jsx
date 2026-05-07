@@ -12,7 +12,6 @@ import BackgroundTab from "./tabs/BackgroundTab";
 import TextTab       from "./tabs/TextTab";
 import LayoutTab     from "./tabs/LayoutTab";
 import blockEditors  from "../blocks/blockEditors";
-import { getBlockVariants } from "../../../../src/core/blockRegistry";
 
 export default function ZoneCard({
   slot, zone, zoneType, zoneDef,
@@ -28,7 +27,7 @@ export default function ZoneCard({
   const background  = zone?.background || {};
   const block       = content?.block   || {};
   const BlockEditor = block?.type ? blockEditors[block.type] : null;
-  const variants    = block?.type ? getBlockVariants(block.type) : [];
+  const variants    = [];
   const isText      = zoneType === "text";
 
   const tabs = isText

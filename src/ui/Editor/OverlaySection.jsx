@@ -4,7 +4,6 @@ import {
   OVERLAY_TYPES, OVERLAY_TYPE_KEYS, ANCHOR_LABELS,
   createOverlay,
 } from "../../core/registries/overlayRegistry";
-import { getSafePlacementAnchors } from "../../core/overlayPlacementEngine";
 import { SFX_LIBRARY, SFX_KEYS, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 
 function Label({ children }) {
@@ -242,12 +241,7 @@ function OverlayCard({ overlay, beat, onUpdate, onRemove }) {
   const scale = overlay.scale ?? 1;
   const delay = overlay.delay ?? 0;
 
-  const safeAnchors = getSafePlacementAnchors({
-    layout:           beat.layout,
-    overlayType:      overlay.type,
-    captionPosition:  beat.caption?.position ?? 80,
-    existingOverlays: (beat.overlays || []).filter(o => o.id !== overlay.id),
-  });
+  const safeAnchors = [];
 
   return (
     <div className="rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[#111118] overflow-hidden">
@@ -303,12 +297,6 @@ export default function OverlaySection({ beat }) {
   const addOverlay = (type) => {
     const ov = createOverlay(type);
     if (!ov) return;
-    const safe = getSafePlacementAnchors({
-      layout: beat.layout, overlayType: type,
-      captionPosition: beat.caption?.position || "bottom",
-      existingOverlays: overlays,
-    });
-    if (safe.length > 0) ov.anchor = safe[0];
     updateBeat(beat.id, { overlays: [...overlays, ov] });
     setAdding(false);
   };

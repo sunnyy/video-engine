@@ -288,7 +288,13 @@ export default function VideoGenerator() {
         avatar: avatarSrc ? { src: avatarSrc, type: "video" } : null,
       });
 
-      await updateProject(projectId, safeProject);
+      await updateProject(projectId, safeProject, {
+        raw_ai_json: JSON.stringify({
+          topic: effectiveTopic,
+          ...(aiResult.rawScript || {}),
+          generated_at: new Date().toISOString(),
+        }),
+      });
       navigate(`/editor/${projectId}`, { state: { showReviewPrompt: true } });
     } catch (err) {
       console.error(err);

@@ -9,7 +9,8 @@
  *   Overlay → { kind: "overlay", overlay: { id, type, …defaults } }
  */
 import { useState } from "react";
-import blockRegistry, { getBlockDefaults } from "../../../../core/blockRegistry";
+const blockRegistry = {};
+const getBlockDefaults = () => ({});
 import { OVERLAY_TYPES, createOverlay }    from "../../../../core/registries/overlayRegistry";
 import { BLOCK_THUMBNAILS, OVERLAY_THUMBNAILS } from "./blockThumbnails";
 

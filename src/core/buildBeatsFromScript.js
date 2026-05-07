@@ -6,23 +6,17 @@
 import { generateCaptionText }   from "./captionTimingEngine";
 import { autoMatchAssets }        from "./assetAutoMatcher";
 import { validateBeats }          from "./compilerValidator";
-import { classifyBeatIntent }     from "./beatIntent/beatIntentClassifier";
 import { applyBeatVariation }     from "./beatVariationEngine";
 import { applyCaptionEmphasis }   from "./captionEmphasisEngine";
-import { planBeatVisual }         from "./visualPlanner";
 import { getLayoutDef, layoutRegistry, initLayoutRegistry, findLayouts } from "./registries/layoutRegistry";
 import { resolveColors }          from "./colorContrastResolver";
 import { resolveBeatColors }      from "./elements/colorContrastResolver";
-import { backgroundPatternRegistry, getBackgroundForIntent } from "./registries/backgroundPatternRegistry.js";
+import { backgroundPatternRegistry } from "./registries/backgroundPatternRegistry.js";
 import { getNicheColorFamily, getNicheAvoid } from "./registries/nichePaletteRegistry.js";
 import { pickBeatSFX } from "./registries/sfxRegistry";
 import { PIPELINE_EFFECTS }              from "./registries/textEffectRegistry.jsx";
 
-import { analyzeBeatRoles }   from "./ai/beatRoleAnalyzer";
-import { analyzeVisualTypes } from "./ai/visualTypeAnalyzer";
-import { validateAIOutputs }  from "./ai/aiOutputValidator";
 import { getTypographyForRole } from "./videoDNA.js";
-import { getPattern } from "../services/ai/patterns";
 import { serverFetch } from "../services/serverApi";
 
 /* ── Helpers ── */
@@ -33,7 +27,6 @@ function words(text) {
 function isLightColor(color) {
   if (!color || typeof color !== "string") return false;
   const c = color.trim().toLowerCase();
-  // CSS named colors → hardcoded luminance classification
   const LIGHT_NAMES = new Set([
     "white","whitesmoke","snow","ivory","floralwhite","ghostwhite","mintcream",
     "aliceblue","lavender","lavenderblush","mistyrose","honeydew","lightyellow",
@@ -51,38 +44,23 @@ function isLightColor(color) {
   ]);
   if (LIGHT_NAMES.has(c)) return true;
   if (DARK_NAMES.has(c)) return false;
-  // 3-digit hex: #rgb → #rrggbb
   if (/^#[0-9a-f]{3}$/.test(c)) {
     const r = parseInt(c[1] + c[1], 16);
     const g = parseInt(c[2] + c[2], 16);
     const b = parseInt(c[3] + c[3], 16);
     return (r * 299 + g * 587 + b * 114) / 1000 > 128;
   }
-  // 6-digit hex: #rrggbb
   if (/^#[0-9a-f]{6}$/.test(c)) {
     const r = parseInt(c.slice(1, 3), 16);
     const g = parseInt(c.slice(3, 5), 16);
     const b = parseInt(c.slice(5, 7), 16);
     return (r * 299 + g * 587 + b * 114) / 1000 > 128;
   }
-  // rgb(...) / rgba(...)
   const rgb = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
   if (rgb) {
     return (parseInt(rgb[1]) * 299 + parseInt(rgb[2]) * 587 + parseInt(rgb[3]) * 114) / 1000 > 128;
   }
   return false;
-}
-
-function splitIntoDurationBeats(text) {
-  const w = words(text);
-  const beats = [];
-  let i = 0;
-  while (i < w.length) {
-    const size = Math.floor(Math.random() * 6) + 4;
-    beats.push(w.slice(i, i + size).join(" "));
-    i += size;
-  }
-  return beats;
 }
 
 /* ── Duration ── */
@@ -102,10 +80,47 @@ function calculateDuration(spoken, intent, energy = 0.5) {
   return Number(Math.min(4.0, Math.max(1.4, base + variance)).toFixed(1));
 }
 
+/* ── Beat type → intent mapping ── */
+const BEAT_TYPE_TO_INTENT = {
+  hook:        "curiosity",
+  item:        "explanation",
+  fact:        "proof",
+  stat:        "proof",
+  explanation: "explanation",
+  reveal:      "reveal",
+  contrast:    "contrast",
+  cta:         "urgency",
+  setup:       "curiosity",
+  conflict:    "shock",
+  escalate:    "urgency",
+  ending:      "reveal",
+  insight:     "proof",
+  claim:       "shock",
+  proof:       "proof",
+  punchline:   "punchline",
+};
+
+const BEAT_TYPE_TO_ENERGY = {
+  hook:        0.85,
+  item:        0.65,
+  fact:        0.6,
+  stat:        0.7,
+  explanation: 0.5,
+  reveal:      0.75,
+  contrast:    0.6,
+  cta:         0.8,
+  setup:       0.6,
+  conflict:    0.75,
+  escalate:    0.8,
+  ending:      0.7,
+  insight:     0.6,
+  claim:       0.8,
+  proof:       0.6,
+  punchline:   0.75,
+};
+
 /* ── Caption ── */
-/* ── Caption style — ONE per video based on overall tone ── */
 function pickVideoCaptionStyle(beats) {
-  // Determine dominant intent/energy across all beats
   const avgEnergy = beats.reduce((s, b) => s + (b.energy ?? 0.5), 0) / (beats.length || 1);
   const intents   = beats.map(b => b.intent).filter(Boolean);
   const dominant  = intents.sort((a, b) =>
@@ -139,27 +154,24 @@ function chooseCaptionPosition(_layoutId, index, total, energy) {
   return 80;
 }
 
-/* ── Beat role — position-based, optional hint for layout picker ── */
+/* ── Beat role ── */
 function assignBeatRole(index, total) {
   if (total <= 1) return "hook";
   if (index === 0)         return "hook";
   if (index === total - 1) return "cta";
-  const pos = index / (total - 1); // 0..1
+  const pos = index / (total - 1);
   if (pos <= 0.25) return "proof";
   if (pos <= 0.60) return "escalate";
   return "reveal";
 }
 
 /* ── Transition ── */
-
-// Canonical durations per transition type
 const TRANSITION_DURATIONS = {
   zoom: 18, whipPan: 12, glitch: 14, flash: 10, spin: 14,
   slideLeft: 16, slideRight: 16, slideUp: 16, slideDown: 16,
   dissolve: 18, dipBlack: 16, dipWhite: 16, fade: 14, cut: 0,
 };
 
-// Buckets: high-energy uses punchy types, low-energy uses smooth types
 const TRANS_HIGH = ["zoom", "whipPan", "slideLeft", "slideUp", "glitch", "flash", "zoom", "slideRight"];
 const TRANS_LOW  = ["dissolve", "dipBlack", "slideRight", "slideDown", "fade", "dissolve", "dipWhite", "slideLeft"];
 
@@ -175,14 +187,12 @@ function chooseTransition(layoutId, index, energy = 0.5, isLast = false, prevTyp
   if (isLast) return { type: "dissolve", duration: TRANSITION_DURATIONS.dissolve };
 
   const pool = energy >= 0.6 ? TRANS_HIGH : TRANS_LOW;
-  // Filter out the previous type to prevent consecutive repeats
   const available = prevType ? pool.filter(t => t !== prevType) : pool;
-  // Deterministic but varied: mix of index + energy as seed
   const pick = available[(index * 7 + Math.round(energy * 13)) % available.length];
   return { type: pick, duration: TRANSITION_DURATIONS[pick] ?? 14 };
 }
 
-/* ── Enforce layout zones — respects new zone type schema ── */
+/* ── Enforce layout zones ── */
 function enforceLayoutZones(layoutId, existingZones = {}) {
   const def = getLayoutDef(layoutId);
   if (!def) return existingZones;
@@ -193,9 +203,6 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
     const existing = existingZones[zoneDef.id];
 
     if (existing) {
-      // Only reuse existing content if the content type matches the zone definition.
-      // Mismatches (e.g. text content in an asset zone) would cause ghost placeholders
-      // or silent failures — treat them as if there is no existing content.
       const existingKind = existing?.content?.kind;
       const kindMatches =
         (zoneDef.type === "text"       && existingKind === "text")       ||
@@ -203,32 +210,23 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
         (zoneDef.type === "avatar"     && existingKind === "asset")      ||
         (zoneDef.type === "decorative" && existingKind === "shape")      ||
         (zoneDef.type === "icon"       && existingKind === "icon")       ||
-        (!existingKind); // no content yet — let it fall through to the empty-zone path
+        (!existingKind);
 
       if (kindMatches && existingKind) {
         fixed[zoneDef.id] = existing;
         return;
       }
-      // Type mismatch — fall through to create a fresh empty zone of the correct type
     }
 
-    // Create empty zone matching type from layout definition
     if (zoneDef.type === "text") {
-      // Strip automation-owned properties from layout zone styles.
-      // DNA owns: color, background (inline), fontFamily, fontWeight, _presetId.
-      // Layout zones contribute structure: fontSize, letterSpacing, textTransform, padding, etc.
-      // EXCEPTION: _userFontFamily on a layout zone means the designer intentionally chose that
-      // font — preserve fontFamily + fontWeight so DNA does not override the designer's choice.
       // eslint-disable-next-line no-unused-vars
       const { _presetId: _sp, color: _sc, background: _sb, fontFamily: _sff, fontWeight: _sfw, ...baseLayoutStyle } = zoneDef.style || {};
       const layoutZoneStyle = zoneDef.style?._userFontFamily
-        ? { ...baseLayoutStyle, fontFamily: _sff, fontWeight: _sfw } // keep designer-chosen font
+        ? { ...baseLayoutStyle, fontFamily: _sff, fontWeight: _sfw }
         : baseLayoutStyle;
       fixed[zoneDef.id] = {
         content: { kind: "text", text: "" },
         style: { ...layoutZoneStyle },
-        // Carry the background layer (set via Zone Background picker) so the contrast
-        // guard in fillTextZones can see it and derive a readable text color.
         ...(zoneDef.background ? { background: zoneDef.background } : {}),
       };
     } else if (zoneDef.type === "asset" || zoneDef.type === "avatar") {
@@ -244,7 +242,6 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
       const isRing  = br >= 999;
       const isLarge = (zoneDef.width ?? 0) > 60 || (zoneDef.height ?? 0) > 60;
       const shape   = isRing ? "ring" : (isLarge ? "square" : "circle");
-      // Prefer Admin-saved filled value; fall back to geometry heuristic
       const filled  = zoneDef.style?.filled ?? (!isRing && !isLarge);
       fixed[zoneDef.id] = {
         content: { shape },
@@ -252,28 +249,111 @@ function enforceLayoutZones(layoutId, existingZones = {}) {
       };
     } else if (zoneDef.type === "icon") {
       fixed[zoneDef.id] = {
-        content: { iconId: null }, // will be filled by buildZones if called; placeholder for editor
+        content: { iconId: null },
         style: { ...zoneDef.style, color: zoneDef.style?.color || "#ffffff", filled: true },
       };
     } else {
-      fixed[zoneDef.id] = {
-        content: {},
-        style: {},
-      };
+      fixed[zoneDef.id] = { content: {}, style: {} };
     }
   });
 
   return fixed;
 }
 
+/* ── Direct zone filling from script fields ── */
+function fillScriptFields(zones, layoutId, scriptBeat) {
+  const def = getLayoutDef(layoutId);
+  if (!def) return zones;
 
-/* ── Fill text zones — DNA-driven color + typography lock ── */
-// Presets are NOT used in automation. All typography comes from dna.typographySystem
-// via getTypographyForRole(). All color comes from dna.colorStory. Layout zone styles
-// (fontSize, textAlign, letterSpacing) are preserved from the layout definition.
+  const ROLE_TO_FIELD = {
+    "display":    scriptBeat.display,
+    "headline":   scriptBeat.display,
+    "item_title": scriptBeat.display,
+    "subtext":    scriptBeat.sub,
+    "item_body":  scriptBeat.sub,
+    "number":     scriptBeat.number,
+    "label":      scriptBeat.label,
+    "stat":       scriptBeat.stat,
+  };
+
+  const filled = { ...zones };
+  const usedRoles = new Set();
+
+  def.zones
+    .filter(z => z.type === "text")
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .forEach(zoneDef => {
+      const role  = zoneDef.role;
+      const value = ROLE_TO_FIELD[role];
+      if (!value || usedRoles.has(role)) return;
+
+      filled[zoneDef.id] = {
+        ...(filled[zoneDef.id] || {}),
+        role,
+        content: { kind: "text", text: String(value) },
+      };
+      usedRoles.add(role);
+    });
+
+  return filled;
+}
+
+/* ── Layout picker by beat type ── */
+const ENTITY_CARD_LAYOUT_ID = "d425bbf7-485b-4cb7-8b26-6d7161fd1eda";
+
+function pickLayoutForBeatType(beatType, usedLayoutIds, orientation, talkingHead = false, scriptBeat = null) {
+  // Primary: find layouts matching this exact beatType
+  let candidates = findLayouts({ beatType, orientation, type: "layout", talkingHead });
+  if (!candidates.length) candidates = findLayouts({ beatType, orientation, talkingHead });
+
+  // Fallback: use intent-based lookup if no beatType-specific layouts exist
+  if (!candidates.length) {
+    const intent = BEAT_TYPE_TO_INTENT[beatType] || "explanation";
+    candidates = findLayouts({ intent, orientation, type: "layout", talkingHead });
+    if (!candidates.length) candidates = findLayouts({ intent, orientation, talkingHead });
+  }
+
+  // Last resort: any orientation layout
+  if (!candidates.length) candidates = findLayouts({ orientation, talkingHead });
+  if (!candidates.length) candidates = findLayouts({ talkingHead });
+
+  // Entity-aware preference: item beats with an entity get the dedicated entity card layout
+  if (beatType === "item" && scriptBeat?.entity) {
+    const recentTwo = new Set(usedLayoutIds.slice(-2));
+    if (!recentTwo.has(ENTITY_CARD_LAYOUT_ID)) {
+      // Check if the entity card layout exists in the registry
+      const allLayouts = findLayouts({ orientation, talkingHead });
+      if (allLayouts.some(l => l.id === ENTITY_CARD_LAYOUT_ID)) {
+        console.log(`[pickLayoutForBeatType] entity="${scriptBeat.entity}" → ENTITY_CARD`);
+        return ENTITY_CARD_LAYOUT_ID;
+      }
+    }
+    // Entity card was recently used or not registered — use text-only layouts.
+    // Horizontal logos/screenshots look worse stretched full-bleed than on a clean dark background.
+    const textOnlyLayouts = candidates.filter(l => (l.def?.assetCount ?? 0) === 0);
+    if (textOnlyLayouts.length) candidates = textOnlyLayouts;
+    // else keep all candidates as absolute last resort
+  }
+
+  // Never repeat the last used layout
+  const lastId = usedLayoutIds.length ? usedLayoutIds[usedLayoutIds.length - 1] : null;
+  if (lastId) {
+    const withoutLast = candidates.filter(l => l.id !== lastId);
+    if (withoutLast.length) candidates = withoutLast;
+  }
+
+  // Rotate through unused layouts for variety
+  const usedSet = new Set(usedLayoutIds);
+  const unused  = candidates.filter(l => !usedSet.has(l.id));
+  if (unused.length) candidates = unused;
+
+  const picked = candidates[Math.floor(Math.random() * candidates.length)];
+  console.log(`[pickLayoutForBeatType] beatType=${beatType} entity=${scriptBeat?.entity || null} → ${picked?.id || "fallback"}`);
+  return picked?.id || "DuoStackHook";
+}
+
+/* ── Fill text zones — DNA color + typography ── */
 function fillTextZones(beats, colorOptions = {}) {
-
-  // Lock typography system for the whole video — logged once here
   const typographySystem = colorOptions.dna?.typographySystem || null;
   if (typographySystem) {
     console.log("[typography] Locking system:", typographySystem);
@@ -283,7 +363,6 @@ function fillTextZones(beats, colorOptions = {}) {
     const def = getLayoutDef(beat.layout);
     if (!def) return beat;
 
-    // resolveColors still used for textShadow and legacy blockBg/accent
     const colors = resolveColors({
       colorStory:  colorOptions.colorStory || null,
       brandColor:  colorOptions.brandColor  || null,
@@ -300,9 +379,6 @@ function fillTextZones(beats, colorOptions = {}) {
     const zones = { ...beat.zones };
     const hasAssetZones = def.zones.some(z => z.type === "asset");
 
-    // Hoist bgIsLight — check the ACTUAL layout background, not just the niche palette bg.
-    // colorStory.bg is the niche's intended palette bg (e.g. #fef3c7 for food), but the
-    // rendered background is beat.layoutBackground (pattern/color). Patterns are always dark.
     const nicheBg         = colorOptions.colorStory?.bg || colorOptions.dna?.colorStory?.bg || "#0b0b10";
     const actualBg        = beat.layoutBackground;
     const actualBgIsDark  = !actualBg
@@ -315,22 +391,14 @@ function fillTextZones(beats, colorOptions = {}) {
     textZones.forEach((zoneDef, order) => {
       const existing = zones[zoneDef.id];
 
-      // ── Automation: NO preset involvement ────────────────────────────────────
-      // Presets are for manual user styling only. In automation, all visual decisions
-      // come from DNA / colorStory. This is the only way to guarantee consistency
-      // across zones and beats within one video.
       const rawPaletteText = colorOptions.colorStory?.text || colorOptions.dna?.colorStory?.text || "#ffffff";
-      // If the actual background is dark but niche palette chose dark text, force white.
       const paletteText = actualBgIsDark && !isLightColor(rawPaletteText) ? "#ffffff" : rawPaletteText;
       const primary     = colorOptions.colorStory?.primary || colorOptions.dna?.colorStory?.primary || "#7c5cfc";
 
       const inject = {};
-
-      // Color: always the DNA palette text color — contrast-safe for this niche's bg.
       console.log("[fillTextZones] paletteText:", paletteText, "colorStory:", JSON.stringify(colorOptions.colorStory?.text), "dna:", JSON.stringify(colorOptions.dna?.colorStory?.text));
       inject.color = paletteText;
 
-      // Text shadow: DNA-driven, stripped on light backgrounds.
       if (bgIsLight) {
         inject.textShadow = "none";
       } else if (hasAssetZones) {
@@ -341,71 +409,41 @@ function fillTextZones(beats, colorOptions = {}) {
         inject.textShadow = colors.textShadow;
       }
 
-      // No automatic background on text zones — pill/badge BGs are designer-set in
-      // the layout zone style, not injected per zone by automation.
-
-      // WebkitTextStroke: keep if zoneDef has it, tinted to DNA primary
       if (zoneDef.style?.WebkitTextStrokeColor || zoneDef.style?.textStrokeColor) {
         inject.WebkitTextStrokeColor = primary;
         inject.textStrokeColor       = primary;
       }
 
-      // Assign a default text effect if the zone doesn't already have one
       if (!existing?.style?.textEffect) {
         const seed2 = (beat.intent || "").charCodeAt(0) + order * 7 + (zoneDef.id || "").charCodeAt(1);
         inject.textEffect = PIPELINE_EFFECTS[seed2 % PIPELINE_EFFECTS.length];
       }
 
       const existingContent = existing?.content || { kind: "text", text: "" };
-
-      // Pull textEffect out so it's handled separately.
       const { textEffect, ...injectVisualStyle } = inject;
 
-      // Merge order (lowest → highest priority):
-      //   injectVisualStyle  — DNA colors / textShadow / stroke as the baseline
-      //   zoneDef.style      — layout structure: fontSize, letterSpacing, textTransform, padding…
-      //   userOverrides      — only explicitly user-pinned values (_userColor, _userBackground)
-      //
-      // Strip DNA-owned properties from the layout zone style so DNA always wins:
-      //   color, background (inline), fontFamily, fontWeight are set by DNA — not layout defs.
-      // Also strip whiteSpace:"nowrap" — dynamic content wraps by definition.
       // eslint-disable-next-line no-unused-vars
       const { whiteSpace: _sWS, _presetId: _sPI, color: _sC, background: _sBG, fontFamily: _sFF, fontWeight: _sFW, ...zoneDef_styleNoNowrap } =
         zoneDef.style || {};
 
-      // Only re-admit values the user explicitly pinned in the editor.
-      // Every other property in existing.style belongs to the layout definition or a
-      // previous automation run — spreading it would let stale fontSize, letterSpacing,
-      // textAlign, textTransform, padding, etc. from an old layout override the current
-      // layout's zone definition, causing mid-video typography/size inconsistencies.
       const userOverrides = {};
       if (existing?.style?._userColor)      userOverrides.color      = existing.style.color;
       if (existing?.style?._userBackground) userOverrides.background = existing.style.background;
 
       const mergedVisual = {
-        ...injectVisualStyle,     // baseline: textShadow, WebkitTextStroke
-        ...zoneDef_styleNoNowrap, // layout structure: fontSize, letterSpacing, padding…
-        ...userOverrides,         // only explicitly user-pinned values
-        whiteSpace:    "normal",
-        wordBreak:     "normal",   // wrap at spaces only
-        overflowWrap:  "normal",   // never break mid-word even as last resort
-        hyphens:       "none",     // no hyphenation
+        ...injectVisualStyle,
+        ...zoneDef_styleNoNowrap,
+        ...userOverrides,
+        whiteSpace:   "normal",
+        wordBreak:    "normal",
+        overflowWrap: "normal",
+        hyphens:      "none",
       };
 
-      // Final textShadow pass — strip on light backgrounds regardless of what any layer set.
-      // Check 1: niche/colorStory bg is light → strip textShadow on ALL text zones.
-      // Check 2: zone's own background is a light solid color → strip on that zone specifically.
-      //
-      // There are TWO distinct background concepts for a zone:
-      //   a) zone.style.background  — CSS background on the text element (pill presets, badge colours)
-      //   b) zone.background.color  — separate background *layer* rendered behind the zone
-      //                               (set via the Zone Background picker in the editor)
-      // Both must be checked; the picker path is the more common one designers use.
-      const zoneBgStyle = mergedVisual.background; // (a) from zone.style.background
-      const zoneBgLayer =                          // (b) from zone.background layer
+      const zoneBgStyle = mergedVisual.background;
+      const zoneBgLayer =
         (typeof zoneDef.background?.color === "string" ? zoneDef.background.color : null)
         ?? (typeof existing?.background?.color === "string" ? existing.background.color : null);
-      // Prefer whichever is the more specific / non-transparent value
       const zoneBg = (zoneBgStyle && zoneBgStyle !== "transparent") ? zoneBgStyle : (zoneBgLayer || null);
 
       const isSolidColor = (v) => v && typeof v === "string"
@@ -419,35 +457,18 @@ function fillTextZones(beats, colorOptions = {}) {
         mergedVisual.textShadow = "none";
       }
 
-      // Zone background contrast guard:
-      // If the zone has a solid background (CSS style OR background layer), verify that the
-      // merged text color is actually readable.  Don't rely on "did the designer pin a color" —
-      // a previous wrong pipeline run may have stored white in existing.style.color, which wins
-      // over zoneDef.style.color in the merge and creates e.g. white text on white background.
-      // Instead, check actual contrast: if text and background are both light (or both dark),
-      // the text is unreadable and we must fix it — regardless of which layer set the color.
-      // Exception: _userColor flag means the user deliberately picked this color in the editor.
       const hasZoneBackground = isSolidColor(zoneBg);
-
       if (hasZoneBackground && !existing?.style?._userColor) {
         const textIsLight = isLightColor(mergedVisual.color || "#ffffff");
         if (textIsLight === zoneBgIsLight) {
-          // Text and background have the same lightness → invisible. Derive a readable colour.
           mergedVisual.color = zoneBgIsLight ? "#0a0a0a" : "#ffffff";
         }
       }
 
-      // ── Force DNA color (after merge, so it wins over any layout zone color) ─────────
-      // DNA palette text color is the single source of truth for text color across all beats.
-      // Only skip if the user explicitly pinned a color in the editor.
       if (!existing?.style?._userColor) {
         mergedVisual.color = paletteText;
       }
 
-      // ── Video-level typography lock — DNA always wins ──────────────────────────────────
-      // layout zone fontFamily/fontWeight are stripped before merging so DNA is the sole
-      // source of truth for fonts. The only exception: _userEditedFont means the user
-      // explicitly changed this zone's font in the editor and wants to keep it.
       if (typographySystem && !existing?.style?._userEditedFont) {
         const ROLE_TO_TYPOGRAPHY_ROLE = {
           eyebrow: "label", number: "display", item_title: "headline",
@@ -466,7 +487,6 @@ function fillTextZones(beats, colorOptions = {}) {
         content: existingContent,
         style: {
           ...mergedVisual,
-          // Preserve user's textEffect pick; otherwise use pipeline-assigned one
           textEffect: existing?.style?.textEffect || textEffect,
         },
       };
@@ -477,10 +497,6 @@ function fillTextZones(beats, colorOptions = {}) {
 }
 
 /* ── Decorative zone color theming ── */
-// Applies the DNA accent/primary color to decorative zones whose color was NOT
-// explicitly set by the layout designer (i.e. they were left at the default white).
-// Designer-pinned colors are always respected.
-// Maps background works_with tokens → actual hex values usable as shape colors
 const WORKS_WITH_HEX = {
   white:  "#ffffff",
   yellow: "#f5c518",
@@ -505,13 +521,10 @@ function fillDecorativeZones(beats, colorOptions = {}) {
     if (!decorativeZones.length) return beat;
 
     const zones = { ...beat.zones };
-
-    // Derive a shape color that works with this beat's actual background
     const bgKey   = (beat.layoutBackground?.type === "pattern" ? beat.layoutBackground.value : null) || lockedBgKey;
     const bgEntry = bgKey ? backgroundPatternRegistry[bgKey] : null;
     const worksWith = bgEntry?.works_with || [];
 
-    // Prefer a color from the background's works_with list; fall back to DNA accent
     let accent  = dnaAccent;
     let accent2 = brandAccent;
     if (worksWith.length) {
@@ -524,16 +537,10 @@ function fillDecorativeZones(beats, colorOptions = {}) {
     decorativeZones.forEach((zoneDef, idx) => {
       const existing = zones[zoneDef.id];
       if (existing?.style?._userColor) return;
-
       const themeColor = idx % 2 === 0 ? accent : accent2;
-
       zones[zoneDef.id] = {
         ...(existing || {}),
-        style: {
-          ...(existing?.style || {}),
-          ...(zoneDef.style || {}),
-          color: themeColor,
-        },
+        style: { ...(existing?.style || {}), ...(zoneDef.style || {}), color: themeColor },
       };
     });
 
@@ -541,14 +548,7 @@ function fillDecorativeZones(beats, colorOptions = {}) {
   });
 }
 
-/* ─────────────────────────────────────────────────────────────
-   VIDEO-LEVEL VISUAL PLAN
-   Runs ONCE before the beat loop.
-   Returns a locked background key + a 2–3 layout rotation for
-   the entire video so all beats share the same visual identity.
-───────────────────────────────────────────────────────────── */
-
-// Minimal AI-intent → background-registry-intent mapping (subset of visualPlanner's map)
+/* ── Video-level visual system ── */
 const INTENT_TO_BG_INTENT_LOCAL = {
   shock: "shock", curiosity: "curiosity", proof: "proof",
   irony: "irony", reveal: "reveal", empathy: "empathy",
@@ -556,19 +556,37 @@ const INTENT_TO_BG_INTENT_LOCAL = {
   punchline: "punchline", hook: "shock", stat: "proof",
 };
 
-// AI-intent → layout-registry-intent (mirrors visualPlanner's AI_TO_LAYOUT_INTENT)
-const INTENT_TO_LAYOUT_INTENT_LOCAL = {
-  shock: "hook", curiosity: "hook", proof: "proof",
-  irony: "contrast", reveal: "reveal", empathy: "testimonial",
-  urgency: "escalate", explanation: "explanation", contrast: "contrast",
-  punchline: "cta", stat: "proof", hook: "hook",
-};
+function pickNicheBackground(niche, intent, excludeKeys = []) {
+  const allBgs = Object.entries(backgroundPatternRegistry);
 
-function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16", mode = "faceless") {
+  const nicheMatch = allBgs.filter(([key, bg]) =>
+    !excludeKeys.includes(key) && bg.niche?.includes(niche)
+  );
+
+  const intentMatch = nicheMatch.filter(([, bg]) => bg.intent?.includes(intent));
+
+  const pool = intentMatch.length ? intentMatch
+    : nicheMatch.length ? nicheMatch
+    : allBgs.filter(([key, bg]) =>
+        !excludeKeys.includes(key) &&
+        bg.intent?.includes(intent) &&
+        bg.category !== "dark"
+      );
+
+  const preferred = pool.filter(([, bg]) =>
+    bg.category === "gradient" || bg.category === "bright"
+  );
+
+  const finalPool = preferred.length ? preferred : pool;
+  if (!finalPool.length) return "nearBlack";
+
+  return finalPool[Math.floor(Math.random() * finalPool.length)][0];
+}
+
+function planVideoVisualSystem(sourceBeats, dna) {
   const niche      = dna?.niche       || null;
   const colorStory = dna?.colorStory  || null;
 
-  // 1. Dominant intent across all beats
   const intentCounts = {};
   sourceBeats.forEach(b => {
     const k = b.intent || "explanation";
@@ -577,83 +595,9 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16", mode = "f
   const dominantIntent = Object.entries(intentCounts)
     .sort(([, a], [, b]) => b - a)[0]?.[0] || "curiosity";
 
-  // 2. Pick ONE locked background for the whole video
-  const colorFamily = getNicheColorFamily(niche);
   const nicheAvoid  = getNicheAvoid(niche);
   const bgIntentKey = INTENT_TO_BG_INTENT_LOCAL[dominantIntent] || "curiosity";
-
-  const lockedBg = getBackgroundForIntent(
-    bgIntentKey, "dark", colorFamily, true, niche, nicheAvoid,
-  );
-
-  // CTA beat gets a companion from the same family but a different key
-  const ctaBg = getBackgroundForIntent(
-    "urgency", "dark", colorFamily, true, niche, [lockedBg.key, ...nicheAvoid],
-  );
-
-  // 3. Pick 2–3 layout IDs for the whole video
-  const layoutIntent  = INTENT_TO_LAYOUT_INTENT_LOCAL[dominantIntent] || "hook";
-  const talkingHead   = mode === "talking_head" ? true : false;
-  // Prefer structural 'layout' type rows; fall back to all layouts when none exist yet
-  let candidates = findLayouts({ intent: layoutIntent, orientation, type: "layout", talkingHead });
-  if (!candidates.length) candidates = findLayouts({ orientation, type: "layout", talkingHead });
-  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation, niche, talkingHead });
-  if (!candidates.length) candidates = findLayouts({ intent: layoutIntent, orientation, talkingHead });
-  if (!candidates.length) candidates = findLayouts({ orientation, talkingHead });
-
-  // Prefer layouts that have at least one asset zone (visual richness)
-  const withAsset = candidates.filter(l => (l.def?.assetCount ?? 0) >= 1);
-  if (withAsset.length >= 2) candidates = withAsset;
-
-  // Pick up to 3 distinct layouts with different text zone counts for variety
-  const family = [];
-  const usedIds = new Set();
-  const usedTextCounts = new Set();
-  for (const l of candidates) {
-    if (family.length >= 3) break;
-    const tc = l.def?.textCount ?? 0;
-    if (usedIds.has(l.id)) continue;
-    // Allow at most one layout per text-count bucket to ensure visual variety
-    if (!usedTextCounts.has(tc) || family.length < 2) {
-      family.push(l.id);
-      usedIds.add(l.id);
-      usedTextCounts.add(tc);
-    }
-  }
-
-  // If primary intent pool yielded fewer than 3 unique layouts, pull from related intent pools
-  const FALLBACK_INTENTS = ["hook", "explanation", "proof", "reveal", "contrast", "cta"];
-  if (family.length < 3) {
-    for (const fallbackIntent of FALLBACK_INTENTS) {
-      if (family.length >= 3) break;
-      // Prefer structural layouts; fall back to all
-      const fallbackCandidates =
-        findLayouts({ intent: fallbackIntent, orientation, type: "layout", talkingHead }).length
-          ? findLayouts({ intent: fallbackIntent, orientation, type: "layout", talkingHead })
-          : findLayouts({ intent: fallbackIntent, orientation, talkingHead });
-      for (const l of fallbackCandidates) {
-        if (family.length >= 3) break;
-        if (!usedIds.has(l.id)) {
-          family.push(l.id);
-          usedIds.add(l.id);
-        }
-      }
-    }
-  }
-
-  // Deduplicate — never allow the same layout twice in the rotation
-  const uniqueFamily = [...new Set(family)];
-  if (uniqueFamily.length === 1) {
-    console.warn("[visual-system] WARNING: Only 1 unique layout found — video will have no layout variety");
-  }
-
-  const finalFamily = uniqueFamily.slice(0, 3);
-  // Last resort: if still only 1, grab any other available layout
-  if (finalFamily.length === 1) {
-    const anyOther = findLayouts({ orientation, talkingHead }).find(l => l.id !== finalFamily[0]);
-    if (anyOther) finalFamily.push(anyOther.id);
-  }
-  if (!finalFamily.length) finalFamily.push("DuoStackHook");
+  const lockedBgKey = pickNicheBackground(niche, bgIntentKey, nicheAvoid);
 
   const colorLocked = {
     bg:     colorStory?.bg      || "#0b0b10",
@@ -661,14 +605,11 @@ function planVideoVisualSystem(sourceBeats, dna, orientation = "9:16", mode = "f
     accent: colorStory?.primary || "#7c5cfc",
   };
 
-  console.log(
-    `[visual-system] bg="${lockedBg.key}" ctaBg="${ctaBg.key}" layouts=[${finalFamily.join(", ")}]`,
-  );
-
-  return { backgroundKey: lockedBg.key, ctaBackgroundKey: ctaBg.key, layoutFamily: finalFamily, colorLocked };
+  console.log(`[visual-system] bg="${lockedBgKey}"`);
+  return { backgroundKey: lockedBgKey, colorLocked };
 }
 
-/* ── Remove background for zones with transparentAsset flag ── */
+/* ── Transparent assets ── */
 async function applyTransparentAssets(beats) {
   const jobs = [];
   beats.forEach((beat, beatIndex) => {
@@ -697,10 +638,7 @@ async function applyTransparentAssets(beats) {
         const zone = beat.zones[zoneId];
         updatedBeats[beatIndex].zones[zoneId] = {
           ...zone,
-          content: {
-            ...zone.content,
-            asset: { ...(zone.content?.asset ?? {}), src: data.transparentUrl },
-          },
+          content: { ...zone.content, asset: { ...(zone.content?.asset ?? {}), src: data.transparentUrl } },
         };
       }
     } catch (e) {
@@ -712,7 +650,7 @@ async function applyTransparentAssets(beats) {
 
 /* ── Main pipeline ── */
 export async function buildBeatsFromScript({
-  script           = "",
+  script:           _script           = "",
   structuredBeats  = null,
   mode             = "faceless",
   videoType:        _videoType        = "viral",
@@ -727,67 +665,45 @@ export async function buildBeatsFromScript({
   audience:         _audience         = "general",
   tone:             _tone             = "bold",
   dna              = null,
-  patternKey       = null,
+  patternKey:       _patternKey       = null,
 }) {
-
-  /* ── Ensure layout registry is loaded before picking layouts ── */
   await initLayoutRegistry();
 
-  /* ── Pattern layout hints (override intent/energy/visual_hint per beatType) ── */
-  const patternLayoutHints = patternKey ? (getPattern(patternKey)?.layoutHints || {}) : {};
+  const talkingHead = mode === "talking_head";
 
-  /* ── Source beats ── */
-  const isRich = Array.isArray(structuredBeats) &&
-    structuredBeats.length > 0 &&
-    typeof structuredBeats[0].energy === "number";
-
-  let sourceBeats = [];
-
-  if (isRich) {
-    sourceBeats = structuredBeats;
-  } else if (Array.isArray(structuredBeats) && structuredBeats.length) {
-    sourceBeats = structuredBeats;
-    sourceBeats = await analyzeBeatRoles(sourceBeats);
-    sourceBeats = await analyzeVisualTypes(sourceBeats);
-    sourceBeats = validateAIOutputs(sourceBeats);
-  } else {
-    const sentences = script.split(/(?<=[.?!])\s+/).map(s => s.trim()).filter(Boolean);
-    sentences.forEach(sentence => {
-      splitIntoDurationBeats(sentence).forEach(p => {
-        sourceBeats.push({
-          spoken: p, intent: classifyBeatIntent(p),
-          energy: 0.5, visual_hint: "none", emphasis_words: [],
-        });
-      });
-    });
-    sourceBeats = await analyzeBeatRoles(sourceBeats);
-    sourceBeats = await analyzeVisualTypes(sourceBeats);
-    sourceBeats = validateAIOutputs(sourceBeats);
+  // Always use structuredBeats (the new schema). Plain script fallback is removed.
+  if (!Array.isArray(structuredBeats) || structuredBeats.length === 0) {
+    console.warn("[buildBeats] No structuredBeats provided — returning empty beats");
+    return [];
   }
 
+  const sourceBeats = structuredBeats.map((b, i) => ({
+    ...b,
+    // Derive intent and energy from beat type if not already present
+    intent: b.intent || BEAT_TYPE_TO_INTENT[b.type] || "explanation",
+    energy: typeof b.energy === "number" ? b.energy : (BEAT_TYPE_TO_ENERGY[b.type] || 0.6),
+    order:  i,
+  }));
+
   const total = sourceBeats.length;
-  // Pick ONE caption style for the entire video for consistency
   const videoCaptionStyle = pickVideoCaptionStyle(sourceBeats);
   let currentStart  = 0;
   let usedLayoutIds = [];
-  let lastMotion    = null;
   let lastSFXKey    = null;
-  let lastBeatType  = null;
 
-  /* ── VIDEO-LEVEL VISUAL SYSTEM — locked once for the whole video ── */
-  const visualSystem = planVideoVisualSystem(sourceBeats, dna, orientation, mode);
+  const visualSystem  = planVideoVisualSystem(sourceBeats, dna);
+  const _bgNiche      = dna?.niche || null;
+  const _bgColorFamily = getNicheColorFamily(_bgNiche);
+  console.log('[bg] colorFamily:', _bgColorFamily, 'niche:', dna?.niche, 'lockedKey:', visualSystem.backgroundKey);
 
-  /* ── Build beats ── */
   let beats = sourceBeats.map((item, index) => {
-    const spoken      = String(item.spoken || "").trim();
-    const beatHints   = patternLayoutHints[item.beatType] || {};
-    const intent      = beatHints.intent     || item.intent      || classifyBeatIntent(spoken);
-    const energy      = beatHints.energy     !== undefined ? beatHints.energy : (item.energy ?? 0.5);
-    const visual_hint = beatHints.visualHint || item.visual_hint || "none";
-    const isLast      = index === total - 1;
+    const spoken    = String(item.spoken || "").trim();
+    const beatType  = item.type || "explanation";
+    const intent    = item.intent;
+    const energy    = item.energy;
+    const isLast    = index === total - 1;
 
-    // Use Whisper timestamps if provided (talking head mode) — exact speech timing
-    // Otherwise fall back to WPM-based calculation
+    // Timing
     let start_sec, end_sec;
     if (item.start_sec != null && item.end_sec != null) {
       start_sec    = item.start_sec;
@@ -800,43 +716,49 @@ export async function buildBeatsFromScript({
       currentStart = end_sec;
     }
 
-    /* Visual plan */
-    const role             = assignBeatRole(index, total);
-    const hasImageHint     = !!(item.asset_hint?.search_query || item.asset_hint?.prompt);
-    // Talking head + showAvatar: layout MUST have an asset zone so the avatar can be placed
-    const requireAssetZone = mode === "talking_head" && item.showAvatar !== false;
-    const visual = planBeatVisual({
-      mode, intent, energy, orientation,
-      usedLayoutIds, lastMotion,
-      brandColor, beatIndex: index,
-      hasImageHint, requireAssetZone, role,
-      spokenWordCount: spoken.split(/\s+/).filter(Boolean).length,
-      colorStory:  dna?.colorStory  || null,
-      motionStyle: dna?.motionStyle || null,
-      niche:       dna?.niche       || null,
-      imageCountNeeded: item.image_count_needed ?? null,
-      textDensity:      item.text_density       ?? null,
-      visualHint:       item.visual_hint        ?? null,
-      beatType:         item.beatType           ?? null,
-      lastBeatType,
-    });
+    // Layout — by beat type, rotating through available layouts
+    const layout = pickLayoutForBeatType(beatType, usedLayoutIds, orientation, talkingHead, item);
+    usedLayoutIds = [...usedLayoutIds, layout];
 
-    const isLastBeat = index === total - 1;
+    // Zones: enforce structure then fill from script fields directly
+    let zones = enforceLayoutZones(layout, {});
+    zones = fillScriptFields(zones, layout, item);
 
-    // ── Lock background to ONE pattern for the whole video ───────────────────
-    visual.layoutBackground = {
-      type:  "pattern",
-      value: isLastBeat ? visualSystem.ctaBackgroundKey : visualSystem.backgroundKey,
+    // Asset hint for downstream image generation
+    const asset_hint = {
+      entity:       item.entity       || null,
+      image_needed: item.image_needed ?? false,
+      prompt:       item.asset_prompt || null,
     };
 
-    usedLayoutIds = [...usedLayoutIds, visual.layout];
-    lastBeatType  = item.beatType ?? null;
-    const z1Motion = visual.zones?.z1?.content?.asset?.motion;
-    if (z1Motion) lastMotion = z1Motion;
+    // Background — per beat type for visual variety; item/cta/explanation use the locked key
+    let _bgValue;
+    if (beatType === "hook") {
+      _bgValue = pickNicheBackground(_bgNiche, "shock",    []);
+    } else if (beatType === "fact" || beatType === "stat") {
+      _bgValue = pickNicheBackground(_bgNiche, "proof",    [visualSystem.backgroundKey]);
+    } else if (beatType === "reveal") {
+      _bgValue = pickNicheBackground(_bgNiche, "reveal",   []);
+    } else if (beatType === "contrast") {
+      _bgValue = pickNicheBackground(_bgNiche, "contrast", []);
+    } else {
+      _bgValue = visualSystem.backgroundKey;
+    }
+    const layoutBackground = { type: "pattern", value: _bgValue };
+    console.log(`[bg] beat ${index} type=${item?.type} → background=${layoutBackground?.value}`);
 
-    const captionShowDefault = layoutRegistry[visual.layout]?.showCaption ?? true;
-    const captionPosition  = chooseCaptionPosition(visual.layout, index, total, energy);
+    // Talking head avatar zone
+    let avatarZone = null;
+    if (talkingHead && item.showAvatar !== false) {
+      const layoutDef = getLayoutDef(layout);
+      const avatarZoneDef = layoutDef?.zones?.find(z => z.type === "avatar")
+        ?? layoutDef?.zones?.find(z => z.type === "asset");
+      avatarZone = avatarZoneDef?.id ?? null;
+    }
 
+    const role            = assignBeatRole(index, total);
+    const captionPosition = chooseCaptionPosition(layout, index, total, energy);
+    const captionShowDefault = layoutRegistry[layout]?.showCaption ?? true;
 
     let sfxCue = pickBeatSFX(intent, energy, 0.4);
     if (sfxCue?.key === lastSFXKey) {
@@ -845,31 +767,13 @@ export async function buildBeatsFromScript({
     }
     if (sfxCue) { lastSFXKey = sfxCue.key; sfxCue = { ...sfxCue, volume: 0.3 }; }
 
-    const finalLayout = visual.layout;
-    const zones = enforceLayoutZones(finalLayout, visual.zones || {});
-
-    // Talking head: avatarZone determines which zone shows the talking head video.
-    // showAvatar=false → avatarZone=null (beat shows an image instead of the face).
-    // showAvatar=true (or unset) → avatarZone = explicit "avatar"-typed zone, or first "asset" zone.
-    let avatarZone = null;
-    if (mode === "talking_head" && item.showAvatar !== false) {
-      const layoutDef = getLayoutDef(finalLayout);
-      // Prefer zones explicitly typed "avatar" (designed for talking-head video).
-      // Fall back to first "asset" zone for layouts without explicit avatar zones.
-      const avatarZoneDef = layoutDef?.zones?.find(z => z.type === "avatar")
-        ?? layoutDef?.zones?.find(z => z.type === "asset");
-      // Only assign avatarZone if the layout actually has a suitable zone.
-      // null means no avatar shown this beat (e.g. text-only layouts like CenterHook).
-      avatarZone = avatarZoneDef?.id ?? null;
-    }
-
     return {
       id:    crypto.randomUUID(),
       order: index,
 
-      layout:           finalLayout,
-      layoutPadding:    visual.layoutPadding || 0,
-      layoutBackground: visual.layoutBackground,
+      layout,
+      layoutPadding:    0,
+      layoutBackground,
 
       avatarZone,
       zones,
@@ -885,45 +789,27 @@ export async function buildBeatsFromScript({
         emphasis_words: item.emphasis_words || [],
       },
 
-      overlays: [],
+      overlays:   [],
       audio_cues: sfxCue ? [sfxCue] : [],
 
-      transition: chooseTransition(visual.layout, index, energy, isLast, null /* anti-repeat applied below */),
+      transition: chooseTransition(layout, index, energy, isLast, null),
 
-      spoken, intent, energy, visual_hint, language, role,
-      beatType:   item.beatType   ?? null,
-      itemNumber: item.itemNumber ?? null,
-      itemTitle:  item.itemTitle  ?? null,
-      itemBody:   item.itemBody   ?? null,
-      asset_hint: item.asset_hint || null,
-      // Pre-generated zone content seeds passed through to generateZoneContent.
-      headline: item.headline || null,
-      subtext:  item.subtext  || null,
-      label:    item.label    || null,
-      stat:     item.stat     || null,
-      tagline:  item.tagline  || null,
-      quote:    item.quote    || null,
-      cta:      (item.beatType === "cta" && ["FOMO","STORY","CURIOSITY","NEGATIVE","CONTRAST","EMPATHY","PERSONAL","URGENCY"].includes((item.cta || "").toUpperCase()))
-                ? null  // hook types leaked into the cta beat field — strip them
-                : (item.cta || null),
+      spoken, intent, energy, language, role,
+      beatType,
+      asset_hint,
+      // Pass through script fields for reference
+      display:    item.display    || null,
+      sub:        item.sub        || null,
+      entity:     item.entity     || null,
+      number:     item.number     || null,
+      stat:       item.stat       || null,
+      label:      item.label      || null,
       duration_sec: end_sec - start_sec,
       start_sec, end_sec,
     };
   });
 
-  /* ── Consistency check ── */
-  {
-    const uniqueBgs     = new Set(beats.map(b => b.layoutBackground?.value)).size;
-    const uniqueLayouts = new Set(beats.map(b => b.layout)).size;
-    console.log(`[consistency] backgrounds: ${uniqueBgs}  layouts: ${uniqueLayouts}`);
-    if (uniqueBgs > 2) {
-      console.warn(`[consistency] WARNING: too many background variations (${uniqueBgs})`);
-    }
-  }
-
-  /* ── Anti-repeat transition pass ──
-     Walk beats in order; if two consecutive beats share the same transition type,
-     re-run chooseTransition passing prevType so the pool excludes the duplicate. */
+  /* ── Anti-repeat transition pass ── */
   for (let i = 1; i < beats.length; i++) {
     const prevType = beats[i - 1].transition?.type;
     if (beats[i].transition?.type && beats[i].transition.type === prevType) {
@@ -950,24 +836,11 @@ export async function buildBeatsFromScript({
     lockedBgKey: visualSystem.backgroundKey || null,
   });
 
-  /* ── Assign asset zone visual styling: border radius, animated border, shine ── */
-  beats = beats.map(beat => {
-    const layoutDef = getLayoutDef(beat.layout);
-    if (!layoutDef) return beat;
-    const zones = { ...beat.zones };
+  beats = beats.map(beat => ({ ...beat, zones: { ...beat.zones } }));
 
-    // Identify the PRIMARY asset zone for this layout — animated borders are only
-    // applied to it, not to background or secondary decorative asset zones.
-    // Primary = the largest non-background asset zone by area; fall back to the
-    // first asset zone if all are backgrounds or there's only one.
-    // Asset zone styling (borderRadius, animatedBorder, shineEffect) is entirely the
-    // layout designer's responsibility — the pipeline does not inject any overrides.
-
-    return { ...beat, zones };
-  });
-
-
-  beats = await autoMatchAssets(beats, orientation, { assetSource, uploadedAssets, topic, language, dna });
+  if (assetSource !== "none") {
+    beats = await autoMatchAssets(beats, orientation, { assetSource, uploadedAssets, topic, language, dna });
+  }
   beats = await applyTransparentAssets(beats);
   beats = applyBeatVariation(beats);
   beats = applyCaptionEmphasis(beats);
