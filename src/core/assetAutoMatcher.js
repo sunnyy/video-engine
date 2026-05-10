@@ -95,7 +95,7 @@ export async function autoMatchAssets(
         visual_hint:    "none",
         topic,
         promptOverride: hint.prompt || null,
-        assetHint:      hint.prompt ? { prompt: hint.prompt } : null,
+        assetHint:      hint,
         dna,
         beat,
       });

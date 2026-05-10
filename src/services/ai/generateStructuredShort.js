@@ -59,9 +59,13 @@ export async function generateStructuredShort({
       .map((beat, i) => ({ beat, beatIndex: i }))
       .filter(({ beat }) => beat.asset_prompt && beat.zones?.z1);
 
+    const STOP = new Set(["the","a","an","and","or","but","in","on","at","to","for","of","with","is","are","was","were","this","that","you","we","it","its","not","so","just","very","how","what","when","where","who","from","by","as"]);
+
     await Promise.allSettled(
       imageJobs.map(async ({ beat, beatIndex }) => {
         try {
+          const spokenWords = (beat.spoken || topic).toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+          const assetHint = { keywords: [...new Set(spokenWords)].slice(0, 4), visual_type: "abstract", prompt: beat.asset_prompt };
           const result = await generateZoneImage({
             spoken:         beat.spoken || topic,
             intent:         beat.intent || "explanation",
@@ -71,6 +75,9 @@ export async function generateStructuredShort({
             beatIndex,
             zoneIndex:      0,
             promptOverride: beat.asset_prompt,
+            assetHint,
+            dna:            { niche },
+            beat,
           });
           if (result?.url) {
             beats[beatIndex].zones.z1.content.asset.src = result.url;
