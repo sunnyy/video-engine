@@ -168,7 +168,6 @@ router.post("/", requireAuth, async (req, res) => {
             };
           });
         } catch (_) {}
-        }
       }
     }
 
