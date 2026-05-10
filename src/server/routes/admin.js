@@ -444,6 +444,31 @@ router.post("/layouts/upload-thumbnail", requireAuth, requireAdmin, uploadMemory
   }
 });
 
+router.post("/layouts/upload-asset", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { layoutId, zoneId, imageUrl } = req.body;
+    if (!layoutId || !zoneId || !imageUrl) {
+      return res.status(400).json({ error: "layoutId, zoneId, imageUrl required" });
+    }
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) throw new Error(`Failed to fetch source image: ${imgRes.status}`);
+    const buffer      = Buffer.from(await imgRes.arrayBuffer());
+    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+    const path        = `templates/${layoutId}/${zoneId}.jpg`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("system-assets")
+      .upload(path, buffer, { contentType, upsert: true });
+    if (upErr) throw new Error(upErr.message);
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from("system-assets")
+      .getPublicUrl(path);
+    res.json({ url: publicUrl });
+  } catch (e) {
+    console.error("[admin/layouts/upload-asset]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.delete("/layouts/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { error } = await supabaseAdmin.from("layouts").delete().eq("id", req.params.id);

@@ -280,6 +280,9 @@ function AvatarVideoZone({ src, trimBefore, objectFit, isRendering, style }) {
     video.style.objectFit = objectFit || "cover";
     video.style.position  = "absolute";
     video.style.inset     = "0";
+    // Force the video into its own GPU compositing layer so Chrome doesn't
+    // try a hardware overlay that escapes the parent's stacking context.
+    video.style.transform = "translateZ(0)";
     container.appendChild(video);
     // No cleanup: the container div is removed by React when the Sequence unmounts,
     // which detaches the video from DOM. The JS object survives in the module singleton
@@ -370,8 +373,11 @@ function ZoneLayer({ zone, beat, project, W, H, beatDurationSec, previewMode = f
     width:           `${Number.isFinite(zone.width)  ? zone.width  : 100}%`,
     height:          isTextZone ? "auto" : `${Number.isFinite(zone.height) ? zone.height : 100}%`,
     zIndex:          zone.zIndex ?? 1,
-    // overflow:visible lets rotated/skewed corners show outside the original bounding rect
-    overflow:        rotation || hasStaticTransform || isTextZone || isDecorativeZone ? "visible" : "hidden",
+    // overflow:visible lets rotated/skewed corners show outside the original bounding rect.
+    // Avatar zones also need "visible" — combining will-change:transform + overflow:hidden on the
+    // same element causes Chrome to hide the video during playback (GPU overlay conflict).
+    // The inner avatarInsetStyle div provides the actual clip boundary without will-change.
+    overflow:        rotation || hasStaticTransform || isTextZone || isDecorativeZone || isAvatarZone ? "visible" : "hidden",
     // Text zones are always fully opaque — layout-def opacity values are ignored for text.
     // Asset/decorative zones respect st.opacity for intended visual effects (overlays, rings, etc).
     opacity:         (animStyle.opacity ?? 1) * (isTextZone ? 1 : (st.opacity ?? 1)),

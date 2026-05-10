@@ -126,6 +126,23 @@ router.get("/tts/voices", requireAuth, async (_req, res) => {
   res.json({ voices: result });
 });
 
+router.get("/elevenlabs/voices", requireAuth, async (_req, res) => {
+  try {
+    const elRes = await fetch("https://api.elevenlabs.io/v1/voices", {
+      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
+    });
+    const body = await elRes.text();
+    if (!elRes.ok) {
+      return res.json({ voices: [], error: `ElevenLabs ${elRes.status}: ${body.slice(0, 200)}` });
+    }
+    const data = JSON.parse(body);
+    res.json({ voices: data.voices || [] });
+  } catch (err) {
+    console.error("[ElevenLabs voices]", err.message);
+    res.json({ voices: [], error: err.message });
+  }
+});
+
 router.get("/tts/history", requireAuth, async (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit)  || 50, 100);
   const offset = Math.max(parseInt(req.query.offset) || 0,  0);
@@ -137,6 +154,58 @@ router.get("/tts/history", requireAuth, async (req, res) => {
     .range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ history: data || [] });
+});
+
+router.post("/generate-tts-elevenlabs", requireAuth, async (req, res) => {
+  try {
+    const { script, voiceId, language, projectId } = req.body;
+    if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
+    if (!voiceId)        return res.status(400).json({ error: "No voiceId provided" });
+
+    const deduction = await deductCredits(req.user.id, 5, "tts_generation", "ElevenLabs TTS voiceover", projectId);
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+    console.log("[ElevenLabs TTS] voice:", voiceId, "lang:", language, "chars:", script.trim().length);
+
+    const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method:  "POST",
+      headers: {
+        "xi-api-key":   process.env.ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+        "Accept":       "audio/mpeg",
+      },
+      body: JSON.stringify({
+        text:       script.trim(),
+        model_id:   "eleven_multilingual_v2",
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
+    });
+
+    if (!elRes.ok) {
+      const errText = await elRes.text().catch(() => "");
+      throw new Error(`ElevenLabs API error ${elRes.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const arrayBuf = await elRes.arrayBuffer();
+    const buffer   = Buffer.from(arrayBuf);
+
+    const filename   = `tts-elevenlabs-${Date.now()}.mp3`;
+    const storageKey = `tts/${req.user.id}/${filename}`;
+
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from("user-assets")
+      .upload(storageKey, buffer, { contentType: "audio/mpeg", upsert: false });
+
+    if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message}`);
+
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+    console.log("[ElevenLabs TTS] uploaded:", publicUrl);
+
+    res.json({ url: publicUrl });
+  } catch (err) {
+    console.error("[ElevenLabs TTS] Error:", err?.message || err);
+    res.status(500).json({ error: err?.message || "ElevenLabs TTS generation failed" });
+  }
 });
 
 router.delete("/tts/history/:id", requireAuth, async (req, res) => {

@@ -188,10 +188,9 @@ function ClipRow({ index, data }) {
   );
 }
 
-/* ══ Main ══ */
-export default function NewProductAd() {
+/* ══ Main generator — used both as a standalone page and as a tab ══ */
+export function AdGenerator({ resumeId: propResumeId = null }) {
   const navigate       = useNavigate();
-  const [searchParams] = useSearchParams();
   const setProject     = useProjectStore(s => s.setProject);
   const setDbId      = useProjectStore(s => s.setDatabaseId);
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
@@ -235,14 +234,13 @@ export default function NewProductAd() {
 
   useEffect(() => {
     localStorage.removeItem(DRAFT_KEY); // superseded by DB tracking
-    const resumeId = searchParams.get("resume");
     getProductAdProjects().then(projects => {
-      const incomplete = resumeId
-        ? projects.find(p => p.id === resumeId)
+      const incomplete = propResumeId
+        ? projects.find(p => p.id === propResumeId)
         : projects.find(p => (p.steps_completed ?? 0) > 1 && (p.steps_completed ?? 0) < 5 && p.raw_ai_json?.analysis);
       if (incomplete) setSavedDraft(incomplete);
     }).catch(() => {});
-  }, []);
+  }, [propResumeId]);
 
   useEffect(() => { if (step === 4 && !generatingClips.current) runClips(); }, [step]);
   useEffect(() => { if (allClipsProcessed && anyClipSucceeded && !clipsLoading) setStep(5); }, [allClipsProcessed, anyClipSucceeded, clipsLoading]);
@@ -467,7 +465,7 @@ export default function NewProductAd() {
 
   /* ══ Render ══ */
   return (
-    <AppLayout>
+    <>
       <style>{`
         @keyframes spin      { to { transform: rotate(360deg); } }
         @keyframes fadeIn    { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
@@ -748,6 +746,16 @@ export default function NewProductAd() {
           onTopUp={() => { setCreditModal(null); navigate("/credits"); }}
         />
       )}
+    </>
+  );
+}
+
+/* Standalone page — keeps /product-ads/new route working */
+export default function NewProductAd() {
+  const [searchParams] = useSearchParams();
+  return (
+    <AppLayout>
+      <AdGenerator resumeId={searchParams.get("resume")} />
     </AppLayout>
   );
 }

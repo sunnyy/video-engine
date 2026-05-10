@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
 import { getProductAdProjects, deleteProject } from "../services/projects/projectService";
+import { AdGenerator } from "./NewProductAd";
 
 const STEP_LABELS = { 2: "Analyzed", 3: "Visuals ready", 4: "Clips ready", 5: "Complete" };
 
@@ -14,7 +15,7 @@ function timeLabel(dateStr) {
   return d.toLocaleDateString();
 }
 
-function AdCard({ project, onDelete }) {
+function AdCard({ project, onDelete, onResume }) {
   const [hovering,   setHovering]   = useState(false);
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ function AdCard({ project, onDelete }) {
     if (isComplete) {
       navigate(`/editor/${project.id}`);
     } else {
-      navigate(`/product-ads/new?resume=${project.id}`);
+      onResume(project.id);
     }
   }
 
@@ -102,12 +103,9 @@ function AdCard({ project, onDelete }) {
         </div>
 
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-          {/* Action label */}
           <span style={{ fontSize: 11, fontWeight: 700, color: isComplete ? "#7c5cfc" : "#f5c518" }}>
             {isComplete ? "Edit →" : "Resume →"}
           </span>
-
-          {/* Delete */}
           <button
             onClick={handleDelete}
             style={{
@@ -132,8 +130,8 @@ function AdCard({ project, onDelete }) {
   );
 }
 
-export default function ProductAds() {
-  const navigate = useNavigate();
+/* ── Listing ── */
+function VideoListing({ onResume }) {
   const [projects, setProjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
 
@@ -157,77 +155,113 @@ export default function ProductAds() {
   const incomplete = projects.filter(p => !isProjectComplete(p));
   const complete   = projects.filter(p =>  isProjectComplete(p));
 
+  if (loading) {
+    return (
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 24, height: 24, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "pa-spin 0.8s linear infinite" }} />
+      </div>
+    );
+  }
+
+  if (projects.length === 0) {
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div style={{ fontSize: 48 }}>📦</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0" }}>No product videos yet</div>
+        <div style={{ fontSize: 14, color: "#77777f" }}>Switch to Create New to generate your first one</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+      {/* In-progress */}
+      {incomplete.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#77777f", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+            In Progress
+          </div>
+          <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
+            {incomplete.map(p => <AdCard key={p.id} project={p} onDelete={handleDelete} onResume={onResume} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Completed */}
+      {complete.length > 0 && (
+        <div>
+          {incomplete.length > 0 && (
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#77777f", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+              Completed
+            </div>
+          )}
+          <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
+            {complete.map(p => <AdCard key={p.id} project={p} onDelete={handleDelete} onResume={onResume} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Main page ── */
+export default function ProductAds() {
+  const [tab,      setTab]      = useState("videos");
+  const [resumeId, setResumeId] = useState(null);
+
+  const tabs = [
+    { id: "videos", label: "My Videos"  },
+    { id: "create", label: "Create New" },
+  ];
+
+  const handleResume = (id) => {
+    setResumeId(id);
+    setTab("create");
+  };
+
+  const handleTabChange = (id) => {
+    if (id !== "create") setResumeId(null);
+    setTab(id);
+  };
+
   return (
     <AppLayout>
-      {/* Top bar */}
-      <div
-        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}
-      >
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
-          Product Video Ad
-          {!loading && (
-            <span style={{ marginLeft: 8, fontSize: 15, fontWeight: 400, color: "#77777f" }}>
-              ({complete.length})
-            </span>
-          )}
-        </h1>
-        <button
-          onClick={() => navigate("/product-ads/new")}
-          style={{ padding: "7px 16px", background: "#f5c518", color: "#0b0b10", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 800, cursor: "pointer" }}
-        >
-          + New Product Ad
-        </button>
+      <style>{`@keyframes pa-spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+
+        {/* Header + tabs */}
+        <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
+          <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
+            Product Video
+          </h1>
+          <div style={{ display: "flex", gap: 4 }}>
+            {tabs.map(t => (
+              <button
+                key={t.id}
+                onClick={() => handleTabChange(t.id)}
+                style={{
+                  padding: "8px 20px",
+                  border: "none", borderRadius: "8px 8px 0 0",
+                  background: tab === t.id ? "rgba(124,92,252,0.15)" : "transparent",
+                  color: tab === t.id ? "#a78bfa" : "#55556a",
+                  fontSize: 14, fontWeight: tab === t.id ? 700 : 500,
+                  fontFamily: "'Outfit',sans-serif",
+                  cursor: "pointer", transition: "all 0.15s",
+                  borderBottom: tab === t.id ? "2px solid #7c5cfc" : "2px solid transparent",
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        {tab === "videos"
+          ? <VideoListing onResume={handleResume} />
+          : <div style={{ flex: 1, overflowY: "auto" }}><AdGenerator resumeId={resumeId} /></div>
+        }
       </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-        {loading && (
-          <div style={{ display: "flex", justifyContent: "center", paddingTop: 80 }}>
-            <div style={{ width: 24, height: 24, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-          </div>
-        )}
-
-        {!loading && projects.length === 0 && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 16, textAlign: "center" }}>
-            <div style={{ fontSize: 48 }}>📦</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0" }}>No product ads yet</div>
-            <div style={{ fontSize: 15, color: "#77777f" }}>Upload a product photo and let AI build your video ad</div>
-            <button
-              onClick={() => navigate("/product-ads/new")}
-              style={{ marginTop: 8, padding: "10px 24px", background: "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: "pointer" }}
-            >
-              + Create First Ad
-            </button>
-          </div>
-        )}
-
-        {/* In-progress */}
-        {!loading && incomplete.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#77777f", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
-              In Progress
-            </div>
-            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
-              {incomplete.map(p => <AdCard key={p.id} project={p} onDelete={handleDelete} />)}
-            </div>
-          </div>
-        )}
-
-        {/* Completed */}
-        {!loading && complete.length > 0 && (
-          <div>
-            {incomplete.length > 0 && (
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#77777f", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
-                Completed
-              </div>
-            )}
-            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
-              {complete.map(p => <AdCard key={p.id} project={p} onDelete={handleDelete} />)}
-            </div>
-          </div>
-        )}
-      </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </AppLayout>
   );
 }

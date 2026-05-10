@@ -10,6 +10,7 @@ import { signOut } from "../../services/auth/authService";
 import validateProject from "../../core/validateProject";
 import { serverFetch } from "../../services/serverApi";
 import { useCreditsStore } from "../../store/useCreditsStore";
+import TemplateModal from "../TemplateModal";
 
 
 export default function Header({ progress, setProgress, currentJobId, setCurrentJobId }) {
@@ -22,6 +23,10 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
   const storedName = useProjectStore((s) => s.projectName);
   const setProjectName = useProjectStore((s) => s.setProjectName);
 
+  const activeBeatId = useProjectStore((s) => s.activeBeatId);
+  const updateBeat   = useProjectStore((s) => s.updateBeat);
+
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [resolution, setResolution] = useState("1080p");
   const [projectList, setProjectList] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -174,6 +179,7 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
   const hasAvatar = !!project?.avatar?.src;
 
   return (
+    <>
     <div className="flex items-center justify-between px-5 border-b border-[rgba(255,255,255,0.06)] bg-[#111118] shrink-0">
       {/* Left — logo + project dropdown */}
       <div className="flex items-center gap-3">
@@ -297,6 +303,15 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
 
       {/* Right — controls */}
       <div className="flex items-center gap-3">
+        {/* Templates */}
+        <button
+          onClick={() => setTemplateModalOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-[5px] rounded-[6px] text-[13px] font-semibold border cursor-pointer transition-all"
+          style={{ background: "rgba(124,92,252,0.1)", borderColor: "rgba(124,92,252,0.35)", color: "#a78bfa" }}
+        >
+          ⊞ Templates
+        </button>
+
         {/* Mode toggle */}
         <div className="flex bg-[#1c1c28] rounded-[6px] p-[2px]">
           {[
@@ -484,5 +499,19 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
         </button>
       </div>
     </div>
+
+    <TemplateModal
+      isOpen={templateModalOpen}
+      onClose={() => setTemplateModalOpen(false)}
+      onSelect={(layout) => {
+        if (!activeBeatId) return;
+        const rawZones = Array.isArray(layout.zones) ? layout.zones : [];
+        const zonesObj = Object.fromEntries(
+          rawZones.map((z, i) => [z.id || `z${i + 1}`, { ...z, id: z.id || `z${i + 1}` }])
+        );
+        updateBeat(activeBeatId, { zones: zonesObj });
+      }}
+    />
+    </>
   );
 }

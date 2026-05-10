@@ -5,6 +5,9 @@
 import { useState, useEffect, useRef } from "react";
 import { serverFetch } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { getCredits } from "../services/credits/creditService";
+import { SERVICE_COSTS } from "../core/utils/creditCosts";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 
 function timeLabel(dateStr) {
@@ -128,8 +131,9 @@ function HistoryItem({ item, onDelete }) {
 export default function TTSStudio() {
   const { fetchCredits } = useCreditsStore();
 
-  const [activeTab, setActiveTab] = useState("generate");
-  const [histPage,  setHistPage]  = useState(0);
+  const [activeTab,   setActiveTab]   = useState("history");
+  const [histPage,    setHistPage]    = useState(0);
+  const [creditModal, setCreditModal] = useState(null);
 
   const [voices,        setVoices]        = useState([]);
   const [voicesLoading, setVoicesLoading] = useState(true);
@@ -180,7 +184,15 @@ export default function TTSStudio() {
     setPlayingVoice(voice.id);
   }
 
+  async function handleGenerateClick() {
+    if (!script.trim() || generating) return;
+    const credits = await getCredits();
+    const { total, breakdown } = SERVICE_COSTS.voiceover;
+    setCreditModal({ total, breakdown, balance: credits?.balance ?? 0 });
+  }
+
   async function handleGenerate() {
+    setCreditModal(null);
     if (!script.trim() || generating) return;
     setGenerating(true);
     setGenErr("");
@@ -210,14 +222,17 @@ export default function TTSStudio() {
   return (
     <AppLayout>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
-        style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-        <h1 className="text-[20px] font-bold" style={{ fontFamily: "'Outfit',sans-serif", color: "#f5c518" }}>Voiceover / TTS</h1>
-        <div className="flex gap-1 bg-[#111118] rounded-[8px] p-[3px]">
-          {[["generate", "Voiceover Generator"], ["history", "My Generated Voiceovers"]].map(([id, label]) => (
+      <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
+        <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Voiceover / TTS</h1>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[["history", "My Voiceovers"], ["generate", "Create New"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              className="px-5 py-[6px] rounded-[6px] text-[13px] font-semibold border-0 cursor-pointer transition-all"
-              style={{ background: activeTab === id ? "#f5c518" : "transparent", color: activeTab === id ? "#0b0b10" : "#55556a" }}>
+              style={{ padding: "8px 20px", border: "none", borderRadius: "8px 8px 0 0",
+                background: activeTab === id ? "rgba(124,92,252,0.15)" : "transparent",
+                color: activeTab === id ? "#a78bfa" : "#55556a",
+                fontSize: 14, fontWeight: activeTab === id ? 700 : 500,
+                fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",
+                borderBottom: activeTab === id ? "2px solid #7c5cfc" : "2px solid transparent" }}>
               {label}
             </button>
           ))}
@@ -288,7 +303,7 @@ export default function TTSStudio() {
 
             {/* Generate */}
             <button
-              onClick={handleGenerate}
+              onClick={handleGenerateClick}
               disabled={!script.trim() || generating}
               style={{ width: "100%", padding: "14px 0", background: !script.trim() || generating ? "rgba(245,197,24,0.3)" : "#f5c518", color: !script.trim() || generating ? "rgba(0,0,0,0.4)" : "#000", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: !script.trim() || generating ? "not-allowed" : "pointer", fontFamily: "'Outfit',sans-serif", letterSpacing: "0.02em", marginBottom: 16 }}
             >
@@ -320,14 +335,13 @@ export default function TTSStudio() {
 
         {activeTab === "history" && (
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Outfit',sans-serif", color: "#e8e8f0" }}>My Generated Voiceovers</h2>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
               <button onClick={loadHistory} style={{ fontSize: 12, color: "#7c5cfc", background: "transparent", border: "none", cursor: "pointer" }}>Refresh</button>
             </div>
 
             {histLoading && history.length === 0 && (
               <div style={{ display: "flex", justifyContent: "center", paddingTop: 80 }}>
-                <div style={{ width: 24, height: 24, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                <div style={{ width: 24, height: 24, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "vo-spin 0.8s linear infinite" }} />
               </div>
             )}
 
@@ -369,7 +383,18 @@ export default function TTSStudio() {
         )}
 
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes vo-spin { to { transform: rotate(360deg); } }`}</style>
+      {creditModal && (
+        <CreditConfirmModal
+          service="Voiceover / TTS"
+          breakdown={creditModal.breakdown}
+          total={creditModal.total}
+          balance={creditModal.balance}
+          onConfirm={handleGenerate}
+          onCancel={() => setCreditModal(null)}
+          onTopUp={() => { setCreditModal(null); window.location.href = "/credits"; }}
+        />
+      )}
     </AppLayout>
   );
 }

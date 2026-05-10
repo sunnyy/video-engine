@@ -4,6 +4,7 @@ import { generateStructuredShort } from "../services/ai/generateStructuredShort"
 import { buildSafeProject } from "../normalize/normalizeProject";
 import { createProject, updateProject, deleteProject } from "../services/projects/projectService";
 import { getCredits } from "../services/credits/creditService";
+import { useCreditsStore } from "../store/useCreditsStore";
 import { estimateCreditCost, CREDIT_COSTS } from "../core/utils/creditCosts";
 import { serverFetch } from "../services/serverApi";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
@@ -115,6 +116,7 @@ function buildAdvancedSummary({ tone, audience, brandColor }) {
 
 export default function VideoGenerator() {
   const navigate = useNavigate();
+  const { fetchCredits } = useCreditsStore();
 
   // Visible fields
   const [topic, setTopic] = useState("");
@@ -295,6 +297,7 @@ export default function VideoGenerator() {
           generated_at: new Date().toISOString(),
         }),
       });
+      fetchCredits();
       navigate(`/editor/${projectId}`, { state: { showReviewPrompt: true } });
     } catch (err) {
       console.error(err);

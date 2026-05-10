@@ -14,7 +14,7 @@ import AdminLayout from "./AdminLayout";
 
 /* ── Constants ───────────────────────────────────────────────── */
 const INTENTS    = ["hook","proof","visual_rest","escalate","reveal","cta","stat","explanation","testimonial","contrast"];
-const BEAT_TYPES = ["hook","item","fact","stat","reveal","explanation","cta","contrast","tension"];
+const BEAT_TYPES = ["hook","context","point","proof","tension","reveal","example","insight","visual","cta"];
 const NICHES     = Object.keys(nichePaletteRegistry).sort();
 const ENERGIES   = ["high", "medium", "low"];
 const IC = {
@@ -23,8 +23,9 @@ const IC = {
   testimonial:"#34d399", contrast:"#f472b6",
 };
 const BT_COLOR = {
-  hook:"#f97316", item:"#22c55e", fact:"#38bdf8", stat:"#fb923c",
-  reveal:"#a78bfa", explanation:"#818cf8", cta:"#f5c518", contrast:"#f472b6", tension:"#f87171",
+  hook:"#f97316", context:"#38bdf8", point:"#22c55e", proof:"#fb923c",
+  tension:"#f87171", reveal:"#a78bfa", example:"#34d399", insight:"#818cf8",
+  visual:"#f472b6", cta:"#f5c518",
 };
 const PLACEHOLDER = {
   headline:"THIS IS THE HOOK", subtext:"Here's what you need to know",

@@ -110,10 +110,14 @@ export async function autoMatchAssets(
   await Promise.allSettled(
     entityJobs.map(async ({ beatIndex, zoneId, entity, assetPrompt, beat: entityBeat }) => {
       let found = false;
+      const ENTITY_LOGO_TYPES = new Set(["example", "point"]);
+      const searchQuery = ENTITY_LOGO_TYPES.has(entityBeat.beatType)
+        ? `${entity} app logo transparent`
+        : entity;
       try {
         const res = await serverFetch("/api/search-image", {
           method: "POST",
-          body:   JSON.stringify({ query: entity }),
+          body:   JSON.stringify({ query: searchQuery }),
         });
         if (res.ok) {
           const data = await res.json();

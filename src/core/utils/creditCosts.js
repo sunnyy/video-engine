@@ -60,6 +60,24 @@ export const SERVICE_COSTS = {
     total: 8,
     breakdown: { "Render captions": 8 },
   },
+  typography_video: {
+    total: 15,
+    breakdown: {
+      "Script & layout generation": 10,
+      "AI voiceover": 5,
+    },
+  },
+  explainer_video: {
+    total: 13,
+    breakdown: {
+      "Transcription": 3,
+      "Build layout": 10,
+    },
+  },
+  voiceover: {
+    total: 5,
+    breakdown: { "Generate voiceover": 5 },
+  },
 };
 
 /**

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { supabase } from "../lib/supabase";
 
 /* ── Icons ── */
 const Icons = {
@@ -107,6 +108,36 @@ const Icons = {
       <line x1="6" y1="14" x2="14" y2="14"/>
     </svg>
   ),
+  aiVideo: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
+      <path d="M9.5 8.5l5 3.5-5 3.5V8.5z"/>
+    </svg>
+  ),
+  explainer: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 16v-4M12 8h.01"/>
+    </svg>
+  ),
+  typography: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7V4h16v3"/>
+      <path d="M9 20h6"/>
+      <path d="M12 4v16"/>
+    </svg>
+  ),
+  textReel: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16M4 10h16M4 14h10"/>
+    </svg>
+  ),
+  custom: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9"/>
+      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg>
+  ),
   signout: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
@@ -117,7 +148,7 @@ const Icons = {
 };
 
 /* ── NavItem: used inside flyout panels ── */
-function NavItem({ icon, label, to, href, active, soon }) {
+function NavItem({ icon, label, sub, to, href, active, soon }) {
   const [hov, setHov] = useState(false);
   const sharedStyle = {
     display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
@@ -130,7 +161,10 @@ function NavItem({ icon, label, to, href, active, soon }) {
   const inner = (
     <>
       <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</span>
-      <span style={{ fontSize: 15, fontWeight: 500, flex: 1, fontFamily: "'Outfit',sans-serif" }}>{label}</span>
+      <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+        <span style={{ fontSize: 15, fontWeight: 500, fontFamily: "'Outfit',sans-serif", lineHeight: 1.2 }}>{label}</span>
+        {sub && <span style={{ fontSize: 12, fontFamily: "'Outfit',sans-serif", lineHeight: 1.2, color: active ? "rgba(167,139,250,0.8)" : "#666680" }}>{sub}</span>}
+      </span>
       {soon && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 5px", borderRadius: 3, background: "rgba(255,255,255,0.05)", color: "#55556a" }}>SOON</span>}
     </>
   );
@@ -174,7 +208,11 @@ function FlyoutGroup({ icon, label, active, children }) {
     clearTimeout(timer.current);
     if (triggerRef.current) {
       const r = triggerRef.current.getBoundingClientRect();
-      setPos({ top: r.top, left: r.right + 6 });
+      const estimatedH = 240;
+      const top = window.innerHeight - r.top >= estimatedH
+        ? r.top
+        : Math.max(8, r.bottom - estimatedH);
+      setPos({ top, left: r.right + 6 });
     }
     setOpen(true);
   };
@@ -227,14 +265,20 @@ export default function AppLayout({ children }) {
   const navigate  = useNavigate();
   const { balance, fetchCredits } = useCreditsStore();
   const path = location.pathname;
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const inAssets  = path === "/assets";
-  const inVideos  = path === "/videos" || path.startsWith("/product-ads") || path === "/video-captions";
+  const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typography" || path === "/videos/explainer" || path.startsWith("/product-ads") || path === "/video-captions" || path === "/videos/custom";
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
 
-  useEffect(() => { fetchCredits(); }, []);
+  useEffect(() => {
+    fetchCredits();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAdmin(session?.user?.app_metadata?.role === "admin");
+    });
+  }, []);
 
   return (
     <>
@@ -259,22 +303,25 @@ export default function AppLayout({ children }) {
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
-              <NavItem icon={Icons.folder}   label="Videos"           to="/videos"         active={path === "/videos"} />
-              <NavItem icon={Icons.ad}       label="Product Video Ad" to="/product-ads"    active={path.startsWith("/product-ads")} />
-              <NavItem icon={Icons.captions} label="Video Captions"   to="/video-captions" active={path === "/video-captions"} />
+              <NavItem icon={Icons.aiVideo}    label="AI Videos"        sub="Generated with AI"        to="/videos"             active={path === "/videos" || path === "/new"} />
+              <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />
+              <NavItem icon={Icons.ad}         label="Product Video"    sub="Ads for your products"    to="/product-ads"         active={path.startsWith("/product-ads")} />
+              <NavItem icon={Icons.explainer}  label="Explainer Video"  sub="Talking head + visuals"   to="/videos/explainer"   active={path === "/videos/explainer"} />
+              <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos" to="/video-captions"     active={path === "/video-captions"} />
+              <NavItem icon={Icons.custom}     label="Custom Videos"    sub="Built from scratch"       to="/videos/custom"      active={path === "/videos/custom"} />
             </FlyoutGroup>
 
             <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>
-              <NavItem icon={Icons.gallery}   label="Images"         to="/image-generation" active={path === "/image-generation"} />
-              <NavItem icon={Icons.poster}    label="Product Poster" to="/product-poster"   active={path === "/product-poster"} />
-              <NavItem icon={Icons.instagram} label="Banner Design"  to="/banner-design"    active={path === "/banner-design"} />
-              <NavItem icon={Icons.thumbnail} label="Thumbnail"      to="/thumbnail"        active={path.startsWith("/thumbnail")} />
-              <NavItem icon={Icons.outfit}    label="Virtual Try-On" to="/virtual-tryon"    active={path === "/virtual-tryon"} />
+              <NavItem icon={Icons.gallery}   label="Images"         sub="AI image generation"   to="/image-generation" active={path === "/image-generation"} />
+              <NavItem icon={Icons.poster}    label="Product Poster" sub="Studio-quality posters" to="/product-poster"   active={path === "/product-poster"} />
+              <NavItem icon={Icons.instagram} label="Banner Design"  sub="Social media banners"  to="/banner-design"    active={path === "/banner-design"} />
+              <NavItem icon={Icons.thumbnail} label="Thumbnail"      sub="YouTube thumbnails"    to="/thumbnail"        active={path.startsWith("/thumbnail")} />
+              <NavItem icon={Icons.outfit}    label="Virtual Try-On" sub="Try clothes with AI"   to="/virtual-tryon"    active={path === "/virtual-tryon"} />
             </FlyoutGroup>
 
             <FlyoutGroup icon={Icons.mic} label="Audio" active={inAudio}>
-              <NavItem icon={Icons.voice} label="Voiceover / TTS" to="/voiceover"      active={path === "/voiceover"} />
-              <NavItem icon={Icons.mic}   label="Speech to Text"  to="/speech-to-text" active={path === "/speech-to-text"} />
+              <NavItem icon={Icons.voice} label="Voiceover / TTS" sub="Text to speech voices"    to="/voiceover"      active={path === "/voiceover"} />
+              <NavItem icon={Icons.mic}   label="Speech to Text"  sub="Transcribe audio to text" to="/speech-to-text" active={path === "/speech-to-text"} />
             </FlyoutGroup>
           </nav>
 
@@ -306,7 +353,7 @@ export default function AppLayout({ children }) {
 
             <IconBtn
               icon={Icons.signout}
-              label="Out"
+              label="Logout"
               onClick={async () => { await signOut(); window.location.href = "/"; }}
               active={false}
             />

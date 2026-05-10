@@ -365,8 +365,25 @@ export default function LayoutEditor() {
 
     // Build zone objects from current canvas state
     const defZones  = layoutDef?.zones ?? [];
-    const saveZones = buildSaveZones(defZones, beat?.zones, beat?.deletedZones);
+    let   saveZones = buildSaveZones(defZones, beat?.zones, beat?.deletedZones);
 
+    // Migrate user-assets images → system-assets before saving
+    const targetId = isNew ? `new-${Date.now()}` : layoutId;
+    saveZones = await Promise.all(saveZones.map(async (zone) => {
+      const src = zone.content?.asset?.src;
+      if (!src || !src.includes("user-assets") || src.includes("system-assets")) return zone;
+      try {
+        const res  = await serverFetch("/api/admin/layouts/upload-asset", {
+          method: "POST",
+          body:   JSON.stringify({ layoutId: targetId, zoneId: zone.id, imageUrl: src }),
+        });
+        if (!res.ok) return zone;
+        const { url } = await res.json();
+        return { ...zone, content: { ...zone.content, asset: { ...zone.content.asset, src: url } } };
+      } catch {
+        return zone; // leave original src on failure — don't block save
+      }
+    }));
 
     const payload = {
       name:             metaName.trim(),

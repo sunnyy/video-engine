@@ -11,6 +11,9 @@ import { useProjectStore } from "../store/useProjectStore";
 import { useProjectsStore } from "../store/useProjectsStore";
 import { createProject, deleteProject } from "../services/projects/projectService";
 import { captionStyleRegistry, captionStyleKeys } from "../core/registries/captionStyleRegistry.jsx";
+import { getCredits } from "../services/credits/creditService";
+import { SERVICE_COSTS } from "../core/utils/creditCosts";
+import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 
 const STYLE_LABELS = {
@@ -133,11 +136,9 @@ function CaptionStylePreview({ styleKey, selected, onClick }) {
         textAlign:    "left",
       }}
     >
-      {/* Thumbnail */}
       <div style={{ background: "#0a0a10", minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 8px" }}>
         {PreviewFn ? <PreviewFn /> : null}
       </div>
-      {/* Label */}
       <div style={{ padding: "5px 8px", fontSize: 10, fontWeight: 700, color: selected ? "#c4b0ff" : "#6b6b82", textTransform: "uppercase", letterSpacing: "0.06em", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         {STYLE_LABELS[styleKey] || styleKey}
       </div>
@@ -196,15 +197,54 @@ function CaptionCard({ project, onDelete }) {
   );
 }
 
-export default function CaptionStudio() {
+/* ── Listing ── */
+function VideoListing() {
+  const { projects, loading, fetchProjects, removeProject } = useProjectsStore();
+
+  useEffect(() => { fetchProjects(); }, []);
+
+  const handleDelete = async (id) => {
+    try { await deleteProject(id); removeProject(id); } catch (_) {}
+  };
+
+  const captionProjects = projects.filter(p => p.source === "caption_studio");
+
+  if (loading) {
+    return (
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 24, height: 24, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "cs-spin 0.8s linear infinite" }} />
+      </div>
+    );
+  }
+
+  if (captionProjects.length === 0) {
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div style={{ fontSize: 48 }}>🎬</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0" }}>No caption videos yet</div>
+        <div style={{ fontSize: 14, color: "#77777f" }}>Switch to Create New to add captions to your first video</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+        {captionProjects.map(p => (
+          <CaptionCard key={p.id} project={p} onDelete={handleDelete} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Generator form ── */
+function GeneratorForm() {
   const navigate      = useNavigate();
   const fetchCredits  = useCreditsStore(s => s.fetchCredits);
   const setProject    = useProjectStore(s => s.setProject);
   const setDatabaseId = useProjectStore(s => s.setDatabaseId);
-  const { projects, fetchProjects, removeProject } = useProjectsStore();
   const fileInputRef  = useRef();
-
-  const [activeTab,    setActiveTab]    = useState("generate");
 
   const [file,         setFile]         = useState(null);
   const [localPreview, setLocalPreview] = useState(null);
@@ -216,6 +256,7 @@ export default function CaptionStudio() {
   const [captionStyle, setCaptionStyle] = useState("wordBlaze");
   const [captionPos,   setCaptionPos]   = useState(80);
   const [creating,     setCreating]     = useState(false);
+  const [creditModal,  setCreditModal]  = useState(null);
   const [error,        setError]        = useState(null);
   const [dragging,     setDragging]     = useState(false);
 
@@ -244,7 +285,6 @@ export default function CaptionStudio() {
     if (!file) return;
     setTranscribing(true); setError(null);
     try {
-      // Upload to permanent storage
       const form1 = new FormData();
       form1.append("file", file);
       const uploadRes = await serverFetch("/api/caption/upload-video", { method: "POST", body: form1 });
@@ -252,9 +292,7 @@ export default function CaptionStudio() {
       if (!uploadRes.ok) throw new Error(uploadData.error || "Upload failed");
       setVideoUrl(uploadData.url);
       setPreviewUrl(uploadData.url);
-      console.log("[caption] videoUrl:", uploadData.url);
 
-      // Transcribe via Whisper
       const form2 = new FormData();
       form2.append("file", file);
       const { supabase } = await import("../lib/supabase");
@@ -275,7 +313,15 @@ export default function CaptionStudio() {
     setTranscribing(false);
   }
 
+  async function handleCreateClick() {
+    if (!segments?.length || !videoUrl) return;
+    const credits = await getCredits();
+    const { total, breakdown } = SERVICE_COSTS.caption_render;
+    setCreditModal({ total, breakdown, balance: credits?.balance ?? 0 });
+  }
+
   async function handleCreate() {
+    setCreditModal(null);
     if (!segments?.length || !videoUrl) return;
     setCreating(true);
     try {
@@ -346,260 +392,258 @@ export default function CaptionStudio() {
     } catch (e) { setError(e.message); setCreating(false); }
   }
 
-  useEffect(() => { fetchProjects(); }, []);
-
-  const captionProjects = projects.filter(p => p.source === "caption_studio");
-
-  const handleDelete = async (id) => {
-    try { await deleteProject(id); removeProject(id); } catch (_) {}
-  };
-
   const done = !!segments;
 
   return (
-    <AppLayout>
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div style={{ display: "flex", flex: 1, overflow: "hidden", flexDirection: "row-reverse" }}>
 
-        {/* Top bar */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Video Captions</h1>
-          <div style={{ display: "flex", gap: 4, background: "#111118", borderRadius: 8, padding: 3 }}>
-            {[["generate", "Caption Generator"], ["history", "My Caption Videos"]].map(([id, label]) => (
-              <button key={id} onClick={() => setActiveTab(id)}
-                style={{ padding: "6px 20px", borderRadius: 6, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.15s", background: activeTab === id ? "#f5c518" : "transparent", color: activeTab === id ? "#0b0b10" : "#55556a" }}>
-                {label}
+      {/* ── Left panel — controls ── */}
+      <div style={{ width: 380, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", overflowY: "auto", padding: "20px 20px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+        {/* Upload */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Video</div>
+
+          {done ? (
+            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 16 }}>✅</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
+                <div style={{ fontSize: 11, color: "#55556a" }}>{segments.length} segments transcribed</div>
+              </div>
+              <button
+                onClick={() => { clearFile(); setVideoUrl(null); setSegments(null); }}
+                style={{ fontSize: 11, color: "#55556a", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
+              >✕</button>
+            </div>
+          ) : (
+            <>
+              <div
+                onClick={() => !file && fileInputRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                style={{
+                  border: `2px dashed ${dragging ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                  borderRadius: 12,
+                  padding: "28px 20px",
+                  textAlign: "center",
+                  cursor: file ? "default" : "pointer",
+                  background: dragging ? "rgba(124,92,252,0.06)" : "rgba(255,255,255,0.02)",
+                  transition: "all 0.2s",
+                }}
+              >
+                {file ? (
+                  <div>
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>🎬</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#e8e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
+                    <div style={{ fontSize: 11, color: "#55556a", marginTop: 2 }}>{formatSize(file.size)}</div>
+                    <button
+                      onClick={e => { e.stopPropagation(); clearFile(); }}
+                      style={{ marginTop: 8, fontSize: 11, color: "#f87171", background: "none", border: "none", cursor: "pointer" }}
+                    >Remove</button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>📹</div>
+                    <div style={{ fontSize: 13, color: "#9494a8" }}>Drop your video here</div>
+                    <div style={{ fontSize: 11, color: "#55556a", marginTop: 4 }}>or click to browse · MP4, MOV, WebM</div>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/mov,video/webm,video/avi,video/quicktime"
+                onChange={handleFilePick}
+                style={{ display: "none" }}
+              />
+
+              {file && !transcribing && (
+                <button
+                  onClick={handleUploadAndTranscribe}
+                  style={{ marginTop: 12, width: "100%", padding: "12px", background: "#7c5cfc", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}
+                >
+                  Transcribe Video →
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Caption Style */}
+        {done && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Caption Style</div>
+            <div style={{ maxHeight: 240, overflowY: "auto", paddingRight: 2 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {captionStyleKeys.map(key => (
+                  <CaptionStylePreview
+                    key={key}
+                    styleKey={key}
+                    selected={captionStyle === key}
+                    onClick={() => setCaptionStyle(key)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Caption Position */}
+        {done && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase" }}>Position</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#9494a8" }}>{positionLabel(captionPos)}</div>
+            </div>
+            <input
+              type="range" min={10} max={90} value={captionPos}
+              onChange={e => setCaptionPos(Number(e.target.value))}
+              style={{ width: "100%", accentColor: "#7c5cfc" }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: "#44444f" }}>Top</span>
+              <span style={{ fontSize: 10, color: "#44444f" }}>Bottom</span>
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 12, color: "#f87171" }}>
+            {error}
+          </div>
+        )}
+
+        {/* Action */}
+        {done && (
+          <div>
+            <button
+              onClick={handleCreateClick}
+              disabled={creating}
+              style={{ width: "100%", padding: "13px", background: creating ? "#6b5a00" : "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: creating ? "not-allowed" : "pointer", fontFamily: "'Outfit',sans-serif" }}
+            >
+              {creating ? "Creating Project…" : "Open in Editor · 8 credits →"}
+            </button>
+          </div>
+        )}
+
+        {creditModal && (
+          <CreditConfirmModal
+            service="Video Captions"
+            breakdown={creditModal.breakdown}
+            total={creditModal.total}
+            balance={creditModal.balance}
+            onConfirm={handleCreate}
+            onCancel={() => setCreditModal(null)}
+            onTopUp={() => { setCreditModal(null); window.location.href = "/credits"; }}
+          />
+        )}
+      </div>
+
+      {/* ── Right panel — preview ── */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+
+        {!file && !transcribing && !done && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center", opacity: 0.5 }}>
+            <div style={{ fontSize: 52 }}>🎬</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#e8e8f0" }}>Upload your talking-head video</div>
+            <div style={{ fontSize: 13, color: "#55556a" }}>We'll transcribe it and add styled captions to every segment</div>
+          </div>
+        )}
+
+        {file && !transcribing && !done && localPreview && (
+          <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", maxWidth: 480 }}>
+            <video src={localPreview} controls style={{ width: "100%", display: "block", maxHeight: 360 }} />
+          </div>
+        )}
+
+        {transcribing && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center" }}>
+            <div style={{ width: 36, height: 36, border: "3px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "cs-spin 0.8s linear infinite" }} />
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Transcribing your video…</div>
+            <div style={{ fontSize: 13, color: "#55556a" }}>This takes 30–60 seconds depending on length</div>
+          </div>
+        )}
+
+        {done && previewUrl && (
+          <>
+            <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", maxWidth: 480 }}>
+              <video controls src={previewUrl} style={{ width: "100%", display: "block", maxHeight: 300 }} />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+                Transcript Preview — {segments.length} segments
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {segments.slice(0, 4).map((seg, i) => (
+                  <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <span style={{ fontSize: 10, color: "#55556a", fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap", paddingTop: 2 }}>
+                      {formatTime(seg.start)}
+                    </span>
+                    <span style={{ fontSize: 13, color: "#c8c8d8", lineHeight: 1.5 }}>{seg.text.trim()}</span>
+                  </div>
+                ))}
+                {segments.length > 4 && (
+                  <div style={{ fontSize: 12, color: "#44444f", textAlign: "center", padding: "4px 0" }}>
+                    + {segments.length - 4} more segments
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main page ── */
+export default function CaptionStudio() {
+  const [tab, setTab] = useState("videos");
+
+  const tabs = [
+    { id: "videos", label: "My Videos"  },
+    { id: "create", label: "Create New" },
+  ];
+
+  return (
+    <AppLayout>
+      <style>{`@keyframes cs-spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+
+        {/* Header + tabs */}
+        <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
+          <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
+            Video Captions
+          </h1>
+          <div style={{ display: "flex", gap: 4 }}>
+            {tabs.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  padding: "8px 20px",
+                  border: "none", borderRadius: "8px 8px 0 0",
+                  background: tab === t.id ? "rgba(124,92,252,0.15)" : "transparent",
+                  color: tab === t.id ? "#a78bfa" : "#55556a",
+                  fontSize: 14, fontWeight: tab === t.id ? 700 : 500,
+                  fontFamily: "'Outfit',sans-serif",
+                  cursor: "pointer", transition: "all 0.15s",
+                  borderBottom: tab === t.id ? "2px solid #7c5cfc" : "2px solid transparent",
+                }}
+              >
+                {t.label}
               </button>
             ))}
           </div>
         </div>
 
-        {activeTab === "history" && (
-          <div style={{ flex: 1, overflowY: "auto", padding: "32px 24px" }}>
-            {captionProjects.length === 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 16, textAlign: "center" }}>
-                <div style={{ fontSize: 48 }}>🎬</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0" }}>No caption videos yet</div>
-                <div style={{ fontSize: 14, color: "#77777f" }}>Upload a talking-head video to add styled captions</div>
-                <button onClick={() => setActiveTab("generate")}
-                  style={{ marginTop: 8, padding: "10px 24px", background: "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
-                  Add Captions →
-                </button>
-              </div>
-            ) : (
-              <div style={{ maxWidth: 960, margin: "0 auto" }}>
-                <div style={{ fontSize: 12, color: "#55556a", marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
-                  {captionProjects.length} video{captionProjects.length !== 1 ? "s" : ""}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
-                  {captionProjects.map(p => (
-                    <CaptionCard key={p.id} project={p} onDelete={handleDelete} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Body — generator */}
-        {activeTab === "generate" && <div style={{ display: "flex", flex: 1, overflow: "hidden", flexDirection: "row-reverse" }}>
-
-          {/* ── Left panel — controls ── */}
-          <div style={{ width: 380, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", overflowY: "auto", padding: "20px 20px", display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Upload */}
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Video</div>
-
-              {done ? (
-                <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 16 }}>✅</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
-                    <div style={{ fontSize: 11, color: "#55556a" }}>{segments.length} segments transcribed</div>
-                  </div>
-                  <button
-                    onClick={() => { clearFile(); setVideoUrl(null); setSegments(null); }}
-                    style={{ fontSize: 11, color: "#55556a", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
-                  >✕</button>
-                </div>
-              ) : (
-                <>
-                  <div
-                    onClick={() => !file && fileInputRef.current?.click()}
-                    onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
-                    style={{
-                      border: `2px dashed ${dragging ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
-                      borderRadius: 12,
-                      padding: "28px 20px",
-                      textAlign: "center",
-                      cursor: file ? "default" : "pointer",
-                      background: dragging ? "rgba(124,92,252,0.06)" : "rgba(255,255,255,0.02)",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {file ? (
-                      <div>
-                        <div style={{ fontSize: 24, marginBottom: 6 }}>🎬</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#e8e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
-                        <div style={{ fontSize: 11, color: "#55556a", marginTop: 2 }}>{formatSize(file.size)}</div>
-                        <button
-                          onClick={e => { e.stopPropagation(); clearFile(); }}
-                          style={{ marginTop: 8, fontSize: 11, color: "#f87171", background: "none", border: "none", cursor: "pointer" }}
-                        >Remove</button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ fontSize: 28, marginBottom: 8 }}>📹</div>
-                        <div style={{ fontSize: 13, color: "#9494a8" }}>Drop your video here</div>
-                        <div style={{ fontSize: 11, color: "#55556a", marginTop: 4 }}>or click to browse · MP4, MOV, WebM</div>
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="video/mp4,video/mov,video/webm,video/avi,video/quicktime"
-                    onChange={handleFilePick}
-                    style={{ display: "none" }}
-                  />
-
-                  {file && !transcribing && (
-                    <button
-                      onClick={handleUploadAndTranscribe}
-                      style={{ marginTop: 12, width: "100%", padding: "12px", background: "#7c5cfc", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}
-                    >
-                      Transcribe Video →
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Caption Style */}
-            {done && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Caption Style</div>
-                <div style={{ maxHeight: 240, overflowY: "auto", paddingRight: 2 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                    {captionStyleKeys.map(key => (
-                      <CaptionStylePreview
-                        key={key}
-                        styleKey={key}
-                        selected={captionStyle === key}
-                        onClick={() => setCaptionStyle(key)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Caption Position */}
-            {done && (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase" }}>Position</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#9494a8" }}>{positionLabel(captionPos)}</div>
-                </div>
-                <input
-                  type="range" min={10} max={90} value={captionPos}
-                  onChange={e => setCaptionPos(Number(e.target.value))}
-                  style={{ width: "100%", accentColor: "#7c5cfc" }}
-                />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                  <span style={{ fontSize: 10, color: "#44444f" }}>Top</span>
-                  <span style={{ fontSize: 10, color: "#44444f" }}>Bottom</span>
-                </div>
-              </div>
-            )}
-
-            {/* Error */}
-            {error && (
-              <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 12, color: "#f87171" }}>
-                {error}
-              </div>
-            )}
-
-            {/* Action */}
-            {done && (
-              <div>
-                <button
-                  onClick={handleCreate}
-                  disabled={creating}
-                  style={{ width: "100%", padding: "13px", background: creating ? "#6b5a00" : "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: creating ? "not-allowed" : "pointer", fontFamily: "'Outfit',sans-serif" }}
-                >
-                  {creating ? "Creating Project…" : "Open in Editor →"}
-                </button>
-                <div style={{ fontSize: 11, color: "#44444f", textAlign: "center", marginTop: 6 }}>~8 credits for render</div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Right panel — preview ── */}
-          <div style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Empty state */}
-            {!file && !transcribing && !done && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center", opacity: 0.5 }}>
-                <div style={{ fontSize: 52 }}>🎬</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#e8e8f0" }}>Upload your talking-head video</div>
-                <div style={{ fontSize: 13, color: "#55556a" }}>We'll transcribe it and add styled captions to every segment</div>
-              </div>
-            )}
-
-            {/* File picked but not yet transcribed — local preview */}
-            {file && !transcribing && !done && localPreview && (
-              <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", maxWidth: 480 }}>
-                <video src={localPreview} controls style={{ width: "100%", display: "block", maxHeight: 360 }} />
-              </div>
-            )}
-
-            {/* Transcribing spinner */}
-            {transcribing && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center" }}>
-                <div style={{ width: 36, height: 36, border: "3px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0" }}>Transcribing your video…</div>
-                <div style={{ fontSize: 13, color: "#55556a" }}>This takes 30–60 seconds depending on length</div>
-              </div>
-            )}
-
-            {/* Video preview + segments */}
-            {done && previewUrl && (
-              <>
-                <div style={{ borderRadius: 12, overflow: "hidden", background: "#000", maxWidth: 480 }}>
-                  <video controls src={previewUrl} style={{ width: "100%", display: "block", maxHeight: 300 }} />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-                    Transcript Preview — {segments.length} segments
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {segments.slice(0, 4).map((seg, i) => (
-                      <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                        <span style={{ fontSize: 10, color: "#55556a", fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap", paddingTop: 2 }}>
-                          {formatTime(seg.start)}
-                        </span>
-                        <span style={{ fontSize: 13, color: "#c8c8d8", lineHeight: 1.5 }}>{seg.text.trim()}</span>
-                      </div>
-                    ))}
-                    {segments.length > 4 && (
-                      <div style={{ fontSize: 12, color: "#44444f", textAlign: "center", padding: "4px 0" }}>
-                        + {segments.length - 4} more segments
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>}
-
+        {/* Tab content */}
+        {tab === "videos" ? <VideoListing /> : <GeneratorForm />}
       </div>
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </AppLayout>
   );
 }

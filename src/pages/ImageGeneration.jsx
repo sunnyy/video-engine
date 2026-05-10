@@ -105,6 +105,7 @@ export default function ImageGeneration() {
   const navigate         = useNavigate();
   const { fetchCredits } = useCreditsStore();
   const [creditModal, setCreditModal] = useState(null);
+  const [topTab,      setTopTab]      = useState("library");
 
   const [prompt,      setPrompt]      = useState("");
   const [aspectRatio, setAspectRatio] = useState("9:16");
@@ -112,14 +113,13 @@ export default function ImageGeneration() {
   const [generating,  setGenerating]  = useState(false);
   const [error,       setError]       = useState(null);
   const [results,     setResults]     = useState([]);
-  const [activeTab,   setActiveTab]   = useState("generate");
 
   const { library, total: libraryTotal, loading: loadingLib, fetched: libraryFetched,
           loadLibrary, prependImages, removeImage } = useImageLibraryStore();
 
   useEffect(() => { fetchCredits(); }, []);
   useEffect(() => { if (!libraryFetched) loadLibrary(true); }, []);
-  useEffect(() => { if (activeTab === "library" && !libraryFetched) loadLibrary(true); }, [activeTab]);
+  useEffect(() => { if (topTab === "library" && !libraryFetched) loadLibrary(true); }, [topTab]);
 
   const creditCost = count * 2;
 
@@ -138,7 +138,6 @@ export default function ImageGeneration() {
     setError(null);
     setGenerating(true);
     setResults([]);
-    setActiveTab("generate");
     try {
       const res  = await serverFetch("/api/image-generation/generate", {
         method: "POST",
@@ -159,219 +158,187 @@ export default function ImageGeneration() {
 
   return (
     <AppLayout>
-      {/* Full-height two-column layout */}
-      <div className="flex h-full overflow-hidden">
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
-        {/* ── Left sidebar — controls ── */}
-        <div className="w-[280px] shrink-0 flex flex-col border-r overflow-hidden"
-          style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0d0d14" }}>
-
-          {/* Header */}
-          <div className="px-5 pt-5 pb-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <div className="text-[18px] font-bold" style={{ color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Images</div>
-            <div className="text-[12px] mt-0.5" style={{ color: "#44444f" }}>AI Image Generator</div>
-          </div>
-
-          {/* Settings — scrollable middle */}
-          <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
-
-            {/* Prompt */}
-            <div>
-              <Label>Prompt</Label>
-              <textarea
-                value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerateClick(); }}
-                placeholder="Describe the image you want to generate…"
-                rows={5}
-                className="w-full rounded-[8px] px-3 py-3 text-[13px] text-[#e8e8f0] resize-none focus:outline-none transition-colors"
-                style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "inherit" }}
-              />
-              <div className="text-[10px] mt-1" style={{ color: "#33333f" }}>⌘+Enter to generate</div>
-            </div>
-
-            {/* Aspect ratio */}
-            <div>
-              <Label>Aspect Ratio</Label>
-              <div className="flex flex-col gap-1.5">
-                {ASPECT_RATIOS.map(r => (
-                  <button key={r.id} onClick={() => setAspectRatio(r.id)}
-                    className="flex items-center gap-3 px-3 py-[8px] rounded-[7px] text-[13px] font-medium border-0 cursor-pointer transition-all text-left"
-                    style={{
-                      background: aspectRatio === r.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
-                      color:      aspectRatio === r.id ? "#f5c518" : "#7070a0",
-                      outline:    aspectRatio === r.id ? "1px solid rgba(245,197,24,0.35)" : "1px solid transparent",
-                    }}>
-                    <span className="text-[15px] opacity-60">{r.icon}</span>
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Count */}
-            <div>
-              <Label>Number of Images</Label>
-              <div className="flex gap-2">
-                {[1, 2, 4].map(n => (
-                  <button key={n} onClick={() => setCount(n)}
-                    className="flex-1 py-[7px] rounded-[7px] text-[13px] font-semibold border-0 cursor-pointer transition-all"
-                    style={{
-                      background: count === n ? "rgba(245,197,24,0.12)" : "rgba(255,255,255,0.04)",
-                      color:      count === n ? "#f5c518" : "#7070a0",
-                      outline:    count === n ? "1px solid rgba(245,197,24,0.35)" : "1px solid transparent",
-                    }}>
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {error && (
-              <div className="px-3 py-2 rounded-[6px] text-[12px] text-[#f87171]"
-                style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)" }}>
-                {error}
-              </div>
-            )}
-
-          </div>
-
-          {/* Generate button — pinned to bottom */}
-          <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <button
-              onClick={handleGenerateClick}
-              disabled={!prompt.trim() || generating}
-              className="w-full py-[11px] rounded-[8px] text-[14px] font-bold border-0 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              style={{ background: "#f5c518", color: "#0b0b10" }}>
-              {generating ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-[#0b0b10] border-t-transparent rounded-full animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <span>✦</span>
-                  Generate · {creditCost} credit{creditCost !== 1 ? "s" : ""}
-                </>
-              )}
-            </button>
+        {/* Header + tabs */}
+        <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
+          <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Images</h1>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[["library", "My Library"], ["create", "Create New"]].map(([id, label]) => (
+              <button key={id} onClick={() => setTopTab(id)}
+                style={{ padding: "8px 20px", border: "none", borderRadius: "8px 8px 0 0",
+                  background: topTab === id ? "rgba(124,92,252,0.15)" : "transparent",
+                  color: topTab === id ? "#a78bfa" : "#55556a",
+                  fontSize: 14, fontWeight: topTab === id ? 700 : 500,
+                  fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",
+                  borderBottom: topTab === id ? "2px solid #7c5cfc" : "2px solid transparent" }}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* ── Right panel — board / results ── */}
-        <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#0b0b10" }}>
-
-          {/* Right top bar */}
-          <div className="flex items-center justify-between px-6 py-3 border-b shrink-0"
-            style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <div className="flex gap-1 bg-[#111118] rounded-[7px] p-[3px]">
-              {[["generate", "Board"], ["library", "My Library"]].map(([id, label]) => (
-                <button key={id} onClick={() => setActiveTab(id)}
-                  className="px-4 py-[5px] rounded-[5px] text-[12px] font-semibold border-0 cursor-pointer transition-all"
-                  style={{
-                    background: activeTab === id ? "#1e1e2e" : "transparent",
-                    color:      activeTab === id ? "#e8e8f0" : "#55556a",
-                  }}>
-                  {label}
+        {/* ── My Library tab ── */}
+        {topTab === "library" && (
+          <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+            {loadingLib && library.length === 0 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 80 }}>
+                <div className="w-6 h-6 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {!loadingLib && library.length === 0 && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 12 }}>
+                <div style={{ fontSize: 14, color: "#55556a" }}>No images generated yet</div>
+                <button onClick={() => setTopTab("create")}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "#7c5cfc", fontSize: 13 }}>
+                  Generate your first image →
                 </button>
-              ))}
-            </div>
-            {activeTab === "library" && (
-              <button onClick={() => loadLibrary(true)}
-                className="text-[12px] bg-transparent border-0 cursor-pointer hover:opacity-80"
-                style={{ color: "#7c5cfc" }}>
-                Refresh
-              </button>
+              </div>
             )}
-          </div>
-
-          {/* Right content */}
-          <div className="flex-1 overflow-y-auto p-6">
-
-            {/* ── Generate tab ── */}
-            {activeTab === "generate" && (
+            {library.length > 0 && (
               <>
-                {results.length === 0 && !generating && (
-                  <div className="flex flex-col items-center justify-center h-full gap-3 rounded-[14px] border"
-                    style={{ borderColor: "rgba(255,255,255,0.04)", background: "rgba(255,255,255,0.01)", minHeight: 320 }}>
-                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.08 }}>
-                      <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.5"/>
-                      <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
-                      <path d="M3 15l5-5 4 4 3-3 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                    <div className="text-[14px]" style={{ color: "#44444f" }}>Your images will appear here</div>
-                    <div className="text-[12px]" style={{ color: "#33333f" }}>Write a prompt and hit Generate</div>
-                  </div>
-                )}
-
-                {generating && (
-                  <div className="flex flex-col items-center justify-center h-full rounded-[14px] border"
-                    style={{ borderColor: "rgba(255,255,255,0.04)", background: "rgba(255,255,255,0.01)", minHeight: 320 }}>
-                    <GeneratingLoader message={`Generating your image${count > 1 ? "s" : ""}`} hint="10–30 seconds" />
-                  </div>
-                )}
-
-                {results.length > 0 && (
-                  <>
-                    <div className="text-[11px] mb-4" style={{ color: "#44444f", fontFamily: "'JetBrains Mono',monospace" }}>
-                      {results.length} image{results.length !== 1 ? "s" : ""} generated
-                    </div>
-                    <div className="grid gap-3"
-                      style={{ gridTemplateColumns: `repeat(${Math.min(results.length, 3)}, 1fr)` }}>
-                      {results.map((img, i) => (
-                        <ImageCard key={img.id || i} img={{ ...img, prompt }} />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-
-            {/* ── Library tab ── */}
-            {activeTab === "library" && (
-              <>
-                {loadingLib && library.length === 0 && (
-                  <div className="flex items-center justify-center py-24">
-                    <div className="w-6 h-6 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-                {!loadingLib && library.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-24 gap-3">
-                    <div className="text-[14px]" style={{ color: "#55556a" }}>No images generated yet</div>
-                    <button onClick={() => setActiveTab("generate")}
-                      className="text-[13px] bg-transparent border-0 cursor-pointer hover:opacity-80"
-                      style={{ color: "#7c5cfc" }}>
-                      Generate your first image →
+                <div style={{ fontSize: 11, color: "#44444f", marginBottom: 16 }}>
+                  Showing {library.length} of {libraryTotal} images
+                </div>
+                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+                  {library.map((img, i) => (
+                    <ImageCard key={img.id || i} img={img} onDelete={id => removeImage(id)} />
+                  ))}
+                </div>
+                {library.length < libraryTotal && (
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: 32 }}>
+                    <button onClick={() => loadLibrary(false)} disabled={loadingLib}
+                      style={{ padding: "8px 24px", borderRadius: 8, fontSize: 13, color: "#9494a8", border: "1px solid rgba(255,255,255,0.08)", background: "transparent", cursor: "pointer", opacity: loadingLib ? 0.5 : 1 }}>
+                      {loadingLib ? "Loading…" : "Load more"}
                     </button>
                   </div>
                 )}
-                {library.length > 0 && (
-                  <>
-                    <div className="text-[11px] mb-4" style={{ color: "#44444f" }}>
-                      Showing {library.length} of {libraryTotal} images
-                    </div>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
-                      {library.map((img, i) => (
-                        <ImageCard key={img.id || i} img={img} onDelete={id => removeImage(id)} />
-                      ))}
-                    </div>
-                    {library.length < libraryTotal && (
-                      <div className="flex justify-center mt-8">
-                        <button onClick={() => loadLibrary(false)} disabled={loadingLib}
-                          className="px-6 py-[8px] rounded-[8px] text-[13px] border cursor-pointer transition-all disabled:opacity-50"
-                          style={{ color: "#9494a8", borderColor: "rgba(255,255,255,0.08)", background: "transparent" }}>
-                          {loadingLib ? "Loading…" : "Load more"}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
               </>
             )}
-
           </div>
-        </div>
+        )}
+
+        {/* ── Create New tab — two-column layout ── */}
+        {topTab === "create" && (
+          <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+            {/* Left sidebar — controls */}
+            <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", borderRight: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", overflow: "hidden" }}>
+
+              {/* Settings — scrollable */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+                {/* Prompt */}
+                <div>
+                  <Label>Prompt</Label>
+                  <textarea
+                    value={prompt}
+                    onChange={e => setPrompt(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerateClick(); }}
+                    placeholder="Describe the image you want to generate…"
+                    rows={5}
+                    style={{ width: "100%", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: "#e8e8f0", resize: "none", outline: "none", background: "#111118", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                  <div style={{ fontSize: 10, marginTop: 4, color: "#33333f" }}>⌘+Enter to generate</div>
+                </div>
+
+                {/* Aspect ratio */}
+                <div>
+                  <Label>Aspect Ratio</Label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {ASPECT_RATIOS.map(r => (
+                      <button key={r.id} onClick={() => setAspectRatio(r.id)}
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderRadius: 7, fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                          background: aspectRatio === r.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
+                          color:      aspectRatio === r.id ? "#f5c518" : "#7070a0",
+                          outline:    aspectRatio === r.id ? "1px solid rgba(245,197,24,0.35)" : "1px solid transparent" }}>
+                        <span style={{ fontSize: 15, opacity: 0.6 }}>{r.icon}</span>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Count */}
+                <div>
+                  <Label>Number of Images</Label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[1, 2, 4].map(n => (
+                      <button key={n} onClick={() => setCount(n)}
+                        style={{ flex: 1, padding: "7px 0", borderRadius: 7, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.15s",
+                          background: count === n ? "rgba(245,197,24,0.12)" : "rgba(255,255,255,0.04)",
+                          color:      count === n ? "#f5c518" : "#7070a0",
+                          outline:    count === n ? "1px solid rgba(245,197,24,0.35)" : "1px solid transparent" }}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {error && (
+                  <div style={{ padding: "8px 12px", borderRadius: 6, fontSize: 12, color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)" }}>
+                    {error}
+                  </div>
+                )}
+              </div>
+
+              {/* Generate button — pinned */}
+              <div style={{ padding: "12px 20px 16px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
+                <button
+                  onClick={handleGenerateClick}
+                  disabled={!prompt.trim() || generating}
+                  style={{ width: "100%", padding: "11px 0", borderRadius: 8, fontSize: 14, fontWeight: 800, border: "none", cursor: !prompt.trim() || generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#f5c518", color: "#0b0b10", opacity: !prompt.trim() || generating ? 0.4 : 1 }}>
+                  {generating ? (
+                    <>
+                      <span style={{ width: 16, height: 16, border: "2px solid #0b0b10", borderTopColor: "transparent", borderRadius: "50%", animation: "ig-spin 0.8s linear infinite", display: "inline-block" }} />
+                      Generating…
+                    </>
+                  ) : (
+                    <>✦ Generate · {creditCost} credit{creditCost !== 1 ? "s" : ""}</>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Right board — results */}
+            <div style={{ flex: 1, overflowY: "auto", padding: 24, background: "#0b0b10" }}>
+              {results.length === 0 && !generating && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.04)", background: "rgba(255,255,255,0.01)", minHeight: 320 }}>
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.08 }}>
+                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.5"/>
+                    <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
+                    <path d="M3 15l5-5 4 4 3-3 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <div style={{ fontSize: 14, color: "#44444f" }}>Your images will appear here</div>
+                  <div style={{ fontSize: 12, color: "#33333f" }}>Write a prompt and hit Generate</div>
+                </div>
+              )}
+
+              {generating && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", borderRadius: 14, border: "1px solid rgba(255,255,255,0.04)", background: "rgba(255,255,255,0.01)", minHeight: 320 }}>
+                  <GeneratingLoader message={`Generating your image${count > 1 ? "s" : ""}`} hint="10–30 seconds" />
+                </div>
+              )}
+
+              {results.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, color: "#44444f", marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {results.length} image{results.length !== 1 ? "s" : ""} generated
+                  </div>
+                  <div style={{ display: "grid", gap: 12, gridTemplateColumns: `repeat(${Math.min(results.length, 3)}, 1fr)` }}>
+                    {results.map((img, i) => (
+                      <ImageCard key={img.id || i} img={{ ...img, prompt }} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
+
+      <style>{`@keyframes ig-spin { to { transform: rotate(360deg); } }`}</style>
 
       {creditModal && (
         <CreditConfirmModal

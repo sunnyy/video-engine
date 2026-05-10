@@ -160,7 +160,7 @@ export default function Credits() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-[18px] font-bold" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>{subscription.plans?.name || "Plan"}</div>
-                    <div className="text-[13px] capitalize" style={{ color: "#9494a8" }}>{subscription.billing_cycle} · ₹{Math.round(subscription.price_paid)}</div>
+                    <div className="text-[13px] capitalize" style={{ color: "#9494a8" }}>{subscription.billing_cycle} · ${Math.round(subscription.price_paid)}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-[13px]" style={{ color: "#9494a8" }}>Renews</div>
@@ -214,9 +214,8 @@ export default function Credits() {
                         </div>
                         <div style={{ fontSize: 10, color: "#9494a8", marginTop: 2 }}>credits</div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#e8e8f0", marginTop: 6 }}>
-                          ₹{inrPrice.toLocaleString()}
+                          ${pkg.priceUSD}
                         </div>
-                        <div style={{ fontSize: 10, color: "#55556a" }}>${pkg.priceUSD}</div>
                       </button>
                     );
                   })}
@@ -242,7 +241,7 @@ export default function Credits() {
                         <span style={{ color: "#f5c518" }}>{newBal.toLocaleString()} cr</span>
                       </div>
                       <div style={{ marginTop: 8, fontSize: 11, color: "#55556a", textAlign: "right" }}>
-                        ₹{inrPrice.toLocaleString()} (${pkg.priceUSD})
+                        ${pkg.priceUSD}
                       </div>
                     </div>
                   );

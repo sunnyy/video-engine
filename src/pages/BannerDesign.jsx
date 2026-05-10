@@ -72,7 +72,7 @@ export default function SocialPostGenerator() {
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
   const [creditModal, setCreditModal] = useState(null);
 
-  const [activeTab, setActiveTab] = useState("generate");
+  const [activeTab, setActiveTab] = useState("history");
 
   // form state
   const [refFile,     setRefFile]     = useState(null);
@@ -194,14 +194,17 @@ export default function SocialPostGenerator() {
   return (
     <AppLayout>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Banner Design</h1>
-        <div style={{ display: "flex", gap: 4, background: "#111118", borderRadius: 8, padding: 3 }}>
-          {[["generate", "Banner Generator"], ["history", "My Generated Banners"]].map(([id, label]) => (
+      <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
+        <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Banner Design</h1>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[["history", "My Banners"], ["generate", "Create New"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              style={{ padding: "6px 20px", borderRadius: 6, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.15s",
-                background: activeTab === id ? "#f5c518" : "transparent",
-                color:      activeTab === id ? "#0b0b10"  : "#55556a" }}>
+              style={{ padding: "8px 20px", border: "none", borderRadius: "8px 8px 0 0",
+                background: activeTab === id ? "rgba(124,92,252,0.15)" : "transparent",
+                color: activeTab === id ? "#a78bfa" : "#55556a",
+                fontSize: 14, fontWeight: activeTab === id ? 700 : 500,
+                fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",
+                borderBottom: activeTab === id ? "2px solid #7c5cfc" : "2px solid transparent" }}>
               {label}
             </button>
           ))}

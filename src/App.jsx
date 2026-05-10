@@ -38,7 +38,10 @@ import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
 import TTSStudio       from "./pages/Voiceover";
-import CaptionStudio  from "./pages/VideoCaptions";
+import CaptionStudio      from "./pages/VideoCaptions";
+import TypographyVideo    from "./pages/TypographyVideo";
+import ExplainerVideo     from "./pages/ExplainerVideo";
+import CustomVideos       from "./pages/CustomVideos";
 import OutfitStudio              from "./pages/VirtualTryOn";
 import SocialPostGenerator       from "./pages/BannerDesign";
 import ImageLibrary    from "./pages/admin/ImageLibrary";
@@ -126,7 +129,10 @@ export default function App() {
             <Route path="/new"              element={<VideoGenerator />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/speech-to-text"   element={<Transcription />} />
-            <Route path="/video-captions"   element={<CaptionStudio />} />
+            <Route path="/video-captions"      element={<CaptionStudio />} />
+            <Route path="/videos/typography"   element={<TypographyVideo />} />
+            <Route path="/videos/explainer"    element={<ExplainerVideo />} />
+            <Route path="/videos/custom"       element={<CustomVideos />} />
             <Route path="/feedback"         element={<Feedback />} />
             <Route path="/checkout"         element={<Checkout />} />
             <Route path="/assets"           element={<Assets />} />
