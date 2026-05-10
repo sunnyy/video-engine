@@ -10,6 +10,7 @@ import { getCredits } from "../services/credits/creditService";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import GeneratingLoader from "../ui/GeneratingLoader";
 import AppLayout from "../ui/AppLayout";
+import RefundClaimTrigger from "../ui/components/RefundClaimTrigger";
 
 const ASPECT_RATIOS = [
   { id: "1:1",  label: "1 : 1",  icon: "▪" },
@@ -329,6 +330,9 @@ export default function ImageGeneration() {
                     {results.map((img, i) => (
                       <ImageCard key={img.id || i} img={{ ...img, prompt }} />
                     ))}
+                  </div>
+                  <div style={{ marginTop: 8, textAlign: "right" }}>
+                    <RefundClaimTrigger service="ai_image" creditsUsed={results.length * 2} />
                   </div>
                 </>
               )}

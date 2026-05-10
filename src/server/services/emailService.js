@@ -263,26 +263,32 @@ export function userPaymentFailedEmail(name, plan) {
   };
 }
 
-export function userPlanExpiringEmail(name, plan, expiryDate) {
+export function userPlanExpiringEmail(name, plan, expiryDate, creditsBalance) {
+  const creditsNote = creditsBalance != null
+    ? `<p style="color:#c8c8d8;margin:0 0 16px">You currently have <strong style="color:#f5c518">${creditsBalance} credits</strong> remaining — they never expire, but renewing keeps premium features unlocked and lets you top up.</p>`
+    : "";
   return {
     subject: `Your ${plan} plan expires soon`,
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#f97316">Plan Expiring Soon ⏳</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
-      <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan expires on <strong style="color:#f97316">${expiryDate}</strong>. Renew now to keep access to all your features and credits.</p>
-      <a href="${APP_URL}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Renew Plan →</a>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan expires on <strong style="color:#f97316">${expiryDate}</strong>. Renew now to keep access to all features.</p>
+      ${creditsNote}<a href="${APP_URL}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Renew Plan →</a>
     `),
   };
 }
 
-export function userPlanExpiredEmail(name, plan) {
+export function userPlanExpiredEmail(name, plan, creditsBalance) {
+  const creditsNote = creditsBalance != null && creditsBalance > 0
+    ? `<p style="color:#c8c8d8;margin:0 0 16px">The good news: your <strong style="color:#f5c518">${creditsBalance} remaining credits</strong> never expire — they'll be right here when you renew. Premium features like Product Ad Studio will reactivate the moment your plan is live again.</p>`
+    : "";
   return {
     subject: `Your ${plan} plan has expired`,
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#ef4444">Plan Expired</h2>
       <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
-      <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan has expired. Resubscribe to unlock all features and get fresh credits.</p>
-      <a href="${APP_URL}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Resubscribe →</a>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your <strong style="color:#e8e8f0">${plan}</strong> plan has expired.</p>
+      ${creditsNote}<a href="${APP_URL}/pricing" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Resubscribe →</a>
     `),
   };
 }

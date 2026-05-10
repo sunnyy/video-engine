@@ -26,13 +26,12 @@ function timeLabel(dateStr) {
   return d.toLocaleDateString();
 }
 
-/* ── Timeline node definitions — user-friendly, non-revealing ── */
-const TIMELINE_NODES = [
-  { id: "upload",     label: "Product",    icon: "📦", activeStep: 1, hints: ["Reading product details…", "Detecting product type…", "Identifying key features…"] },
-  { id: "concept",    label: "Concept",    icon: "✦",  activeStep: 2, hints: ["Building creative concept…", "Planning visual story…", "Selecting composition style…", "Crafting scene sequence…"] },
-  { id: "visuals",    label: "Visuals",    icon: "◈",  activeStep: 3, hints: ["Preparing visual elements…", "Rendering scenes…", "Refining composition…", "Applying visual treatment…"] },
-  { id: "production", label: "Production", icon: "▶",  activeStep: 4, hints: ["Animating scenes…", "Syncing motion…", "Applying cinematic effects…", "Finalizing footage…"] },
-  { id: "ready",      label: "Ready",      icon: "✦",  activeStep: 5, hints: ["Your ad is ready"] },
+const LOADING_MESSAGES = [
+  "Crafting your ad concept…",
+  "Rendering visuals…",
+  "Building your scenes…",
+  "Putting it all together…",
+  "Almost there…",
 ];
 
 /* ── Design tokens ── */
@@ -57,62 +56,6 @@ const S = {
   btnGhost:   { padding: "10px 16px", background: "transparent", color: T.muted, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" },
 };
 
-/* ── Fancy Timeline ── */
-function FancyTimeline({ step }) {
-  const [hintIndex, setHintIndex] = useState(0);
-  const activeNode = TIMELINE_NODES.find(n => n.activeStep === step) || TIMELINE_NODES[0];
-
-  useEffect(() => {
-    setHintIndex(0);
-    if (activeNode.hints.length <= 1) return;
-    const iv = setInterval(() => setHintIndex(i => (i + 1) % activeNode.hints.length), 2200);
-    return () => clearInterval(iv);
-  }, [step]);
-
-  return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", alignItems: "center" }}>
-        {TIMELINE_NODES.map((node, i) => {
-          const done = node.activeStep < step, active = node.activeStep === step, isLast = i === TIMELINE_NODES.length - 1;
-          return (
-            <div key={node.id} style={{ display: "flex", alignItems: "center", flex: isLast ? "none" : 1 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, position: "relative", zIndex: 1 }}>
-                <div style={{
-                  width: active ? 40 : 32, height: active ? 40 : 32, borderRadius: "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: active ? 16 : 13, transition: "all 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-                  background: done ? `radial-gradient(circle,${T.success}33,${T.success}11)` : active ? `radial-gradient(circle,${T.accent}44,${T.accent}11)` : "rgba(255,255,255,0.04)",
-                  border: done ? `2px solid ${T.success}66` : active ? `2px solid ${T.accent}88` : `1px solid ${T.border}`,
-                  boxShadow: active ? `0 0 20px ${T.accent}44,0 0 40px ${T.accent}22` : "none",
-                  animation: active ? "nodePulse 2s ease-in-out infinite" : "none",
-                  position: "relative",
-                }}>
-                  {done ? <span style={{ color: T.success, fontSize: 14 }}>✓</span> : <span style={{ color: active ? T.accent : T.dim }}>{node.icon}</span>}
-                  {active && <div style={{ position: "absolute", inset: -6, borderRadius: "50%", border: `1px solid ${T.accent}33`, animation: "ringPulse 2s ease-in-out infinite" }} />}
-                </div>
-                <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: done ? T.success : active ? T.text : T.dim, whiteSpace: "nowrap", letterSpacing: "0.04em", textTransform: "uppercase", transition: "color 0.3s" }}>{node.label}</span>
-              </div>
-              {!isLast && (
-                <div style={{ flex: 1, height: 2, margin: "0 4px", marginBottom: 22, position: "relative", overflow: "hidden", borderRadius: 99 }}>
-                  <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.06)", borderRadius: 99 }} />
-                  <div style={{ position: "absolute", inset: 0, borderRadius: 99, background: done ? `linear-gradient(90deg,${T.success}88,${T.success}44)` : active ? `linear-gradient(90deg,${T.accent}66,transparent)` : "transparent", transition: "all 0.6s ease", width: done ? "100%" : active ? "50%" : "0%" }} />
-                  {active && <div style={{ position: "absolute", top: 0, bottom: 0, width: "30%", background: `linear-gradient(90deg,transparent,${T.accent}88,transparent)`, animation: "shimmer 1.5s ease-in-out infinite" }} />}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 8 }}>
-        {step > 1 && step < 5 && (
-          <div key={`${step}-${hintIndex}`} style={{ fontSize: 11, color: T.muted, fontStyle: "italic", animation: "hintFade 0.4s ease forwards" }}>
-            {activeNode.hints[hintIndex]}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ── Shell ── */
 function Shell({ left, right }) {
@@ -227,13 +170,14 @@ export function AdGenerator({ resumeId: propResumeId = null }) {
   const [savedDraft,      setSavedDraft]      = useState(null);
   const [upgradeRequired, setUpgradeRequired] = useState(false);
   const [creditModal,     setCreditModal]     = useState(null);
+  const [msgIdx,          setMsgIdx]          = useState(0);
 
   const allImagesReady    = analysis?.shots?.every(s => images[s.id]?.url);
   const allClipsProcessed = analysis?.shots?.every(s => clips[s.id]?.videoUrl || clips[s.id]?.error);
   const anyClipSucceeded  = analysis?.shots?.some(s => clips[s.id]?.videoUrl);
 
   useEffect(() => {
-    localStorage.removeItem(DRAFT_KEY); // superseded by DB tracking
+    localStorage.removeItem(DRAFT_KEY);
     getProductAdProjects().then(projects => {
       const incomplete = propResumeId
         ? projects.find(p => p.id === propResumeId)
@@ -241,6 +185,31 @@ export function AdGenerator({ resumeId: propResumeId = null }) {
       if (incomplete) setSavedDraft(incomplete);
     }).catch(() => {});
   }, [propResumeId]);
+
+  // Rotate loading messages while working
+  useEffect(() => {
+    if (step < 2 || step > 4) return;
+    const iv = setInterval(() => setMsgIdx(i => (i + 1) % LOADING_MESSAGES.length), 3000);
+    return () => clearInterval(iv);
+  }, [step]);
+
+  // Auto-chain: analysis done → start visuals
+  useEffect(() => {
+    if (analysis && !analyzing && step === 2) handleStartVisuals();
+  }, [analysis, analyzing]);
+
+  // Auto-chain: base image ready → generate scenes
+  useEffect(() => {
+    if (baseImage && !baseLoading && !baseErr && step === 3 && !imagesLoading) {
+      const missing = analysis?.shots?.filter(s => !images[s.id]?.url) ?? [];
+      if (missing.length > 0) runImages(missing, baseImage);
+    }
+  }, [baseImage, baseLoading, baseErr]);
+
+  // Auto-chain: all images ready → produce video
+  useEffect(() => {
+    if (allImagesReady && !imagesLoading && step === 3) setStep(4);
+  }, [allImagesReady, imagesLoading]);
 
   useEffect(() => { if (step === 4 && !generatingClips.current) runClips(); }, [step]);
   useEffect(() => { if (allClipsProcessed && anyClipSucceeded && !clipsLoading) setStep(5); }, [allClipsProcessed, anyClipSucceeded, clipsLoading]);
@@ -460,19 +429,17 @@ export function AdGenerator({ resumeId: propResumeId = null }) {
     localStorage.removeItem(DRAFT_KEY);
     setSavedDraft(null); setStep(1); setAnalysis(null); setBaseImage(null);
     setBaseErr(""); setImages({}); setClips({}); setPreviewUrl(""); setImageUrl(""); setImageFile(null);
-    setHasMannequin(false); setTargetMarket(""); generatingClips.current = false; pickedModelUrl.current = null; projectDbId.current = null;
+    setHasMannequin(false); setTargetMarket(""); setMsgIdx(0);
+    generatingClips.current = false; pickedModelUrl.current = null; projectDbId.current = null;
   }
 
   /* ══ Render ══ */
   return (
     <>
       <style>{`
-        @keyframes spin      { to { transform: rotate(360deg); } }
-        @keyframes fadeIn    { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes nodePulse { 0%,100% { box-shadow:0 0 20px #7c5cfc44,0 0 40px #7c5cfc22; } 50% { box-shadow:0 0 30px #7c5cfc66,0 0 60px #7c5cfc33; } }
-        @keyframes ringPulse { 0%,100% { opacity:0.4; transform:scale(1); } 50% { opacity:0.8; transform:scale(1.08); } }
-        @keyframes shimmer   { 0% { left:-30%; } 100% { left:130%; } }
-        @keyframes hintFade  { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes spin     { to { transform: rotate(360deg); } }
+        @keyframes fadeIn   { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes hintFade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
         .fade-in { animation: fadeIn 0.35s ease forwards; }
       `}</style>
       <div style={{ padding: "28px 28px 40px", maxWidth: 1280, margin: "0 auto" }}>
@@ -493,7 +460,6 @@ export function AdGenerator({ resumeId: propResumeId = null }) {
               <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 2 }}>Resume where you left off</div>
               <div style={{ fontSize: 11, color: T.muted }}>
                 {savedDraft.raw_ai_json?.analysis?.product_analysis?.product_type || savedDraft.name || "Product"}
-                {" · step "}{savedDraft.steps_completed ?? 2}
                 {" · "}{timeLabel(savedDraft.updated_at)}
               </div>
             </div>
@@ -517,8 +483,6 @@ export function AdGenerator({ resumeId: propResumeId = null }) {
             </button>
           </div>
         )}
-
-        <FancyTimeline step={step} />
 
         {/* ── STEP 1 ── */}
         {step === 1 && (
@@ -562,141 +526,78 @@ export function AdGenerator({ resumeId: propResumeId = null }) {
           />
         )}
 
-        {/* ── STEP 2 ── */}
-        {step === 2 && (
-          <Shell
-            left={<>
-              <Section title="Product">
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {previewUrl && <img src={previewUrl} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, border: `1px solid ${T.border}` }} />}
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 2 }}>{brandName || "Your product"}</div>
-                    <div style={{ fontSize: 11, color: T.dim }}>Processing…</div>
-                  </div>
-                </div>
-              </Section>
-              <Section style={{ borderBottom: "none" }}>
-                {analyzeErr && <div style={{ marginBottom: 12 }}><div style={{ fontSize: 12, color: T.danger, marginBottom: 8 }}>✕ {analyzeErr}</div><button onClick={() => runAnalysis(imageUrl)} style={{ ...S.btnGhost, width: "100%", fontSize: 12 }}>↺ Try Again</button></div>}
-                {analysis && !analyzing && <button onClick={handleStartVisuals} style={{ ...S.btnYellow, width: "100%" }}>Continue →</button>}
-              </Section>
-            </>}
-            right={
-              analyzing ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 480, gap: 20 }}>
-                  <div style={{ position: "relative", width: 64, height: 64 }}><Spinner size={64} color={T.accent} /><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>✦</div></div>
-                  <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 600, color: T.muted, marginBottom: 6 }}>Building your ad concept…</div><div style={{ fontSize: 12, color: T.dim }}>About 10–15 seconds</div></div>
-                </div>
-              ) : analysis ? (
-                <div style={{ padding: 32 }} className="fade-in">
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>✅</div>
-                    <div><div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>Concept ready</div><div style={{ fontSize: 12, color: T.dim }}>{analysis.shots.length} scenes planned</div></div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-                    {[["Product", analysis.product_analysis.product_type], ["Category", analysis.product_analysis.category], ["Audience", analysis.product_analysis.target_audience?.slice(0, 38)], ["Music", analysis.product_analysis.recommended_music_mood]].map(([k, v]) => v && (
-                      <div key={k} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>{k}</div>
-                        <div style={{ fontSize: 12, color: T.text, fontWeight: 600 }}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Key Features</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{analysis.product_analysis.key_features?.slice(0, 5).map((f, i) => <span key={i} style={{ fontSize: 11, background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRadius: 6, padding: "4px 10px", color: T.muted }}>{f}</span>)}</div>
-                  </div>
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>Scenes</div>
-                    {analysis.shots.map((shot, i) => (
-                      <div key={shot.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: `1px solid ${T.border}` }}>
-                        <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: T.accent, flexShrink: 0 }}>{i + 1}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{shot.shot_type}</div><div style={{ fontSize: 11, color: T.dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shot.narrative}</div></div>
-                        <span style={{ fontSize: 11, color: T.dim, flexShrink: 0 }}>{shot.duration_seconds || 3}s</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : <RightEmpty icon="✦" title="Building your concept" subtitle="Your ad concept will appear here." />
-            }
-          />
-        )}
+        {/* ── WORKING (steps 2–4) — single loading screen ── */}
+        {(step === 2 || step === 3 || step === 4) && (
+          <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 520, textAlign: "center", padding: "60px 40px" }}>
+            {previewUrl && (
+              <img src={previewUrl} alt="Product" style={{ width: 80, height: 80, objectFit: "contain", borderRadius: 14, border: `1px solid ${T.border}`, marginBottom: 36, opacity: 0.65 }} />
+            )}
 
-        {/* ── STEP 3 ── */}
-        {step === 3 && (
-          <Shell
-            left={<>
-              <Section title="Product">
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {previewUrl && <img src={previewUrl} alt="" style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 6, border: `1px solid ${T.border}` }} />}
-                  <div><div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{analysis?.product_analysis?.product_type}</div><div style={{ fontSize: 11, color: T.dim }}>{analysis?.product_analysis?.category}</div></div>
-                </div>
-              </Section>
-              {baseImage && !baseLoading && !baseErr && (
-                <Section title="Base Visual">
-                  <img src={baseImage} alt="Base" style={{ width: "100%", borderRadius: 10, border: `1px solid ${T.border}`, marginBottom: 12, display: "block" }} />
-                  <div style={{ fontSize: 11, color: T.dim, marginBottom: 12, lineHeight: 1.5 }}>This visual is the identity reference for all scenes. Retry if it doesn't look right.</div>
-                  {Object.keys(images).length === 0 && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><button onClick={() => runImages(null, baseImage)} style={{ ...S.btnYellow, width: "100%" }}>Generate Scenes →</button><button onClick={handleStartVisuals} style={{ ...S.btnGhost, width: "100%", fontSize: 12 }}>↺ Retry</button></div>}
-                </Section>
-              )}
-              {baseErr && !baseLoading && <Section style={{ borderBottom: "none" }}><div style={{ fontSize: 12, color: T.danger, marginBottom: 10 }}>✕ {baseErr}</div><div style={{ display: "flex", gap: 8 }}><button onClick={handleStartVisuals} style={{ ...S.btnPrimary, flex: 1, justifyContent: "center", fontSize: 12 }}>↺ Retry</button><button onClick={() => setStep(2)} style={{ ...S.btnGhost, fontSize: 12 }}>← Back</button></div></Section>}
-              {allImagesReady && !imagesLoading && <Section style={{ borderBottom: "none" }}><button onClick={() => setStep(4)} style={{ ...S.btnYellow, width: "100%" }}>Produce Video →</button></Section>}
-            </>}
-            right={
-              baseLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 480, gap: 20 }}>
-                  <div style={{ position: "relative", width: 64, height: 64 }}><Spinner size={64} color={T.accent} /><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>◈</div></div>
-                  <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 600, color: T.muted, marginBottom: 6 }}>{analysis?.product_analysis?.category === "clothing" || analysis?.product_analysis?.category === "wearable" ? "Preparing your visual style…" : "Enhancing product presentation…"}</div><div style={{ fontSize: 12, color: T.dim }}>About 15–20 seconds</div></div>
-                </div>
-              ) : Object.keys(images).length > 0 ? (
-                <div style={{ padding: 24 }}>
-                  <div style={{ marginBottom: 16 }}><div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{allImagesReady ? "All Scenes Ready" : "Generating Scenes…"}</div><div style={{ fontSize: 12, color: T.dim, marginTop: 2 }}>{allImagesReady ? "Review each scene. Tap ↺ to regenerate." : "Creating your scenes…"}</div></div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>{analysis.shots.map((shot, i) => <SceneCard key={shot.id} index={i} data={images[shot.id]} onRegen={() => regenImage(shot)} />)}</div>
-                </div>
-              ) : baseImage && !baseErr ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 480, gap: 14, padding: 40, textAlign: "center" }}>
-                  <div style={{ fontSize: 40 }}>✅</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Visual ready</div>
-                  <div style={{ fontSize: 13, color: T.dim, maxWidth: 280, lineHeight: 1.6 }}>Review the base visual on the left, then click "Generate Scenes →"</div>
-                </div>
-              ) : <RightEmpty icon="◈" title="Preparing visuals" subtitle="Your scenes will appear here." />
-            }
-          />
-        )}
+            {/* Error: analysis failed */}
+            {analyzeErr && (
+              <div>
+                <div style={{ fontSize: 14, color: T.danger, marginBottom: 20 }}>✕ {analyzeErr}</div>
+                <button onClick={() => runAnalysis(imageUrl)} style={S.btnGhost}>↺ Try Again</button>
+              </div>
+            )}
 
-        {/* ── STEP 4 ── */}
-        {step === 4 && (
-          <Shell
-            left={<>
-              <Section title="Progress">
-                {(() => {
-                  const done = analysis.shots.filter(s => clips[s.id]?.videoUrl).length, failed = analysis.shots.filter(s => clips[s.id]?.error).length, total = analysis.shots.length, pct = Math.round((done / total) * 100);
-                  return (<>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}><span style={{ fontSize: 13, color: T.text, fontWeight: 700 }}>{done}/{total}</span><span style={{ fontSize: 12, color: T.muted }}>{pct}%</span></div>
-                    <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden", marginBottom: 8 }}><div style={{ height: "100%", borderRadius: 99, background: `linear-gradient(90deg,${T.accent},${T.yellow})`, width: `${pct}%`, transition: "width 0.5s ease" }} /></div>
-                    {failed > 0 && <div style={{ fontSize: 11, color: T.danger, marginTop: 4 }}>{failed} scene{failed !== 1 ? "s" : ""} failed</div>}
-                    {clipsLoading && <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>This takes a few minutes…</div>}
-                  </>);
-                })()}
-              </Section>
-              <Section title="Scenes" style={{ borderBottom: "none" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
-                  {analysis.shots.map((shot, i) => { const data = clips[shot.id], col = data?.videoUrl ? T.success : data?.error ? T.danger : data?.loading ? T.yellow : T.dim; return <div key={shot.id} style={{ aspectRatio: "9/16", borderRadius: 6, overflow: "hidden", background: "rgba(0,0,0,0.3)", border: `1px solid ${col}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>{data?.videoUrl ? <video src={data.videoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted loop autoPlay playsInline /> : data?.loading ? <Spinner size={14} color={T.yellow} /> : data?.error ? <span style={{ fontSize: 10, color: T.danger }}>✕</span> : <span style={{ fontSize: 10, color: T.dim }}>{i + 1}</span>}</div>; })}
+            {/* Error: base image failed */}
+            {baseErr && !analyzeErr && (
+              <div>
+                <div style={{ fontSize: 14, color: T.danger, marginBottom: 20 }}>Something went wrong. Please try again.</div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <button onClick={handleStartVisuals} style={S.btnPrimary}>↺ Retry</button>
+                  <button onClick={resetAll} style={S.btnGhost}>Start Over</button>
                 </div>
-              </Section>
-            </>}
-            right={
-              <div style={{ padding: 24 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 4 }}>Producing Your Video</div>
-                <div style={{ fontSize: 12, color: T.dim, marginBottom: 20 }}>Each scene takes 30–60 seconds to produce</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{analysis.shots.map((shot, i) => <ClipRow key={shot.id} index={i} data={clips[shot.id]} />)}</div>
-                {allClipsProcessed && !anyClipSucceeded && (
-                  <div style={{ marginTop: 20, padding: 20, borderRadius: 12, background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)", textAlign: "center" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: T.danger, marginBottom: 8 }}>All scenes failed</div>
-                    <div style={{ display: "flex", gap: 10, justifyContent: "center" }}><button onClick={() => { generatingClips.current = false; setClips({}); runClips(); }} style={S.btnPrimary}>↺ Retry All</button><button onClick={() => setStep(3)} style={S.btnGhost}>← Back</button></div>
+              </div>
+            )}
+
+            {/* Error: all clips failed */}
+            {allClipsProcessed && !anyClipSucceeded && !baseErr && !analyzeErr && (
+              <div>
+                <div style={{ fontSize: 14, color: T.danger, marginBottom: 20 }}>Video generation failed. Please try again.</div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <button onClick={() => { generatingClips.current = false; setClips({}); runClips(); }} style={S.btnPrimary}>↺ Retry</button>
+                  <button onClick={resetAll} style={S.btnGhost}>Start Over</button>
+                </div>
+              </div>
+            )}
+
+            {/* Normal loading state */}
+            {!analyzeErr && !baseErr && !(allClipsProcessed && !anyClipSucceeded) && (
+              <>
+                <div style={{ position: "relative", width: 72, height: 72, marginBottom: 32 }}>
+                  <Spinner size={72} color={T.accent} />
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>✦</div>
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", marginBottom: 10, letterSpacing: "-0.3px" }}>
+                  Creating your ad…
+                </div>
+                <div key={msgIdx} style={{ fontSize: 13, color: T.dim, animation: "hintFade 0.4s ease forwards" }}>
+                  {LOADING_MESSAGES[msgIdx]}
+                </div>
+                {step === 4 && analysis && (
+                  <div style={{ marginTop: 36, width: "100%", maxWidth: 300 }}>
+                    {(() => {
+                      const done  = analysis.shots.filter(s => clips[s.id]?.videoUrl).length;
+                      const total = analysis.shots.length;
+                      const pct   = Math.round((done / total) * 100);
+                      return (
+                        <>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12, color: T.dim }}>
+                            <span>{done} of {total} scenes</span><span>{pct}%</span>
+                          </div>
+                          <div style={{ height: 4, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                            <div style={{ height: "100%", borderRadius: 99, background: `linear-gradient(90deg,${T.accent},${T.yellow})`, width: `${pct}%`, transition: "width 0.5s ease" }} />
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
-              </div>
-            }
-          />
+              </>
+            )}
+          </div>
         )}
 
         {/* ── STEP 5 ── */}

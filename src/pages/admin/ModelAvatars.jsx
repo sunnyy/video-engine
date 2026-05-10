@@ -154,6 +154,8 @@ export default function ModelAvatars() {
   const [uploadIsStored, setUploadIsStored] = useState(false);    // already in our storage
   const [uploadErr,      setUploadErr]      = useState("");
   const uploadFileRef = useRef();
+  const genPendingFileRef    = useRef(null);
+  const uploadPendingFileRef = useRef(null);
 
   /* ── Fetch avatar list ── */
   useEffect(() => {
@@ -176,23 +178,30 @@ export default function ModelAvatars() {
   }
 
   /* ── Generate section handlers ── */
-  async function handleGenRefFile(e) {
+  function handleGenRefFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const url = await uploadFileToStorage(file);
-      setRefUrl(url);
-    } catch (err) { setGenErr(err.message); }
+    if (refUrl?.startsWith("blob:")) URL.revokeObjectURL(refUrl);
+    genPendingFileRef.current = file;
+    setRefUrl(URL.createObjectURL(file));
+    setGenErr("");
   }
 
   async function handleGenerate() {
     if (!refUrl || !genPrompt.trim()) { setGenErr("Reference photo and prompt are required."); return; }
     setGenerating(true); setGenErr(""); setGeneratedUrl(""); setShowGenMeta(false);
     try {
+      let imageUrl = refUrl;
+      if (genPendingFileRef.current) {
+        imageUrl = await uploadFileToStorage(genPendingFileRef.current);
+        URL.revokeObjectURL(refUrl);
+        genPendingFileRef.current = null;
+        setRefUrl(imageUrl);
+      }
       const res  = await serverFetch("/api/admin/model-avatars/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ imageUrl: refUrl, prompt: genPrompt }),
+        body:    JSON.stringify({ imageUrl, prompt: genPrompt }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
@@ -220,28 +229,32 @@ export default function ModelAvatars() {
   }
 
   /* ── Upload section handlers ── */
-  async function handleUploadFile(e) {
+  function handleUploadFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (uploadPreview?.startsWith("blob:")) URL.revokeObjectURL(uploadPreview);
+    uploadPendingFileRef.current = file;
     setUploadPreview(URL.createObjectURL(file));
     setUploadUrl(""); setUploadIsStored(false); setUploadErr("");
-    setUploadUploading(true);
-    try {
-      const url = await uploadFileToStorage(file);
-      setUploadUrl(url);
-      setUploadIsStored(true);
-    } catch (err) { setUploadErr(err.message); }
-    finally { setUploadUploading(false); }
   }
 
   async function handleUploadSave() {
     const { gender, skin_tone, age_group } = uploadMeta;
-    if (!uploadUrl || !gender || !skin_tone || !age_group) { setUploadErr("Image and all metadata fields are required."); return; }
+    const hasPending = !!uploadPendingFileRef.current;
+    if (!hasPending && !uploadUrl) { setUploadErr("Image and all metadata fields are required."); return; }
+    if (!gender || !skin_tone || !age_group) { setUploadErr("Image and all metadata fields are required."); return; }
     setUploadSaving(true); setUploadErr("");
     try {
-      // If not yet in our storage (pasted external URL), proxy it first
       let finalUrl = uploadUrl;
-      if (!uploadIsStored) {
+      if (hasPending) {
+        setUploadUploading(true);
+        try {
+          finalUrl = await uploadFileToStorage(uploadPendingFileRef.current);
+          uploadPendingFileRef.current = null;
+          if (uploadPreview?.startsWith("blob:")) URL.revokeObjectURL(uploadPreview);
+        } finally { setUploadUploading(false); }
+      } else if (!uploadIsStored) {
+        // Pasted external URL — proxy it to our storage
         const proxyRes  = await serverFetch("/api/admin/model-avatars/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: uploadUrl }) });
         const proxyData = await proxyRes.json();
         if (!proxyRes.ok) throw new Error(proxyData.error || "Upload failed");
@@ -255,6 +268,7 @@ export default function ModelAvatars() {
       setAvatars(prev => [approveData.avatar, ...prev]);
       setUploadUrl(""); setUploadPreview(""); setUploadIsStored(false);
       setUploadMeta({ gender: "", skin_tone: "", age_group: "", style_notes: "" });
+      uploadPendingFileRef.current = null;
     } catch (e) { setUploadErr(e.message); }
     setUploadSaving(false);
   }

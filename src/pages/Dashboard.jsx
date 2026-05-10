@@ -15,12 +15,12 @@ const SECTIONS = [
     label: "Video",
     accent: "#f5c518",
     services: [
-      { emoji: "🎬", title: "AI Video",          desc: "Script to short film — beats, visuals, voiceover, music.",    href: "/new",                accent: "#f5c518", tag: "Popular" },
-      { emoji: "📝", title: "Typography Video",   desc: "Kinetic text animations synced to your script.",              href: "/videos/typography",  accent: "#a78bfa" },
-      { emoji: "🎙", title: "Explainer Video",    desc: "Professional explainer-style videos from a script or prompt.", href: "/videos/explainer",   accent: "#60a5fa" },
-      { emoji: "🛍️", title: "Product Ad Studio",  desc: "Drop a product photo. Get a full short-form video ad.",       href: "/product-ads",        accent: "#f97316", tag: "Hot 🔥" },
-      { emoji: "💬", title: "Video Captions",     desc: "Auto-generate stylized captions for any video.",              href: "/video-captions",     accent: "#34d399" },
-      { emoji: "✏️", title: "Custom Video",       desc: "Build your own video beat by beat — full creative control.",  href: "/videos/custom",      accent: "#f472b6" },
+      { emoji: "🎬", title: "AI Video",          desc: "Turn a topic or script into a ready-to-post short-form video.",   href: "/new",                accent: "#f5c518", tag: "Popular" },
+      { emoji: "📝", title: "Typography Video",   desc: "Make quotes, hooks & announcements impossible to scroll past.",   href: "/videos/typography",  accent: "#a78bfa" },
+      { emoji: "🎙", title: "Explainer Video",    desc: "Explain your product or idea clearly — without hiring anyone.",    href: "/videos/explainer",   accent: "#60a5fa" },
+      { emoji: "🛍️", title: "Product Ad Studio",  desc: "Drop a product photo. Ship a scroll-stopping video ad in minutes.", href: "/product-ads",        accent: "#f97316", tag: "Hot 🔥" },
+      { emoji: "💬", title: "Video Captions",     desc: "Boost watch time & reach with auto-styled captions on any video.", href: "/video-captions",     accent: "#34d399" },
+      { emoji: "✏️", title: "Custom Video",       desc: "Hand-craft every beat, visual & voiceover — total control.",       href: "/videos/custom",      accent: "#f472b6" },
     ],
   },
   {
@@ -28,11 +28,11 @@ const SECTIONS = [
     label: "Image",
     accent: "#a78bfa",
     services: [
-      { emoji: "🖼️", title: "AI Images",        desc: "Generate stunning images from any prompt in any style.",     href: "/image-generation", accent: "#a78bfa" },
-      { emoji: "🪄", title: "Product Poster",   desc: "Turn product photos into luxury ad posters with AI copy.",   href: "/product-poster",   accent: "#34d399", tag: "New ✨" },
-      { emoji: "🎨", title: "Banner Design",    desc: "AI-designed social banners for any platform or niche.",      href: "/banner-design",    accent: "#f5c518" },
-      { emoji: "🖱️", title: "Thumbnails",       desc: "Eye-catching YouTube and social thumbnails in seconds.",     href: "/thumbnail",        accent: "#f97316" },
-      { emoji: "👕", title: "Virtual Try-On",   desc: "See how outfits look on any model photo instantly.",         href: "/virtual-tryon",    accent: "#22d3ee" },
+      { emoji: "🖼️", title: "AI Images",        desc: "Create product shots, ad creatives & social visuals in seconds.", href: "/image-generation", accent: "#a78bfa" },
+      { emoji: "🪄", title: "Product Poster",   desc: "Get a luxury ad poster from a product photo — ready to publish.",  href: "/product-poster",   accent: "#34d399", tag: "New ✨" },
+      { emoji: "🎨", title: "Banner Design",    desc: "Launch-ready social banners for any platform, any niche.",          href: "/banner-design",    accent: "#f5c518" },
+      { emoji: "🖱️", title: "Thumbnails",       desc: "More clicks, more views — high-impact thumbnails in seconds.",      href: "/thumbnail",        accent: "#f97316" },
+      { emoji: "👕", title: "Virtual Try-On",   desc: "Show any outfit on any model — no photoshoot needed.",              href: "/virtual-tryon",    accent: "#22d3ee" },
     ],
   },
   {
@@ -40,8 +40,8 @@ const SECTIONS = [
     label: "Audio",
     accent: "#f472b6",
     services: [
-      { emoji: "🔊", title: "Voiceover / TTS",  desc: "Natural AI voices in multiple languages. One click.",        href: "/voiceover",        accent: "#f472b6" },
-      { emoji: "🎙️", title: "Speech to Text",   desc: "Upload audio or video and get a clean, accurate transcript.", href: "/speech-to-text",  accent: "#22d3ee" },
+      { emoji: "🔊", title: "Voiceover / TTS",  desc: "Add a pro-sounding voice to any script — 30+ languages.",    href: "/voiceover",        accent: "#f472b6" },
+      { emoji: "🎙️", title: "Speech to Text",   desc: "Get a clean, accurate transcript from any audio or video.",   href: "/speech-to-text",   accent: "#22d3ee" },
     ],
   },
 ];
@@ -157,7 +157,8 @@ export default function Dashboard() {
   useEffect(() => {
     fetchProjects();
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user;
       if (!user) return;
       setUserId(user.id);
       setUserName(user.user_metadata?.full_name?.split(" ")[0] || user.user_metadata?.name?.split(" ")[0] || "");

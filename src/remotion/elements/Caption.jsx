@@ -46,8 +46,8 @@ export default function Caption({ caption, beat, project }) {
   // Beat duration in seconds — used for caption word timing
   const beatDuration = beat.end_sec - beat.start_sec || beat.duration_sec || 3;
 
-  // Only use beat-aware timing if duration is reasonable (>1s)
-  const safeBeatDuration = beatDuration >= 1 ? beatDuration : null;
+  // Always use beat duration to pace animation; null only if genuinely missing
+  const safeBeatDuration = beatDuration > 0 ? beatDuration : null;
 
   const rendered = styleEntry.render({
     text:         caption.text,

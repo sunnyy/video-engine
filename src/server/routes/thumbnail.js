@@ -49,11 +49,9 @@ router.post("/generate", requireAuth, async (req, res) => {
       const gptRes = await openai.chat.completions.create({ model: "gpt-4o", max_tokens: 400, messages });
       optimizedPrompt = gptRes.choices[0].message.content?.trim();
     } catch (e) {
-      console.warn("[thumbnail/generate] GPT-4o failed, using fallback prompt:", e.message);
       const STYLE_MAP = { bold: "bold dramatic high-contrast", minimal: "clean minimal elegant", vibrant: "vibrant energetic saturated", dark: "dark moody cinematic" };
       optimizedPrompt = `${STYLE_MAP[style] || "bold dramatic"} YouTube thumbnail for ${niche} niche. Headline text: "${headline}". ${subtext ? `Subtext: "${subtext}".` : ""} 16:9 horizontal landscape, high contrast, ultra-sharp, professional thumbnail quality, no watermarks.`;
     }
-    console.log("[thumbnail/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
     // Step 2 — Upload image to Fal.ai storage (best effort — fallback to direct URL)
     let falImageUrl = imageUrl || null;
@@ -72,9 +70,8 @@ router.post("/generate", requireAuth, async (req, res) => {
           const uploaded = await falUploadRes.json();
           falImageUrl = uploaded.url;
         }
-      } catch (e) {
-        console.warn("[thumbnail/generate] Fal.ai storage upload failed, using direct URL:", e.message);
-      }
+      } catch (_) {}
+
     }
 
     // Step 3 — Generate via nano-banana

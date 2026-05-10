@@ -303,35 +303,28 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
 
       {/* Right — controls */}
       <div className="flex items-center gap-3">
-        {/* Templates */}
-        <button
-          onClick={() => setTemplateModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-[5px] rounded-[6px] text-[13px] font-semibold border cursor-pointer transition-all"
-          style={{ background: "rgba(124,92,252,0.1)", borderColor: "rgba(124,92,252,0.35)", color: "#a78bfa" }}
-        >
-          ⊞ Templates
-        </button>
-
-        {/* Mode toggle */}
-        <div className="flex bg-[#1c1c28] rounded-[6px] p-[2px]">
-          {[
-            ["talking_head", "Talking Head"],
-            ["faceless", "Faceless"],
-          ].map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => handleModeChange(val)}
-              className={`px-3 py-[4px] text-[13px] rounded-[4px] border-0 transition cursor-pointer
-                ${
-                  project.meta.mode === val
-                    ? "bg-[#f5c518] text-[#0b0b10] font-bold"
-                    : "bg-[#111118] text-[#55556a] hover:text-[#9494a8]"
-                }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle — only for services where mode is meaningful */}
+        {["ai_generated", "scratch"].includes(project?.source) && (
+          <div className="flex bg-[#1c1c28] rounded-[6px] p-[2px]">
+            {[
+              ["talking_head", "Talking Head"],
+              ["faceless", "Faceless"],
+            ].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => handleModeChange(val)}
+                className={`px-3 py-[4px] text-[13px] rounded-[4px] border-0 transition cursor-pointer
+                  ${
+                    project.meta.mode === val
+                      ? "bg-[#f5c518] text-[#0b0b10] font-bold"
+                      : "bg-[#111118] text-[#55556a] hover:text-[#9494a8]"
+                  }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Talking Head — Avatar Assignment */}
         {isTalkingHead && (
@@ -487,16 +480,6 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
           </div>
         )}
 
-        {/* Sign out */}
-        <button
-          onClick={async () => {
-            await signOut();
-            navigate("/login");
-          }}
-          className="text-[13px] text-[#f87171] bg-transparent border-0 cursor-pointer hover:opacity-80 transition-opacity px-1"
-        >
-          Sign out
-        </button>
       </div>
     </div>
 

@@ -131,8 +131,6 @@ async function bingScrapeImages(query) {
     results.push({ murl: murls[i] || null, turl: turls[i] || null });
   }
 
-  console.log(`[search] Bing found ${results.length} results for "${query}" (encoded:${murlsEncoded.length} raw:${murlsRaw.length})`);
-  if (results.length === 0) console.warn(`[search] Zero results — Bing HTML may have changed format. Check /api/test-search?q=${encodeURIComponent(query)}`);
   return results;
 }
 
@@ -184,14 +182,11 @@ router.post("/search-image", requireAuth, async (req, res) => {
           if (!uploadErr) {
             const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
             try { fs.unlinkSync(cached.filePath); } catch {}
-            console.log(`[search] Uploaded to Supabase for "${query}": ${publicUrl}`);
             res.json({ url: publicUrl, source: "bing_scrape", query });
             return;
           }
-          console.warn(`[search] Supabase upload failed, falling back to temp URL`);
-        } catch (e) {
-          console.warn(`[search] Supabase upload error: ${e.message}`);
-        }
+        } catch (_) {}
+
         // Fallback: temp local URL (only works in local dev)
         res.json({ url: cached.localUrl, source: "bing_scrape", query });
         setTimeout(() => { try { fs.unlinkSync(cached.filePath); } catch {} }, 30_000);
@@ -204,7 +199,6 @@ router.post("/search-image", requireAuth, async (req, res) => {
     // Bing blocks cloud-hosting IPs (403/429) or the scrape timed out.
     // Return 503 (upstream dependency unavailable) — not a server bug.
     // The generation pipeline checks res.ok and falls through to AI image gen.
-    console.warn(`[search] Bing unavailable for "${query}": ${e.message}`);
     res.status(503).json({ error: "Image search unavailable", detail: e.message });
   }
 });
@@ -247,7 +241,6 @@ router.post("/generate-image", requireAuth, async (req, res) => {
 
         if (!falRes.ok) {
           lastErr = await falRes.text();
-          console.warn(`[fal.ai] Attempt ${attempt + 1} failed (${falRes.status}):`, lastErr.slice(0, 80));
           if (NO_RETRY_CODES.has(falRes.status)) break; // no point retrying
           continue;
         }
@@ -258,7 +251,6 @@ router.post("/generate-image", requireAuth, async (req, res) => {
         lastErr = "No image URL in response";
       } catch (e) {
         lastErr = e.message;
-        console.warn(`[fal.ai] Attempt ${attempt + 1} threw:`, lastErr);
       }
     }
 
@@ -479,8 +471,7 @@ router.post("/transcription/transcribe", requireAuth, uploadTranscription.single
     let durationSeconds = 0;
     try {
       durationSeconds = await getFileDuration(req.file.path);
-    } catch (e) {
-      console.warn("[transcription] ffprobe failed, defaulting to 60s:", e.message);
+    } catch (_) {
       durationSeconds = 60;
     }
 
@@ -592,7 +583,6 @@ router.post("/caption/upload-video", requireAuth, upload.single("file"), async (
     try { fs.unlinkSync(req.file.path); } catch {}
     if (error) throw new Error(error.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
-    console.log("[caption/upload-video] publicUrl:", publicUrl);
     res.json({ url: publicUrl, key });
   } catch (e) {
     console.error("[caption/upload-video]", e.message);
@@ -751,10 +741,8 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
           ],
         });
         finalPrompt = enhanced.choices[0].message.content.trim();
-        console.log(`[image-gen] prompt auto-enhanced (${prompt.length} → ${finalPrompt.length} chars)`);
-      } catch (e) {
-        console.warn("[image-gen] prompt enhancement failed, using original:", e.message);
-      }
+      } catch (_) {}
+
     }
 
     const fullPrompt = finalPrompt;
@@ -765,8 +753,6 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
     const falBody = isHighQuality
       ? { prompt: fullPrompt, image_size: imageSize, num_inference_steps: 28, guidance_scale: 3.5, num_images: numImages, enable_safety_checker: true }
       : { prompt: fullPrompt, image_size: imageSize, num_inference_steps: 4,  num_images: numImages, enable_safety_checker: true };
-
-    console.log(`[image-gen] user=${req.user.id} model=${model} count=${numImages} size=${imageSize.width}x${imageSize.height}`);
 
     // Call fal.ai
     const falRes = await fetch(`https://fal.run/${model}`, {
@@ -800,13 +786,10 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
           if (!uploadErr) {
             const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(fname);
             storedUrl = publicUrl;
-          } else {
-            console.warn("[image-gen] Upload error:", uploadErr.message);
           }
         }
-      } catch (uploadEx) {
-        console.warn("[image-gen] Upload failed:", uploadEx.message);
-      }
+      } catch (_) {}
+
 
       // Save to generated_images table — try full schema first, fall back to minimal
       let record = null;
@@ -826,7 +809,6 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
         .select()
         .single();
       if (insertErr) console.error("[image-gen] DB insert error:", insertErr.message);
-      else console.log("[image-gen] Saved record id:", dbRecord?.id);
 
       results.push({ url: storedUrl, id: dbRecord?.id, width: img.width || imageSize.width, height: img.height || imageSize.height });
     }

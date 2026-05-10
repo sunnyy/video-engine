@@ -4,11 +4,11 @@ import path from "path";
 import {
   supabaseAdmin, requireAuth, requireAdmin, deductCredits, addCredits,
   upload, uploadMemory, uuidv4,
-  sendAdminAlert,
+  sendAdminAlert, sendUserEmail,
   adminUserDeletedEmail, adminCreditsTopupEmail,
   adminNewSaleEmail, adminPlanRenewalEmail, adminPlanUpgradeEmail,
   userAccountDeletedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
-  userPlanExpiringEmail, userPlanExpiredEmail,
+  userCreditsPurchasedEmail, userPlanExpiringEmail, userPlanExpiredEmail,
   openai, TEMP_DIR,
 } from "../middleware/shared.js";
 
@@ -45,6 +45,15 @@ router.post("/add-credits", requireAuth, requireAdmin, async (req, res) => {
     const { userId, amount, reason } = req.body;
     if (!userId || !amount || amount <= 0) return res.status(400).json({ error: "userId and positive amount required" });
     const result = await addCredits(userId, amount, "bonus", "admin_grant", reason || "Admin grant");
+
+    // Notify user by email (fire-and-forget)
+    supabaseAdmin.auth.admin.getUserById(userId).then(({ data: { user } }) => {
+      if (!user?.email) return;
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
+      const tpl  = userCreditsPurchasedEmail(name, amount, result.balance);
+      sendUserEmail(user.email, tpl.subject, tpl.html);
+    }).catch(() => {});
+
     res.json(result);
   } catch (err) {
     console.error("[admin/add-credits]", err.message);
@@ -646,7 +655,6 @@ router.post("/generate-layout-preview", requireAuth, requireAdmin, async (req, r
     const { prompt, niche = "entertainment", intent = "hook" } = req.body;
     if (!prompt) return res.status(400).json({ error: "prompt required" });
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
-    console.log(`[layout-preview] Generating mockup for: ${prompt.substring(0, 80)}`);
     let falUrl = null, lastErr = "";
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
@@ -671,10 +679,10 @@ router.post("/generate-layout-preview", requireAuth, requireAdmin, async (req, r
         if (!uploadErr) {
           const { data: { publicUrl } } = supabaseAdmin.storage.from("layout-previews").getPublicUrl(fname);
           imageUrl = publicUrl;
-          console.log("[layout-preview] Mockup saved:", imageUrl);
-        } else { console.warn("[layout-preview] Upload error:", uploadErr.message); }
+        }
       }
-    } catch (uploadEx) { console.warn("[layout-preview] Upload failed:", uploadEx.message); }
+    } catch (_) {}
+
     res.json({ imageUrl, falUrl });
   } catch (err) {
     console.error("[admin/generate-layout-preview]", err.message);
@@ -781,7 +789,6 @@ router.post("/remove-background", requireAuth, async (req, res) => {
     const { imageUrl } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
-    console.log("[rembg] Removing background from:", imageUrl.substring(0, 80));
     const falRes = await fetch("https://fal.run/fal-ai/birefnet", { method: "POST", headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ image_url: imageUrl, model: "General Use (Light)", operating_resolution: "1024x1024", output_format: "png" }) });
     if (!falRes.ok) { const errText = await falRes.text(); throw new Error(`Fal.ai birefnet HTTP ${falRes.status}: ${errText.slice(0, 120)}`); }
     const falData = await falRes.json();
@@ -794,10 +801,10 @@ router.post("/remove-background", requireAuth, async (req, res) => {
         const buffer = Buffer.from(await pngRes.arrayBuffer());
         const fileName = `layouts/transparent/${Date.now()}_${uuidv4().slice(0, 8)}.png`;
         const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(fileName, buffer, { contentType: "image/png", upsert: true });
-        if (!upErr) { const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(fileName); transparentUrl = publicUrl; console.log("[rembg] Transparent PNG saved:", transparentUrl); }
-        else { console.warn("[rembg] Upload failed:", upErr.message); }
+        if (!upErr) { const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(fileName); transparentUrl = publicUrl; }
       }
-    } catch (upEx) { console.warn("[rembg] Upload exception:", upEx.message); }
+    } catch (_) {}
+
     res.json({ transparentUrl });
   } catch (err) {
     console.error("[rembg]", err.message);
@@ -828,7 +835,6 @@ router.post("/generate-zone-assets", requireAuth, requireAdmin, async (req, res)
       } else {
         falPrompt = `${niche} ${intent} visual element. ${visual_direction}. Professional. No text. Vertical 9:16.`;
       }
-      console.log(`[generate-zone-assets] Zone ${zone.id} (${zone.role}): ${falPrompt.slice(0, 80)}`);
       try {
         const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", { method: "POST", headers: { "Authorization": `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ prompt: falPrompt, image_size: { width: 608, height: 1080 }, num_images: 1, num_inference_steps: 4, enable_safety_checker: false }) });
         if (!falRes.ok) { results.push({ zoneId: zone.id, role: zone.role, imageUrl: null, error: `Fal HTTP ${falRes.status}` }); continue; }
@@ -1043,15 +1049,6 @@ Max 4 zones total. No CTA zone.` : ''}`;
     let raw = response.choices[0].message.content.trim();
     raw = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(raw);
-
-    console.log('\n[convert-layout-image] ── RAW VISION OUTPUT ─────────────────────');
-    console.log('bg_category:', parsed.background_category, '| colors:', parsed.background_colors, '| color_family:', parsed.color_family);
-    console.log('zones count:', (parsed.zones || []).length);
-    (parsed.zones || []).forEach((z, i) => {
-      const s = z.style || {};
-      console.log(`  z${i+1} [${z.type}/${z.role}] x:${z.x} y:${z.y} w:${z.width} h:${z.height} | content:"${z.content || ''}" | fontSize:${s.fontSize} iconKey:${s.iconKey||z.iconKey||'-'} shapeKey:${s.shapeKey||'-'}${z.assetDescription ? ` | asset:"${z.assetDescription}"` : ''}`);
-    });
-    console.log('──────────────────────────────────────────────────────────────────\n');
 
     const bgCategory  = parsed.background_category || 'solid';
     const bgColors    = parsed.background_colors || ['#1a1a2e'];
@@ -1279,10 +1276,6 @@ Max 4 zones total. No CTA zone.` : ''}`;
     }
 
     zones = zones.map((z, i) => ({ ...z, id: `z${i + 1}` }));
-
-    console.log('[convert-layout-image] ── PROCESSED ZONES ──────────────────────');
-    zones.forEach(z => { console.log(`  ${z.id} [${z.type}/${z.role}] x:${z.x} y:${z.y} w:${z.width} h:${z.height} | maxChars:${z.maxChars ?? '-'} iconify:${z.iconify ? z.iconify.icon : '-'}${z.assetDescription ? ` | asset:"${z.assetDescription}"` : ''}`); });
-    console.log('──────────────────────────────────────────────────────────────────\n');
 
     let defaultBackground = null;
     if (bgCategory === 'solid' || bgCategory === 'pattern') {

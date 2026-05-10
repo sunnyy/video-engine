@@ -20,11 +20,12 @@ function activeIndex(frame, fps, total, intervalMs = 370, overrideIntervalMs = n
 }
 
 /** Calculate ms-per-word from beat duration and word count.
- *  No clamping — let the beat duration fully control the pace. */
+ *  Spreads all words evenly across 90% of the beat, with a 60ms floor
+ *  so words are always perceptible even on very short beats. */
 function beatInterval(beatDurationSec, wordCount) {
   if (!beatDurationSec || !wordCount) return null;
-  // Spread words evenly across 90% of beat duration (leave 10% buffer at end)
-  return (beatDurationSec * 1000 * 0.9) / wordCount;
+  const ms = (beatDurationSec * 1000 * 0.9) / wordCount;
+  return Math.max(ms, 60);
 }
 
 /** Spring from a per-word staggered offset */
@@ -145,8 +146,10 @@ function StackReveal({ text, frame, fps, brandColor, beatDuration }) {
     lines.push(words.slice(i, i + chunkSize).join(" "));
   }
 
-  // Which word to highlight (second word of line 0)
-  const STAGGER = 14;
+  // Scale stagger so all lines reveal within 80% of the beat duration
+  const STAGGER = beatDuration
+    ? Math.max(4, Math.round((beatDuration * fps * 0.8) / lines.length))
+    : 14;
 
   return (
     <div style={{ textAlign: "center", perspective: 600, lineHeight: 1.15 }}>

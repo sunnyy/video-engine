@@ -31,7 +31,6 @@ router.post("/generate-tts", requireAuth, async (req, res) => {
     const { script, voice = "female_warm", speed = 1.0, projectId } = req.body;
     const deduction = await deductCredits(req.user.id, 5, "tts_generation", "TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    console.log("[TTS] Request:", { voice, speed, scriptLength: script?.length });
     if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
 
     const validVoices = ["nova","shimmer","coral","alloy","sage","ash","onyx","echo","fable","verse","marin","cedar"];
@@ -63,7 +62,6 @@ router.post("/generate-tts", requireAuth, async (req, res) => {
     if (!uploadErr) {
       fs.unlinkSync(normPath);
       const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
-      console.log("[TTS] Uploaded to Supabase:", publicUrl);
       try {
         await supabaseAdmin.from("tts_generations").insert({
           user_id:    req.user.id,
@@ -78,7 +76,6 @@ router.post("/generate-tts", requireAuth, async (req, res) => {
     } else {
       // Fallback: return localhost temp URL (only works in local dev)
       const url = `http://localhost:5000/renders/${normName}`;
-      console.warn("[TTS] Supabase upload failed, using temp URL:", uploadErr.message);
       res.json({ url });
     }
   } catch (err) {
@@ -102,22 +99,25 @@ const VOICE_CATALOG = [
 const TTS_SAMPLE_TEXT = "Hey, this is how I sound. I can narrate your videos with clarity and energy.";
 
 router.get("/tts/voices", requireAuth, async (_req, res) => {
+  // One list call to find all pre-generated samples
+  const { data: existing } = await supabaseAdmin.storage
+    .from("user-assets")
+    .list("tts/samples");
+  const existingSet = new Set((existing || []).map(f => f.name));
+
   const result = await Promise.all(VOICE_CATALOG.map(async (voice) => {
-    const storageKey = `tts/samples/${voice.id}.mp3`;
-    const { data: existing } = await supabaseAdmin.storage
-      .from("user-assets")
-      .list("tts/samples", { search: `${voice.id}.mp3` });
-    if (existing?.length > 0) {
-      const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
-      return { ...voice, sampleUrl: publicUrl };
-    }
+    const fileName   = `${voice.id}.mp3`;
+    const storageKey = `tts/samples/${fileName}`;
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+
+    if (existingSet.has(fileName)) return { ...voice, sampleUrl: publicUrl };
+
     try {
       const mp3 = await openai.audio.speech.create({
         model: "tts-1-hd", voice: voice.id, input: TTS_SAMPLE_TEXT, speed: 1.0,
       });
       const buffer = Buffer.from(await mp3.arrayBuffer());
       await supabaseAdmin.storage.from("user-assets").upload(storageKey, buffer, { contentType: "audio/mpeg", upsert: true });
-      const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
       return { ...voice, sampleUrl: publicUrl };
     } catch {
       return { ...voice, sampleUrl: null };
@@ -165,8 +165,6 @@ router.post("/generate-tts-elevenlabs", requireAuth, async (req, res) => {
     const deduction = await deductCredits(req.user.id, 5, "tts_generation", "ElevenLabs TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
-    console.log("[ElevenLabs TTS] voice:", voiceId, "lang:", language, "chars:", script.trim().length);
-
     const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method:  "POST",
       headers: {
@@ -199,8 +197,6 @@ router.post("/generate-tts-elevenlabs", requireAuth, async (req, res) => {
     if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message}`);
 
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
-    console.log("[ElevenLabs TTS] uploaded:", publicUrl);
-
     res.json({ url: publicUrl });
   } catch (err) {
     console.error("[ElevenLabs TTS] Error:", err?.message || err);

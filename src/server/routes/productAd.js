@@ -91,14 +91,6 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
-    console.log("[generate-base-image] ── INPUT ──────────────────────");
-    console.log("[generate-base-image] category:", category);
-    console.log("[generate-base-image] hasMannequin:", hasMannequin);
-    console.log("[generate-base-image] hasWatermark:", hasWatermark);
-    console.log("[generate-base-image] productImageUrl:", productImageUrl?.slice(0, 100));
-    console.log("[generate-base-image] modelImageUrl:", modelImageUrl?.slice(0, 100) || "NULL — no model provided");
-    console.log("[generate-base-image] ───────────────────────────────");
-
     let falUrl;
 
     if (category === "clothing" && modelImageUrl) {
@@ -111,12 +103,9 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
         body:    JSON.stringify({ image_urls: [modelImageUrl, productImageUrl], prompt }),
       });
       const raw = await falRes.text();
-      console.log("[generate-base-image] nano-banana status:", falRes.status);
-      console.log("[generate-base-image] nano-banana response:", raw.slice(0, 300));
       if (!falRes.ok) throw new Error(`nano-banana failed: ${raw.slice(0, 200)}`);
       const data = JSON.parse(raw);
       falUrl = data.images?.[0]?.url;
-      console.log("[generate-base-image] extracted falUrl:", falUrl?.slice(0, 100) || "NULL — no URL in response");
     } else {
       // Enhance/clean product photo via nano-banana
       const prompt = "Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, labels, and shape — completely unchanged. Replace the background with a pure white seamless studio backdrop. Improve lighting to clean directional studio light with soft shadows. Remove any props, clutter, or distractions. No people, no text additions. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
@@ -126,12 +115,9 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
         body:    JSON.stringify({ image_urls: [productImageUrl], prompt }),
       });
       const raw = await falRes.text();
-      console.log("[generate-base-image] nano-banana status:", falRes.status);
-      console.log("[generate-base-image] nano-banana response:", raw.slice(0, 300));
       if (!falRes.ok) throw new Error(`nano-banana failed: ${raw.slice(0, 200)}`);
       const data = JSON.parse(raw);
       falUrl = data.images?.[0]?.url;
-      console.log("[generate-base-image] extracted falUrl:", falUrl?.slice(0, 100) || "NULL — no URL in response");
     }
 
     if (!falUrl) throw new Error("No image URL returned from Fal.ai");
@@ -151,11 +137,9 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
           const cleanData = await cleanRes.json();
           const cleanedUrl = cleanData.images?.[0]?.url;
           if (cleanedUrl) falUrl = cleanedUrl;
-          console.log("[generate-base-image] watermark removed, url:", falUrl?.slice(0, 100));
         }
-      } catch (e) {
-        console.warn("[generate-base-image] watermark removal skipped:", e.message);
-      }
+      } catch (_) {}
+
     }
 
     // Proxy to permanent Supabase storage
@@ -168,7 +152,6 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
     const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
-    console.log("[generate-base-image] final publicUrl returned:", publicUrl?.slice(0, 100));
     res.json({ imageUrl: publicUrl });
   } catch (e) {
     console.error("[product-ad/generate-base-image]", e.message);
@@ -192,13 +175,6 @@ router.post("/generate-images", requireAuth, async (req, res) => {
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
-    console.log("[generate-images] ── INPUT ───────────────────────");
-    console.log("[generate-images] shots count:", shots?.length);
-    console.log("[generate-images] category:", category);
-    console.log("[generate-images] referenceImageUrl:", referenceImageUrl?.slice(0, 100) || "NULL");
-    console.log("[generate-images] modelImageUrl:", modelImageUrl?.slice(0, 100) || "NULL");
-    console.log("[generate-images] ────────────────────────────────");
-
     // Sequential with delay — avoids Fal.ai 429 rate limits under concurrent user load
     const results = [];
     for (const [index, shot] of shots.entries()) {
@@ -211,8 +187,6 @@ router.post("/generate-images", requireAuth, async (req, res) => {
       const isClothing    = category === "clothing";
       const hasModelRef   = !!modelImageUrl;
       const useNanoBanana = isClothing && hasModelRef;
-
-      console.log(`[generate-images] shot=${shot.id} category=${category} useNanoBanana=${useNanoBanana}`);
 
       let lastErr = null;
       let succeeded = false;
@@ -228,7 +202,6 @@ router.post("/generate-images", requireAuth, async (req, res) => {
               : `Use the uploaded photo as the identity reference. Keep the person's face, skin tone, hair, and identity completely unchanged. ${shot.image_generation_prompt}`;
             endpoint = "https://fal.run/fal-ai/nano-banana/edit";
             reqBody  = { prompt: anchoredPrompt, image_urls: [modelImageUrl] };
-            console.log(`[generate-images] shot=${shot.id} → nano-banana (model anchor)`);
           } else {
             // Non-worn all shots + wearable product-only shots: nano-banana with product reference
             endpoint = "https://fal.run/fal-ai/nano-banana/edit";
@@ -236,19 +209,16 @@ router.post("/generate-images", requireAuth, async (req, res) => {
               image_urls: [referenceImageUrl],
               prompt:     `Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, and shape — completely unchanged. Only change the scene, environment, surface, and lighting as described: ${shot.image_generation_prompt}`,
             };
-            console.log(`[generate-images] shot=${shot.id} → nano-banana (product-only)`);
           }
 
-          console.log(`[generate-images] shot=${shot.id} index=${index} attempt=${attempt + 1} prompt preview:`, shot.image_generation_prompt?.slice(0, 100));
           const falRes = await fetch(endpoint, {
             method:  "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
             body:    JSON.stringify(reqBody),
           });
-          if (!falRes.ok) { lastErr = await falRes.text(); console.error(`[generate-images] fal error shot=${shot.id}:`, lastErr.slice(0, 200)); continue; }
+          if (!falRes.ok) { lastErr = await falRes.text(); continue; }
           const data = await falRes.json();
           let falUrl = data.images?.[0]?.url;
-          console.log(`[generate-images] shot=${shot.id} falUrl:`, falUrl?.slice(0, 100) || "NULL");
           if (!falUrl) throw new Error("No image URL from Fal.ai");
           results.push({ shotId: shot.id, imageUrl: falUrl, ok: true });
           succeeded = true;
@@ -283,8 +253,6 @@ router.post("/generate-clip", requireAuth, async (req, res) => {
     });
 
     const rawText = await falRes.text();
-    console.log(`[generate-clip] status=${falRes.status} body=${rawText.slice(0, 300)}`);
-
     if (!falRes.ok) throw new Error(`Pixverse ${falRes.status}: ${rawText.slice(0, 200)}`);
 
     let data;
@@ -303,13 +271,9 @@ router.post("/generate-clip", requireAuth, async (req, res) => {
 // GET /models
 router.get("/models", requireAuth, async (req, res) => {
   const { gender } = req.query;
-  console.log("[product-ad/models] gender filter:", gender);
   let query = supabaseAdmin.from("model_avatars").select("*").eq("is_active", true);
   if (gender) query = query.eq("gender", gender);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  console.log("[product-ad/models] models found:", data?.length || 0);
-  console.log("[product-ad/models] first record keys:", data?.[0] ? Object.keys(data[0]) : "no data");
-  console.log("[product-ad/models] first record:", JSON.stringify(data?.[0]));
   res.json({ models: data || [] });
 });

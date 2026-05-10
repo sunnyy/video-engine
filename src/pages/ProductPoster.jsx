@@ -7,6 +7,7 @@ import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import GeneratingLoader from "../ui/GeneratingLoader";
 import AppLayout from "../ui/AppLayout";
+import RefundClaimTrigger from "../ui/components/RefundClaimTrigger";
 
 const C = {
   inp: { padding: "9px 12px", background: "#0d0d14", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#e8e8f0", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" },
@@ -393,7 +394,10 @@ export default function PosterStudio() {
                 </div>
               )}
               {genTime && posterUrl && (
-                <div style={{ fontSize: 11, color: "#444" }}>Generated in {genTime}s</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: 340 }}>
+                  <div style={{ fontSize: 11, color: "#444" }}>Generated in {genTime}s</div>
+                  <RefundClaimTrigger service="product_poster" creditsUsed={10} />
+                </div>
               )}
             </div>
           </div>

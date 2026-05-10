@@ -6,9 +6,9 @@ export const useProjectsStore = create((set, get) => ({
   loading:  false,
   fetched:  false,
 
-  /** Fetch from server only if not already loaded. */
-  fetchProjects: async () => {
-    if (get().fetched) return;
+  /** Fetch from server only if not already loaded. Pass force=true to bypass the guard. */
+  fetchProjects: async (force = false) => {
+    if (!force && get().fetched) return;
     set({ loading: true });
     try {
       const projects = await getUserProjects();

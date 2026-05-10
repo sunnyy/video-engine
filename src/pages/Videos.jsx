@@ -289,34 +289,45 @@ export default function Videos() {
         <FeedbackModal context="post_visit" onClose={() => setShowFeedback(false)} />
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 py-5 border-b shrink-0"
-        style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <div>
-          <h1 className="text-[22px] font-bold" style={{ color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Videos</h1>
-          <div className="text-[12px] mt-0.5" style={{ color: "#44444f" }}>
-            {loading ? "Loading…" : `${videoProjects.length} project${videoProjects.length !== 1 ? "s" : ""}`}
-          </div>
+      {/* Header + tabs */}
+      <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
+        <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
+          AI Videos
+        </h1>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[["videos", "My Videos"], ["create", "Create New"]].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => id === "create" ? navigate("/new") : undefined}
+              style={{
+                padding: "8px 20px", border: "none", borderRadius: "8px 8px 0 0",
+                background: id === "videos" ? "rgba(124,92,252,0.15)" : "transparent",
+                color: id === "videos" ? "#a78bfa" : "#55556a",
+                fontSize: 14, fontWeight: id === "videos" ? 700 : 500,
+                fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",
+                borderBottom: id === "videos" ? "2px solid #7c5cfc" : "2px solid transparent",
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-3">
-          {/* Search */}
+      </div>
+
+      {/* Search + Grid */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div className="flex items-center justify-between mb-5">
+          <div style={{ fontSize: 13, color: "#44444f" }}>
+            {loading ? "" : `${videoProjects.length} project${videoProjects.length !== 1 ? "s" : ""}`}
+          </div>
           <input
             value={search}
             onChange={e => handleSearch(e.target.value)}
             placeholder="Search videos…"
-            className="rounded-[8px] px-3 py-[7px] text-[13px] text-[#e8e8f0] focus:outline-none transition-colors"
+            className="rounded-[8px] px-3 py-[7px] text-[13px] text-[#e8e8f0] focus:outline-none"
             style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", width: 200 }}
           />
-          <button onClick={() => navigate("/new")}
-            className="px-4 py-[8px] rounded-[8px] text-[13px] font-bold border-0 cursor-pointer hover:opacity-90 transition-opacity"
-            style={{ background: "#f5c518", color: "#0b0b10" }}>
-            + New Video
-          </button>
         </div>
-      </div>
-
-      {/* Grid */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
         {loading && (
           <div className="flex items-center justify-center py-24">
             <div className="w-6 h-6 border-2 border-[#7c5cfc] border-t-transparent rounded-full animate-spin" />

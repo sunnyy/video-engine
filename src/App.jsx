@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { getSession, onAuthStateChange } from "./services/auth/authService";
 import { setInsufficientCreditsHandler } from "./services/serverApi";
 import { initLayoutRegistry } from "./core/registries/layoutRegistry";
+import { useCreditsStore } from "./store/useCreditsStore";
 import "./App.css"
 import LandingPage     from "./pages/LandingPage";
 import TermsOfService  from "./pages/legal/TermsOfService";
@@ -55,11 +56,13 @@ import AdminFeedback   from "./pages/admin/Feedback";
 import MusicLibrary   from "./pages/admin/MusicLibrary";
 import SFXLibrary     from "./pages/admin/SFXLibrary";
 import Samples        from "./pages/admin/Samples";
+import RefundClaims   from "./pages/admin/RefundClaims";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [recovering, setRecovering] = useState(false);
+  const fetchCredits = useCreditsStore(s => s.fetchCredits);
 
   useEffect(() => {
     initLayoutRegistry().catch(() => {});
@@ -71,6 +74,7 @@ export default function App() {
     getSession().then((sess) => {
       setSession(sess);
       setLoading(false);
+      if (sess) fetchCredits();
     });
 
     const sub = onAuthStateChange((event, sess) => {
@@ -80,6 +84,7 @@ export default function App() {
       } else if (event === "SIGNED_IN") {
         setRecovering(false);
         setSession(sess);
+        fetchCredits();
       } else if (event === "SIGNED_OUT") {
         setRecovering(false);
         setSession(null);
@@ -168,6 +173,7 @@ export default function App() {
                 <Route path="/admin/music"            element={<MusicLibrary />} />
                 <Route path="/admin/sfx"              element={<SFXLibrary />} />
                 <Route path="/admin/samples"          element={<Samples />} />
+                <Route path="/admin/refund-claims"   element={<RefundClaims />} />
               </>
             ) : (
               <Route path="/admin/*" element={<Navigate to="/dashboard" />} />

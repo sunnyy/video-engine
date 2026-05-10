@@ -40,17 +40,14 @@ async function getBundle() {
   // This avoids spawning esbuild at runtime, which crashes on restricted hosts.
   const PREBUNDLE_DIR = path.join(PROJECT_ROOT, "remotion-bundle");
   if (fs.existsSync(path.join(PREBUNDLE_DIR, "index.html"))) {
-    console.log("[bundle] Using pre-built bundle at:", PREBUNDLE_DIR);
     return PREBUNDLE_DIR;
   }
   // Fallback: build at runtime (local dev only).
   const { bundle } = await import("@remotion/bundler");
-  console.log("[bundle] Building bundle at runtime (dev only)...");
   const result = await bundle({
     entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx"),
     publicDir:  PUBLIC_DIR,
   });
-  console.log("[bundle] Done:", result);
   return result;
 }
 
@@ -99,7 +96,6 @@ router.post("/", requireAuth, async (req, res) => {
       };
     }
 
-    console.log("[render] Job", jobId, "— resolving asset URLs...");
     const tempFiles = []; // track temp files to clean up after render
 
     /* ── 1. Sanitise asset URLs (blob: → null; HTTPS passed directly to Chrome) ── */
@@ -120,8 +116,6 @@ router.post("/", requireAuth, async (req, res) => {
       });
     }
 
-    console.log("[render] audio.music:", JSON.stringify(project?.audio?.music));
-
     /* ── 2. Resolve music src ── */
     if (project?.audio?.music) {
       const { src, musicKey } = project.audio.music;
@@ -139,13 +133,10 @@ router.post("/", requireAuth, async (req, res) => {
             .maybeSingle();
           if (track?.public_url) {
             project.audio.music = { ...project.audio.music, src: track.public_url, musicKey: null };
-            console.log("[render] Music (legacy key) resolved to:", track.public_url);
           } else {
-            console.warn("[render] Legacy music key not found in DB:", musicKey);
             project.audio.music = null;
           }
         } catch (e) {
-          console.warn("[render] Legacy music DB lookup failed:", e.message);
           project.audio.music = null;
         }
       }
@@ -176,9 +167,7 @@ router.post("/", requireAuth, async (req, res) => {
               ),
             };
           });
-          console.log(`[render] Resolved ${sfxKeys.length} SFX keys`);
-        } catch (e) {
-          console.warn("[render] SFX resolution failed:", e.message);
+        } catch (_) {}
         }
       }
     }
@@ -197,12 +186,10 @@ router.post("/", requireAuth, async (req, res) => {
         if (layoutRows?.length) {
           const layoutDefs = Object.fromEntries(layoutRows.map(r => [r.id, r]));
           project = { ...project, meta: { ...project.meta, layoutDefs } };
-          console.log(`[render] Embedded ${layoutRows.length} layout defs into inputProps`);
         }
       }
-    } catch (e) {
-      console.warn("[render] Failed to embed layout defs:", e.message);
-    }
+    } catch (_) {}
+
 
     /* ── 3.6. Watermark for free users ── */
     try {
@@ -214,11 +201,9 @@ router.post("/", requireAuth, async (req, res) => {
         .maybeSingle();
       if (!sub) {
         project = { ...project, meta: { ...project.meta, showWatermark: true } };
-        console.log("[render] Free user — watermark enabled");
       }
-    } catch (e) {
-      console.warn("[render] Subscription check failed:", e.message);
-    }
+    } catch (_) {}
+
 
     /* ── 4. Get cached bundle ── */
     const serveUrl = await getBundle();
@@ -232,8 +217,6 @@ router.post("/", requireAuth, async (req, res) => {
     const outputPath = path.join(TEMP_DIR, `render-${jobId}.mp4`);
     const framesDir  = path.join(TEMP_DIR, `frames-${jobId}`);
     if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
-
-    console.log("[render] Rendering frames...");
 
     const hasVideoAssets = (project.beats || []).some(b =>
       Object.values(b.zones || {}).some(z => z?.content?.asset?.type === "video")
@@ -260,8 +243,6 @@ router.post("/", requireAuth, async (req, res) => {
       },
     });
 
-    console.log("[render] Stitching video...");
-
     await stitchFramesToVideo({
       composition:    comp,
       serveUrl,
@@ -277,7 +258,6 @@ router.post("/", requireAuth, async (req, res) => {
     /* ── 6. Cleanup frames + cached assets ── */
     fs.rmSync(framesDir, { recursive: true, force: true });
     tempFiles.forEach(f => { try { fs.unlinkSync(f); } catch {} });
-    console.log("[render] Cleaned", tempFiles.length, "temp files");
 
     /* ── 7. Upload render to Supabase storage + save DB record ── */
     let videoUrl = null;
@@ -303,7 +283,6 @@ router.post("/", requireAuth, async (req, res) => {
           file_path:  storageKey,
           created_at: new Date().toISOString(),
         }]);
-        console.log("[render] Saved to storage + DB:", videoUrl);
 
         // Render complete email (fire-and-forget)
         Promise.all([
@@ -327,11 +306,9 @@ router.post("/", requireAuth, async (req, res) => {
       video_url: videoUrl,
       error:     null,
     });
-    console.log("[render] Done:", jobId);
 
   } catch (err) {
     if (err.message === "RENDER_CANCELLED") {
-      console.log("[render] Cancelled:", jobId);
       writeJob(jobId, { progress: 0, done: true, url: null, error: null, cancelled: true });
     } else {
       console.error("[render] Failed:", err.message);
@@ -367,6 +344,5 @@ router.get("/download/:jobId", requireAuth, (req, res) => {
     try { fs.unlinkSync(filePath); } catch {}
     try { fs.unlinkSync(jobPath(jobId)); } catch {}
     delete renderJobs[jobId];
-    console.log("[render] Deleted output after download:", `render-${jobId}.mp4`);
   });
 });

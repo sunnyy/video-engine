@@ -30,7 +30,6 @@ async function findExistingImage(assetHint, dna) {
     if (error || !data?.length) return null;
 
     const match = data[Math.floor(Math.random() * data.length)];
-    console.log(`[ai_image_library] Reusing existing image (niche=${niche}, visual_type=${visual_type}): ${match.src}`);
 
     // Fire-and-forget reuse count increment (via server to bypass RLS)
     serverFetch("/api/ai-image-library/increment-reuse", {
@@ -75,12 +74,6 @@ async function saveToImageLibrary({ src, prompt, assetHint, beat, dna, orientati
       method: "POST",
       body: JSON.stringify(record),
     });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      console.warn("[ai_image_library] Save failed:", d.error || res.status);
-    } else {
-      console.log(`[ai_image_library] Saved — niche=${record.niche} intent=${record.intent} subject=${record.subject}`);
-    }
   } catch (e) {
     console.warn("[ai_image_library] saveToImageLibrary error:", e.message);
   }
@@ -372,8 +365,6 @@ export async function generateZoneImage({
     ? `${promptOverride}, ${orientation === "9:16" ? "vertical 9:16 portrait composition" : "horizontal 16:9 landscape composition"}, photorealistic, sharp focus, 8k quality, ${NO_TEXT}`
     : buildImagePrompt({ spoken, intent, visual_hint, topic, orientation, beatIndex: effectiveIndex });
 
-  console.log(`[fal] Beat ${beatIndex} Zone ${zoneIndex}: "${prompt.slice(0, 80)}..."`);
-
   const res = await serverFetch("/api/generate-image", {
     method: "POST",
     body:   JSON.stringify({ prompt, orientation }),
@@ -396,7 +387,6 @@ export async function generateZoneImage({
     const blob   = await proxyRes.blob();
     const file   = new File([blob], `ai-gen-${Date.now()}.jpg`, { type: "image/jpeg" });
     const asset  = await uploadUserAsset(file, "image", null, "project", projectId);
-    console.log(`[fal] Beat ${beatIndex} saved to Supabase: ${asset.url}`);
     useAssetsStore.getState().addMyAsset({
       id: asset.id, url: asset.url, file_path: asset.file_path,
       type: "image", name: asset.name || file.name, size: asset.size || file.size,
@@ -407,8 +397,7 @@ export async function generateZoneImage({
     saveToImageLibrary({ src: asset.url, prompt, assetHint, beat, dna, orientation, width: w, height: h });
 
     return { url: asset.url, assetId: asset.id, type: "image", width: w, height: h };
-  } catch (e) {
-    console.warn(`[fal] Re-upload failed for beat ${beatIndex}, using temporary Fal.ai URL:`, e.message);
+  } catch (_) {
     return { url: falUrl, type: "image", width: w, height: h };
   }
 }

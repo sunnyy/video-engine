@@ -123,12 +123,50 @@ export default function Credits() {
     setTopping(false);
   }
 
+  const now = Date.now();
+  const periodEnd = subscription?.current_period_end ? new Date(subscription.current_period_end).getTime() : null;
+  const isExpired  = subscription && periodEnd && periodEnd < now;
+  const daysLeft   = periodEnd && !isExpired ? Math.ceil((periodEnd - now) / 86400000) : null;
+  const isExpiring = daysLeft !== null && daysLeft <= 3;
+
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[640px] px-10 py-10">
 
           <h1 className="text-[20px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit',sans-serif" }}>Credits & Usage</h1>
+
+          {/* Plan expiry banners */}
+          {isExpired && (
+            <div className="rounded-[12px] px-4 py-3 mb-4 flex items-start gap-3" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
+              <span style={{ fontSize: 18, lineHeight: 1.4 }}>⚠️</span>
+              <div>
+                <div className="text-[14px] font-bold" style={{ color: "#f87171" }}>Your plan has expired</div>
+                {balance > 0
+                  ? <div className="text-[13px] mt-0.5" style={{ color: "#c8c8d8" }}>You still have <strong style={{ color: "#f5c518" }}>{balance} credits</strong> — they never expire. Renew to unlock premium features and top up.</div>
+                  : <div className="text-[13px] mt-0.5" style={{ color: "#c8c8d8" }}>Resubscribe to unlock all features and get fresh credits.</div>
+                }
+                <button onClick={() => navigate("/pricing")} className="mt-2 text-[12px] font-bold px-3 py-1.5 rounded-[7px] border-0 cursor-pointer" style={{ background: "#ef4444", color: "#fff" }}>
+                  Renew Plan →
+                </button>
+              </div>
+            </div>
+          )}
+          {isExpiring && !isExpired && (
+            <div className="rounded-[12px] px-4 py-3 mb-4 flex items-start gap-3" style={{ background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.25)" }}>
+              <span style={{ fontSize: 18, lineHeight: 1.4 }}>⏳</span>
+              <div>
+                <div className="text-[14px] font-bold" style={{ color: "#fb923c" }}>Plan expires in {daysLeft} day{daysLeft !== 1 ? "s" : ""}</div>
+                {balance > 0
+                  ? <div className="text-[13px] mt-0.5" style={{ color: "#c8c8d8" }}>You have <strong style={{ color: "#f5c518" }}>{balance} credits</strong> remaining. Renew now so you don't lose access to premium features.</div>
+                  : <div className="text-[13px] mt-0.5" style={{ color: "#c8c8d8" }}>Renew now to keep all features active without interruption.</div>
+                }
+                <button onClick={() => navigate("/pricing")} className="mt-2 text-[12px] font-bold px-3 py-1.5 rounded-[7px] border-0 cursor-pointer" style={{ background: "#f97316", color: "#fff" }}>
+                  Renew Plan →
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-4">
 
@@ -155,7 +193,12 @@ export default function Credits() {
               <div className="rounded-[14px] border p-5 flex flex-col gap-3" style={{ background: "#111118", borderColor: "rgba(245,197,24,0.2)" }}>
                 <div className="flex items-center justify-between">
                   <div className="text-[12px] font-bold uppercase tracking-[1.5px]" style={{ color: "#8888a8", fontFamily: "'JetBrains Mono',monospace" }}>Current Plan</div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>ACTIVE</span>
+                  {isExpired
+                    ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.15)", color: "#f87171" }}>EXPIRED</span>
+                    : isExpiring
+                      ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(249,115,22,0.15)", color: "#fb923c" }}>EXPIRING SOON</span>
+                      : <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>ACTIVE</span>
+                  }
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -163,8 +206,8 @@ export default function Credits() {
                     <div className="text-[13px] capitalize" style={{ color: "#9494a8" }}>{subscription.billing_cycle} · ${Math.round(subscription.price_paid)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[13px]" style={{ color: "#9494a8" }}>Renews</div>
-                    <div className="text-[13px] font-medium" style={{ color: "#e8e8f0" }}>{fmtDateFull(subscription.current_period_end)}</div>
+                    <div className="text-[13px]" style={{ color: "#9494a8" }}>{isExpired ? "Expired" : "Renews"}</div>
+                    <div className="text-[13px] font-medium" style={{ color: isExpired ? "#f87171" : "#e8e8f0" }}>{fmtDateFull(subscription.current_period_end)}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-[13px]" style={{ color: "#9494a8" }}>

@@ -14,6 +14,7 @@ import ColorsTab      from "./tabs/ColorsTab";
 import TextTab        from "./tabs/TextTab";
 import IconsTab       from "./tabs/IconsTab";
 import DecorativesTab from "./tabs/DecorativesTab";
+import StickersTab    from "./tabs/StickersTab";
 
 export default function ZonePickerModal({
   onSelect,
@@ -33,9 +34,9 @@ export default function ZonePickerModal({
     if (a.src)       { onSelect({ url: a.src });       return; }
   };
 
-  const defaultTabs  = ["assets", "gallery", "blocks", "colors", "icons", "decoratives"];
+  const defaultTabs  = ["assets", "gallery", "blocks", "colors", "icons", "decoratives", "stickers"];
   const activeTabs   = allowedTabs || defaultTabs;
-  const tabKeyMap    = { assets: "my", gallery: "gallery", blocks: "blocks", colors: "colors", icons: "icons", decoratives: "decoratives" };
+  const tabKeyMap    = { assets: "my", gallery: "gallery", blocks: "blocks", colors: "colors", icons: "icons", decoratives: "decoratives", stickers: "stickers" };
   const initialTab   = tabKeyMap[activeTabs[0]] || "my";
 
   const [tab,        setTab]        = useState(initialTab);
@@ -112,6 +113,7 @@ export default function ZonePickerModal({
       { key: "colors",      label: "Colors",      type: "colors"      },
       { key: "icons",       label: "Icons",       type: "icons"       },
       { key: "decoratives", label: "Decoratives", type: "decoratives" },
+      { key: "stickers",    label: "Stickers",    type: "stickers"    },
     ];
     return all.filter(t => activeTabs.includes(t.type));
   }, [activeTabs]);
@@ -134,6 +136,7 @@ export default function ZonePickerModal({
     if (tab === "colors")  return <ColorsTab  onSelect={onSelect} onClose={onClose} />;
     if (tab === "icons")       return <IconsTab       onSelect={(a) => { onSelect(a); onClose(); }} />;
     if (tab === "decoratives") return <DecorativesTab onSelect={(a) => { onSelect(a); onClose(); }} />;
+    if (tab === "stickers")    return <StickersTab    onSelect={(a) => { onSelect(a); onClose(); }} />;
   };
 
   return (

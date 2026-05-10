@@ -34,11 +34,31 @@ export const supabaseAdmin = createClient(
 
 export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const authCache = new Map(); // token -> { user, expiresAt }
+const AUTH_CACHE_TTL = 60_000; // 60 seconds
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of authCache.entries()) {
+    if (val.expiresAt <= now) authCache.delete(key);
+  }
+}, 5 * 60_000);
+
 export async function requireAuth(req, res, next) {
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+  const now = Date.now();
+  const cached = authCache.get(token);
+  if (cached && cached.expiresAt > now) {
+    req.user = cached.user;
+    return next();
+  }
+
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) return res.status(401).json({ error: "Unauthorized" });
+
+  authCache.set(token, { user, expiresAt: now + AUTH_CACHE_TTL });
   req.user = user;
   next();
 }

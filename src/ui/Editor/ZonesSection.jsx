@@ -630,7 +630,7 @@ export default function ZonesSection({ beat, project, selectedZoneId, selectedZo
         <ZonePickerModal
           orientation={project.meta.orientation}
           mode="content"
-          allowedTabs={["assets","gallery","text","blocks","colors","icons","decoratives"]}
+          allowedTabs={["assets","gallery","text","blocks","colors","icons","decoratives","stickers"]}
           onSelect={handleAddZoneSelect}
           onClose={() => setAddZonePicker(false)}
         />

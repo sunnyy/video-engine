@@ -263,7 +263,7 @@ function FlyoutGroup({ icon, label, active, children }) {
 export default function AppLayout({ children }) {
   const location  = useLocation();
   const navigate  = useNavigate();
-  const { balance, fetchCredits } = useCreditsStore();
+  const { balance } = useCreditsStore();
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -274,7 +274,6 @@ export default function AppLayout({ children }) {
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
 
   useEffect(() => {
-    fetchCredits();
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAdmin(session?.user?.app_metadata?.role === "admin");
     });

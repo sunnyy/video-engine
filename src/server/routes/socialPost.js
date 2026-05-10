@@ -57,12 +57,9 @@ router.post("/generate", requireAuth, async (req, res) => {
       const gptRes = await openai.chat.completions.create({ model: "gpt-4o", max_tokens: 500, messages });
       optimizedPrompt = gptRes.choices[0].message.content?.trim().slice(0, 1000);
     } catch (e) {
-      console.warn("[social-post/generate] GPT-4o failed, using fallback:", e.message);
       const ratioLabel = aspectRatio === "4:5" ? "Portrait 4:5 format" : aspectRatio === "9:16" ? "Story 9:16 format" : "Square 1:1 format";
       optimizedPrompt = `Professional social media post for ${niche} niche. ${headline ? `Headline: "${headline}".` : ""} ${subtext ? `Subtext: "${subtext}".` : ""} ${brandName ? `Brand: "${brandName}".` : ""} Modern clean design, bold typography, high contrast. ${ratioLabel}. High resolution, no watermarks.`.slice(0, 1000);
     }
-
-    console.log("[social-post/generate] prompt:", optimizedPrompt?.slice(0, 150));
 
     // Always nano-banana/edit: blank PNG + explicit image_size both anchor aspect ratio
     const NANO_SIZE  = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": { width: 680, height: 1080 } };
@@ -76,7 +73,6 @@ router.post("/generate", requireAuth, async (req, res) => {
       : `[CRITICAL: Output must be exactly ${dimLabel}. The last image is a blank canvas showing the exact required output dimensions — match its size precisely.] `;
     const finalBody  = { image_urls: imageUrls, prompt: sizeNote + optimizedPrompt, image_size: NANO_SIZE[aspectRatio] || "square_hd" };
 
-    console.log("[social-post/generate] calling fal:", endpoint, "hasLogo:", !!logoUrl, "hasRef:", !!referenceImageUrl);
     const falAbort = new AbortController();
     const falTimeout = setTimeout(() => falAbort.abort(), 90_000);
     let falRes;
@@ -90,10 +86,8 @@ router.post("/generate", requireAuth, async (req, res) => {
     } finally {
       clearTimeout(falTimeout);
     }
-    console.log("[social-post/generate] fal status:", falRes.status);
     if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
     const data   = await falRes.json();
-    console.log("[social-post/generate] fal response keys:", Object.keys(data));
     const falUrl = data.images?.[0]?.url || data.image?.url;
     if (!falUrl) throw new Error(`No image returned. Response: ${JSON.stringify(data).slice(0, 200)}`);
 

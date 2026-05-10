@@ -18,7 +18,8 @@ import { router as posterRouter }     from "./routes/poster.js";
 import { router as thumbnailRouter }  from "./routes/thumbnail.js";
 import { router as outfitRouter }     from "./routes/outfit.js";
 import { router as socialPostRouter } from "./routes/socialPost.js";
-import { router as adminRouter }      from "./routes/admin.js";
+import { router as adminRouter }        from "./routes/admin.js";
+import { router as refundClaimsRouter } from "./routes/refundClaims.js";
 
 console.log("Server starting...", new Date().toISOString());
 
@@ -75,6 +76,7 @@ app.use("/api",              ttsRouter);
 app.use("/api",              authRouter);
 app.use("/api",              assetsRouter);
 app.use("/api",              paymentsRouter);
+app.use("/api",              refundClaimsRouter);
 
 /* ── Serve built frontend — must come after all API routes ── */
 app.use(express.static(path.join(PROJECT_ROOT, "dist")));
@@ -100,7 +102,8 @@ async function checkPlanExpiry() {
       const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(sub.user_id);
       if (user?.email) {
         const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
-        const { subject, html } = userPlanExpiredEmail(name, sub.plans?.name || "your");
+        const { data: credRow } = await supabaseAdmin.from("user_credits").select("balance").eq("user_id", sub.user_id).maybeSingle();
+        const { subject, html } = userPlanExpiredEmail(name, sub.plans?.name || "your", credRow?.balance ?? null);
         sendUserEmail(user.email, subject, html);
       }
     }
@@ -118,7 +121,8 @@ async function checkPlanExpiry() {
       if (user?.email) {
         const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
         const expiryDate = new Date(sub.current_period_end).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-        const { subject, html } = userPlanExpiringEmail(name, sub.plans?.name || "your", expiryDate);
+        const { data: credRow } = await supabaseAdmin.from("user_credits").select("balance").eq("user_id", sub.user_id).maybeSingle();
+        const { subject, html } = userPlanExpiringEmail(name, sub.plans?.name || "your", expiryDate, credRow?.balance ?? null);
         sendUserEmail(user.email, subject, html);
       }
     }

@@ -10,18 +10,33 @@
 import { create } from "zustand";
 import { getCredits } from "../services/credits/creditService";
 
-export const useCreditsStore = create((set) => ({
+export const useCreditsStore = create((set, get) => ({
   balance:         null,
   lifetimeCredits: null,
   loading:         false,
+  fetched:         false,
 
   fetchCredits: async () => {
+    if (get().fetched || get().loading) return;
     set({ loading: true });
     const data = await getCredits();
     set({
       balance:         data?.balance         ?? 0,
       lifetimeCredits: data?.lifetime_credits ?? 0,
       loading:         false,
+      fetched:         true,
+    });
+  },
+
+  /** Force a fresh fetch (e.g. after purchase). */
+  refetchCredits: async () => {
+    set({ fetched: false, loading: true });
+    const data = await getCredits();
+    set({
+      balance:         data?.balance         ?? 0,
+      lifetimeCredits: data?.lifetime_credits ?? 0,
+      loading:         false,
+      fetched:         true,
     });
   },
 
