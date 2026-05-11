@@ -185,7 +185,7 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
       <div className="flex items-center gap-3">
         {/* Back to dashboard */}
         <button
-          onClick={() => { invalidateProjects(); navigate("/videos"); }}
+          onClick={() => { invalidateProjects(); navigate(-1); }}
           className="flex items-center gap-1 text-[#77777f] hover:text-[#e8e8f0] transition-colors text-[16px] bg-transparent border-0 cursor-pointer"
         >
           ← <span className="hidden sm:inline">Home</span>
