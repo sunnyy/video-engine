@@ -92,7 +92,7 @@ export default function About() {
             lineHeight: 1.6,
             margin: 0,
           }}>
-            Vidquence is an AI video production studio for the next generation of creators and businesses.
+            Vidquence is an AI creative platform for creators and businesses — videos, ads, posters, voiceovers, and more from one place.
           </p>
         </section>
 
