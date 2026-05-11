@@ -33,6 +33,7 @@
     "fs-extra": "^11.3.4",
     "multer": "^2.1.0",
     "openai": "^6.22.0",
+    "posthog-js": "^1.372.10",
     "puppeteer": "^24.40.0",
     "razorpay": "^2.9.6",
     "react": "^19.2.0",

@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getSession, onAuthStateChange } from "./services/auth/authService";
+import { posthog } from "./lib/posthog";
 import { setInsufficientCreditsHandler } from "./services/serverApi";
 import { initLayoutRegistry } from "./core/registries/layoutRegistry";
 import { useCreditsStore } from "./store/useCreditsStore";
@@ -85,6 +86,10 @@ export default function App() {
       } else if (event === "SIGNED_IN") {
         setRecovering(false);
         setSession(sess);
+        posthog.identify(sess.user.id, {
+          email: sess.user.email,
+          name: sess.user.user_metadata?.full_name || sess.user.user_metadata?.name || "",
+        });
         // New accounts (created within last 15s): poll briefly in case the
         // DB trigger hasn't committed yet. Existing users: single fetch.
         const isNewUser = sess?.user?.created_at &&
@@ -93,6 +98,7 @@ export default function App() {
       } else if (event === "SIGNED_OUT") {
         setRecovering(false);
         setSession(null);
+        posthog.reset();
       } else if (event === "USER_UPDATED") {
         setRecovering(false);
         setSession(sess);
