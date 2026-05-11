@@ -568,6 +568,7 @@ export default function UserManager() {
               <tr className="border-b border-white/[0.08] text-left text-sm">
                 <SortTh col="email">Email</SortTh>
                 <SortTh col="role">Role</SortTh>
+                <SortTh col="plan">Plan</SortTh>
                 <SortTh col="balance">Balance</SortTh>
                 <SortTh col="lifetime_credits">Lifetime</SortTh>
                 <SortTh col="last_sign_in_at">Last Sign In</SortTh>
@@ -583,6 +584,11 @@ export default function UserManager() {
                     {u.role === "admin"
                       ? <span className="text-[#f5c518] text-xs font-bold bg-[#f5c518]/10 px-2 py-0.5 rounded-full">admin</span>
                       : <span className="text-[#555] text-xs">user</span>}
+                  </td>
+                  <td className="px-3 py-3">
+                    {u.plan
+                      ? <span className="text-[#a78bfa] text-xs font-semibold bg-[#7c5cfc]/10 px-2 py-0.5 rounded-full">{u.plan}</span>
+                      : <span className="text-[#444] text-xs">—</span>}
                   </td>
                   <td className="px-3 py-3">
                     <span className={`font-semibold text-sm ${u.balance === null ? "text-[#444]" : u.balance < 10 ? "text-[#f97316]" : "text-[#7c5cfc]"}`}>
@@ -649,7 +655,7 @@ export default function UserManager() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-8 text-[#444] text-center">
+                <tr><td colSpan={8} className="px-3 py-8 text-[#444] text-center">
                   {search ? `No users matching "${search}"` : "No users found."}
                 </td></tr>
               )}

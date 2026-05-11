@@ -75,22 +75,12 @@ export async function requireAdmin(req, res, next) {
 }
 
 export async function deductCredits(userId, amount, action, description, projectId = null) {
-  const { data: credits } = await supabaseAdmin
-    .from("user_credits")
-    .select("balance")
-    .eq("user_id", userId)
-    .single();
+  const { data: newBalance } = await supabaseAdmin.rpc("deduct_credits", {
+    p_user_id: userId,
+    p_amount:  amount,
+  });
 
-  if (!credits || credits.balance < amount) {
-    return { success: false, error: "Insufficient credits" };
-  }
-
-  const newBalance = credits.balance - amount;
-
-  await supabaseAdmin
-    .from("user_credits")
-    .update({ balance: newBalance, updated_at: new Date().toISOString() })
-    .eq("user_id", userId);
+  if (newBalance === null) return { success: false, error: "Insufficient credits" };
 
   await supabaseAdmin
     .from("credit_transactions")
@@ -105,7 +95,7 @@ export async function deductCredits(userId, amount, action, description, project
     });
 
   // Low-credits warning: fire once when balance crosses below 20
-  if (newBalance < 20 && credits.balance >= 20) {
+  if (newBalance < 20 && newBalance + amount >= 20) {
     supabaseAdmin.auth.admin.getUserById(userId).then(({ data: { user } }) => {
       if (user?.email) {
         const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
@@ -130,11 +120,12 @@ export async function addCredits(userId, amount, type, action, description, paym
   const newBalance  = current  + amount;
   const newLifetime = lifetime + amount;
 
-  await supabaseAdmin
+  const { error: upsertErr } = await supabaseAdmin
     .from("user_credits")
     .upsert({ user_id: userId, balance: newBalance, lifetime_credits: newLifetime, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (upsertErr) throw new Error(`addCredits upsert failed: ${upsertErr.message}`);
 
-  await supabaseAdmin
+  const { error: txErr } = await supabaseAdmin
     .from("credit_transactions")
     .insert({
       user_id:      userId,
@@ -145,20 +136,7 @@ export async function addCredits(userId, amount, type, action, description, paym
       payment_id:   paymentId,
       balance_after: newBalance,
     });
-
-  // Fire email alerts for credit purchases (not admin grants / plan assignments)
-  if (type === "purchase" || type === "topup") {
-    supabaseAdmin.auth.admin.getUserById(userId).then(({ data: { user } }) => {
-      if (!user) return;
-      const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
-      // Admin alert
-      const adminEmail = adminCreditsTopupEmail({ userEmail: user.email, amount, balance: newBalance });
-      sendAdminAlert(adminEmail.subject, adminEmail.html);
-      // User confirmation
-      const userEmail = userCreditsPurchasedEmail(name, amount, newBalance);
-      sendUserEmail(user.email, userEmail.subject, userEmail.html);
-    }).catch(() => {});
-  }
+  if (txErr) throw new Error(`addCredits transaction insert failed: ${txErr.message}`);
 
   return { success: true, balance: newBalance };
 }

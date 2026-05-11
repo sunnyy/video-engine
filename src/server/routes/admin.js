@@ -20,9 +20,14 @@ router.get("/users", requireAuth, requireAdmin, async (_req, res) => {
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
     if (error) throw error;
     const ids = users.map(u => u.id);
-    const { data: creditRows } = await supabaseAdmin.from("user_credits").select("user_id, balance, lifetime_credits").in("user_id", ids);
+    const [{ data: creditRows }, { data: subRows }] = await Promise.all([
+      supabaseAdmin.from("user_credits").select("user_id, balance, lifetime_credits").in("user_id", ids),
+      supabaseAdmin.from("subscriptions").select("user_id, plans(name)").eq("status", "active").in("user_id", ids),
+    ]);
     const creditsMap = {};
     for (const r of creditRows || []) creditsMap[r.user_id] = r;
+    const planMap = {};
+    for (const r of subRows || []) planMap[r.user_id] = r.plans?.name ?? null;
     const result = users.map(u => ({
       id:               u.id,
       email:            u.email,
@@ -31,6 +36,7 @@ router.get("/users", requireAuth, requireAdmin, async (_req, res) => {
       role:             u.app_metadata?.role ?? null,
       balance:          creditsMap[u.id]?.balance          ?? null,
       lifetime_credits: creditsMap[u.id]?.lifetime_credits ?? null,
+      plan:             planMap[u.id] ?? null,
     }));
     res.json(result);
   } catch (err) {
@@ -691,7 +697,7 @@ router.post("/generate-layout-preview", requireAuth, requireAdmin, async (req, r
 });
 
 /* ── Model Avatars ── */
-router.post("/upload-system-asset", requireAuth, upload.single("file"), async (req, res) => {
+router.post("/upload-system-asset", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const { prefix = "models/uploads" } = req.body;
@@ -709,13 +715,13 @@ router.post("/upload-system-asset", requireAuth, upload.single("file"), async (r
   }
 });
 
-router.get("/model-avatars", requireAuth, async (_req, res) => {
+router.get("/model-avatars", requireAuth, requireAdmin, async (_req, res) => {
   const { data, error } = await supabaseAdmin.from("model_avatars").select("*").order("created_at", { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ avatars: data || [] });
 });
 
-router.post("/model-avatars/generate", requireAuth, async (req, res) => {
+router.post("/model-avatars/generate", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { imageUrl, prompt } = req.body;
     if (!imageUrl || !prompt) return res.status(400).json({ error: "imageUrl and prompt required" });
@@ -740,7 +746,7 @@ router.post("/model-avatars/generate", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/model-avatars/upload", requireAuth, async (req, res) => {
+router.post("/model-avatars/upload", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { imageUrl } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
@@ -758,7 +764,7 @@ router.post("/model-avatars/upload", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/model-avatars/approve", requireAuth, async (req, res) => {
+router.post("/model-avatars/approve", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { imageUrl, gender, skin_tone, age_group, style_notes } = req.body;
     if (!imageUrl || !gender || !skin_tone || !age_group) return res.status(400).json({ error: "Missing required fields" });
@@ -770,21 +776,21 @@ router.post("/model-avatars/approve", requireAuth, async (req, res) => {
   }
 });
 
-router.patch("/model-avatars/:id", requireAuth, async (req, res) => {
+router.patch("/model-avatars/:id", requireAuth, requireAdmin, async (req, res) => {
   const { is_active } = req.body;
   const { error } = await supabaseAdmin.from("model_avatars").update({ is_active }).eq("id", req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true });
 });
 
-router.delete("/model-avatars/:id", requireAuth, async (req, res) => {
+router.delete("/model-avatars/:id", requireAuth, requireAdmin, async (req, res) => {
   const { error } = await supabaseAdmin.from("model_avatars").delete().eq("id", req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true });
 });
 
 /* ── Background removal ── */
-router.post("/remove-background", requireAuth, async (req, res) => {
+router.post("/remove-background", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { imageUrl } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
@@ -1450,7 +1456,7 @@ router.get("/samples/public", async (req, res) => {
 });
 
 // Upload sample file to storage
-router.post("/samples/upload", requireAuth, uploadMemory.single("file"), async (req, res) => {
+router.post("/samples/upload", requireAuth, requireAdmin, uploadMemory.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const { service_key, type } = req.body;

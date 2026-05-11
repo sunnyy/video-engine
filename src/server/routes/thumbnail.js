@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  supabaseAdmin, requireAuth, deductCredits,
+  supabaseAdmin, requireAuth, deductCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
 
@@ -20,7 +20,8 @@ router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, re
 
 router.post("/generate", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 10, "thumbnail_generate", "Thumbnail Generator");
+    const recordId = uuidv4();
+    const deduction = await deductCredits(req.user.id, 10, "thumbnail_generate", "Thumbnail Generator", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
     const { imageUrl, headline, subtext, style, niche } = req.body;
@@ -106,7 +107,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     // Step 5 — Save metadata (silently skipped if table doesn't exist)
     try {
       await supabaseAdmin.from("thumbnails").insert({
-        user_id: req.user.id, thumbnail_url: publicUrl, storage_key: key,
+        id: recordId, user_id: req.user.id, thumbnail_url: publicUrl, storage_key: key,
         headline: headline || null, subtext: subtext || null, niche: niche || null, style: style || null,
       });
     } catch (_) {}

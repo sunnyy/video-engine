@@ -137,6 +137,15 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Payment verification failed" });
     }
 
+    // Idempotency: skip if this payment was already processed
+    const { data: existingTx, error: idempotencyErr } = await supabaseAdmin
+      .from("credit_transactions")
+      .select("id")
+      .eq("payment_id", razorpay_payment_id)
+      .maybeSingle();
+    if (idempotencyErr) throw new Error(`Idempotency check failed: ${idempotencyErr.message}`);
+    if (existingTx) return res.json({ success: true, duplicate: true });
+
     // Fetch plan
     const { data: plan, error } = await supabaseAdmin
       .from("plans")
@@ -168,6 +177,13 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
     const isRenewal = existingSub?.plans?.slug === planSlug;
     const isUpgrade = existingSub && !isRenewal;
     const prevPlanName = existingSub?.plans?.name || null;
+
+    // Supersede any existing active subscriptions before inserting new one
+    await supabaseAdmin
+      .from("subscriptions")
+      .update({ status: "superseded" })
+      .eq("user_id", req.user.id)
+      .eq("status", "active");
 
     // Insert subscription record
     await supabaseAdmin.from("subscriptions").insert({
@@ -311,6 +327,15 @@ router.post("/credits/topup/verify", requireAuth, async (req, res) => {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
     if (expected !== razorpay_signature) return res.status(400).json({ error: "Payment verification failed" });
+
+    // Idempotency: skip if this payment was already processed
+    const { data: existingTopupTx, error: topupIdempotencyErr } = await supabaseAdmin
+      .from("credit_transactions")
+      .select("id")
+      .eq("payment_id", razorpay_payment_id)
+      .maybeSingle();
+    if (topupIdempotencyErr) throw new Error(`Idempotency check failed: ${topupIdempotencyErr.message}`);
+    if (existingTopupTx) return res.json({ success: true, duplicate: true });
 
     const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);
     if (!pkg) return res.status(404).json({ error: "Package not found" });

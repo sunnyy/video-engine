@@ -12,7 +12,7 @@ import { router as renderRouter }     from "./routes/render.js";
 import { router as ttsRouter }        from "./routes/tts.js";
 import { router as authRouter }       from "./routes/auth.js";
 import { router as assetsRouter }     from "./routes/assets.js";
-import { router as paymentsRouter }   from "./routes/payments.js";
+import { router as paymentsRouter } from "./routes/payments.js";
 import { router as productAdRouter }  from "./routes/productAd.js";
 import { router as posterRouter }     from "./routes/poster.js";
 import { router as thumbnailRouter }  from "./routes/thumbnail.js";
@@ -36,6 +36,7 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 const app = express();
 app.use(cors());
+
 app.use(express.json({ limit: "100mb" }));
 
 app.use("/renders", express.static(TEMP_DIR));

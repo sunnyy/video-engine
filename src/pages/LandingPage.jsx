@@ -348,12 +348,18 @@ export default function LandingPage() {
   useEffect(() => {
     const hash = location.hash;
     if (!hash) return;
+    const offset = hash === "#pricing" ? 280 : 0;
+    const scrollTo = (el) => {
+      const top = el.getBoundingClientRect().top + window.scrollY + offset;
+      window.scrollTo({ top, behavior: "smooth" });
+    };
     const el = document.querySelector(hash);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
+      scrollTo(el);
     } else {
       const t = setTimeout(() => {
-        document.querySelector(hash)?.scrollIntoView({ behavior: "smooth" });
+        const delayed = document.querySelector(hash);
+        if (delayed) scrollTo(delayed);
       }, 300);
       return () => clearTimeout(t);
     }
@@ -575,7 +581,7 @@ export default function LandingPage() {
                 See All Services
               </button>
             </div>
-            <div className="hero-proof">200 free credits · No credit card required</div>
+            <div className="hero-proof">✦ 50 free credits on signup · No credit card required</div>
           </div>
         </div>
       </section>
@@ -933,11 +939,54 @@ export default function LandingPage() {
                   const usd = cycle === "annual" ? annualPerMo : monthly;
                   const hasDiscount = cycle === "annual" && discount > 0;
                   const inr = toINR(usd, rate);
-                  const feats = Array.isArray(plan.features) ? plan.features : [];
-                  const creditsText = feats.find((f) => /credits/i.test(f)) || "All services";
-                  const videosText = feats.find((f) => /videos?/i.test(f)) || "Fast exports";
-                  const productText = feats.find((f) => /product/i.test(f)) || "Creative tools";
                   const meterWidth = `${Math.min(100, 42 + planIndex * 24)}%`;
+                  const PLAN_FEATURES = {
+                    starter: [
+                      "1,800 Credits/month",
+                      "Product Ad Studio",
+                      "TTS Voiceover",
+                      "AI Image Generator",
+                      "Product Poster",
+                      "Video Captions",
+                      "AI Video Generator",
+                      "Typography Videos",
+                      "Email Support",
+                    ],
+                    pro: [
+                      "3,500 Credits/month",
+                      "Product Ad Studio",
+                      "TTS Voiceover",
+                      "AI Image Generator",
+                      "Product Poster",
+                      "Video Captions",
+                      "AI Video Generator",
+                      "Typography Videos",
+                      "Explainer Videos",
+                      "Banner & Thumbnail Generator",
+                      "Virtual Try-On",
+                      "Speech to Text",
+                      "Priority Support",
+                    ],
+                    agency: [
+                      "6,000 Credits/month",
+                      "Product Ad Studio",
+                      "TTS Voiceover",
+                      "AI Image Generator",
+                      "Product Poster",
+                      "Video Captions",
+                      "AI Video Generator",
+                      "Typography Videos",
+                      "Explainer Videos",
+                      "Banner & Thumbnail Generator",
+                      "Virtual Try-On",
+                      "Speech to Text",
+                      "Product Video Ads",
+                      "Social Media Post Generator",
+                      "Best credit value per dollar",
+                      "Dedicated Support",
+                    ],
+                  };
+                  const feats = PLAN_FEATURES[plan.slug] || [];
                   return (
                     <div key={plan.id} className={`plan${plan.is_popular ? " plan-hot" : ""}`}>
                       {plan.is_popular && <div className="plan-hot-badge">Most Popular</div>}
@@ -1007,21 +1056,8 @@ export default function LandingPage() {
                           </div>
                         </div>
                       )}
-                      <div className="plan-stats">
-                        <div className="plan-stat">
-                          <strong>{creditsText.replace("/month", "/mo")}</strong>
-                          <span>Included</span>
-                        </div>
-                        <div className="plan-stat">
-                          <strong>{videosText}</strong>
-                          <span>Output</span>
-                        </div>
-                      </div>
                       <div className="plan-meter" aria-hidden="true">
                         <div className="plan-meter-fill" style={{ width: meterWidth }} />
-                      </div>
-                      <div className="plan-mini-chip" style={{ display: "inline-flex", marginBottom: 4 }}>
-                        {productText}
                       </div>
                       <div className="plan-hr" />
                       <ul className="plan-feats">
@@ -1084,7 +1120,7 @@ export default function LandingPage() {
                 <br />
                 Start creating.
               </div>
-              <div className="cta-banner-sub">200 free credits. No card required. Every service unlocked.</div>
+              <div className="cta-banner-sub">50 free credits. No card required. Every service unlocked.</div>
             </div>
             <button className="cta-banner-btn" onClick={handleCTA}>
               Get Started Free →

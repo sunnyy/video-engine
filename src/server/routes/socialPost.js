@@ -7,7 +7,7 @@ const BLANK_URLS = {
 };
 
 import {
-  supabaseAdmin, requireAuth, deductCredits,
+  supabaseAdmin, requireAuth, deductCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
 
@@ -28,7 +28,8 @@ router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, re
 
 router.post("/generate", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 10, "social_post", "Social Media Post Generator");
+    const recordId = uuidv4();
+    const deduction = await deductCredits(req.user.id, 15, "social_post", "Social Media Post Generator", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
     const { referenceImageUrl, logoUrl, brandColor, headline, subtext, brandName, niche, style, aspectRatio } = req.body;
@@ -102,7 +103,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
 
     const { error: dbErr } = await supabaseAdmin.from("social_posts").insert({
-      user_id: req.user.id, post_url: publicUrl, storage_key: key,
+      id: recordId, user_id: req.user.id, post_url: publicUrl, storage_key: key,
       headline: headline || null, subtext: subtext || null,
       brand_name: brandName || null, niche, aspect_ratio: aspectRatio || "1:1",
     });

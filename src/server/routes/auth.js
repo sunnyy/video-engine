@@ -120,7 +120,7 @@ router.post("/webhooks/user-created", async (req, res) => {
     const name = raw_user_meta_data?.full_name || raw_user_meta_data?.name || "";
 
     // Free signup credits
-    await addCredits(id, 200, "bonus", "signup_bonus", "Welcome bonus — free credits");
+    await addCredits(id, 50, "bonus", "signup_bonus", "Welcome bonus — free credits");
 
     // Admin alert (fire-and-forget)
     const adminEmail = adminNewUserEmail({ id, email, name });

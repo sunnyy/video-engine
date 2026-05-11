@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  supabaseAdmin, requireAuth, deductCredits,
+  supabaseAdmin, requireAuth, deductCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
 
@@ -26,7 +26,8 @@ router.get("/models", requireAuth, async (_req, res) => {
 
 router.post("/generate", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 8, "outfit_tryon", "Outfit Studio — virtual try-on");
+    const recordId = uuidv4();
+    const deduction = await deductCredits(req.user.id, 15, "outfit_tryon", "Outfit Studio — virtual try-on", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
 
     const { garmentUrl, modelUrl, hasMannequin, useMyPhoto } = req.body;
@@ -60,7 +61,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
 
     const { error: dbErr } = await supabaseAdmin.from("outfit_tryons").insert({
-      user_id: req.user.id, result_url: publicUrl, storage_key: key,
+      id: recordId, user_id: req.user.id, result_url: publicUrl, storage_key: key,
       garment_url: garmentUrl, model_url: modelUrl,
     });
     if (dbErr) console.error("[outfit/generate] db insert:", dbErr.message);

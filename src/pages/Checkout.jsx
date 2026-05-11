@@ -94,10 +94,10 @@ export default function Checkout() {
   }
 
   const baseUSD      = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
-  const finalUSD     = calcPrice(baseUSD, plan.discount_percent);
+  const finalUSD     = calcPrice(baseUSD, cycle === "annual" ? plan.discount_percent : 0);
   const finalINR     = toINR(finalUSD, rate);
   const originalINR  = toINR(baseUSD, rate);
-  const saved        = plan.discount_percent > 0;
+  const saved        = cycle === "annual" && plan.discount_percent > 0;
   const features     = Array.isArray(plan.features) ? plan.features : [];
   const cycleLabel   = cycle === "annual" ? "year" : "month";
 

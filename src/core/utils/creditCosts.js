@@ -7,7 +7,7 @@
  */
 
 export const CREDIT_COSTS = {
-  base_generation:  10,  // script + beats + layouts + zone content
+  base_generation:  25,  // script + beats + layouts + zone content
   ai_image:         2,   // per image generated via Fal.ai
   image_reuse:      0,   // reused from library — free
   tts_generation:   5,   // full video TTS
@@ -20,24 +20,24 @@ export const CREDIT_COSTS = {
   product_ad_analyze:    5,   // GPT-4o strategy analysis
   product_ad_base_image: 8,   // base model image (Fal.ai)
   product_ad_scenes:     40,  // 5 scene images
-  product_ad_clip:       50,  // video clip (LTX per clip)
+  product_ad_clip:       60,  // video clip (LTX per clip)
   // Other tools
   poster_generate:       10,  // Poster Studio
   thumbnail_generate:    10,  // Thumbnail Generator
-  outfit_tryon:           8,  // Virtual Try-On
-  social_post:           10,  // Banner Design / Social Post
+  outfit_tryon:          15,  // Virtual Try-On
+  social_post:           15,  // Banner Design / Social Post
   caption_studio:         8,  // Caption Studio (render)
 };
 
 // Full cost estimates per service — used by CreditConfirmModal
 export const SERVICE_COSTS = {
   product_ad_full: {
-    total: 303,
+    total: 353,
     breakdown: {
       "Analyze product":    5,
       "Base scene image":   8,
       "Scene images (5)":  40,
-      "Video clips (5)":  250,
+      "Video clips (5)":  300,
     },
   },
   poster: {
@@ -49,12 +49,12 @@ export const SERVICE_COSTS = {
     breakdown: { "Generate thumbnail": 10 },
   },
   outfit_tryon: {
-    total: 8,
-    breakdown: { "Virtual try-on": 8 },
+    total: 15,
+    breakdown: { "Virtual try-on": 15 },
   },
   social_post: {
-    total: 10,
-    breakdown: { "Generate banner": 10 },
+    total: 15,
+    breakdown: { "Generate banner": 15 },
   },
   caption_render: {
     total: 8,

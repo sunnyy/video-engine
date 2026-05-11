@@ -18,7 +18,7 @@ export const router = express.Router();
 router.post("/generate", requireAuth, async (req, res) => {
   try {
     const { prompt, projectId, model: reqModel } = req.body;
-    const deduction = await deductCredits(req.user.id, 10, "base_generation", "Video generation", projectId);
+    const deduction = await deductCredits(req.user.id, 25, "base_generation", "Video generation", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const completion = await openai.chat.completions.create({
       model: reqModel || "gpt-4o",

@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  supabaseAdmin, requireAuth, deductCredits,
+  supabaseAdmin, requireAuth, deductCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
 
@@ -53,7 +53,8 @@ router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, re
 
 router.post("/generate", requireAuth, async (req, res) => {
   try {
-    const deduction = await deductCredits(req.user.id, 10, "poster_generate", "Poster Studio — poster generation");
+    const recordId = uuidv4();
+    const deduction = await deductCredits(req.user.id, 10, "poster_generate", "Poster Studio — poster generation", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { productImageUrl, brandName, headline, tagline, colorMood, language = "English" } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
@@ -97,6 +98,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
 
     const { error: dbErr } = await supabaseAdmin.from("posters").insert({
+      id:                recordId,
       user_id:           req.user.id,
       product_image_url: productImageUrl,
       poster_url:        publicUrl,

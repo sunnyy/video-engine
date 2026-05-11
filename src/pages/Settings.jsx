@@ -189,21 +189,6 @@ export default function Settings() {
             </Card>
           </section>
 
-          {/* Preferences */}
-          <section>
-            <SectionLabel>Preferences</SectionLabel>
-            <Card>
-              <SelectField label="Default Niche"    value={prefNiche}    onChange={setPrefNiche}    options={NICHES} />
-              <SelectField label="Default Goal"     value={prefGoal}     onChange={setPrefGoal}     options={GOALS} />
-              <SelectField label="Default Language" value={prefLanguage} onChange={setPrefLanguage} options={LANGUAGES} />
-              <button onClick={handleSavePrefs} disabled={prefSaving}
-                className="self-start px-5 py-2 rounded-[8px] text-[14px] font-bold border-0 cursor-pointer transition-all"
-                style={{ background: prefSaved ? "rgba(34,197,94,0.2)" : "#f5c518", color: prefSaved ? "#22c55e" : "#0b0b10", opacity: prefSaving ? 0.7 : 1, fontFamily: "'Outfit',sans-serif" }}>
-                {prefSaving ? "Saving…" : prefSaved ? "✓ Saved" : "Save Preferences"}
-              </button>
-            </Card>
-          </section>
-
           {/* Notifications */}
           <section>
             <SectionLabel>Notifications</SectionLabel>

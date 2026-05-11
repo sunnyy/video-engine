@@ -240,7 +240,7 @@ router.post("/generate-clip", requireAuth, async (req, res) => {
   try {
     const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(req.user.id, 50, "product_ad_clip", "Product Ad — video clip");
+    const deduction = await deductCredits(req.user.id, 60, "product_ad_clip", "Product Ad — video clip");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     const { imageUrl, motionPrompt, durationSeconds = 3 } = req.body;
     if (!imageUrl || !motionPrompt) return res.status(400).json({ error: "imageUrl and motionPrompt required" });
