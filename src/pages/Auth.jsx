@@ -2,7 +2,7 @@ import { signInWithGoogle } from "../services/auth/authService";
 
 export default function Auth() {
   return (
-    <div className="flex h-screen items-center justify-center bg-[#0b0b10]">
+    <div className="flex h-screen items-center justify-center bg-[#0F0E1A]">
       <div className="w-[380px] rounded-[14px] bg-[#13131f] border border-[rgba(255,255,255,0.08)] p-8 shadow-2xl">
 
         <h2 className="mb-1 text-[22px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit', sans-serif" }}>

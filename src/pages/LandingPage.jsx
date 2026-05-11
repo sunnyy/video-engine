@@ -74,7 +74,7 @@ const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   :root {
-    --bg: #0b0b10; --bg2: #0f0f16; --card: #111118; --card2: #13131c;
+    --bg: #0F0E1A; --bg2: #0f0f16; --card: #111118; --card2: #13131c;
     --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.04);
     --yellow: #f5c518; --yellow-dim: rgba(245,197,24,0.10); --yellow-glow: rgba(245,197,24,0.06);
     --text: #f5f5fb; --muted: #c4c4d4; --dim: #9a9aae;
@@ -88,14 +88,14 @@ const CSS = `
   @media (max-width: 768px) { .container { padding: 0 20px; } }
 
   /* NAV */
-  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: rgba(11,11,16,0.92); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border2); height: 60px; }
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: rgba(15,14,26,0.92); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border2); height: 60px; }
   .nav-inner { max-width: var(--container); margin: 0 auto; padding: 0 40px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
   @media (max-width: 768px) { .nav-inner { padding: 0 20px; } }
   .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
   .nav-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .nav-link { font-family: var(--font-body); font-size: 15px; color: var(--muted); text-decoration: none; padding: 7px 14px; border-radius: 6px; transition: color 0.2s; }
   .nav-link:hover { color: var(--text); }
-  .btn-yellow { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0b0b10; background: var(--yellow); border: none; border-radius: 7px; padding: 9px 18px; cursor: pointer; transition: opacity 0.2s; }
+  .btn-yellow { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0F0E1A; background: var(--yellow); border: none; border-radius: 7px; padding: 9px 18px; cursor: pointer; transition: opacity 0.2s; }
   .btn-yellow:hover { opacity: 0.85; }
 
   /* HERO */
@@ -111,7 +111,7 @@ const CSS = `
   .hero-h1 .outline { -webkit-text-stroke: 1.5px rgba(255,255,255,0.18); color: transparent; }
   .hero-sub { font-family: var(--font-body); font-size: 19px; color: var(--muted); line-height: 1.7; max-width: 620px; margin: 0 auto 48px; }
   .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
-  .hero-cta { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0b0b10; background: var(--yellow); border: none; border-radius: 10px; padding: 16px 36px; cursor: pointer; transition: opacity 0.2s; }
+  .hero-cta { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0F0E1A; background: var(--yellow); border: none; border-radius: 10px; padding: 16px 36px; cursor: pointer; transition: opacity 0.2s; }
   .hero-cta:hover { opacity: 0.85; }
   .hero-cta-ghost { font-family: var(--font-body); font-size: 15px; font-weight: 600; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 15px 28px; cursor: pointer; transition: border-color 0.2s; }
   .hero-cta-ghost:hover { border-color: rgba(255,255,255,0.3); }
@@ -262,7 +262,7 @@ const CSS = `
   .plan:hover { border-color: rgba(245,197,24,0.28); transform: translateY(-6px); box-shadow: 0 24px 80px rgba(0,0,0,0.38); }
   .plan:hover::before { opacity: 1; }
   .plan-hot { border-color: rgba(245,197,24,0.45) !important; box-shadow: 0 0 0 1px rgba(245,197,24,0.12) inset; }
-  .plan-hot-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0b0b10; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 5px 18px; border-radius: 100px; white-space: nowrap; z-index: 2; }
+  .plan-hot-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0F0E1A; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 5px 18px; border-radius: 100px; white-space: nowrap; z-index: 2; }
 
   .plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
   .plan-name { font-family: var(--font-body); font-size: 14px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
@@ -284,7 +284,7 @@ const CSS = `
   .plan:hover .plan-btn { transform: translateY(-1px); }
   .plan-btn-default { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
   .plan-btn-default:hover { background: rgba(255,255,255,0.1); }
-  .plan-btn-hot { background: var(--yellow); color: #0b0b10; }
+  .plan-btn-hot { background: var(--yellow); color: #0F0E1A; }
   .plan-btn-hot:hover { opacity: 0.85; }
   @media (max-width: 760px) {
     .pricing-grid { grid-template-columns: 1fr !important; }
@@ -301,7 +301,7 @@ const CSS = `
   .cta-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 70% 50%, rgba(245,197,24,0.06), transparent 60%); pointer-events: none; }
   .cta-banner-title { font-family: var(--font-display); font-size: clamp(36px, 5vw, 56px); color: var(--text); line-height: 0.95; position: relative; z-index: 1; }
   .cta-banner-sub { font-family: var(--font-body); font-size: 16px; color: var(--muted); margin-top: 12px; position: relative; z-index: 1; }
-  .cta-banner-btn { position: relative; z-index: 1; font-family: var(--font-body); font-size: 15px; font-weight: 700; color: var(--yellow); background: #0b0b10; border: none; border-radius: 12px; padding: 18px 40px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity 0.2s; }
+  .cta-banner-btn { position: relative; z-index: 1; font-family: var(--font-body); font-size: 15px; font-weight: 700; color: var(--yellow); background: #0F0E1A; border: none; border-radius: 12px; padding: 18px 40px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity 0.2s; }
   .cta-banner-btn:hover { opacity: 0.85; }
 
   /* FOOTER */
@@ -428,7 +428,7 @@ export default function LandingPage() {
       <nav className="nav">
         <div className="nav-inner">
           <a href="/" className="nav-logo">
-            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 52, width: "auto" }} />
+            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 68, width: "auto" }} />
           </a>
           <div className="nav-right">
             <a href="/about" className="nav-link">
@@ -826,14 +826,14 @@ export default function LandingPage() {
                     fontWeight: 700,
                     fontFamily: "var(--font-body)",
                     background: cycle === c ? "var(--yellow)" : "transparent",
-                    color: cycle === c ? "#0b0b10" : "var(--muted)",
+                    color: cycle === c ? "#0F0E1A" : "var(--muted)",
                     transition: "all 0.15s",
                   }}
                 >
                   {c === "monthly" ? "Monthly" : "Annual"}
                   {c === "annual" && (
                     <span
-                      style={{ fontSize: 11, marginLeft: 5, color: cycle === "annual" ? "#0b0b10" : "var(--yellow)" }}
+                      style={{ fontSize: 11, marginLeft: 5, color: cycle === "annual" ? "#0F0E1A" : "var(--yellow)" }}
                     >
                       Save more
                     </span>
@@ -1053,7 +1053,7 @@ export default function LandingPage() {
         <div className="container">
           <div className="footer-inner">
             <a href="/" className="nav-logo">
-              <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 52, width: "auto" }} />
+              <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 68, width: "auto" }} />
             </a>
             <div className="footer-links">
               <a href="/about" className="footer-link">

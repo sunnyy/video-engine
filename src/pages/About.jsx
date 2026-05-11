@@ -38,7 +38,7 @@ export default function About() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
+    <div className="min-h-screen text-[#e8e8f0]" style={{ background: "#0F0E1A" }}>
 
       {/* Top nav */}
       <nav style={{
@@ -60,7 +60,7 @@ export default function About() {
           <button onClick={() => navigate("/dashboard")}
             style={{
               fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
-              background: "#f5c518", color: "#0b0b10", padding: "7px 16px",
+              background: "#f5c518", color: "#0F0E1A", padding: "7px 16px",
               borderRadius: 7, border: "none", cursor: "pointer", marginLeft: 8,
             }}>
             Open App →
@@ -175,7 +175,7 @@ export default function About() {
           <a href="mailto:hello@vidquence.com" style={{
             display: "inline-block",
             background: "#f5c518",
-            color: "#0b0b10",
+            color: "#0F0E1A",
             fontFamily: "'Outfit', sans-serif",
             fontWeight: 700,
             fontSize: 14,
