@@ -32,6 +32,11 @@ export async function serverFetch(path, options = {}) {
   };
   const res = await fetch(`${SERVER}${path}`, { ...options, headers });
 
+  if (res.status === 401) {
+    window.location.href = "/login";
+    return res;
+  }
+
   if (res.status === 402) {
     const body = await res.clone().json().catch(() => ({}));
     if (body.code === "NO_CREDITS") {

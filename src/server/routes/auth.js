@@ -145,8 +145,13 @@ router.post("/webhooks/user-created", async (req, res) => {
       .eq("email", email)
       .maybeSingle();
 
-    if (!wasDeleted) {
-      await addCredits(id, 50, "bonus", "signup_bonus", "Welcome bonus — free credits");
+    try {
+      if (!wasDeleted) {
+        await addCredits(id, 50, "bonus", "signup_bonus", "Welcome bonus — free credits");
+      }
+    } catch (creditsErr) {
+      console.error("[webhook/user-created] Failed to grant credits:", creditsErr.message);
+      // Admin alert still fires below so the signup can be manually topped up
     }
 
     // Admin alert (fire-and-forget)

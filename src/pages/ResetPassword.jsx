@@ -20,7 +20,12 @@ export default function ResetPassword() {
       await updatePassword(password);
       navigate("/");
     } catch (err) {
-      setError(err.message);
+      const msg = err.message || "";
+      if (msg.toLowerCase().includes("jwt") || msg.toLowerCase().includes("not authenticated") || msg.toLowerCase().includes("session")) {
+        setError("Your reset link has expired. Please request a new password reset.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
