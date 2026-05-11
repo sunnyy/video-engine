@@ -445,7 +445,7 @@ export default function LandingPage() {
     },
     {
       q: "Is there a free trial?",
-      a: "New accounts get 200 free credits — enough to generate several videos, posters, and thumbnails without a credit card. Product Ad Studio requires an active plan. Paid plans start at $15/month with no long-term commitment.",
+      a: "New accounts get 50 free credits — enough to generate several videos, posters, and thumbnails without a credit card. Product Ad Studio requires an active plan. Paid plans start at $15/month with no long-term commitment.",
     },
     {
       q: "What are the plan limits?",
@@ -1087,7 +1087,7 @@ export default function LandingPage() {
               letterSpacing: 1,
             }}
           >
-            200 free credits on signup · No credit card required · Cancel anytime
+            50 free credits on signup · No credit card required · Cancel anytime
           </div>
         </div>
       </section>
