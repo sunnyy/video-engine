@@ -10,6 +10,7 @@ import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
+import { moderateInput } from "../middleware/moderateInput.js";
 
 
 export const router = express.Router();
@@ -37,6 +38,8 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     const { referenceImageUrl, logoUrl, brandColor, headline, subtext, brandName, niche, style, aspectRatio } = req.body;
     if (!niche) return res.status(400).json({ error: "niche required" });
+    const { flagged } = await moderateInput([headline, subtext].filter(Boolean).join(" "));
+    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
     const { getSocialPostPrompt } = await import("../prompts/socialPostAnalysis.js");

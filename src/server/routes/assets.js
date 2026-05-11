@@ -11,6 +11,7 @@ import {
   supabaseAdmin, openai, requireAuth, deductCredits, addCredits,
   upload, uploadMemory, TEMP_DIR, uuidv4,
 } from "../middleware/shared.js";
+import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
 
@@ -20,6 +21,8 @@ router.post("/generate", requireAuth, async (req, res) => {
   let creditAmount = 0;
   try {
     const { prompt, projectId, model: reqModel } = req.body;
+    const { flagged } = await moderateInput(prompt);
+    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
     const deduction = await deductCredits(userId, 25, "base_generation", "Video generation", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     creditAmount = 25;
@@ -711,6 +714,8 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
     const { prompt, aspect_ratio = "1:1", count = 1, type = "image" } = req.body;
     const quality = "standard";
     if (!prompt?.trim()) return res.status(400).json({ error: "prompt required" });
+    const { flagged: imgFlagged } = await moderateInput(prompt);
+    if (imgFlagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
 
     const numImages = Math.min(Math.max(parseInt(count) || 1, 1), 4);

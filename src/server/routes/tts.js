@@ -7,6 +7,7 @@ import {
   supabaseAdmin, openai, requireAuth, deductCredits, addCredits,
   TEMP_DIR,
 } from "../middleware/shared.js";
+import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
 
@@ -31,10 +32,12 @@ router.post("/generate-tts", requireAuth, async (req, res) => {
   let creditAmount = 0;
   try {
     const { script, voice = "female_warm", speed = 1.0, projectId } = req.body;
+    if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
+    const { flagged } = await moderateInput(script);
+    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
     const deduction = await deductCredits(userId, 5, "tts_generation", "TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     creditAmount = 5;
-    if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
 
     const validVoices = ["nova","shimmer","coral","alloy","sage","ash","onyx","echo","fable","verse","marin","cedar"];
     const resolvedVoice = validVoices.includes(voice) ? voice : "nova";
@@ -167,6 +170,8 @@ router.post("/generate-tts-elevenlabs", requireAuth, async (req, res) => {
     const { script, voiceId, language, projectId } = req.body;
     if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
     if (!voiceId)        return res.status(400).json({ error: "No voiceId provided" });
+    const { flagged } = await moderateInput(script);
+    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
 
     const deduction = await deductCredits(userId, 5, "tts_generation", "ElevenLabs TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });

@@ -4,6 +4,7 @@ import {
   supabaseAdmin, requireAuth, deductCredits, addCredits,
   upload, uuidv4,
 } from "../middleware/shared.js";
+import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
 
@@ -39,6 +40,8 @@ router.post("/analyze", requireAuth, async (req, res) => {
     creditAmount = 5;
     const { imageUrl, targetMarket } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
+    const { flagged } = await moderateInput(targetMarket);
+    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
 
     const { getProductAnalysisPrompt } = await import("../prompts/productAdAnalysis.js");
 
