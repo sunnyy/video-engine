@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getSession, onAuthStateChange } from "./services/auth/authService";
-import { posthog } from "./lib/posthog";
+import posthog from "posthog-js";
 import { setInsufficientCreditsHandler } from "./services/serverApi";
 import { initLayoutRegistry } from "./core/registries/layoutRegistry";
 import { useCreditsStore } from "./store/useCreditsStore";
