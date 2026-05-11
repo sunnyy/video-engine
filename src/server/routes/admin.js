@@ -7,7 +7,7 @@ import {
   sendAdminAlert, sendUserEmail,
   adminUserDeletedEmail, adminCreditsTopupEmail,
   adminNewSaleEmail, adminPlanRenewalEmail, adminPlanUpgradeEmail,
-  userAccountDeletedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
+  userPlanUpgradeEmail, userPlanRenewalEmail,
   userCreditsPurchasedEmail, userPlanExpiringEmail, userPlanExpiredEmail,
   openai, TEMP_DIR,
 } from "../middleware/shared.js";
@@ -134,12 +134,6 @@ router.post("/delete-user", requireAuth, requireAdmin, async (req, res) => {
     if (error) throw error;
     const adminEmail = adminUserDeletedEmail({ id: userId, email: deletedUser?.email || "unknown" });
     sendAdminAlert(adminEmail.subject, adminEmail.html);
-    if (deletedUser?.email) {
-      const name = deletedUser.user_metadata?.full_name || deletedUser.user_metadata?.name || "";
-      const { sendUserEmail } = await import("../services/emailService.js");
-      const farewellEmail = userAccountDeletedEmail(name);
-      sendUserEmail(deletedUser.email, farewellEmail.subject, farewellEmail.html);
-    }
     res.json({ success: true });
   } catch (err) {
     console.error("[admin/delete-user]", err.message);

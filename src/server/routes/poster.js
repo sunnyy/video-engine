@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  supabaseAdmin, requireAuth, deductCredits, uuidv4,
+  supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
 
@@ -52,10 +52,13 @@ router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, re
 });
 
 router.post("/generate", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const recordId = uuidv4();
-    const deduction = await deductCredits(req.user.id, 10, "poster_generate", "Poster Studio — poster generation", recordId);
+    const deduction = await deductCredits(userId, 10, "poster_generate", "Poster Studio — poster generation", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 10;
     const { productImageUrl, brandName, headline, tagline, colorMood, language = "English" } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
 
@@ -112,7 +115,8 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (dbErr) console.error("[poster/generate] db insert error:", dbErr.message);
     res.json({ posterUrl: publicUrl });
   } catch (e) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: poster generation failed").catch(() => {});
     console.error("[poster/generate]", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });

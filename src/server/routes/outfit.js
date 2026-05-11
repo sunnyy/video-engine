@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  supabaseAdmin, requireAuth, deductCredits, uuidv4,
+  supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
 
@@ -25,10 +25,13 @@ router.get("/models", requireAuth, async (_req, res) => {
 });
 
 router.post("/generate", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const recordId = uuidv4();
-    const deduction = await deductCredits(req.user.id, 15, "outfit_tryon", "Outfit Studio — virtual try-on", recordId);
+    const deduction = await deductCredits(userId, 15, "outfit_tryon", "Outfit Studio — virtual try-on", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 15;
 
     const { garmentUrl, modelUrl, hasMannequin, useMyPhoto } = req.body;
     if (!garmentUrl || !modelUrl) return res.status(400).json({ error: "garmentUrl and modelUrl required" });
@@ -68,8 +71,9 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     res.json({ resultUrl: publicUrl });
   } catch (e) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: virtual try-on failed").catch(() => {});
     console.error("[outfit/generate]", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 

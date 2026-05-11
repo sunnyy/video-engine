@@ -8,7 +8,7 @@ import multer from "multer";
 import compressVideo from "../compressVideo.cjs";
 import compressAudio from "../compressAudio.cjs";
 import {
-  supabaseAdmin, openai, requireAuth, deductCredits,
+  supabaseAdmin, openai, requireAuth, deductCredits, addCredits,
   upload, uploadMemory, TEMP_DIR, uuidv4,
 } from "../middleware/shared.js";
 
@@ -16,10 +16,13 @@ export const router = express.Router();
 
 /* ---------------- AI ROUTE ---------------- */
 router.post("/generate", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const { prompt, projectId, model: reqModel } = req.body;
-    const deduction = await deductCredits(req.user.id, 25, "base_generation", "Video generation", projectId);
+    const deduction = await deductCredits(userId, 25, "base_generation", "Video generation", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 25;
     const completion = await openai.chat.completions.create({
       model: reqModel || "gpt-4o",
       messages: [
@@ -36,8 +39,9 @@ router.post("/generate", requireAuth, async (req, res) => {
     const parsed = JSON.parse(cleaned);
     res.json(parsed);
   } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: video generation failed").catch(() => {});
     console.error("[generate]", err.message);
-    res.status(500).json({ error: "AI generation failed" });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 
@@ -217,10 +221,13 @@ router.get("/test-search", async (req, res) => {
 
 /* ---------------- FAL.AI IMAGE GENERATION ---------------- */
 router.post("/generate-image", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const { prompt, orientation, projectId } = req.body;
-    const deduction = await deductCredits(req.user.id, 2, "ai_image", "AI image generation", projectId);
+    const deduction = await deductCredits(userId, 2, "ai_image", "AI image generation", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 2;
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
 
     const imageSize = orientation === "9:16" ? "portrait_16_9" : "landscape_16_9";
@@ -254,15 +261,13 @@ router.post("/generate-image", requireAuth, async (req, res) => {
       }
     }
 
-    if (!url) {
-      console.error("[fal.ai] Failed:", lastErr);
-      return res.status(500).json({ error: "Fal.ai request failed" });
-    }
+    if (!url) throw new Error(`Fal.ai request failed: ${lastErr}`);
 
     res.json({ url });
   } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: AI image generation failed").catch(() => {});
     console.error("[fal.ai]", err);
-    res.status(500).json({ error: "Image generation failed" });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 
@@ -398,11 +403,14 @@ router.post("/compress-audio", requireAuth, upload.single("audio"), async (req, 
 
 /* ── Talking Head: Transcription via Fal.ai Whisper ── */
 router.post("/transcribe", requireAuth, upload.single("video"), async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     if (!req.file) return res.status(400).json({ error: "No video file uploaded" });
 
-    const deduction = await deductCredits(req.user.id, 3, "transcription", "Video transcription (Whisper)", null);
+    const deduction = await deductCredits(userId, 3, "transcription", "Video transcription (Whisper)", null);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 3;
 
     // Extract audio only — Whisper only needs audio, not the full video.
     // A 65 MB video becomes ~3–5 MB mp3, well within OpenAI Whisper's 25 MB limit.
@@ -441,8 +449,9 @@ router.post("/transcribe", requireAuth, upload.single("video"), async (req, res)
 
     res.json({ transcript, segments });
   } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: transcription failed").catch(() => {});
     console.error("[transcribe]", err.message);
-    res.status(500).json({ error: err.message || "Transcription failed" });
+    res.status(500).json({ error: "Transcription failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 
@@ -463,6 +472,8 @@ function getFileDuration(filePath) {
 }
 
 router.post("/transcription/transcribe", requireAuth, uploadTranscription.single("file"), async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   const tempFiles = [];
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -476,8 +487,9 @@ router.post("/transcription/transcribe", requireAuth, uploadTranscription.single
     }
 
     const creditsUsed = Math.max(2, Math.ceil(durationSeconds / 60) * 2);
-    const deduction = await deductCredits(req.user.id, creditsUsed, "transcription_service", "Transcription service", null);
+    const deduction = await deductCredits(userId, creditsUsed, "transcription_service", "Transcription service", null);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = creditsUsed;
 
     // Extract audio — Whisper works on audio only, keeps file small
     const audioPath = req.file.path + ".mp3";
@@ -532,8 +544,9 @@ router.post("/transcription/transcribe", requireAuth, uploadTranscription.single
       credits_used:     creditsUsed,
     });
   } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: transcription failed").catch(() => {});
     console.error("[transcription]", err.message);
-    res.status(500).json({ error: err.message || "Transcription failed" });
+    res.status(500).json({ error: "Transcription failed. Your credits have been refunded.", code: "AI_FAILURE" });
   } finally {
     tempFiles.forEach(f => { try { fs.unlinkSync(f); } catch {} });
   }
@@ -692,6 +705,8 @@ router.post("/image-generation/enhance-prompt", requireAuth, async (req, res) =>
 // Body: { prompt, style, aspect_ratio, quality, count }
 // Generates images via Fal.ai, uploads to Supabase, saves to generated_images table
 router.post("/image-generation/generate", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const { prompt, aspect_ratio = "1:1", count = 1, type = "image" } = req.body;
     const quality = "standard";
@@ -704,13 +719,14 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
     const totalCredits = numImages * creditsPerImage;
 
     const creditResult = await deductCredits(
-      req.user.id,
+      userId,
       totalCredits,
       "image_generation",
       `Image generation: "${prompt.slice(0, 60)}" × ${numImages}`,
       null
     );
     if (!creditResult.success) return res.status(402).json({ error: creditResult.error, code: "NO_CREDITS" });
+    creditAmount = totalCredits;
 
     // Build fal.ai size from aspect_ratio
     const SIZES = {
@@ -764,12 +780,12 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
     if (!falRes.ok) {
       const errText = await falRes.text();
       console.error("[image-gen] fal.ai error:", errText.slice(0, 200));
-      return res.status(500).json({ error: "Image generation failed", detail: errText.slice(0, 120) });
+      throw new Error(`Image generation failed: ${errText.slice(0, 120)}`);
     }
 
     const falData = await falRes.json();
     const falImages = falData?.images || [];
-    if (!falImages.length) return res.status(500).json({ error: "No images returned from fal.ai" });
+    if (!falImages.length) throw new Error("No images returned from fal.ai");
 
     // Upload each image to Supabase storage and save record
     const results = [];
@@ -815,8 +831,9 @@ router.post("/image-generation/generate", requireAuth, async (req, res) => {
 
     res.json({ images: results, creditsUsed: totalCredits, balance: creditResult.balance });
   } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: image generation failed").catch(() => {});
     console.error("[image-generation/generate]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 

@@ -78,6 +78,7 @@ export default function Settings() {
   const { fetchCredits } = useCreditsStore();
 
   const [user, setUser] = useState(null);
+  const [subscription, setSubscription] = useState(undefined); // undefined = loading
 
   const [prefNiche,    setPrefNiche]    = useState("");
   const [prefGoal,     setPrefGoal]     = useState("");
@@ -109,6 +110,9 @@ export default function Settings() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
     fetchCredits();
+    serverFetch("/api/payments/subscription").then(r => r.json())
+      .then(d => setSubscription(d.subscription || null))
+      .catch(() => setSubscription(null));
     serverFetch("/api/user/profile").then(r => r.json()).then(d => {
       if (d.niche)            setPrefNiche(Array.isArray(d.niche) ? d.niche[0] || "" : d.niche);
       if (d.goal)             setPrefGoal(d.goal);
@@ -185,6 +189,44 @@ export default function Settings() {
                     <span className="text-[11px]" style={{ color: "#606078", fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1 }}>SIGNED IN VIA GOOGLE</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Membership */}
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 20 }}>
+                <div className="text-[11px] font-bold uppercase tracking-[2px] mb-3" style={{ color: "#8888a8", fontFamily: "'JetBrains Mono',monospace" }}>Membership</div>
+                {subscription === undefined ? (
+                  <div className="text-[13px]" style={{ color: "#55556a" }}>Loading…</div>
+                ) : subscription ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="px-3 py-1 rounded-full text-[12px] font-bold" style={{ background: "rgba(245,197,24,0.12)", color: "#f5c518", fontFamily: "'JetBrains Mono',monospace" }}>
+                        {subscription.plans?.name || "Plan"}
+                      </span>
+                      <span className="text-[12px]" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
+                        {subscription.billing_cycle === "annual" ? "Annual" : "Monthly"} · {subscription.plans?.credits?.toLocaleString() || "—"} credits/month
+                      </span>
+                    </div>
+                    {subscription.current_period_end && (
+                      <div className="text-[12px]" style={{ color: "#55556a", fontFamily: "'Outfit',sans-serif" }}>
+                        Renews {new Date(subscription.current_period_end).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </div>
+                    )}
+                    <button onClick={() => navigate("/checkout?plan=" + (subscription.plans?.slug || ""))}
+                      className="self-start px-3 py-1.5 rounded-[7px] text-[12px] font-semibold border transition-all cursor-pointer mt-1"
+                      style={{ background: "transparent", borderColor: "rgba(245,197,24,0.3)", color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
+                      Upgrade Plan →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="text-[13px]" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>No active plan — you're on free credits.</div>
+                    <button onClick={() => navigate("/#pricing")}
+                      className="self-start px-3 py-1.5 rounded-[7px] text-[12px] font-semibold border transition-all cursor-pointer"
+                      style={{ background: "rgba(245,197,24,0.08)", borderColor: "rgba(245,197,24,0.3)", color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
+                      View Plans →
+                    </button>
+                  </div>
+                )}
               </div>
             </Card>
           </section>

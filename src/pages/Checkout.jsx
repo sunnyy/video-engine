@@ -11,6 +11,50 @@ import { useCreditsStore } from "../store/useCreditsStore";
 
 const FALLBACK_RATE = 92.60;
 
+const PLAN_FEATURES = {
+  starter: [
+    "1,800 Credits/month",
+    "Product Ad Studio",
+    "TTS Voiceover",
+    "AI Image Generator",
+    "Product Poster",
+    "Video Captions",
+    "AI Video Generator",
+    "Typography Videos",
+  ],
+  pro: [
+    "3,500 Credits/month",
+    "Product Ad Studio",
+    "TTS Voiceover",
+    "AI Image Generator",
+    "Product Poster",
+    "Video Captions",
+    "AI Video Generator",
+    "Typography Videos",
+    "Explainer Videos",
+    "Banner & Thumbnail Generator",
+    "Virtual Try-On",
+    "Speech to Text",
+  ],
+  agency: [
+    "6,000 Credits/month",
+    "Product Ad Studio",
+    "TTS Voiceover",
+    "AI Image Generator",
+    "Product Poster",
+    "Video Captions",
+    "AI Video Generator",
+    "Typography Videos",
+    "Explainer Videos",
+    "Banner & Thumbnail Generator",
+    "Virtual Try-On",
+    "Speech to Text",
+    "Product Video Ads",
+    "Social Media Post Generator",
+    "Best credit value per dollar",
+  ],
+};
+
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;
   return +(base * (1 - discountPct / 100)).toFixed(2);
@@ -35,7 +79,7 @@ export default function Checkout() {
   const slug            = params.get("plan") || "";
   const [cycle, setCycle] = useState(params.get("cycle") === "annual" ? "annual" : "monthly");
 
-  const { fetchCredits } = useCreditsStore();
+  const { refetchCredits } = useCreditsStore();
 
   const [plan,    setPlan]    = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,7 +142,7 @@ export default function Checkout() {
   const finalINR     = toINR(finalUSD, rate);
   const originalINR  = toINR(baseUSD, rate);
   const saved        = cycle === "annual" && plan.discount_percent > 0;
-  const features     = Array.isArray(plan.features) ? plan.features : [];
+  const features     = PLAN_FEATURES[plan.slug] || (Array.isArray(plan.features) ? plan.features : []);
   const cycleLabel   = cycle === "annual" ? "year" : "month";
 
   async function handlePay() {
@@ -160,7 +204,7 @@ export default function Checkout() {
                 return;
               }
               const data = await verifyRes.json();
-              fetchCredits();
+              refetchCredits();
               resolve(data);
             } catch (e) {
               reject(e);

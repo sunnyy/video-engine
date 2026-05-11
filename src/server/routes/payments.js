@@ -89,8 +89,10 @@ router.post("/payments/create-order", requireAuth, async (req, res) => {
       : await getUSDtoINR();
 
     const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
-    const discounted = plan.discount_percent > 0 ? baseUSD * (1 - plan.discount_percent / 100) : baseUSD;
-    const amountPaise = Math.round(discounted * rate * 100);
+    const discounted = (billingCycle === "annual" && plan.discount_percent > 0)
+      ? baseUSD * (1 - plan.discount_percent / 100)
+      : baseUSD;
+    const amountPaise = Math.round(discounted * rate) * 100;
 
     const razorpay = getRazorpay();
     const order = await razorpay.orders.create({
@@ -156,7 +158,9 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
     if (error || !plan) return res.status(404).json({ error: "Plan not found" });
 
     const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
-    const discounted = plan.discount_percent > 0 ? baseUSD * (1 - plan.discount_percent / 100) : baseUSD;
+    const discounted = (billingCycle === "annual" && plan.discount_percent > 0)
+      ? baseUSD * (1 - plan.discount_percent / 100)
+      : baseUSD;
     const rate       = await getUSDtoINR();
     const amountINR  = +(discounted * rate).toFixed(2);
 
@@ -290,7 +294,7 @@ router.post("/credits/topup/create-order", requireAuth, async (req, res) => {
     const rate = (typeof clientRate === "number" && clientRate >= 50 && clientRate <= 150)
       ? clientRate : await getUSDtoINR();
 
-    const amountPaise = Math.round(pkg.priceUSD * rate * 100);
+    const amountPaise = Math.round(pkg.priceUSD * rate) * 100;
 
     const razorpay = getRazorpay();
     const order = await razorpay.orders.create({

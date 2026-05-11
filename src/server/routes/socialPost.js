@@ -7,7 +7,7 @@ const BLANK_URLS = {
 };
 
 import {
-  supabaseAdmin, requireAuth, deductCredits, uuidv4,
+  supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
 
@@ -27,10 +27,13 @@ router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, re
 });
 
 router.post("/generate", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const recordId = uuidv4();
-    const deduction = await deductCredits(req.user.id, 15, "social_post", "Social Media Post Generator", recordId);
+    const deduction = await deductCredits(userId, 15, "social_post", "Social Media Post Generator", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 15;
 
     const { referenceImageUrl, logoUrl, brandColor, headline, subtext, brandName, niche, style, aspectRatio } = req.body;
     if (!niche) return res.status(400).json({ error: "niche required" });
@@ -111,8 +114,9 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     res.json({ postUrl: publicUrl });
   } catch (e) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: social post generation failed").catch(() => {});
     console.error("[social-post/generate]", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 

@@ -1,7 +1,7 @@
 import express from "express";
 import fs from "fs";
 import {
-  supabaseAdmin, requireAuth, deductCredits,
+  supabaseAdmin, requireAuth, deductCredits, addCredits,
   upload, uuidv4,
 } from "../middleware/shared.js";
 
@@ -29,11 +29,14 @@ router.post("/upload", requireAuth, upload.single("image"), async (req, res) => 
 
 // POST /analyze — GPT-4o Vision analyses product image, returns shot strategy
 router.post("/analyze", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
-    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(req.user.id, 5, "product_ad_analyze", "Product Ad — strategy analysis");
+    const deduction = await deductCredits(userId, 5, "product_ad_analyze", "Product Ad — strategy analysis");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 5;
     const { imageUrl, targetMarket } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
 
@@ -73,8 +76,9 @@ router.post("/analyze", requireAuth, async (req, res) => {
 
     res.json(parsed);
   } catch (e) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: product analysis failed").catch(() => {});
     console.error("[product-ad/analyze]", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 
@@ -82,11 +86,14 @@ router.post("/analyze", requireAuth, async (req, res) => {
 // Clothing: nano-banana try-on [model + product] → model wearing the product
 // Wearable + non_worn: nano-banana [product only] → cleaned studio product photo
 router.post("/generate-base-image", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
-    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(req.user.id, 8, "product_ad_base_image", "Product Ad — base model image");
+    const deduction = await deductCredits(userId, 8, "product_ad_base_image", "Product Ad — base model image");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 8;
     const { productImageUrl, modelImageUrl, category, hasMannequin, hasWatermark } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
@@ -154,8 +161,9 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
     res.json({ imageUrl: publicUrl });
   } catch (e) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: base image generation failed").catch(() => {});
     console.error("[product-ad/generate-base-image]", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 
@@ -165,11 +173,14 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
 //   wearable         → nano-banana with product reference for ALL shots (worn shots described in text prompt)
 //   non_worn         → nano-banana with product reference for ALL shots
 router.post("/generate-images", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
-    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(req.user.id, 40, "product_ad_scenes", "Product Ad — scene images");
+    const deduction = await deductCredits(userId, 40, "product_ad_scenes", "Product Ad — scene images");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 40;
     const { shots, referenceImageUrl, category, modelImageUrl } = req.body;
     if (!shots?.length || !referenceImageUrl) return res.status(400).json({ error: "shots and referenceImageUrl required" });
 
@@ -230,18 +241,22 @@ router.post("/generate-images", requireAuth, async (req, res) => {
 
     res.json({ results });
   } catch (e) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: scene generation failed").catch(() => {});
     console.error("[product-ad/generate-images]", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 
 // POST /generate-clip — Image-to-video via Fal.ai LTX-Video 13B Distilled
 router.post("/generate-clip", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
-    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
+    const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(req.user.id, 60, "product_ad_clip", "Product Ad — video clip");
+    const deduction = await deductCredits(userId, 60, "product_ad_clip", "Product Ad — video clip");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 60;
     const { imageUrl, motionPrompt, durationSeconds = 3 } = req.body;
     if (!imageUrl || !motionPrompt) return res.status(400).json({ error: "imageUrl and motionPrompt required" });
 
@@ -263,8 +278,9 @@ router.post("/generate-clip", requireAuth, async (req, res) => {
     if (!videoUrl) throw new Error(`No video URL in response: ${rawText.slice(0, 200)}`);
     res.json({ videoUrl });
   } catch (e) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: video clip generation failed").catch(() => {});
     console.error("[product-ad/generate-clip]", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 

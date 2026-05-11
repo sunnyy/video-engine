@@ -4,7 +4,7 @@ import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import {
-  supabaseAdmin, openai, requireAuth, deductCredits,
+  supabaseAdmin, openai, requireAuth, deductCredits, addCredits,
   TEMP_DIR,
 } from "../middleware/shared.js";
 
@@ -27,10 +27,13 @@ function normalizeTTS(inputPath, outputPath) {
 }
 
 router.post("/generate-tts", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const { script, voice = "female_warm", speed = 1.0, projectId } = req.body;
-    const deduction = await deductCredits(req.user.id, 5, "tts_generation", "TTS voiceover", projectId);
+    const deduction = await deductCredits(userId, 5, "tts_generation", "TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 5;
     if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
 
     const validVoices = ["nova","shimmer","coral","alloy","sage","ash","onyx","echo","fable","verse","marin","cedar"];
@@ -79,8 +82,9 @@ router.post("/generate-tts", requireAuth, async (req, res) => {
       res.json({ url });
     }
   } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: TTS generation failed").catch(() => {});
     console.error("[TTS] Error:", err?.message || err);
-    res.status(500).json({ error: err?.message || "TTS generation failed" });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 
@@ -157,13 +161,16 @@ router.get("/tts/history", requireAuth, async (req, res) => {
 });
 
 router.post("/generate-tts-elevenlabs", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
   try {
     const { script, voiceId, language, projectId } = req.body;
     if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
     if (!voiceId)        return res.status(400).json({ error: "No voiceId provided" });
 
-    const deduction = await deductCredits(req.user.id, 5, "tts_generation", "ElevenLabs TTS voiceover", projectId);
+    const deduction = await deductCredits(userId, 5, "tts_generation", "ElevenLabs TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = 5;
 
     const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method:  "POST",
@@ -199,8 +206,9 @@ router.post("/generate-tts-elevenlabs", requireAuth, async (req, res) => {
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
     res.json({ url: publicUrl });
   } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: ElevenLabs TTS failed").catch(() => {});
     console.error("[ElevenLabs TTS] Error:", err?.message || err);
-    res.status(500).json({ error: err?.message || "ElevenLabs TTS generation failed" });
+    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
   }
 });
 

@@ -950,7 +950,6 @@ export default function LandingPage() {
                       "Video Captions",
                       "AI Video Generator",
                       "Typography Videos",
-                      "Email Support",
                     ],
                     pro: [
                       "3,500 Credits/month",
@@ -965,7 +964,6 @@ export default function LandingPage() {
                       "Banner & Thumbnail Generator",
                       "Virtual Try-On",
                       "Speech to Text",
-                      "Priority Support",
                     ],
                     agency: [
                       "6,000 Credits/month",
@@ -983,7 +981,6 @@ export default function LandingPage() {
                       "Product Video Ads",
                       "Social Media Post Generator",
                       "Best credit value per dollar",
-                      "Dedicated Support",
                     ],
                   };
                   const feats = PLAN_FEATURES[plan.slug] || [];
