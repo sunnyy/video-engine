@@ -113,36 +113,36 @@ export function adminUserDeletedEmail({ id, email, reason = "", reasonDetail = "
   };
 }
 
-export function adminNewSaleEmail({ userEmail, plan, amount, credits }) {
+export function adminNewSaleEmail({ userEmail, plan, amount, credits, currency = "₹" }) {
   return {
-    subject: `New Sale — ${plan} — $${amount}`,
+    subject: `New Sale — ${plan} — ${currency}${amount}`,
     html: adminWrap(`
       <h2 style="margin:0 0 8px;font-size:18px;color:#16a34a">New Plan Purchase 💰</h2>
       <table style="width:100%;border-collapse:collapse;margin-top:12px">
         ${row("User", userEmail)}
         ${row("Plan", plan)}
-        ${row("Amount", `$${amount}`)}
+        ${row("Amount", `${currency}${amount}`)}
         ${row("Credits", credits)}
       </table>
     `),
   };
 }
 
-export function adminPlanRenewalEmail({ userEmail, plan, amount }) {
+export function adminPlanRenewalEmail({ userEmail, plan, amount, currency = "₹" }) {
   return {
-    subject: `Plan Renewal — ${plan} — $${amount}`,
+    subject: `Plan Renewal — ${plan} — ${currency}${amount}`,
     html: adminWrap(`
       <h2 style="margin:0 0 8px;font-size:18px;color:#2563eb">Plan Renewed 🔁</h2>
       <table style="width:100%;border-collapse:collapse;margin-top:12px">
         ${row("User", userEmail)}
         ${row("Plan", plan)}
-        ${row("Amount", `$${amount}`)}
+        ${row("Amount", `${currency}${amount}`)}
       </table>
     `),
   };
 }
 
-export function adminPlanUpgradeEmail({ userEmail, fromPlan, toPlan, amount }) {
+export function adminPlanUpgradeEmail({ userEmail, fromPlan, toPlan, amount, currency = "₹" }) {
   return {
     subject: `Plan Upgrade — ${fromPlan} → ${toPlan}`,
     html: adminWrap(`
@@ -151,7 +151,7 @@ export function adminPlanUpgradeEmail({ userEmail, fromPlan, toPlan, amount }) {
         ${row("User", userEmail)}
         ${row("From", fromPlan)}
         ${row("To", toPlan)}
-        ${row("Amount", `$${amount}`)}
+        ${row("Amount", `${currency}${amount}`)}
       </table>
     `),
   };
