@@ -317,6 +317,8 @@ const CSS = `
 
 export default function LandingPage() {
   useReveal();
+  const SHOW_SAMPLES = false; // flip to true when showcase-ready samples are loaded
+
   const navigate = useNavigate();
   const location = useLocation();
   const [session, setSession] = useState(null);
@@ -669,6 +671,7 @@ export default function LandingPage() {
                   </div>
                   <div className="service-desc">{svc.desc}</div>
                 </div>
+                {SHOW_SAMPLES && (
                 <div className="service-card" style={{ background: svc.bg }}>
                   {/* Sample placeholder — replace with actual sample images/videos */}
                   <div className="service-samples-row">
@@ -695,6 +698,7 @@ export default function LandingPage() {
                     ))}
                   </div>
                 </div>
+                )}
               </div>
             )})}
           </div>
