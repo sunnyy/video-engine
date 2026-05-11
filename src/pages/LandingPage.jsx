@@ -295,6 +295,22 @@ const CSS = `
   .faq-section { padding: 90px 0; background: var(--bg2); border-top: 1px solid var(--border2); }
   .faq-inner { max-width: 720px; margin: 0 auto; }
 
+  /* SERVICES — show/hide by breakpoint */
+  .services-desktop { display: block; }
+  .services-mobile  { display: none; }
+  @media (max-width: 768px) {
+    .services-desktop { display: none; }
+    .services-mobile  { display: block; }
+  }
+
+  /* MOBILE SERVICE CARDS */
+  .m-svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+  .m-svc-card { position: relative; border-radius: 16px; padding: 20px 16px 16px; display: flex; flex-direction: column; justify-content: flex-end; min-height: 150px; overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.07); background: #13131e; transition: border-color 0.2s, transform 0.2s; }
+  .m-svc-card:active { transform: scale(0.97); }
+  .m-svc-card-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.75) 100%); pointer-events: none; }
+  .m-svc-card-name { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: #e8e8f0; text-transform: uppercase; line-height: 1.2; position: relative; z-index: 1; }
+  .m-svc-card-desc { font-family: 'Outfit', sans-serif; font-size: 11px; color: rgba(232,232,240,0.75); margin-top: 4px; line-height: 1.35; position: relative; z-index: 1; }
+
   /* CTA */
   .cta-banner-section { padding: 40px 0 80px; }
   .cta-banner { background: linear-gradient(135deg, #14140e 0%, #1a1a10 100%); border: 1px solid rgba(245,197,24,0.2); border-radius: 20px; padding: 60px 64px; display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; position: relative; overflow: hidden; }
@@ -379,15 +395,15 @@ export default function LandingPage() {
   const faqs = [
     {
       q: "How is Vidquence different from other AI video tools?",
-      a: "Most tools give you plain text over stock footage. Vidquence is a full AI production studio — every beat of your video gets its own layout, visual design, pacing, and narrative intent. Beyond auto-generated videos, you get a complete creative suite: Product Ad Studio for AI video ads from a single product photo, Poster Studio, Thumbnail Generator, Voice Studio, and Transcription — all in one platform.",
+      a: "Most tools give you plain text over stock footage. Vidquence is a full AI production studio — every beat of your video gets its own layout, visual design, pacing, and narrative intent. Beyond auto-generated videos, you get a complete creative suite: Product Video Ads, Poster Studio, Thumbnail Generator, Banner Design, Voice Studio, Virtual Try-On, and more — all in one platform.",
     },
     {
       q: "What are credits and how are they used?",
-      a: "Credits power every AI action on the platform. A complete auto-generated short-form video costs around 39 credits (script, images, voiceover, and export). A full Product Ad campaign with 5 cinematic scenes and video clips costs around 303 credits. Simpler actions like generating a poster or thumbnail cost 10 credits each. Your plan renews credits monthly — unused credits carry over.",
+      a: "Credits power every AI action on the platform — video generation, product ads, posters, thumbnails, voiceovers, and more. Each action has a listed credit cost. Check the Credits page for current costs on each service.",
     },
     {
       q: "What services are included?",
-      a: "Vidquence includes: AI Video Generator (faceless and talking head modes), Product Ad Studio (photo → full video ad), Poster Studio, Thumbnail Generator, Outfit Studio (virtual try-on), Social Post Generator, Voice Studio (TTS voiceovers), Speech to Text, and Caption Studio. All services in one dashboard.",
+      a: "Vidquence includes: AI Video Generator (faceless and talking head modes), Product Video Ads (photo → full video ad), Poster Studio, Thumbnail Generator, Virtual Try-On, Banner Design, Voice Studio (TTS voiceovers), Speech to Text, and Caption Studio. All services in one dashboard.",
     },
     {
       q: "What niches and languages are supported?",
@@ -402,16 +418,16 @@ export default function LandingPage() {
       a: "Fully. Every element of every beat is editable — change text, swap visuals, adjust timing, change transitions, add overlays, update captions, swap background music, and add sound effects. The AI produces a production-ready starting point. You have complete control from there.",
     },
     {
-      q: "Does Product Ad Studio work for any product?",
+      q: "Does Product Video Ads work for any product?",
       a: "Yes — clothing, fashion, wearables (watches, earphones, shoes), beauty products, food, gadgets, and more. For clothing, the system uses AI model avatars to show the product being worn. For other products, it generates cinematic product photography shots. Upload one product photo and get a full video ad with multiple scenes, transitions, and background music.",
     },
     {
       q: "Is there a free trial?",
-      a: "New accounts get 50 free credits — enough to generate several videos, posters, and thumbnails without a credit card. Product Ad Studio requires an active plan. Paid plans start at $15/month with no long-term commitment.",
+      a: "New accounts get 50 free credits — enough to try several services without a credit card. Product Video Ads requires an active plan. Paid plans start at ₹999/month with no long-term commitment.",
     },
     {
       q: "What are the plan limits?",
-      a: "Starter ($15/mo) includes 1,800 credits — roughly 46 full videos or 5 Product Ad campaigns per month. Pro ($29/mo) includes 3,500 credits. Agency ($50/mo) includes 6,000 credits. All plans include every service on the platform.",
+      a: "Starter includes 1,800 credits per month. Pro includes 3,500 credits. Agency includes 6,000 credits. All plans include every service on the platform. Check the pricing section for current plan rates.",
     },
     {
       q: "Can I cancel anytime?",
@@ -515,6 +531,8 @@ export default function LandingPage() {
         <div className="container">
           <div className="section-label">The Full Suite</div>
 
+          {/* ── Desktop bento grid ── */}
+          <div className="services-desktop">
           {(() => {
             const CARDS = [
               { emoji: "🎬", name: "AI Video Generator",    desc: "Script to viral video in minutes",       route: "/new",            accent: "#7c5cfc", col: "span 3", image: "/assets/images/services/AIVideoGenerator.png"    },
@@ -560,10 +578,10 @@ export default function LandingPage() {
                 }}>
                   <div style={{ fontSize: 11, letterSpacing: 2, color: "#f5c518", fontFamily: "var(--font-mono)", textTransform: "uppercase", marginBottom: 16 }}>The Full Suite</div>
                   <h2 style={{ margin: 0, fontSize: "clamp(44px, 5.6vw, 68px)", fontWeight: 800, color: "#e8e8f0", lineHeight: 1.15, letterSpacing: "-0.5px", textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
-                    9 Tools.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>One Dashboard.</span>
+                    Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
                   </h2>
                   <p style={{ margin: "14px 0 0", fontSize: 18, color: "#e8e8f0", lineHeight: 1.6, maxWidth: 340 }}>
-                    Pick a tool. Create in minutes.
+                    Every creative tool your brand needs — in one place.
                   </p>
                 </div>
 
@@ -579,7 +597,7 @@ export default function LandingPage() {
                   >
                     {/* Dark overlay for text readability over background image */}
                     {svc.image && (
-                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.72) 100%)", pointerEvents: "none" }} />
+                      <div style={{ position: "absolute", inset: "-1px", background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.72) 100%)", pointerEvents: "none" }} />
                     )}
                     {/* Accent glow */}
                     {!svc.image && (
@@ -620,6 +638,40 @@ export default function LandingPage() {
               </div>
             );
           })()}
+          </div>{/* end services-desktop */}
+
+          {/* ── Mobile service list ── */}
+          <div className="services-mobile">
+            <div style={{ marginBottom: 28 }}>
+              <h2 style={{ margin: 0, fontSize: 38, fontWeight: 800, color: "#e8e8f0", lineHeight: 1.1, textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
+                Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
+              </h2>
+              <p style={{ margin: "10px 0 0", fontSize: 15, color: "#e8e8f0", lineHeight: 1.5 }}>Every creative tool your brand needs — in one place.</p>
+            </div>
+            <div className="m-svc-grid">
+              {[
+                { emoji: "🎬", name: "AI Video Generator",   desc: "Script to viral video",          route: "/new",            accent: "#7c5cfc", image: "/assets/images/services/AIVideoGenerator.png"   },
+                { emoji: "📦", name: "Product Video Ads",    desc: "One photo → cinematic ad",       route: "/product-ads",    accent: "#f97316", image: "/assets/images/services/ProductVideoAds.png"    },
+                { emoji: "👗", name: "Virtual Try-On",       desc: "AI model, your product",         route: "/virtual-tryon",  accent: "#ec4899", image: "/assets/images/services/VirtualTryOn.png"       },
+                { emoji: "🎨", name: "Banner Design",        desc: "Social banners in seconds",      route: "/banner-design",  accent: "#f5c518", image: "/assets/images/services/BannerDesign.png"       },
+                { emoji: "🖼️", name: "Thumbnails",          desc: "Click-worthy AI thumbnails",     route: "/thumbnail",      accent: "#ef4444", image: "/assets/images/services/ThumbnailGenerator.png" },
+                { emoji: "🎨", name: "Poster Studio",        desc: "Luxury product posters",         route: "/product-poster", accent: "#d946ef", image: "/assets/images/services/PosterStudio.png"       },
+                { emoji: "💬", name: "Caption Studio",       desc: "Auto-captions with style",       route: "/video-captions", accent: "#22c55e", image: "/assets/images/services/CaptionStudio.png"      },
+                { emoji: "🎙️", name: "Voice Studio",        desc: "AI voiceovers, multilingual",    route: "/voiceover",      accent: "#3b82f6", image: "/assets/images/services/VoiceStudio.png"        },
+                { emoji: "🔤", name: "Speech to Text",       desc: "Accurate transcription",         route: "/speech-to-text", accent: "#8b5cf6", image: "/assets/images/services/SpeechtoText.png"       },
+              ].map(svc => (
+                <div key={svc.name} className="m-svc-card"
+                  style={{ background: svc.image ? `url(${svc.image}) center/cover no-repeat` : "#13131e", borderColor: svc.accent + "33" }}
+                  onClick={() => navigate(svc.route)}
+                >
+                  {svc.image && <div className="m-svc-card-overlay" />}
+                  <div className="m-svc-card-name" style={{ color: "#e8e8f0" }}>{svc.name}</div>
+                  <div className="m-svc-card-desc">{svc.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </section>
 

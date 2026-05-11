@@ -1,251 +1,1275 @@
 {
-  "id": "ad79df18-66a5-4092-8d8e-02d734ff32ae",
+  "id": "c5729261-f662-4493-a6f8-3fbb785a2ca7",
   "dna": null,
   "meta": {
     "fps": 25,
     "mode": "faceless",
+    "name": "The 5 minute story of the Titanic",
+    "tone": "bold",
+    "brand": {},
     "width": 1080,
     "height": 1920,
-    "orientation": "9:16"
+    "audience": "general",
+    "language": "english",
+    "video_type": "text_reel",
+    "bg_gradient": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)",
+    "brand_color": null,
+    "orientation": "9:16",
+    "accent_color": "#ffe066"
   },
   "audio": {
+    "tts": {
+      "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/tts/a03471b2-4f83-49d0-8c49-73a57480057c/tts-1778346688975.mp3",
+      "volume": 1
+    },
     "music": {
-      "key": "eliveta_2",
-      "volume": 0.4
+      "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/user-assets/music/dramatic_5.mp3",
+      "volume": 0.1
     }
   },
   "beats": [
     {
-      "id": "ebbd07ac-12ff-4f7b-9a67-071e271f360a",
-      "order": 0,
-      "zones": {
-        "z1": {
-          "type": "asset",
-          "style": {},
-          "content": {
-            "kind": "asset",
-            "asset": {
-              "src": "https://v3b.fal.media/files/b/0a979bf0/Ch5vWwYdeVb43sROfG7GY_video.mp4",
-              "type": "video",
-              "motion": "none",
-              "objectFit": "cover",
-              "exitTransition": "none",
-              "enterTransition": "none"
-            }
-          },
-          "background": {}
-        }
+  "id": "beat_titanic_hook",
+  "spoken": "Hey, ever wondered how the Titanic sank in just 5 minutes?",
+  "duration_sec": 4,
+  "layoutBackground": {
+    "type": "gradient",
+    "value": {
+      "gradientType": "radial",
+      "colors": ["#2b0066", "#12002f", "#050014"]
+    }
+  },
+  "zones": {
+    "z1": {
+      "id": "z1",
+      "role": "headline",
+      "type": "text",
+      "x": 12,
+      "y": 16,
+      "width": 28,
+      "height": 10,
+      "zIndex": 3,
+      "style": {
+        "color": "#ffffff",
+        "fontSize": 190,
+        "fontWeight": 400,
+        "fontFamily": "'Cormorant Garamond', serif",
+        "lineHeight": 0.82,
+        "letterSpacing": "-2px"
       },
-      "energy": 0.8,
-      "intent": "hook",
-      "layout": "blank",
-      "spoken": "",
-      "caption": {
-        "show": false,
-        "text": "",
-        "style": "wordBlaze",
-        "position": 80
+      "content": {
+        "kind": "text",
+        "text": "Hey,"
       },
-      "end_sec": 3,
-      "beatType": null,
-      "overlays": [],
-      "start_sec": 0,
-      "audio_cues": [],
-      "transition": {
-        "type": "dissolve",
-        "duration": 16
-      },
-      "duration_sec": 3,
-      "layoutBackground": {
-        "type": "color",
-        "value": "#000000"
-      }
+      "enterAnimation": "slideLeftIn"
     },
+
+    "z2": {
+      "id": "z2",
+      "role": "shape",
+      "type": "shape",
+      "x": 20,
+      "y": 31,
+      "width": 64,
+      "height": 7,
+      "zIndex": 1,
+      "style": {
+        "backgroundColor": "#8b5cf6",
+        "borderRadius": 2
+      },
+      "enterAnimation": "wipeReveal"
+    },
+
+    "z3": {
+      "id": "z3",
+      "role": "headline",
+      "type": "text",
+      "x": 22,
+      "y": 31.8,
+      "width": 60,
+      "height": 6,
+      "zIndex": 3,
+      "style": {
+        "color": "#090909",
+        "fontSize": 92,
+        "fontWeight": 900,
+        "fontFamily": "'Bebas Neue', sans-serif",
+        "lineHeight": 0.9,
+        "letterSpacing": "1px"
+      },
+      "content": {
+        "kind": "text",
+        "text": "EVER WONDERED"
+      },
+      "enterAnimation": "slideRightIn",
+      "textAnimation": "Pop In"
+    },
+
+    "z4": {
+      "id": "z4",
+      "role": "subtext",
+      "type": "text",
+      "x": 16,
+      "y": 41,
+      "width": 34,
+      "height": 5,
+      "zIndex": 3,
+      "style": {
+        "color": "#ffffff",
+        "fontSize": 74,
+        "fontWeight": 500,
+        "fontFamily": "'DM Sans', sans-serif",
+        "lineHeight": 0.95
+      },
+      "content": {
+        "kind": "text",
+        "text": "how the"
+      },
+      "enterAnimation": "fadeIn"
+    },
+
+    "z5": {
+      "id": "z5",
+      "role": "hero",
+      "type": "text",
+      "x": 13,
+      "y": 44,
+      "width": 78,
+      "height": 16,
+      "zIndex": 4,
+      "style": {
+        "color": "#f3f1ef",
+        "fontSize": 240,
+        "fontWeight": 900,
+        "fontFamily": "'Bebas Neue', sans-serif",
+        "lineHeight": 0.82,
+        "letterSpacing": "-3px"
+      },
+      "content": {
+        "kind": "text",
+        "text": "TITANIC"
+      },
+      "enterAnimation": "slideUpIn",
+      "textAnimation": "Word Reveal"
+    },
+
+    "z6": {
+      "id": "z6",
+      "role": "shape",
+      "type": "shape",
+      "x": 50,
+      "y": 56,
+      "width": 36,
+      "height": 5,
+      "zIndex": 1,
+      "style": {
+        "backgroundColor": "#5f189f",
+        "borderRadius": 0
+      },
+      "enterAnimation": "wipeReveal"
+    },
+
+    "z7": {
+      "id": "z7",
+      "role": "headline",
+      "type": "text",
+      "x": 52,
+      "y": 50,
+      "width": 30,
+      "height": 12,
+      "zIndex": 4,
+      "style": {
+        "color": "#ffffff",
+        "fontSize": 190,
+        "fontStyle": "italic",
+        "fontWeight": 500,
+        "fontFamily": "'Cormorant Garamond', serif",
+        "lineHeight": 0.8,
+        "letterSpacing": "-3px"
+      },
+      "content": {
+        "kind": "text",
+        "text": "sank"
+      },
+      "enterAnimation": "blurIn"
+    },
+
+    "z8": {
+      "id": "z8",
+      "role": "subtext",
+      "type": "text",
+      "x": 15,
+      "y": 68,
+      "width": 20,
+      "height": 5,
+      "zIndex": 3,
+      "style": {
+        "color": "#ffffff",
+        "fontSize": 68,
+        "fontWeight": 400,
+        "fontFamily": "'DM Mono', monospace",
+        "lineHeight": 1
+      },
+      "content": {
+        "kind": "text",
+        "text": "in just"
+      },
+      "enterAnimation": "fadeIn"
+    },
+
+    "z9": {
+      "id": "z9",
+      "role": "hero",
+      "type": "text",
+      "x": 13,
+      "y": 72,
+      "width": 76,
+      "height": 14,
+      "zIndex": 5,
+      "style": {
+        "color": "#ffd84d",
+        "fontSize": 210,
+        "fontStyle": "italic",
+        "fontWeight": 500,
+        "fontFamily": "'Playfair Display', serif",
+        "lineHeight": 0.8,
+        "letterSpacing": "-3px"
+      },
+      "content": {
+        "kind": "text",
+        "text": "5 minutes?"
+      },
+      "enterAnimation": "springScaleIn",
+      "textAnimation": "Word Reveal"
+    }
+  }
+},
     {
-      "id": "7740c1e8-038d-46a9-b4d7-fa8b6a9567ec",
+      "id": "beat_b1130a96_1",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
       "order": 1,
+      "quote": null,
       "zones": {
         "z1": {
+          "x": 62,
+          "y": 18,
+          "id": "z1",
+          "end": null,
+          "role": "support",
+          "type": "text",
+          "start": 0.2,
+          "style": {
+            "color": "#e7e7fd",
+            "fontSize": 56,
+            "textAlign": "right",
+            "fontFamily": "Outfit, sans-serif",
+            "fontWeight": 600,
+            "lineHeight": 1.08,
+            "textEffect": "none"
+          },
+          "width": 28,
+          "height": 9,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Imagine boarding" },
+          "enterAnimation": "fadeIn"
+        },
+        "z2": {
+          "x": 33,
+          "y": 53,
+          "id": "z2",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.4,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 200,
+            "fontStyle": "italic",
+            "textAlign": "right",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-3px"
+          },
+          "width": 59,
+          "height": 25,
+          "zIndex": 6,
+          "content": { "kind": "text", "text": "the world’s biggest,\n'unsinkable' ship" },
+          "enterAnimation": "slideUpIn"
+        },
+        "zs1": {
+          "x": 30,
+          "y": 5,
+          "id": "zs1",
+          "end": null,
+          "role": "sticker",
           "type": "asset",
-          "style": {},
+          "start": 0,
+          "style": { "objectFit": "contain" },
+          "width": 40,
+          "height": 22,
+          "zIndex": 1,
           "content": {
             "kind": "asset",
             "asset": {
-              "src": "https://v3b.fal.media/files/b/0a979bf4/L4OGkF_iJKRlI_1NUi30a_video.mp4",
-              "type": "video",
-              "motion": "none",
-              "objectFit": "cover",
-              "exitTransition": "none",
-              "enterTransition": "none"
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/stickers/realistic_eyeball.png",
+              "type": "image",
+              "objectFit": "contain"
             }
           },
-          "background": {}
+          "enterAnimation": "fadeIn"
         }
       },
-      "energy": 0.8,
-      "intent": "hook",
-      "layout": "blank",
-      "spoken": "",
+      "blocks": [],
+      "energy": 0.87,
+      "intent": "setup",
+      "layout": null,
+      "spoken": "Imagine boarding the world’s biggest, 'unsinkable' ship.",
       "caption": {
         "show": false,
-        "text": "",
+        "text": "Imagine boarding the world’s biggest, 'unsinkable' ship.",
         "style": "wordBlaze",
-        "position": 80
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
       },
-      "end_sec": 6,
-      "beatType": null,
+      "end_sec": 7.1,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
       "overlays": [],
-      "start_sec": 3,
+      "start_sec": 4.3,
+      "asset_hint": null,
       "audio_cues": [],
-      "transition": {
-        "type": "dissolve",
-        "duration": 16
-      },
-      "duration_sec": 3,
-      "layoutBackground": {
-        "type": "color",
-        "value": "#000000"
-      }
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 2.8,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
     },
     {
-      "id": "e4de12bf-55b9-4c73-85cb-a5293eb46ed2",
+      "id": "beat_c919e3f4_2",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
       "order": 2,
+      "quote": null,
       "zones": {
         "z1": {
-          "type": "asset",
-          "style": {},
-          "content": {
-            "kind": "asset",
-            "asset": {
-              "src": "https://v3b.fal.media/files/b/0a979bf7/xOG-0_xayq5pz4v_qX-jQ_video.mp4",
-              "type": "video",
-              "motion": "none",
-              "objectFit": "cover",
-              "exitTransition": "none",
-              "enterTransition": "none"
-            }
+          "x": 7,
+          "y": 52,
+          "id": "z1",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 200,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-2px"
           },
-          "background": {}
+          "width": 55,
+          "height": 15,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Excitement." },
+          "enterAnimation": "slideUpIn"
+        },
+        "z2": {
+          "x": 44,
+          "y": 70,
+          "id": "z2",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 180,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Great Vibes, cursive",
+            "fontWeight": 900,
+            "lineHeight": 0.82,
+            "textEffect": "none",
+            "letterSpacing": "-1px"
+          },
+          "width": 48,
+          "height": 13,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Luxury." },
+          "enterAnimation": "slideUpIn"
         }
       },
-      "energy": 0.8,
-      "intent": "hook",
-      "layout": "blank",
-      "spoken": "",
+      "blocks": [],
+      "energy": 0.93,
+      "intent": "emotion",
+      "layout": null,
+      "spoken": "Excitement. Luxury.",
       "caption": {
         "show": false,
-        "text": "",
+        "text": "Excitement. Luxury.",
         "style": "wordBlaze",
-        "position": 80
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
       },
-      "end_sec": 9,
-      "beatType": null,
+      "end_sec": 8.1,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
       "overlays": [],
-      "start_sec": 6,
+      "start_sec": 7.1,
+      "asset_hint": null,
       "audio_cues": [],
-      "transition": {
-        "type": "dissolve",
-        "duration": 16
-      },
-      "duration_sec": 3,
-      "layoutBackground": {
-        "type": "color",
-        "value": "#000000"
-      }
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 1,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
     },
     {
-      "id": "84910b99-d59a-4a00-9706-35f99ad2fd4a",
+      "id": "beat_950899ea_3",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
       "order": 3,
+      "quote": null,
       "zones": {
         "z1": {
+          "x": 55,
+          "y": 60,
+          "id": "z1",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 200,
+            "fontStyle": "italic",
+            "textAlign": "right",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-3px"
+          },
+          "width": 37,
+          "height": 20,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Then—\niceberg." },
+          "enterAnimation": "slideRightIn"
+        },
+        "zs1": {
+          "x": 30,
+          "y": 5,
+          "id": "zs1",
+          "end": null,
+          "role": "sticker",
           "type": "asset",
-          "style": {},
+          "start": 0,
+          "style": { "objectFit": "contain" },
+          "width": 40,
+          "height": 22,
+          "zIndex": 1,
           "content": {
             "kind": "asset",
             "asset": {
-              "src": "https://v3b.fal.media/files/b/0a979bfb/gio5C8R5hQgkcgAn-GEEm_video.mp4",
-              "type": "video",
-              "motion": "none",
-              "objectFit": "cover",
-              "exitTransition": "none",
-              "enterTransition": "none"
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/stickers/folded_dollar_bill.png",
+              "type": "image",
+              "objectFit": "contain"
             }
           },
-          "background": {}
+          "enterAnimation": "fadeIn"
         }
       },
-      "energy": 0.8,
-      "intent": "hook",
-      "layout": "blank",
-      "spoken": "",
+      "blocks": [],
+      "energy": 0.96,
+      "intent": "drama",
+      "layout": null,
+      "spoken": "Then—iceberg.",
       "caption": {
         "show": false,
-        "text": "",
+        "text": "Then—iceberg.",
         "style": "wordBlaze",
-        "position": 80
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
       },
-      "end_sec": 12,
-      "beatType": null,
+      "end_sec": 9.1,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
       "overlays": [],
-      "start_sec": 9,
+      "start_sec": 8.1,
+      "asset_hint": null,
       "audio_cues": [],
-      "transition": {
-        "type": "dissolve",
-        "duration": 16
-      },
-      "duration_sec": 3,
-      "layoutBackground": {
-        "type": "color",
-        "value": "#000000"
-      }
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 1,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
     },
     {
-      "id": "108993a3-c440-4b6a-b017-7ef5c006f5a6",
+      "id": "beat_e9add47b_4",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
       "order": 4,
+      "quote": null,
       "zones": {
         "z1": {
+          "x": 11,
+          "y": 56,
+          "id": "z1",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 190,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-2px"
+          },
+          "width": 49,
+          "height": 13,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Panic." },
+          "enterAnimation": "slideUpIn"
+        },
+        "z2": {
+          "x": 38,
+          "y": 74,
+          "id": "z2",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 170,
+            "textAlign": "left",
+            "fontFamily": "Bebas Neue, sans-serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none"
+          },
+          "width": 44,
+          "height": 12,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Chaos." },
+          "enterAnimation": "slideUpIn"
+        }
+      },
+      "blocks": [],
+      "energy": 0.95,
+      "intent": "escalation",
+      "layout": null,
+      "spoken": "Panic. Chaos.",
+      "caption": {
+        "show": false,
+        "text": "Panic. Chaos.",
+        "style": "wordBlaze",
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
+      },
+      "end_sec": 10.1,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
+      "overlays": [],
+      "start_sec": 9.1,
+      "asset_hint": null,
+      "audio_cues": [],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 1,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
+    },
+    {
+      "id": "beat_65e48275_5",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
+      "order": 5,
+      "quote": null,
+      "zones": {
+        "z1": {
+          "x": 10,
+          "y": 58,
+          "id": "z1",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 200,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-2px"
+          },
+          "width": 75,
+          "height": 23,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Lifeboats\nnot enough." },
+          "enterAnimation": "slideUpIn"
+        },
+        "zs1": {
+          "x": 30,
+          "y": 5,
+          "id": "zs1",
+          "end": null,
+          "role": "sticker",
           "type": "asset",
-          "style": {},
+          "start": 0,
+          "style": { "objectFit": "contain" },
+          "width": 40,
+          "height": 22,
+          "zIndex": 1,
           "content": {
             "kind": "asset",
             "asset": {
-              "src": "https://v3b.fal.media/files/b/0a979bfe/K6CXX3WIimRtxtVskSnoK_video.mp4",
-              "type": "video",
-              "motion": "none",
-              "objectFit": "cover",
-              "exitTransition": "none",
-              "enterTransition": "none"
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/stickers/hand_holding_small_red_house.jpg",
+              "type": "image",
+              "objectFit": "contain"
             }
           },
-          "background": {}
+          "enterAnimation": "fadeIn"
         }
       },
-      "energy": 0.8,
-      "intent": "hook",
-      "layout": "blank",
-      "spoken": "",
+      "blocks": [],
+      "energy": 0.88,
+      "intent": "reveal",
+      "layout": null,
+      "spoken": "Lifeboats not enough.",
       "caption": {
         "show": false,
-        "text": "",
+        "text": "Lifeboats not enough.",
         "style": "wordBlaze",
-        "position": 80
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
       },
-      "end_sec": 15,
-      "beatType": null,
+      "end_sec": 11.299999999999999,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
       "overlays": [],
-      "start_sec": 12,
+      "start_sec": 10.1,
+      "asset_hint": null,
       "audio_cues": [],
-      "transition": {
-        "type": "fade",
-        "duration": 14
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 1.2,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
+    },
+    {
+      "id": "beat_24b05398_6",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
+      "order": 6,
+      "quote": null,
+      "zones": {
+        "z1": {
+          "x": 10,
+          "y": 44,
+          "id": "z1",
+          "end": null,
+          "role": "support",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#e7e7fd",
+            "fontSize": 54,
+            "textAlign": "left",
+            "fontFamily": "Outfit, sans-serif",
+            "fontWeight": 600,
+            "lineHeight": 1.1,
+            "textEffect": "none"
+          },
+          "width": 54,
+          "height": 7,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Heroes," },
+          "enterAnimation": "fadeIn"
+        },
+        "z2": {
+          "x": 37,
+          "y": 51,
+          "id": "z2",
+          "end": null,
+          "role": "support",
+          "type": "text",
+          "start": 0.5,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 54,
+            "textAlign": "left",
+            "fontFamily": "Outfit, sans-serif",
+            "fontWeight": 600,
+            "lineHeight": 1.1,
+            "textEffect": "none"
+          },
+          "width": 54,
+          "height": 7,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "heartbreak," },
+          "enterAnimation": "fadeIn"
+        },
+        "z3": {
+          "x": 10,
+          "y": 67,
+          "id": "z3",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.75,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 170,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-2px"
+          },
+          "width": 80,
+          "height": 14,
+          "zIndex": 6,
+          "content": { "kind": "text", "text": "history made." },
+          "enterAnimation": "slideUpIn"
+        },
+        "zs1": {
+          "x": 65,
+          "y": 9,
+          "id": "zs1",
+          "end": null,
+          "role": "sticker",
+          "type": "asset",
+          "start": 0,
+          "style": { "objectFit": "contain" },
+          "width": 35,
+          "height": 28,
+          "zIndex": 2,
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/stickers/gold_pocket_watch.png",
+              "type": "image",
+              "objectFit": "contain"
+            }
+          },
+          "enterAnimation": "fadeIn"
+        }
       },
-      "duration_sec": 3,
-      "layoutBackground": {
-        "type": "color",
-        "value": "#000000"
-      }
+      "blocks": [],
+      "energy": 0.91,
+      "intent": "summation",
+      "layout": null,
+      "spoken": "Heroes, heartbreak, history made.",
+      "caption": {
+        "show": false,
+        "text": "Heroes, heartbreak, history made.",
+        "style": "wordBlaze",
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
+      },
+      "end_sec": 12.899999999999999,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
+      "overlays": [],
+      "start_sec": 11.299999999999999,
+      "asset_hint": null,
+      "audio_cues": [],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 1.6,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
+    },
+    {
+      "id": "beat_4750d0a5_7",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
+      "order": 7,
+      "quote": null,
+      "zones": {
+        "z1": {
+          "x": 8,
+          "y": 44,
+          "id": "z1",
+          "end": null,
+          "role": "support",
+          "type": "text",
+          "start": 0,
+          "style": {
+            "color": "#e7e7fd",
+            "fontSize": 54,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Cormorant Garamond, serif",
+            "fontWeight": 600,
+            "lineHeight": 1.1,
+            "textEffect": "none"
+          },
+          "width": 78,
+          "height": 8,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Over 1,500" },
+          "enterAnimation": "fadeIn"
+        },
+        "z2": {
+          "x": 8,
+          "y": 62,
+          "id": "z2",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 200,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.82,
+            "textEffect": "none",
+            "letterSpacing": "-2px"
+          },
+          "width": 85,
+          "height": 22,
+          "zIndex": 6,
+          "content": { "kind": "text", "text": "lives lost\nin a night." },
+          "enterAnimation": "slideUpIn"
+        },
+        "zs1": {
+          "x": 30,
+          "y": 5,
+          "id": "zs1",
+          "end": null,
+          "role": "sticker",
+          "type": "asset",
+          "start": 0,
+          "style": { "objectFit": "contain" },
+          "width": 40,
+          "height": 22,
+          "zIndex": 1,
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/stickers/wooden_hourglass.png",
+              "type": "image",
+              "objectFit": "contain"
+            }
+          },
+          "enterAnimation": "fadeIn"
+        }
+      },
+      "blocks": [],
+      "energy": 0.97,
+      "intent": "impact",
+      "layout": null,
+      "spoken": "Over 1,500 lives lost in a night.",
+      "caption": {
+        "show": false,
+        "text": "Over 1,500 lives lost in a night.",
+        "style": "wordBlaze",
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
+      },
+      "end_sec": 15.7,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
+      "overlays": [],
+      "start_sec": 12.899999999999999,
+      "asset_hint": null,
+      "audio_cues": [],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 2.8,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
+    },
+    {
+      "id": "beat_e75ad583_8",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
+      "order": 8,
+      "quote": null,
+      "zones": {
+        "z1": {
+          "x": 10,
+          "y": 60,
+          "id": "z1",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 200,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Great Vibes, cursive",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-2px"
+          },
+          "width": 82,
+          "height": 22,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Gives you chills," },
+          "enterAnimation": "slideUpIn"
+        },
+        "z2": {
+          "x": 10,
+          "y": 82,
+          "id": "z2",
+          "end": null,
+          "role": "support",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#ffffff",
+            "fontSize": 70,
+            "textAlign": "left",
+            "fontFamily": "Outfit, sans-serif",
+            "fontWeight": 700,
+            "lineHeight": 1.1,
+            "textEffect": "none"
+          },
+          "width": 42,
+          "height": 6,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "right?" },
+          "enterAnimation": "fadeIn"
+        }
+      },
+      "blocks": [],
+      "energy": 0.83,
+      "intent": "emotion",
+      "layout": null,
+      "spoken": "Gives you chills, right?",
+      "caption": {
+        "show": false,
+        "text": "Gives you chills, right?",
+        "style": "wordBlaze",
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
+      },
+      "end_sec": 17.3,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
+      "overlays": [],
+      "start_sec": 15.7,
+      "asset_hint": null,
+      "audio_cues": [],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 1.6,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
+    },
+    {
+      "id": "beat_3bb5f570_9",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
+      "order": 9,
+      "quote": null,
+      "zones": {
+        "z1": {
+          "x": 10,
+          "y": 62,
+          "id": "z1",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 180,
+            "textAlign": "left",
+            "fontFamily": "Bebas Neue, sans-serif",
+            "fontWeight": 900,
+            "lineHeight": 0.82,
+            "textEffect": "none"
+          },
+          "width": 75,
+          "height": 19,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Want more wild stories like this?" },
+          "enterAnimation": "slideUpIn"
+        },
+        "zs1": {
+          "x": 30,
+          "y": 5,
+          "id": "zs1",
+          "end": null,
+          "role": "sticker",
+          "type": "asset",
+          "start": 0,
+          "style": { "objectFit": "contain" },
+          "width": 40,
+          "height": 22,
+          "zIndex": 1,
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/stickers/business_growth_and_productivity.png",
+              "type": "image",
+              "objectFit": "contain"
+            }
+          },
+          "enterAnimation": "fadeIn"
+        }
+      },
+      "blocks": [],
+      "energy": 0.9,
+      "intent": "CTA",
+      "layout": null,
+      "spoken": "Want more wild stories like this?",
+      "caption": {
+        "show": false,
+        "text": "Want more wild stories like this?",
+        "style": "wordBlaze",
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
+      },
+      "end_sec": 19.7,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
+      "overlays": [],
+      "start_sec": 17.3,
+      "asset_hint": null,
+      "audio_cues": [],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 2.4,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
+    },
+    {
+      "id": "beat_dc0481e1_10",
+      "cta": null,
+      "stat": null,
+      "text": null,
+      "label": null,
+      "order": 10,
+      "quote": null,
+      "zones": {
+        "z1": {
+          "x": 60,
+          "y": 44,
+          "id": "z1",
+          "end": null,
+          "role": "support",
+          "type": "text",
+          "start": 0.25,
+          "style": {
+            "color": "#f3f3f3",
+            "fontSize": 64,
+            "textAlign": "right",
+            "fontFamily": "Outfit, sans-serif",
+            "fontWeight": 600,
+            "lineHeight": 1.12,
+            "textEffect": "none"
+          },
+          "width": 30,
+          "height": 10,
+          "zIndex": 5,
+          "content": { "kind": "text", "text": "Smash that follow button" },
+          "enterAnimation": "fadeIn"
+        },
+        "z2": {
+          "x": 21,
+          "y": 66,
+          "id": "z2",
+          "end": null,
+          "role": "headline",
+          "type": "text",
+          "start": 0.5,
+          "style": {
+            "color": "#ffe066",
+            "fontSize": 170,
+            "fontStyle": "italic",
+            "textAlign": "left",
+            "fontFamily": "Playfair Display, serif",
+            "fontWeight": 900,
+            "lineHeight": 0.8,
+            "textEffect": "none",
+            "letterSpacing": "-2px"
+          },
+          "width": 70,
+          "height": 17,
+          "zIndex": 6,
+          "content": { "kind": "text", "text": "for your daily dose of history in minutes!" },
+          "enterAnimation": "slideUpIn"
+        },
+        "zs1": {
+          "x": 9,
+          "y": 7,
+          "id": "zs1",
+          "end": null,
+          "role": "sticker",
+          "type": "asset",
+          "start": 0,
+          "style": { "objectFit": "contain" },
+          "width": 55,
+          "height": 34,
+          "zIndex": 2,
+          "content": {
+            "kind": "asset",
+            "asset": {
+              "src": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/stickers/learn_more_button.png",
+              "type": "image",
+              "objectFit": "contain"
+            }
+          },
+          "enterAnimation": "popIn"
+        }
+      },
+      "blocks": [],
+      "energy": 1,
+      "intent": "cta",
+      "layout": null,
+      "spoken": "Smash that follow button for your daily dose of history in minutes!",
+      "caption": {
+        "show": false,
+        "text": "Smash that follow button for your daily dose of history in minutes!",
+        "style": "wordBlaze",
+        "position": 80,
+        "animation": "fade",
+        "emphasis_words": []
+      },
+      "end_sec": 24.4,
+      "heading": null,
+      "subtext": null,
+      "tagline": null,
+      "headline": null,
+      "language": "english",
+      "overlays": [],
+      "start_sec": 19.7,
+      "asset_hint": null,
+      "audio_cues": [],
+      "avatarZone": null,
+      "components": {},
+      "transition": { "type": "cut", "duration": 0 },
+      "visual_hint": "none",
+      "deletedZones": [],
+      "duration_sec": 4.7,
+      "layoutPadding": 0,
+      "asset_settings": {},
+      "layoutBackground": { "type": "gradient", "value": "linear-gradient(135deg, #0d0d2b 0%, #2d0057 100%)" }
     }
   ],
   "avatar": null,
-  "duration_sec": 15
+  "script": {
+    "text": "Hey, ever wondered how the Titanic sank in just 5 minutes? Imagine boarding the world’s biggest, 'unsinkable' ship. Excitement. Luxury. Then—iceberg. Panic. Chaos. Lifeboats not enough. Heroes, heartbreak, history made. Over 1,500 lives lost in a night. Gives you chills, right? Want more wild stories like this? Smash that follow button for your daily dose of history in minutes!",
+    "emotionalArc": ""
+  },
+  "overlays": [],
+  "workflow": { "script_completed": true, "beats_initialized": true },
+  "duration_sec": 24.4
 }

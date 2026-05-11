@@ -7,11 +7,6 @@ import { supabase } from "../lib/supabase";
 
 /* ── Icons ── */
 const Icons = {
-  assets: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-    </svg>
-  ),
   home: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
@@ -295,8 +290,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const inAssets  = path === "/assets";
-  const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typography" || path === "/videos/explainer" || path.startsWith("/product-ads") || path === "/video-captions" || path === "/videos/custom";
+const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typography" || path === "/videos/explainer" || path.startsWith("/product-ads") || path === "/video-captions" || path === "/videos/custom";
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -326,16 +320,15 @@ export default function AppLayout({ children }) {
           {/* Top nav */}
           <nav style={{ flex: 1, padding: "8px 6px", display: "flex", flexDirection: "column", gap: 2 }}>
             <IconBtn icon={Icons.home} label="Home" to="/dashboard" active={path === "/dashboard"} />
-            <IconBtn icon={Icons.assets} label="Assets" to="/assets" active={inAssets} />
 
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
-              <NavItem icon={Icons.aiVideo}    label="AI Videos"        sub="Generated with AI"        to="/videos"             active={path === "/videos" || path === "/new"} />
-              {isAdmin && <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />}
-              <NavItem icon={Icons.ad}         label="Product Video"    sub="Ads for your products"    to="/product-ads"         active={path.startsWith("/product-ads")} />
-              <NavItem icon={Icons.explainer}  label="Explainer Video"  sub="Talking head + visuals"   to="/videos/explainer"   active={path === "/videos/explainer"} />
+              <NavItem icon={Icons.ad}         label="Product Video"    sub="Ads for your products"    to="/product-ads"        active={path.startsWith("/product-ads")} />
               <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos" to="/video-captions"     active={path === "/video-captions"} />
+              <NavItem icon={Icons.explainer}  label="Explainer Video"  sub="Talking head + visuals"   to="/videos/explainer"   active={path === "/videos/explainer"} />
+              {isAdmin && <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />}
+              <NavItem icon={Icons.aiVideo}    label="AI Videos"        sub="Generated with AI"        to="/videos"             active={path === "/videos" || path === "/new"} />
               <NavItem icon={Icons.custom}     label="Custom Videos"    sub="Built from scratch"       to="/videos/custom"      active={path === "/videos/custom"} />
             </FlyoutGroup>
 

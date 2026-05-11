@@ -204,15 +204,15 @@ export default function PosterStudio() {
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
         {/* Header + tabs */}
-        <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-          <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Product Poster</h1>
+        <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0, display: "flex", alignItems: "center", gap: 24 }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>Product Poster</h1>
           <div style={{ display: "flex", gap: 4 }}>
-            {[["history", "My Posters"], ["create", "Create New"]].map(([id, label]) => (
+            {[["history", `My Posters${history.length ? ` (${history.length})` : ""}`], ["create", "Create New"]].map(([id, label]) => (
               <button key={id} onClick={() => setTopTab(id)}
-                style={{ padding: "8px 20px", border: "none", borderRadius: "8px 8px 0 0",
+                style={{ padding: "16px 28px", border: "none", borderRadius: "8px 8px 0 0",
                   background: topTab === id ? "rgba(124,92,252,0.15)" : "transparent",
                   color: topTab === id ? "#a78bfa" : "#55556a",
-                  fontSize: 14, fontWeight: topTab === id ? 700 : 500,
+                  fontSize: 16, fontWeight: topTab === id ? 700 : 500,
                   fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",
                   borderBottom: topTab === id ? "2px solid #7c5cfc" : "2px solid transparent" }}>
                 {label}
@@ -361,7 +361,7 @@ export default function PosterStudio() {
                 <button
                   onClick={handleGenerateClick}
                   disabled={!canGen}
-                  style={{ width: "100%", padding: "11px 0", background: "#f5c518", color: "#000", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 800, cursor: canGen ? "pointer" : "not-allowed", opacity: canGen ? 1 : 0.45 }}
+                  style={{ width: "100%", padding: "11px 0", background: "#f5c518", color: "#000", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 800, cursor: canGen ? "pointer" : "not-allowed", opacity: canGen ? 1 : 0.45 }}
                 >
                   {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Generate Poster"}
                 </button>

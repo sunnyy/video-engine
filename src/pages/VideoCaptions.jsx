@@ -39,7 +39,7 @@ const PREVIEWS = {
     </div>
   ),
   karaokeFill: () => (
-    <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 14, fontWeight: 800, textAlign: "center", lineHeight: 1.2 }}>
+    <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 16, fontWeight: 800, textAlign: "center", lineHeight: 1.2 }}>
       <span style={{ color: "rgba(255,255,255,0.3)", margin: "0 2px" }}>Bold</span>
       <span style={{ position: "relative", display: "inline-block", color: "#fff", margin: "0 2px" }}>
         Move
@@ -85,7 +85,7 @@ const PREVIEWS = {
     </div>
   ),
   neonTicker: () => (
-    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 14, fontWeight: 700, color: "#00e5c3", textAlign: "center", textShadow: "0 0 8px rgba(0,229,195,0.6)", letterSpacing: "0.04em" }}>
+    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 16, fontWeight: 700, color: "#00e5c3", textAlign: "center", textShadow: "0 0 8px rgba(0,229,195,0.6)", letterSpacing: "0.04em" }}>
       TYPING_
       <span style={{ display: "inline-block", width: 2, height: "1em", background: "#00e5c3", boxShadow: "0 0 6px #00e5c3", verticalAlign: "middle", marginLeft: 2 }} />
     </div>
@@ -462,7 +462,7 @@ function GeneratorForm() {
               {file && !transcribing && (
                 <button
                   onClick={handleUploadAndTranscribe}
-                  style={{ marginTop: 12, width: "100%", padding: "12px", background: "#7c5cfc", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}
+                  style={{ marginTop: 12, width: "100%", padding: "12px", background: "#7c5cfc", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}
                 >
                   Transcribe Video →
                 </button>
@@ -522,7 +522,7 @@ function GeneratorForm() {
             <button
               onClick={handleCreateClick}
               disabled={creating}
-              style={{ width: "100%", padding: "13px", background: creating ? "#6b5a00" : "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: creating ? "not-allowed" : "pointer", fontFamily: "'Outfit',sans-serif" }}
+              style={{ width: "100%", padding: "13px", background: creating ? "#6b5a00" : "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 800, cursor: creating ? "not-allowed" : "pointer", fontFamily: "'Outfit',sans-serif" }}
             >
               {creating ? "Creating Project…" : "Open in Editor · 8 credits →"}
             </button>
@@ -605,7 +605,7 @@ export default function CaptionStudio() {
   const [tab, setTab] = useState("videos");
 
   const tabs = [
-    { id: "videos", label: "My Videos"  },
+    { id: "videos", label: "My Videos" },
     { id: "create", label: "Create New" },
   ];
 
@@ -615,8 +615,8 @@ export default function CaptionStudio() {
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
         {/* Header + tabs */}
-        <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-          <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
+        <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0, display: "flex", alignItems: "center", gap: 24 }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>
             Video Captions
           </h1>
           <div style={{ display: "flex", gap: 4 }}>
@@ -625,11 +625,11 @@ export default function CaptionStudio() {
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 style={{
-                  padding: "8px 20px",
+                  padding: "16px 28px",
                   border: "none", borderRadius: "8px 8px 0 0",
                   background: tab === t.id ? "rgba(124,92,252,0.15)" : "transparent",
                   color: tab === t.id ? "#a78bfa" : "#55556a",
-                  fontSize: 14, fontWeight: tab === t.id ? 700 : 500,
+                  fontSize: 16, fontWeight: tab === t.id ? 700 : 500,
                   fontFamily: "'Outfit',sans-serif",
                   cursor: "pointer", transition: "all 0.15s",
                   borderBottom: tab === t.id ? "2px solid #7c5cfc" : "2px solid transparent",

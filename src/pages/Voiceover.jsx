@@ -50,7 +50,7 @@ function VoiceCard({ voice, selected, onSelect, onPlay, playing }) {
         <div style={{ position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: "50%", background: "#7c5cfc" }} />
       )}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>{voice.label}</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>{voice.label}</span>
         <button
           onClick={e => { e.stopPropagation(); onPlay(voice); }}
           disabled={!voice.sampleUrl}
@@ -222,15 +222,15 @@ export default function TTSStudio() {
   return (
     <AppLayout>
       {/* Top bar */}
-      <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-        <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Voiceover / TTS</h1>
+      <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0, display: "flex", alignItems: "center", gap: 24 }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>Voiceover / TTS</h1>
         <div style={{ display: "flex", gap: 4 }}>
-          {[["history", "My Voiceovers"], ["generate", "Create New"]].map(([id, label]) => (
+          {[["history", `My Voiceovers${history.length ? ` (${history.length})` : ""}`], ["generate", "Create New"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              style={{ padding: "8px 20px", border: "none", borderRadius: "8px 8px 0 0",
+              style={{ padding: "16px 28px", border: "none", borderRadius: "8px 8px 0 0",
                 background: activeTab === id ? "rgba(124,92,252,0.15)" : "transparent",
                 color: activeTab === id ? "#a78bfa" : "#55556a",
-                fontSize: 14, fontWeight: activeTab === id ? 700 : 500,
+                fontSize: 16, fontWeight: activeTab === id ? 700 : 500,
                 fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",
                 borderBottom: activeTab === id ? "2px solid #7c5cfc" : "2px solid transparent" }}>
               {label}
@@ -260,7 +260,7 @@ export default function TTSStudio() {
               {voicesLoading && (
                 <div style={{ padding: "40px 0", textAlign: "center" }}>
                   <div style={{ fontSize: 28, marginBottom: 10 }}>🔊</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#9494a8", marginBottom: 4 }}>Preparing voice samples…</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: "#9494a8", marginBottom: 4 }}>Preparing voice samples…</div>
                   <div style={{ fontSize: 12, color: "#555" }}>Generating previews on first load — this takes ~15 seconds</div>
                 </div>
               )}
@@ -351,7 +351,7 @@ export default function TTSStudio() {
                 <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0" }}>No voiceovers yet</div>
                 <div style={{ fontSize: 14, color: "#77777f" }}>Generate natural AI voiceovers in multiple languages</div>
                 <button onClick={() => setActiveTab("generate")}
-                  style={{ marginTop: 8, padding: "10px 24px", background: "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  style={{ marginTop: 8, padding: "10px 24px", background: "#f5c518", color: "#0b0b10", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
                   Generate First Voiceover →
                 </button>
               </div>

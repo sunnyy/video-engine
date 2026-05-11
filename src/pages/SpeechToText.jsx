@@ -297,15 +297,15 @@ export default function Transcription() {
   return (
     <AppLayout>
       {/* Top bar */}
-      <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-        <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>Speech to Text</h1>
+      <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0, display: "flex", alignItems: "center", gap: 24 }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>Speech to Text</h1>
         <div style={{ display: "flex", gap: 4 }}>
-          {[["history", "My Transcriptions"], ["generate", "Create New"]].map(([id, label]) => (
+          {[["history", `My Transcriptions${!loading && history.length ? ` (${history.length})` : ""}`], ["generate", "Create New"]].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              style={{ padding: "8px 20px", border: "none", borderRadius: "8px 8px 0 0",
+              style={{ padding: "16px 28px", border: "none", borderRadius: "8px 8px 0 0",
                 background: activeTab === id ? "rgba(124,92,252,0.15)" : "transparent",
                 color: activeTab === id ? "#a78bfa" : "#55556a",
-                fontSize: 14, fontWeight: activeTab === id ? 700 : 500,
+                fontSize: 16, fontWeight: activeTab === id ? 700 : 500,
                 fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",
                 borderBottom: activeTab === id ? "2px solid #7c5cfc" : "2px solid transparent" }}>
               {label}

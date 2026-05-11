@@ -31,7 +31,6 @@ import ImageGeneration from "./pages/ImageGeneration";
 import Transcription   from "./pages/SpeechToText";
 import Feedback        from "./pages/Feedback";
 import Checkout        from "./pages/Checkout";
-import Assets          from "./pages/Assets";
 import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
 import ProductAds      from "./pages/ProductAds";
@@ -151,7 +150,6 @@ export default function App() {
             <Route path="/videos/custom"       element={<CustomVideos />} />
             <Route path="/feedback"         element={<Feedback />} />
             <Route path="/checkout"         element={<Checkout />} />
-            <Route path="/assets"           element={<Assets />} />
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/editor/:id"       element={<Editor />} />

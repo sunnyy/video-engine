@@ -93,7 +93,7 @@ function AdCard({ project, onDelete, onResume }) {
       {/* Info row */}
       <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Outfit',sans-serif" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Outfit',sans-serif" }}>
             {project.name}
           </div>
           <div style={{ fontSize: 11, color: "#77777f", marginTop: 3, display: "flex", gap: 8, alignItems: "center" }}>
@@ -230,8 +230,8 @@ export default function ProductAds() {
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
         {/* Header + tabs */}
-        <div style={{ padding: "16px 32px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0 }}>
-          <h1 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>
+        <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0, display: "flex", alignItems: "center", gap: 24 }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>
             Product Video
           </h1>
           <div style={{ display: "flex", gap: 4 }}>
@@ -240,11 +240,11 @@ export default function ProductAds() {
                 key={t.id}
                 onClick={() => handleTabChange(t.id)}
                 style={{
-                  padding: "8px 20px",
+                  padding: "16px 28px",
                   border: "none", borderRadius: "8px 8px 0 0",
                   background: tab === t.id ? "rgba(124,92,252,0.15)" : "transparent",
                   color: tab === t.id ? "#a78bfa" : "#55556a",
-                  fontSize: 14, fontWeight: tab === t.id ? 700 : 500,
+                  fontSize: 16, fontWeight: tab === t.id ? 700 : 500,
                   fontFamily: "'Outfit',sans-serif",
                   cursor: "pointer", transition: "all 0.15s",
                   borderBottom: tab === t.id ? "2px solid #7c5cfc" : "2px solid transparent",

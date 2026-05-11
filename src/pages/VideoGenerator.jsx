@@ -29,13 +29,6 @@ const MODES = [
   { value: "talking_head", label: "Talking Head" },
 ];
 
-const AUDIENCES = [
-  { value: "general", label: "General Audience" },
-  { value: "teens", label: "Teens / Gen Z" },
-  { value: "professionals", label: "Professionals" },
-  { value: "creators", label: "Creators / Builders" },
-  { value: "parents", label: "Parents / Families" },
-];
 
 const TONES = [
   { value: "auto", label: "Auto — AI picks" },
@@ -103,18 +96,10 @@ function Toggle({ value, onChange }) {
   );
 }
 
-/* ── Advanced summary line ────────────────────────────────── */
-function buildAdvancedSummary({ tone, audience, brandColor }) {
-  const parts = [];
-  if (tone !== "auto") parts.push(TONES.find((o) => o.value === tone)?.label || tone);
-  if (audience !== "general") parts.push(AUDIENCES.find((o) => o.value === audience)?.label || audience);
-  if (brandColor) parts.push("Brand color set");
-  return parts.length ? parts.join(" · ") : "All defaults — AI decides";
-}
 
 /* ── Main component ───────────────────────────────────────── */
 
-export default function VideoGenerator() {
+export default function VideoGenerator({ embedded = false }) {
   const navigate = useNavigate();
   const { fetchCredits } = useCreditsStore();
 
@@ -123,15 +108,13 @@ export default function VideoGenerator() {
   const [orientation, setOrientation] = useState("9:16");
 
 
-  // Advanced fields (collapsed by default)
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [audience, setAudience] = useState("general");
   const [tone, setTone] = useState("auto");
+  const audience = "general";
   const [mode, setMode] = useState("faceless");
   const [language, setLanguage] = useState("english");
-  const [brandColor, setBrandColor] = useState("");
-  const [generateImages, setGenerateImages] = useState(true);
-  const [generateTTS, setGenerateTTS] = useState(true);
+  const brandColor = "";
+  const generateImages = true;
+  const generateTTS = true;
   const [ttsVoice, setTtsVoice] = useState("female_warm");
 
   // Talking head mode state
@@ -365,32 +348,29 @@ export default function VideoGenerator() {
   const _pool = STEP_MESSAGE_POOLS[loadingStep] ?? STEP_MESSAGE_POOLS._default;
   const currentLoadingMessage = _pool[msgIndex % _pool.length];
 
-  const advancedSummary = buildAdvancedSummary({
-    tone,
-    audience,
-    brandColor: brandColor.trim(),
-  });
 
   return (
-    <div className="min-h-screen flex flex-col text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
+    <div className={embedded ? "" : "min-h-screen flex flex-col text-[#e8e8f0]"} style={embedded ? {} : { background: "#0b0b10" }}>
 
-      {/* ── Header ── */}
-      <div className="border-b border-[rgba(255,255,255,0.06)] px-6 py-3 flex items-center justify-between shrink-0" style={{ background: "#111118" }}>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/videos")}
-            className="text-[#77777f] hover:text-[#e8e8f0] transition-colors text-[14px] bg-transparent border-0 cursor-pointer">
-            ← Videos
-          </button>
-          <div className="w-[1px] h-[18px] bg-[rgba(255,255,255,0.08)]" />
-          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
-          <span className="text-[15px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit',sans-serif" }}>
-            Create Video
-          </span>
+      {/* ── Header (standalone only) ── */}
+      {!embedded && (
+        <div className="border-b border-[rgba(255,255,255,0.06)] px-6 py-3 flex items-center justify-between shrink-0" style={{ background: "#111118" }}>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate("/videos")}
+              className="text-[#77777f] hover:text-[#e8e8f0] transition-colors text-[14px] bg-transparent border-0 cursor-pointer">
+              ← Videos
+            </button>
+            <div className="w-[1px] h-[18px] bg-[rgba(255,255,255,0.08)]" />
+            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
+            <span className="text-[15px] font-bold text-[#e8e8f0]" style={{ fontFamily: "'Outfit',sans-serif" }}>
+              Create Video
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Page body ── */}
-      <div className="flex-1 flex items-start justify-center px-4 py-10 overflow-y-auto">
+      <div className={embedded ? "flex justify-center px-4 py-6" : "flex-1 flex items-start justify-center px-4 py-10 overflow-y-auto"}>
       <div className="w-full max-w-[520px] flex flex-col gap-6">
 
       {/* Loading overlay */}
@@ -596,102 +576,36 @@ export default function VideoGenerator() {
           )}
         </div>
 
-        {/* ── Step 4: AI Options (faceless only) ── */}
+        {/* ── Tone ── */}
+        <div>
+          <Label>Tone</Label>
+          <Select value={tone} onChange={setTone} options={TONES} />
+        </div>
+
+        {/* ── Step 4: Voice selection (faceless only) ── */}
         {mode === "faceless" && (
           <div className="flex flex-col gap-3 p-4 rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#0E0D22]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <div className="text-[14px] font-semibold text-[#e8e8f0]">Auto-generate images</div>
-                <span className="text-[12px] text-[#aaaaae]">Uses credits.</span>
-              </div>
-              <Toggle value={generateImages} onChange={setGenerateImages} />
+            <div className="text-[13px] font-semibold text-[#8888a8] uppercase tracking-widest">AI Voice</div>
+            <div className="grid grid-cols-2 gap-[6px]">
+              {[
+                { key: "female_warm",  label: "Female — Warm",  sub: "Nova"    },
+                { key: "female_clear", label: "Female — Clear", sub: "Shimmer" },
+                { key: "male_deep",    label: "Male — Deep",    sub: "Onyx"    },
+                { key: "male_neutral", label: "Male — Neutral", sub: "Echo"    },
+              ].map(({ key, label, sub }) => (
+                <button key={key} onClick={() => setTtsVoice(key)}
+                  className="flex flex-col items-start px-3 py-[7px] rounded-[8px] border cursor-pointer transition-all text-left"
+                  style={ttsVoice === key
+                    ? { background: "rgba(124,92,252,0.12)", borderColor: "#7c5cfc" }
+                    : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}
+                >
+                  <span className="text-[12px] font-semibold" style={{ color: ttsVoice === key ? "#a78bfa" : "#d8d8f0" }}>{label}</span>
+                  <span className="text-[10px] font-mono"     style={{ color: ttsVoice === key ? "#7c5cfc" : "#8888a8" }}>{sub}</span>
+                </button>
+              ))}
             </div>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <div className="text-[14px] font-semibold text-[#e8e8f0]">Generate AI voice (TTS)</div>
-                <span className="text-[12px] text-[#aaaaae]">Uses credits.</span>
-              </div>
-              <Toggle value={generateTTS} onChange={setGenerateTTS} />
-            </div>
-            {generateTTS && (
-              <div className="grid grid-cols-2 gap-[6px]">
-                {[
-                  { key: "female_warm",  label: "Female — Warm",  sub: "Nova"    },
-                  { key: "female_clear", label: "Female — Clear", sub: "Shimmer" },
-                  { key: "male_deep",    label: "Male — Deep",    sub: "Onyx"    },
-                  { key: "male_neutral", label: "Male — Neutral", sub: "Echo"    },
-                ].map(({ key, label, sub }) => (
-                  <button key={key} onClick={() => setTtsVoice(key)}
-                    className="flex flex-col items-start px-3 py-[7px] rounded-[8px] border cursor-pointer transition-all text-left"
-                    style={ttsVoice === key
-                      ? { background: "rgba(124,92,252,0.12)", borderColor: "#7c5cfc" }
-                      : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}
-                  >
-                    <span className="text-[12px] font-semibold" style={{ color: ttsVoice === key ? "#a78bfa" : "#d8d8f0" }}>{label}</span>
-                    <span className="text-[10px] font-mono"     style={{ color: ttsVoice === key ? "#7c5cfc" : "#8888a8" }}>{sub}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
-
-        {/* Talking head: images toggle — still useful for non-avatar beats */}
-        {mode === "talking_head" && (
-          <div className="flex items-start justify-between gap-3 px-4 py-3 rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#0E0D22]">
-            <div className="flex-1">
-              <div className="text-[14px] font-semibold text-[#e8e8f0]">Auto-generate images</div>
-              <span className="text-[12px] text-[#aaaaae]">For non-avatar beats. Uses credits.</span>
-            </div>
-            <Toggle value={generateImages} onChange={setGenerateImages} />
-          </div>
-        )}
-
-        {/* ── Step 5: Advanced Options (collapsed) ── */}
-        <div className="rounded-[12px] border border-[rgba(255,255,255,0.12)] overflow-hidden">
-          <button
-            onClick={() => setAdvancedOpen((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-[#16162a] cursor-pointer border-0 text-left transition-colors hover:bg-[#1c1c32]"
-          >
-            <span className="text-[11px] font-bold tracking-widest uppercase text-[#8888a8]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              Advanced Options
-            </span>
-            <span style={{ color: "#8888a8", fontSize: 12, display: "inline-block", transition: "transform 0.2s", transform: advancedOpen ? "rotate(180deg)" : "none" }}>▾</span>
-          </button>
-          {!advancedOpen && (
-            <div className="px-4 py-[10px] bg-[#13132a] border-t border-[rgba(255,255,255,0.08)]">
-              <span className="text-[12px] text-[#8888a8]">{advancedSummary}</span>
-            </div>
-          )}
-          {advancedOpen && (
-            <div className="px-4 pb-4 pt-3 bg-[#13132a] border-t border-[rgba(255,255,255,0.08)] flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Audience</Label>
-                  <Select value={audience} onChange={setAudience} options={AUDIENCES} />
-                </div>
-                <div>
-                  <Label>Tone</Label>
-                  <Select value={tone} onChange={setTone} options={TONES} />
-                </div>
-              </div>
-              <div>
-                <Label>
-                  Brand Color <span className="text-[#8888a8] normal-case tracking-normal font-normal">(optional)</span>
-                </Label>
-                <div className="flex gap-2 items-center">
-                  <input type="color" value={brandColor || "#7c5cfc"} onChange={(e) => setBrandColor(e.target.value)}
-                    className="w-[36px] h-[36px] rounded-[6px] border border-[rgba(255,255,255,0.12)] cursor-pointer bg-[#21213a] p-[2px]" />
-                  <input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} placeholder="#optional"
-                    className="flex-1 bg-[#21213a] border border-[rgba(255,255,255,0.12)] rounded-[8px] px-3 py-[8px] text-[14px] text-[#e8e8f0] focus:border-[#7c5cfc] focus:outline-none transition-colors font-mono" />
-                  {brandColor && (
-                    <button onClick={() => setBrandColor("")} className="text-[#8888a8] hover:text-[#e8e8f0] text-[16px] leading-none border-0 bg-transparent cursor-pointer">×</button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Error */}
         {error && (
@@ -720,17 +634,6 @@ export default function VideoGenerator() {
           );
         })()}
 
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-[1px] bg-[rgba(255,255,255,0.09)]" />
-          <span className="text-[11px] text-[#8888a8]">or</span>
-          <div className="flex-1 h-[1px] bg-[rgba(255,255,255,0.09)]" />
-        </div>
-
-        <button onClick={handleScratch} disabled={loading}
-          className="w-full py-[9px] rounded-[8px] text-[13px] font-bold border border-[rgba(255,255,255,0.14)] text-[#b0b0cc] hover:text-[#e8e8f0] hover:border-[rgba(255,255,255,0.2)] bg-transparent cursor-pointer transition-all"
-        >
-          Start from Scratch — Empty Project
-        </button>
       </div>
 
       {/* ── Credit pre-flight modal ── */}
