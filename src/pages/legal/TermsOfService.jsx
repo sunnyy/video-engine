@@ -3,7 +3,7 @@ import Section, { P, UL, Highlight, ContactBlock } from "./Section";
 
 export default function TermsOfService() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="April 19, 2026">
+    <LegalLayout title="Terms of Service" lastUpdated="May 11, 2026">
 
       <Section title="1. Acceptance of Terms">
         <P>By accessing or using Vidquence ("the Service"), operated by PX Galaxy Studio, you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</P>
@@ -28,16 +28,17 @@ export default function TermsOfService() {
 
       <Section title="4. Credits and Payments">
         <Highlight>Credits are non-refundable once purchased, except as expressly stated in our Refund Policy.</Highlight>
-        <P>Credits are the in-platform currency used to access AI features. Credit costs vary by action:</P>
+        <P>Credits are the in-platform currency used to access AI features. Credit costs vary by feature and are displayed on the platform before each action is performed. Current costs include but are not limited to:</P>
         <UL items={[
-          "Base video generation: 8 credits",
+          "AI video generation: 25 credits",
           "AI image generation: 2 credits per image",
           "Text-to-speech generation: 5 credits",
-          "Local export: 2 credits",
-          "Layout swap: 1 credit",
+          "Poster, thumbnail, or banner generation: 10–15 credits",
+          "Product ad generation: varies by step (5–60 credits)",
+          "Virtual try-on: 15 credits",
         ]} />
         <P>Subscription plans automatically renew at the end of each billing period unless cancelled prior to the renewal date. You authorize us to charge your payment method on file for each renewal. Credits from monthly plans do not roll over to the next billing period unless otherwise stated in your plan description.</P>
-        <P>All prices are in USD unless otherwise stated. We reserve the right to change pricing with 14 days' notice to subscribers.</P>
+        <P>All prices are in INR unless otherwise stated. We reserve the right to change pricing with 14 days' notice to subscribers.</P>
       </Section>
 
       <Section title="5. Acceptable Use">
@@ -52,6 +53,7 @@ export default function TermsOfService() {
           "Involves unauthorized data collection or surveillance of others",
           "Promotes illegal activities or violence",
         ]} />
+        <P>We employ automated content screening to detect and block prompts or inputs that violate these policies. Attempts to circumvent content filters — including prompt injection, encoding tricks, or using indirect language to generate prohibited content — are a material breach of these Terms and grounds for immediate account termination.</P>
         <P>We reserve the right to remove any content and suspend or terminate accounts found to be in violation of these policies without prior notice.</P>
       </Section>
 
@@ -92,11 +94,16 @@ export default function TermsOfService() {
       </Section>
 
       <Section title="10. Governing Law">
-        <P>These Terms are governed by and construed in accordance with the laws of India. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts of India.</P>
+        <P>These Terms are governed by and construed in accordance with the laws of India. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the competent courts having jurisdiction over the registered office of PX Galaxy Studio, India.</P>
         <P>If any provision of these Terms is found to be unenforceable, the remaining provisions will continue in full force and effect.</P>
       </Section>
 
-      <Section title="11. Contact">
+      <Section title="11. Marketing Communications">
+        <P>By creating an account, you agree to receive transactional emails related to your account, billing, and service updates. We may also send you product announcements and promotional emails from time to time.</P>
+        <P>You may opt out of marketing emails at any time by clicking the unsubscribe link in any promotional email or by contacting us at hello@vidquence.com. Opting out of marketing emails does not affect delivery of transactional emails (such as billing receipts, password resets, and account alerts) which are necessary for the operation of your account.</P>
+      </Section>
+
+      <Section title="12. Contact">
         <P>For questions about these Terms, please contact us:</P>
         <ContactBlock email="hello@vidquence.com" />
       </Section>
