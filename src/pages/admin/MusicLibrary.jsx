@@ -3,6 +3,7 @@
  * Admin page for managing music tracks in Supabase (music_tracks table + media/music/ storage).
  */
 import { useEffect, useRef, useState } from "react";
+import { showToast } from "../../ui/Toast";
 import AdminLayout from "./AdminLayout";
 import { supabase } from "../../lib/supabase";
 
@@ -247,7 +248,7 @@ export default function MusicLibrary() {
         .eq("id", track.id);
       if (e) throw new Error(e.message);
       setTracks(ts => ts.map(t => t.id === track.id ? { ...t, is_active: !t.is_active } : t));
-    } catch (e) { alert("Update failed: " + e.message); }
+    } catch (e) { showToast("Update failed: " + e.message); }
     finally { setToggling(null); }
   };
 
@@ -261,7 +262,7 @@ export default function MusicLibrary() {
       const { error: e } = await supabase.from("music_tracks").delete().eq("id", track.id);
       if (e) throw new Error(e.message);
       setTracks(ts => ts.filter(t => t.id !== track.id));
-    } catch (e) { alert("Delete failed: " + e.message); }
+    } catch (e) { showToast("Delete failed: " + e.message); }
     finally { setDeleting(null); }
   };
 

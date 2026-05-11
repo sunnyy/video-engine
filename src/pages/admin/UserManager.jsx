@@ -3,6 +3,7 @@
  * Users list with search, sort, edit user modal, credit history.
  */
 import { useEffect, useState, useRef } from "react";
+import { showToast } from "../../ui/Toast";
 import AdminLayout from "./AdminLayout";
 import { serverFetch } from "../../services/serverApi";
 
@@ -461,7 +462,7 @@ export default function UserManager() {
       setUsers(prev => prev.filter(u => u.id !== user.id));
       setDeleteTarget(null);
     } catch (e) {
-      alert("Delete failed: " + e.message);
+      showToast("Delete failed: " + e.message);
     } finally {
       setDeleting(false);
     }
@@ -478,7 +479,7 @@ export default function UserManager() {
       if (!res.ok) throw new Error((await res.json()).error || "Failed");
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, banned_until: suspend ? "suspended" : null } : u));
     } catch (e) {
-      alert("Suspend failed: " + e.message);
+      showToast("Suspend failed: " + e.message);
     } finally {
       setSuspending(null);
     }
@@ -497,7 +498,7 @@ export default function UserManager() {
       setCreditTarget(null);
       setCreditAmt("");
     } catch (e) {
-      alert("Credits failed: " + e.message);
+      showToast("Credits failed: " + e.message);
     }
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { showToast } from "../../ui/Toast";
 import AdminLayout from "./AdminLayout";
 import { supabase } from "../../lib/supabase";
 import { SFX_LIBRARY, SFX_KEYS } from "../../core/registries/sfxRegistry";
@@ -134,7 +135,7 @@ export default function SFXLibrary() {
       onDone();
       await load();
     } catch (e) {
-      alert("Upload failed: " + e.message);
+      showToast("Upload failed: " + e.message);
     } finally {
       setUploading(null);
     }
@@ -149,7 +150,7 @@ export default function SFXLibrary() {
       if (e) throw new Error(e.message);
       setUploaded(u => { const next = { ...u }; delete next[sfxKey]; return next; });
     } catch (e) {
-      alert("Delete failed: " + e.message);
+      showToast("Delete failed: " + e.message);
     } finally {
       setDeleting(null);
     }

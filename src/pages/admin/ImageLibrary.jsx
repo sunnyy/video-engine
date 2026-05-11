@@ -3,6 +3,7 @@
  * Two tabs: User Uploads (user_assets) + AI Generated (ai_image_library).
  */
 import { useEffect, useRef, useState } from "react";
+import { showToast } from "../../ui/Toast";
 import AdminLayout from "./AdminLayout";
 import { serverFetch } from "../../services/serverApi";
 
@@ -64,7 +65,7 @@ function UserUploads() {
       setAssets(p => p.filter(x => x.id !== a.id));
       setTotal(t => t - 1);
       if (preview?.id === a.id) setPreview(null);
-    } catch (e) { alert("Delete failed: " + e.message); }
+    } catch (e) { showToast("Delete failed: " + e.message); }
     finally { setDeleting(null); }
   }
 
@@ -206,7 +207,7 @@ function AIImages() {
       setImages(p => p.filter(x => x.id !== img.id));
       setTotal(t => t - 1);
       if (preview?.id === img.id) setPreview(null);
-    } catch (e) { alert("Delete failed: " + e.message); }
+    } catch (e) { showToast("Delete failed: " + e.message); }
     finally { setDeleting(null); }
   }
 

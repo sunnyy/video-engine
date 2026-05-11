@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { getSession, onAuthStateChange } from "./services/auth/authService";
 import posthog from "posthog-js";
 import { setInsufficientCreditsHandler } from "./services/serverApi";
+import { ToastContainer, showToast } from "./ui/Toast";
 import { initLayoutRegistry } from "./core/registries/layoutRegistry";
 import { useCreditsStore } from "./store/useCreditsStore";
 import "./App.css"
@@ -69,7 +70,7 @@ export default function App() {
     initLayoutRegistry().catch(() => {});
 
     setInsufficientCreditsHandler(() => {
-      alert("Not enough credits. Purchase more to continue.");
+      showToast("Not enough credits. Purchase more to continue.");
     });
 
     getSession().then((sess) => {
@@ -122,6 +123,8 @@ export default function App() {
   }
 
   return (
+    <>
+    <ToastContainer />
     <BrowserRouter>
       <Routes>
         {/* ── Public routes — always accessible ── */}
@@ -197,5 +200,6 @@ export default function App() {
         )}
       </Routes>
     </BrowserRouter>
+    </>
   );
 }

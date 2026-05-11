@@ -4,6 +4,7 @@
  * Multi-select with bulk type assignment and bulk delete.
  */
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { showToast } from "../../ui/Toast";
 import { useNavigate } from "react-router-dom";
 import { Thumbnail } from "@remotion/player";
 import { AbsoluteFill } from "remotion";
@@ -304,14 +305,14 @@ export default function LayoutManager() {
     try {
       await serverFetch(`/api/admin/layouts/${id}/duplicate`, { method: "POST" });
       await load();
-    } catch (err) { alert("Duplicate failed: " + err.message); }
+    } catch (err) { showToast("Duplicate failed: " + err.message); }
   };
 
   const handleDelete = async (id) => {
     try {
       await serverFetch(`/api/admin/layouts/${id}`, { method: "DELETE" });
       await load();
-    } catch (err) { alert("Delete failed: " + err.message); }
+    } catch (err) { showToast("Delete failed: " + err.message); }
   };
 
   const toggleSelect = (id) => {
@@ -337,7 +338,7 @@ export default function LayoutManager() {
         body: JSON.stringify({ ids: [...selected], updates }),
       });
       await load();
-    } catch (err) { alert("Bulk update failed: " + err.message); }
+    } catch (err) { showToast("Bulk update failed: " + err.message); }
     setBulkWorking(false);
   };
 
@@ -351,7 +352,7 @@ export default function LayoutManager() {
         body: JSON.stringify({ ids: [...selected] }),
       });
       await load();
-    } catch (err) { alert("Bulk delete failed: " + err.message); }
+    } catch (err) { showToast("Bulk delete failed: " + err.message); }
     setBulkWorking(false);
   };
 

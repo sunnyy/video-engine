@@ -3,6 +3,7 @@
  * Admin section for managing LandingPage service samples (images & videos).
  */
 import { useEffect, useState, useRef } from "react";
+import { showToast } from "../../ui/Toast";
 import AdminLayout from "./AdminLayout";
 import { serverFetch } from "../../services/serverApi";
 
@@ -215,7 +216,7 @@ export default function Samples() {
       await serverFetch(`/api/admin/samples/${sample.id}`, { method: "DELETE" });
       setSamples(s => s.filter(x => x.id !== sample.id));
     } catch (e) {
-      alert("Delete failed: " + e.message);
+      showToast("Delete failed: " + e.message);
     } finally {
       setDeleting(null);
     }

@@ -8,6 +8,7 @@ import { useProjectsStore } from "../../store/useProjectsStore";
 import { getUserProjects, renameProject } from "../../services/projects/projectService";
 import { signOut } from "../../services/auth/authService";
 import validateProject from "../../core/validateProject";
+import { showToast } from "../Toast";
 import { serverFetch } from "../../services/serverApi";
 import { useCreditsStore } from "../../store/useCreditsStore";
 import TemplateModal from "../TemplateModal";
@@ -114,7 +115,7 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
 
     const result = validateProject(clampedProject);
     if (!result.valid) {
-      alert(result.errors.join("\n"));
+      showToast(result.errors.join(" · "));
       return;
     }
     setProgress(0);
@@ -143,7 +144,7 @@ export default function Header({ progress, setProgress, currentJobId, setCurrent
       console.error(err);
       setProgress(null);
       setCurrentJobId(null);
-      alert("Render failed");
+      showToast("Render failed");
     }
   };
 
