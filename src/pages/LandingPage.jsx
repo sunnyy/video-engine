@@ -317,15 +317,12 @@ const CSS = `
 
 export default function LandingPage() {
   useReveal();
-  const SHOW_SAMPLES = false; // flip to true when showcase-ready samples are loaded
-
   const navigate = useNavigate();
   const location = useLocation();
   const [session, setSession] = useState(null);
   const [plans, setPlans] = useState([]);
   const [rate, setRate] = useState(FALLBACK_RATE);
   const [cycle, setCycle] = useState("monthly");
-  const [samples, setSamples] = useState([]);
 
   useEffect(() => {
     getSession()
@@ -340,10 +337,6 @@ export default function LandingPage() {
       .then((d) => {
         if (d?.rate) setRate(d.rate);
       })
-      .catch(() => {});
-    fetch(`${SERVER}/api/admin/samples/public`)
-      .then((r) => r.json())
-      .then((d) => setSamples(Array.isArray(d.samples) ? d.samples : []))
       .catch(() => {});
   }, []);
 
@@ -394,25 +387,6 @@ export default function LandingPage() {
 
 
 
-  // Map services to sample service keys
-  const serviceKeyMap = {
-    "AI Video Generator": "ai_videos",
-    "Product Video Ads": "product_ads",
-    "Virtual Try-On": "virtual_tryon",
-    "Social Post Generator": "social_posts",
-    "Thumbnail Generator": "thumbnails",
-    "Poster Studio": "posters",
-    "Voice Studio": "voiceover",
-    "Caption Studio": "captions",
-    "Speech to Text": "transcription",
-  };
-
-  // Group samples by service
-  const samplesByService = {};
-  samples.forEach((s) => {
-    if (!samplesByService[s.service_key]) samplesByService[s.service_key] = [];
-    samplesByService[s.service_key].push(s);
-  });
 
   const faqs = [
     {
@@ -457,71 +431,6 @@ export default function LandingPage() {
     },
   ];
 
-  const services = [
-    {
-      tag: "Video",
-      title: "AI Video Generator",
-      desc: "Type a topic. Get a fully produced short-form video — scripted, visualized, voiced, edit or export ready.",
-      icon: "🎬",
-      bg: "linear-gradient(135deg, rgba(245,197,24,0.08), rgba(245,197,24,0.02))",
-    },
-    {
-      tag: "Advertising",
-      title: "Product Video Ads",
-      desc: "Upload one product photo. Get a cinematic 5-scene video ad with AI model, transitions, and background music.",
-      icon: "🛍️",
-      bg: "linear-gradient(135deg, rgba(124,92,252,0.1), rgba(124,92,252,0.02))",
-    },
-    {
-      tag: "Try-On",
-      title: "Virtual Try-On",
-      desc: "Upload a garment and a model photo. AI dresses the model in your outfit instantly. Perfect for fashion brands.",
-      icon: "👗",
-      bg: "linear-gradient(135deg, rgba(236,72,153,0.08), rgba(236,72,153,0.02))",
-    },
-    {
-      tag: "Social Media",
-      title: "Social Post Generator",
-      desc: "Generate ready-to-post graphics for Instagram, Facebook, and LinkedIn. Upload your brand logo and pick your colors.",
-      icon: "📱",
-      bg: "linear-gradient(135deg, rgba(56,189,248,0.08), rgba(56,189,248,0.02))",
-    },
-    {
-      tag: "Thumbnails",
-      title: "Thumbnail Generator",
-      desc: "AI-generated clickbait-style thumbnails for YouTube and Reels. GPT-4o crafts the perfect visual strategy first.",
-      icon: "🖼",
-      bg: "linear-gradient(135deg, rgba(251,146,60,0.08), rgba(251,146,60,0.02))",
-    },
-    {
-      tag: "Branding",
-      title: "Poster Studio",
-      desc: "Turn any product photo into a premium commercial poster ad. Luxury brand quality in seconds.",
-      icon: "🎨",
-      bg: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.02))",
-    },
-    {
-      tag: "Audio",
-      title: "Voice Studio",
-      desc: "9 natural AI voices. Generate voiceovers for any content in seconds. Multilingual support.",
-      icon: "🎙",
-      bg: "linear-gradient(135deg, rgba(245,197,24,0.06), rgba(245,197,24,0.01))",
-    },
-    {
-      tag: "Captions",
-      title: "Caption Studio",
-      desc: "Upload your talking head video. Transcribe, style, and export with viral caption overlays in 10 styles.",
-      icon: "💬",
-      bg: "linear-gradient(135deg, rgba(124,92,252,0.07), rgba(124,92,252,0.01))",
-    },
-    {
-      tag: "Transcription",
-      title: "Speech to Text",
-      desc: "Upload any audio or video. Get an accurate transcript with timestamps. Export as SRT or plain text.",
-      icon: "📝",
-      bg: "linear-gradient(135deg, rgba(56,189,248,0.06), rgba(56,189,248,0.01))",
-    },
-  ];
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100vh" }}>
