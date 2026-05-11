@@ -41,7 +41,7 @@ export default function PrivacyPolicy() {
           "AI image and video generation providers — prompts and reference images you submit are processed to produce generated images and video clips",
           "Payment processing — Razorpay processes all payment transactions; we never receive or store your card, UPI, or banking credentials (razorpay.com/privacy)",
         ]} />
-        <Highlight>When you use AI features, your prompts and content inputs are transmitted to third-party AI processing providers. We only engage providers who maintain industry-standard data protection practices. We do not authorise these providers to use your data for their own model training.</Highlight>
+        <Highlight>When you use AI features, your prompts and content inputs are transmitted to third-party AI processing providers. Each provider has its own data retention and usage policies. We only engage providers who maintain industry-standard data protection practices, but we recommend reviewing the relevant provider's privacy policy if you have specific concerns about how your inputs are handled.</Highlight>
       </Section>
 
       <Section title="5. Data Storage and Security">
