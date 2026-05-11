@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import fs from "fs";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
@@ -38,6 +39,41 @@ const app = express();
 app.use(cors());
 
 app.use(express.json({ limit: "100mb" }));
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: "Too many requests, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const generationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Generation limit reached, please wait before trying again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many attempts, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api", generalLimiter);
+app.use("/api/generate", generationLimiter);
+app.use("/api/image-generation/generate", generationLimiter);
+app.use("/api/poster", generationLimiter);
+app.use("/api/thumbnail", generationLimiter);
+app.use("/api/outfit", generationLimiter);
+app.use("/api/social-post", generationLimiter);
+app.use("/api/product-ad", generationLimiter);
+app.use("/api/tts", generationLimiter);
+app.use("/api/webhooks", authLimiter);
 
 app.use("/renders", express.static(TEMP_DIR));
 
