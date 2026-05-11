@@ -260,6 +260,34 @@ function FlyoutGroup({ icon, label, active, children }) {
   );
 }
 
+function MobileBanner() {
+  const [visible, setVisible] = useState(() => {
+    if (typeof window === "undefined") return false;
+    if (window.innerWidth >= 768) return false;
+    return sessionStorage.getItem("mobile_banner_dismissed") !== "1";
+  });
+
+  if (!visible) return null;
+
+  return (
+    <div
+      className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between gap-3 px-4 py-2 md:hidden"
+      style={{ background: "#1a1a2e", borderBottom: "1px solid rgba(124,92,252,0.3)" }}
+    >
+      <span className="text-[13px] text-[#b0b0c8]">
+        Vidquence works best on desktop. Some features may not work on mobile.
+      </span>
+      <button
+        onClick={() => { sessionStorage.setItem("mobile_banner_dismissed", "1"); setVisible(false); }}
+        className="shrink-0 text-[#77777f] hover:text-[#e8e8f0] transition-colors bg-transparent border-0 cursor-pointer text-[18px] leading-none"
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function AppLayout({ children }) {
   const location  = useLocation();
   const navigate  = useNavigate();
@@ -281,6 +309,7 @@ export default function AppLayout({ children }) {
 
   return (
     <>
+      <MobileBanner />
       <style>{`@keyframes flyoutIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }`}</style>
       <div className="flex h-screen overflow-hidden text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
 
