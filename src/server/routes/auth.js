@@ -81,6 +81,26 @@ router.post("/account/delete", requireAuth, async (req, res) => {
     const { reason = "", reasonDetail = "" } = req.body || {};
     const { data: { user: deletedUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
 
+    const name = deletedUser?.user_metadata?.full_name || deletedUser?.user_metadata?.name || "";
+
+    // Capture data before deleting rows
+    const [{ data: creditsData }, { count: projectCount }] = await Promise.all([
+      supabaseAdmin.from("user_credits").select("balance").eq("user_id", userId).single(),
+      supabaseAdmin.from("projects").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    ]);
+
+    // Record churn before wiping data so the email is blockable on re-signup
+    await supabaseAdmin.from("deleted_users").insert({
+      user_id:            userId,
+      email:              deletedUser?.email || null,
+      name:               name || null,
+      reason:             reason || null,
+      reason_detail:      reasonDetail || null,
+      credits_at_deletion: creditsData?.balance ?? null,
+      project_count:      projectCount ?? 0,
+      deleted_at:         new Date().toISOString(),
+    });
+
     await supabaseAdmin.from("profiles").delete().eq("id", userId);
     await supabaseAdmin.from("user_credits").delete().eq("user_id", userId);
     await supabaseAdmin.from("subscriptions").delete().eq("user_id", userId);
@@ -94,7 +114,6 @@ router.post("/account/delete", requireAuth, async (req, res) => {
     sendAdminAlert(adminEmail.subject, adminEmail.html);
 
     if (deletedUser?.email) {
-      const name = deletedUser.user_metadata?.full_name || deletedUser.user_metadata?.name || "";
       const farewellEmail = userAccountDeletedEmail(name);
       sendUserEmail(deletedUser.email, farewellEmail.subject, farewellEmail.html);
     }
@@ -119,8 +138,16 @@ router.post("/webhooks/user-created", async (req, res) => {
     const { id, email, raw_user_meta_data } = record;
     const name = raw_user_meta_data?.full_name || raw_user_meta_data?.name || "";
 
-    // Free signup credits
-    await addCredits(id, 50, "bonus", "signup_bonus", "Welcome bonus — free credits");
+    // Block signup bonus for previously deleted accounts
+    const { data: wasDeleted } = await supabaseAdmin
+      .from("deleted_users")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (!wasDeleted) {
+      await addCredits(id, 50, "bonus", "signup_bonus", "Welcome bonus — free credits");
+    }
 
     // Admin alert (fire-and-forget)
     const adminEmail = adminNewUserEmail({ id, email, name });

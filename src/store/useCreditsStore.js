@@ -46,4 +46,26 @@ export const useCreditsStore = create((set, get) => ({
 
   /** Call after a successful purchase to sync the new balance. */
   setBalance: (balance) => set({ balance }),
+
+  /**
+   * Polls up to 4 times (0s, 2s, 4s, 6s) waiting for the signup webhook to
+   * credit the account. Used immediately after a brand-new Google signup so
+   * the dashboard doesn't flash 0 while the webhook is in-flight.
+   */
+  fetchCreditsForNewUser: async () => {
+    set({ fetched: false, loading: true });
+    for (let i = 0; i < 4; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 2000));
+      const data = await getCredits();
+      const bal = data?.balance ?? 0;
+      const done = bal > 0 || i === 3;
+      set({
+        balance:         bal,
+        lifetimeCredits: data?.lifetime_credits ?? 0,
+        loading:         !done,
+        fetched:         done,
+      });
+      if (bal > 0) return;
+    }
+  },
 }));

@@ -62,7 +62,8 @@ export default function App() {
   const [session,    setSession]    = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [recovering, setRecovering] = useState(false);
-  const fetchCredits = useCreditsStore(s => s.fetchCredits);
+  const fetchCredits           = useCreditsStore(s => s.fetchCredits);
+  const fetchCreditsForNewUser = useCreditsStore(s => s.fetchCreditsForNewUser);
 
   useEffect(() => {
     initLayoutRegistry().catch(() => {});
@@ -84,7 +85,11 @@ export default function App() {
       } else if (event === "SIGNED_IN") {
         setRecovering(false);
         setSession(sess);
-        fetchCredits();
+        // New accounts (created within last 15s): poll briefly in case the
+        // DB trigger hasn't committed yet. Existing users: single fetch.
+        const isNewUser = sess?.user?.created_at &&
+          Date.now() - new Date(sess.user.created_at).getTime() < 15_000;
+        if (isNewUser) fetchCreditsForNewUser(); else fetchCredits();
       } else if (event === "SIGNED_OUT") {
         setRecovering(false);
         setSession(null);
