@@ -332,7 +332,7 @@ export default function AppLayout({ children }) {
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
               <NavItem icon={Icons.aiVideo}    label="AI Videos"        sub="Generated with AI"        to="/videos"             active={path === "/videos" || path === "/new"} />
-              <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />
+              {isAdmin && <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />}
               <NavItem icon={Icons.ad}         label="Product Video"    sub="Ads for your products"    to="/product-ads"         active={path.startsWith("/product-ads")} />
               <NavItem icon={Icons.explainer}  label="Explainer Video"  sub="Talking head + visuals"   to="/videos/explainer"   active={path === "/videos/explainer"} />
               <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos" to="/video-captions"     active={path === "/video-captions"} />
