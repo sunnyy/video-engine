@@ -657,50 +657,39 @@ export default function LandingPage() {
             Stop juggling 6 different tools. One subscription. Every creative asset your business needs.
           </p>
 
-          <div className="services-grid" data-reveal>
-            {services.map((svc, i) => {
-              const serviceKey = serviceKeyMap[svc.title] || "";
-              const serviceSamples = samplesByService[serviceKey] || [];
-              return (
-              <div key={i} className="service-section">
-                <div className="service-header">
-                  <div className="service-tag">{svc.tag}</div>
-                  <div className="service-heading-row">
-                    <div className="service-heading-icon">{svc.icon}</div>
-                    <div className="service-title">{svc.title}</div>
-                  </div>
-                  <div className="service-desc">{svc.desc}</div>
-                </div>
-                {SHOW_SAMPLES && (
-                <div className="service-card" style={{ background: svc.bg }}>
-                  {/* Sample placeholder — replace with actual sample images/videos */}
-                  <div className="service-samples-row">
-                    {serviceSamples.map((media, sample) => (
-                      <div key={media.id} className="sample-slot" data-orientation={media.orientation || "horizontal"}>
-                        {media.type === "video" ? (
-                          <video
-                            src={media.src}
-                            poster={media.poster}
-                            muted
-                            loop
-                            playsInline
-                            preload="metadata"
-                            onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.pause();
-                              e.currentTarget.currentTime = 0;
-                            }}
-                          />
-                        ) : (
-                          <img src={media.src} alt={`${svc.title} sample ${sample + 1}`} loading="lazy" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                )}
+          <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginTop: 48 }}>
+            {[
+              { emoji: "🎬", name: "AI Video Generator",     desc: "Script to video in minutes"           },
+              { emoji: "📦", name: "Product Video Ads",      desc: "One photo → cinematic ad"             },
+              { emoji: "👗", name: "Virtual Try-On",         desc: "AI model wearing your product"        },
+              { emoji: "📱", name: "Social Post Generator",  desc: "Ready-to-post graphics instantly"     },
+              { emoji: "🖼️", name: "Thumbnail Generator",   desc: "Click-worthy thumbnails with AI"      },
+              { emoji: "🎨", name: "Poster Studio",          desc: "Luxury product posters in seconds"    },
+              { emoji: "🎙️", name: "Voice Studio",          desc: "Natural AI voiceovers, multilingual"  },
+              { emoji: "💬", name: "Caption Studio",         desc: "Auto-captions with style"             },
+              { emoji: "🔤", name: "Speech to Text",         desc: "Accurate transcription instantly"     },
+            ].map((svc) => (
+              <div
+                key={svc.name}
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: 14,
+                  padding: "20px 20px 18px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  transition: "border-color 0.2s",
+                  cursor: "default",
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(245,197,24,0.35)"}
+                onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"}
+              >
+                <div style={{ fontSize: 28, lineHeight: 1 }}>{svc.emoji}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3 }}>{svc.name}</div>
+                <div style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.45 }}>{svc.desc}</div>
               </div>
-            )})}
+            ))}
           </div>
         </div>
       </section>
