@@ -557,49 +557,106 @@ export default function LandingPage() {
       <section className="section" id="services">
         <div className="container">
           <div className="section-label">The Full Suite</div>
-          <h2 className="section-h">
-            Everything a brand needs.
-            <br />
-            <span className="yellow">In one place.</span>
-          </h2>
-          <p className="section-sub">
-            Stop juggling 6 different tools. One subscription. Every creative asset your business needs.
-          </p>
 
-          <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginTop: 48 }}>
-            {[
-              { emoji: "🎬", name: "AI Video Generator",     desc: "Script to video in minutes"           },
-              { emoji: "📦", name: "Product Video Ads",      desc: "One photo → cinematic ad"             },
-              { emoji: "👗", name: "Virtual Try-On",         desc: "AI model wearing your product"        },
-              { emoji: "📱", name: "Social Post Generator",  desc: "Ready-to-post graphics instantly"     },
-              { emoji: "🖼️", name: "Thumbnail Generator",   desc: "Click-worthy thumbnails with AI"      },
-              { emoji: "🎨", name: "Poster Studio",          desc: "Luxury product posters in seconds"    },
-              { emoji: "🎙️", name: "Voice Studio",          desc: "Natural AI voiceovers, multilingual"  },
-              { emoji: "💬", name: "Caption Studio",         desc: "Auto-captions with style"             },
-              { emoji: "🔤", name: "Speech to Text",         desc: "Accurate transcription instantly"     },
-            ].map((svc) => (
-              <div
-                key={svc.name}
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  borderRadius: 14,
-                  padding: "20px 20px 18px",
+          {(() => {
+            const CARDS = [
+              { emoji: "🎬", name: "AI Video Generator",    desc: "Script to video in minutes",          route: "/new",            accent: "#7c5cfc", col: "span 3" },
+              { emoji: "📦", name: "Product Video Ads",     desc: "One photo → cinematic ad",            route: "/product-ads",    accent: "#f97316", col: "span 2" },
+              { emoji: "👗", name: "Virtual Try-On",        desc: "AI model wearing your product",       route: "/virtual-tryon",  accent: "#ec4899", col: "span 2" },
+              { emoji: "📱", name: "Social Post Generator", desc: "Ready-to-post graphics instantly",    route: "/banner-design",  accent: "#f5c518", col: "span 2" },
+              { emoji: "🖼️", name: "Thumbnail Generator",  desc: "Click-worthy thumbnails with AI",     route: "/thumbnail",      accent: "#ef4444", col: "span 2" },
+              { emoji: "🎨", name: "Poster Studio",         desc: "Luxury product posters in seconds",   route: "/product-poster", accent: "#d946ef", col: "span 2" },
+              { emoji: "💬", name: "Caption Studio",        desc: "Auto-captions with style",            route: "/video-captions", accent: "#22c55e", col: "span 2" },
+              { emoji: "🎙️", name: "Voice Studio",         desc: "Natural AI voiceovers, multilingual", route: "/voiceover",      accent: "#3b82f6", col: "span 3" },
+              { emoji: "🔤", name: "Speech to Text",        desc: "Accurate transcription instantly",    route: "/speech-to-text", accent: "#8b5cf6", col: "span 3" },
+            ];
+
+            const cardStyle = (accent, col) => ({
+              gridColumn: col,
+              position: "relative",
+              background: "#13131e",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: 18,
+              padding: "28px 24px 22px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              minHeight: col === "span 3" ? 240 : 190,
+              overflow: "hidden",
+              transition: "border-color 0.2s, transform 0.2s",
+              cursor: "pointer",
+            });
+
+            return (
+              <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginTop: 40 }}>
+                {/* Row 1 left — heading card */}
+                <div style={{
+                  gridColumn: "span 3",
+                  background: "linear-gradient(135deg, #13131e 60%, rgba(245,197,24,0.07))",
+                  border: "1px solid rgba(245,197,24,0.18)",
+                  borderRadius: 18,
+                  padding: "36px 32px",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 8,
-                  transition: "border-color 0.2s",
-                  cursor: "default",
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(245,197,24,0.35)"}
-                onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"}
-              >
-                <div style={{ fontSize: 28, lineHeight: 1 }}>{svc.emoji}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3 }}>{svc.name}</div>
-                <div style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.45 }}>{svc.desc}</div>
+                  justifyContent: "flex-end",
+                  minHeight: 240,
+                }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2, color: "#f5c518", fontFamily: "var(--font-mono)", textTransform: "uppercase", marginBottom: 16 }}>Everything a brand needs</div>
+                  <h2 style={{ margin: 0, fontSize: "clamp(22px, 2.8vw, 34px)", fontWeight: 800, color: "#e8e8f0", lineHeight: 1.15, letterSpacing: "-0.5px" }}>
+                    One AI suite.<br /><span style={{ color: "#f5c518" }}>Every creative asset.</span>
+                  </h2>
+                  <p style={{ margin: "14px 0 0", fontSize: 14, color: "var(--dim)", lineHeight: 1.6, maxWidth: 340 }}>
+                    Videos, ads, posters, voiceovers, thumbnails, captions — all from one dashboard.
+                  </p>
+                </div>
+
+                {/* Service cards */}
+                {CARDS.map((svc) => (
+                  <div
+                    key={svc.name}
+                    data-service={svc.name}
+                    style={cardStyle(svc.accent, svc.col)}
+                    onClick={() => navigate(svc.route)}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = svc.accent + "55"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.transform = "translateY(0)"; }}
+                  >
+                    {/* Accent glow */}
+                    <div style={{ position: "absolute", top: -60, right: -60, width: 160, height: 160, borderRadius: "50%", background: svc.accent, opacity: 0.07, pointerEvents: "none" }} />
+
+                    {/* Top — icon */}
+                    <div style={{ fontSize: 30, lineHeight: 1 }}>{svc.emoji}</div>
+
+                    {/* Bottom — name + desc + button */}
+                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3 }}>{svc.name}</div>
+                        <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 4, lineHeight: 1.4 }}>{svc.desc}</div>
+                      </div>
+                      <button
+                        style={{
+                          flexShrink: 0,
+                          background: svc.accent + "22",
+                          border: `1px solid ${svc.accent}55`,
+                          color: svc.accent,
+                          borderRadius: 20,
+                          padding: "5px 13px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          transition: "background 0.15s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = svc.accent + "44"}
+                        onMouseLeave={e => e.currentTarget.style.background = svc.accent + "22"}
+                      >
+                        Open →
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       </section>
 
