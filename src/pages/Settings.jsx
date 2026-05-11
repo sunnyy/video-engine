@@ -96,6 +96,7 @@ export default function Settings() {
   const [confirmText,       setConfirmText]       = useState("");
   const [deleting,          setDeleting]          = useState(false);
   const [deleteError,       setDeleteError]       = useState("");
+  const [avatarError,       setAvatarError]       = useState(false);
 
   const DELETE_REASONS = [
     "Too expensive / not worth it",
@@ -169,8 +170,8 @@ export default function Settings() {
             <SectionLabel>Profile</SectionLabel>
             <Card>
               <div className="flex items-center gap-5">
-                {avatar ? (
-                  <img src={avatar} alt={name} className="w-16 h-16 rounded-full object-cover shrink-0" style={{ border: "2px solid rgba(245,197,24,0.3)" }} />
+                {avatar && !avatarError ? (
+                  <img src={avatar} alt={name} onError={() => setAvatarError(true)} className="w-16 h-16 rounded-full object-cover shrink-0" style={{ border: "2px solid rgba(245,197,24,0.3)" }} />
                 ) : (
                   <div className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center text-[24px] font-bold" style={{ background: "rgba(245,197,24,0.12)", color: "#f5c518", border: "2px solid rgba(245,197,24,0.3)" }}>
                     {name.charAt(0).toUpperCase()}
