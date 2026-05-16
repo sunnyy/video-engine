@@ -11,6 +11,7 @@ const ANIMATION_TYPES_IN = [
   "zoom", "bounce", "typewriter",
 ];
 const ANIMATION_TYPES_OUT = ["none", "fade"];
+const TRANSITION_TYPES = ["none", "fade", "dissolve", "slide-left", "slide-right"];
 const OBJECT_FIT_OPTIONS = ["cover", "contain", "fill"];
 
 const labelStyle = {
@@ -258,6 +259,30 @@ function AnimationProps({ layer, update }) {
           <NumberInput value={anim.out?.duration ?? 0.3} onChange={(v) => updateOut({ duration: Math.max(0, v) })} min={0} step={0.05} />
         </Field>
       </Row2>
+    </Section>
+  );
+}
+
+function TransitionProps({ layer, update }) {
+  const tr = layer.transition ?? { type: "none", duration: 0.5 };
+  const updateTr = (patch) => update({ transition: { ...tr, ...patch } });
+  return (
+    <Section title="Transition">
+      <Field label="Type">
+        <select style={selectStyle} value={tr.type ?? "none"} onChange={(e) => updateTr({ type: e.target.value })}>
+          {TRANSITION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </Field>
+      {(tr.type ?? "none") !== "none" && (
+        <Field label="Duration (s)">
+          <NumberInput
+            value={tr.duration ?? 0.5}
+            onChange={(v) => updateTr({ duration: Math.max(0.1, Math.min(2, v)) })}
+            min={0.1} max={2} step={0.1}
+          />
+        </Field>
+      )}
+      <div style={{ fontSize: 11, color: "#55557a", marginTop: -4 }}>Applied at the end of this clip</div>
     </Section>
   );
 }
@@ -526,6 +551,7 @@ export default function PropertiesPanel() {
           {layer.type === "text" && <TextProps layer={layer} update={update} />}
           {(layer.type === "image" || layer.type === "sticker") && <ImageProps layer={layer} update={update} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
           {layer.type !== "audio" && <AnimationProps layer={layer} update={update} />}
+          {(layer.type === "video" || layer.type === "image") && <TransitionProps layer={layer} update={update} />}
           {layer.type !== "audio" && layer.type !== "captions" && (
             <KeyframesSection
               layer={layer}

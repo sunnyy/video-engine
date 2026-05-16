@@ -1,6 +1,6 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
-import TimelineTrack from "./TimelineTrack";
+import TimelineTrack, { TRACK_H } from "./TimelineTrack";
 
 const LABEL_W = 60;
 const RULER_H = 28;
@@ -27,9 +27,18 @@ export default function Timeline() {
   const zoom = useTimelineStore((s) => s.zoom);
   const setCurrentTime = useTimelineStore((s) => s.setCurrentTime);
   const setIsPlaying = useTimelineStore((s) => s.setIsPlaying);
+  const reorderTrackGroups = useTimelineStore((s) => s.reorderTrackGroups);
 
   const scrollRef = useRef(null);
   const isDraggingPlayhead = useRef(false);
+  const dragSrcIdx = useRef(null);
+  const [dropIndicatorIdx, setDropIndicatorIdx] = useState(null);
+
+  // Cross-track clip drag state
+  const [crossDragLayerId, setCrossDragLayerId] = useState(null);
+  const [crossDragTargetIdx, setCrossDragTargetIdx] = useState(null); // number | 'new' | null
+  // Stable ref to latest trackGroups so callbacks don't go stale
+  const trackGroupsRef = useRef([]);
 
   const pps = 80 * zoom;
   const totalWidth = Math.max(duration * pps + 80, 200);
@@ -51,6 +60,46 @@ export default function Timeline() {
     }
     trackMap.get(tid).push(layer);
   }
+
+  // Keep trackGroupsRef current so stable callbacks can read latest groups
+  useEffect(() => { trackGroupsRef.current = trackGroups; });
+
+  // Stable helper — maps clientY to track group index using scroll-aware math
+  const clientYToTrackIdx = useCallback((clientY) => {
+    const el = scrollRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const relY = clientY - rect.top + el.scrollTop - RULER_H;
+    if (relY < 0) return null;
+    return Math.floor(relY / TRACK_H);
+  }, []);
+
+  // Stable cross-track callbacks — read fresh state via refs
+  const onCrossTrackMove = useCallback((layerId, clientY) => {
+    setCrossDragLayerId(layerId);
+    const idx = clientYToTrackIdx(clientY);
+    if (idx === null) { setCrossDragTargetIdx(null); return; }
+    setCrossDragTargetIdx(idx >= trackGroupsRef.current.length ? "new" : idx);
+  }, [clientYToTrackIdx]);
+
+  const onCrossTrackDrop = useCallback((layerId, clientY) => {
+    setCrossDragLayerId(null);
+    setCrossDragTargetIdx(null);
+    const idx = clientYToTrackIdx(clientY);
+    if (idx === null) return;
+    const tg = trackGroupsRef.current;
+    const store = useTimelineStore.getState();
+    const layer = store.project?.layers?.find((l) => l.id === layerId);
+    if (!layer) return;
+    const currentTrackId = layer.trackId ?? layer.id;
+    if (idx >= tg.length) {
+      // Drop on new-track zone — give clip its own unique row
+      if (currentTrackId !== layerId) store.moveClipToTrack(layerId, layerId);
+    } else {
+      const targetTrackId = tg[idx][0].trackId ?? tg[idx][0].id;
+      if (targetTrackId !== currentTrackId) store.moveClipToTrack(layerId, targetTrackId);
+    }
+  }, [clientYToTrackIdx]);
 
   const clientXToTime = useCallback(
     (clientX) => {
@@ -176,13 +225,68 @@ export default function Timeline() {
               Add a layer to see it on the timeline
             </div>
           ) : (
-            trackGroups.map((trackLayers) => (
+            trackGroups.map((trackLayers, idx) => (
               <TimelineTrack
                 key={trackLayers[0].trackId ?? trackLayers[0].id}
                 layers={trackLayers}
                 pps={pps}
+                isDragOver={dropIndicatorIdx === idx}
+                onLabelDragStart={(e) => {
+                  dragSrcIdx.current = idx;
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onLabelDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragSrcIdx.current !== null && dragSrcIdx.current !== idx) {
+                    setDropIndicatorIdx(idx);
+                  }
+                }}
+                onLabelDrop={(e) => {
+                  e.preventDefault();
+                  const src = dragSrcIdx.current;
+                  dragSrcIdx.current = null;
+                  setDropIndicatorIdx(null);
+                  if (src === null || src === idx) return;
+                  const ids = trackGroups.map((g) => g[0].trackId ?? g[0].id);
+                  const movedId = ids[src];
+                  const filtered = ids.filter((_, i) => i !== src);
+                  const insertAt = idx > src ? idx - 1 : idx;
+                  filtered.splice(insertAt, 0, movedId);
+                  reorderTrackGroups(filtered);
+                }}
+                onLabelDragEnd={() => {
+                  dragSrcIdx.current = null;
+                  setDropIndicatorIdx(null);
+                }}
+                isClipDragTarget={crossDragTargetIdx === idx}
+                crossDragLayerId={crossDragLayerId}
+                onCrossTrackMove={onCrossTrackMove}
+                onCrossTrackDrop={onCrossTrackDrop}
               />
             ))
+          )}
+
+          {/* New-track drop zone — appears below all tracks while cross-track dragging */}
+          {crossDragLayerId && (
+            <div
+              style={{
+                height: TRACK_H,
+                margin: "3px 0",
+                borderRadius: 5,
+                border: `1.5px dashed ${crossDragTargetIdx === "new" ? "#7c5cfc" : "rgba(124,92,252,0.3)"}`,
+                background: crossDragTargetIdx === "new" ? "rgba(124,92,252,0.08)" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                paddingLeft: LABEL_W + 12,
+                color: crossDragTargetIdx === "new" ? "#9070f0" : "#44445a",
+                fontSize: 11,
+                transition: "all 0.1s",
+                userSelect: "none",
+                pointerEvents: "none",
+              }}
+            >
+              + New track
+            </div>
           )}
 
           {/* ── Playhead ── */}

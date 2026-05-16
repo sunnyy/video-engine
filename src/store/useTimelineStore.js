@@ -150,7 +150,64 @@ export const useTimelineStore = create((set, get) => ({
     const layers = [...project.layers];
     const [moved] = layers.splice(fromIndex, 1);
     layers.splice(toIndex, 0, moved);
-    set({ project: { ...project, layers }, _history: newHistory, _future: [] });
+    const newLayers = layers.map((l, i) => ({ ...l, zIndex: i + 1 }));
+    set({ project: { ...project, layers: newLayers }, _history: newHistory, _future: [] });
+  },
+
+  bringForward: (layerId) => {
+    const { project, _history } = get();
+    if (!project) return;
+    const layers = [...project.layers];
+    const idx = layers.findIndex((l) => l.id === layerId);
+    if (idx < 0 || idx >= layers.length - 1) return;
+    const newHistory = pushHistory(_history, project);
+    [layers[idx], layers[idx + 1]] = [layers[idx + 1], layers[idx]];
+    const newLayers = layers.map((l, i) => ({ ...l, zIndex: i + 1 }));
+    set({ project: { ...project, layers: newLayers }, _history: newHistory, _future: [] });
+  },
+
+  sendBack: (layerId) => {
+    const { project, _history } = get();
+    if (!project) return;
+    const layers = [...project.layers];
+    const idx = layers.findIndex((l) => l.id === layerId);
+    if (idx <= 0) return;
+    const newHistory = pushHistory(_history, project);
+    [layers[idx], layers[idx - 1]] = [layers[idx - 1], layers[idx]];
+    const newLayers = layers.map((l, i) => ({ ...l, zIndex: i + 1 }));
+    set({ project: { ...project, layers: newLayers }, _history: newHistory, _future: [] });
+  },
+
+  moveClipToTrack: (layerId, targetTrackId) => {
+    const { project, _history } = get();
+    if (!project) return;
+    const newHistory = pushHistory(_history, project);
+    const newLayers = project.layers.map((l) =>
+      l.id === layerId ? { ...l, trackId: targetTrackId } : l
+    );
+    set({ project: { ...project, layers: newLayers }, _history: newHistory, _future: [] });
+  },
+
+  reorderTrackGroups: (orderedTrackIds) => {
+    const { project, _history } = get();
+    if (!project) return;
+    const newHistory = pushHistory(_history, project);
+    const byTrack = new Map();
+    for (const layer of project.layers) {
+      const tid = layer.trackId ?? layer.id;
+      if (!byTrack.has(tid)) byTrack.set(tid, []);
+      byTrack.get(tid).push(layer);
+    }
+    const newLayers = [];
+    for (const tid of orderedTrackIds) {
+      const group = byTrack.get(tid);
+      if (group) newLayers.push(...group);
+    }
+    for (const layer of project.layers) {
+      if (!newLayers.find((l) => l.id === layer.id)) newLayers.push(layer);
+    }
+    const withZIndex = newLayers.map((l, i) => ({ ...l, zIndex: i + 1 }));
+    set({ project: { ...project, layers: withZIndex }, _history: newHistory, _future: [] });
   },
 
   // ── Selection ────────────────────────────────────────────────

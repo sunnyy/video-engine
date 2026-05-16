@@ -46,6 +46,18 @@ export default function TimelineEditor() {
           e.preventDefault();
           useTimelineStore.getState().duplicateLayer(selectedLayerId);
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.code === "BracketRight") {
+        const { selectedLayerId } = useTimelineStore.getState();
+        if (selectedLayerId) {
+          e.preventDefault();
+          useTimelineStore.getState().bringForward(selectedLayerId);
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.code === "BracketLeft") {
+        const { selectedLayerId } = useTimelineStore.getState();
+        if (selectedLayerId) {
+          e.preventDefault();
+          useTimelineStore.getState().sendBack(selectedLayerId);
+        }
       }
     };
 

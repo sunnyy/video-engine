@@ -22,7 +22,11 @@ const LAYER_COLORS = {
   sticker: "#ff9f40",
 };
 
-export default function TimelineTrack({ layers, pps }) {
+export default function TimelineTrack({
+  layers, pps,
+  isDragOver, onLabelDragStart, onLabelDragOver, onLabelDrop, onLabelDragEnd,
+  isClipDragTarget, crossDragLayerId, onCrossTrackMove, onCrossTrackDrop,
+}) {
   const selectedLayerId = useTimelineStore((s) => s.selectedLayerId);
   const selectLayer = useTimelineStore((s) => s.selectLayer);
 
@@ -37,12 +41,15 @@ export default function TimelineTrack({ layers, pps }) {
       style={{
         display: "flex",
         height: TRACK_H,
+        borderTop: isDragOver ? "2px solid #7c5cfc" : "2px solid transparent",
         borderBottom: "1px solid rgba(255,255,255,0.05)",
         position: "relative",
+        boxSizing: "border-box",
       }}
     >
       {/* Sticky label */}
       <div
+        draggable
         style={{
           width: LABEL_W,
           flexShrink: 0,
@@ -55,10 +62,14 @@ export default function TimelineTrack({ layers, pps }) {
           alignItems: "center",
           gap: 5,
           padding: "0 8px",
-          cursor: "pointer",
+          cursor: "grab",
           userSelect: "none",
         }}
         onClick={() => selectLayer(primary.id)}
+        onDragStart={onLabelDragStart}
+        onDragOver={onLabelDragOver}
+        onDrop={onLabelDrop}
+        onDragEnd={onLabelDragEnd}
       >
         <span style={{ fontSize: 12, color, flexShrink: 0, lineHeight: 1 }}>
           {LAYER_ICONS[primary.type] ?? "?"}
@@ -82,12 +93,22 @@ export default function TimelineTrack({ layers, pps }) {
         style={{
           flex: 1,
           position: "relative",
-          background: isSelected ? "rgba(124,92,252,0.05)" : "transparent",
+          background: isClipDragTarget
+            ? "rgba(124,92,252,0.15)"
+            : isSelected ? "rgba(124,92,252,0.05)" : "transparent",
+          transition: "background 0.1s",
         }}
         onClick={(e) => { if (e.target === e.currentTarget) selectLayer(null); }}
       >
         {sorted.map((layer) => (
-          <TimelineClip key={layer.id} layer={layer} pps={pps} />
+          <TimelineClip
+            key={layer.id}
+            layer={layer}
+            pps={pps}
+            isCrossTracking={crossDragLayerId === layer.id}
+            onCrossTrackMove={onCrossTrackMove}
+            onCrossTrackDrop={onCrossTrackDrop}
+          />
         ))}
       </div>
     </div>

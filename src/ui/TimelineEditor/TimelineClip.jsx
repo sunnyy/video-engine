@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
+import WaveformCanvas from "./WaveformCanvas";
 
 const LAYER_COLORS = {
   video: "#4a9eff",
@@ -12,7 +13,7 @@ const LAYER_COLORS = {
 
 const HANDLE_W = 7;
 
-export default function TimelineClip({ layer, pps }) {
+export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrackMove, onCrossTrackDrop }) {
   const selectedLayerId = useTimelineStore((s) => s.selectedLayerId);
   const selectLayer = useTimelineStore((s) => s.selectLayer);
   const updateLayer = useTimelineStore((s) => s.updateLayer);
@@ -36,11 +37,19 @@ export default function TimelineClip({ layer, pps }) {
     selectLayer(layer.id);
 
     const startX = e.clientX;
+    const startY = e.clientY;
     const origStart = layer.start;
     const clipDur = layer.end - layer.start;
     dragRef.current = true;
+    let crossMode = false;
 
     const onMove = (me) => {
+      if (!crossMode && Math.abs(me.clientY - startY) > 20) {
+        crossMode = true;
+      }
+      if (crossMode) {
+        onCrossTrackMove?.(layer.id, me.clientY);
+      }
       let newStart = snapVal(Math.max(0, origStart + (me.clientX - startX) / pps));
       let newEnd = newStart + clipDur;
       if (newEnd > duration) { newEnd = duration; newStart = newEnd - clipDur; }
@@ -53,6 +62,9 @@ export default function TimelineClip({ layer, pps }) {
       let newStart = snapVal(Math.max(0, origStart + (me.clientX - startX) / pps));
       let newEnd = newStart + clipDur;
       if (newEnd > duration) { newEnd = duration; newStart = newEnd - clipDur; }
+      if (crossMode) {
+        onCrossTrackDrop?.(layer.id, me.clientY);
+      }
       updateLayer(layer.id, { start: newStart, end: newEnd });
     };
     window.addEventListener("mousemove", onMove);
@@ -133,6 +145,8 @@ export default function TimelineClip({ layer, pps }) {
         display: "flex",
         alignItems: "center",
         overflow: "hidden",
+        opacity: isCrossTracking ? 0.45 : 1,
+        transition: "opacity 0.1s",
       }}
       onMouseDown={onBodyMouseDown}
     >
@@ -147,6 +161,17 @@ export default function TimelineClip({ layer, pps }) {
         }}
         onMouseDown={onLeftMouseDown}
       />
+
+      {/* Audio waveform */}
+      {layer.type === "audio" && width > 20 && (
+        <WaveformCanvas
+          src={layer.src}
+          width={Math.round(width)}
+          height={34}
+          color="#ffffff"
+          opacity={0.5}
+        />
+      )}
 
       {/* Label */}
       <div
@@ -176,6 +201,22 @@ export default function TimelineClip({ layer, pps }) {
         }}
         onMouseDown={onRightMouseDown}
       />
+
+      {/* Transition-out indicator — gradient on right edge */}
+      {(layer.transition?.type ?? "none") !== "none" && (
+        <div
+          style={{
+            position: "absolute",
+            right: 0,
+            top: 0,
+            width: Math.min(Math.round(width * 0.35), 48),
+            height: "100%",
+            background: `linear-gradient(to right, transparent, ${color}bb)`,
+            pointerEvents: "none",
+            zIndex: 3,
+          }}
+        />
+      )}
 
       {/* Keyframe diamonds */}
       {kfTimes.map((time) => (

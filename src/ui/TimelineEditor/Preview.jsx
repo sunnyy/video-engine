@@ -27,6 +27,51 @@ function resolvedObjectFit(layer, currentTime) {
   return stepKeyframe(layer.keyframes?.objectFit ?? [], localTime) ?? layer.objectFit ?? "cover";
 }
 
+// ── Transition helpers ────────────────────────────────────────────────────────
+
+function buildTransitionEffect(type, p) {
+  // p: 0 = fully visible, 1 = fully hidden
+  switch (type) {
+    case "fade":        return { opacity: 1 - p, translateX: 0, addBlur: 0 };
+    case "dissolve":    return { opacity: 1 - p, translateX: 0, addBlur: p * 8 };
+    case "slide-left":  return { opacity: 1, translateX: -p * 100, addBlur: 0 };
+    case "slide-right": return { opacity: 1, translateX:  p * 100, addBlur: 0 };
+    default:            return { opacity: 1, translateX: 0, addBlur: 0 };
+  }
+}
+
+// Returns { opacity, translateX, addBlur } for a layer at the current playback time.
+// Checks transition-out (this clip's own transition) and transition-in (reverse of previous clip's transition).
+function getTransitionStyle(layer, currentTime, allLayers) {
+  const { type = "none", duration = 0.5 } = layer.transition ?? {};
+
+  if (type !== "none" && duration > 0) {
+    const outStart = layer.end - duration;
+    if (currentTime >= outStart) {
+      const p = Math.min(1, (currentTime - outStart) / duration);
+      return buildTransitionEffect(type, p);
+    }
+  }
+
+  const trackId = layer.trackId ?? layer.id;
+  const prev = (allLayers ?? [])
+    .filter((l) => l.id !== layer.id && (l.trackId ?? l.id) === trackId && l.end <= layer.end)
+    .sort((a, b) => b.end - a.end)[0];
+
+  if (prev) {
+    const { type: pType = "none", duration: pDur = 0.5 } = prev.transition ?? {};
+    if (pType !== "none" && pDur > 0) {
+      const inEnd = layer.start + pDur;
+      if (currentTime < inEnd) {
+        const p = 1 - (currentTime - layer.start) / pDur;
+        return buildTransitionEffect(pType, Math.max(0, Math.min(1, p)));
+      }
+    }
+  }
+
+  return { opacity: 1, translateX: 0, addBlur: 0 };
+}
+
 // ── Video / Audio helpers ─────────────────────────────────────────────────────
 
 // Seek to `time`, then call play() only after the browser finishes seeking.
@@ -115,12 +160,23 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
     el.currentTime = sourceTime;
   }, [currentTime]);
 
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.volume = Math.max(0, Math.min(1, layer.volume ?? 1));
+  }, [layer.volume]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.muted = layer.muted ?? false;
+  }, [layer.muted]);
+
   return (
     <audio
       ref={ref}
       src={layer.src}
       style={{ display: "none" }}
-      muted={layer.muted ?? false}
       preload="auto"
     />
   );
@@ -202,6 +258,9 @@ function PersistentVideoTrack({
 
   const left = canvasW / 2 + x - width / 2;
   const top  = canvasH / 2 + y - height / 2;
+
+  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0 } =
+    activeClip ? getTransitionStyle(activeClip, currentTime, clips) : {};
 
   const onResizeMouseDown = (e, handleId) => {
     if (!activeClip) return;
@@ -312,10 +371,10 @@ function PersistentVideoTrack({
         top:    activeClip ? top    : 0,
         width:  activeClip ? width  : 0,
         height: activeClip ? height : 0,
-        transform: `rotate(${rotation}deg) scale(${scale})`,
+        transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation}deg) scale(${scale})`,
         transformOrigin: "center center",
-        opacity: activeClip ? opacity : 0,
-        filter: blur ? `blur(${blur}px)` : undefined,
+        opacity: activeClip ? opacity * tOpacity : 0,
+        filter: (blur || tBlur) ? `blur(${blur + tBlur}px)` : undefined,
         userSelect: "none",
         pointerEvents: "none",
         outline: activeClip && isSelected
@@ -337,9 +396,9 @@ function PersistentVideoTrack({
       >
         <video
           ref={videoRef}
-          src={clips[0]?.src}
+          src={activeClip?.src ?? clips[0]?.src}
           style={{ width: "100%", height: "100%", objectFit: activeClip ? resolvedObjectFit(activeClip, currentTime) : "cover", pointerEvents: "none" }}
-          muted={clips[0]?.muted ?? false}
+          muted={activeClip?.muted ?? clips[0]?.muted ?? false}
           loop={false}
           preload="auto"
           playsInline
@@ -387,6 +446,7 @@ function LayerElement({
   onBodyMouseDown,
   onStartEdit,
   onEndEdit,
+  transitionStyle,
 }) {
   // Must be unconditional — called before the audio early-return below
   const wrapperRef  = useRef(null);
@@ -412,6 +472,8 @@ function LayerElement({
 
   const tr = resolveTransform(layer, currentTime);
   const { x, y, width, height, rotation, scale, opacity, blur } = tr;
+
+  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0 } = transitionStyle ?? {};
 
   const isDraggable = DRAGGABLE_TYPES.has(layer.type) && !layer.locked && !isEditing;
   const isResizable = isSelected && !layer.locked && DRAGGABLE_TYPES.has(layer.type) && !isEditing;
@@ -657,10 +719,10 @@ function LayerElement({
         top,
         width,
         height,
-        transform: `rotate(${rotation ?? 0}deg) scale(${scale ?? 1})`,
+        transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${scale ?? 1})`,
         transformOrigin: "center center",
-        opacity: opacity ?? 1,
-        filter: blur ? `blur(${blur}px)` : undefined,
+        opacity: (opacity ?? 1) * tOpacity,
+        filter: (blur || tBlur) ? `blur(${(blur ?? 0) + tBlur}px)` : undefined,
         userSelect: "none",
         // Pointer events off on outer; inner content and handles opt in individually
         pointerEvents: "none",
@@ -1015,6 +1077,7 @@ export default function Preview() {
               onBodyMouseDown={handleBodyMouseDown}
               onStartEdit={() => setEditingLayerId(layer.id)}
               onEndEdit={() => setEditingLayerId(null)}
+              transitionStyle={getTransitionStyle(layer, currentTime, layers)}
             />
           ))}
 

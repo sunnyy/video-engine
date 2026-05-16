@@ -40,9 +40,15 @@ export default function TimelineToolbar() {
   const duplicateLayer       = useTimelineStore((s) => s.duplicateLayer);
   const splitLayerAtPlayhead = useTimelineStore((s) => s.splitLayerAtPlayhead);
   const addKeyframe          = useTimelineStore((s) => s.addKeyframe);
+  const bringForward         = useTimelineStore((s) => s.bringForward);
+  const sendBack             = useTimelineStore((s) => s.sendBack);
 
   const hasSelection = !!selectedLayerId;
   const selectedLayer = project?.layers?.find((l) => l.id === selectedLayerId) ?? null;
+  const layerIdx = project?.layers?.findIndex((l) => l.id === selectedLayerId) ?? -1;
+  const totalLayers = project?.layers?.length ?? 0;
+  const canBringForward = hasSelection && layerIdx < totalLayers - 1;
+  const canSendBack = hasSelection && layerIdx > 0;
 
   const hasKeyframes = selectedLayer
     ? Object.values(selectedLayer.keyframes ?? {}).some((arr) => arr?.length > 0)
@@ -145,6 +151,26 @@ export default function TimelineToolbar() {
         title="Delete (Del)"
       >
         🗑
+      </button>
+
+      <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.09)", margin: "0 4px" }} />
+
+      {/* Z-order */}
+      <button
+        style={{ ...iconBtn(false), opacity: canBringForward ? 1 : 0.3 }}
+        onClick={() => canBringForward && bringForward(selectedLayerId)}
+        disabled={!canBringForward}
+        title="Bring Forward (Ctrl+])"
+      >
+        ↑
+      </button>
+      <button
+        style={{ ...iconBtn(false), opacity: canSendBack ? 1 : 0.3 }}
+        onClick={() => canSendBack && sendBack(selectedLayerId)}
+        disabled={!canSendBack}
+        title="Send Back (Ctrl+[)"
+      >
+        ↓
       </button>
 
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.09)", margin: "0 4px" }} />
