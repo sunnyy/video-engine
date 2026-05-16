@@ -116,6 +116,7 @@ export default function Timeline() {
     if (e.button !== 0) return;
     e.stopPropagation();
     isDraggingPlayhead.current = true;
+    const wasPlaying = useTimelineStore.getState().isPlaying;
     setIsPlaying(false);
     const onMove = (me) => setCurrentTime(clientXToTime(me.clientX));
     const onUp = (me) => {
@@ -123,14 +124,17 @@ export default function Timeline() {
       window.removeEventListener("mouseup", onUp);
       isDraggingPlayhead.current = false;
       setCurrentTime(clientXToTime(me.clientX));
+      if (wasPlaying) setIsPlaying(true);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
 
   const onRulerMouseDown = (e) => {
+    const wasPlaying = useTimelineStore.getState().isPlaying;
     setIsPlaying(false);
     setCurrentTime(clientXToTime(e.clientX));
+    if (wasPlaying) setIsPlaying(true);
   };
 
   const interval = tickInterval(pps);

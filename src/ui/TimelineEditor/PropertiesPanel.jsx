@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform } from "./keyframeUtils";
+import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 
 const FONT_FAMILIES = [
   "Outfit", "Inter", "Roboto", "Montserrat",
@@ -13,6 +14,14 @@ const ANIMATION_TYPES_IN = [
 const ANIMATION_TYPES_OUT = ["none", "fade"];
 const TRANSITION_TYPES = ["none", "fade", "dissolve", "slide-left", "slide-right", "zoom"];
 const OBJECT_FIT_OPTIONS = ["cover", "contain", "fill"];
+const BOX_SHADOW_PRESETS = [
+  { label: "None",    value: null },
+  { label: "Soft",    value: "0 4px 24px rgba(0,0,0,0.5)" },
+  { label: "Hard",    value: "6px 6px 0px rgba(0,0,0,0.85)" },
+  { label: "Glow",    value: "0 0 24px rgba(255,255,255,0.55)" },
+  { label: "Purple",  value: "0 0 24px rgba(124,92,252,0.75)" },
+  { label: "Gold",    value: "0 0 24px rgba(255,200,0,0.7)" },
+];
 
 const labelStyle = {
   fontSize: 11,
@@ -47,11 +56,17 @@ function Field({ label, children }) {
   );
 }
 
+function roundToStep(value, step) {
+  const decimals = step >= 1 ? 0 : step >= 0.1 ? 1 : 2;
+  const factor = Math.pow(10, decimals);
+  return Math.round((value ?? 0) * factor) / factor;
+}
+
 function NumberInput({ value, onChange, min, max, step = 1 }) {
   return (
     <input
       type="number"
-      value={value ?? 0}
+      value={roundToStep(value, step)}
       min={min}
       max={max}
       step={step}
@@ -104,18 +119,77 @@ function SrcField({ layer, update }) {
   );
 }
 
-function VideoProps({ layer, update, resolvedObjectFitVal, updateObjectFit }) {
+function VideoProps({ layer, update, updateSilent, commit, resolvedObjectFitVal, updateObjectFit }) {
+  const preVol = useRef(null);
   return (
     <Section title="Video">
       <SrcField layer={layer} update={update} />
-      <Row2>
-        <Field label="Volume">
-          <NumberInput value={layer.volume} onChange={(v) => update({ volume: Math.max(0, Math.min(1, v)) })} min={0} max={1} step={0.05} />
-        </Field>
-        <Field label="Speed">
-          <NumberInput value={layer.playbackRate} onChange={(v) => update({ playbackRate: Math.max(0.1, v) })} min={0.1} max={4} step={0.1} />
-        </Field>
-      </Row2>
+      <Field label="Volume">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <button
+            onClick={() => update({ muted: !layer.muted })}
+            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 16, opacity: layer.muted ? 0.4 : 1, padding: 0 }}
+          >
+            {layer.muted ? "🔇" : (layer.volume ?? 1) > 0.5 ? "🔊" : "🔉"}
+          </button>
+          <span style={{ fontSize: 11, color: "#7070a0", minWidth: 36, textAlign: "right" }}>
+            {layer.muted ? "Muted" : `${Math.round((layer.volume ?? 1) * 100)}%`}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={layer.muted ? 0 : (layer.volume ?? 1)}
+          onMouseDown={() => { preVol.current = JSON.parse(JSON.stringify(useTimelineStore.getState().project)); }}
+          onChange={(e) => updateSilent({ volume: parseFloat(e.target.value), muted: false })}
+          onMouseUp={(e) => commit({ volume: parseFloat(e.target.value), muted: false }, preVol.current)}
+          style={{ width: "100%", accentColor: "#7c5cfc", margin: 0 }}
+        />
+        <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+          <div style={{
+            height: "100%",
+            width: `${layer.muted ? 0 : (layer.volume ?? 1) * 100}%`,
+            background: layer.muted ? "#55556a" : "#7c5cfc",
+            borderRadius: 2,
+            transition: "width 0.1s",
+          }} />
+        </div>
+      </Field>
+      <Field label="Speed">
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3].map((speed) => {
+            const active = (layer.playbackRate ?? 1) === speed;
+            return (
+              <button
+                key={speed}
+                onClick={() => {
+                  const trimStart = layer.trimStart ?? 0;
+                  const trimEnd = layer.trimEnd ?? layer.end;
+                  const originalDuration = trimEnd - trimStart;
+                  const effectiveDuration = originalDuration / speed;
+                  update({ playbackRate: speed, end: layer.start + effectiveDuration });
+                }}
+                style={{
+                  padding: "4px 8px", borderRadius: 6, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                  background: active ? "rgba(124,92,252,0.2)" : "transparent",
+                  color: active ? "#a78bfa" : "#9090b0",
+                  fontWeight: active ? 700 : 400,
+                }}
+              >
+                {speed}x
+              </button>
+            );
+          })}
+        </div>
+        {(layer.playbackRate ?? 1) !== 1 && (
+          <div style={{ fontSize: 11, color: "#7070a0", marginTop: 5 }}>
+            At {layer.playbackRate}x — {((layer.end - layer.start) * layer.playbackRate).toFixed(1)}s of source plays in {(layer.end - layer.start).toFixed(1)}s
+          </div>
+        )}
+      </Field>
       <Row2>
         <Field label="Trim Start">
           <NumberInput value={layer.trimStart} onChange={(v) => update({ trimStart: Math.max(0, v) })} min={0} step={0.1} />
@@ -129,31 +203,54 @@ function VideoProps({ layer, update, resolvedObjectFitVal, updateObjectFit }) {
           {OBJECT_FIT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       </Field>
-      <Field label="Muted">
-        <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer" }}>
-          <input type="checkbox" checked={layer.muted ?? false} onChange={(e) => update({ muted: e.target.checked })} />
-          <span style={{ fontSize: 13, color: "#c0c0d8" }}>Muted</span>
-        </label>
-      </Field>
     </Section>
   );
 }
 
-function AudioProps({ layer, update }) {
+function AudioProps({ layer, update, updateSilent, commit }) {
+  const preVol = useRef(null);
   return (
     <Section title="Audio">
       <SrcField layer={layer} update={update} />
-      <Row2>
-        <Field label="Volume">
-          <NumberInput value={layer.volume} onChange={(v) => update({ volume: Math.max(0, Math.min(1, v)) })} min={0} max={1} step={0.05} />
-        </Field>
-        <Field label="Type">
-          <select style={selectStyle} value={layer.audioType ?? "music"} onChange={(e) => update({ audioType: e.target.value })}>
-            <option value="music">Music</option>
-            <option value="voiceover">Voiceover</option>
-          </select>
-        </Field>
-      </Row2>
+      <Field label="Type">
+        <select style={selectStyle} value={layer.audioType ?? "music"} onChange={(e) => update({ audioType: e.target.value })}>
+          <option value="music">Music</option>
+          <option value="voiceover">Voiceover</option>
+        </select>
+      </Field>
+      <Field label="Volume">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <button
+            onClick={() => update({ muted: !layer.muted })}
+            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 16, opacity: layer.muted ? 0.4 : 1, padding: 0 }}
+          >
+            {layer.muted ? "🔇" : (layer.volume ?? 1) > 0.5 ? "🔊" : "🔉"}
+          </button>
+          <span style={{ fontSize: 11, color: "#7070a0", minWidth: 36, textAlign: "right" }}>
+            {layer.muted ? "Muted" : `${Math.round((layer.volume ?? 1) * 100)}%`}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={layer.muted ? 0 : (layer.volume ?? 1)}
+          onMouseDown={() => { preVol.current = JSON.parse(JSON.stringify(useTimelineStore.getState().project)); }}
+          onChange={(e) => updateSilent({ volume: parseFloat(e.target.value), muted: false })}
+          onMouseUp={(e) => commit({ volume: parseFloat(e.target.value), muted: false }, preVol.current)}
+          style={{ width: "100%", accentColor: "#7c5cfc", margin: 0 }}
+        />
+        <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+          <div style={{
+            height: "100%",
+            width: `${layer.muted ? 0 : (layer.volume ?? 1) * 100}%`,
+            background: layer.muted ? "#55556a" : "#7c5cfc",
+            borderRadius: 2,
+            transition: "width 0.1s",
+          }} />
+        </div>
+      </Field>
       <Row2>
         <Field label="Fade In">
           <NumberInput value={layer.fadeIn} onChange={(v) => update({ fadeIn: Math.max(0, v) })} min={0} step={0.1} />
@@ -162,19 +259,16 @@ function AudioProps({ layer, update }) {
           <NumberInput value={layer.fadeOut} onChange={(v) => update({ fadeOut: Math.max(0, v) })} min={0} step={0.1} />
         </Field>
       </Row2>
-      <Field label="Muted">
-        <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer" }}>
-          <input type="checkbox" checked={layer.muted ?? false} onChange={(e) => update({ muted: e.target.checked })} />
-          <span style={{ fontSize: 13, color: "#c0c0d8" }}>Muted</span>
-        </label>
-      </Field>
     </Section>
   );
 }
 
-function TextProps({ layer, update }) {
+function TextProps({ layer, update, updateSilent, commit }) {
   const s = layer.style ?? {};
   const updateStyle = (patch) => update({ style: { ...s, ...patch } });
+  const updateStyleSilent = (patch) => updateSilent({ style: { ...s, ...patch } });
+  const commitStyle = (patch, pre) => commit({ style: { ...s, ...patch } }, pre);
+  const preColor = useRef(null);
   return (
     <Section title="Text">
       <Field label="Content">
@@ -203,7 +297,9 @@ function TextProps({ layer, update }) {
           <input
             type="color"
             value={s.color ?? "#ffffff"}
-            onChange={(e) => updateStyle({ color: e.target.value })}
+            onFocus={() => { preColor.current = JSON.parse(JSON.stringify(useTimelineStore.getState().project)); }}
+            onChange={(e) => updateStyleSilent({ color: e.target.value })}
+            onBlur={(e) => commitStyle({ color: e.target.value }, preColor.current)}
             style={{ ...inputStyle, height: 34, padding: 3, cursor: "pointer" }}
           />
         </Field>
@@ -227,6 +323,110 @@ function ImageProps({ layer, update, resolvedObjectFitVal, updateObjectFit }) {
         <select style={selectStyle} value={resolvedObjectFitVal} onChange={(e) => updateObjectFit(e.target.value)}>
           {OBJECT_FIT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
+      </Field>
+    </Section>
+  );
+}
+
+function AppearanceSection({ layer, update, updateSilent, commit }) {
+  const shadow = layer.boxShadow ?? null;
+  const hasBg  = !!layer.backgroundColor;
+  const pre = useRef(null);
+  const snap = () => { pre.current = JSON.parse(JSON.stringify(useTimelineStore.getState().project)); };
+  return (
+    <Section title="Appearance">
+      <Field label="Border Radius">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="range" min={0} max={500} step={1}
+            value={layer.borderRadius ?? 0}
+            onMouseDown={snap}
+            onChange={(e) => updateSilent({ borderRadius: parseInt(e.target.value) })}
+            onMouseUp={(e) => commit({ borderRadius: parseInt(e.target.value) }, pre.current)}
+            style={{ flex: 1, accentColor: "#7c5cfc", margin: 0 }}
+          />
+          <span style={{ fontSize: 11, color: "#7070a0", minWidth: 30, textAlign: "right" }}>
+            {layer.borderRadius ?? 0}px
+          </span>
+        </div>
+      </Field>
+
+      <Row2>
+        <Field label="Border Width">
+          <NumberInput value={layer.borderWidth ?? 0} onChange={(v) => update({ borderWidth: Math.max(0, v) })} min={0} step={1} />
+        </Field>
+        <Field label="Border Color">
+          <input
+            type="color"
+            value={layer.borderColor ?? "#ffffff"}
+            onFocus={snap}
+            onChange={(e) => updateSilent({ borderColor: e.target.value })}
+            onBlur={(e) => commit({ borderColor: e.target.value }, pre.current)}
+            style={{ ...inputStyle, height: 34, padding: 3, cursor: "pointer" }}
+          />
+        </Field>
+      </Row2>
+
+      <Field label="Background">
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="color"
+            value={hasBg ? layer.backgroundColor : "#000000"}
+            onFocus={snap}
+            onChange={(e) => updateSilent({ backgroundColor: e.target.value })}
+            onBlur={(e) => commit({ backgroundColor: e.target.value }, pre.current)}
+            style={{ ...inputStyle, height: 34, padding: 3, cursor: "pointer", flex: 1, opacity: hasBg ? 1 : 0.35 }}
+          />
+          <button
+            onClick={() => update({ backgroundColor: hasBg ? null : "#000000" })}
+            style={{
+              padding: "5px 10px", borderRadius: 5, fontSize: 11, cursor: "pointer",
+              border: `1px solid ${hasBg ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+              background: hasBg ? "rgba(124,92,252,0.18)" : "transparent",
+              color: hasBg ? "#a78bfa" : "#55556a", whiteSpace: "nowrap",
+            }}
+          >
+            {hasBg ? "Clear" : "Off"}
+          </button>
+        </div>
+      </Field>
+
+      <Field label="Padding">
+        <NumberInput value={layer.padding ?? 0} onChange={(v) => update({ padding: Math.max(0, v) })} min={0} step={2} />
+      </Field>
+
+      <Field label="Shadow">
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {BOX_SHADOW_PRESETS.map(({ label, value }) => {
+            const active = shadow === value;
+            return (
+              <button key={label} onClick={() => update({ boxShadow: value })}
+                style={{
+                  padding: "4px 9px", borderRadius: 5, fontSize: 11, cursor: "pointer",
+                  border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                  background: active ? "rgba(124,92,252,0.18)" : "transparent",
+                  color: active ? "#a78bfa" : "#9090b0",
+                  fontWeight: active ? 700 : 400,
+                }}
+              >{label}</button>
+            );
+          })}
+        </div>
+      </Field>
+
+      <Field label="Flip">
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["flipX", "↔ Horizontal"], ["flipY", "↕ Vertical"]].map(([prop, label]) => (
+            <button key={prop} onClick={() => update({ [prop]: !layer[prop] })}
+              style={{
+                flex: 1, padding: "6px 0", borderRadius: 6, fontSize: 12, cursor: "pointer",
+                border: `1px solid ${layer[prop] ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                background: layer[prop] ? "rgba(124,92,252,0.18)" : "transparent",
+                color: layer[prop] ? "#a78bfa" : "#9090b0",
+              }}
+            >{label}</button>
+          ))}
+        </div>
       </Field>
     </Section>
   );
@@ -379,15 +579,108 @@ function KeyframesSection({ layer }) {
   );
 }
 
+const SFX_OPTIONS = [
+  { key: "", label: "None" },
+  ...Object.entries(SFX_LIBRARY)
+    .sort((a, b) => a[1].label.localeCompare(b[1].label))
+    .map(([key, meta]) => ({ key, label: `${meta.label} (${meta.duration}s)` })),
+];
+
+function SfxSection({ layer, update }) {
+  const sfx = layer.sfx ?? null;
+  const previewRef = useRef(null);
+
+  const updateSfx = (patch) =>
+    update({ sfx: { key: sfx?.key ?? "", volume: sfx?.volume ?? 1, delay: sfx?.delay ?? 0, ...patch } });
+
+  const playPreview = () => {
+    if (previewRef.current) { previewRef.current.pause(); }
+    if (!sfx?.key) return;
+    const a = new Audio(getSFXPreviewUrl(sfx.key));
+    a.volume = Math.max(0, Math.min(1, sfx?.volume ?? 1));
+    a.play().catch(() => {});
+    previewRef.current = a;
+  };
+
+  return (
+    <Section title="Sound Effect">
+      <Field label="SFX">
+        <select
+          style={selectStyle}
+          value={sfx?.key ?? ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            update({ sfx: val ? { key: val, volume: sfx?.volume ?? 1, delay: sfx?.delay ?? 0 } : null });
+          }}
+        >
+          {SFX_OPTIONS.map(({ key, label }) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+      </Field>
+      {sfx?.key && (
+        <>
+          <Field label="Volume">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={sfx.volume ?? 1}
+              onChange={(e) => updateSfx({ volume: parseFloat(e.target.value) })}
+              style={{ width: "100%", accentColor: "#7c5cfc", margin: 0 }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+              <span style={{ fontSize: 11, color: "#7070a0" }}>Volume</span>
+              <span style={{ fontSize: 11, color: "#7070a0" }}>{Math.round((sfx.volume ?? 1) * 100)}%</span>
+            </div>
+          </Field>
+          <Field label="Delay (s)">
+            <NumberInput
+              value={sfx.delay ?? 0}
+              onChange={(v) => updateSfx({ delay: Math.max(0, v) })}
+              min={0}
+              step={0.1}
+            />
+            <div style={{ fontSize: 11, color: "#7070a0", marginTop: 3 }}>
+              {sfx.delay ? `Plays ${sfx.delay}s after layer start` : "Plays at layer start"}
+            </div>
+          </Field>
+          <button
+            onClick={playPreview}
+            style={{
+              width: "100%", padding: "5px 0", borderRadius: 6, cursor: "pointer",
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+              color: "#c0c0d8", fontSize: 12, fontWeight: 600,
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.background = "rgba(124,92,252,0.15)")}
+            onMouseOut={(e)  => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+          >
+            ▶ Preview Sound
+          </button>
+        </>
+      )}
+    </Section>
+  );
+}
+
 export default function PropertiesPanel() {
   const project = useTimelineStore((s) => s.project);
   const selectedLayerId = useTimelineStore((s) => s.selectedLayerId);
+  const selectedLayerIds = useTimelineStore((s) => s.selectedLayerIds);
+  const alignSelectedLayers = useTimelineStore((s) => s.alignSelectedLayers);
   const updateLayer = useTimelineStore((s) => s.updateLayer);
+  const updateLayerSilent = useTimelineStore((s) => s.updateLayerSilent);
+  const commitDrag = useTimelineStore((s) => s.commitDrag);
   const currentTime = useTimelineStore((s) => s.currentTime);
   const addKeyframeAction = useTimelineStore((s) => s.addKeyframe);
 
   const layer = project?.layers?.find((l) => l.id === selectedLayerId);
+  const canvasW = project?.format?.width  ?? 1080;
+  const canvasH = project?.format?.height ?? 1920;
   const update = (patch) => { if (layer) updateLayer(layer.id, patch); };
+  const updateSilent = (patch) => { if (layer) updateLayerSilent(layer.id, patch); };
+  const commit = (patch, pre) => { if (layer) commitDrag(layer.id, patch, pre); };
 
   // Resolved transform at current time — uses keyframe interpolation when active
   const resolvedTr = layer ? resolveTransform(layer, currentTime) : {};
@@ -429,19 +722,96 @@ export default function PropertiesPanel() {
       <div
         style={{
           padding: "9px 16px",
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#8888a8",
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
           flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        Properties
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#8888a8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Properties
+        </span>
+        {layer && (
+          <button
+            onClick={() => update({ locked: !layer.locked })}
+            title={layer.locked ? "Unlock layer" : "Lock layer"}
+            style={{
+              background: layer.locked ? "rgba(255,180,50,0.15)" : "transparent",
+              border: `1px solid ${layer.locked ? "rgba(255,180,50,0.4)" : "rgba(255,255,255,0.1)"}`,
+              borderRadius: 6,
+              cursor: "pointer",
+              padding: "3px 8px",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 11,
+              color: layer.locked ? "#ffb432" : "#7070a0",
+              fontWeight: 600,
+            }}
+          >
+            <span style={{ fontSize: 13 }}>{layer.locked ? "🔒" : "🔓"}</span>
+            {layer.locked ? "Locked" : "Lock"}
+          </button>
+        )}
       </div>
 
-      {!layer ? (
+      {selectedLayerIds.length > 1 ? (
+        <div style={{ flex: 1, padding: "20px 16px" }}>
+          <div style={{ fontSize: 11, color: "#7070a0", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>
+            {selectedLayerIds.length} layers selected
+          </div>
+          <span style={labelStyle}>Align</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {/* Horizontal row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+              {[
+                { type: "left",    title: "Align left",    x: -1 },
+                { type: "centerH", title: "Center horiz",  x: 0  },
+                { type: "right",   title: "Align right",   x: 1  },
+              ].map(({ type, title, x }) => (
+                <button key={type} title={title} onClick={() => alignSelectedLayers(type)}
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer", padding: "5px 0", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "rgba(124,92,252,0.15)")}
+                  onMouseOut={(e)  => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}>
+                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                    <rect x="1" y="8" width="20" height="6" rx="1" fill="rgba(255,255,255,0.12)" />
+                    {x < 0  && <rect x="1"   y="8" width="7" height="6" rx="1" fill="#7c5cfc" />}
+                    {x === 0 && <rect x="7.5" y="8" width="7" height="6" rx="1" fill="#7c5cfc" />}
+                    {x > 0  && <rect x="14"  y="8" width="7" height="6" rx="1" fill="#7c5cfc" />}
+                    {x < 0  && <line x1="1"  y1="4" x2="1"  y2="18" stroke="#7c5cfc" strokeWidth="1.5" />}
+                    {x === 0 && <line x1="11" y1="4" x2="11" y2="18" stroke="#7c5cfc" strokeWidth="1.5" />}
+                    {x > 0  && <line x1="21" y1="4" x2="21" y2="18" stroke="#7c5cfc" strokeWidth="1.5" />}
+                  </svg>
+                </button>
+              ))}
+            </div>
+            {/* Vertical row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+              {[
+                { type: "top",     title: "Align top",    y: -1 },
+                { type: "centerV", title: "Center vert",  y: 0  },
+                { type: "bottom",  title: "Align bottom", y: 1  },
+              ].map(({ type, title, y }) => (
+                <button key={type} title={title} onClick={() => alignSelectedLayers(type)}
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer", padding: "5px 0", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "rgba(124,92,252,0.15)")}
+                  onMouseOut={(e)  => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}>
+                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                    <rect x="8" y="1" width="6" height="20" rx="1" fill="rgba(255,255,255,0.12)" />
+                    {y < 0  && <rect x="8" y="1"   width="6" height="7" rx="1" fill="#7c5cfc" />}
+                    {y === 0 && <rect x="8" y="7.5" width="6" height="7" rx="1" fill="#7c5cfc" />}
+                    {y > 0  && <rect x="8" y="14"  width="6" height="7" rx="1" fill="#7c5cfc" />}
+                    {y < 0  && <line x1="4" y1="1"  x2="18" y2="1"  stroke="#7c5cfc" strokeWidth="1.5" />}
+                    {y === 0 && <line x1="4" y1="11" x2="18" y2="11" stroke="#7c5cfc" strokeWidth="1.5" />}
+                    {y > 0  && <line x1="4" y1="21" x2="18" y2="21" stroke="#7c5cfc" strokeWidth="1.5" />}
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : !layer ? (
         <div
           style={{
             flex: 1,
@@ -458,7 +828,29 @@ export default function PropertiesPanel() {
           Select a layer to edit its properties
         </div>
       ) : (
-        <div className="dark-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 16px" }}>
+        <div className="dark-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 16px", position: "relative" }}>
+          {layer.locked && (
+            <div style={{
+              position: "absolute", inset: 0, zIndex: 20,
+              background: "rgba(10,10,20,0.55)",
+              backdropFilter: "blur(1px)",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10,
+              pointerEvents: "all",
+            }}>
+              <span style={{ fontSize: 28 }}>🔒</span>
+              <span style={{ fontSize: 13, color: "#ffb432", fontWeight: 600 }}>Layer is locked</span>
+              <button
+                onClick={() => update({ locked: false })}
+                style={{
+                  marginTop: 4, padding: "6px 18px", borderRadius: 7, cursor: "pointer",
+                  background: "rgba(255,180,50,0.15)", border: "1px solid rgba(255,180,50,0.4)",
+                  color: "#ffb432", fontSize: 12, fontWeight: 600,
+                }}
+              >
+                Unlock
+              </button>
+            </div>
+          )}
           {/* Layer info */}
           <Section title="Layer">
             <Field label="Name">
@@ -477,6 +869,87 @@ export default function PropertiesPanel() {
           {/* Transform */}
           {layer.type !== "audio" && (
             <Section title="Transform">
+              {/* Align */}
+              <div style={{ marginBottom: 12 }}>
+                <span style={labelStyle}>Align</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {[
+                    [
+                      { title: "Align left",   icon: "⬛◻◻", x: -(canvasW - (resolvedTr.width ?? layer.transform?.width ?? canvasW)) / 2 },
+                      { title: "Center horiz", icon: "◻⬛◻", x: 0 },
+                      { title: "Align right",  icon: "◻◻⬛", x:  (canvasW - (resolvedTr.width ?? layer.transform?.width ?? canvasW)) / 2 },
+                    ],
+                    [
+                      { title: "Align top",    icon: "⬛◻◻", y: -(canvasH - (resolvedTr.height ?? layer.transform?.height ?? canvasH)) / 2 },
+                      { title: "Center vert",  icon: "◻⬛◻", y: 0 },
+                      { title: "Align bottom", icon: "◻◻⬛", y:  (canvasH - (resolvedTr.height ?? layer.transform?.height ?? canvasH)) / 2 },
+                    ],
+                  ].map((row, ri) => (
+                    <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                      {row.map(({ title, icon, x, y }) => {
+                        const svgH = ri === 0;
+                        return (
+                          <button
+                            key={title}
+                            title={title}
+                            onClick={() => updateTransform(x !== undefined ? { x } : { y })}
+                            style={{
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: 6, cursor: "pointer", padding: "5px 0",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseOver={(e) => (e.currentTarget.style.background = "rgba(124,92,252,0.15)")}
+                            onMouseOut={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                          >
+                            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                              {svgH ? (
+                                <>
+                                  <rect x="1" y="8" width="20" height="6" rx="1" fill="rgba(255,255,255,0.12)" />
+                                  {x !== undefined && x < 0  && <rect x="1"  y="8" width="7" height="6" rx="1" fill="#7c5cfc" />}
+                                  {x !== undefined && x === 0 && <rect x="7.5" y="8" width="7" height="6" rx="1" fill="#7c5cfc" />}
+                                  {x !== undefined && x > 0  && <rect x="14" y="8" width="7" height="6" rx="1" fill="#7c5cfc" />}
+                                  {x !== undefined && x < 0  && <line x1="1"  y1="4" x2="1"  y2="18" stroke="#7c5cfc" strokeWidth="1.5" />}
+                                  {x !== undefined && x === 0 && <line x1="11" y1="4" x2="11" y2="18" stroke="#7c5cfc" strokeWidth="1.5" />}
+                                  {x !== undefined && x > 0  && <line x1="21" y1="4" x2="21" y2="18" stroke="#7c5cfc" strokeWidth="1.5" />}
+                                </>
+                              ) : (
+                                <>
+                                  <rect x="8" y="1" width="6" height="20" rx="1" fill="rgba(255,255,255,0.12)" />
+                                  {y !== undefined && y < 0  && <rect x="8" y="1"  width="6" height="7" rx="1" fill="#7c5cfc" />}
+                                  {y !== undefined && y === 0 && <rect x="8" y="7.5" width="6" height="7" rx="1" fill="#7c5cfc" />}
+                                  {y !== undefined && y > 0  && <rect x="8" y="14" width="6" height="7" rx="1" fill="#7c5cfc" />}
+                                  {y !== undefined && y < 0  && <line x1="4" y1="1"  x2="18" y2="1"  stroke="#7c5cfc" strokeWidth="1.5" />}
+                                  {y !== undefined && y === 0 && <line x1="4" y1="11" x2="18" y2="11" stroke="#7c5cfc" strokeWidth="1.5" />}
+                                  {y !== undefined && y > 0  && <line x1="4" y1="21" x2="18" y2="21" stroke="#7c5cfc" strokeWidth="1.5" />}
+                                </>
+                              )}
+                            </svg>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fill canvas */}
+              <div style={{ marginBottom: 12 }}>
+                <button
+                  title="Set layer to fill the full canvas (x=0, y=0, width=canvasW, height=canvasH)"
+                  onClick={() => updateTransform({ x: 0, y: 0, width: canvasW, height: canvasH })}
+                  style={{
+                    width: "100%", padding: "5px 0", borderRadius: 6, cursor: "pointer",
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#c0c0d8", fontSize: 12, fontWeight: 600,
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "rgba(124,92,252,0.15)")}
+                  onMouseOut={(e)  => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                >
+                  Fill Canvas
+                </button>
+              </div>
+
               <Row2>
                 <Field label="X"><NumberInput value={resolvedTr.x ?? 0} onChange={(v) => updateOrKeyframe("x", v)} /></Field>
                 <Field label="Y"><NumberInput value={resolvedTr.y ?? 0} onChange={(v) => updateOrKeyframe("y", v)} /></Field>
@@ -496,12 +969,14 @@ export default function PropertiesPanel() {
             </Section>
           )}
 
-          {layer.type === "video" && <VideoProps layer={layer} update={update} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
-          {layer.type === "audio" && <AudioProps layer={layer} update={update} />}
-          {layer.type === "text" && <TextProps layer={layer} update={update} />}
+          {layer.type === "video" && <VideoProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
+          {layer.type === "audio" && <AudioProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
+          {layer.type === "text" && <TextProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
           {(layer.type === "image" || layer.type === "sticker") && <ImageProps layer={layer} update={update} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
+          {layer.type !== "audio" && <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
           {layer.type !== "audio" && <AnimationProps layer={layer} update={update} />}
           {(layer.type === "video" || layer.type === "image") && <TransitionProps layer={layer} update={update} />}
+          {layer.type !== "audio" && <SfxSection layer={layer} update={update} />}
           {layer.type !== "audio" && layer.type !== "captions" && (
             <KeyframesSection layer={layer} />
           )}

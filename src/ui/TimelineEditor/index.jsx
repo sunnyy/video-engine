@@ -13,50 +13,84 @@ export default function TimelineEditor() {
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
 
-      if (e.code === "Space") {
-        e.preventDefault();
-        useTimelineStore.getState().setIsPlaying(
-          !useTimelineStore.getState().isPlaying
-        );
-      } else if (e.code === "ArrowLeft") {
-        e.preventDefault();
-        useTimelineStore
-          .getState()
-          .setCurrentTime(useTimelineStore.getState().currentTime - 1);
-      } else if (e.code === "ArrowRight") {
-        e.preventDefault();
-        useTimelineStore
-          .getState()
-          .setCurrentTime(useTimelineStore.getState().currentTime + 1);
-      } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyZ") {
+      // Undo / redo
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyZ") {
         e.preventDefault();
         useTimelineStore.getState().undo();
-      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyZ") {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.shiftKey && e.code === "KeyZ" || e.code === "KeyY")) {
         e.preventDefault();
         useTimelineStore.getState().redo();
-      } else if (e.code === "Delete" || e.code === "Backspace") {
+        return;
+      }
+
+      // Escape — deselect
+      if (e.code === "Escape") {
+        useTimelineStore.getState().selectLayer(null);
+        return;
+      }
+
+      // Delete / Backspace — remove selected layer
+      if (e.code === "Delete" || e.code === "Backspace") {
         const { selectedLayerId } = useTimelineStore.getState();
         if (selectedLayerId) {
           e.preventDefault();
           useTimelineStore.getState().removeLayer(selectedLayerId);
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.code === "KeyD") {
+        return;
+      }
+
+      // Ctrl+D — duplicate
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyD") {
         const { selectedLayerId } = useTimelineStore.getState();
         if (selectedLayerId) {
           e.preventDefault();
           useTimelineStore.getState().duplicateLayer(selectedLayerId);
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.code === "BracketRight") {
+        return;
+      }
+
+      // Ctrl+] / Ctrl+[ — z-order
+      if ((e.ctrlKey || e.metaKey) && e.code === "BracketRight") {
         const { selectedLayerId } = useTimelineStore.getState();
+        if (selectedLayerId) { e.preventDefault(); useTimelineStore.getState().bringForward(selectedLayerId); }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.code === "BracketLeft") {
+        const { selectedLayerId } = useTimelineStore.getState();
+        if (selectedLayerId) { e.preventDefault(); useTimelineStore.getState().sendBack(selectedLayerId); }
+        return;
+      }
+
+      // Space — play / pause
+      if (e.code === "Space") {
+        e.preventDefault();
+        const store = useTimelineStore.getState();
+        store.setIsPlaying(!store.isPlaying);
+        return;
+      }
+
+      // Arrow keys — nudge selected layer or seek
+      if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.code)) {
+        const { selectedLayerId, project } = useTimelineStore.getState();
         if (selectedLayerId) {
           e.preventDefault();
-          useTimelineStore.getState().bringForward(selectedLayerId);
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.code === "BracketLeft") {
-        const { selectedLayerId } = useTimelineStore.getState();
-        if (selectedLayerId) {
+          const layer = project?.layers?.find((l) => l.id === selectedLayerId);
+          if (!layer) return;
+          const step = e.shiftKey ? 10 : 1;
+          const dx = e.code === "ArrowLeft" ? -step : e.code === "ArrowRight" ? step : 0;
+          const dy = e.code === "ArrowUp"   ? -step : e.code === "ArrowDown"  ? step : 0;
+          useTimelineStore.getState().updateLayer(selectedLayerId, {
+            transform: { ...layer.transform, x: (layer.transform?.x ?? 0) + dx, y: (layer.transform?.y ?? 0) + dy },
+          });
+        } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
           e.preventDefault();
-          useTimelineStore.getState().sendBack(selectedLayerId);
+          const { currentTime } = useTimelineStore.getState();
+          const delta = e.shiftKey ? 5 : (e.ctrlKey || e.metaKey) ? 0.5 : 1;
+          useTimelineStore.getState().setCurrentTime(
+            currentTime + (e.code === "ArrowLeft" ? -delta : delta)
+          );
         }
       }
     };

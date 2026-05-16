@@ -29,3 +29,16 @@ input:-webkit-autofill:focus {
   caret-color: #e8e8f0;
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* Show lock button on timeline clip hover */
+.timeline-clip:hover .clip-lock-btn {
+  opacity: 1 !important;
+}
+
+/* Preview fullscreen — fill the screen, keep dark background */
+.preview-container:fullscreen {
+  background: #0a0a14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

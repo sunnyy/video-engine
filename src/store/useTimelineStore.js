@@ -27,6 +27,7 @@ export const useTimelineStore = create((set, get) => ({
 
   // Selection
   selectedLayerId: null,
+  selectedLayerIds: [],
 
   // Timeline UI
   zoom: 1,
@@ -58,6 +59,7 @@ export const useTimelineStore = create((set, get) => ({
       currentTime: 0,
       isPlaying: false,
       selectedLayerId: null,
+      selectedLayerIds: [],
       _history: [],
       _future: [],
     });
@@ -116,13 +118,14 @@ export const useTimelineStore = create((set, get) => ({
   updateLayerSilent: (layerId, patch) => {
     const { project } = get();
     if (!project) return;
+    const newLayers = project.layers.map((l) => l.id === layerId ? { ...l, ...patch } : l);
+    const newDuration = recalcDuration(newLayers);
     const newProject = {
       ...project,
-      layers: project.layers.map((l) =>
-        l.id === layerId ? { ...l, ...patch } : l
-      ),
+      layers: newLayers,
+      format: { ...project.format, duration: newDuration },
     };
-    set({ project: newProject });
+    set({ project: newProject, duration: newDuration });
     return newProject;
   },
 
@@ -167,9 +170,14 @@ export const useTimelineStore = create((set, get) => ({
     const layer = project.layers.find((l) => l.id === layerId);
     if (!layer) return;
     const newHistory = pushHistory(_history, project);
+    const newId = crypto.randomUUID();
+    const duration = layer.end - layer.start;
     const clone = {
       ...JSON.parse(JSON.stringify(layer)),
-      id: crypto.randomUUID(),
+      id: newId,
+      trackId: newId,
+      start: layer.end,
+      end: layer.end + duration,
       name: layer.name + " copy",
     };
     const newLayers = [...project.layers, clone];
@@ -254,7 +262,60 @@ export const useTimelineStore = create((set, get) => ({
   },
 
   // ── Selection ────────────────────────────────────────────────
-  selectLayer: (layerId) => set({ selectedLayerId: layerId }),
+  selectLayer: (layerId) => set({ selectedLayerId: layerId, selectedLayerIds: [] }),
+
+  toggleLayerSelection: (layerId) => {
+    const { selectedLayerIds, selectedLayerId } = get();
+    // Start multi-select from the primary selected layer if needed
+    const base = selectedLayerId && !selectedLayerIds.includes(selectedLayerId)
+      ? [selectedLayerId]
+      : [...selectedLayerIds];
+    const next = base.includes(layerId)
+      ? base.filter((id) => id !== layerId)
+      : [...base, layerId];
+    set({ selectedLayerIds: next });
+  },
+
+  alignSelectedLayers: (type) => {
+    const { project, _history, selectedLayerIds } = get();
+    if (!project || selectedLayerIds.length < 2) return;
+    const canvasW = project.format?.width ?? 1080;
+    const canvasH = project.format?.height ?? 1920;
+    const layers = project.layers.filter((l) => selectedLayerIds.includes(l.id));
+
+    const leftEdge  = (l) => canvasW / 2 + (l.transform?.x ?? 0) - (l.transform?.width ?? 100) / 2;
+    const rightEdge = (l) => canvasW / 2 + (l.transform?.x ?? 0) + (l.transform?.width ?? 100) / 2;
+    const topEdge   = (l) => canvasH / 2 + (l.transform?.y ?? 0) - (l.transform?.height ?? 100) / 2;
+    const botEdge   = (l) => canvasH / 2 + (l.transform?.y ?? 0) + (l.transform?.height ?? 100) / 2;
+
+    const minLeft   = Math.min(...layers.map(leftEdge));
+    const maxRight  = Math.max(...layers.map(rightEdge));
+    const minTop    = Math.min(...layers.map(topEdge));
+    const maxBot    = Math.max(...layers.map(botEdge));
+    const centerX   = (minLeft + maxRight) / 2;
+    const centerY   = (minTop + maxBot) / 2;
+
+    const getNewTransform = (l) => {
+      const w = l.transform?.width ?? 100;
+      const h = l.transform?.height ?? 100;
+      switch (type) {
+        case "left":     return { x: minLeft  - canvasW / 2 + w / 2 };
+        case "right":    return { x: maxRight - canvasW / 2 - w / 2 };
+        case "centerH":  return { x: centerX  - canvasW / 2 };
+        case "top":      return { y: minTop   - canvasH / 2 + h / 2 };
+        case "bottom":   return { y: maxBot   - canvasH / 2 - h / 2 };
+        case "centerV":  return { y: centerY  - canvasH / 2 };
+        default: return {};
+      }
+    };
+
+    const newHistory = pushHistory(_history, project);
+    const newLayers = project.layers.map((l) => {
+      if (!selectedLayerIds.includes(l.id)) return l;
+      return { ...l, transform: { ...l.transform, ...getNewTransform(l) } };
+    });
+    set({ project: { ...project, layers: newLayers }, _history: newHistory, _future: [] });
+  },
 
   // ── Playback ─────────────────────────────────────────────────
   setCurrentTime: (time) => {

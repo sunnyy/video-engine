@@ -2,8 +2,50 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
+import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 
 const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker"]);
+const SNAP_T = 12; // canvas-space pixels
+
+// Snap layer center (x,y) to canvas edges and center during body drag
+function snapBody(x, y, w, h, cW, cH) {
+  let sx = x, sy = y;
+  const lEdge = cW / 2 + x - w / 2, rEdge = cW / 2 + x + w / 2;
+  if      (Math.abs(lEdge)       < SNAP_T) sx = -cW / 2 + w / 2;
+  else if (Math.abs(rEdge - cW)  < SNAP_T) sx =  cW / 2 - w / 2;
+  else if (Math.abs(x)           < SNAP_T) sx = 0;
+  const tEdge = cH / 2 + y - h / 2, bEdge = cH / 2 + y + h / 2;
+  if      (Math.abs(tEdge)       < SNAP_T) sy = -cH / 2 + h / 2;
+  else if (Math.abs(bEdge - cH)  < SNAP_T) sy =  cH / 2 - h / 2;
+  else if (Math.abs(y)           < SNAP_T) sy = 0;
+  return { x: sx, y: sy };
+}
+
+// Snap the moving edge of a resize handle to the canvas boundary
+function snapResize(newX, newY, newW, newH, cfg, origT, cW, cH) {
+  let x = newX, y = newY, w = newW, h = newH;
+  const origR = cW / 2 + origT.x + origT.width  / 2;
+  const origL = cW / 2 + origT.x - origT.width  / 2;
+  const origB = cH / 2 + origT.y + origT.height / 2;
+  const origTo = cH / 2 + origT.y - origT.height / 2;
+  if (cfg.wm !== 0) {
+    const lEdge = cW / 2 + x - w / 2, rEdge = cW / 2 + x + w / 2;
+    if (cfg.xa < 0 && Math.abs(lEdge) < SNAP_T) {
+      w = origR; x = origR / 2 - cW / 2;
+    } else if (cfg.xa > 0 && Math.abs(rEdge - cW) < SNAP_T) {
+      w = cW - origL; x = (origL + cW) / 2 - cW / 2;
+    }
+  }
+  if (cfg.hm !== 0) {
+    const tEdge = cH / 2 + y - h / 2, bEdge = cH / 2 + y + h / 2;
+    if (cfg.ya < 0 && Math.abs(tEdge) < SNAP_T) {
+      h = origB; y = origB / 2 - cH / 2;
+    } else if (cfg.ya > 0 && Math.abs(bEdge - cH) < SNAP_T) {
+      h = cH - origTo; y = (origTo + cH) / 2 - cH / 2;
+    }
+  }
+  return { x, y, w, h };
+}
 const MIN_SIZE = 20;
 const HANDLE_HIT = 36;   // clickable area
 const HANDLE_VIS = 28;   // visible square inside
@@ -75,7 +117,24 @@ function seekAndPlay(el, time, shouldPlay) {
 function VideoLayerEl({ layer, currentTime, isPlaying }) {
   const ref = useRef(null);
   const playing = useRef(false);
-  const sourceTime = (layer.trimStart ?? 0) + (currentTime - layer.start);
+  const rate = layer.playbackRate || 1;
+  const sourceTime = (layer.trimStart ?? 0) + (currentTime - layer.start) * rate;
+
+  // Apply playbackRate whenever it changes
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.playbackRate = rate;
+  }, [rate]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.volume = Math.max(0, Math.min(1, layer.volume ?? 1));
+  }, [layer.volume]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.muted = layer.muted ?? false;
+  }, [layer.muted]);
 
   // Play/pause toggle
   useEffect(() => {
@@ -104,6 +163,7 @@ function VideoLayerEl({ layer, currentTime, isPlaying }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    el.playbackRate = rate;
     if (isPlaying) playing.current = true;
     return seekAndPlay(el, sourceTime, isPlaying);
   }, []);
@@ -119,6 +179,37 @@ function VideoLayerEl({ layer, currentTime, isPlaying }) {
       playsInline
     />
   );
+}
+
+function SfxLayerEl({ layer, currentTime, isPlaying }) {
+  const audioRef = useRef(null);
+  const timeoutRef = useRef(null);
+  const sfx = layer.sfx;
+  const triggerTime = layer.start + (sfx?.delay ?? 0);
+  const sfxDur = sfx?.key ? (SFX_LIBRARY[sfx.key]?.duration ?? 3) : 0;
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !sfx?.key) return;
+    el.volume = Math.max(0, Math.min(1, sfx.volume ?? 1));
+  }, [sfx?.volume, sfx?.key]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !sfx?.key) return;
+    clearTimeout(timeoutRef.current);
+    if (!isPlaying) { el.pause(); return; }
+    const ahead = triggerTime - currentTime;
+    if (ahead < 0) {
+      if (-ahead < sfxDur) { el.currentTime = -ahead; el.play().catch(() => {}); }
+    } else {
+      timeoutRef.current = setTimeout(() => { el.currentTime = 0; el.play().catch(() => {}); }, ahead * 1000);
+    }
+    return () => clearTimeout(timeoutRef.current);
+  }, [isPlaying]);
+
+  if (!sfx?.key) return null;
+  return <audio ref={audioRef} src={getSFXPreviewUrl(sfx.key)} preload="auto" style={{ display: "none" }} />;
 }
 
 function AudioLayerEl({ layer, currentTime, isPlaying }) {
@@ -190,14 +281,35 @@ function PersistentVideoTrack({
 
   const activeClip  = clips.find((c) => currentTime >= c.start && currentTime < c.end) ?? null;
   const activeClipId = activeClip?.id ?? null;
+  const rate = activeClip?.playbackRate || 1;
   const sourceTime  = activeClip
-    ? (activeClip.trimStart ?? 0) + (currentTime - activeClip.start)
+    ? (activeClip.trimStart ?? 0) + (currentTime - activeClip.start) * rate
     : 0;
+
+  // Apply playbackRate whenever the active clip or its rate changes
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.playbackRate = rate;
+  }, [rate, activeClipId]);
+
+  const activeVolume = activeClip?.volume;
+  const activeMuted  = activeClip?.muted;
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.volume = Math.max(0, Math.min(1, activeVolume ?? 1));
+  }, [activeVolume]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.muted = activeMuted ?? false;
+  }, [activeMuted]);
 
   // Mount once: seek to starting position, auto-play if already in playback
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !activeClip) return;
+    el.playbackRate = rate;
     if (isPlaying) playing.current = true;
     return seekAndPlay(el, sourceTime, isPlaying);
   }, []);
@@ -272,14 +384,27 @@ function PersistentVideoTrack({
       height: resolved.height ?? freshClip.transform.height,
     };
     const origKF = JSON.parse(JSON.stringify(freshClip.keyframes ?? {}));
+    const aspectRatio = origT.width / (origT.height || 1);
 
     const buildPatch = (me) => {
       const s = scaleRef.current;
       const dx = (me.clientX - startClientX) / s, dy = (me.clientY - startClientY) / s;
-      const newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
-      const newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
-      const newX = origT.x + cfg.xa * (newW - origT.width);
-      const newY = origT.y + cfg.ya * (newH - origT.height);
+      let newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
+      let newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
+      if (me.shiftKey) {
+        if (cfg.wm !== 0 && cfg.hm !== 0) {
+          Math.abs(cfg.wm * dx) >= Math.abs(cfg.hm * dy)
+            ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
+            : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
+        } else if (cfg.wm !== 0) {
+          newH = Math.max(MIN_SIZE, newW / aspectRatio);
+        } else if (cfg.hm !== 0) {
+          newW = Math.max(MIN_SIZE, newH * aspectRatio);
+        }
+      }
+      let newX = origT.x + cfg.xa * (newW - origT.width);
+      let newY = origT.y + cfg.ya * (newH - origT.height);
+      ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
       const transformPatch = { ...freshClip.transform };
       if (!hasXKF) transformPatch.x = newX;
@@ -361,7 +486,7 @@ function PersistentVideoTrack({
           top:    activeClip ? top    : 0,
           width:  activeClip ? width  : 0,
           height: activeClip ? height : 0,
-          transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation}deg) scale(${scale * tScale})`,
+          transform: `${tX ? `translateX(${tX}%) ` : ""}${activeClip?.flipX ? "scaleX(-1) " : ""}${activeClip?.flipY ? "scaleY(-1) " : ""}rotate(${rotation}deg) scale(${scale * tScale})`,
           transformOrigin: "center center",
           opacity: activeClip ? opacity * tOpacity : 0,
           filter: (blur || tBlur) ? `blur(${blur + tBlur}px)` : undefined,
@@ -381,6 +506,12 @@ function PersistentVideoTrack({
             overflow: "hidden",
             cursor: isDraggable ? (isDragging ? "grabbing" : "move") : "default",
             pointerEvents: isDraggable ? "auto" : "none",
+            borderRadius: activeClip?.borderRadius ? `${activeClip.borderRadius}px` : undefined,
+            border: activeClip?.borderWidth ? `${activeClip.borderWidth}px solid ${activeClip.borderColor ?? "#ffffff"}` : undefined,
+            backgroundColor: activeClip?.backgroundColor ?? undefined,
+            boxShadow: activeClip?.boxShadow ?? undefined,
+            padding: activeClip?.padding ? `${activeClip.padding}px` : undefined,
+            boxSizing: activeClip?.padding ? "border-box" : undefined,
           }}
           onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, activeClip) : undefined}
         >
@@ -506,15 +637,28 @@ function LayerElement({
       height: resolved.height ?? freshLayer.transform.height,
     };
     const origKF = JSON.parse(JSON.stringify(freshLayer.keyframes ?? {}));
+    const aspectRatio = origT.width / (origT.height || 1);
 
     const buildPatch = (me) => {
       const s = scaleRef.current;
       const dx = (me.clientX - startClientX) / s;
       const dy = (me.clientY - startClientY) / s;
-      const newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
-      const newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
-      const newX = origT.x + cfg.xa * (newW - origT.width);
-      const newY = origT.y + cfg.ya * (newH - origT.height);
+      let newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
+      let newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
+      if (me.shiftKey) {
+        if (cfg.wm !== 0 && cfg.hm !== 0) {
+          Math.abs(cfg.wm * dx) >= Math.abs(cfg.hm * dy)
+            ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
+            : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
+        } else if (cfg.wm !== 0) {
+          newH = Math.max(MIN_SIZE, newW / aspectRatio);
+        } else if (cfg.hm !== 0) {
+          newW = Math.max(MIN_SIZE, newH * aspectRatio);
+        }
+      }
+      let newX = origT.x + cfg.xa * (newW - origT.width);
+      let newY = origT.y + cfg.ya * (newH - origT.height);
+      ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
       const transformPatch = { ...freshLayer.transform };
       if (!hasXKF) transformPatch.x = newX;
@@ -634,9 +778,6 @@ function LayerElement({
       lineHeight: s.lineHeight ?? 1.2,
       letterSpacing: s.letterSpacing ?? 0,
       textShadow: s.textShadow ?? undefined,
-      background: s.background ?? undefined,
-      borderRadius: s.borderRadius ?? 0,
-      padding: s.padding ?? 0,
       wordBreak: "break-word",
       whiteSpace: "pre-wrap",
       boxSizing: "border-box",
@@ -720,7 +861,7 @@ function LayerElement({
           top,
           width,
           height,
-          transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
+          transform: `${tX ? `translateX(${tX}%) ` : ""}${layer.flipX ? "scaleX(-1) " : ""}${layer.flipY ? "scaleY(-1) " : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
           transformOrigin: "center center",
           opacity: (opacity ?? 1) * tOpacity,
           filter: (blur || tBlur) ? `blur(${(blur ?? 0) + tBlur}px)` : undefined,
@@ -742,6 +883,12 @@ function LayerElement({
             overflow: "hidden",
             cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "move") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",
+            borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : undefined,
+            border: layer.borderWidth ? `${layer.borderWidth}px solid ${layer.borderColor ?? "#ffffff"}` : undefined,
+            backgroundColor: layer.backgroundColor ?? undefined,
+            boxShadow: layer.boxShadow ?? undefined,
+            padding: layer.padding ? `${layer.padding}px` : undefined,
+            boxSizing: layer.padding ? "border-box" : undefined,
           }}
           onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, layer) : undefined}
         >
@@ -789,22 +936,159 @@ export default function Preview() {
   const project        = useTimelineStore((s) => s.project);
   const currentTime    = useTimelineStore((s) => s.currentTime);
   const isPlaying      = useTimelineStore((s) => s.isPlaying);
-  const selectedLayerId = useTimelineStore((s) => s.selectedLayerId);
-  const selectLayer    = useTimelineStore((s) => s.selectLayer);
+  const selectedLayerId      = useTimelineStore((s) => s.selectedLayerId);
+  const selectedLayerIds     = useTimelineStore((s) => s.selectedLayerIds);
+  const selectLayer          = useTimelineStore((s) => s.selectLayer);
+  const toggleLayerSelection = useTimelineStore((s) => s.toggleLayerSelection);
   const setCurrentTime = useTimelineStore((s) => s.setCurrentTime);
   const setIsPlaying   = useTimelineStore((s) => s.setIsPlaying);
 
   const containerRef = useRef(null);
   const [scale, setScale]           = useState(1);
   const scaleRef                    = useRef(1);
+  const [userZoom, setUserZoom]     = useState(1);
+  const userZoomRef                 = useRef(1);
+  const [panOffset, setPanOffset]   = useState({ x: 0, y: 0 });
+  const panOffsetRef                = useRef({ x: 0, y: 0 });
+  const [isHandMode, setIsHandMode] = useState(false);
+  const isHandModeRef               = useRef(false);
   const [draggingLayerId, setDraggingLayerId] = useState(null);
   const [editingLayerId,  setEditingLayerId]  = useState(null);
   const [handlesEl, setHandlesEl] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const ZOOM_STEP = 0.2;
+  const clampZoom = (z) => Math.max(0.15, Math.min(6, z));
+  const effectiveScale = scale * userZoom;
+  const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  // ── Keyboard shortcuts (zoom, hand tool, fullscreen) ─────────────────────
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const isTyping = tag === "input" || tag === "textarea" || tag === "select"
+        || document.activeElement?.isContentEditable;
+      if (isTyping) return;
+
+      // H — hold for hand (pan) mode
+      if (e.code === "KeyH" && !e.repeat) {
+        isHandModeRef.current = true;
+        setIsHandMode(true);
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.code === "Equal" || e.code === "NumpadAdd") {
+          e.preventDefault();
+          setUserZoom((z) => clampZoom(z + ZOOM_STEP));
+          return;
+        }
+        if (e.code === "Minus" || e.code === "NumpadSubtract") {
+          e.preventDefault();
+          setUserZoom((z) => clampZoom(z - ZOOM_STEP));
+          return;
+        }
+        if (e.code === "Digit0" || e.code === "Numpad0") {
+          e.preventDefault();
+          setUserZoom(1);
+          setPanOffset({ x: 0, y: 0 });
+          panOffsetRef.current = { x: 0, y: 0 };
+          return;
+        }
+      }
+
+      if (e.code === "KeyF") {
+        toggleFullscreen();
+        return;
+      }
+    };
+
+    const onKeyUp = (e) => {
+      if (e.code === "KeyH") {
+        isHandModeRef.current = false;
+        setIsHandMode(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, []);
+
+  // ── Ctrl+wheel zoom, plain wheel pan ───────────────────────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+        setUserZoom((z) => clampZoom(z + delta));
+      } else {
+        e.preventDefault();
+        setPanOffset((p) => {
+          const next = { x: p.x - e.deltaX, y: p.y - e.deltaY };
+          panOffsetRef.current = next;
+          return next;
+        });
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  // ── H + drag pan ───────────────────────────────────────────────────────────
+  const handleContainerMouseDown = useCallback((e) => {
+    if (!isHandModeRef.current || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsHandMode(true); // force grab cursor during drag
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origPan = { ...panOffsetRef.current };
+    const onMove = (me) => {
+      const next = { x: origPan.x + me.clientX - startX, y: origPan.y + me.clientY - startY };
+      panOffsetRef.current = next;
+      setPanOffset(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
 
   const canvasW = project?.format?.width  ?? 1080;
   const canvasH = project?.format?.height ?? 1920;
 
-  useEffect(() => { scaleRef.current = scale; }, [scale]);
+  useEffect(() => {
+    const es = scale * userZoomRef.current;
+    scaleRef.current = es;
+  }, [scale]);
+  useEffect(() => {
+    userZoomRef.current = userZoom;
+    scaleRef.current = scale * userZoom;
+  }, [userZoom, scale]);
 
   const computeScale = useCallback(() => {
     const el = containerRef.current;
@@ -850,6 +1134,7 @@ export default function Preview() {
     if (e.button !== 0 || layer.locked) return;
     e.stopPropagation();
 
+    if (e.shiftKey) { toggleLayerSelection(layer.id); return; }
     selectLayer(layer.id);
     setDraggingLayerId(layer.id);
 
@@ -874,8 +1159,12 @@ export default function Preview() {
 
     const buildPatch = (clientX, clientY) => {
       const s = scaleRef.current;
-      const newX = origX + (clientX - startClientX) / s;
-      const newY = origY + (clientY - startClientY) / s;
+      const { format } = useTimelineStore.getState().project ?? {};
+      const cW = format?.width ?? 1080, cH = format?.height ?? 1920;
+      const w = origT.width ?? cW, h = origT.height ?? cH;
+      const rawX = origX + (clientX - startClientX) / s;
+      const rawY = origY + (clientY - startClientY) / s;
+      const { x: newX, y: newY } = snapBody(rawX, rawY, w, h, cW, cH);
 
       if (hasXKF || hasYKF) {
         const kf = JSON.parse(JSON.stringify(origKF));
@@ -946,9 +1235,89 @@ export default function Preview() {
       currentTime < l.end
   );
 
+  const sfxLayers = layers.filter((l) => l.sfx?.key && l.visible !== false);
+
+  const mod = isMac ? "⌘" : "Ctrl";
+  const SHORTCUTS = [
+    { section: "Playback" },
+    { key: "Space",            desc: "Play / Pause" },
+    { key: "← →",              desc: "Seek ±1s  (Shift = ±5s)" },
+    { section: "Layer" },
+    { key: "↑ ↓ ← →",          desc: "Nudge layer ±1px (when selected)" },
+    { key: "⇧ + arrows",       desc: "Nudge layer ±10px" },
+    { key: `${mod}D`,           desc: "Duplicate layer" },
+    { key: "Del / ⌫",           desc: "Delete layer" },
+    { key: `${mod}]  /  ${mod}[`, desc: "Bring forward / send back" },
+    { section: "History" },
+    { key: `${mod}Z`,           desc: "Undo" },
+    { key: `${mod}Y  /  ${mod}⇧Z`, desc: "Redo" },
+    { section: "Canvas Zoom" },
+    { key: `${mod}=  /  ${mod}+`, desc: "Zoom in" },
+    { key: `${mod}−`,           desc: "Zoom out" },
+    { key: `${mod}0`,           desc: "Reset zoom + pan" },
+    { key: `${mod} + scroll`,   desc: "Zoom in / out" },
+    { key: "Scroll",            desc: "Pan canvas" },
+    { key: "H + drag",          desc: "Pan canvas (hand tool)" },
+    { section: "Selection" },
+    { key: "⇧ + click",         desc: "Add to multi-select" },
+    { key: "F",                 desc: "Toggle fullscreen" },
+    { key: "Esc",               desc: "Deselect layer" },
+  ];
+
   return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+
+      {/* ── Shortcuts toolbar ─────────────────────────────────────────────── */}
+      <div style={{
+        display: "flex", alignItems: "center", padding: "5px 12px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        flexShrink: 0, gap: 10, background: "#0d0d18",
+      }}>
+        {/* Quick hints */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#555", fontFamily: "monospace" }}>
+          <span>Space ▶/⏸</span>
+          <span style={{ opacity: 0.3 }}>·</span>
+          <span>H+drag pan</span>
+          <span style={{ opacity: 0.3 }}>·</span>
+          <span>{mod}Z undo</span>
+          <span style={{ opacity: 0.3 }}>·</span>
+          <span>{mod}Y redo</span>
+          <span style={{ opacity: 0.3 }}>·</span>
+          <span>Esc deselect</span>
+        </div>
+
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Zoom controls */}
+          <button
+            onClick={() => setUserZoom((z) => clampZoom(z - ZOOM_STEP))}
+            title={`Zoom out (${mod}-)`}
+            style={{ width: 22, height: 22, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", background: "rgba(255,255,255,0.05)", color: "#999", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >−</button>
+          <button
+            onClick={() => { setUserZoom(1); setPanOffset({ x: 0, y: 0 }); panOffsetRef.current = { x: 0, y: 0 }; }}
+            title={`Reset zoom (${mod}0)`}
+            style={{ minWidth: 42, height: 22, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", background: "rgba(255,255,255,0.05)", color: userZoom === 1 ? "#555" : "#a78bfa", fontSize: 11, fontFamily: "monospace", fontWeight: 700 }}
+          >{Math.round(userZoom * 100)}%</button>
+          <button
+            onClick={() => setUserZoom((z) => clampZoom(z + ZOOM_STEP))}
+            title={`Zoom in (${mod}=)`}
+            style={{ width: 22, height: 22, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", background: "rgba(255,255,255,0.05)", color: "#999", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >+</button>
+
+          {/* All shortcuts link */}
+          <button
+            onClick={() => setShowShortcuts(true)}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#555", fontFamily: "monospace", textDecoration: "underline", textUnderlineOffset: 2, padding: "0 4px", marginLeft: 4 }}
+            onMouseOver={(e) => (e.currentTarget.style.color = "#7c5cfc")}
+            onMouseOut={(e)  => (e.currentTarget.style.color = "#555")}
+          >All Shortcuts</button>
+        </div>
+      </div>
+
+      {/* ── Canvas area (fullscreened on F / button) ───────────────────────── */}
     <div
       ref={containerRef}
+      className="preview-container"
       style={{
         flex: 1,
         display: "flex",
@@ -957,11 +1326,57 @@ export default function Preview() {
         background: "#0a0a14",
         overflow: "hidden",
         position: "relative",
+        cursor: isHandMode ? "grab" : undefined,
       }}
+      onMouseDown={handleContainerMouseDown}
     >
+      {/* Fullscreen toggle */}
+      <button
+        onClick={toggleFullscreen}
+        title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 100,
+          background: "rgba(0,0,0,0.45)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 7,
+          cursor: "pointer",
+          padding: "5px 7px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: 0.6,
+          transition: "opacity 0.15s",
+        }}
+        onMouseOver={(e) => (e.currentTarget.style.opacity = 1)}
+        onMouseOut={(e) => (e.currentTarget.style.opacity = 0.6)}
+      >
+        {isFullscreen ? (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="8 3 3 3 3 8"/><polyline points="21 8 21 3 16 3"/>
+            <polyline points="3 16 3 21 8 21"/><polyline points="16 21 21 21 21 16"/>
+          </svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+        )}
+      </button>
+
       {audioLayers.map((layer) => (
         <AudioLayerEl
           key={layer.id}
+          layer={layer}
+          currentTime={currentTime}
+          isPlaying={isPlaying}
+        />
+      ))}
+      {sfxLayers.map((layer) => (
+        <SfxLayerEl
+          key={`sfx-${layer.id}`}
           layer={layer}
           currentTime={currentTime}
           isPlaying={isPlaying}
@@ -973,9 +1388,10 @@ export default function Preview() {
       <div
         style={{
           position: "relative",
-          width: canvasW * scale,
-          height: canvasH * scale,
+          width: canvasW * effectiveScale,
+          height: canvasH * effectiveScale,
           flexShrink: 0,
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
         }}
       >
         {/* Full-size canvas, scaled from top-left */}
@@ -988,10 +1404,10 @@ export default function Preview() {
             height: canvasH,
             background: "#000",
             transformOrigin: "top left",
-            transform: `scale(${scale})`,
+            transform: `scale(${effectiveScale})`,
             overflow: "hidden",
           }}
-          onMouseDown={() => selectLayer(null)}
+          onMouseDown={(e) => { if (!isHandModeRef.current) selectLayer(null); }}
         >
           {/* Persistent video tracks — one element per track, never unmounts */}
           {videoTracks.map((clips) => (
@@ -1019,7 +1435,7 @@ export default function Preview() {
               isPlaying={isPlaying}
               canvasW={canvasW}
               canvasH={canvasH}
-              isSelected={layer.id === selectedLayerId}
+              isSelected={layer.id === selectedLayerId || selectedLayerIds.includes(layer.id)}
               isDragging={layer.id === draggingLayerId}
               isEditing={layer.id === editingLayerId}
               scaleRef={scaleRef}
@@ -1036,7 +1452,7 @@ export default function Preview() {
               position: "absolute", inset: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#2a2a3a",
-              fontSize: Math.max(14, 24 * scale),
+              fontSize: Math.max(14, 24 * effectiveScale),
               textAlign: "center",
               padding: 24,
             }}>
@@ -1055,12 +1471,41 @@ export default function Preview() {
             width: canvasW,
             height: canvasH,
             transformOrigin: "top left",
-            transform: `scale(${scale})`,
+            transform: `scale(${effectiveScale})`,
             overflow: "visible",
             pointerEvents: "none",
           }}
         />
       </div>
+    </div>
+
+      {/* ── Shortcuts modal ────────────────────────────────────────────────── */}
+      {showShortcuts && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div
+            style={{ background: "#16161f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "24px 28px", width: 440, maxHeight: "80vh", overflowY: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#e8e8f0", letterSpacing: "0.1em", textTransform: "uppercase" }}>Keyboard Shortcuts</span>
+              <button onClick={() => setShowShortcuts(false)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>✕</button>
+            </div>
+            {SHORTCUTS.map((row, i) =>
+              row.section ? (
+                <div key={i} style={{ fontSize: 10, fontWeight: 700, color: "#444", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: i === 0 ? 0 : 14, marginBottom: 6 }}>{row.section}</div>
+              ) : (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <kbd style={{ fontSize: 12, fontFamily: "monospace", color: "#7c5cfc", background: "rgba(124,92,252,0.1)", padding: "2px 8px", borderRadius: 4 }}>{row.key}</kbd>
+                  <span style={{ fontSize: 13, color: "#aaa" }}>{row.desc}</span>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

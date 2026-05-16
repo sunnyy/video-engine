@@ -77,6 +77,7 @@ export default function TimelineToolbar() {
         padding: "0 14px",
         gap: 5,
         flexShrink: 0,
+        userSelect: "none",
       }}
     >
       {/* Play / Pause */}

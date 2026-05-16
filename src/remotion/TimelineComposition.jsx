@@ -1,4 +1,5 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence } from "remotion";
+import { SFX_LIBRARY, getSFXPreviewUrl } from "../core/registries/sfxRegistry";
 
 export default function TimelineComposition({ project }) {
   const frame = useCurrentFrame();
@@ -14,6 +15,17 @@ export default function TimelineComposition({ project }) {
       {layers.map((layer) => (
         <TimelineLayer key={layer.id} layer={layer} currentTime={currentTime} fps={fps} />
       ))}
+      {layers
+        .filter((l) => l.sfx?.key)
+        .map((l) => {
+          const sfxStart = Math.round((l.start + (l.sfx.delay ?? 0)) * fps);
+          const sfxDur = Math.max(1, Math.round((SFX_LIBRARY[l.sfx.key]?.duration ?? 3) * fps));
+          return (
+            <Sequence key={`sfx-${l.id}`} from={sfxStart} durationInFrames={sfxDur}>
+              <Audio src={getSFXPreviewUrl(l.sfx.key)} volume={l.sfx.volume ?? 1} />
+            </Sequence>
+          );
+        })}
     </AbsoluteFill>
   );
 }
