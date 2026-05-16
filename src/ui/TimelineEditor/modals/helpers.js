@@ -33,7 +33,6 @@ export function makeLayerAt(type, project, start, duration, opts = {}) {
     zIndex: (project?.layers?.length ?? 0) + 1,
     objectFit: "cover",
     transform: { x: 0, y: 0, width: w, height: h, rotation: 0, scale: 1, opacity: 1, blur: 0 },
-    animation: { in: { type: "none", duration: 0.3 }, out: { type: "none", duration: 0.3 } },
     keyframes: {},
   };
 

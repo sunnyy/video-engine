@@ -7,11 +7,6 @@ const FONT_FAMILIES = [
   "Outfit", "Inter", "Roboto", "Montserrat",
   "Playfair Display", "Oswald", "Lato", "Raleway",
 ];
-const ANIMATION_TYPES_IN = [
-  "none", "fade", "slide-up", "slide-down", "slide-left", "slide-right",
-  "zoom", "bounce", "typewriter",
-];
-const ANIMATION_TYPES_OUT = ["none", "fade"];
 const TRANSITION_TYPES = ["none", "fade", "dissolve", "slide-left", "slide-right", "zoom"];
 const OBJECT_FIT_OPTIONS = ["cover", "contain", "fill"];
 const BOX_SHADOW_PRESETS = [
@@ -147,15 +142,6 @@ function VideoProps({ layer, update, updateSilent, commit, resolvedObjectFitVal,
           onMouseUp={(e) => commit({ volume: parseFloat(e.target.value), muted: false }, preVol.current)}
           style={{ width: "100%", accentColor: "#7c5cfc", margin: 0 }}
         />
-        <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
-          <div style={{
-            height: "100%",
-            width: `${layer.muted ? 0 : (layer.volume ?? 1) * 100}%`,
-            background: layer.muted ? "#55556a" : "#7c5cfc",
-            borderRadius: 2,
-            transition: "width 0.1s",
-          }} />
-        </div>
       </Field>
       <Field label="Speed">
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
@@ -241,15 +227,6 @@ function AudioProps({ layer, update, updateSilent, commit }) {
           onMouseUp={(e) => commit({ volume: parseFloat(e.target.value), muted: false }, preVol.current)}
           style={{ width: "100%", accentColor: "#7c5cfc", margin: 0 }}
         />
-        <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
-          <div style={{
-            height: "100%",
-            width: `${layer.muted ? 0 : (layer.volume ?? 1) * 100}%`,
-            background: layer.muted ? "#55556a" : "#7c5cfc",
-            borderRadius: 2,
-            transition: "width 0.1s",
-          }} />
-        </div>
       </Field>
       <Row2>
         <Field label="Fade In">
@@ -367,33 +344,34 @@ function AppearanceSection({ layer, update, updateSilent, commit }) {
         </Field>
       </Row2>
 
-      <Field label="Background">
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input
-            type="color"
-            value={hasBg ? layer.backgroundColor : "#000000"}
-            onFocus={snap}
-            onChange={(e) => updateSilent({ backgroundColor: e.target.value })}
-            onBlur={(e) => commit({ backgroundColor: e.target.value }, pre.current)}
-            style={{ ...inputStyle, height: 34, padding: 3, cursor: "pointer", flex: 1, opacity: hasBg ? 1 : 0.35 }}
-          />
-          <button
-            onClick={() => update({ backgroundColor: hasBg ? null : "#000000" })}
-            style={{
-              padding: "5px 10px", borderRadius: 5, fontSize: 11, cursor: "pointer",
-              border: `1px solid ${hasBg ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
-              background: hasBg ? "rgba(124,92,252,0.18)" : "transparent",
-              color: hasBg ? "#a78bfa" : "#55556a", whiteSpace: "nowrap",
-            }}
-          >
-            {hasBg ? "Clear" : "Off"}
-          </button>
-        </div>
-      </Field>
-
-      <Field label="Padding">
-        <NumberInput value={layer.padding ?? 0} onChange={(v) => update({ padding: Math.max(0, v) })} min={0} step={2} />
-      </Field>
+      <Row2>
+        <Field label="Background">
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="color"
+              value={hasBg ? layer.backgroundColor : "#000000"}
+              onFocus={snap}
+              onChange={(e) => updateSilent({ backgroundColor: e.target.value })}
+              onBlur={(e) => commit({ backgroundColor: e.target.value }, pre.current)}
+              style={{ ...inputStyle, height: 32, padding: 3, cursor: "pointer", flex: 1, opacity: hasBg ? 1 : 0.35 }}
+            />
+            <button
+              onClick={() => update({ backgroundColor: hasBg ? null : "#000000" })}
+              style={{
+                padding: "5px 8px", borderRadius: 5, fontSize: 11, cursor: "pointer",
+                border: `1px solid ${hasBg ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                background: hasBg ? "rgba(124,92,252,0.18)" : "transparent",
+                color: hasBg ? "#a78bfa" : "#55556a", whiteSpace: "nowrap",
+              }}
+            >
+              {hasBg ? "✕" : "Off"}
+            </button>
+          </div>
+        </Field>
+        <Field label="Padding">
+          <NumberInput value={layer.padding ?? 0} onChange={(v) => update({ padding: Math.max(0, v) })} min={0} step={2} />
+        </Field>
+      </Row2>
 
       <Field label="Shadow">
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -432,36 +410,6 @@ function AppearanceSection({ layer, update, updateSilent, commit }) {
   );
 }
 
-function AnimationProps({ layer, update }) {
-  const anim = layer.animation ?? {
-    in: { type: "none", duration: 0.3 },
-    out: { type: "none", duration: 0.3 },
-  };
-  const updateIn = (patch) => update({ animation: { ...anim, in: { ...anim.in, ...patch } } });
-  const updateOut = (patch) => update({ animation: { ...anim, out: { ...anim.out, ...patch } } });
-  return (
-    <Section title="Animation">
-      <Row2>
-        <Field label="In Type">
-          <select style={selectStyle} value={anim.in?.type ?? "none"} onChange={(e) => updateIn({ type: e.target.value })}>
-            {ANIMATION_TYPES_IN.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="In Duration">
-          <NumberInput value={anim.in?.duration ?? 0.3} onChange={(v) => updateIn({ duration: Math.max(0, v) })} min={0} step={0.05} />
-        </Field>
-        <Field label="Out Type">
-          <select style={selectStyle} value={anim.out?.type ?? "none"} onChange={(e) => updateOut({ type: e.target.value })}>
-            {ANIMATION_TYPES_OUT.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Out Duration">
-          <NumberInput value={anim.out?.duration ?? 0.3} onChange={(v) => updateOut({ duration: Math.max(0, v) })} min={0} step={0.05} />
-        </Field>
-      </Row2>
-    </Section>
-  );
-}
 
 function TransitionProps({ layer, update }) {
   const tr = layer.transition ?? { type: "none", duration: 0.5 };
@@ -974,7 +922,6 @@ export default function PropertiesPanel() {
           {layer.type === "text" && <TextProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
           {(layer.type === "image" || layer.type === "sticker") && <ImageProps layer={layer} update={update} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
           {layer.type !== "audio" && <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
-          {layer.type !== "audio" && <AnimationProps layer={layer} update={update} />}
           {(layer.type === "video" || layer.type === "image") && <TransitionProps layer={layer} update={update} />}
           {layer.type !== "audio" && <SfxSection layer={layer} update={update} />}
           {layer.type !== "audio" && layer.type !== "captions" && (
