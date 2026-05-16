@@ -1,0 +1,139 @@
+import { useNavigate } from "react-router-dom";
+import { useTimelineStore } from "../../store/useTimelineStore";
+
+const btn = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  borderRadius: 6,
+  padding: "5px 10px",
+  fontSize: 14,
+  color: "#c0c0d8",
+};
+
+const btnDisabled = { ...btn, color: "#3a3a52", cursor: "default" };
+
+export default function TopBar() {
+  const navigate = useNavigate();
+  const project = useTimelineStore((s) => s.project);
+  const _history = useTimelineStore((s) => s._history);
+  const _future = useTimelineStore((s) => s._future);
+  const undo = useTimelineStore((s) => s.undo);
+  const redo = useTimelineStore((s) => s.redo);
+  const updateProject = useTimelineStore((s) => s.updateProject);
+
+  const name = project?.name ?? "Untitled Video";
+  const isPortrait =
+    (project?.format?.width ?? 1080) < (project?.format?.height ?? 1920);
+
+  const handleNameChange = (e) => {
+    if (!project) return;
+    updateProject({ name: e.target.value });
+  };
+
+  const handleFormatToggle = () => {
+    if (!project) return;
+    const { width, height } = project.format;
+    updateProject({ format: { ...project.format, width: height, height: width } });
+  };
+
+  return (
+    <div
+      style={{
+        height: 52,
+        background: "#111118",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 14px",
+        gap: 4,
+        flexShrink: 0,
+      }}
+    >
+      {/* Left: Back */}
+      <button style={btn} onClick={() => navigate("/videos")} title="Back to Videos">
+        ← Back
+      </button>
+
+      {/* Center: project name */}
+      <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
+        <input
+          value={name}
+          onChange={handleNameChange}
+          onFocus={(e) => e.target.select()}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "#e8e8f0",
+            fontSize: 15,
+            fontWeight: 600,
+            textAlign: "center",
+            outline: "none",
+            padding: "5px 12px",
+            borderRadius: 6,
+            maxWidth: 340,
+            width: "100%",
+          }}
+          onMouseOver={(e) => (e.target.style.background = "rgba(255,255,255,0.06)")}
+          onMouseOut={(e) => (e.target.style.background = "transparent")}
+        />
+      </div>
+
+      {/* Right: controls */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <button
+          style={_history.length ? btn : btnDisabled}
+          onClick={undo}
+          disabled={!_history.length}
+          title="Undo (Ctrl+Z)"
+        >
+          ↩ Undo
+        </button>
+        <button
+          style={_future.length ? btn : btnDisabled}
+          onClick={redo}
+          disabled={!_future.length}
+          title="Redo (Ctrl+Shift+Z)"
+        >
+          ↪ Redo
+        </button>
+
+        <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", margin: "0 8px" }} />
+
+        <button
+          onClick={handleFormatToggle}
+          title="Toggle aspect ratio"
+          style={{
+            background: "rgba(124,92,252,0.14)",
+            border: "1px solid rgba(124,92,252,0.4)",
+            color: "#a080ff",
+            cursor: "pointer",
+            padding: "5px 12px",
+            borderRadius: 6,
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "0.03em",
+          }}
+        >
+          {isPortrait ? "9:16" : "16:9"}
+        </button>
+
+        <button
+          style={{
+            background: "#7c5cfc",
+            border: "none",
+            color: "#fff",
+            cursor: "pointer",
+            padding: "7px 20px",
+            borderRadius: 6,
+            fontSize: 14,
+            fontWeight: 600,
+            marginLeft: 4,
+          }}
+        >
+          Export
+        </button>
+      </div>
+    </div>
+  );
+}

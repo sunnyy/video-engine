@@ -41,6 +41,7 @@ import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
 import TTSStudio       from "./pages/Voiceover";
 import CaptionStudio      from "./pages/VideoCaptions";
+import VideoEditor        from "./pages/VideoEditor";
 import TypographyVideo    from "./pages/TypographyVideo";
 import ExplainerVideo     from "./pages/ExplainerVideo";
 import CustomVideos       from "./pages/CustomVideos";
@@ -156,6 +157,7 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/editor/:id"       element={<Editor />} />
+            <Route path="/video-editor/:id" element={<VideoEditor />} />
             <Route path="/product-ads"       element={<ProductAds />} />
             <Route path="/product-ads/new"   element={<NewProductAd />} />
             <Route path="/product-ad-studio" element={<ProductAds />} />
