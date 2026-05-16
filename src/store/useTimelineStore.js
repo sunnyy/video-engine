@@ -3,6 +3,11 @@ import { interpolateKeyframes } from "../ui/TimelineEditor/keyframeUtils";
 
 const MAX_HISTORY = 50;
 
+function recalcDuration(layers) {
+  const furthest = layers.reduce((max, l) => Math.max(max, l.end || 0), 0);
+  return Math.max(5, furthest);
+}
+
 function pushHistory(history, project) {
   const snap = JSON.parse(JSON.stringify(project));
   const next = [...history, snap];
@@ -30,15 +35,26 @@ export const useTimelineStore = create((set, get) => ({
   // History
   _history: [],
   _future: [],
+  // Keyframe coalescing: consecutive addKeyframe calls on the same layer within
+  // 800ms share one history entry so a single Ctrl+Z undoes the whole batch.
+  _kfCoalesceLayerId: null,
+  _kfCoalesceTs: 0,
 
   // Pending uploads: layerId → File (blob URLs awaiting upload on save)
   pendingFiles: {},
 
   // ── Project actions ──────────────────────────────────────────
   setProject: (project) => {
+    const layers = project?.layers ?? [];
+    const newDuration = layers.length > 0
+      ? recalcDuration(layers)
+      : (project?.format?.duration ?? 30);
+    const newProject = project
+      ? { ...project, format: { ...project.format, duration: newDuration } }
+      : project;
     set({
-      project,
-      duration: project?.format?.duration ?? 30,
+      project: newProject,
+      duration: newDuration,
       currentTime: 0,
       isPlaying: false,
       selectedLayerId: null,
@@ -68,13 +84,31 @@ export const useTimelineStore = create((set, get) => ({
     const { project, _history } = get();
     if (!project) return;
     const newHistory = pushHistory(_history, project);
+    const newLayers = project.layers.map((l) => l.id === layerId ? { ...l, ...patch } : l);
+    const newDuration = recalcDuration(newLayers);
     const newProject = {
       ...project,
-      layers: project.layers.map((l) =>
-        l.id === layerId ? { ...l, ...patch } : l
-      ),
+      layers: newLayers,
+      format: { ...project.format, duration: newDuration },
     };
-    set({ project: newProject, _history: newHistory, _future: [] });
+    set({ project: newProject, _history: newHistory, _future: [], duration: newDuration });
+    return newProject;
+  },
+
+  // Commit a drag: pushes preDragProject as the undo point, applies patch to current project.
+  // Prevents the double-undo problem where updateLayer would push the already-dragged state.
+  commitDrag: (layerId, patch, preDragProject) => {
+    const { project, _history } = get();
+    if (!project) return;
+    const newHistory = pushHistory(_history, preDragProject);
+    const newLayers = project.layers.map((l) => l.id === layerId ? { ...l, ...patch } : l);
+    const newDuration = recalcDuration(newLayers);
+    const newProject = {
+      ...project,
+      layers: newLayers,
+      format: { ...project.format, duration: newDuration },
+    };
+    set({ project: newProject, _history: newHistory, _future: [], duration: newDuration });
     return newProject;
   },
 
@@ -96,30 +130,34 @@ export const useTimelineStore = create((set, get) => ({
     const { project, _history } = get();
     if (!project) return;
     const newHistory = pushHistory(_history, project);
-    // Ensure every layer belongs to a track (defaults to its own id)
     const l = layer.trackId ? layer : { ...layer, trackId: layer.id };
-    const newProject = { ...project, layers: [...project.layers, l] };
-    set({
-      project: newProject,
-      _history: newHistory,
-      _future: [],
-      selectedLayerId: l.id,
-    });
+    const newLayers = [...project.layers, l];
+    const newDuration = recalcDuration(newLayers);
+    const newProject = {
+      ...project,
+      layers: newLayers,
+      format: { ...project.format, duration: newDuration },
+    };
+    set({ project: newProject, _history: newHistory, _future: [], selectedLayerId: l.id, duration: newDuration });
   },
 
   removeLayer: (layerId) => {
     const { project, _history, selectedLayerId } = get();
     if (!project) return;
     const newHistory = pushHistory(_history, project);
+    const newLayers = project.layers.filter((l) => l.id !== layerId);
+    const newDuration = recalcDuration(newLayers);
     const newProject = {
       ...project,
-      layers: project.layers.filter((l) => l.id !== layerId),
+      layers: newLayers,
+      format: { ...project.format, duration: newDuration },
     };
     set({
       project: newProject,
       _history: newHistory,
       _future: [],
       selectedLayerId: selectedLayerId === layerId ? null : selectedLayerId,
+      duration: newDuration,
     });
   },
 
@@ -134,13 +172,14 @@ export const useTimelineStore = create((set, get) => ({
       id: crypto.randomUUID(),
       name: layer.name + " copy",
     };
-    const newProject = { ...project, layers: [...project.layers, clone] };
-    set({
-      project: newProject,
-      _history: newHistory,
-      _future: [],
-      selectedLayerId: clone.id,
-    });
+    const newLayers = [...project.layers, clone];
+    const newDuration = recalcDuration(newLayers);
+    const newProject = {
+      ...project,
+      layers: newLayers,
+      format: { ...project.format, duration: newDuration },
+    };
+    set({ project: newProject, _history: newHistory, _future: [], selectedLayerId: clone.id, duration: newDuration });
   },
 
   reorderLayers: (fromIndex, toIndex) => {
@@ -151,7 +190,9 @@ export const useTimelineStore = create((set, get) => ({
     const [moved] = layers.splice(fromIndex, 1);
     layers.splice(toIndex, 0, moved);
     const newLayers = layers.map((l, i) => ({ ...l, zIndex: i + 1 }));
-    set({ project: { ...project, layers: newLayers }, _history: newHistory, _future: [] });
+    const newDuration = recalcDuration(newLayers);
+    const newProject = { ...project, layers: newLayers, format: { ...project.format, duration: newDuration } };
+    set({ project: newProject, _history: newHistory, _future: [], duration: newDuration });
   },
 
   bringForward: (layerId) => {
@@ -185,7 +226,9 @@ export const useTimelineStore = create((set, get) => ({
     const newLayers = project.layers.map((l) =>
       l.id === layerId ? { ...l, trackId: targetTrackId } : l
     );
-    set({ project: { ...project, layers: newLayers }, _history: newHistory, _future: [] });
+    const newDuration = recalcDuration(newLayers);
+    const newProject = { ...project, layers: newLayers, format: { ...project.format, duration: newDuration } };
+    set({ project: newProject, _history: newHistory, _future: [], duration: newDuration });
   },
 
   reorderTrackGroups: (orderedTrackIds) => {
@@ -206,7 +249,7 @@ export const useTimelineStore = create((set, get) => ({
     for (const layer of project.layers) {
       if (!newLayers.find((l) => l.id === layer.id)) newLayers.push(layer);
     }
-    const withZIndex = newLayers.map((l, i) => ({ ...l, zIndex: i + 1 }));
+    const withZIndex = newLayers.map((l, i) => ({ ...l, zIndex: newLayers.length - i }));
     set({ project: { ...project, layers: withZIndex }, _history: newHistory, _future: [] });
   },
 
@@ -235,7 +278,8 @@ export const useTimelineStore = create((set, get) => ({
     const newFut = project
       ? [JSON.parse(JSON.stringify(project)), ..._future]
       : _future;
-    set({ project: prev, _history: newHist, _future: newFut });
+    const prevDuration = recalcDuration(prev?.layers ?? []);
+    set({ project: prev, _history: newHist, _future: newFut, _kfCoalesceLayerId: null, _kfCoalesceTs: 0, duration: prevDuration });
   },
 
   redo: () => {
@@ -246,16 +290,19 @@ export const useTimelineStore = create((set, get) => ({
     const newHist = project
       ? [..._history, JSON.parse(JSON.stringify(project))]
       : _history;
-    set({ project: next, _history: newHist, _future: newFut });
+    const nextDuration = recalcDuration(next?.layers ?? []);
+    set({ project: next, _history: newHist, _future: newFut, _kfCoalesceLayerId: null, _kfCoalesceTs: 0, duration: nextDuration });
   },
 
   // ── Keyframes ────────────────────────────────────────────────
   addKeyframe: (layerId, property, time, value) => {
-    const { project, _history } = get();
+    const { project, _history, _kfCoalesceLayerId, _kfCoalesceTs } = get();
     if (!project) return;
     const layer = project.layers.find((l) => l.id === layerId);
     if (!layer) return;
-    const newHistory = pushHistory(_history, project);
+    const now = Date.now();
+    const coalesce = _kfCoalesceLayerId === layerId && (now - _kfCoalesceTs) < 800;
+    const newHistory = coalesce ? _history : pushHistory(_history, project);
     const existing = layer.keyframes?.[property] ?? [];
     const dupIdx = existing.findIndex((kf) => Math.abs(kf.time - time) < 0.001);
     const newFrames = dupIdx >= 0
@@ -267,6 +314,25 @@ export const useTimelineStore = create((set, get) => ({
         l.id === layerId
           ? { ...l, keyframes: { ...l.keyframes, [property]: newFrames } }
           : l
+      ),
+    };
+    set({ project: newProject, _history: newHistory, _future: [], _kfCoalesceLayerId: layerId, _kfCoalesceTs: now });
+  },
+
+  removeKeyframesAtTime: (layerId, time) => {
+    const { project, _history } = get();
+    if (!project) return;
+    const layer = project.layers.find((l) => l.id === layerId);
+    if (!layer) return;
+    const newHistory = pushHistory(_history, project);
+    const newKeyframes = {};
+    for (const [prop, arr] of Object.entries(layer.keyframes ?? {})) {
+      newKeyframes[prop] = (arr ?? []).filter((kf) => Math.abs(kf.time - time) >= 0.001);
+    }
+    const newProject = {
+      ...project,
+      layers: project.layers.map((l) =>
+        l.id === layerId ? { ...l, keyframes: newKeyframes } : l
       ),
     };
     set({ project: newProject, _history: newHistory, _future: [] });
@@ -378,11 +444,13 @@ export const useTimelineStore = create((set, get) => ({
       rightPart
     );
 
+    const newDuration = recalcDuration(layers);
     set({
-      project: { ...project, layers },
+      project: { ...project, layers, format: { ...project.format, duration: newDuration } },
       _history: newHistory,
       _future: [],
       selectedLayerId: rightPart.id,
+      duration: newDuration,
     });
   },
 }));

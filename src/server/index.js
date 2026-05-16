@@ -64,7 +64,11 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use("/api", generalLimiter);
+app.use("/api", (req, res, next) => {
+  // Exempt render status polling — it's a long-running endpoint and has no security risk
+  if (req.path.startsWith("/render/status/")) return next();
+  return generalLimiter(req, res, next);
+});
 app.use("/api/generate", generationLimiter);
 app.use("/api/image-generation/generate", generationLimiter);
 app.use("/api/poster", generationLimiter);

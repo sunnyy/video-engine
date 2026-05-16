@@ -200,6 +200,18 @@ export default function TimelineToolbar() {
         {Math.round(zoom * 100)}%
       </div>
       <button style={iconBtn(false)} onClick={() => setZoom(zoom * 1.4)} title="Zoom in">+</button>
+      <button
+        style={iconBtn(false)}
+        onClick={() => {
+          const el = document.getElementById("timeline-scroll");
+          const w = el ? el.clientWidth : 800;
+          const newZoom = (w - 60) / (duration * 80);
+          setZoom(Math.max(0.1, Math.min(newZoom, 5)));
+        }}
+        title="Zoom to fit entire project"
+      >
+        ⊡
+      </button>
     </div>
   );
 }

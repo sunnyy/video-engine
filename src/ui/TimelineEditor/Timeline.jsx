@@ -152,6 +152,7 @@ export default function Timeline() {
       }}
     >
       <div
+        id="timeline-scroll"
         ref={scrollRef}
         className="dark-scroll"
         style={{ flex: 1, overflowX: "auto", overflowY: "auto", position: "relative" }}

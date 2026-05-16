@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
+import { serverFetch } from "../../services/serverApi";
 
 const btn = {
   background: "none",
@@ -16,11 +18,15 @@ const btnDisabled = { ...btn, color: "#3a3a52", cursor: "default" };
 export default function TopBar() {
   const navigate = useNavigate();
   const project = useTimelineStore((s) => s.project);
+  const projectId = useTimelineStore((s) => s.projectId);
   const _history = useTimelineStore((s) => s._history);
   const _future = useTimelineStore((s) => s._future);
   const undo = useTimelineStore((s) => s.undo);
   const redo = useTimelineStore((s) => s.redo);
   const updateProject = useTimelineStore((s) => s.updateProject);
+
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   const name = project?.name ?? "Untitled Video";
   const isPortrait =
@@ -29,6 +35,43 @@ export default function TopBar() {
   const handleNameChange = (e) => {
     if (!project) return;
     updateProject({ name: e.target.value });
+  };
+
+  const handleExport = async () => {
+    if (!project || exporting) return;
+    setExporting(true);
+    setExportProgress(0);
+    try {
+      const res = await serverFetch("/api/render/timeline", {
+        method: "POST",
+        body: JSON.stringify({ project, projectId, resolution: "1080p" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Export failed");
+      }
+      const { jobId } = await res.json();
+
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await serverFetch(`/api/render/status/${jobId}`);
+          if (!statusRes.ok) return;
+          const status = await statusRes.json();
+          setExportProgress(status.progress || 0);
+          if (status.done) {
+            clearInterval(poll);
+            setExporting(false);
+            if (status.cancelled) return;
+            if (status.error) { alert("Export failed: " + status.error); return; }
+            if (status.video_url) window.open(status.video_url, "_blank");
+            else if (status.url) window.open(status.url, "_blank");
+          }
+        } catch (_) {}
+      }, 3000);
+    } catch (err) {
+      setExporting(false);
+      alert(err.message || "Export failed");
+    }
   };
 
   const handleFormatToggle = () => {
@@ -119,19 +162,23 @@ export default function TopBar() {
         </button>
 
         <button
+          onClick={handleExport}
+          disabled={!project || exporting}
           style={{
-            background: "#7c5cfc",
+            background: exporting ? "#4a3a9a" : "#7c5cfc",
             border: "none",
             color: "#fff",
-            cursor: "pointer",
+            cursor: !project || exporting ? "default" : "pointer",
             padding: "7px 20px",
             borderRadius: 6,
             fontSize: 14,
             fontWeight: 600,
             marginLeft: 4,
+            minWidth: 110,
+            opacity: !project ? 0.4 : 1,
           }}
         >
-          Export
+          {exporting ? `Exporting… ${exportProgress}%` : "Export"}
         </button>
       </div>
     </div>

@@ -1,0 +1,166 @@
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence } from "remotion";
+
+export default function TimelineComposition({ project }) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const currentTime = frame / fps;
+
+  const layers = [...(project?.layers || [])]
+    .filter((l) => l.visible !== false)
+    .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+  return (
+    <AbsoluteFill style={{ background: project?.format?.background || "#000" }}>
+      {layers.map((layer) => (
+        <TimelineLayer key={layer.id} layer={layer} currentTime={currentTime} fps={fps} />
+      ))}
+    </AbsoluteFill>
+  );
+}
+
+function TimelineLayer({ layer, currentTime, fps }) {
+  if (currentTime < layer.start || currentTime >= layer.end) return null;
+
+  const tr = getInterpolatedTransform(layer, currentTime);
+  const startFrame = Math.round(layer.start * fps);
+  const durationFrames = Math.max(1, Math.round((layer.end - layer.start) * fps));
+
+  const baseStyle = {
+    position: "absolute",
+    left: tr.x,
+    top: tr.y,
+    width: tr.width,
+    height: tr.height,
+    opacity: tr.opacity,
+    transform: `rotate(${tr.rotation}deg) scale(${tr.scale})`,
+    filter: tr.blur > 0 ? `blur(${tr.blur}px)` : undefined,
+    zIndex: layer.zIndex,
+  };
+
+  if (layer.type === "video") {
+    return (
+      <Sequence from={startFrame} durationInFrames={durationFrames}>
+        <Video
+          src={layer.src}
+          style={{ ...baseStyle, position: "absolute" }}
+          startFrom={Math.round((layer.trimStart || 0) * fps)}
+          volume={layer.muted ? 0 : (layer.volume ?? 1)}
+          playbackRate={layer.playbackRate || 1}
+        />
+      </Sequence>
+    );
+  }
+
+  if (layer.type === "image" || layer.type === "sticker") {
+    return (
+      <Sequence from={startFrame} durationInFrames={durationFrames}>
+        <Img
+          src={layer.src}
+          style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover" }}
+        />
+      </Sequence>
+    );
+  }
+
+  if (layer.type === "text") {
+    const s = layer.style || {};
+    return (
+      <Sequence from={startFrame} durationInFrames={durationFrames}>
+        <div
+          style={{
+            ...baseStyle,
+            position: "absolute",
+            fontFamily: s.fontFamily || "Outfit",
+            fontSize: s.fontSize || 48,
+            fontWeight: s.fontWeight || 700,
+            color: s.color || "#ffffff",
+            textAlign: s.textAlign || "center",
+            lineHeight: s.lineHeight || 1.2,
+            letterSpacing: s.letterSpacing || 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent:
+              s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {layer.content}
+        </div>
+      </Sequence>
+    );
+  }
+
+  if (layer.type === "audio") {
+    return (
+      <Sequence from={startFrame} durationInFrames={durationFrames}>
+        <Audio
+          src={layer.src}
+          volume={layer.muted ? 0 : (layer.volume ?? 1)}
+          startFrom={Math.round((layer.trimStart || 0) * fps)}
+        />
+      </Sequence>
+    );
+  }
+
+  if (layer.type === "captions") {
+    const activeSegment = (layer.segments || []).find(
+      (seg) => currentTime >= seg.start && currentTime < seg.end
+    );
+    if (!activeSegment) return null;
+    const cs = layer.captionStyle || {};
+    return (
+      <Sequence from={startFrame} durationInFrames={durationFrames}>
+        <div
+          style={{
+            ...baseStyle,
+            position: "absolute",
+            fontFamily: cs.fontFamily || "Outfit",
+            fontSize: cs.fontSize || 48,
+            fontWeight: cs.fontWeight || 700,
+            color: cs.color || "#ffffff",
+            textAlign: cs.textAlign || "center",
+            background: cs.background || "rgba(0,0,0,0.5)",
+            borderRadius: cs.borderRadius || 8,
+            padding: cs.padding || 8,
+          }}
+        >
+          {activeSegment.text}
+        </div>
+      </Sequence>
+    );
+  }
+
+  return null;
+}
+
+function getInterpolatedTransform(layer, currentTime) {
+  const t = layer.transform || {};
+  const kf = layer.keyframes || {};
+  const localTime = currentTime - layer.start;
+
+  const interpolate = (property, defaultVal) => {
+    const frames = kf[property];
+    if (!frames || frames.length === 0) return t[property] ?? defaultVal;
+    if (frames.length === 1) return frames[0].value;
+    const sorted = [...frames].sort((a, b) => a.time - b.time);
+    if (localTime <= sorted[0].time) return sorted[0].value;
+    if (localTime >= sorted[sorted.length - 1].time) return sorted[sorted.length - 1].value;
+    const nextIdx = sorted.findIndex((k) => k.time > localTime);
+    const prev = sorted[nextIdx - 1];
+    const next = sorted[nextIdx];
+    const progress = (localTime - prev.time) / (next.time - prev.time);
+    return prev.value + (next.value - prev.value) * progress;
+  };
+
+  return {
+    x: interpolate("x", 0),
+    y: interpolate("y", 0),
+    width: interpolate("width", t.width ?? 1080),
+    height: interpolate("height", t.height ?? 1920),
+    rotation: interpolate("rotation", 0),
+    scale: interpolate("scale", 1),
+    opacity: interpolate("opacity", 1),
+    blur: interpolate("blur", 0),
+  };
+}

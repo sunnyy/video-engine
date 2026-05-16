@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
-import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
+import { interpolateKeyframes, resolveTransform } from "./keyframeUtils";
 
 const FONT_FAMILIES = [
   "Outfit", "Inter", "Roboto", "Montserrat",
@@ -11,7 +11,7 @@ const ANIMATION_TYPES_IN = [
   "zoom", "bounce", "typewriter",
 ];
 const ANIMATION_TYPES_OUT = ["none", "fade"];
-const TRANSITION_TYPES = ["none", "fade", "dissolve", "slide-left", "slide-right"];
+const TRANSITION_TYPES = ["none", "fade", "dissolve", "slide-left", "slide-right", "zoom"];
 const OBJECT_FIT_OPTIONS = ["cover", "contain", "fill"];
 
 const labelStyle = {
@@ -282,7 +282,7 @@ function TransitionProps({ layer, update }) {
           />
         </Field>
       )}
-      <div style={{ fontSize: 11, color: "#55557a", marginTop: -4 }}>Applied at the end of this clip</div>
+      <div style={{ fontSize: 11, color: "#55557a", marginTop: -4 }}>Applied at the start of this clip (entrance)</div>
     </Section>
   );
 }
@@ -298,7 +298,7 @@ const KEYFRAMEABLE = [
   { prop: "blur",     label: "Blur",     step: 1,    digits: 1 },
 ];
 
-function KeyframesSection({ layer, showObjectFit }) {
+function KeyframesSection({ layer }) {
   const currentTime    = useTimelineStore((s) => s.currentTime);
   const addKeyframe    = useTimelineStore((s) => s.addKeyframe);
   const removeKeyframe = useTimelineStore((s) => s.removeKeyframe);
@@ -332,8 +332,11 @@ function KeyframesSection({ layer, showObjectFit }) {
                 style={{ ...inputStyle, flex: 1 }}
                 onChange={(e) => setEditing((s) => ({ ...s, [prop]: e.target.value }))}
                 onBlur={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) addKeyframe(layer.id, prop, localTime, val);
+                  // Only commit if user actually typed something (editing[prop] set by onChange)
+                  if (editing[prop] !== undefined) {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) addKeyframe(layer.id, prop, localTime, val);
+                  }
                   setEditing((s) => { const c = { ...s }; delete c[prop]; return c; });
                 }}
                 onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
@@ -353,7 +356,10 @@ function KeyframesSection({ layer, showObjectFit }) {
                   style={{ ...inputStyle, flex: 1 }}
                   onBlur={(e) => {
                     const val = parseFloat(e.target.value);
-                    if (!isNaN(val)) updateKeyframe(layer.id, prop, i, { value: val });
+                    // Only commit if value actually changed
+                    if (!isNaN(val) && Math.abs(val - frame.value) > 0.0001) {
+                      updateKeyframe(layer.id, prop, i, { value: val });
+                    }
                   }}
                   onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
                 />
@@ -369,51 +375,6 @@ function KeyframesSection({ layer, showObjectFit }) {
           </div>
         );
       })}
-
-      {/* Object Fit — discrete (step) keyframe, only for video/image/sticker */}
-      {showObjectFit && (() => {
-        const frames = [...(kf.objectFit ?? [])].sort((a, b) => a.time - b.time);
-        const hasFrames = frames.length > 0;
-        const currentVal = stepKeyframe(frames, localTime) ?? layer.objectFit ?? "cover";
-        return (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: hasFrames ? 5 : 0 }}>
-              <span style={{ fontSize: 9, color: hasFrames ? "#f5c518" : "#33334a", flexShrink: 0 }}>◆</span>
-              <span style={{ ...labelStyle, marginBottom: 0, width: 54, flexShrink: 0 }}>Fit</span>
-              <select
-                style={{ ...selectStyle, flex: 1 }}
-                value={currentVal}
-                onChange={(e) => addKeyframe(layer.id, "objectFit", localTime, e.target.value)}
-              >
-                {OBJECT_FIT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            {frames.map((frame, i) => (
-              <div key={`${i}-${frame.time}`} style={{ display: "flex", alignItems: "center", gap: 5, paddingLeft: 16, marginBottom: 3 }}>
-                <span style={{ fontSize: 9, color: "#f5c518", flexShrink: 0 }}>◆</span>
-                <span style={{ fontSize: 11, color: "#7070a0", width: 34, flexShrink: 0 }}>
-                  {frame.time.toFixed(1)}s
-                </span>
-                <select
-                  style={{ ...selectStyle, flex: 1 }}
-                  defaultValue={frame.value}
-                  key={`objectFit-${i}-${frame.value}`}
-                  onChange={(e) => updateKeyframe(layer.id, "objectFit", i, { value: e.target.value })}
-                >
-                  {OBJECT_FIT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-                <button
-                  onClick={() => removeKeyframe(layer.id, "objectFit", i)}
-                  title="Delete keyframe"
-                  style={{ background: "none", border: "none", color: "#ff4f4f", cursor: "pointer", fontSize: 12, padding: "2px 3px", flexShrink: 0, lineHeight: 1 }}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
     </Section>
   );
 }
@@ -431,10 +392,8 @@ export default function PropertiesPanel() {
   // Resolved transform at current time — uses keyframe interpolation when active
   const resolvedTr = layer ? resolveTransform(layer, currentTime) : {};
 
-  // Resolved objectFit at current time — step keyframe for discrete values
   const localTime = layer ? Math.max(0, currentTime - layer.start) : 0;
-  const ofFrames = layer?.keyframes?.objectFit ?? [];
-  const resolvedObjectFitVal = stepKeyframe(ofFrames, localTime) ?? layer?.objectFit ?? "cover";
+  const resolvedObjectFitVal = layer?.objectFit ?? "cover";
 
   // For the 6 keyframeable props: show resolved value; write to keyframe if KFs are active,
   // otherwise write to base transform. Width/height are NOT keyframeable — always base transform.
@@ -448,16 +407,7 @@ export default function PropertiesPanel() {
     }
   };
 
-  // objectFit: write to keyframe if KFs are active, otherwise write base prop
-  const updateObjectFit = (val) => {
-    if (!layer) return;
-    const hasKF = (layer.keyframes?.objectFit?.length ?? 0) > 0;
-    if (hasKF) {
-      addKeyframeAction(layer.id, "objectFit", localTime, val);
-    } else {
-      update({ objectFit: val });
-    }
-  };
+  const updateObjectFit = (val) => { if (layer) update({ objectFit: val }); };
 
   const updateTransform = (patch) => {
     if (layer) updateLayer(layer.id, { transform: { ...layer.transform, ...patch } });
@@ -553,10 +503,7 @@ export default function PropertiesPanel() {
           {layer.type !== "audio" && <AnimationProps layer={layer} update={update} />}
           {(layer.type === "video" || layer.type === "image") && <TransitionProps layer={layer} update={update} />}
           {layer.type !== "audio" && layer.type !== "captions" && (
-            <KeyframesSection
-              layer={layer}
-              showObjectFit={layer.type === "video" || layer.type === "image" || layer.type === "sticker"}
-            />
+            <KeyframesSection layer={layer} />
           )}
         </div>
       )}

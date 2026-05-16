@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
 
@@ -30,46 +31,31 @@ function resolvedObjectFit(layer, currentTime) {
 // ── Transition helpers ────────────────────────────────────────────────────────
 
 function buildTransitionEffect(type, p) {
-  // p: 0 = fully visible, 1 = fully hidden
+  // p: 0 = just appeared, 1 = fully visible (entrance progress)
   switch (type) {
-    case "fade":        return { opacity: 1 - p, translateX: 0, addBlur: 0 };
-    case "dissolve":    return { opacity: 1 - p, translateX: 0, addBlur: p * 8 };
-    case "slide-left":  return { opacity: 1, translateX: -p * 100, addBlur: 0 };
-    case "slide-right": return { opacity: 1, translateX:  p * 100, addBlur: 0 };
-    default:            return { opacity: 1, translateX: 0, addBlur: 0 };
+    case "fade":        return { opacity: p,     translateX: 0,           addBlur: 0,            scale: 1 };
+    case "dissolve":    return { opacity: p,     translateX: 0,           addBlur: (1 - p) * 10, scale: 1 };
+    case "slide-left":  return { opacity: 1,     translateX: -(1 - p) * 100, addBlur: 0,         scale: 1 };
+    case "slide-right": return { opacity: 1,     translateX:  (1 - p) * 100, addBlur: 0,         scale: 1 };
+    case "zoom":        return { opacity: p,     translateX: 0,           addBlur: 0,            scale: 0.5 + p * 0.5 };
+    default:            return { opacity: 1,     translateX: 0,           addBlur: 0,            scale: 1 };
   }
 }
 
-// Returns { opacity, translateX, addBlur } for a layer at the current playback time.
-// Checks transition-out (this clip's own transition) and transition-in (reverse of previous clip's transition).
-function getTransitionStyle(layer, currentTime, allLayers) {
+// Returns { opacity, translateX, addBlur, scale } for a layer at the current playback time.
+// Entrance effect only — applied at the start of the layer.
+function getTransitionStyle(layer, currentTime) {
   const { type = "none", duration = 0.5 } = layer.transition ?? {};
 
-  if (type !== "none" && duration > 0) {
-    const outStart = layer.end - duration;
-    if (currentTime >= outStart) {
-      const p = Math.min(1, (currentTime - outStart) / duration);
-      return buildTransitionEffect(type, p);
-    }
+  if (type === "none" || duration <= 0) return { opacity: 1, translateX: 0, addBlur: 0, scale: 1 };
+
+  const transitionEnd = layer.start + duration;
+  if (currentTime >= layer.start && currentTime < transitionEnd) {
+    const p = (currentTime - layer.start) / duration;
+    return buildTransitionEffect(type, Math.max(0, Math.min(1, p)));
   }
 
-  const trackId = layer.trackId ?? layer.id;
-  const prev = (allLayers ?? [])
-    .filter((l) => l.id !== layer.id && (l.trackId ?? l.id) === trackId && l.end <= layer.end)
-    .sort((a, b) => b.end - a.end)[0];
-
-  if (prev) {
-    const { type: pType = "none", duration: pDur = 0.5 } = prev.transition ?? {};
-    if (pType !== "none" && pDur > 0) {
-      const inEnd = layer.start + pDur;
-      if (currentTime < inEnd) {
-        const p = 1 - (currentTime - layer.start) / pDur;
-        return buildTransitionEffect(pType, Math.max(0, Math.min(1, p)));
-      }
-    }
-  }
-
-  return { opacity: 1, translateX: 0, addBlur: 0 };
+  return { opacity: 1, translateX: 0, addBlur: 0, scale: 1 };
 }
 
 // ── Video / Audio helpers ─────────────────────────────────────────────────────
@@ -196,6 +182,7 @@ function PersistentVideoTrack({
   draggingLayerId,
   scaleRef,
   onBodyMouseDown,
+  handlesEl,
 }) {
   const videoRef  = useRef(null);
   const wrapperRef = useRef(null);
@@ -259,8 +246,8 @@ function PersistentVideoTrack({
   const left = canvasW / 2 + x - width / 2;
   const top  = canvasH / 2 + y - height / 2;
 
-  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0 } =
-    activeClip ? getTransitionStyle(activeClip, currentTime, clips) : {};
+  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0, scale: tScale = 1 } =
+    activeClip ? getTransitionStyle(activeClip, currentTime) : {};
 
   const onResizeMouseDown = (e, handleId) => {
     if (!activeClip) return;
@@ -269,6 +256,7 @@ function PersistentVideoTrack({
     const startClientX = e.clientX, startClientY = e.clientY;
 
     const storeState = useTimelineStore.getState();
+    const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
     const freshClip = storeState.project?.layers?.find((l) => l.id === activeClip.id) ?? activeClip;
     const localTime = Math.max(0, ct - freshClip.start);
@@ -318,7 +306,7 @@ function PersistentVideoTrack({
 
     const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, buildPatch(me));
     const onUp   = (me) => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
-                              useTimelineStore.getState().updateLayer(activeClip.id, buildPatch(me)); };
+                              useTimelineStore.getState().commitDrag(activeClip.id, buildPatch(me), preDragProject); };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
@@ -331,6 +319,7 @@ function PersistentVideoTrack({
     const centerX = (rect.left + rect.right) / 2, centerY = (rect.top + rect.bottom) / 2;
 
     const storeState = useTimelineStore.getState();
+    const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
     const freshClip = storeState.project?.layers?.find((l) => l.id === activeClip.id) ?? activeClip;
     const localTime = Math.max(0, ct - freshClip.start);
@@ -357,77 +346,86 @@ function PersistentVideoTrack({
 
     const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, buildPatch(me));
     const onUp   = (me) => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
-                              useTimelineStore.getState().updateLayer(activeClip.id, buildPatch(me)); };
+                              useTimelineStore.getState().commitDrag(activeClip.id, buildPatch(me), preDragProject); };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
 
   return (
-    <div
-      ref={wrapperRef}
-      style={{
-        position: "absolute",
-        left:   activeClip ? left   : 0,
-        top:    activeClip ? top    : 0,
-        width:  activeClip ? width  : 0,
-        height: activeClip ? height : 0,
-        transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation}deg) scale(${scale})`,
-        transformOrigin: "center center",
-        opacity: activeClip ? opacity * tOpacity : 0,
-        filter: (blur || tBlur) ? `blur(${blur + tBlur}px)` : undefined,
-        userSelect: "none",
-        pointerEvents: "none",
-        outline: activeClip && isSelected
-          ? isDragging ? "2px solid rgba(124,92,252,0.9)" : "2px dashed rgba(124,92,252,0.55)"
-          : "none",
-        outlineOffset: 1,
-        overflow: "visible",
-      }}
-    >
+    <>
       <div
+        ref={wrapperRef}
         style={{
           position: "absolute",
-          inset: 0,
-          overflow: "hidden",
-          cursor: isDraggable ? (isDragging ? "grabbing" : "move") : "default",
-          pointerEvents: isDraggable ? "auto" : "none",
+          left:   activeClip ? left   : 0,
+          top:    activeClip ? top    : 0,
+          width:  activeClip ? width  : 0,
+          height: activeClip ? height : 0,
+          transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation}deg) scale(${scale * tScale})`,
+          transformOrigin: "center center",
+          opacity: activeClip ? opacity * tOpacity : 0,
+          filter: (blur || tBlur) ? `blur(${blur + tBlur}px)` : undefined,
+          userSelect: "none",
+          pointerEvents: "none",
+          outline: activeClip && isSelected
+            ? isDragging ? "2px solid rgba(124,92,252,0.9)" : "2px dashed rgba(124,92,252,0.55)"
+            : "none",
+          outlineOffset: 1,
+          overflow: "visible",
         }}
-        onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, activeClip) : undefined}
       >
-        <video
-          ref={videoRef}
-          src={activeClip?.src ?? clips[0]?.src}
-          style={{ width: "100%", height: "100%", objectFit: activeClip ? resolvedObjectFit(activeClip, currentTime) : "cover", pointerEvents: "none" }}
-          muted={activeClip?.muted ?? clips[0]?.muted ?? false}
-          loop={false}
-          preload="auto"
-          playsInline
-        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            overflow: "hidden",
+            cursor: isDraggable ? (isDragging ? "grabbing" : "move") : "default",
+            pointerEvents: isDraggable ? "auto" : "none",
+          }}
+          onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, activeClip) : undefined}
+        >
+          <video
+            ref={videoRef}
+            src={activeClip?.src ?? clips[0]?.src}
+            style={{ width: "100%", height: "100%", objectFit: activeClip ? resolvedObjectFit(activeClip, currentTime) : "cover", pointerEvents: "none" }}
+            muted={activeClip?.muted ?? clips[0]?.muted ?? false}
+            loop={false}
+            preload="auto"
+            playsInline
+          />
+        </div>
       </div>
 
-      {isResizable && Object.entries(HANDLE_CONFIGS).map(([id, cfg]) => (
-        <div key={id} style={{ position: "absolute", left: cfg.pl, top: cfg.pt,
-          width: HANDLE_HIT, height: HANDLE_HIT, transform: "translate(-50%, -50%)",
-          cursor: cfg.cursor, pointerEvents: "auto", zIndex: 10,
-          display: "flex", alignItems: "center", justifyContent: "center" }}
-          onMouseDown={(e) => onResizeMouseDown(e, id)}>
-          <div style={{ width: HANDLE_VIS, height: HANDLE_VIS, background: "#ffffff",
-            border: "2px solid #7c5cfc", borderRadius: 3, boxSizing: "border-box", pointerEvents: "none" }} />
-        </div>
-      ))}
-
-      {isResizable && (
-        <div style={{ position: "absolute", left: "50%", top: 0, width: 0, height: 0, pointerEvents: "none" }}>
-          <div style={{ position: "absolute", left: -1, top: -32, width: 2, height: 32, background: "rgba(124,92,252,0.75)" }} />
-          <div style={{ position: "absolute", left: -14, top: -60, width: 28, height: 28,
-            background: "#7c5cfc", border: "2px solid #ffffff", borderRadius: "50%",
-            boxSizing: "border-box", cursor: "grab", pointerEvents: "auto", zIndex: 11,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16, color: "#ffffff", userSelect: "none" }}
-            onMouseDown={onRotateMouseDown}>↻</div>
-        </div>
+      {/* Resize + rotate handles — portaled outside clipped canvas so they're never cropped */}
+      {handlesEl && isResizable && createPortal(
+        <div style={{
+          position: "absolute", left, top, width, height, pointerEvents: "none",
+          transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation}deg) scale(${scale * tScale})`,
+          transformOrigin: "center center",
+        }}>
+          {Object.entries(HANDLE_CONFIGS).map(([id, cfg]) => (
+            <div key={id} style={{ position: "absolute", left: cfg.pl, top: cfg.pt,
+              width: HANDLE_HIT, height: HANDLE_HIT, transform: "translate(-50%, -50%)",
+              cursor: cfg.cursor, pointerEvents: "auto", zIndex: 10,
+              display: "flex", alignItems: "center", justifyContent: "center" }}
+              onMouseDown={(e) => onResizeMouseDown(e, id)}>
+              <div style={{ width: HANDLE_VIS, height: HANDLE_VIS, background: "#ffffff",
+                border: "2px solid #7c5cfc", borderRadius: 3, boxSizing: "border-box", pointerEvents: "none" }} />
+            </div>
+          ))}
+          <div style={{ position: "absolute", left: "50%", top: 0, width: 0, height: 0, pointerEvents: "none" }}>
+            <div style={{ position: "absolute", left: -1, top: -32, width: 2, height: 32, background: "rgba(124,92,252,0.75)" }} />
+            <div style={{ position: "absolute", left: -14, top: -60, width: 28, height: 28,
+              background: "#7c5cfc", border: "2px solid #ffffff", borderRadius: "50%",
+              boxSizing: "border-box", cursor: "grab", pointerEvents: "auto", zIndex: 11,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 16, color: "#ffffff", userSelect: "none" }}
+              onMouseDown={onRotateMouseDown}>↻</div>
+          </div>
+        </div>,
+        handlesEl
       )}
-    </div>
+    </>
   );
 }
 
@@ -447,6 +445,7 @@ function LayerElement({
   onStartEdit,
   onEndEdit,
   transitionStyle,
+  handlesEl,
 }) {
   // Must be unconditional — called before the audio early-return below
   const wrapperRef  = useRef(null);
@@ -473,7 +472,7 @@ function LayerElement({
   const tr = resolveTransform(layer, currentTime);
   const { x, y, width, height, rotation, scale, opacity, blur } = tr;
 
-  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0 } = transitionStyle ?? {};
+  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0, scale: tScale = 1 } = transitionStyle ?? {};
 
   const isDraggable = DRAGGABLE_TYPES.has(layer.type) && !layer.locked && !isEditing;
   const isResizable = isSelected && !layer.locked && DRAGGABLE_TYPES.has(layer.type) && !isEditing;
@@ -491,6 +490,7 @@ function LayerElement({
     const startClientY = e.clientY;
 
     const storeState = useTimelineStore.getState();
+    const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
     const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
     const localTime = Math.max(0, ct - freshLayer.start);
@@ -545,7 +545,7 @@ function LayerElement({
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      useTimelineStore.getState().updateLayer(layer.id, buildPatch(me));
+      useTimelineStore.getState().commitDrag(layer.id, buildPatch(me), preDragProject);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -563,6 +563,7 @@ function LayerElement({
     const centerY = (rect.top + rect.bottom) / 2;
 
     const storeState = useTimelineStore.getState();
+    const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
     const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
     const localTime = Math.max(0, ct - freshLayer.start);
@@ -593,7 +594,7 @@ function LayerElement({
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      useTimelineStore.getState().updateLayer(layer.id, buildPatch(me));
+      useTimelineStore.getState().commitDrag(layer.id, buildPatch(me), preDragProject);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -710,131 +711,75 @@ function LayerElement({
   }
 
   return (
-    // Outer wrapper: handles transforms, outline — NO overflow:hidden so handles aren't clipped
-    <div
-      ref={wrapperRef}
-      style={{
-        position: "absolute",
-        left,
-        top,
-        width,
-        height,
-        transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${scale ?? 1})`,
-        transformOrigin: "center center",
-        opacity: (opacity ?? 1) * tOpacity,
-        filter: (blur || tBlur) ? `blur(${(blur ?? 0) + tBlur}px)` : undefined,
-        userSelect: "none",
-        // Pointer events off on outer; inner content and handles opt in individually
-        pointerEvents: "none",
-        // Selection outline on the outer wrapper so it's not clipped by inner overflow:hidden
-        outline: isSelected
-          ? isDragging
-            ? "2px solid rgba(124,92,252,0.9)"
-            : "2px dashed rgba(124,92,252,0.55)"
-          : "none",
-        outlineOffset: 1,
-      }}
-    >
-      {/* Inner content — overflow clipped here, drag events here */}
+    <>
       <div
+        ref={wrapperRef}
         style={{
           position: "absolute",
-          inset: 0,
-          overflow: "hidden",
-          cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "move") : "default",
-          // keep auto when editing so contenteditable receives focus/keyboard events
-          pointerEvents: isDraggable || isEditing ? "auto" : "none",
+          left,
+          top,
+          width,
+          height,
+          transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
+          transformOrigin: "center center",
+          opacity: (opacity ?? 1) * tOpacity,
+          filter: (blur || tBlur) ? `blur(${(blur ?? 0) + tBlur}px)` : undefined,
+          userSelect: "none",
+          pointerEvents: "none",
+          outline: isSelected
+            ? isDragging
+              ? "2px solid rgba(124,92,252,0.9)"
+              : "2px dashed rgba(124,92,252,0.55)"
+            : "none",
+          outlineOffset: 1,
         }}
-        onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, layer) : undefined}
       >
-        {content}
-      </div>
-
-      {/* Resize handles — rendered outside inner clip, so corners are fully visible */}
-      {isResizable &&
-        Object.entries(HANDLE_CONFIGS).map(([id, cfg]) => (
-          <div
-            key={id}
-            style={{
-              position: "absolute",
-              left: cfg.pl,
-              top: cfg.pt,
-              width: HANDLE_HIT,
-              height: HANDLE_HIT,
-              transform: "translate(-50%, -50%)",
-              cursor: cfg.cursor,
-              pointerEvents: "auto",
-              zIndex: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            onMouseDown={(e) => onResizeMouseDown(e, id)}
-          >
-            <div style={{
-              width: HANDLE_VIS,
-              height: HANDLE_VIS,
-              background: "#ffffff",
-              border: "2px solid #7c5cfc",
-              borderRadius: 3,
-              boxSizing: "border-box",
-              pointerEvents: "none",
-            }} />
-          </div>
-        ))}
-
-      {/* Rotation handle — anchor sits at top-center, line + circle go above it */}
-      {isResizable && (
+        {/* Inner content — overflow clipped here, drag events here */}
         <div
           style={{
             position: "absolute",
-            left: "50%",
-            top: 0,
-            width: 0,
-            height: 0,
-            pointerEvents: "none",
+            inset: 0,
+            overflow: "hidden",
+            cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "move") : "default",
+            pointerEvents: isDraggable || isEditing ? "auto" : "none",
           }}
+          onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, layer) : undefined}
         >
-          {/* Connecting line */}
-          <div
-            style={{
-              position: "absolute",
-              left: -1,
-              top: -32,
-              width: 2,
-              height: 32,
-              background: "rgba(124,92,252,0.75)",
-            }}
-          />
-          {/* Rotation circle handle */}
-          <div
-            style={{
-              position: "absolute",
-              left: -14,
-              top: -60,
-              width: 28,
-              height: 28,
-              background: "#7c5cfc",
-              border: "2px solid #ffffff",
-              borderRadius: "50%",
-              boxSizing: "border-box",
-              cursor: "grab",
-              pointerEvents: "auto",
-              zIndex: 11,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 16,
-              color: "#ffffff",
-              userSelect: "none",
-            }}
-            onMouseDown={onRotateMouseDown}
-          >
-            ↻
-          </div>
+          {content}
         </div>
+      </div>
+
+      {/* Resize + rotate handles — portaled outside clipped canvas so they're never cropped */}
+      {handlesEl && isResizable && createPortal(
+        <div style={{
+          position: "absolute", left, top, width, height, pointerEvents: "none",
+          transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
+          transformOrigin: "center center",
+        }}>
+          {Object.entries(HANDLE_CONFIGS).map(([id, cfg]) => (
+            <div key={id} style={{
+              position: "absolute", left: cfg.pl, top: cfg.pt,
+              width: HANDLE_HIT, height: HANDLE_HIT, transform: "translate(-50%, -50%)",
+              cursor: cfg.cursor, pointerEvents: "auto", zIndex: 10,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }} onMouseDown={(e) => onResizeMouseDown(e, id)}>
+              <div style={{ width: HANDLE_VIS, height: HANDLE_VIS, background: "#ffffff",
+                border: "2px solid #7c5cfc", borderRadius: 3, boxSizing: "border-box", pointerEvents: "none" }} />
+            </div>
+          ))}
+          <div style={{ position: "absolute", left: "50%", top: 0, width: 0, height: 0, pointerEvents: "none" }}>
+            <div style={{ position: "absolute", left: -1, top: -32, width: 2, height: 32, background: "rgba(124,92,252,0.75)" }} />
+            <div style={{ position: "absolute", left: -14, top: -60, width: 28, height: 28,
+              background: "#7c5cfc", border: "2px solid #ffffff", borderRadius: "50%",
+              boxSizing: "border-box", cursor: "grab", pointerEvents: "auto", zIndex: 11,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 16, color: "#ffffff", userSelect: "none" }}
+              onMouseDown={onRotateMouseDown}>↻</div>
+          </div>
+        </div>,
+        handlesEl
       )}
-    </div>
+    </>
   );
 }
 
@@ -854,6 +799,7 @@ export default function Preview() {
   const scaleRef                    = useRef(1);
   const [draggingLayerId, setDraggingLayerId] = useState(null);
   const [editingLayerId,  setEditingLayerId]  = useState(null);
+  const [handlesEl, setHandlesEl] = useState(null);
 
   const canvasW = project?.format?.width  ?? 1080;
   const canvasH = project?.format?.height ?? 1920;
@@ -912,6 +858,7 @@ export default function Preview() {
 
     // Get fresh layer and currentTime from store at the moment of mousedown
     const storeState = useTimelineStore.getState();
+    const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
     const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
     const origT = { ...(freshLayer.transform ?? {}) };
@@ -958,7 +905,7 @@ export default function Preview() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       setDraggingLayerId(null);
-      useTimelineStore.getState().updateLayer(layer.id, buildPatch(me.clientX, me.clientY));
+      useTimelineStore.getState().commitDrag(layer.id, buildPatch(me.clientX, me.clientY), preDragProject);
     };
 
     window.addEventListener("mousemove", onMove);
@@ -1044,6 +991,7 @@ export default function Preview() {
             transform: `scale(${scale})`,
             overflow: "hidden",
           }}
+          onMouseDown={() => selectLayer(null)}
         >
           {/* Persistent video tracks — one element per track, never unmounts */}
           {videoTracks.map((clips) => (
@@ -1058,6 +1006,7 @@ export default function Preview() {
               draggingLayerId={draggingLayerId}
               scaleRef={scaleRef}
               onBodyMouseDown={handleBodyMouseDown}
+              handlesEl={handlesEl}
             />
           ))}
 
@@ -1077,7 +1026,8 @@ export default function Preview() {
               onBodyMouseDown={handleBodyMouseDown}
               onStartEdit={() => setEditingLayerId(layer.id)}
               onEndEdit={() => setEditingLayerId(null)}
-              transitionStyle={getTransitionStyle(layer, currentTime, layers)}
+              transitionStyle={getTransitionStyle(layer, currentTime)}
+              handlesEl={handlesEl}
             />
           ))}
 
@@ -1094,6 +1044,22 @@ export default function Preview() {
             </div>
           )}
         </div>
+
+        {/* Handles overlay — same transform as canvas but overflow:visible, so handles show outside canvas bounds */}
+        <div
+          ref={(el) => { if (el && el !== handlesEl) setHandlesEl(el); }}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: canvasW,
+            height: canvasH,
+            transformOrigin: "top left",
+            transform: `scale(${scale})`,
+            overflow: "visible",
+            pointerEvents: "none",
+          }}
+        />
       </div>
     </div>
   );

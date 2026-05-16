@@ -1,6 +1,45 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import WaveformCanvas from "./WaveformCanvas";
+
+// Called once at mousedown to capture snap targets from the live store state.
+// Returns { edge(val), body(rawStart, clipDur) } snapping functions.
+function buildSnap(layerId, pps, snapEnabled) {
+  if (!snapEnabled) return { edge: (v) => v, body: (s) => s };
+  const { currentTime, duration, project } = useTimelineStore.getState();
+  const threshold = 10 / pps;
+  const targets = [
+    currentTime,
+    0,
+    duration,
+    ...(project?.layers ?? [])
+      .filter((l) => l.id !== layerId)
+      .flatMap((l) => [l.start, l.end]),
+  ];
+
+  // Snap a single edge value to the nearest target, fall back to 0.5s grid.
+  const edge = (val) => {
+    for (const t of targets) {
+      if (Math.abs(val - t) < threshold) return t;
+    }
+    return Math.round(val * 2) / 2;
+  };
+
+  // Snap a clip body: checks both the start edge and the end edge against targets,
+  // picks whichever gives the smaller distance, falls back to 0.5s grid.
+  const body = (rawStart, clipDur) => {
+    let best = { dist: Infinity, start: null };
+    for (const t of targets) {
+      const ds = Math.abs(rawStart - t);
+      if (ds < threshold && ds < best.dist) best = { dist: ds, start: t };
+      const de = Math.abs(rawStart + clipDur - t);
+      if (de < threshold && de < best.dist) best = { dist: de, start: t - clipDur };
+    }
+    return best.start !== null ? best.start : Math.round(rawStart * 2) / 2;
+  };
+
+  return { edge, body };
+}
 
 const LAYER_COLORS = {
   video: "#4a9eff",
@@ -18,24 +57,26 @@ export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrack
   const selectLayer = useTimelineStore((s) => s.selectLayer);
   const updateLayer = useTimelineStore((s) => s.updateLayer);
   const updateLayerSilent = useTimelineStore((s) => s.updateLayerSilent);
+  const commitDrag = useTimelineStore((s) => s.commitDrag);
   const snapEnabled = useTimelineStore((s) => s.snapEnabled);
   const duration = useTimelineStore((s) => s.duration);
   const setCurrentTime = useTimelineStore((s) => s.setCurrentTime);
 
+  const removeKeyframesAtTime = useTimelineStore((s) => s.removeKeyframesAtTime);
+
   const isSelected = layer.id === selectedLayerId;
   const color = LAYER_COLORS[layer.type] ?? "#7c5cfc";
   const dragRef = useRef(null);
+  const [hoveredKfTime, setHoveredKfTime] = useState(null);
 
-  function snapVal(val) {
-    return snapEnabled ? Math.round(val * 2) / 2 : val;
-  }
-
-  // ── Body drag (move) ──────────────────────────────────────────────────────
+  // ── Body drag (move) ─────────────────────────────────────────────────────���
   const onBodyMouseDown = (e) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     selectLayer(layer.id);
 
+    const preDragProject = JSON.parse(JSON.stringify(useTimelineStore.getState().project));
+    const { body: snapBody } = buildSnap(layer.id, pps, snapEnabled);
     const startX = e.clientX;
     const startY = e.clientY;
     const origStart = layer.start;
@@ -43,29 +84,24 @@ export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrack
     dragRef.current = true;
     let crossMode = false;
 
-    const onMove = (me) => {
-      if (!crossMode && Math.abs(me.clientY - startY) > 20) {
-        crossMode = true;
-      }
-      if (crossMode) {
-        onCrossTrackMove?.(layer.id, me.clientY);
-      }
-      let newStart = snapVal(Math.max(0, origStart + (me.clientX - startX) / pps));
+    const calc = (clientX) => {
+      let newStart = snapBody(Math.max(0, origStart + (clientX - startX) / pps), clipDur);
       let newEnd = newStart + clipDur;
       if (newEnd > duration) { newEnd = duration; newStart = newEnd - clipDur; }
-      updateLayerSilent(layer.id, { start: newStart, end: newEnd });
+      return { start: newStart, end: newEnd };
+    };
+
+    const onMove = (me) => {
+      if (!crossMode && Math.abs(me.clientY - startY) > 20) crossMode = true;
+      if (crossMode) onCrossTrackMove?.(layer.id, me.clientY);
+      updateLayerSilent(layer.id, calc(me.clientX));
     };
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       dragRef.current = false;
-      let newStart = snapVal(Math.max(0, origStart + (me.clientX - startX) / pps));
-      let newEnd = newStart + clipDur;
-      if (newEnd > duration) { newEnd = duration; newStart = newEnd - clipDur; }
-      if (crossMode) {
-        onCrossTrackDrop?.(layer.id, me.clientY);
-      }
-      updateLayer(layer.id, { start: newStart, end: newEnd });
+      if (crossMode) onCrossTrackDrop?.(layer.id, me.clientY);
+      commitDrag(layer.id, calc(me.clientX), preDragProject);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -77,18 +113,20 @@ export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrack
     e.stopPropagation();
     selectLayer(layer.id);
 
+    const preDragProject = JSON.parse(JSON.stringify(useTimelineStore.getState().project));
+    const { edge: snapEdge } = buildSnap(layer.id, pps, snapEnabled);
     const startX = e.clientX;
     const origStart = layer.start;
+    const origEnd = layer.end;
 
-    const onMove = (me) => {
-      const newStart = snapVal(Math.max(0, Math.min(layer.end - 0.1, origStart + (me.clientX - startX) / pps)));
-      updateLayerSilent(layer.id, { start: newStart });
-    };
+    const calc = (clientX) =>
+      Math.max(0, Math.min(origEnd - 0.1, snapEdge(origStart + (clientX - startX) / pps)));
+
+    const onMove = (me) => updateLayerSilent(layer.id, { start: calc(me.clientX) });
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      const newStart = snapVal(Math.max(0, Math.min(layer.end - 0.1, origStart + (me.clientX - startX) / pps)));
-      updateLayer(layer.id, { start: newStart });
+      commitDrag(layer.id, { start: calc(me.clientX) }, preDragProject);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -100,18 +138,20 @@ export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrack
     e.stopPropagation();
     selectLayer(layer.id);
 
+    const preDragProject = JSON.parse(JSON.stringify(useTimelineStore.getState().project));
+    const { edge: snapEdge } = buildSnap(layer.id, pps, snapEnabled);
     const startX = e.clientX;
     const origEnd = layer.end;
+    const origStart = layer.start;
 
-    const onMove = (me) => {
-      const newEnd = snapVal(Math.max(layer.start + 0.1, Math.min(duration, origEnd + (me.clientX - startX) / pps)));
-      updateLayerSilent(layer.id, { end: newEnd });
-    };
+    const calc = (clientX) =>
+      Math.max(origStart + 0.1, Math.min(duration, snapEdge(origEnd + (clientX - startX) / pps)));
+
+    const onMove = (me) => updateLayerSilent(layer.id, { end: calc(me.clientX) });
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      const newEnd = snapVal(Math.max(layer.start + 0.1, Math.min(duration, origEnd + (me.clientX - startX) / pps)));
-      updateLayer(layer.id, { end: newEnd });
+      commitDrag(layer.id, { end: calc(me.clientX) }, preDragProject);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -222,25 +262,73 @@ export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrack
       {kfTimes.map((time) => (
         <div
           key={time}
-          title={`Keyframe at ${(layer.start + time).toFixed(2)}s`}
           style={{
             position: "absolute",
             left: time * pps,
             top: "50%",
-            transform: "translate(-50%, -50%) rotate(45deg)",
-            width: 7,
-            height: 7,
-            background: "#f5c518",
-            border: "1px solid rgba(0,0,0,0.5)",
+            transform: "translate(-50%, -50%)",
+            width: 16,
+            height: 16,
             zIndex: 5,
             cursor: "pointer",
             pointerEvents: "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
+          onMouseEnter={() => setHoveredKfTime(time)}
+          onMouseLeave={() => setHoveredKfTime(null)}
           onClick={(e) => {
             e.stopPropagation();
             setCurrentTime(layer.start + time);
           }}
-        />
+        >
+          {/* Diamond shape */}
+          <div
+            title={`Keyframe at ${(layer.start + time).toFixed(2)}s`}
+            style={{
+              width: 7,
+              height: 7,
+              background: hoveredKfTime === time ? "#ff6b6b" : "#f5c518",
+              border: "1px solid rgba(0,0,0,0.5)",
+              transform: "rotate(45deg)",
+              transition: "background 0.1s",
+            }}
+          />
+          {/* Delete button on hover */}
+          {hoveredKfTime === time && (
+            <div
+              title="Delete keyframe"
+              style={{
+                position: "absolute",
+                top: -8,
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: 14,
+                height: 14,
+                background: "#ff4444",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 9,
+                color: "#fff",
+                fontWeight: 700,
+                lineHeight: 1,
+                cursor: "pointer",
+                zIndex: 6,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.5)",
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeKeyframesAtTime(layer.id, time);
+                setHoveredKfTime(null);
+              }}
+            >
+              ×
+            </div>
+          )}
+        </div>
       ))}
     </div>
   );

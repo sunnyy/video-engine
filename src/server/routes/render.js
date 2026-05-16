@@ -316,6 +316,130 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
+/* ---------------- TIMELINE RENDER ---------------- */
+router.post("/timeline", requireAuth, async (req, res) => {
+  const { project, projectId, resolution = "1080p" } = req.body;
+
+  const deduction = await deductCredits(req.user.id, 8, "export_timeline", "Timeline video export", projectId);
+  if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+
+  const jobId = uuidv4();
+  writeJob(jobId, { progress: 0, done: false, url: null, error: null, cancelled: false });
+  res.json({ success: true, jobId });
+
+  timelineRenderJob(jobId, req.user.id, project, projectId, resolution).catch(console.error);
+});
+
+async function timelineRenderJob(jobId, userId, project, projectId, resolution) {
+  try {
+    /* ── Sanitise blob: asset URLs ── */
+    const cleanLayers = (project?.layers || []).map((layer) => ({
+      ...layer,
+      src: resolveAssetUrl(layer.src),
+    }));
+    const cleanProject = { ...project, layers: cleanLayers };
+
+    /* ── Watermark for free users ── */
+    let finalProject = cleanProject;
+    try {
+      const { data: sub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .maybeSingle();
+      if (!sub) finalProject = { ...finalProject, meta: { ...finalProject.meta, showWatermark: true } };
+    } catch (_) {}
+
+    const serveUrl = await getBundle();
+    const { getCompositions, renderFrames, stitchFramesToVideo } = await import("@remotion/renderer");
+    const comps = await getCompositions(serveUrl, { inputProps: { project: finalProject } });
+    const comp = comps.find((c) => c.id === "TimelineComposition");
+    if (!comp) throw new Error("TimelineComposition not found in bundle");
+
+    const fmt = finalProject.format || {};
+    const scale = resolution === "4k" ? 2 : 1;
+    const width = (fmt.width || 1080) * scale;
+    const height = (fmt.height || 1920) * scale;
+    const compositionWithRes = { ...comp, width, height };
+
+    const outputPath = path.join(TEMP_DIR, `render-${jobId}.mp4`);
+    const framesDir = path.join(TEMP_DIR, `frames-${jobId}`);
+    if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
+
+    const hasVideoLayers = (finalProject.layers || []).some((l) => l.type === "video");
+    let rendered = 0;
+    const { assetsInfo } = await renderFrames({
+      composition: compositionWithRes,
+      serveUrl,
+      inputProps: { project: finalProject },
+      outputDir: framesDir,
+      imageFormat: "jpeg",
+      concurrency: hasVideoLayers ? 1 : 2,
+      chromiumOptions: { gl: "angle" },
+      onFrameUpdate: () => {
+        if (renderJobs[jobId]?.cancelled) throw new Error("RENDER_CANCELLED");
+        rendered++;
+        const pct = Math.round((rendered / comp.durationInFrames) * 90);
+        renderJobs[jobId].progress = pct;
+        if (pct % 10 === 0) writeJob(jobId, renderJobs[jobId]);
+      },
+    });
+
+    await stitchFramesToVideo({
+      composition: compositionWithRes,
+      serveUrl,
+      inputProps: { project: finalProject },
+      codec: "h264",
+      assetsInfo,
+      outputLocation: outputPath,
+      fps: comp.fps,
+      width,
+      height,
+    });
+
+    fs.rmSync(framesDir, { recursive: true, force: true });
+
+    let videoUrl = null;
+    try {
+      const storageKey = `renders/${userId}/render-${jobId}.mp4`;
+      const videoBuffer = fs.readFileSync(outputPath);
+      const { error: storageErr } = await supabaseAdmin.storage
+        .from("user-assets")
+        .upload(storageKey, videoBuffer, { contentType: "video/mp4", upsert: false });
+      if (!storageErr) {
+        const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+        videoUrl = publicUrl;
+        await supabaseAdmin.from("renders").insert([{
+          project_id: projectId || null,
+          user_id: userId,
+          video_url: videoUrl,
+          status: "done",
+          file_path: storageKey,
+          created_at: new Date().toISOString(),
+        }]);
+      }
+    } catch (e) {
+      console.warn("[timeline-render] Post-render save failed:", e.message);
+    }
+
+    writeJob(jobId, {
+      progress: 100,
+      done: true,
+      url: `http://localhost:${process.env.PORT || 5000}/api/render/download/${jobId}`,
+      video_url: videoUrl,
+      error: null,
+    });
+  } catch (err) {
+    if (err.message === "RENDER_CANCELLED") {
+      writeJob(jobId, { progress: 0, done: true, url: null, error: null, cancelled: true });
+    } else {
+      console.error("[timeline-render] Failed:", err.message);
+      writeJob(jobId, { progress: 0, done: true, url: null, error: err.message });
+    }
+  }
+}
+
 router.post("/cancel", requireAuth, (req, res) => {
   const { jobId } = req.body;
   const job = readJob(jobId);
