@@ -1,4 +1,5 @@
 import { useTimelineStore } from "../../store/useTimelineStore";
+import { resolveTransform } from "./keyframeUtils";
 
 function formatTime(seconds) {
   const s = Math.max(0, seconds);
@@ -50,8 +51,10 @@ export default function TimelineToolbar() {
   const stampKeyframes = () => {
     if (!selectedLayer) return;
     const localTime = Math.max(0, currentTime - selectedLayer.start);
-    const tr = selectedLayer.transform ?? {};
-    for (const prop of ["x", "y", "scale", "rotation", "opacity", "blur"]) {
+    // Use the resolved (visually displayed) values, not just the base transform,
+    // so stamping while keyframes are active captures the correct interpolated position.
+    const tr = resolveTransform(selectedLayer, currentTime);
+    for (const prop of ["x", "y", "width", "height", "scale", "rotation", "opacity", "blur"]) {
       addKeyframe(selectedLayer.id, prop, localTime, tr[prop] ?? 0);
     }
   };

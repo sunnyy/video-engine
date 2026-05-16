@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { interpolateKeyframes } from "../ui/TimelineEditor/keyframeUtils";
 
 const MAX_HISTORY = 50;
 
@@ -215,18 +216,33 @@ export const useTimelineStore = create((set, get) => ({
   },
 
   removeKeyframe: (layerId, property, index) => {
-    const { project, _history } = get();
+    const { project, _history, currentTime } = get();
     if (!project) return;
     const layer = project.layers.find((l) => l.id === layerId);
     if (!layer) return;
     const newHistory = pushHistory(_history, project);
     const sorted = [...(layer.keyframes?.[property] ?? [])].sort((a, b) => a.time - b.time);
     sorted.splice(index, 1);
+
+    // When removing the last keyframe for this property, write its resolved value
+    // back to the base transform so the layer doesn't jump to a stale/garbage position.
+    let transformPatch = {};
+    if (sorted.length === 0) {
+      const localTime = Math.max(0, currentTime - layer.start);
+      const oldArr = [...(layer.keyframes?.[property] ?? [])].sort((a, b) => a.time - b.time);
+      const resolved = interpolateKeyframes(oldArr, localTime);
+      if (resolved !== null) transformPatch[property] = resolved;
+    }
+
     const newProject = {
       ...project,
       layers: project.layers.map((l) =>
         l.id === layerId
-          ? { ...l, keyframes: { ...l.keyframes, [property]: sorted } }
+          ? {
+              ...l,
+              keyframes: { ...l.keyframes, [property]: sorted },
+              transform: { ...l.transform, ...transformPatch },
+            }
           : l
       ),
     };

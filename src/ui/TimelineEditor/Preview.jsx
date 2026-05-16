@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
-import { interpolateKeyframes } from "./keyframeUtils";
+import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
 
 const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker"]);
 const MIN_SIZE = 20;
@@ -22,16 +22,9 @@ const HANDLE_CONFIGS = {
 };
 
 
-function resolveTransform(layer, currentTime) {
-  const t = { ...layer.transform };
-  const kf = layer.keyframes ?? {};
-  for (const prop of ["x", "y", "scale", "rotation", "opacity", "blur"]) {
-    if (kf[prop]?.length) {
-      const v = interpolateKeyframes(kf[prop], currentTime - layer.start);
-      if (v !== null) t[prop] = v;
-    }
-  }
-  return t;
+function resolvedObjectFit(layer, currentTime) {
+  const localTime = Math.max(0, currentTime - layer.start);
+  return stepKeyframe(layer.keyframes?.objectFit ?? [], localTime) ?? layer.objectFit ?? "cover";
 }
 
 // ── Video / Audio helpers ─────────────────────────────────────────────────────
@@ -88,7 +81,7 @@ function VideoLayerEl({ layer, currentTime, isPlaying }) {
     <video
       ref={ref}
       src={layer.src}
-      style={{ width: "100%", height: "100%", objectFit: layer.objectFit ?? "cover" }}
+      style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), pointerEvents: "none" }}
       muted={layer.muted ?? false}
       loop={false}
       preload="auto"
@@ -215,19 +208,58 @@ function PersistentVideoTrack({
     e.stopPropagation(); e.preventDefault();
     const cfg = HANDLE_CONFIGS[handleId];
     const startClientX = e.clientX, startClientY = e.clientY;
-    const origT = { ...activeClip.transform };
-    const compute = (me) => {
+
+    const storeState = useTimelineStore.getState();
+    const ct = storeState.currentTime;
+    const freshClip = storeState.project?.layers?.find((l) => l.id === activeClip.id) ?? activeClip;
+    const localTime = Math.max(0, ct - freshClip.start);
+    const hasXKF = (freshClip.keyframes?.x?.length ?? 0) > 0;
+    const hasYKF = (freshClip.keyframes?.y?.length ?? 0) > 0;
+    const hasWKF = (freshClip.keyframes?.width?.length ?? 0) > 0;
+    const hasHKF = (freshClip.keyframes?.height?.length ?? 0) > 0;
+    const resolved = resolveTransform(freshClip, ct);
+    const origT = {
+      ...freshClip.transform,
+      x: resolved.x ?? 0, y: resolved.y ?? 0,
+      width: resolved.width ?? freshClip.transform.width,
+      height: resolved.height ?? freshClip.transform.height,
+    };
+    const origKF = JSON.parse(JSON.stringify(freshClip.keyframes ?? {}));
+
+    const buildPatch = (me) => {
       const s = scaleRef.current;
       const dx = (me.clientX - startClientX) / s, dy = (me.clientY - startClientY) / s;
-      const newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width  + cfg.wm * dx) : origT.width;
+      const newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
       const newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
-      return { ...origT, width: newW, height: newH,
-               x: origT.x + cfg.xa * (newW - origT.width),
-               y: origT.y + cfg.ya * (newH - origT.height) };
+      const newX = origT.x + cfg.xa * (newW - origT.width);
+      const newY = origT.y + cfg.ya * (newH - origT.height);
+
+      const transformPatch = { ...freshClip.transform };
+      if (!hasXKF) transformPatch.x = newX;
+      if (!hasYKF) transformPatch.y = newY;
+      if (!hasWKF) transformPatch.width = newW;
+      if (!hasHKF) transformPatch.height = newH;
+
+      if (hasXKF || hasYKF || hasWKF || hasHKF) {
+        const kf = JSON.parse(JSON.stringify(origKF));
+        const upsert = (arr, time, val) => {
+          const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
+          if (idx >= 0) arr[idx] = { ...arr[idx], value: val };
+          else { arr.push({ time, value: val }); arr.sort((a, b) => a.time - b.time); }
+          return arr;
+        };
+        if (hasXKF) kf.x = upsert(kf.x ?? [], localTime, newX);
+        if (hasYKF) kf.y = upsert(kf.y ?? [], localTime, newY);
+        if (hasWKF) kf.width = upsert(kf.width ?? [], localTime, newW);
+        if (hasHKF) kf.height = upsert(kf.height ?? [], localTime, newH);
+        return { transform: transformPatch, keyframes: kf };
+      }
+      return { transform: { ...freshClip.transform, width: newW, height: newH, x: newX, y: newY } };
     };
-    const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, { transform: compute(me) });
+
+    const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, buildPatch(me));
     const onUp   = (me) => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
-                              useTimelineStore.getState().updateLayer(activeClip.id, { transform: compute(me) }); };
+                              useTimelineStore.getState().updateLayer(activeClip.id, buildPatch(me)); };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
@@ -238,12 +270,35 @@ function PersistentVideoTrack({
     const rect = wrapperRef.current?.getBoundingClientRect();
     if (!rect) return;
     const centerX = (rect.left + rect.right) / 2, centerY = (rect.top + rect.bottom) / 2;
-    const origT = { ...activeClip.transform };
-    const angleOffset = (origT.rotation ?? 0) - Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-    const compute = (me) => ({ ...origT, rotation: Math.atan2(me.clientY - centerY, me.clientX - centerX) * (180 / Math.PI) + angleOffset });
-    const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, { transform: compute(me) });
+
+    const storeState = useTimelineStore.getState();
+    const ct = storeState.currentTime;
+    const freshClip = storeState.project?.layers?.find((l) => l.id === activeClip.id) ?? activeClip;
+    const localTime = Math.max(0, ct - freshClip.start);
+    const hasRotKF = (freshClip.keyframes?.rotation?.length ?? 0) > 0;
+    const origRotation = resolveTransform(freshClip, ct).rotation ?? 0;
+    const origT = { ...freshClip.transform };
+    const origKF = JSON.parse(JSON.stringify(freshClip.keyframes ?? {}));
+
+    const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+    const angleOffset = origRotation - startAngle;
+
+    const buildPatch = (me) => {
+      const newRotation = Math.atan2(me.clientY - centerY, me.clientX - centerX) * (180 / Math.PI) + angleOffset;
+      if (hasRotKF) {
+        const kf = JSON.parse(JSON.stringify(origKF));
+        kf.rotation = kf.rotation ?? [];
+        const idx = kf.rotation.findIndex((k) => Math.abs(k.time - localTime) < 0.001);
+        if (idx >= 0) kf.rotation[idx] = { ...kf.rotation[idx], value: newRotation };
+        else { kf.rotation.push({ time: localTime, value: newRotation }); kf.rotation.sort((a, b) => a.time - b.time); }
+        return { keyframes: kf };
+      }
+      return { transform: { ...origT, rotation: newRotation } };
+    };
+
+    const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, buildPatch(me));
     const onUp   = (me) => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
-                              useTimelineStore.getState().updateLayer(activeClip.id, { transform: compute(me) }); };
+                              useTimelineStore.getState().updateLayer(activeClip.id, buildPatch(me)); };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
@@ -283,7 +338,7 @@ function PersistentVideoTrack({
         <video
           ref={videoRef}
           src={clips[0]?.src}
-          style={{ width: "100%", height: "100%", objectFit: activeClip?.objectFit ?? "cover" }}
+          style={{ width: "100%", height: "100%", objectFit: activeClip ? resolvedObjectFit(activeClip, currentTime) : "cover", pointerEvents: "none" }}
           muted={clips[0]?.muted ?? false}
           loop={false}
           preload="auto"
@@ -327,11 +382,29 @@ function LayerElement({
   canvasH,
   isSelected,
   isDragging,
+  isEditing,
   scaleRef,
   onBodyMouseDown,
+  onStartEdit,
+  onEndEdit,
 }) {
   // Must be unconditional — called before the audio early-return below
-  const wrapperRef = useRef(null);
+  const wrapperRef  = useRef(null);
+  const textEditRef = useRef(null);
+
+  // When entering edit mode, set content and move cursor to end
+  useEffect(() => {
+    if (!isEditing || !textEditRef.current) return;
+    const el = textEditRef.current;
+    el.innerText = layer.content ?? ""; // eslint-disable-line react-hooks/exhaustive-deps
+    el.focus();
+    const range = document.createRange();
+    const sel   = window.getSelection();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }, [isEditing]); // intentionally omits layer.content — set once on entry
 
   if (layer.type === "audio") {
     return <AudioLayerEl layer={layer} currentTime={currentTime} isPlaying={isPlaying} />;
@@ -340,8 +413,8 @@ function LayerElement({
   const tr = resolveTransform(layer, currentTime);
   const { x, y, width, height, rotation, scale, opacity, blur } = tr;
 
-  const isDraggable = DRAGGABLE_TYPES.has(layer.type) && !layer.locked;
-  const isResizable = isSelected && !layer.locked && DRAGGABLE_TYPES.has(layer.type);
+  const isDraggable = DRAGGABLE_TYPES.has(layer.type) && !layer.locked && !isEditing;
+  const isResizable = isSelected && !layer.locked && DRAGGABLE_TYPES.has(layer.type) && !isEditing;
 
   const left = canvasW / 2 + x - width / 2;
   const top  = canvasH / 2 + y - height / 2;
@@ -354,32 +427,63 @@ function LayerElement({
     const cfg = HANDLE_CONFIGS[handleId];
     const startClientX = e.clientX;
     const startClientY = e.clientY;
-    const origT = { ...layer.transform };
 
-    const compute = (me) => {
+    const storeState = useTimelineStore.getState();
+    const ct = storeState.currentTime;
+    const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
+    const localTime = Math.max(0, ct - freshLayer.start);
+    const hasXKF = (freshLayer.keyframes?.x?.length ?? 0) > 0;
+    const hasYKF = (freshLayer.keyframes?.y?.length ?? 0) > 0;
+    const hasWKF = (freshLayer.keyframes?.width?.length ?? 0) > 0;
+    const hasHKF = (freshLayer.keyframes?.height?.length ?? 0) > 0;
+    const resolved = resolveTransform(freshLayer, ct);
+    const origT = {
+      ...freshLayer.transform,
+      x: resolved.x ?? 0, y: resolved.y ?? 0,
+      width: resolved.width ?? freshLayer.transform.width,
+      height: resolved.height ?? freshLayer.transform.height,
+    };
+    const origKF = JSON.parse(JSON.stringify(freshLayer.keyframes ?? {}));
+
+    const buildPatch = (me) => {
       const s = scaleRef.current;
       const dx = (me.clientX - startClientX) / s;
       const dy = (me.clientY - startClientY) / s;
-      const newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width  + cfg.wm * dx) : origT.width;
+      const newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
       const newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
-      const dW = newW - origT.width;
-      const dH = newH - origT.height;
-      return {
-        ...origT,
-        width:  newW,
-        height: newH,
-        x: origT.x + cfg.xa * dW,
-        y: origT.y + cfg.ya * dH,
-      };
+      const newX = origT.x + cfg.xa * (newW - origT.width);
+      const newY = origT.y + cfg.ya * (newH - origT.height);
+
+      const transformPatch = { ...freshLayer.transform };
+      if (!hasXKF) transformPatch.x = newX;
+      if (!hasYKF) transformPatch.y = newY;
+      if (!hasWKF) transformPatch.width = newW;
+      if (!hasHKF) transformPatch.height = newH;
+
+      if (hasXKF || hasYKF || hasWKF || hasHKF) {
+        const kf = JSON.parse(JSON.stringify(origKF));
+        const upsert = (arr, time, val) => {
+          const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
+          if (idx >= 0) arr[idx] = { ...arr[idx], value: val };
+          else { arr.push({ time, value: val }); arr.sort((a, b) => a.time - b.time); }
+          return arr;
+        };
+        if (hasXKF) kf.x = upsert(kf.x ?? [], localTime, newX);
+        if (hasYKF) kf.y = upsert(kf.y ?? [], localTime, newY);
+        if (hasWKF) kf.width = upsert(kf.width ?? [], localTime, newW);
+        if (hasHKF) kf.height = upsert(kf.height ?? [], localTime, newH);
+        return { transform: transformPatch, keyframes: kf };
+      }
+      return { transform: { ...freshLayer.transform, width: newW, height: newH, x: newX, y: newY } };
     };
 
     const onMove = (me) => {
-      useTimelineStore.getState().updateLayerSilent(layer.id, { transform: compute(me) });
+      useTimelineStore.getState().updateLayerSilent(layer.id, buildPatch(me));
     };
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      useTimelineStore.getState().updateLayer(layer.id, { transform: compute(me) });
+      useTimelineStore.getState().updateLayer(layer.id, buildPatch(me));
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -393,29 +497,41 @@ function LayerElement({
     const rect = wrapperRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Layer center in screen space — valid regardless of rotation because
-    // getBoundingClientRect() center always equals the CSS transformOrigin point.
     const centerX = (rect.left + rect.right) / 2;
     const centerY = (rect.top + rect.bottom) / 2;
 
-    const origT = { ...layer.transform };
-    const origRotation = origT.rotation ?? 0;
+    const storeState = useTimelineStore.getState();
+    const ct = storeState.currentTime;
+    const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
+    const localTime = Math.max(0, ct - freshLayer.start);
+    const hasRotKF = (freshLayer.keyframes?.rotation?.length ?? 0) > 0;
+    const origRotation = resolveTransform(freshLayer, ct).rotation ?? 0;
+    const origT = { ...freshLayer.transform };
+    const origKF = JSON.parse(JSON.stringify(freshLayer.keyframes ?? {}));
+
     const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-    // Offset so rotation continues from the layer's current value, not jumps to 0
     const angleOffset = origRotation - startAngle;
 
-    const compute = (me) => {
-      const angle = Math.atan2(me.clientY - centerY, me.clientX - centerX) * (180 / Math.PI);
-      return { ...origT, rotation: angle + angleOffset };
+    const buildPatch = (me) => {
+      const newRotation = Math.atan2(me.clientY - centerY, me.clientX - centerX) * (180 / Math.PI) + angleOffset;
+      if (hasRotKF) {
+        const kf = JSON.parse(JSON.stringify(origKF));
+        kf.rotation = kf.rotation ?? [];
+        const idx = kf.rotation.findIndex((k) => Math.abs(k.time - localTime) < 0.001);
+        if (idx >= 0) kf.rotation[idx] = { ...kf.rotation[idx], value: newRotation };
+        else { kf.rotation.push({ time: localTime, value: newRotation }); kf.rotation.sort((a, b) => a.time - b.time); }
+        return { keyframes: kf };
+      }
+      return { transform: { ...origT, rotation: newRotation } };
     };
 
     const onMove = (me) => {
-      useTimelineStore.getState().updateLayerSilent(layer.id, { transform: compute(me) });
+      useTimelineStore.getState().updateLayerSilent(layer.id, buildPatch(me));
     };
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      useTimelineStore.getState().updateLayer(layer.id, { transform: compute(me) });
+      useTimelineStore.getState().updateLayer(layer.id, buildPatch(me));
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -430,7 +546,7 @@ function LayerElement({
     content = layer.src ? (
       <img
         src={layer.src}
-        style={{ width: "100%", height: "100%", objectFit: layer.objectFit ?? "cover", display: "block" }}
+        style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), display: "block", pointerEvents: "none" }}
         draggable={false}
       />
     ) : (
@@ -445,29 +561,69 @@ function LayerElement({
     );
   } else if (layer.type === "text") {
     const s = layer.style ?? {};
-    content = (
-      <div style={{
-        width: "100%", height: "100%",
-        display: "flex", alignItems: "center",
-        justifyContent: s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
-        fontFamily: s.fontFamily ?? "Outfit, sans-serif",
-        fontSize: s.fontSize ?? 72,
-        fontWeight: s.fontWeight ?? 800,
-        color: s.color ?? "#ffffff",
-        textAlign: s.textAlign ?? "center",
-        lineHeight: s.lineHeight ?? 1.2,
-        letterSpacing: s.letterSpacing ?? 0,
-        textShadow: s.textShadow ?? undefined,
-        background: s.background ?? undefined,
-        borderRadius: s.borderRadius ?? 0,
-        padding: s.padding ?? 0,
-        wordBreak: "break-word",
-        whiteSpace: "pre-wrap",
-        boxSizing: "border-box",
-      }}>
-        {layer.content ?? ""}
-      </div>
-    );
+    const baseTextStyle = {
+      width: "100%", height: "100%",
+      fontFamily: s.fontFamily ?? "Outfit, sans-serif",
+      fontSize: s.fontSize ?? 72,
+      fontWeight: s.fontWeight ?? 800,
+      color: s.color ?? "#ffffff",
+      textAlign: s.textAlign ?? "center",
+      lineHeight: s.lineHeight ?? 1.2,
+      letterSpacing: s.letterSpacing ?? 0,
+      textShadow: s.textShadow ?? undefined,
+      background: s.background ?? undefined,
+      borderRadius: s.borderRadius ?? 0,
+      padding: s.padding ?? 0,
+      wordBreak: "break-word",
+      whiteSpace: "pre-wrap",
+      boxSizing: "border-box",
+    };
+
+    if (isEditing) {
+      const saveAndExit = (el) => {
+        useTimelineStore.getState().updateLayer(layer.id, { content: el.innerText });
+        onEndEdit?.();
+      };
+      content = (
+        <div
+          ref={textEditRef}
+          contentEditable
+          suppressContentEditableWarning
+          style={{
+            ...baseTextStyle,
+            outline: "2px solid rgba(124,92,252,0.7)",
+            outlineOffset: 4,
+            cursor: "text",
+            overflowY: "auto",
+          }}
+          onBlur={(e) => saveAndExit(e.currentTarget)}
+          onKeyDown={(e) => {
+            e.stopPropagation(); // suppress space / shortcut keys while typing
+            if (e.key === "Escape") {
+              e.currentTarget.blur();
+            } else if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
+        />
+      );
+    } else {
+      content = (
+        <div
+          style={{
+            ...baseTextStyle,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
+            cursor: isDraggable ? "move" : "default",
+          }}
+          onDoubleClick={(e) => { e.stopPropagation(); onStartEdit?.(); }}
+        >
+          {layer.content ?? ""}
+        </div>
+      );
+    }
   } else if (layer.type === "captions") {
     const seg = layer.segments?.find((s) => currentTime >= s.start && currentTime < s.end);
     const cs = layer.captionStyle ?? {};
@@ -523,8 +679,9 @@ function LayerElement({
           position: "absolute",
           inset: 0,
           overflow: "hidden",
-          cursor: isDraggable ? (isDragging ? "grabbing" : "move") : "default",
-          pointerEvents: isDraggable ? "auto" : "none",
+          cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "move") : "default",
+          // keep auto when editing so contenteditable receives focus/keyboard events
+          pointerEvents: isDraggable || isEditing ? "auto" : "none",
         }}
         onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, layer) : undefined}
       >
@@ -631,9 +788,10 @@ export default function Preview() {
   const setIsPlaying   = useTimelineStore((s) => s.setIsPlaying);
 
   const containerRef = useRef(null);
-  const [scale, setScale]     = useState(1);
-  const scaleRef              = useRef(1);
+  const [scale, setScale]           = useState(1);
+  const scaleRef                    = useRef(1);
   const [draggingLayerId, setDraggingLayerId] = useState(null);
+  const [editingLayerId,  setEditingLayerId]  = useState(null);
 
   const canvasW = project?.format?.width  ?? 1080;
   const canvasH = project?.format?.height ?? 1920;
@@ -689,31 +847,56 @@ export default function Preview() {
 
     const startClientX = e.clientX;
     const startClientY = e.clientY;
-    const origT = { ...(layer.transform ?? {}) };
+
+    // Get fresh layer and currentTime from store at the moment of mousedown
+    const storeState = useTimelineStore.getState();
+    const ct = storeState.currentTime;
+    const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
+    const origT = { ...(freshLayer.transform ?? {}) };
+
+    // If keyframes drive x/y, we must drag in keyframe space; otherwise base transform
+    const resolvedT = resolveTransform(freshLayer, ct);
+    const origX = resolvedT.x ?? 0;
+    const origY = resolvedT.y ?? 0;
+    const localTime = Math.max(0, ct - freshLayer.start);
+    const hasXKF = (freshLayer.keyframes?.x?.length ?? 0) > 0;
+    const hasYKF = (freshLayer.keyframes?.y?.length ?? 0) > 0;
+    const origKF = JSON.parse(JSON.stringify(freshLayer.keyframes ?? {}));
+
+    const buildPatch = (clientX, clientY) => {
+      const s = scaleRef.current;
+      const newX = origX + (clientX - startClientX) / s;
+      const newY = origY + (clientY - startClientY) / s;
+
+      if (hasXKF || hasYKF) {
+        const kf = JSON.parse(JSON.stringify(origKF));
+        const upsert = (arr, time, value) => {
+          const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
+          if (idx >= 0) arr[idx] = { ...arr[idx], value };
+          else { arr.push({ time, value }); arr.sort((a, b) => a.time - b.time); }
+          return arr;
+        };
+        if (hasXKF) kf.x = upsert(kf.x ?? [], localTime, newX);
+        if (hasYKF) kf.y = upsert(kf.y ?? [], localTime, newY);
+        // Also update base transform for non-keyframed axis
+        const transform = { ...origT };
+        if (!hasXKF) transform.x = newX;
+        if (!hasYKF) transform.y = newY;
+        return { keyframes: kf, transform };
+      }
+
+      return { transform: { ...origT, x: newX, y: newY } };
+    };
 
     const onMove = (me) => {
-      const s = scaleRef.current;
-      useTimelineStore.getState().updateLayerSilent(layer.id, {
-        transform: {
-          ...origT,
-          x: (origT.x ?? 0) + (me.clientX - startClientX) / s,
-          y: (origT.y ?? 0) + (me.clientY - startClientY) / s,
-        },
-      });
+      useTimelineStore.getState().updateLayerSilent(layer.id, buildPatch(me.clientX, me.clientY));
     };
 
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       setDraggingLayerId(null);
-      const s = scaleRef.current;
-      useTimelineStore.getState().updateLayer(layer.id, {
-        transform: {
-          ...origT,
-          x: (origT.x ?? 0) + (me.clientX - startClientX) / s,
-          y: (origT.y ?? 0) + (me.clientY - startClientY) / s,
-        },
-      });
+      useTimelineStore.getState().updateLayer(layer.id, buildPatch(me.clientX, me.clientY));
     };
 
     window.addEventListener("mousemove", onMove);
@@ -827,8 +1010,11 @@ export default function Preview() {
               canvasH={canvasH}
               isSelected={layer.id === selectedLayerId}
               isDragging={layer.id === draggingLayerId}
+              isEditing={layer.id === editingLayerId}
               scaleRef={scaleRef}
               onBodyMouseDown={handleBodyMouseDown}
+              onStartEdit={() => setEditingLayerId(layer.id)}
+              onEndEdit={() => setEditingLayerId(null)}
             />
           ))}
 
