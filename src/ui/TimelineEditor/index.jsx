@@ -81,9 +81,16 @@ export default function TimelineEditor() {
           const step = e.shiftKey ? 10 : 1;
           const dx = e.code === "ArrowLeft" ? -step : e.code === "ArrowRight" ? step : 0;
           const dy = e.code === "ArrowUp"   ? -step : e.code === "ArrowDown"  ? step : 0;
-          useTimelineStore.getState().updateLayer(selectedLayerId, {
+          const kf = layer.keyframes ?? {};
+          const patch = {
             transform: { ...layer.transform, x: (layer.transform?.x ?? 0) + dx, y: (layer.transform?.y ?? 0) + dy },
-          });
+            keyframes: {
+              ...kf,
+              ...(dx && kf.x?.length ? { x: kf.x.map((k) => ({ ...k, value: k.value + dx })) } : {}),
+              ...(dy && kf.y?.length ? { y: kf.y.map((k) => ({ ...k, value: k.value + dy })) } : {}),
+            },
+          };
+          useTimelineStore.getState().updateLayer(selectedLayerId, patch);
         } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
           e.preventDefault();
           const { currentTime } = useTimelineStore.getState();
