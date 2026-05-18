@@ -21,6 +21,7 @@ import { router as outfitRouter }     from "./routes/outfit.js";
 import { router as socialPostRouter } from "./routes/socialPost.js";
 import { router as adminRouter }        from "./routes/admin.js";
 import { router as refundClaimsRouter } from "./routes/refundClaims.js";
+import { router as productVideoRouter } from "./routes/productVideo.js";
 
 console.log("Server starting...", new Date().toISOString());
 
@@ -106,6 +107,7 @@ cleanTempDir();
 setInterval(cleanTempDir, 6 * 60 * 60 * 1000);
 
 /* ── Route mounts ── */
+app.use("/api/product-video", generationLimiter, productVideoRouter);
 app.use("/api/render",       renderRouter);
 app.use("/api/product-ad",   productAdRouter);
 app.use("/api/poster",       posterRouter);

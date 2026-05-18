@@ -318,8 +318,18 @@
     - images
       - favicon.png
       - logo.png
-    - index-C-3nEIsh.css
-    - index-DW9qGos8.js
+      - services
+        - AIVideoGenerator.png
+        - BannerDesign.png
+        - CaptionStudio.png
+        - PosterStudio.png
+        - ProductVideoAds.png
+        - SpeechtoText.png
+        - ThumbnailGenerator.png
+        - VirtualTryOn.png
+        - VoiceStudio.png
+    - index-Bd1XWMjk.css
+    - index-D0Fv4Jdy.js
     - videos
   - icons
     - ai-images.png
@@ -383,6 +393,16 @@
     - images
       - favicon.png
       - logo.png
+      - services
+        - AIVideoGenerator.png
+        - BannerDesign.png
+        - CaptionStudio.png
+        - PosterStudio.png
+        - ProductVideoAds.png
+        - SpeechtoText.png
+        - ThumbnailGenerator.png
+        - VirtualTryOn.png
+        - VoiceStudio.png
     - videos
   - icons
     - ai-images.png
@@ -451,6 +471,16 @@
       - images
         - favicon.png
         - logo.png
+        - services
+          - AIVideoGenerator.png
+          - BannerDesign.png
+          - CaptionStudio.png
+          - PosterStudio.png
+          - ProductVideoAds.png
+          - SpeechtoText.png
+          - ThumbnailGenerator.png
+          - VirtualTryOn.png
+          - VoiceStudio.png
       - videos
     - icons
       - ai-images.png
@@ -580,16 +610,17 @@
       - MusicLibrary.jsx
       - Plans.jsx
       - PlansSales.jsx
+      - RefundClaims.jsx
       - Sales.jsx
       - Samples.jsx
       - SFXLibrary.jsx
       - System.jsx
       - UserManager.jsx
-    - Assets.jsx
     - Auth.jsx
     - BannerDesign.jsx
     - Checkout.jsx
     - Credits.jsx
+    - CustomVideos.jsx
     - Dashboard.jsx
     - Editor.jsx
     - ExplainerVideo.jsx
@@ -613,6 +644,7 @@
     - Thumbnails.jsx
     - TypographyVideo.jsx
     - VideoCaptions.jsx
+    - VideoEditor.jsx
     - VideoGenerator.jsx
     - Videos.jsx
     - VirtualTryOn.jsx
@@ -659,6 +691,7 @@
       - LayoutBackgroundRenderer.jsx
       - LayoutRenderer.jsx
     - Root.jsx
+    - TimelineComposition.jsx
     - VideoComposition.jsx
   - server
     - assets
@@ -667,6 +700,7 @@
     - compressVideo.cjs
     - index.js
     - middleware
+      - moderateInput.js
       - shared.js
     - prompts
       - instagramPostAnalysis.js
@@ -681,6 +715,7 @@
       - payments.js
       - poster.js
       - productAd.js
+      - refundClaims.js
       - render.js
       - socialPost.js
       - thumbnail.js
@@ -725,6 +760,231 @@
         - element-032.jpeg
         - element-033.jpeg
         - element-034.jpeg
+      - frames-42531633-1cfb-4d0c-9aff-462e1240cdb7
+        - element-000.jpeg
+        - element-001.jpeg
+        - element-002.jpeg
+        - element-003.jpeg
+        - element-004.jpeg
+        - element-005.jpeg
+        - element-006.jpeg
+        - element-007.jpeg
+        - element-008.jpeg
+        - element-009.jpeg
+        - element-010.jpeg
+        - element-011.jpeg
+        - element-012.jpeg
+        - element-013.jpeg
+        - element-014.jpeg
+        - element-015.jpeg
+        - element-016.jpeg
+        - element-017.jpeg
+        - element-018.jpeg
+        - element-019.jpeg
+        - element-020.jpeg
+        - element-021.jpeg
+        - element-022.jpeg
+        - element-023.jpeg
+        - element-024.jpeg
+        - element-025.jpeg
+        - element-026.jpeg
+        - element-027.jpeg
+        - element-028.jpeg
+        - element-029.jpeg
+        - element-030.jpeg
+        - element-031.jpeg
+        - element-032.jpeg
+        - element-033.jpeg
+        - element-034.jpeg
+        - element-035.jpeg
+        - element-036.jpeg
+        - element-037.jpeg
+        - element-038.jpeg
+        - element-039.jpeg
+        - element-040.jpeg
+        - element-041.jpeg
+        - element-042.jpeg
+        - element-043.jpeg
+        - element-044.jpeg
+        - element-045.jpeg
+        - element-046.jpeg
+        - element-047.jpeg
+        - element-048.jpeg
+        - element-049.jpeg
+        - element-050.jpeg
+        - element-051.jpeg
+        - element-052.jpeg
+        - element-053.jpeg
+        - element-054.jpeg
+        - element-055.jpeg
+        - element-056.jpeg
+        - element-057.jpeg
+        - element-058.jpeg
+        - element-059.jpeg
+        - element-060.jpeg
+        - element-061.jpeg
+        - element-062.jpeg
+        - element-063.jpeg
+        - element-064.jpeg
+        - element-065.jpeg
+        - element-066.jpeg
+        - element-067.jpeg
+        - element-068.jpeg
+        - element-069.jpeg
+        - element-070.jpeg
+        - element-071.jpeg
+        - element-072.jpeg
+        - element-073.jpeg
+        - element-074.jpeg
+        - element-075.jpeg
+        - element-076.jpeg
+        - element-077.jpeg
+        - element-078.jpeg
+        - element-079.jpeg
+        - element-080.jpeg
+        - element-081.jpeg
+        - element-082.jpeg
+        - element-083.jpeg
+        - element-084.jpeg
+        - element-085.jpeg
+        - element-086.jpeg
+        - element-087.jpeg
+        - element-088.jpeg
+        - element-089.jpeg
+        - element-090.jpeg
+        - element-091.jpeg
+        - element-092.jpeg
+        - element-093.jpeg
+        - element-094.jpeg
+        - element-095.jpeg
+        - element-096.jpeg
+        - element-097.jpeg
+        - element-098.jpeg
+        - element-099.jpeg
+        - element-100.jpeg
+        - element-101.jpeg
+        - element-102.jpeg
+        - element-103.jpeg
+        - element-104.jpeg
+        - element-105.jpeg
+        - element-106.jpeg
+        - element-107.jpeg
+        - element-108.jpeg
+        - element-109.jpeg
+        - element-110.jpeg
+        - element-111.jpeg
+        - element-112.jpeg
+        - element-113.jpeg
+        - element-114.jpeg
+        - element-115.jpeg
+        - element-116.jpeg
+        - element-117.jpeg
+        - element-118.jpeg
+        - element-119.jpeg
+        - element-120.jpeg
+        - element-121.jpeg
+        - element-122.jpeg
+        - element-123.jpeg
+        - element-124.jpeg
+        - element-125.jpeg
+        - element-126.jpeg
+        - element-127.jpeg
+        - element-128.jpeg
+        - element-129.jpeg
+        - element-130.jpeg
+        - element-131.jpeg
+        - element-132.jpeg
+        - element-133.jpeg
+        - element-134.jpeg
+        - element-135.jpeg
+        - element-136.jpeg
+        - element-137.jpeg
+        - element-138.jpeg
+        - element-139.jpeg
+        - element-140.jpeg
+        - element-141.jpeg
+        - element-142.jpeg
+        - element-143.jpeg
+        - element-144.jpeg
+        - element-145.jpeg
+        - element-146.jpeg
+        - element-147.jpeg
+        - element-148.jpeg
+        - element-149.jpeg
+        - element-150.jpeg
+        - element-151.jpeg
+        - element-152.jpeg
+        - element-153.jpeg
+        - element-154.jpeg
+        - element-155.jpeg
+        - element-156.jpeg
+        - element-157.jpeg
+        - element-158.jpeg
+        - element-159.jpeg
+        - element-160.jpeg
+        - element-161.jpeg
+        - element-162.jpeg
+        - element-163.jpeg
+        - element-164.jpeg
+        - element-165.jpeg
+        - element-166.jpeg
+        - element-167.jpeg
+        - element-168.jpeg
+        - element-169.jpeg
+        - element-170.jpeg
+        - element-171.jpeg
+        - element-172.jpeg
+        - element-173.jpeg
+        - element-174.jpeg
+        - element-175.jpeg
+        - element-176.jpeg
+        - element-177.jpeg
+        - element-178.jpeg
+        - element-179.jpeg
+        - element-180.jpeg
+        - element-181.jpeg
+        - element-182.jpeg
+        - element-183.jpeg
+        - element-184.jpeg
+        - element-185.jpeg
+        - element-186.jpeg
+        - element-187.jpeg
+        - element-188.jpeg
+        - element-189.jpeg
+        - element-190.jpeg
+        - element-191.jpeg
+        - element-192.jpeg
+        - element-193.jpeg
+        - element-194.jpeg
+        - element-195.jpeg
+        - element-196.jpeg
+        - element-197.jpeg
+        - element-198.jpeg
+        - element-199.jpeg
+        - element-200.jpeg
+        - element-201.jpeg
+        - element-202.jpeg
+        - element-203.jpeg
+        - element-204.jpeg
+        - element-205.jpeg
+        - element-206.jpeg
+        - element-207.jpeg
+        - element-208.jpeg
+        - element-209.jpeg
+        - element-210.jpeg
+        - element-211.jpeg
+        - element-212.jpeg
+        - element-213.jpeg
+        - element-214.jpeg
+        - element-215.jpeg
+        - element-216.jpeg
+        - element-217.jpeg
+        - element-218.jpeg
+        - element-219.jpeg
+        - element-220.jpeg
+        - element-221.jpeg
+        - element-222.jpeg
+        - element-223.jpeg
       - frames-6154d0de-1b41-4a32-9ae8-2df497295a2a
         - element-000.jpeg
         - element-001.jpeg
@@ -2054,6 +2314,12 @@
         - element-020.jpeg
         - element-021.jpeg
         - element-022.jpeg
+      - job-015734ae-b022-47aa-8a1f-5a7051546733.json
+      - job-74d673ac-bef8-4642-852d-ee0b2d1f33f2.json
+      - job-a69c7141-7866-4016-a789-ce30f4214c2c.json
+      - job-d7211133-75ef-4efb-b96d-bea992c03e96.json
+      - render-a69c7141-7866-4016-a789-ce30f4214c2c.mp4
+      - render-d7211133-75ef-4efb-b96d-bea992c03e96.mp4
   - services
     - ai
       - generateExplainerVideo.js
@@ -2086,11 +2352,14 @@
     - useImageLibraryStore.js
     - useProjectsStore.js
     - useProjectStore.js
+    - useTimelineStore.js
   - ui
     - AppLayout.jsx
     - components
       - CaptionStylePreview.jsx
       - FeedbackModal.jsx
+      - RefundClaimModal.jsx
+      - RefundClaimTrigger.jsx
     - CreditConfirmModal.jsx
     - Editor
       - AudioSection.jsx
@@ -2140,6 +2409,7 @@
           - IconsTab.jsx
           - MyAssetsTab.jsx
           - ShapesTab.jsx
+          - StickersTab.jsx
           - TextTab.jsx
         - ZonePickerModal.jsx
       - zones
@@ -2154,6 +2424,27 @@
       - ZonesSection.jsx
     - GeneratingLoader.jsx
     - TemplateModal.jsx
+    - TimelineEditor
+      - index.jsx
+      - keyframeUtils.js
+      - LeftPanel.jsx
+      - modals
+        - AudioModal.jsx
+        - EditorModal.jsx
+        - helpers.js
+        - MediaModal.jsx
+        - MusicModal.jsx
+        - StickersModal.jsx
+        - TextModal.jsx
+      - Preview.jsx
+      - PropertiesPanel.jsx
+      - Timeline.jsx
+      - TimelineClip.jsx
+      - TimelineToolbar.jsx
+      - TimelineTrack.jsx
+      - TopBar.jsx
+      - WaveformCanvas.jsx
+    - Toast.jsx
     - VoiceSelector.jsx
 - Strategy.txt
 - supabase

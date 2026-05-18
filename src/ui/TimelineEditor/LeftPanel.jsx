@@ -1,9 +1,10 @@
 import { useState } from "react";
-import MediaModal    from "./modals/MediaModal";
-import TextModal     from "./modals/TextModal";
-import StickersModal from "./modals/StickersModal";
-import AudioModal    from "./modals/AudioModal";
-import MusicModal    from "./modals/MusicModal";
+import MediaModal      from "./modals/MediaModal";
+import TextModal       from "./modals/TextModal";
+import StickersModal   from "./modals/StickersModal";
+import AudioModal      from "./modals/AudioModal";
+import MusicModal      from "./modals/MusicModal";
+import ShapesModal     from "./modals/ShapesModal";
 
 const PANELS = [
   {
@@ -23,6 +24,16 @@ const PANELS = [
         <polyline points="4 7 4 4 20 4 20 7"/>
         <line x1="9" y1="20" x2="15" y2="20"/>
         <line x1="12" y1="4" x2="12" y2="20"/>
+      </svg>
+    ),
+  },
+  {
+    id: "shapes", label: "Shapes", color: "#a78bfa",
+    icon: (color) => (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="4"/>
+        <rect x="3" y="3" width="6" height="6" rx="1"/>
+        <polygon points="18,3 21,8 15,8"/>
       </svg>
     ),
   },
@@ -115,11 +126,12 @@ export default function LeftPanel() {
         })}
       </div>
 
-      {activeModal === "media"    && <MediaModal    onClose={close} />}
-      {activeModal === "text"     && <TextModal     onClose={close} />}
-      {activeModal === "stickers" && <StickersModal onClose={close} />}
-      {activeModal === "music"    && <MusicModal    onClose={close} />}
-      {activeModal === "audio"    && <AudioModal    onClose={close} />}
+      {activeModal === "media"     && <MediaModal     onClose={close} />}
+      {activeModal === "text"      && <TextModal      onClose={close} />}
+      {activeModal === "shapes"    && <ShapesModal    onClose={close} />}
+      {activeModal === "stickers"  && <StickersModal  onClose={close} />}
+      {activeModal === "music"     && <MusicModal     onClose={close} />}
+      {activeModal === "audio"     && <AudioModal     onClose={close} />}
     </>
   );
 }

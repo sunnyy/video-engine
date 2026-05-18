@@ -492,10 +492,33 @@ Compose all scenes as a single layers[] array. Stack scenes sequentially based o
     console.log('[compose] first 3 layers raw:', JSON.stringify(rawLayers.slice(0, 3), null, 2));
     console.log('[compose timing debug]', rawLayers.slice(0, 5).map(l => ({ id: l.id, start: l.start, end: l.end, startTime: l.startTime, endTime: l.endTime, scene: l.scene, sceneId: l.sceneId })));
 
+    // Build sceneId → absolute {start, end} from the scenes array
+    const sceneTimingMap = {};
+    let cursor = 0;
+    for (const scene of scenes) {
+      const dur = scene.duration_sec ?? 4;
+      sceneTimingMap[scene.id] = { start: cursor, end: cursor + dur };
+      cursor += dur;
+    }
+
+    // Inject absolute timing into raw layers based on scene field
+    const timedLayers = rawLayers.map(layer => {
+      const sceneId = layer.scene ?? layer.sceneId;
+      const timing = sceneTimingMap[sceneId];
+      if (timing) {
+        return {
+          ...layer,
+          start: layer.start ?? timing.start,
+          end:   layer.end   ?? timing.end,
+        };
+      }
+      return layer;
+    });
+
     // Validate and sanitize
     const seenIds = new Set();
 
-    const layers = rawLayers.map((layer, index) => {
+    const layers = timedLayers.map((layer, index) => {
       let id = layer.id || `layer_${index}`;
       if (seenIds.has(id)) id = `${id}_${index}`;
       seenIds.add(id);

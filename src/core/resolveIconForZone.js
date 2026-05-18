@@ -15,7 +15,7 @@
  *   Generic white icons → brand color → DNA primary → #ffffff
  */
 
-import iconRegistry from "./registries/iconRegistry.jsx";
+import iconRegistry from "./registries/iconRegistry.js";
 import { backgroundPatternRegistry } from "./registries/backgroundPatternRegistry.js";
 
 const ENTRIES = Object.entries(iconRegistry);

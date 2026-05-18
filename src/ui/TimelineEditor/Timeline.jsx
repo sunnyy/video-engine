@@ -27,7 +27,9 @@ export default function Timeline() {
   const zoom = useTimelineStore((s) => s.zoom);
   const setCurrentTime = useTimelineStore((s) => s.setCurrentTime);
   const setIsPlaying = useTimelineStore((s) => s.setIsPlaying);
+  const isPlaying = useTimelineStore((s) => s.isPlaying);
   const reorderTrackGroups = useTimelineStore((s) => s.reorderTrackGroups);
+  const selectedLayerId = useTimelineStore((s) => s.selectedLayerId);
 
   const scrollRef = useRef(null);
   const isDraggingPlayhead = useRef(false);
@@ -63,6 +65,51 @@ export default function Timeline() {
 
   // Keep trackGroupsRef current so stable callbacks can read latest groups
   useEffect(() => { trackGroupsRef.current = trackGroups; });
+
+  // Scroll horizontally + vertically to follow playhead and active layers during playback
+  useEffect(() => {
+    if (!isPlaying || !scrollRef.current || isDraggingPlayhead.current) return;
+    const el = scrollRef.current;
+
+    // Horizontal: keep playhead in view
+    const headX = LABEL_W + currentTime * pps;
+    const margin = 80;
+    if (headX > el.scrollLeft + el.clientWidth - margin) {
+      el.scrollLeft = headX - el.clientWidth / 2;
+    } else if (headX < el.scrollLeft + LABEL_W) {
+      el.scrollLeft = Math.max(0, headX - LABEL_W - margin);
+    }
+
+    // Vertical: keep the first active track row in view
+    const tg = trackGroupsRef.current;
+    const activeIdx = tg.findIndex((g) =>
+      g.some((l) => currentTime >= l.start && currentTime < l.end)
+    );
+    if (activeIdx !== -1) {
+      const trackTop = RULER_H + activeIdx * TRACK_H;
+      const trackBottom = trackTop + TRACK_H;
+      if (trackTop < el.scrollTop + RULER_H) {
+        el.scrollTop = trackTop - RULER_H;
+      } else if (trackBottom > el.scrollTop + el.clientHeight) {
+        el.scrollTop = trackBottom - el.clientHeight;
+      }
+    }
+  }, [currentTime, isPlaying, pps]);
+
+  // Scroll selected layer's track row into view
+  useEffect(() => {
+    if (!selectedLayerId || !scrollRef.current) return;
+    const idx = trackGroupsRef.current.findIndex((g) => g.some((l) => l.id === selectedLayerId));
+    if (idx === -1) return;
+    const trackTop = RULER_H + idx * TRACK_H;
+    const trackBottom = trackTop + TRACK_H;
+    const el = scrollRef.current;
+    if (trackTop < el.scrollTop + RULER_H) {
+      el.scrollTo({ top: trackTop - RULER_H, behavior: "smooth" });
+    } else if (trackBottom > el.scrollTop + el.clientHeight) {
+      el.scrollTo({ top: trackBottom - el.clientHeight, behavior: "smooth" });
+    }
+  }, [selectedLayerId]);
 
   // Stable helper — maps clientY to track group index using scroll-aware math
   const clientYToTrackIdx = useCallback((clientY) => {

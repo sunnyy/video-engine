@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform } from "./keyframeUtils";
 import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
+import { cinematicById } from "../../core/registries/cinematicRegistry";
+import PresetsModal from "./modals/PresetsModal";
 
 const FONT_FAMILIES = [
   "Outfit", "Inter", "Roboto", "Montserrat",
@@ -145,7 +147,7 @@ function VideoProps({ layer, update, updateSilent, commit, resolvedObjectFitVal,
       </Field>
       <Field label="Speed">
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-          {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3].map((speed) => {
+          {[0.25, 0.5, 1, 1.5, 2].map((speed) => {
             const active = (layer.playbackRate ?? 1) === speed;
             return (
               <button
@@ -305,92 +307,501 @@ function ImageProps({ layer, update, resolvedObjectFitVal, updateObjectFit }) {
   );
 }
 
-function AppearanceSection({ layer, update, updateSilent, commit }) {
+function ShapeProps({ layer, update }) {
+  const parseGradient = (g) => {
+    if (!g) return { angle: 135, c1: "#7c5cfc", c2: "#ffffff" };
+    const colors = g.match(/#[0-9a-fA-F]{3,6}|rgb[^)]+\)|rgba[^)]+\)/g);
+    const angle = g.match(/(\d+)deg/)?.[1] ?? 135;
+    return { angle: parseInt(angle), c1: colors?.[0] ?? "#7c5cfc", c2: colors?.[1] ?? "#ffffff" };
+  };
+  const [gradientMode, setGradientMode] = useState(!!(layer.gradient || layer.gradientRaw));
+  const [gradState, setGradState] = useState(() => parseGradient(layer.gradient));
+  const [showPresetsModal, setShowPresetsModal] = useState(false);
+
+  const entry = layer.registry === "cinematic" ? cinematicById[layer.shapeId] : null;
+  const colorMode = layer.registry === "cinematic"
+    ? (entry?.colorMode ?? "fill")
+    : (layer.filled !== false ? "fill" : "stroke");
+
+  const buildGradient = (gs) => `linear-gradient(${gs.angle}deg, ${gs.c1}, ${gs.c2})`;
+  const applyGradient = (gs) => update({ gradient: buildGradient(gs), gradientRaw: null });
+
+  const CINEMATIC_FILL_NO_PATTERN = new Set(["blob_asymmetric", "liquid_blob", "cloud_soft", "ink_splash", "grunge_splat", "paint_stroke_h", "wave_swoosh", "overlay_vignette", "overlay_light_leak", "overlay_color_grade", "spotlight_cone", "radial_glow", "glow_halo"]);
+  const showPresets = (
+    (colorMode === "fill" || colorMode === "mixed") &&
+    (
+      (layer.registry === "shape" && layer.filled !== false) ||
+      (layer.registry === "cinematic" && CINEMATIC_FILL_NO_PATTERN.has(layer.shapeId)) ||
+      (layer.registry === "decorative")
+    )
+  );
+
+  const applyPreset = (_key, entry) => {
+    const bg = entry.style?.background ?? entry.style?.backgroundImage ?? entry.style?.backgroundColor;
+    if (!bg) { update({ color: "#ffffff", gradient: null, gradientRaw: null }); setGradientMode(false); return; }
+    const extractedColors = bg.match(/#[0-9a-fA-F]{3,6}|rgb[^)]+\)|rgba[^)]+\)/g) ?? [];
+    if (!bg.includes("gradient")) {
+      update({ color: extractedColors[0] ?? bg, gradient: null, gradientRaw: null });
+      setGradientMode(false);
+    } else if (extractedColors.length === 2) {
+      const angle = parseInt(bg.match(/(\d+)deg/)?.[1] ?? 135);
+      const gs = { c1: extractedColors[0], c2: extractedColors[1], angle };
+      setGradState(gs);
+      setGradientMode(true);
+      update({ gradient: buildGradient(gs), gradientRaw: null });
+    } else {
+      update({ gradientRaw: bg, gradient: null });
+      setGradientMode(true);
+    }
+  };
+
+  return (
+    <>
+      <Section title="Shape">
+        {layer.registry === "shape" && (
+          <Field label="Style">
+            <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+              <button
+                onClick={() => update({ filled: true })}
+                style={{ flex: 1, padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${layer.filled !== false ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                  background: layer.filled !== false ? "rgba(124,92,252,0.2)" : "transparent",
+                  color: layer.filled !== false ? "#a78bfa" : "#9090b0" }}>
+                Filled
+              </button>
+              <button
+                onClick={() => update({ filled: false })}
+                style={{ flex: 1, padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${layer.filled === false ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                  background: layer.filled === false ? "rgba(124,92,252,0.2)" : "transparent",
+                  color: layer.filled === false ? "#a78bfa" : "#9090b0" }}>
+                Outline
+              </button>
+            </div>
+          </Field>
+        )}
+        {colorMode === "stroke" && (
+          <>
+            <Field label="Stroke">
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <button
+                  onClick={() => { setGradientMode(false); update({ gradient: null, gradientRaw: null }); }}
+                  style={{ flex: 1, padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                    border: `1px solid ${!gradientMode ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                    background: !gradientMode ? "rgba(124,92,252,0.2)" : "transparent",
+                    color: !gradientMode ? "#a78bfa" : "#9090b0" }}>
+                  Solid
+                </button>
+                <button
+                  onClick={() => {
+                    const currentColor = layer.color ?? "#ffffff";
+                    const initialGrad = layer.gradient
+                      ? gradState
+                      : { angle: 135, c1: currentColor, c2: "#000000" };
+                    setGradState(initialGrad);
+                    setGradientMode(true);
+                    applyGradient(initialGrad);
+                  }}
+                  style={{ flex: 1, padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                    border: `1px solid ${gradientMode ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                    background: gradientMode ? "rgba(124,92,252,0.2)" : "transparent",
+                    color: gradientMode ? "#a78bfa" : "#9090b0" }}>
+                  Gradient
+                </button>
+              </div>
+              {layer.registry === "shape" && (
+                <div style={{ marginBottom: 8 }}>
+                  <button
+                    onClick={() => setShowPresetsModal(true)}
+                    style={{
+                      width: "100%", padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      background: "rgba(255,255,255,0.04)",
+                      color: "#9090b0", fontWeight: 600,
+                    }}
+                  >
+                    🎨 Presets
+                  </button>
+                </div>
+              )}
+            </Field>
+            {layer.gradientRaw ? (
+              <div style={{ fontSize: 11, color: "#9090b0", padding: "6px 8px", background: "rgba(255,255,255,0.04)", borderRadius: 5, wordBreak: "break-all", marginBottom: 8 }}>
+                {layer.gradientRaw}
+              </div>
+            ) : !gradientMode ? (
+              <Field label="Stroke Color">
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input type="color" value={layer.strokeColor ?? layer.color ?? "#ffffff"}
+                    onChange={(e) => update({ strokeColor: e.target.value, color: e.target.value })}
+                    style={{ width: 36, height: 28, border: "none", borderRadius: 4, cursor: "pointer" }} />
+                  <input style={{ ...inputStyle, flex: 1 }} value={layer.strokeColor ?? layer.color ?? "#ffffff"}
+                    onChange={(e) => update({ strokeColor: e.target.value, color: e.target.value })} />
+                </div>
+              </Field>
+            ) : (
+              <>
+                <Row2>
+                  <Field label="Color 1">
+                    <input type="color" value={gradState.c1}
+                      onChange={(e) => { const gs = { ...gradState, c1: e.target.value }; setGradState(gs); applyGradient(gs); }}
+                      style={{ width: "100%", height: 28, border: "none", borderRadius: 4, cursor: "pointer" }} />
+                  </Field>
+                  <Field label="Color 2">
+                    <input type="color" value={gradState.c2}
+                      onChange={(e) => { const gs = { ...gradState, c2: e.target.value }; setGradState(gs); applyGradient(gs); }}
+                      style={{ width: "100%", height: 28, border: "none", borderRadius: 4, cursor: "pointer" }} />
+                  </Field>
+                </Row2>
+                <Field label="Angle">
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input type="range" min={0} max={360} value={gradState.angle}
+                      onChange={(e) => { const gs = { ...gradState, angle: parseInt(e.target.value) }; setGradState(gs); applyGradient(gs); }}
+                      style={{ flex: 1, accentColor: "#7c5cfc" }} />
+                    <span style={{ fontSize: 12, color: "#9090b0", minWidth: 36 }}>{gradState.angle}°</span>
+                  </div>
+                </Field>
+              </>
+            )}
+          </>
+        )}
+        {layer.registry === "shape" && layer.filled === false && (
+          <Field label="Stroke Width">
+            <NumberInput value={layer.strokeWidth ?? 2} onChange={(v) => update({ strokeWidth: Math.max(0, v) })} min={0} step={1} />
+          </Field>
+        )}
+        {colorMode === "fill" && (
+          <Field label="Fill Color">
+            <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+              {["Solid", "Gradient"].map((m) => {
+                const active = m === "Gradient" ? gradientMode : !gradientMode;
+                return (
+                  <button key={m} onClick={() => {
+                    const isGrad = m === "Gradient";
+                    if (isGrad) {
+                      const currentColor = layer.color ?? "#ffffff";
+                      const initialGrad = layer.gradient
+                        ? gradState
+                        : { angle: 135, c1: currentColor, c2: "#000000" };
+                      setGradState(initialGrad);
+                      setGradientMode(true);
+                      applyGradient(initialGrad);
+                    } else {
+                      setGradientMode(false);
+                      update({ gradient: null, gradientRaw: null, color: layer.color ?? "#ffffff" });
+                    }
+                  }}
+                    style={{
+                      flex: 1, padding: "4px 0", borderRadius: 6, fontSize: 11, cursor: "pointer",
+                      border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                      background: active ? "rgba(124,92,252,0.18)" : "transparent",
+                      color: active ? "#a78bfa" : "#9090b0",
+                    }}
+                  >{m}</button>
+                );
+              })}
+            </div>
+            {showPresets && (
+              <div style={{ marginBottom: 8 }}>
+                <button
+                  onClick={() => setShowPresetsModal(true)}
+                  style={{
+                    width: "100%", padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.04)",
+                    color: "#9090b0", fontWeight: 600,
+                  }}
+                >
+                  🎨 Presets
+                </button>
+              </div>
+            )}
+            {layer.gradientRaw ? (
+              <div style={{ fontSize: 11, color: "#9090b0", padding: "6px 8px", background: "rgba(255,255,255,0.04)", borderRadius: 5, wordBreak: "break-all", marginBottom: 8 }}>
+                {layer.gradientRaw}
+              </div>
+            ) : !gradientMode ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="color" value={layer.color ?? "#ffffff"} onChange={(e) => update({ color: e.target.value })} style={{ width: 36, height: 28, border: "none", borderRadius: 4, cursor: "pointer", background: "none" }} />
+                <input style={{ ...inputStyle, flex: 1 }} value={layer.color ?? "#ffffff"} onChange={(e) => update({ color: e.target.value })} />
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <Row2>
+                  <Field label="Color 1">
+                    <input type="color" value={gradState.c1} onChange={(e) => { const gs = { ...gradState, c1: e.target.value }; setGradState(gs); applyGradient(gs); }} style={{ ...inputStyle, height: 30, padding: 3, cursor: "pointer" }} />
+                  </Field>
+                  <Field label="Color 2">
+                    <input type="color" value={gradState.c2} onChange={(e) => { const gs = { ...gradState, c2: e.target.value }; setGradState(gs); applyGradient(gs); }} style={{ ...inputStyle, height: 30, padding: 3, cursor: "pointer" }} />
+                  </Field>
+                </Row2>
+                <Field label="Angle">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="range" min={0} max={360} step={1} value={gradState.angle}
+                      onChange={(e) => { const gs = { ...gradState, angle: parseInt(e.target.value) }; setGradState(gs); applyGradient(gs); }}
+                      style={{ flex: 1, accentColor: "#7c5cfc" }} />
+                    <span style={{ fontSize: 11, color: "#7070a0", minWidth: 30 }}>{gradState.angle}°</span>
+                  </div>
+                </Field>
+              </div>
+            )}
+          </Field>
+        )}
+        {colorMode !== "mixed" && (
+          <Field label="Opacity">
+            <NumberInput value={layer.shapeOpacity ?? 1} onChange={(v) => update({ shapeOpacity: Math.max(0, Math.min(1, v)) })} min={0} max={1} step={0.05} />
+          </Field>
+        )}
+      </Section>
+      {colorMode === "mixed" && (
+        <Section title="Colors">
+          <Field label="Stroke Color">
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="color" value={layer.strokeColor ?? layer.color ?? "#ffffff"}
+                onChange={(e) => update({ strokeColor: e.target.value })}
+                style={{ width: 36, height: 28, border: "none", borderRadius: 4, cursor: "pointer" }} />
+              <input style={{ ...inputStyle, flex: 1 }} value={layer.strokeColor ?? layer.color ?? "#ffffff"}
+                onChange={(e) => update({ strokeColor: e.target.value })} />
+            </div>
+          </Field>
+          <Field label="Fill">
+            <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+              {["Solid", "Gradient"].map((m) => {
+                const active = m === "Gradient" ? gradientMode : !gradientMode;
+                return (
+                  <button key={m} onClick={() => {
+                    const isGrad = m === "Gradient";
+                    if (isGrad) {
+                      const currentColor = layer.color ?? "#ffffff";
+                      const initialGrad = layer.gradient
+                        ? gradState
+                        : { angle: 135, c1: currentColor, c2: "#000000" };
+                      setGradState(initialGrad);
+                      setGradientMode(true);
+                      applyGradient(initialGrad);
+                    } else {
+                      setGradientMode(false);
+                      update({ gradient: null, gradientRaw: null, color: layer.color ?? "#ffffff" });
+                    }
+                  }}
+                    style={{
+                      flex: 1, padding: "4px 0", borderRadius: 6, fontSize: 11, cursor: "pointer",
+                      border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                      background: active ? "rgba(124,92,252,0.18)" : "transparent",
+                      color: active ? "#a78bfa" : "#9090b0",
+                    }}
+                  >{m}</button>
+                );
+              })}
+            </div>
+            {showPresets && (
+              <div style={{ marginBottom: 8 }}>
+                <button
+                  onClick={() => setShowPresetsModal(true)}
+                  style={{
+                    width: "100%", padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.04)",
+                    color: "#9090b0", fontWeight: 600,
+                  }}
+                >
+                  🎨 Presets
+                </button>
+              </div>
+            )}
+            {layer.gradientRaw ? (
+              <div style={{ fontSize: 11, color: "#9090b0", padding: "6px 8px", background: "rgba(255,255,255,0.04)", borderRadius: 5, wordBreak: "break-all", marginBottom: 8 }}>
+                {layer.gradientRaw}
+              </div>
+            ) : !gradientMode ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="color" value={layer.color ?? "#ffffff"} onChange={(e) => update({ color: e.target.value })} style={{ width: 36, height: 28, border: "none", borderRadius: 4, cursor: "pointer", background: "none" }} />
+                <input style={{ ...inputStyle, flex: 1 }} value={layer.color ?? "#ffffff"} onChange={(e) => update({ color: e.target.value })} />
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <Row2>
+                  <Field label="Color 1">
+                    <input type="color" value={gradState.c1} onChange={(e) => { const gs = { ...gradState, c1: e.target.value }; setGradState(gs); applyGradient(gs); }} style={{ ...inputStyle, height: 30, padding: 3, cursor: "pointer" }} />
+                  </Field>
+                  <Field label="Color 2">
+                    <input type="color" value={gradState.c2} onChange={(e) => { const gs = { ...gradState, c2: e.target.value }; setGradState(gs); applyGradient(gs); }} style={{ ...inputStyle, height: 30, padding: 3, cursor: "pointer" }} />
+                  </Field>
+                </Row2>
+                <Field label="Angle">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="range" min={0} max={360} step={1} value={gradState.angle}
+                      onChange={(e) => { const gs = { ...gradState, angle: parseInt(e.target.value) }; setGradState(gs); applyGradient(gs); }}
+                      style={{ flex: 1, accentColor: "#7c5cfc" }} />
+                    <span style={{ fontSize: 11, color: "#7070a0", minWidth: 30 }}>{gradState.angle}°</span>
+                  </div>
+                </Field>
+              </div>
+            )}
+          </Field>
+          <Field label="Opacity">
+            <NumberInput value={layer.shapeOpacity ?? 1} onChange={(v) => update({ shapeOpacity: Math.max(0, Math.min(1, v)) })} min={0} max={1} step={0.05} />
+          </Field>
+        </Section>
+      )}
+      {showPresetsModal && (
+        <PresetsModal
+          categories={["bright", "light", "dark", "gradient"]}
+          onClose={() => setShowPresetsModal(false)}
+          onSelect={applyPreset}
+        />
+      )}
+    </>
+  );
+}
+
+function GradientProps({ layer, update }) {
+  const [showPresetsModal, setShowPresetsModal] = useState(false);
+  return (
+    <>
+    <Section title="Gradient">
+      <Field label="CSS Gradient">
+        <input
+          style={inputStyle}
+          defaultValue={layer.gradient ?? ""}
+          placeholder="linear-gradient(135deg, #000000, #ffffff)"
+          onBlur={(e) => update({ gradient: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+        />
+      </Field>
+      <div style={{ marginBottom: 8 }}>
+        <button
+          onClick={() => setShowPresetsModal(true)}
+          style={{
+            width: "100%", padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(255,255,255,0.04)",
+            color: "#9090b0", fontWeight: 600,
+          }}
+        >
+          🎨 Presets
+        </button>
+      </div>
+    </Section>
+    {showPresetsModal && (
+      <PresetsModal
+        allowPatterns={true}
+        onClose={() => setShowPresetsModal(false)}
+        onSelect={(_key, entry) => {
+          const bg = entry.style?.background ?? entry.style?.backgroundImage ?? entry.style?.backgroundColor;
+          update({ gradient: bg ?? "#000000" });
+        }}
+      />
+    )}
+    </>
+  );
+}
+
+function AppearanceSection({ layer, update, updateSilent, commit,
+  showBorderRadius = false,
+  showBorder = false,
+  showBackground = false,
+  showPadding = false,
+  showBoxShadow = false,
+  showBlendMode = false,
+}) {
   const shadow = layer.boxShadow ?? null;
   const hasBg  = !!layer.backgroundColor;
   const pre = useRef(null);
   const snap = () => { pre.current = JSON.parse(JSON.stringify(useTimelineStore.getState().project)); };
   return (
     <Section title="Appearance">
-      <Field label="Border Radius">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input
-            type="range" min={0} max={500} step={1}
-            value={layer.borderRadius ?? 0}
-            onMouseDown={snap}
-            onChange={(e) => updateSilent({ borderRadius: parseInt(e.target.value) })}
-            onMouseUp={(e) => commit({ borderRadius: parseInt(e.target.value) }, pre.current)}
-            style={{ flex: 1, accentColor: "#7c5cfc", margin: 0 }}
-          />
-          <span style={{ fontSize: 11, color: "#7070a0", minWidth: 30, textAlign: "right" }}>
-            {layer.borderRadius ?? 0}px
-          </span>
-        </div>
-      </Field>
-
-      <Row2>
-        <Field label="Border Width">
-          <NumberInput value={layer.borderWidth ?? 0} onChange={(v) => update({ borderWidth: Math.max(0, v) })} min={0} step={1} />
-        </Field>
-        <Field label="Border Color">
-          <input
-            type="color"
-            value={layer.borderColor ?? "#ffffff"}
-            onFocus={snap}
-            onChange={(e) => updateSilent({ borderColor: e.target.value })}
-            onBlur={(e) => commit({ borderColor: e.target.value }, pre.current)}
-            style={{ ...inputStyle, height: 34, padding: 3, cursor: "pointer" }}
-          />
-        </Field>
-      </Row2>
-
-      <Row2>
-        <Field label="Background">
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      {showBorderRadius && (
+        <Field label="Border Radius">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
-              type="color"
-              value={hasBg ? layer.backgroundColor : "#000000"}
-              onFocus={snap}
-              onChange={(e) => updateSilent({ backgroundColor: e.target.value })}
-              onBlur={(e) => commit({ backgroundColor: e.target.value }, pre.current)}
-              style={{ ...inputStyle, height: 32, padding: 3, cursor: "pointer", flex: 1, opacity: hasBg ? 1 : 0.35 }}
+              type="range" min={0} max={500} step={1}
+              value={layer.borderRadius ?? 0}
+              onMouseDown={snap}
+              onChange={(e) => updateSilent({ borderRadius: parseInt(e.target.value) })}
+              onMouseUp={(e) => commit({ borderRadius: parseInt(e.target.value) }, pre.current)}
+              style={{ flex: 1, accentColor: "#7c5cfc", margin: 0 }}
             />
-            <button
-              onClick={() => update({ backgroundColor: hasBg ? null : "#000000" })}
-              style={{
-                padding: "5px 8px", borderRadius: 5, fontSize: 11, cursor: "pointer",
-                border: `1px solid ${hasBg ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
-                background: hasBg ? "rgba(124,92,252,0.18)" : "transparent",
-                color: hasBg ? "#a78bfa" : "#55556a", whiteSpace: "nowrap",
-              }}
-            >
-              {hasBg ? "✕" : "Off"}
-            </button>
+            <span style={{ fontSize: 11, color: "#7070a0", minWidth: 30, textAlign: "right" }}>
+              {layer.borderRadius ?? 0}px
+            </span>
           </div>
         </Field>
-        <Field label="Padding">
-          <NumberInput value={layer.padding ?? 0} onChange={(v) => update({ padding: Math.max(0, v) })} min={0} step={2} />
-        </Field>
-      </Row2>
+      )}
 
-      <Field label="Shadow">
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {BOX_SHADOW_PRESETS.map(({ label, value }) => {
-            const active = shadow === value;
-            return (
-              <button key={label} onClick={() => update({ boxShadow: value })}
-                style={{
-                  padding: "4px 9px", borderRadius: 5, fontSize: 11, cursor: "pointer",
-                  border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
-                  background: active ? "rgba(124,92,252,0.18)" : "transparent",
-                  color: active ? "#a78bfa" : "#9090b0",
-                  fontWeight: active ? 700 : 400,
-                }}
-              >{label}</button>
-            );
-          })}
-        </div>
-      </Field>
+      {showBorder && (
+        <Row2>
+          <Field label="Border Width">
+            <NumberInput value={layer.borderWidth ?? 0} onChange={(v) => update({ borderWidth: Math.max(0, v) })} min={0} step={1} />
+          </Field>
+          <Field label="Border Color">
+            <input
+              type="color"
+              value={layer.borderColor ?? "#ffffff"}
+              onFocus={snap}
+              onChange={(e) => updateSilent({ borderColor: e.target.value })}
+              onBlur={(e) => commit({ borderColor: e.target.value }, pre.current)}
+              style={{ ...inputStyle, height: 34, padding: 3, cursor: "pointer" }}
+            />
+          </Field>
+        </Row2>
+      )}
+
+      {(showBackground || showPadding) && (
+        <Row2>
+          {showBackground && (
+            <Field label="Background">
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="color"
+                  value={hasBg ? layer.backgroundColor : "#000000"}
+                  onFocus={snap}
+                  onChange={(e) => updateSilent({ backgroundColor: e.target.value })}
+                  onBlur={(e) => commit({ backgroundColor: e.target.value }, pre.current)}
+                  style={{ ...inputStyle, height: 32, padding: 3, cursor: "pointer", flex: 1, opacity: hasBg ? 1 : 0.35 }}
+                />
+                <button
+                  onClick={() => update({ backgroundColor: hasBg ? null : "#000000" })}
+                  style={{
+                    padding: "5px 8px", borderRadius: 5, fontSize: 11, cursor: "pointer",
+                    border: `1px solid ${hasBg ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                    background: hasBg ? "rgba(124,92,252,0.18)" : "transparent",
+                    color: hasBg ? "#a78bfa" : "#55556a", whiteSpace: "nowrap",
+                  }}
+                >
+                  {hasBg ? "✕" : "Off"}
+                </button>
+              </div>
+            </Field>
+          )}
+          {showPadding && (
+            <Field label="Padding">
+              <NumberInput value={layer.padding ?? 0} onChange={(v) => update({ padding: Math.max(0, v) })} min={0} step={2} />
+            </Field>
+          )}
+        </Row2>
+      )}
+
+      {showBoxShadow && (
+        <Field label="Shadow">
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {BOX_SHADOW_PRESETS.map(({ label, value }) => {
+              const active = shadow === value;
+              return (
+                <button key={label} onClick={() => update({ boxShadow: value })}
+                  style={{
+                    padding: "4px 9px", borderRadius: 5, fontSize: 11, cursor: "pointer",
+                    border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                    background: active ? "rgba(124,92,252,0.18)" : "transparent",
+                    color: active ? "#a78bfa" : "#9090b0",
+                    fontWeight: active ? 700 : 400,
+                  }}
+                >{label}</button>
+              );
+            })}
+          </div>
+        </Field>
+      )}
 
       <Field label="Flip">
         <div style={{ display: "flex", gap: 6 }}>
@@ -406,6 +817,20 @@ function AppearanceSection({ layer, update, updateSilent, commit }) {
           ))}
         </div>
       </Field>
+
+      {showBlendMode && (
+        <Field label="Blend Mode">
+          <select
+            style={selectStyle}
+            value={layer.blendMode ?? "normal"}
+            onChange={(e) => update({ blendMode: e.target.value === "normal" ? undefined : e.target.value })}
+          >
+            {["normal","multiply","screen","overlay","darken","lighten","color-dodge","color-burn","hard-light","soft-light","difference","exclusion"].map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </Field>
+      )}
     </Section>
   );
 }
@@ -917,14 +1342,44 @@ export default function PropertiesPanel() {
             </Section>
           )}
 
-          {layer.type === "video" && <VideoProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
-          {layer.type === "audio" && <AudioProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
-          {layer.type === "text" && <TextProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
+          {/* Type-specific props */}
+          {layer.type === "video"    && <VideoProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
+          {layer.type === "audio"   && <AudioProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
+          {layer.type === "text"    && <TextProps  layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
           {(layer.type === "image" || layer.type === "sticker") && <ImageProps layer={layer} update={update} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
-          {layer.type !== "audio" && <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
-          {(layer.type === "video" || layer.type === "image") && <TransitionProps layer={layer} update={update} />}
-          {layer.type !== "audio" && <SfxSection layer={layer} update={update} />}
-          {layer.type !== "audio" && layer.type !== "captions" && (
+          {layer.type === "shape"    && <ShapeProps    layer={layer} update={update} />}
+          {layer.type === "gradient" && <GradientProps layer={layer} update={update} />}
+
+          {/* Appearance — scoped per layer type */}
+          {layer.type === "text" && (
+            <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit}
+              showBorderRadius showBorder showBackground showPadding showBoxShadow showBlendMode />
+          )}
+          {(layer.type === "image" || layer.type === "video" || layer.type === "sticker") && (
+            <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit}
+              showBorderRadius showBorder showBoxShadow showBlendMode />
+          )}
+          {layer.type === "gradient" && (
+            <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit}
+              showBorderRadius showBlendMode />
+          )}
+          {layer.type === "shape" && (
+            <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit}
+              showBlendMode />
+          )}
+
+          {/* Transitions — image and video only */}
+          {(layer.type === "image" || layer.type === "video") && (
+            <TransitionProps layer={layer} update={update} />
+          )}
+
+          {/* SFX — all visual layers except audio and captions */}
+          {!["audio", "captions"].includes(layer.type) && (
+            <SfxSection layer={layer} update={update} />
+          )}
+
+          {/* Keyframes — all visual layers except audio and captions */}
+          {!["audio", "captions"].includes(layer.type) && (
             <KeyframesSection layer={layer} />
           )}
         </div>
