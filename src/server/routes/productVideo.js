@@ -630,6 +630,8 @@ router.post("/motion", requireAuth, async (req, res) => {
     const { layers, direction } = req.body;
     if (!Array.isArray(layers)) return res.json({ layers: [] });
 
+    console.log('[motion timing check]', layers.slice(0, 3).map(l => ({ id: l.id, start: l.start, end: l.end })));
+
     const isKinetic = direction?.energy === "high";
 
     const enriched = layers.map((layer) => {
@@ -691,6 +693,8 @@ router.post("/motion", requireAuth, async (req, res) => {
       out.keyframes = kf;
       return out;
     });
+
+    console.log('[motion timing out]', enriched.slice(0, 3).map(l => ({ id: l.id, start: l.start, end: l.end })));
 
     res.json({ layers: enriched });
   } catch (err) {
