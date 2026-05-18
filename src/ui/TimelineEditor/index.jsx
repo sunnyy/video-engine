@@ -71,26 +71,31 @@ export default function TimelineEditor() {
         return;
       }
 
-      // Arrow keys — nudge selected layer or seek
+      // Arrow keys — nudge selected layer(s) or seek
       if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.code)) {
-        const { selectedLayerId, project } = useTimelineStore.getState();
-        if (selectedLayerId) {
+        const { selectedLayerId, selectedLayerIds, project } = useTimelineStore.getState();
+        const ids = selectedLayerIds.length > 0 ? selectedLayerIds : selectedLayerId ? [selectedLayerId] : [];
+        if (ids.length > 0) {
           e.preventDefault();
-          const layer = project?.layers?.find((l) => l.id === selectedLayerId);
-          if (!layer) return;
           const step = e.shiftKey ? 10 : 1;
           const dx = e.code === "ArrowLeft" ? -step : e.code === "ArrowRight" ? step : 0;
           const dy = e.code === "ArrowUp"   ? -step : e.code === "ArrowDown"  ? step : 0;
-          const kf = layer.keyframes ?? {};
-          const patch = {
-            transform: { ...layer.transform, x: (layer.transform?.x ?? 0) + dx, y: (layer.transform?.y ?? 0) + dy },
-            keyframes: {
-              ...kf,
-              ...(dx && kf.x?.length ? { x: kf.x.map((k) => ({ ...k, value: k.value + dx })) } : {}),
-              ...(dy && kf.y?.length ? { y: kf.y.map((k) => ({ ...k, value: k.value + dy })) } : {}),
-            },
-          };
-          useTimelineStore.getState().updateLayer(selectedLayerId, patch);
+          const store = useTimelineStore.getState();
+          ids.forEach((id, i) => {
+            const layer = project?.layers?.find((l) => l.id === id);
+            if (!layer) return;
+            const kf = layer.keyframes ?? {};
+            const patch = {
+              transform: { ...layer.transform, x: (layer.transform?.x ?? 0) + dx, y: (layer.transform?.y ?? 0) + dy },
+              keyframes: {
+                ...kf,
+                ...(dx && kf.x?.length ? { x: kf.x.map((k) => ({ ...k, value: k.value + dx })) } : {}),
+                ...(dy && kf.y?.length ? { y: kf.y.map((k) => ({ ...k, value: k.value + dy })) } : {}),
+              },
+            };
+            if (i < ids.length - 1) store.updateLayerSilent(id, patch);
+            else store.updateLayer(id, patch);
+          });
         } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
           e.preventDefault();
           const { currentTime } = useTimelineStore.getState();
