@@ -489,9 +489,6 @@ Compose all scenes as a single layers[] array. Stack scenes sequentially based o
     const raw = JSON.parse(completion.choices[0].message.content);
     const rawLayers = Array.isArray(raw.layers) ? raw.layers : [];
 
-    console.log('[compose] first 3 layers raw:', JSON.stringify(rawLayers.slice(0, 3), null, 2));
-    console.log('[compose timing debug]', rawLayers.slice(0, 5).map(l => ({ id: l.id, start: l.start, end: l.end, startTime: l.startTime, endTime: l.endTime, scene: l.scene, sceneId: l.sceneId })));
-
     // Build sceneId → absolute {start, end} from the scenes array
     const sceneTimingMap = {};
     let cursor = 0;
@@ -570,8 +567,6 @@ Compose all scenes as a single layers[] array. Stack scenes sequentially based o
         validated.content = typeof layer.content === "string" && layer.content
           ? layer.content
           : (typeof layer.text === "string" && layer.text ? layer.text : "Text");
-        console.log('[compose] text layer content:', { id: layer.id, content: validated.content, text: layer.text, layerContent: layer.content });
-
         const baseStyle = layer.style && typeof layer.style === "object" ? layer.style : {};
 
         // Determine correct font by layer role
@@ -653,8 +648,6 @@ router.post("/motion", requireAuth, async (req, res) => {
     const { layers, direction } = req.body;
     if (!Array.isArray(layers)) return res.json({ layers: [] });
 
-    console.log('[motion timing check]', layers.slice(0, 3).map(l => ({ id: l.id, start: l.start, end: l.end })));
-
     const isKinetic = direction?.energy === "high";
 
     const enriched = layers.map((layer) => {
@@ -716,8 +709,6 @@ router.post("/motion", requireAuth, async (req, res) => {
       out.keyframes = kf;
       return out;
     });
-
-    console.log('[motion timing out]', enriched.slice(0, 3).map(l => ({ id: l.id, start: l.start, end: l.end })));
 
     res.json({ layers: enriched });
   } catch (err) {
