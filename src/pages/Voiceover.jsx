@@ -131,7 +131,7 @@ function HistoryItem({ item, onDelete }) {
 export default function TTSStudio() {
   const { fetchCredits } = useCreditsStore();
 
-  const [activeTab,   setActiveTab]   = useState("history");
+  const [activeTab,   setActiveTab]   = useState("generate");
   const [histPage,    setHistPage]    = useState(0);
   const [creditModal, setCreditModal] = useState(null);
 

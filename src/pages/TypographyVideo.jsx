@@ -351,7 +351,7 @@ function VideoListing() {
 
 /* ── Main page ── */
 export default function TypographyVideo() {
-  const [tab, setTab] = useState("videos");
+  const [tab, setTab] = useState("create");
 
   const tabs = [
     { id: "videos",  label: "My Videos"  },

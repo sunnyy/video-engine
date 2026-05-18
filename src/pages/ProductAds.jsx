@@ -206,7 +206,7 @@ function VideoListing({ onResume }) {
 
 /* ── Main page ── */
 export default function ProductAds() {
-  const [tab,      setTab]      = useState("videos");
+  const [tab,      setTab]      = useState("create");
   const [resumeId, setResumeId] = useState(null);
 
   const tabs = [

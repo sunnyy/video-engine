@@ -82,7 +82,7 @@ export default function PosterStudio() {
   const navigate     = useNavigate();
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
   const [creditModal, setCreditModal] = useState(null);
-  const [topTab,      setTopTab]      = useState("history");
+  const [topTab,      setTopTab]      = useState("create");
 
   // form state
   const [imageUrl,   setImageUrl]   = useState("");

@@ -94,7 +94,11 @@ export default function TopBar() {
       }}
     >
       {/* Left: Back */}
-      <button style={btn} onClick={() => navigate("/videos")} title="Back to Videos">
+      <button
+        style={btn}
+        onClick={() => navigate(project?.meta?.source === "product_video" ? "/product-video" : "/videos")}
+        title="Back"
+      >
         ← Back
       </button>
 

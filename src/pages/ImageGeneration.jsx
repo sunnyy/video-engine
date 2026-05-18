@@ -106,7 +106,7 @@ export default function ImageGeneration() {
   const navigate         = useNavigate();
   const { fetchCredits } = useCreditsStore();
   const [creditModal, setCreditModal] = useState(null);
-  const [topTab,      setTopTab]      = useState("library");
+  const [topTab,      setTopTab]      = useState("create");
 
   const [prompt,      setPrompt]      = useState("");
   const [aspectRatio, setAspectRatio] = useState("9:16");

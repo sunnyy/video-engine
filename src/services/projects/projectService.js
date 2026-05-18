@@ -59,6 +59,21 @@ export async function getUserProjects() {
   return data;
 }
 
+export async function getProductVideoProjects() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, updated_at, safe_project_json")
+    .eq("user_id", user.id)
+    .eq("source", "product_video")
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function getProductAdProjects() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");

@@ -3,8 +3,11 @@ import { createPortal } from "react-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
 import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
+import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeRegistry";
+import { decorativeById } from "../../core/registries/decorativeRegistry";
+import { cinematicById } from "../../core/registries/cinematicRegistry";
 
-const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker"]);
+const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape"]);
 const SNAP_T = 12; // canvas-space pixels
 
 // Snap layer center (x,y) to canvas edges and center during body drag
@@ -824,7 +827,7 @@ function LayerElement({
           }}
           onDoubleClick={(e) => { e.stopPropagation(); onStartEdit?.(); }}
         >
-          {layer.content ?? ""}
+          {layer.content || layer.text || ""}
         </div>
       );
     }
@@ -849,6 +852,148 @@ function LayerElement({
         </div>
       </div>
     ) : null;
+  } else if (layer.type === "gradient") {
+    content = (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          background: layer.gradient ?? "linear-gradient(135deg, #000000, #ffffff)",
+          pointerEvents: "none",
+        }}
+      />
+    );
+  } else if (layer.type === "shape") {
+    const registry = layer.registry ?? "decorative";
+    const color = layer.color ?? "#ffffff";
+    const shapeOpacity = layer.shapeOpacity ?? 1;
+
+    if (registry === "shape") {
+      const rendered = renderDecorativeSVG(layer.shapeId, { color, filled: layer.filled ?? true, strokeWidth: layer.strokeWidth ?? 0, opacity: shapeOpacity });
+      if (rendered) {
+        let svgHtml = rendered.content;
+        const isFilled = layer.filled !== false;
+        const gradVal = layer.gradient || layer.gradientRaw;
+        if (gradVal) {
+          const gradColors = gradVal.match(/#[0-9a-fA-F]{3,6}|rgb[^)]+\)|rgba[^)]+\)/g);
+          const gradAngle = parseInt(gradVal.match(/(\d+)deg/)?.[1] ?? 135);
+          const gc1 = gradColors?.[0] ?? color;
+          const gc2 = gradColors?.[1] ?? color;
+          const gRad = (gradAngle * Math.PI) / 180;
+          const gx2 = (50 + Math.cos(gRad) * 50).toFixed(0);
+          const gy2 = (50 + Math.sin(gRad) * 50).toFixed(0);
+          const gradDef = `<defs><linearGradient id="lg_${layer.id}" x1="50%" y1="50%" x2="${gx2}%" y2="${gy2}%"><stop offset="0%" stop-color="${gc1}"/><stop offset="100%" stop-color="${gc2}"/></linearGradient></defs>`;
+          if (isFilled) {
+            svgHtml = gradDef + svgHtml.replace(/fill="(?!none)[^"]+"/g, `fill="url(#lg_${layer.id})"`);
+          } else {
+            svgHtml = gradDef + svgHtml.replace(/stroke="[^"]*"/g, `stroke="url(#lg_${layer.id})"`);
+          }
+        }
+        content = (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg
+              viewBox={rendered.viewBox}
+              style={{ width: "100%", height: "100%", overflow: "visible" }}
+              dangerouslySetInnerHTML={{ __html: svgHtml }}
+            />
+          </div>
+        );
+      } else {
+        content = null;
+      }
+    } else if (registry === "cinematic") {
+      const entry = cinematicById[layer.shapeId];
+      if (!entry) { content = null; }
+      else {
+        const colorMode = entry.colorMode ?? "fill";
+        const solidColor = layer.color ?? "#ffffff";
+        const gradientVal = layer.gradient || layer.gradientRaw;
+        const opacity = layer.shapeOpacity ?? 1;
+        const filterStyle = entry.render === "svg_filter" ? `drop-shadow(0 0 8px ${solidColor})` : undefined;
+        let svgContent = entry.svg;
+        if (svgContent && gradientVal) {
+          const colorMatches = gradientVal.match(/#[0-9a-fA-F]{3,6}|rgb[^)]+\)|rgba[^)]+\)/g);
+          const angleMatch = gradientVal.match(/(\d+)deg/);
+          const c1 = colorMatches?.[0] ?? solidColor;
+          const c2 = colorMatches?.[1] ?? solidColor;
+          const angle = angleMatch ? parseInt(angleMatch[1]) : 135;
+          const rad = (angle * Math.PI) / 180;
+          const x2 = (50 + Math.cos(rad) * 50).toFixed(0);
+          const y2 = (50 + Math.sin(rad) * 50).toFixed(0);
+          const gradientDef = `<linearGradient id="lg_${layer.id}" x1="50%" y1="50%" x2="${x2}%" y2="${y2}%"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient>`;
+          if (svgContent.includes("<defs>")) {
+            svgContent = svgContent.replace("<defs>", `<defs>${gradientDef}`);
+          } else {
+            svgContent = svgContent.replace(/<svg([^>]*)>/, `<svg$1><defs>${gradientDef}</defs>`);
+          }
+          if (colorMode === "stroke") {
+            svgContent = svgContent.replace(/stroke="currentColor"/g, `stroke="url(#lg_${layer.id})"`);
+          } else if (colorMode === "mixed") {
+            svgContent = svgContent
+              .replace(/fill="currentColor"/g, `fill="url(#lg_${layer.id})"`)
+              .replace(/stroke="currentColor"/g, `stroke="${layer.strokeColor ?? c1}"`);
+          } else {
+            svgContent = svgContent
+              .replace(/fill="currentColor"/g, `fill="url(#lg_${layer.id})"`)
+              .replace(/stroke="currentColor"/g, `stroke="url(#lg_${layer.id})"`);
+          }
+        }
+        if (entry.render === "css_repeat" && entry.css) {
+          content = (
+            <div style={{ width: "100%", height: "100%", color: solidColor, opacity, background: colorMode !== "stroke" && gradientVal ? gradientVal : undefined, ...entry.css }} />
+          );
+        } else {
+          content = (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: solidColor, opacity, filter: filterStyle }} dangerouslySetInnerHTML={{ __html: svgContent }} />
+          );
+        }
+      }
+    } else {
+      const entry = decorativeById[layer.shapeId];
+      if (!entry) { content = null; }
+      else {
+        let svgContent = entry.svg ?? "";
+        const gradVal = layer.gradient || layer.gradientRaw;
+
+        if (gradVal && entry.render === "svg") {
+          const colors = gradVal.match(/#[0-9a-fA-F]{3,6}|rgb[^)]+\)|rgba[^)]+\)/g);
+          const angle = parseInt(gradVal.match(/(\d+)deg/)?.[1] ?? 135);
+          const rad = (angle * Math.PI) / 180;
+          const x2 = (50 + Math.cos(rad) * 50).toFixed(0);
+          const y2 = (50 + Math.sin(rad) * 50).toFixed(0);
+          const c1 = colors?.[0] ?? color;
+          const c2 = colors?.[1] ?? color;
+          const gradDef = `<linearGradient id="lg_${layer.id}" x1="50%" y1="50%" x2="${x2}%" y2="${y2}%"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient>`;
+          svgContent = svgContent.replace(/fill="currentColor"/g, `fill="url(#lg_${layer.id})"`);
+          if (svgContent.includes("<defs>")) {
+            svgContent = svgContent.replace("<defs>", `<defs>${gradDef}`);
+          } else {
+            svgContent = svgContent.replace(/<svg([^>]*)>/, `<svg$1><defs>${gradDef}</defs>`);
+          }
+        }
+
+        if (entry.render === "svg") {
+          content = (
+            <div
+              style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color }}
+              dangerouslySetInnerHTML={{ __html: svgContent }}
+            />
+          );
+        } else if (entry.render === "css_repeat") {
+          content = (
+            <div
+              style={{
+                width: "100%", height: "100%",
+                color,
+                opacity: shapeOpacity,
+                background: gradVal ?? undefined,
+                ...entry.css,
+              }}
+            />
+          );
+        }
+      }
+    }
   }
 
   return (
@@ -889,6 +1034,7 @@ function LayerElement({
             boxShadow: layer.boxShadow ?? undefined,
             padding: layer.padding ? `${layer.padding}px` : undefined,
             boxSizing: layer.padding ? "border-box" : undefined,
+            mixBlendMode: layer.blendMode ?? undefined,
           }}
           onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, layer) : undefined}
         >

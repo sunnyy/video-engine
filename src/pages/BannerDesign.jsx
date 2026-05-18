@@ -72,7 +72,7 @@ export default function SocialPostGenerator() {
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
   const [creditModal, setCreditModal] = useState(null);
 
-  const [activeTab, setActiveTab] = useState("history");
+  const [activeTab, setActiveTab] = useState("generate");
 
   // form state
   const [refFile,     setRefFile]     = useState(null);

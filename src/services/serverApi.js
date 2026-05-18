@@ -30,7 +30,7 @@ export async function serverFetch(path, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
-  const res = await fetch(`${SERVER}${path}`, { ...options, headers });
+  const res = await fetch(`${SERVER}${path}`, { ...options, headers, signal: options.signal });
 
   if (res.status === 401) {
     window.location.href = "/login";

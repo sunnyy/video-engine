@@ -189,7 +189,7 @@ function GeneratorForm() {
 
 /* ── Main page ── */
 export default function CustomVideos() {
-  const [tab, setTab] = useState("videos");
+  const [tab, setTab] = useState("create");
 
   const tabs = [
     { id: "videos", label: "My Videos"  },

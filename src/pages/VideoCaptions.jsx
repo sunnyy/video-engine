@@ -602,7 +602,7 @@ function GeneratorForm() {
 
 /* ── Main page ── */
 export default function CaptionStudio() {
-  const [tab, setTab] = useState("videos");
+  const [tab, setTab] = useState("create");
 
   const tabs = [
     { id: "videos", label: "My Videos" },

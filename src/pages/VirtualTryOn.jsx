@@ -127,7 +127,7 @@ export default function VirtualTryOn() {
   const fetchCredits = useCreditsStore(s => s.fetchCredits);
   const [creditModal, setCreditModal] = useState(null);
 
-  const [activeTab, setActiveTab] = useState("history");
+  const [activeTab, setActiveTab] = useState("generate");
   const [gallPage,  setGallPage]  = useState(0);
 
   const [garmentFile,    setGarmentFile]    = useState(null);
