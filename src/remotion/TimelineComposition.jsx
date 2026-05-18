@@ -143,6 +143,14 @@ function TimelineLayer({ layer, currentTime, fps }) {
     );
   }
 
+  if (layer.type === "gradient") {
+    return (
+      <Sequence from={startFrame} durationInFrames={durationFrames}>
+        <div style={{ ...baseStyle, position: "absolute", background: layer.gradient || "#000000" }} />
+      </Sequence>
+    );
+  }
+
   return null;
 }
 
