@@ -22,8 +22,6 @@ import { router as socialPostRouter } from "./routes/socialPost.js";
 import { router as adminRouter }        from "./routes/admin.js";
 import { router as refundClaimsRouter } from "./routes/refundClaims.js";
 import { router as productVideoRouter } from "./routes/productVideo.js";
-import { router as productVideoComposeRouter } from "./routes/productVideoCompose.js";
-import { router as productVideoDNARouter } from "./routes/productVideoDNA.js";
 import { router as productVideoSceneRouter } from "./routes/productVideoScene.js";
 
 console.log("Server starting...", new Date().toISOString());
@@ -111,8 +109,6 @@ setInterval(cleanTempDir, 6 * 60 * 60 * 1000);
 
 /* ── Route mounts ── */
 app.use("/api/product-video", generationLimiter, productVideoRouter);
-app.use("/api/product-video", generationLimiter, productVideoComposeRouter);
-app.use("/api/product-video", generationLimiter, productVideoDNARouter);
 app.use("/api/product-video", generationLimiter, productVideoSceneRouter);
 app.use("/api/render",       renderRouter);
 app.use("/api/product-ad",   productAdRouter);
