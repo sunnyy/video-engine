@@ -15,39 +15,6 @@ import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
 
-/* ---------------- AI ROUTE ---------------- */
-router.post("/generate", requireAuth, async (req, res) => {
-  const userId = req.user.id;
-  let creditAmount = 0;
-  try {
-    const { prompt, projectId, model: reqModel } = req.body;
-    const { flagged } = await moderateInput(prompt);
-    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
-    const deduction = await deductCredits(userId, 25, "base_generation", "Video generation", projectId);
-    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 25;
-    const completion = await openai.chat.completions.create({
-      model: reqModel || "gpt-4o",
-      messages: [
-        { role: "system", content: "You are a strict JSON generator. Output only valid JSON." },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-    });
-    const raw = completion.choices[0].message.content;
-    const cleaned = raw
-      .replace(/```json\s*/gi, "")
-      .replace(/```\s*/gi, "")
-      .trim();
-    const parsed = JSON.parse(cleaned);
-    res.json(parsed);
-  } catch (err) {
-    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: video generation failed").catch(() => {});
-    console.error("[generate]", err.message);
-    res.status(500).json({ error: "Generation failed. Your credits have been refunded.", code: "AI_FAILURE" });
-  }
-});
-
 /* ---------------- TOPIC RESEARCH ---------------- */
 router.post("/research-topic", requireAuth, async (req, res) => {
   try {
@@ -338,36 +305,6 @@ router.get("/proxy-video", (req, res) => {
 });
 
 /* ── Upload + compress avatar video → Supabase (bypasses client bucket size limit) ── */
-router.post("/upload-avatar", requireAuth, upload.single("video"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-    const inputPath  = req.file.path;
-    const outputPath = path.join(TEMP_DIR, `avatar-${Date.now()}.mp4`);
-
-    await compressVideo(inputPath, outputPath);
-    fs.unlinkSync(inputPath);
-
-    const buffer      = fs.readFileSync(outputPath);
-    fs.unlinkSync(outputPath);
-
-    const filePath = `${req.user.id}/avatar-${Date.now()}.mp4`;
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from("user-assets")
-      .upload(filePath, buffer, { contentType: "video/mp4", upsert: true });
-
-    if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
-
-    const { data: { publicUrl } } = supabaseAdmin.storage
-      .from("user-assets")
-      .getPublicUrl(filePath);
-
-    res.json({ url: publicUrl, filePath });
-  } catch (err) {
-    console.error("[upload-avatar]", err.message);
-    res.status(500).json({ error: err.message || "Avatar upload failed" });
-  }
-});
 
 router.post("/compress", requireAuth, upload.single("video"), async (req, res) => {
   try {
@@ -404,59 +341,6 @@ router.post("/compress-audio", requireAuth, upload.single("audio"), async (req, 
   }
 });
 
-/* ── Talking Head: Transcription via Fal.ai Whisper ── */
-router.post("/transcribe", requireAuth, upload.single("video"), async (req, res) => {
-  const userId = req.user.id;
-  let creditAmount = 0;
-  try {
-    if (!req.file) return res.status(400).json({ error: "No video file uploaded" });
-
-    const deduction = await deductCredits(userId, 3, "transcription", "Video transcription (Whisper)", null);
-    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 3;
-
-    // Extract audio only — Whisper only needs audio, not the full video.
-    // A 65 MB video becomes ~3–5 MB mp3, well within OpenAI Whisper's 25 MB limit.
-    const audioPath = req.file.path + ".mp3";
-    await new Promise((resolve, reject) => {
-      ffmpeg(req.file.path)
-        .noVideo()
-        .audioCodec("libmp3lame")
-        .audioBitrate("64k")
-        .audioChannels(1)
-        .on("end", resolve)
-        .on("error", reject)
-        .save(audioPath);
-    });
-    fs.unlinkSync(req.file.path); // original video no longer needed
-
-    // Transcribe via OpenAI Whisper — reads directly from disk, no external storage needed
-    let transcription;
-    try {
-      transcription = await openai.audio.transcriptions.create({
-        file:             fs.createReadStream(audioPath),
-        model:            "whisper-1",
-        response_format:  "verbose_json",
-        timestamp_granularities: ["segment"],
-      });
-    } finally {
-      fs.unlink(audioPath, () => {}); // clean up regardless of success/failure
-    }
-
-    const transcript = transcription.text || "";
-    const segments   = (transcription.segments || []).map(s => ({
-      text:  s.text?.trim() || "",
-      start: s.start ?? 0,
-      end:   s.end   ?? 0,
-    })).filter(s => s.text);
-
-    res.json({ transcript, segments });
-  } catch (err) {
-    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: transcription failed").catch(() => {});
-    console.error("[transcribe]", err.message);
-    res.status(500).json({ error: "Transcription failed. Your credits have been refunded.", code: "AI_FAILURE" });
-  }
-});
 
 /* ── Transcription Service ─────────────────────────────────────────── */
 

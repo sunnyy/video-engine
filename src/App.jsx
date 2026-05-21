@@ -21,8 +21,6 @@ import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
 import Videos         from "./pages/Videos";
-import VideoGenerator  from "./pages/VideoGenerator";
-import Editor          from "./pages/Editor";
 import AdminDashboard  from "./pages/admin/AdminDashboard";
 import UserManager     from "./pages/admin/UserManager";
 import LayoutManager   from "./pages/admin/LayoutManager";
@@ -144,7 +142,6 @@ export default function App() {
           <>
             <Route path="/dashboard"        element={<Dashboard />} />
             <Route path="/videos"           element={<Videos />} />
-            <Route path="/new"              element={<VideoGenerator />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/speech-to-text"   element={<Transcription />} />
             <Route path="/video-captions"      element={<CaptionStudio />} />
@@ -155,7 +152,6 @@ export default function App() {
             <Route path="/checkout"         element={<Checkout />} />
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
-            <Route path="/editor/:id"       element={<Editor />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
             <Route path="/product-video"      element={<ProductVideoGenerator />} />
             <Route path="/product-poster"    element={<PosterStudio />} />
