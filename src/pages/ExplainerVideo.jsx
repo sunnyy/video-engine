@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
-import { generateExplainerVideo } from "../services/ai/generateExplainerVideo";
 import { buildSafeProject } from "../normalize/normalizeProject";
 import { createProject, updateProject, deleteProject } from "../services/projects/projectService";
 import { useProjectsStore } from "../store/useProjectsStore";
@@ -127,7 +126,7 @@ function GeneratorForm() {
       projectId = saved.id;
 
       setStep("segmenting");
-      const result = await generateExplainerVideo({ videoFile, videoUrl, language });
+      throw new Error("Explainer Video generation is currently unavailable.");
 
       setStep("building");
       const safeProject = buildSafeProject({

@@ -7,7 +7,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { serverFetch, SERVER } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
-import { useProjectStore } from "../store/useProjectStore";
 import { useProjectsStore } from "../store/useProjectsStore";
 import { createProject, deleteProject } from "../services/projects/projectService";
 import { captionStyleRegistry, captionStyleKeys } from "../core/registries/captionStyleRegistry.jsx";
@@ -242,8 +241,6 @@ function VideoListing() {
 function GeneratorForm() {
   const navigate      = useNavigate();
   const fetchCredits  = useCreditsStore(s => s.fetchCredits);
-  const setProject    = useProjectStore(s => s.setProject);
-  const setDatabaseId = useProjectStore(s => s.setDatabaseId);
   const fileInputRef  = useRef();
 
   const [file,         setFile]         = useState(null);
@@ -386,9 +383,7 @@ function GeneratorForm() {
       });
       if (!saved?.id) throw new Error("Failed to create project");
 
-      setDatabaseId(saved.id);
-      setProject(project);
-      navigate(`/editor/${saved.id}`);
+      navigate(`/videos`);
     } catch (e) { setError(e.message); setCreating(false); }
   }
 
