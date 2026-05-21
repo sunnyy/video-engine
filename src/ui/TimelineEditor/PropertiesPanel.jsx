@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform } from "./keyframeUtils";
 import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import PresetsModal from "./modals/PresetsModal";
+import IconModal from "./modals/IconModal";
 
 const FONT_FAMILIES = [
   "Outfit", "Inter", "Roboto", "Montserrat",
@@ -196,9 +197,65 @@ function VideoProps({ layer, update, updateSilent, commit, resolvedObjectFitVal,
 }
 
 function AudioProps({ layer, update, updateSilent, commit }) {
-  const preVol = useRef(null);
+  const preVol   = useRef(null);
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  function togglePreview() {
+    if (!layer.src) return;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.onended = null;
+      audioRef.current = null;
+      setIsPlaying(false);
+      return;
+    }
+    const a = new Audio(layer.src);
+    a.volume = layer.muted ? 0 : Math.max(0, Math.min(1, layer.volume ?? 1));
+    a.onended = () => { audioRef.current = null; setIsPlaying(false); };
+    a.play().catch(() => { audioRef.current = null; setIsPlaying(false); });
+    audioRef.current = a;
+    setIsPlaying(true);
+  }
+
+  // Stop playback if layer changes
+  const layerId = layer.id;
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    };
+  }, [layerId]);
+
+  const label = layer.name || (layer.audioType === "voiceover" ? "Voiceover" : "Music");
+
   return (
     <Section title="Audio">
+      {/* Preview player */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9 }}>
+        <button
+          onClick={togglePreview}
+          disabled={!layer.src}
+          title={isPlaying ? "Stop preview" : "Preview audio"}
+          style={{
+            width: 34, height: 34, borderRadius: "50%", border: "none", cursor: layer.src ? "pointer" : "not-allowed",
+            background: isPlaying ? "rgba(124,92,252,0.3)" : "rgba(124,92,252,0.15)",
+            color: layer.src ? "#a78bfa" : "#44445a",
+            fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            transition: "background 0.15s",
+          }}
+        >
+          {isPlaying ? "⏹" : "▶"}
+        </button>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: isPlaying ? "#a78bfa" : "#c0c0d8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {label}
+          </div>
+          <div style={{ fontSize: 10, color: "#55556a", marginTop: 2 }}>
+            {layer.src ? (isPlaying ? "Playing..." : "Click ▶ to preview") : "No audio source"}
+          </div>
+        </div>
+      </div>
+
       <SrcField layer={layer} update={update} />
       <Field label="Type">
         <select style={selectStyle} value={layer.audioType ?? "music"} onChange={(e) => update({ audioType: e.target.value })}>
@@ -655,6 +712,72 @@ function ShapeProps({ layer, update }) {
   );
 }
 
+const ICON_WEIGHTS = ["thin", "light", "regular", "bold", "fill", "duotone"];
+
+function IconProps({ layer, update }) {
+  const [showIconModal, setShowIconModal] = useState(false);
+  return (
+    <>
+      <Section title="Icon">
+        <Field label="Icon">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, color: "#e8e8f0", flex: 1 }}>{layer.iconName || "—"}</span>
+            <button
+              onClick={() => setShowIconModal(true)}
+              style={{
+                padding: "4px 12px", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(251,146,60,0.12)",
+                color: "#fb923c", fontWeight: 600,
+              }}
+            >
+              Change Icon
+            </button>
+          </div>
+        </Field>
+        <Field label="Color">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="color"
+              value={layer.style?.color || "#ffffff"}
+              onChange={(e) => update({ style: { ...layer.style, color: e.target.value } })}
+              style={{ width: 32, height: 28, border: "none", borderRadius: 6, cursor: "pointer", padding: 2, background: "transparent" }}
+            />
+            <input
+              style={{ ...inputStyle, flex: 1 }}
+              value={layer.style?.color || "#ffffff"}
+              onChange={(e) => update({ style: { ...layer.style, color: e.target.value } })}
+            />
+          </div>
+        </Field>
+        <Field label="Weight">
+          <select
+            value={layer.style?.weight || "regular"}
+            onChange={(e) => update({ style: { ...layer.style, weight: e.target.value } })}
+            style={selectStyle}
+          >
+            {ICON_WEIGHTS.map((w) => <option key={w} value={w}>{w}</option>)}
+          </select>
+        </Field>
+        <Field label="Size">
+          <NumberInput
+            value={layer.transform?.width ?? 100}
+            onChange={(v) => update({ transform: { ...layer.transform, width: Math.max(16, v), height: Math.max(16, v) } })}
+            min={16}
+            step={8}
+          />
+        </Field>
+      </Section>
+      {showIconModal && (
+        <IconModal
+          onClose={() => setShowIconModal(false)}
+          onSelect={(iconName, color, weight) => update({ iconName, style: { ...layer.style, color, weight } })}
+        />
+      )}
+    </>
+  );
+}
+
 function GradientProps({ layer, update }) {
   const [showPresetsModal, setShowPresetsModal] = useState(false);
   return (
@@ -1105,28 +1228,6 @@ export default function PropertiesPanel() {
         <span style={{ fontSize: 11, fontWeight: 700, color: "#8888a8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
           Properties
         </span>
-        {layer && (
-          <button
-            onClick={() => update({ locked: !layer.locked })}
-            title={layer.locked ? "Unlock layer" : "Lock layer"}
-            style={{
-              background: layer.locked ? "rgba(255,180,50,0.15)" : "transparent",
-              border: `1px solid ${layer.locked ? "rgba(255,180,50,0.4)" : "rgba(255,255,255,0.1)"}`,
-              borderRadius: 6,
-              cursor: "pointer",
-              padding: "3px 8px",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontSize: 11,
-              color: layer.locked ? "#ffb432" : "#7070a0",
-              fontWeight: 600,
-            }}
-          >
-            <span style={{ fontSize: 13 }}>{layer.locked ? "🔒" : "🔓"}</span>
-            {layer.locked ? "Locked" : "Lock"}
-          </button>
-        )}
       </div>
 
       {selectedLayerIds.length > 1 ? (
@@ -1349,6 +1450,7 @@ export default function PropertiesPanel() {
           {(layer.type === "image" || layer.type === "sticker") && <ImageProps layer={layer} update={update} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
           {layer.type === "shape"    && <ShapeProps    layer={layer} update={update} />}
           {layer.type === "gradient" && <GradientProps layer={layer} update={update} />}
+          {layer.type === "icon"     && <IconProps     layer={layer} update={update} />}
 
           {/* Appearance — scoped per layer type */}
           {layer.type === "text" && (

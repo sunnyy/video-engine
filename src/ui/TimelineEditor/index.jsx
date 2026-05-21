@@ -131,12 +131,12 @@ export default function TimelineEditor() {
       {/* Main body below the top bar */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-        {/* Left column: preview area + timeline stacked vertically */}
+        {/* Left panel — full height, narrow */}
+        <LeftPanel />
+
+        {/* Center column: canvas on top, timeline below */}
         <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
-          <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
-            <LeftPanel />
-            <Preview />
-          </div>
+          <Preview />
           <TimelineToolbar />
           <Timeline />
         </div>

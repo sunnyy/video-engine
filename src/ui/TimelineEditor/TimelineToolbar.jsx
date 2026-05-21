@@ -40,6 +40,7 @@ export default function TimelineToolbar() {
   const duplicateLayer       = useTimelineStore((s) => s.duplicateLayer);
   const splitLayerAtPlayhead = useTimelineStore((s) => s.splitLayerAtPlayhead);
   const addKeyframe          = useTimelineStore((s) => s.addKeyframe);
+  const updateLayer          = useTimelineStore((s) => s.updateLayer);
   const bringForward         = useTimelineStore((s) => s.bringForward);
   const sendBack             = useTimelineStore((s) => s.sendBack);
 
@@ -152,6 +153,20 @@ export default function TimelineToolbar() {
         title="Delete (Del)"
       >
         🗑
+      </button>
+      <button
+        style={{
+          ...iconBtn(selectedLayer?.locked),
+          opacity: hasSelection ? 1 : 0.3,
+          color: selectedLayer?.locked ? "#ffb432" : undefined,
+          borderColor: selectedLayer?.locked ? "rgba(255,180,50,0.45)" : undefined,
+          background: selectedLayer?.locked ? "rgba(255,180,50,0.15)" : undefined,
+        }}
+        onClick={() => hasSelection && updateLayer(selectedLayerId, { locked: !selectedLayer?.locked })}
+        disabled={!hasSelection}
+        title={selectedLayer?.locked ? "Unlock layer" : "Lock layer"}
+      >
+        {selectedLayer?.locked ? "🔒" : "🔓"}
       </button>
 
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.09)", margin: "0 4px" }} />

@@ -339,8 +339,19 @@ async function timelineRenderJob(jobId, userId, project, projectId, resolution) 
     }));
     const cleanProject = { ...project, layers: cleanLayers };
 
+    /* ── Cap duration to max visual layer end (prevents long audio tracks from bloating export) ── */
+    const visualLayers = cleanLayers.filter((l) => l.type !== "audio");
+    const maxVisualEnd = visualLayers.length > 0
+      ? Math.max(...visualLayers.map((l) => l.end ?? 0))
+      : (cleanProject.format?.duration || 30);
+    const cappedDuration = Math.min(cleanProject.format?.duration || 30, maxVisualEnd);
+    const cleanProjectWithDuration = {
+      ...cleanProject,
+      format: { ...cleanProject.format, duration: Math.max(1, cappedDuration) },
+    };
+
     /* ── Watermark for free users ── */
-    let finalProject = cleanProject;
+    let finalProject = cleanProjectWithDuration;
     try {
       const { data: sub } = await supabaseAdmin
         .from("subscriptions")

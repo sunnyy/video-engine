@@ -212,6 +212,9 @@ function GeneratorForm() {
   const [ctaText,    setCtaText]    = useState("Shop Now");
   const [website,    setWebsite]    = useState("");
 
+  // Visual mode
+  const [visualMode, setVisualMode] = useState("image");
+
   // Voiceover
   const [voices,        setVoices]        = useState([]);
   const [selectedVoice, setSelectedVoice] = useState("nova");
@@ -307,13 +310,14 @@ function GeneratorForm() {
       // Run pipeline
       const result = await generateProductVideo({
         productImageUrl,
-        logoUrl:   logoUrl ?? null,
-        brandName: brandName.trim(),
+        logoUrl:    logoUrl ?? null,
+        brandName:  brandName.trim(),
         videoType,
-        offerText: offerText.trim(),
-        ctaText:   ctaText.trim() || "Shop Now",
-        website:   website.trim(),
-        tagline:   "",
+        offerText:  offerText.trim(),
+        ctaText:    ctaText.trim() || "Shop Now",
+        website:    website.trim(),
+        tagline:    "",
+        visualMode,
         projectId,
         onProgress: (s) => {
           setStep(s);
@@ -330,13 +334,14 @@ function GeneratorForm() {
           ...emptyProjectJson.meta,
           productAnalysis: result.productAnalysis,
           shots:           result.shots,
+          voiceoverScript: result.aiOutput?.voiceoverScript ?? "",
           updatedAt:       new Date().toISOString(),
         },
       };
 
       const { error: updateError } = await supabase
         .from("projects")
-        .update({ safe_project_json: finalProjectJson })
+        .update({ safe_project_json: finalProjectJson, raw_ai_json: result.aiOutput })
         .eq("id", projectId);
 
       if (updateError) throw updateError;
@@ -523,6 +528,83 @@ function GeneratorForm() {
             )}
           </div>
         )}
+
+        {/* Visual mode */}
+        <div style={{ marginBottom: 28 }}>
+          <Label>Visuals</Label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              {
+                id: "image",
+                icon: "🖼",
+                label: "Image Only",
+                credits: "~50 credits",
+                desc: "AI-generated product shots with designed text layouts",
+              },
+              {
+                id: "hybrid",
+                icon: "🎬",
+                label: "Image + Video",
+                credits: "~160 credits",
+                desc: "Hook and hero scenes as video clips, CTA as image",
+                recommended: true,
+              },
+              {
+                id: "video",
+                icon: "⚡",
+                label: "Full Video",
+                credits: "~230 credits",
+                desc: "All scenes as video clips for maximum impact",
+              },
+            ].map(opt => {
+              const active = visualMode === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => !generating && setVisualMode(opt.id)}
+                  disabled={generating}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 14,
+                    padding: "13px 16px",
+                    background: active ? "rgba(124,92,252,0.10)" : "rgba(255,255,255,0.03)",
+                    border: `1.5px solid ${active ? "rgba(124,92,252,0.55)" : T.border}`,
+                    borderRadius: 12, cursor: generating ? "not-allowed" : "pointer",
+                    textAlign: "left", fontFamily: "inherit",
+                    transition: "all 0.15s", opacity: generating ? 0.6 : 1,
+                  }}
+                >
+                  <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1 }}>{opt.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: active ? "#c4b5fd" : T.text }}>
+                        {opt.label}
+                      </span>
+                      {opt.recommended && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
+                          background: "rgba(124,92,252,0.2)", color: "#a78bfa",
+                          border: "1px solid rgba(124,92,252,0.3)", lineHeight: 1.4,
+                        }}>
+                          RECOMMENDED
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.4 }}>{opt.desc}</div>
+                  </div>
+                  <div style={{
+                    flexShrink: 0, fontSize: 12, fontWeight: 700,
+                    color: active ? "#a78bfa" : "#55556a",
+                    background: active ? "rgba(124,92,252,0.15)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${active ? "rgba(124,92,252,0.3)" : "rgba(255,255,255,0.08)"}`,
+                    borderRadius: 8, padding: "4px 10px", whiteSpace: "nowrap",
+                  }}>
+                    {opt.credits}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Error */}
         {error && (

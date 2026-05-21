@@ -7,7 +7,7 @@ export default function TimelineComposition({ project }) {
   const currentTime = frame / fps;
 
   const layers = [...(project?.layers || [])]
-    .filter((l) => l.visible !== false)
+    .filter((l) => l.type === "audio" || l.visible !== false)
     .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
   return (
@@ -56,7 +56,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
       <Sequence from={startFrame} durationInFrames={durationFrames}>
         <Video
           src={layer.src}
-          style={{ ...baseStyle, position: "absolute" }}
+          style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover" }}
           startFrom={Math.round((layer.trimStart || 0) * fps)}
           volume={layer.muted ? 0 : (layer.volume ?? 1)}
           playbackRate={layer.playbackRate || 1}
@@ -91,12 +91,18 @@ function TimelineLayer({ layer, currentTime, fps }) {
             textAlign: s.textAlign || "center",
             lineHeight: s.lineHeight || 1.2,
             letterSpacing: s.letterSpacing || 0,
+            textTransform: s.textTransform || "none",
+            background: s.background || undefined,
+            borderRadius: s.borderRadius || 0,
+            padding: s.padding || 0,
+            textShadow: s.textShadow || undefined,
             display: "flex",
             alignItems: "center",
             justifyContent:
               s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
+            overflow: "hidden",
           }}
         >
           {layer.content}

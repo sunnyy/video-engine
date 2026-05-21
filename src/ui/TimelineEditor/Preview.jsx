@@ -6,8 +6,31 @@ import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry
 import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeRegistry";
 import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
+import {
+  Package, Star, ShieldCheck, Truck, Heart, CheckCircle, Lightning, Leaf, Drop, Fire,
+  SealCheck, Sparkle, ArrowRight, Tag, Certificate,
+  ArrowLeft, ArrowUp, ArrowDown, Bell, Bookmark, Camera, Car, ChatCircle, Clock, Cloud,
+  Coffee, CreditCard, Crown, Cube, Diamond, Download, Envelope, Eye, Fingerprint, Flag,
+  Flower, Gear, Gift, Globe, Headphones, House, Image, Info, Infinity, Key, Laptop,
+  Lightbulb, Link, Lock, MagicWand, MapPin, Medal, Megaphone, Moon, MusicNote,
+  PaperPlaneTilt, Pencil, Phone, Plant, Plus, Question, Rainbow, Rocket, MagnifyingGlass,
+  ShareNetwork, Shield, ShoppingBag, Smiley, Stack, Sun, Target, ThumbsUp, Timer,
+  Trash, Trophy, TShirt, Umbrella, Upload, User, Video, Wallet, Warning, WifiHigh, Wind,
+} from "@phosphor-icons/react";
 
-const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape"]);
+const PHOSPHOR_ICONS = {
+  Package, Star, ShieldCheck, Truck, Heart, CheckCircle, Lightning, Leaf, Drop, Fire,
+  SealCheck, Sparkle, ArrowRight, Tag, Certificate,
+  ArrowLeft, ArrowUp, ArrowDown, Bell, Bookmark, Camera, Car, ChatCircle, Clock, Cloud,
+  Coffee, CreditCard, Crown, Cube, Diamond, Download, Envelope, Eye, Fingerprint, Flag,
+  Flower, Gear, Gift, Globe, Headphones, House, Image, Info, Infinity, Key, Laptop,
+  Lightbulb, Link, Lock, MagicWand, MapPin, Medal, Megaphone, Moon, MusicNote,
+  PaperPlaneTilt, Pencil, Phone, Plant, Plus, Question, Rainbow, Rocket, MagnifyingGlass,
+  ShareNetwork, Shield, ShoppingBag, Smiley, Stack, Sun, Target, ThumbsUp, Timer,
+  Trash, Trophy, TShirt, Umbrella, Upload, User, Video, Wallet, Warning, WifiHigh, Wind,
+};
+
+const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape", "icon"]);
 const SNAP_T = 12; // canvas-space pixels
 
 // Snap layer center (x,y) to canvas edges and center during body drag
@@ -750,7 +773,18 @@ function LayerElement({
   // ── Content ────────────────────────────────────────────────────────────────
   let content = null;
 
-  if (layer.type === "video") {
+  if (layer.type === "icon") {
+    const IconComponent = PHOSPHOR_ICONS[layer.iconName];
+    console.log("[icon layer]", layer.iconName, "→ component found:", !!IconComponent, "size:", width, height);
+    content = IconComponent ? (
+      <IconComponent
+        size={Math.min(width, height)}
+        color={layer.style?.color || "#ffffff"}
+        weight={layer.style?.weight || "regular"}
+        style={{ display: "block" }}
+      />
+    ) : null;
+  } else if (layer.type === "video") {
     content = <VideoLayerEl layer={layer} currentTime={currentTime} isPlaying={isPlaying} />;
   } else if (layer.type === "image" || layer.type === "sticker") {
     content = layer.src ? (
@@ -1204,7 +1238,11 @@ export default function Preview() {
 
   // ── H + drag pan ───────────────────────────────────────────────────────────
   const handleContainerMouseDown = useCallback((e) => {
-    if (!isHandModeRef.current || e.button !== 0) return;
+    if (!isHandModeRef.current) {
+      if (e.target === e.currentTarget) selectLayer(null);
+      return;
+    }
+    if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     setIsHandMode(true); // force grab cursor during drag

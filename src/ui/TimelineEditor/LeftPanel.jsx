@@ -5,6 +5,7 @@ import StickersModal   from "./modals/StickersModal";
 import AudioModal      from "./modals/AudioModal";
 import MusicModal      from "./modals/MusicModal";
 import ShapesModal     from "./modals/ShapesModal";
+import IconModal       from "./modals/IconModal";
 
 const PANELS = [
   {
@@ -34,6 +35,14 @@ const PANELS = [
         <circle cx="12" cy="12" r="4"/>
         <rect x="3" y="3" width="6" height="6" rx="1"/>
         <polygon points="18,3 21,8 15,8"/>
+      </svg>
+    ),
+  },
+  {
+    id: "icons", label: "Icons", color: "#fb923c",
+    icon: (color) => (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
       </svg>
     ),
   },
@@ -85,8 +94,9 @@ export default function LeftPanel() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          paddingTop: 10,
-          gap: 2,
+          paddingTop: 8,
+          gap: 1,
+          overflowY: "auto",
         }}
       >
         {PANELS.map((panel) => {
@@ -99,7 +109,7 @@ export default function LeftPanel() {
               title={panel.label}
               style={{
                 width: 68,
-                padding: "10px 0 8px",
+                padding: "14px 0 11px",
                 border: "none",
                 borderRadius: 9,
                 cursor: "pointer",
@@ -107,7 +117,7 @@ export default function LeftPanel() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 5,
+                gap: 6,
               }}
               onMouseOver={(e) => { if (!active) e.currentTarget.style.background = `${panel.color}10`; }}
               onMouseOut={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
@@ -129,6 +139,7 @@ export default function LeftPanel() {
       {activeModal === "media"     && <MediaModal     onClose={close} />}
       {activeModal === "text"      && <TextModal      onClose={close} />}
       {activeModal === "shapes"    && <ShapesModal    onClose={close} />}
+      {activeModal === "icons"     && <IconModal      onClose={close} />}
       {activeModal === "stickers"  && <StickersModal  onClose={close} />}
       {activeModal === "music"     && <MusicModal     onClose={close} />}
       {activeModal === "audio"     && <AudioModal     onClose={close} />}

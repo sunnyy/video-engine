@@ -5,7 +5,7 @@ export const router = express.Router();
 
 router.post("/generate-scenes", requireAuth, async (req, res) => {
   try {
-    const { imageUrl, brandName, ctaText, offerText, website, tagline, forcedLayouts } = req.body;
+    const { imageUrl, brandName, ctaText, offerText, website, tagline, forcedLayouts, visualMode = "image" } = req.body;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-5.5",
@@ -56,13 +56,22 @@ Generate exactly 3 scenes. Choose the narrative arc, composition style, and scen
 Each scene duration is 3.5 seconds.
 
 VOICEOVER RULES:
-- Each scene voiceover must be 4-8 words only.
-- Target spoken duration: 1.2-1.8 seconds per scene.
-- Speak at 150-180 WPM — short, punchy, breathable.
-- Do NOT write full sentences. Write spoken fragments.
-- Do NOT repeat on-screen headline text.
-- Do NOT explain the visuals.
-- Examples: "Cherry vanilla. Softer refreshment." / "Prebiotics. Botanicals. Better soda." / "Meet your new favorite sip."
+Write ONE voiceoverScript covering the entire video — not per scene.
+This is a single cinematic narration for the full ad. 30-40 words total.
+
+Style: Nike × Apple × luxury ecommerce. Cinematic. Confident. Minimal words, high impact.
+
+Structure (across the full script):
+- Hook: 1 short punchy line — grab attention, introduce the product energy
+- Product sensation: 1-2 lines — convert visible qualities into emotional language (shape, feel, motion, presence, design language)
+- Premium payoff: 1 line — build desire
+- Closing statement: 1 memorable brand-style line
+
+Rules:
+- Short sentences. Use rhythm and variation. Build momentum.
+- Mention only what is visible in the product image.
+- Do NOT use: "best", "ultimate", "revolutionary", feature lists, technical specs, generic marketing phrases.
+- Tone: exciting but not loud. Sophisticated, not cheesy.
 
 HEADLINE RULES:
 - 2-6 words maximum — bold, punchy, attitude-driven
@@ -202,8 +211,14 @@ LAYER TYPES AVAILABLE:
 - text: for all text content
 - shape: for rectangles, lines, circles
 - gradient: for overlays, color panels, atmospheric effects
+- icon: Phosphor icon (optional, max 2 per scene)
 
-NO icon layers.
+ICON LAYERS (optional, use sparingly — max 2 per scene):
+type: "icon"
+iconName: one of: Package | Star | ShieldCheck | Truck | Heart | CheckCircle | Lightning | Leaf | Drop | Fire | SealCheck | Sparkle | ArrowRight | Tag | Certificate
+style: { color: "#hex", weight: "regular|bold|fill", opacity: 1 }
+Use icons to reinforce feature points — place next to feature text layers.
+Never use icons as decorative elements alone — always pair with text.
 
 Each visual element must be its own separate layer object with its own unique id.
 trackId must always equal the layer id.
@@ -221,6 +236,11 @@ ROLE FIELD — every layer must have a role:
 - cta-button (CTA button with background color)
 - accent-line (thin decorative line)
 - accent-shape (other decorative shapes)
+
+CTA COLOR RULE:
+cta-button text color must ALWAYS be white (#ffffff) or a very light color — never dark.
+Any icon layer paired with a cta-button must also use white (#ffffff) or the accentColor — never the dominantColor.
+Dark text on a CTA button is only acceptable when the button background is a very light/white color.
 
 FONTS — use only:
 - Oswald (bold headlines)
@@ -294,6 +314,24 @@ VISUAL PROMPT RULES:
 - The image must be generated without any text, words, or typography
 - End every prompt with: NO TEXT in image, pure photography only.
 
+MOTION PROMPT RULES (video scenes only):
+motionPrompt describes what happens during the video clip — camera movement, subject motion, atmosphere changes.
+It is passed directly to a video generation model (Pixverse). Write it like a cinematographer's shot note.
+
+Rules:
+- 1-3 sentences maximum
+- Describe camera movement first: slow orbit, push in, pull back, pan, static hold
+- Describe subject motion: subtle rotation, particles rising, steam wisping, light shifting
+- Describe atmosphere: cinematic light pulse, lens flare drift, shallow depth breathing
+- Keep motion subtle and premium — not hyperactive
+- Never describe text, overlays, or UI elements — only the physical scene
+- Match the energy of the scene: hook = dynamic, hero = confident, CTA = calm and elegant
+
+Examples:
+- "Camera slowly orbits the product from left to right. Soft gold particles rise. Warm volumetric light pulses gently. Cinematic and premium."
+- "Slow push-in toward the product. Background bokeh shifts subtly. A single light ray drifts across the frame."
+- "Static hold on the product. Ambient fog drifts. Light breathes in and out with a slow rhythm."
+
 LAYOUT SELECTION RULE:
 Choose one archetype per scene from this list. Each scene must use a different one.
 Declare choices in layoutChoices. Then generate layers EXACTLY matching the archetype.
@@ -341,6 +379,7 @@ RETURN FORMAT:
     "mood": "string",
     "style": "string"
   },
+  "voiceoverScript": "string — full cinematic narration for the entire video, 30-40 words",
   "layoutChoices": {
     "scene_0": "string — name one layout archetype from the list: FULL_BLEED_TYPOGRAPHIC | BOTTOM_STRIP | RIGHT_COLUMN | LEFT_COLUMN | CENTERED_MINIMAL",
     "scene_1": "string — must be different from scene_0",
@@ -351,8 +390,9 @@ RETURN FORMAT:
       "index": 0,
       "purpose": "string",
       "sceneName": "string",
+      "sceneType": "image | video",
       "sceneDuration": 3.5,
-      "voiceover": "string",
+      "motionPrompt": "string — camera and motion description for video generation. Required when sceneType is video. Omit for image scenes.",
       "visual": {
         "prompt": "string",
         "composition": {
@@ -366,7 +406,8 @@ RETURN FORMAT:
         {
           "id": "string",
           "trackId": "string (must equal id)",
-          "type": "text | shape | gradient",
+          "type": "text | shape | gradient | icon",
+          "iconName": "string (icon layers only — one of the allowed icon names)",
           "role": "string (from role list)",
           "x": 0,
           "y": 0,
@@ -402,7 +443,20 @@ RETURN FORMAT:
           content: [
             {
               type: "text",
-              text: `Analyze this product and generate 3 premium cinematic advertisement scenes.${brandName ? ` Brand: ${brandName}.` : ""}${ctaText ? ` CTA: ${ctaText}.` : " CTA: Shop Now."}${offerText ? ` Offer: ${offerText}.` : ""}${website ? ` Website: ${website}.` : ""}${tagline ? ` Tagline: ${tagline}.` : ""}${forcedLayouts?.length === 3 ? `\n\nMANDATORY LAYOUT ASSIGNMENT\n\nScene 1: ${forcedLayouts[0]}\nScene 2: ${forcedLayouts[1]}\nScene 3: ${forcedLayouts[2]}\n\nThese layouts are mandatory. Do not deviate.\nDo not reuse same text alignment, panel placement, product placement, or composition flow.\nLayout changes structure. Creative direction stays constant.\nAll scenes must still feel like one campaign.` : ""}`,
+              text: (() => {
+                let msg = `Analyze this product and generate 3 premium cinematic advertisement scenes.${brandName ? ` Brand: ${brandName}.` : ""}${ctaText ? ` CTA: ${ctaText}.` : " CTA: Shop Now."}${offerText ? ` Offer: ${offerText}.` : ""}${website ? ` Website: ${website}.` : ""}${tagline ? ` Tagline: ${tagline}.` : ""}`;
+                if (forcedLayouts?.length === 3) {
+                  msg += `\n\nMANDATORY LAYOUT ASSIGNMENT\n\nScene 1: ${forcedLayouts[0]}\nScene 2: ${forcedLayouts[1]}\nScene 3: ${forcedLayouts[2]}\n\nThese layouts are mandatory. Do not deviate.\nDo not reuse same text alignment, panel placement, product placement, or composition flow.\nLayout changes structure. Creative direction stays constant.\nAll scenes must still feel like one campaign.`;
+                }
+                if (visualMode === "hybrid") {
+                  msg += `\n\nSCENE TYPE ASSIGNMENT\nScene 0: sceneType "video"\nScene 1: sceneType "video"\nScene 2: sceneType "image"\n\nFor scenes marked "video": output both visual.prompt (still image composition) AND motionPrompt (camera/motion description for video generation).\nFor scenes marked "image": output only visual.prompt.`;
+                } else if (visualMode === "video") {
+                  msg += `\n\nSCENE TYPE ASSIGNMENT\nAll 3 scenes: sceneType "video"\n\nFor every scene: output both visual.prompt AND motionPrompt.`;
+                } else {
+                  msg += `\n\nAll scenes: sceneType "image". Output only visual.prompt for each scene.`;
+                }
+                return msg;
+              })(),
             },
             {
               type: "image_url",

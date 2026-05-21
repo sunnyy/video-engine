@@ -1,6 +1,15 @@
 const CANVAS_W = 1080;
 const CANVAS_H = 1920;
 
+function isTooDark(hex) {
+  const c = hex?.replace("#", "");
+  if (!c || c.length < 6) return false;
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 60;
+}
+
 const PRESETS = {
   "background-image": (s, e) => ({
     keyframes: { x: [], y: [], scale: [{ time: 0, value: 1, easing: "linear" }, { time: e - s, value: 1.06, easing: "linear" }], rotation: [], opacity: [], blur: [] },
@@ -35,8 +44,8 @@ export function convertScenesToTimeline(aiOutput, shotUrls) {
       const fi = role === "feature" ? featureCount[sceneIndex]++ : 0;
       const preset = (PRESETS[role] || PRESETS["body"])(start, end, fi);
 
-      const cx = (aiLayer.x + aiLayer.width / 2) - CANVAS_W / 2;
-      const cy = (aiLayer.y + aiLayer.height / 2) - CANVAS_H / 2;
+      const cx = ((aiLayer.x ?? 0) + (aiLayer.width ?? 80) / 2) - CANVAS_W / 2;
+      const cy = ((aiLayer.y ?? 0) + (aiLayer.height ?? 80) / 2) - CANVAS_H / 2;
 
       const base = {
         id: aiLayer.id,
@@ -51,12 +60,28 @@ export function convertScenesToTimeline(aiOutput, shotUrls) {
       };
 
       if (role === "background-image") {
+        const isVideo = scene.sceneType === "video" || (shotUrl && shotUrl.includes(".mp4"));
         layers.push({
           ...base,
-          type: "image",
+          type: isVideo ? "video" : "image",
           src: shotUrl,
           objectFit: "cover",
           transform: { x: 0, y: 0, width: CANVAS_W, height: CANVAS_H, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+        });
+      } else if (aiLayer.type === "icon") {
+        const iw = aiLayer.width || 80;
+        const ih = aiLayer.height || 80;
+        const ix = aiLayer.x != null ? (aiLayer.x + iw / 2) - CANVAS_W / 2 : cx;
+        const iy = aiLayer.y != null ? (aiLayer.y + ih / 2) - CANVAS_H / 2 : cy;
+        layers.push({
+          ...base,
+          type: "icon",
+          iconName: aiLayer.iconName || "Star",
+          style: {
+            color: isTooDark(aiLayer.style?.color) ? "#ffffff" : (aiLayer.style?.color || "#ffffff"),
+            weight: aiLayer.style?.weight || "regular",
+          },
+          transform: { x: ix, y: iy, width: iw, height: ih, opacity: aiLayer.style?.opacity || 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
         });
       } else if (aiLayer.type === "text") {
         layers.push({
@@ -84,7 +109,7 @@ export function convertScenesToTimeline(aiOutput, shotUrls) {
           ...base,
           type: "gradient",
           gradient: aiLayer.style?.background || "#000000",
-          transform: { x: cx, y: cy, width: aiLayer.width, height: aiLayer.height, opacity: aiLayer.style?.opacity || 1, rotation: aiLayer.rotation || 0, scale: 1, blur: aiLayer.style?.blur || 0, borderRadius: aiLayer.style?.borderRadius || 0, borderWidth: 0, borderColor: "#ffffff" },
+          transform: { x: cx, y: cy, width: aiLayer.width, height: aiLayer.height, opacity: aiLayer.style?.opacity || 1, rotation: role === "accent-line" ? 0 : (aiLayer.rotation || 0), scale: 1, blur: aiLayer.style?.blur || 0, borderRadius: aiLayer.style?.borderRadius || 0, borderWidth: 0, borderColor: "#ffffff" },
         });
       }
     });

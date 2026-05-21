@@ -83,13 +83,39 @@ router.post("/generate-shots", requireAuth, async (req, res) => {
   try {
     // When called with a single custom shot (from compose pipeline), skip hardcoded list
     if (singleShot) {
+      // ── Create a 1080×1920 vertical reference so nano-banana outputs vertical images.
+      // nano-banana mirrors the input aspect ratio; compositing onto a vertical canvas fixes this.
+      let shotRefUrl = referenceUrl;
+      try {
+        const { default: sharp } = await import("sharp");
+        const imgBuf = Buffer.from(await (await fetch(referenceUrl)).arrayBuffer());
+        const meta = await sharp(imgBuf).metadata();
+        const TW = 1080, TH = 1920;
+        const scale = Math.min((TW * 0.82) / (meta.width || TW), (TH * 0.60) / (meta.height || TH));
+        const fitW = Math.round((meta.width || TW) * scale);
+        const fitH = Math.round((meta.height || TH) * scale);
+        const left = Math.round((TW - fitW) / 2);
+        const top  = Math.round((TH - fitH) / 2);
+        const vertBuf = await sharp({ create: { width: TW, height: TH, channels: 3, background: { r: 18, g: 18, b: 22 } } })
+          .composite([{ input: await sharp(imgBuf).resize(fitW, fitH).toBuffer(), left, top }])
+          .jpeg({ quality: 90 })
+          .toBuffer();
+        const vKey = `product-videos/${req.user.id}/${projectId || "tmp"}/vref-${Date.now()}.jpg`;
+        await supabaseAdmin.storage.from("user-assets").upload(vKey, vertBuf, { contentType: "image/jpeg", upsert: false });
+        const { data: { publicUrl: vUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(vKey);
+        shotRefUrl = vUrl;
+        console.log("[generate-shots] vertical reference created:", vKey);
+      } catch (e) {
+        console.error("[generate-shots] vertical ref failed, using original:", e.message);
+      }
+
       const generateShot = async (shot, attempt = 1) => {
         try {
           const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
             method: "POST",
             headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-              image_urls: [referenceUrl],
+              image_urls: [shotRefUrl],
               prompt: ANCHOR + "STRICT RULE: This image must contain ZERO text, ZERO words, ZERO letters, ZERO numbers, ZERO UI elements, ZERO buttons, ZERO labels. Absolutely no typography of any kind anywhere in the image. Pure photography only.\n" + shot.prompt,
             }),
           });

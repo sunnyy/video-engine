@@ -10,6 +10,7 @@ export async function generateProductVideo({
   ctaText = "Shop Now",
   website = "",
   tagline = "",
+  visualMode = "image",
   projectId,
   onProgress,
 }) {
@@ -27,7 +28,7 @@ export async function generateProductVideo({
   const forcedLayouts = LAYOUT_SETS[Math.floor(Math.random() * LAYOUT_SETS.length)];
   const scenesRes = await serverFetch("/api/product-video/generate-scenes", {
     method: "POST",
-    body: JSON.stringify({ imageUrl: productImageUrl, brandName, ctaText, offerText, website, tagline, forcedLayouts }),
+    body: JSON.stringify({ imageUrl: productImageUrl, brandName, ctaText, offerText, website, tagline, forcedLayouts, visualMode }),
   });
   if (!scenesRes.ok) throw new Error("Scene generation failed");
   const aiOutput = await scenesRes.json();
@@ -65,9 +66,35 @@ export async function generateProductVideo({
     await new Promise(r => setTimeout(r, 500));
   }
 
+  // Step 2b — Generate video clips for video scenes
+  const finalShotUrls = [...shotUrls];
+  if (visualMode === "hybrid" || visualMode === "video") {
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      if (scene.sceneType !== "video") continue;
+      const motionPrompt = scene.motionPrompt;
+      const sourceImageUrl = shotUrls[i];
+      if (!motionPrompt || !sourceImageUrl) continue;
+      try {
+        const clipRes = await serverFetch("/api/product-ad/generate-clip", {
+          method: "POST",
+          body: JSON.stringify({ imageUrl: sourceImageUrl, motionPrompt, durationSeconds: 5 }),
+        });
+        if (clipRes.ok) {
+          const { videoUrl } = await clipRes.json();
+          if (videoUrl) finalShotUrls[i] = videoUrl;
+        } else {
+          console.error(`[video-clip] scene ${i} failed:`, clipRes.status);
+        }
+      } catch (err) {
+        console.error(`[video-clip] scene ${i} error:`, err.message);
+      }
+    }
+  }
+
   // Step 3 — Convert to timeline (deterministic)
   progress(3, "Building your video...");
-  const layers = convertScenesToTimeline(aiOutput, shotUrls);
+  const layers = convertScenesToTimeline(aiOutput, finalShotUrls);
 
   // Ensure every scene has a background image layer
   const sceneDuration = 3.5;
@@ -75,13 +102,14 @@ export async function generateProductVideo({
   scenes.forEach((scene, i) => {
     const start = i * sceneDuration;
     const end = start + sceneDuration;
-    const shotUrl = shotUrls[i];
-    const hasBg = safetyLayers.some(l => l.start === start && l.type === "image" && l.zIndex === 1);
+    const shotUrl = finalShotUrls[i];
+    const isVideoShot = scene.sceneType === "video" || (shotUrl && shotUrl.includes(".mp4"));
+    const hasBg = safetyLayers.some(l => l.start === start && (l.type === "image" || l.type === "video") && l.zIndex === 1);
     if (!hasBg && shotUrl) {
       safetyLayers.unshift({
         id: `s${i}_bg_injected`,
         trackId: `s${i}_bg_injected`,
-        type: "image",
+        type: isVideoShot ? "video" : "image",
         src: shotUrl,
         objectFit: "cover",
         start, end,
@@ -127,47 +155,44 @@ export async function generateProductVideo({
     console.error("[music] injection failed:", err.message);
   }
 
-  // Step 5 — Voiceovers (one TTS per scene)
-  progress(5, "Generating voiceovers...");
-  for (let i = 0; i < scenes.length; i++) {
-    const script = scenes[i].voiceover?.trim();
-    if (!script) continue;
-    const start = i * 3.5;
-    const end = start + 3.5;
+  // Step 5 — Voiceover (single TTS for full video)
+  progress(5, "Generating voiceover...");
+  const voiceoverScript = aiOutput.voiceoverScript?.trim();
+  if (voiceoverScript) {
     try {
       const ttsRes = await serverFetch("/api/generate-tts", {
         method: "POST",
-        body: JSON.stringify({ script, voice: "nova", speed: 1.2, projectId }),
+        body: JSON.stringify({ script: voiceoverScript, voice: "nova", speed: 1.1, projectId }),
       });
       if (ttsRes.ok) {
         const { url } = await ttsRes.json();
         if (url) {
           finalLayers.push({
-            id: `voiceover_${i}`,
-            trackId: `voiceover_${i}`,
+            id: "voiceover_main",
+            trackId: "voiceover_main",
             type: "audio",
             audioType: "voiceover",
-            name: `Voiceover ${i + 1}`,
-            start,
-            end,
+            name: "Voiceover",
+            start: 0,
+            end: totalDuration,
             src: url,
             volume: 1.0,
             visible: false,
             locked: false,
             muted: false,
             fadeIn: 0.1,
-            fadeOut: 0.2,
+            fadeOut: 0.3,
             sfx: null,
             keyframes: { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
             transform: { x: 0, y: 0, width: 0, height: 0, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
           });
-          console.log(`[voiceover] scene ${i} injected:`, url);
+          console.log("[voiceover] injected:", voiceoverScript);
         }
       } else {
-        console.error(`[voiceover] scene ${i} TTS failed:`, ttsRes.status);
+        console.error("[voiceover] TTS failed:", ttsRes.status);
       }
     } catch (err) {
-      console.error(`[voiceover] scene ${i} failed:`, err.message);
+      console.error("[voiceover] failed:", err.message);
     }
   }
 
@@ -175,6 +200,7 @@ export async function generateProductVideo({
     layers: finalLayers,
     productAnalysis: aiOutput.productDNA || {},
     totalDuration,
-    shots: shotUrls.map((url, i) => ({ url, purpose: scenes[i]?.purpose })),
+    shots: finalShotUrls.map((url, i) => ({ url, purpose: scenes[i]?.purpose, sceneType: scenes[i]?.sceneType ?? "image" })),
+    aiOutput,
   };
 }

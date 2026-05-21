@@ -11,7 +11,7 @@
  *   uppbeat.io
  *   freesound.org
  */
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase.js";
 
 export const MUSIC_LIBRARY = {
 

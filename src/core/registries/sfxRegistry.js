@@ -10,7 +10,7 @@
  *   pixabay.com/sound-effects
  *   zapsplat.com
  */
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase.js";
 
 export const SFX_LIBRARY = {
 
