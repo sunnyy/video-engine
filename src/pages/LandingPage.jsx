@@ -536,7 +536,7 @@ export default function LandingPage() {
           {(() => {
             const CARDS = [
               { emoji: "🎬", name: "AI Video Generator",    desc: "Script to viral video in minutes",       route: "/new",            accent: "#7c5cfc", col: "span 3", image: "/assets/images/services/AIVideoGenerator.png"    },
-              { emoji: "📦", name: "Product Video Ads",     desc: "One photo → cinematic ad",               route: "/product-ads",    accent: "#f97316", col: "span 2", image: "/assets/images/services/ProductVideoAds.png"     },
+              { emoji: "📦", name: "Product Video Ads",     desc: "One photo → cinematic ad",               route: "/product-video",    accent: "#f97316", col: "span 2", image: "/assets/images/services/ProductVideoAds.png"     },
               { emoji: "👗", name: "Virtual Try-On",        desc: "AI model wearing your product",          route: "/virtual-tryon",  accent: "#ec4899", col: "span 2", image: "/assets/images/services/VirtualTryOn.png"        },
               { emoji: "🎨", name: "Banner Design",         desc: "Social media banners in seconds",        route: "/banner-design",  accent: "#f5c518", col: "span 2", image: "/assets/images/services/BannerDesign.png"        },
               { emoji: "🖼️", name: "Thumbnail Generator",  desc: "Click-worthy thumbnails with AI",        route: "/thumbnail",      accent: "#ef4444", col: "span 2", image: "/assets/images/services/ThumbnailGenerator.png"  },
@@ -651,7 +651,7 @@ export default function LandingPage() {
             <div className="m-svc-grid">
               {[
                 { emoji: "🎬", name: "AI Video Generator",   desc: "Script to viral video",          route: "/new",            accent: "#7c5cfc", image: "/assets/images/services/AIVideoGenerator.png"   },
-                { emoji: "📦", name: "Product Video Ads",    desc: "One photo → cinematic ad",       route: "/product-ads",    accent: "#f97316", image: "/assets/images/services/ProductVideoAds.png"    },
+                { emoji: "📦", name: "Product Video Ads",    desc: "One photo → cinematic ad",       route: "/product-video",    accent: "#f97316", image: "/assets/images/services/ProductVideoAds.png"    },
                 { emoji: "👗", name: "Virtual Try-On",       desc: "AI model, your product",         route: "/virtual-tryon",  accent: "#ec4899", image: "/assets/images/services/VirtualTryOn.png"       },
                 { emoji: "🎨", name: "Banner Design",        desc: "Social banners in seconds",      route: "/banner-design",  accent: "#f5c518", image: "/assets/images/services/BannerDesign.png"       },
                 { emoji: "🖼️", name: "Thumbnails",          desc: "Click-worthy AI thumbnails",     route: "/thumbnail",      accent: "#ef4444", image: "/assets/images/services/ThumbnailGenerator.png" },

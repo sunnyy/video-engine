@@ -290,7 +290,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typography" || path === "/videos/explainer" || path.startsWith("/product-ads") || path === "/video-captions" || path === "/videos/custom" || path === "/product-video";
+const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typography" || path === "/videos/explainer" || path === "/video-captions" || path === "/videos/custom" || path === "/product-video";
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -325,7 +325,7 @@ const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typ
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
               {isAdmin && <NavItem icon={Icons.aiVideo}    label="Product Video (AI)" sub="AI-generated product ads" to="/product-video"      active={path === "/product-video"} />}
-              <NavItem icon={Icons.ad}         label="Product Video"    sub="Ads for your products"    to="/product-ads"        active={path.startsWith("/product-ads")} />
+              <NavItem icon={Icons.ad}         label="Product Video"    sub="Ads for your products"    to="/product-video"      active={path === "/product-video"} />
               <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos" to="/video-captions"     active={path === "/video-captions"} />
               <NavItem icon={Icons.explainer}  label="Explainer Video"  sub="Talking head + visuals"   to="/videos/explainer"   active={path === "/videos/explainer"} />
               {isAdmin && <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />}
