@@ -1,5 +1,5 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender } from "remotion";
-import { SFX_LIBRARY, getSFXPreviewUrl } from "../core/registries/sfxRegistry";
+import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../core/registries/sfxRegistry";
 import { useMemo, useEffect } from "react";
 
 export default function TimelineComposition({ project }) {
@@ -31,7 +31,7 @@ export default function TimelineComposition({ project }) {
       document.head.appendChild(link);
       return link;
     });
-    document.fonts.ready.then(() => continueRender(fontHandle));
+    Promise.all([document.fonts.ready, loadSFXLibrary()]).then(() => continueRender(fontHandle));
     return () => links.forEach((l) => l.remove());
   }, [fontHandle]);
 
@@ -45,7 +45,7 @@ export default function TimelineComposition({ project }) {
         .filter((l) => l.sfx?.key)
         .map((l) => {
           const sfxStart = Math.round((l.start + (l.sfx.delay ?? 0)) * fps);
-          const sfxDur = Math.max(1, Math.round((SFX_LIBRARY[l.sfx.key]?.duration ?? 3) * fps));
+          const sfxDur = Math.max(1, Math.round(getSFXDuration(l.sfx.key) * fps));
           return (
             <Sequence key={`sfx-${l.id}`} from={sfxStart} durationInFrames={sfxDur}>
               <Audio src={getSFXPreviewUrl(l.sfx.key)} volume={l.sfx.volume ?? 1} />
@@ -56,10 +56,36 @@ export default function TimelineComposition({ project }) {
   );
 }
 
+function getTransitionOpacity(layer, currentTime) {
+  const inCfg  = layer.transition?.in  ?? (layer.transition?.type ? layer.transition : null);
+  const outCfg = layer.transition?.out ?? null;
+  const inType  = inCfg?.type  ?? "none";
+  const inDur   = inCfg?.duration ?? 0.5;
+  const outType = outCfg?.type ?? "none";
+  const outDur  = outCfg?.duration ?? 0.5;
+
+  if (outType !== "none" && outDur > 0) {
+    const exitStart = layer.end - outDur;
+    if (currentTime >= exitStart && currentTime < layer.end) {
+      return Math.max(0, 1 - (currentTime - exitStart) / outDur);
+    }
+  }
+
+  if (inType !== "none" && inDur > 0) {
+    const entranceEnd = layer.start + inDur;
+    if (currentTime >= layer.start && currentTime < entranceEnd) {
+      return Math.max(0, Math.min(1, (currentTime - layer.start) / inDur));
+    }
+  }
+
+  return 1;
+}
+
 function TimelineLayer({ layer, currentTime, fps }) {
   if (currentTime < layer.start || currentTime >= layer.end) return null;
 
   const tr = getInterpolatedTransform(layer, currentTime);
+  const tOpacity = getTransitionOpacity(layer, currentTime);
   const startFrame = Math.round(layer.start * fps);
   const durationFrames = Math.max(1, Math.round((layer.end - layer.start) * fps));
 
@@ -71,7 +97,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
     top: CANVAS_H / 2 + tr.y - tr.height / 2,
     width: tr.width,
     height: tr.height,
-    opacity: tr.opacity,
+    opacity: tr.opacity * tOpacity,
     transform: `rotate(${tr.rotation}deg) scale(${tr.scale})`,
     filter: tr.blur > 0 ? `blur(${tr.blur}px)` : undefined,
     zIndex: layer.zIndex,

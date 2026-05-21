@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
-import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
+import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../../core/registries/sfxRegistry";
 import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeRegistry";
 import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
@@ -101,29 +101,48 @@ function resolvedObjectFit(layer, currentTime) {
 function buildTransitionEffect(type, p) {
   // p: 0 = just appeared, 1 = fully visible (entrance progress)
   switch (type) {
-    case "fade":        return { opacity: p,     translateX: 0,           addBlur: 0,            scale: 1 };
-    case "dissolve":    return { opacity: p,     translateX: 0,           addBlur: (1 - p) * 10, scale: 1 };
-    case "slide-left":  return { opacity: 1,     translateX: -(1 - p) * 100, addBlur: 0,         scale: 1 };
-    case "slide-right": return { opacity: 1,     translateX:  (1 - p) * 100, addBlur: 0,         scale: 1 };
-    case "zoom":        return { opacity: p,     translateX: 0,           addBlur: 0,            scale: 0.5 + p * 0.5 };
-    default:            return { opacity: 1,     translateX: 0,           addBlur: 0,            scale: 1 };
+    case "crossfade":
+    case "fade":        return { opacity: p,   translateX: 0,               translateY: 0,               addBlur: 0,            scale: 1 };
+    case "dissolve":    return { opacity: p,   translateX: 0,               translateY: 0,               addBlur: (1 - p) * 10, scale: 1 };
+    case "slide-left":  return { opacity: 1,   translateX: -(1 - p) * 100,  translateY: 0,               addBlur: 0,            scale: 1 };
+    case "slide-right": return { opacity: 1,   translateX:  (1 - p) * 100,  translateY: 0,               addBlur: 0,            scale: 1 };
+    case "slide-up":    return { opacity: 1,   translateX: 0,               translateY:  (1 - p) * 100,  addBlur: 0,            scale: 1 };
+    case "slide-down":  return { opacity: 1,   translateX: 0,               translateY: -(1 - p) * 100,  addBlur: 0,            scale: 1 };
+    case "zoom-in":
+    case "zoom":        return { opacity: p,   translateX: 0,               translateY: 0,               addBlur: 0,            scale: 0.5 + p * 0.5 };
+    default:            return { opacity: 1,   translateX: 0,               translateY: 0,               addBlur: 0,            scale: 1 };
   }
 }
 
-// Returns { opacity, translateX, addBlur, scale } for a layer at the current playback time.
-// Entrance effect only — applied at the start of the layer.
+// Returns { opacity, translateX, translateY, addBlur, scale } for a layer at the current time.
+// Handles both entrance (transition.in) and exit (transition.out).
 function getTransitionStyle(layer, currentTime) {
-  const { type = "none", duration = 0.5 } = layer.transition ?? {};
+  const inCfg  = layer.transition?.in  ?? (layer.transition?.type ? layer.transition : null);
+  const outCfg = layer.transition?.out ?? null;
+  const inType  = inCfg?.type  ?? "none";
+  const inDur   = inCfg?.duration ?? 0.5;
+  const outType = outCfg?.type ?? "none";
+  const outDur  = outCfg?.duration ?? 0.5;
 
-  if (type === "none" || duration <= 0) return { opacity: 1, translateX: 0, addBlur: 0, scale: 1 };
-
-  const transitionEnd = layer.start + duration;
-  if (currentTime >= layer.start && currentTime < transitionEnd) {
-    const p = (currentTime - layer.start) / duration;
-    return buildTransitionEffect(type, Math.max(0, Math.min(1, p)));
+  // Exit — outgoing layer fades out in its last outDur seconds
+  if (outType !== "none" && outDur > 0) {
+    const exitStart = layer.end - outDur;
+    if (currentTime >= exitStart && currentTime < layer.end) {
+      const p = 1 - (currentTime - exitStart) / outDur;
+      return { opacity: Math.max(0, p), translateX: 0, translateY: 0, addBlur: 0, scale: 1 };
+    }
   }
 
-  return { opacity: 1, translateX: 0, addBlur: 0, scale: 1 };
+  // Entrance
+  if (inType !== "none" && inDur > 0) {
+    const entranceEnd = layer.start + inDur;
+    if (currentTime >= layer.start && currentTime < entranceEnd) {
+      const p = (currentTime - layer.start) / inDur;
+      return buildTransitionEffect(inType, Math.max(0, Math.min(1, p)));
+    }
+  }
+
+  return { opacity: 1, translateX: 0, translateY: 0, addBlur: 0, scale: 1 };
 }
 
 // ── Video / Audio helpers ─────────────────────────────────────────────────────
@@ -212,7 +231,7 @@ function SfxLayerEl({ layer, currentTime, isPlaying }) {
   const timeoutRef = useRef(null);
   const sfx = layer.sfx;
   const triggerTime = layer.start + (sfx?.delay ?? 0);
-  const sfxDur = sfx?.key ? (SFX_LIBRARY[sfx.key]?.duration ?? 3) : 0;
+  const sfxDur = sfx?.key ? getSFXDuration(sfx.key) : 0;
 
   useEffect(() => {
     const el = audioRef.current;
@@ -385,7 +404,7 @@ function PersistentVideoTrack({
   const left = canvasW / 2 + x - width / 2;
   const top  = canvasH / 2 + y - height / 2;
 
-  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0, scale: tScale = 1 } =
+  const { opacity: tOpacity = 1, translateX: tX = 0, translateY: tY = 0, addBlur: tBlur = 0, scale: tScale = 1 } =
     activeClip ? getTransitionStyle(activeClip, currentTime) : {};
 
   const onResizeMouseDown = (e, handleId) => {
@@ -513,7 +532,7 @@ function PersistentVideoTrack({
           top:    activeClip ? top    : 0,
           width:  activeClip ? width  : 0,
           height: activeClip ? height : 0,
-          transform: `${tX ? `translateX(${tX}%) ` : ""}${activeClip?.flipX ? "scaleX(-1) " : ""}${activeClip?.flipY ? "scaleY(-1) " : ""}rotate(${rotation}deg) scale(${scale * tScale})`,
+          transform: `${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}${activeClip?.flipX ? "scaleX(-1) " : ""}${activeClip?.flipY ? "scaleY(-1) " : ""}rotate(${rotation}deg) scale(${scale * tScale})`,
           transformOrigin: "center center",
           opacity: activeClip ? opacity * tOpacity : 0,
           filter: (blur || tBlur) ? `blur(${blur + tBlur}px)` : undefined,
@@ -633,7 +652,7 @@ function LayerElement({
   const tr = resolveTransform(layer, currentTime);
   const { x, y, width, height, rotation, scale, opacity, blur } = tr;
 
-  const { opacity: tOpacity = 1, translateX: tX = 0, addBlur: tBlur = 0, scale: tScale = 1 } = transitionStyle ?? {};
+  const { opacity: tOpacity = 1, translateX: tX = 0, translateY: tY = 0, addBlur: tBlur = 0, scale: tScale = 1 } = transitionStyle ?? {};
 
   const isDraggable = DRAGGABLE_TYPES.has(layer.type) && !layer.locked && !isEditing;
   const isResizable = isSelected && !layer.locked && DRAGGABLE_TYPES.has(layer.type) && !isEditing;
@@ -1044,7 +1063,7 @@ function LayerElement({
           top,
           width,
           height,
-          transform: `${tX ? `translateX(${tX}%) ` : ""}${layer.flipX ? "scaleX(-1) " : ""}${layer.flipY ? "scaleY(-1) " : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
+          transform: `${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}${layer.flipX ? "scaleX(-1) " : ""}${layer.flipY ? "scaleY(-1) " : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
           transformOrigin: "center center",
           opacity: (opacity ?? 1) * tOpacity,
           filter: (blur || tBlur) ? `blur(${(blur ?? 0) + tBlur}px)` : undefined,
@@ -1086,7 +1105,7 @@ function LayerElement({
       {handlesEl && isResizable && createPortal(
         <div style={{
           position: "absolute", left, top, width, height, pointerEvents: "none",
-          transform: `${tX ? `translateX(${tX}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
+          transform: `${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
           transformOrigin: "center center",
         }}>
           {Object.entries(HANDLE_CONFIGS).map(([id, cfg]) => (
@@ -1149,6 +1168,8 @@ export default function Preview() {
   const clampZoom = (z) => Math.max(0.15, Math.min(6, z));
   const effectiveScale = scale * userZoom;
   const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+
+  useEffect(() => { loadSFXLibrary(); }, []);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
