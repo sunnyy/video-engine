@@ -19,13 +19,9 @@ const T = {
 };
 
 const STEP_LABELS = [
-  "Understanding your product...",
-  "Preparing your product image...",
-  "Crafting your ad concept...",
-  "Writing your video story...",
-  "Creating visuals...",
+  "Analyzing your product...",
+  "Creating your visuals...",
   "Building your video...",
-  "Adding motion and effects...",
   "Adding music...",
 ];
 
@@ -328,12 +324,11 @@ function GeneratorForm() {
       const finalProjectJson = {
         ...emptyProjectJson,
         layers: result.layers,
+        format: { ...emptyProjectJson.format, duration: result.totalDuration },
         meta: {
           ...emptyProjectJson.meta,
-          spec:            result.spec,
-          direction:       result.direction,
-          scenes:          result.scenes,
           productAnalysis: result.productAnalysis,
+          shots:           result.shots,
           updatedAt:       new Date().toISOString(),
         },
       };

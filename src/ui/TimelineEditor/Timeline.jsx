@@ -354,6 +354,7 @@ export default function Timeline() {
               zIndex: 20,
             }}
           >
+            {/* Triangle head */}
             <div
               style={{
                 position: "absolute",
@@ -380,6 +381,19 @@ export default function Timeline() {
                 }}
               />
             </div>
+            {/* Full-height grab strip */}
+            <div
+              style={{
+                position: "absolute",
+                top: RULER_H,
+                left: -5,
+                width: 11,
+                bottom: 0,
+                cursor: "ew-resize",
+                pointerEvents: "all",
+              }}
+              onMouseDown={onPlayheadMouseDown}
+            />
           </div>
         </div>
       </div>

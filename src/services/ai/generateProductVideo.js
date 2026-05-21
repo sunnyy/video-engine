@@ -1,15 +1,9 @@
-/**
- * generateProductVideo.js
- * Orchestrates the product ad pipeline using ProductAdSpec as single source of truth.
- * Steps: analyze → remove-bg → direction → scene-plan → generate-backgrounds → compose → motion → music
- */
 import { serverFetch } from "../serverApi";
-import { createProductAdSpec } from "./productVideo/productAdSpec";
 import { injectMusic } from "./productVideo/musicInjector";
+import { convertScenesToTimeline } from "./productVideo/sceneConverter";
 
 export async function generateProductVideo({
   productImageUrl,
-  logoUrl = null,
   brandName = "",
   videoType = "promo",
   offerText = "",
@@ -19,134 +13,97 @@ export async function generateProductVideo({
   projectId,
   onProgress,
 }) {
-  const TOTAL = 8;
+  const TOTAL = 4;
   const progress = (step, label) => onProgress?.(step, TOTAL, label);
 
-  // Initialize spec
-  const spec = createProductAdSpec({
-    productImageUrl, logoUrl, brandName,
-    videoType, offerText, ctaText, website, tagline,
-  });
-
-  // Step 1 — Analyze product
+  // Step 1 — Generate scenes (GPT-4o vision, direct URL)
   progress(1, "Analyzing your product...");
-  const analyzeRes = await serverFetch("/api/product-video/analyze", {
+  const scenesRes = await serverFetch("/api/product-video/generate-scenes", {
     method: "POST",
-    body: JSON.stringify({ imageUrl: productImageUrl }),
+    body: JSON.stringify({ imageUrl: productImageUrl, brandName, ctaText, offerText, website, tagline }),
   });
-  if (!analyzeRes.ok) throw new Error("Product analysis failed");
-  spec.productAnalysis = await analyzeRes.json();
+  if (!scenesRes.ok) throw new Error("Scene generation failed");
+  const aiOutput = await scenesRes.json();
+  const scenes = aiOutput.scenes || [];
 
-  // Step 2 — Remove background
-  progress(2, "Removing background...");
-  try {
-    const bgRes = await serverFetch("/api/product-video/remove-background", {
-      method: "POST",
-      body: JSON.stringify({ imageUrl: productImageUrl, projectId }),
-    });
-    if (bgRes.ok) {
-      const bgData = await bgRes.json();
-      spec.productCutoutUrl = bgData.url ?? null;
+  // Background removal (non-fatal, fire-and-forget)
+  serverFetch("/api/product-video/remove-background", {
+    method: "POST",
+    body: JSON.stringify({ imageUrl: productImageUrl, projectId }),
+  }).catch(() => {});
+
+  // Step 2 — Generate shots (one per scene)
+  progress(2, "Creating your visuals...");
+  const shotUrls = [];
+  for (const scene of scenes) {
+    try {
+      const shotRes = await serverFetch("/api/product-video/generate-shots", {
+        method: "POST",
+        body: JSON.stringify({
+          productImageUrl,
+          productCutoutUrl: null,
+          projectId,
+          singleShot: { purpose: scene.purpose, prompt: scene.visual?.prompt || "" },
+        }),
+      });
+      if (shotRes.ok) {
+        const shotData = await shotRes.json();
+        shotUrls.push(shotData.shots?.[0]?.url || productImageUrl);
+      } else {
+        shotUrls.push(productImageUrl);
+      }
+    } catch {
+      shotUrls.push(productImageUrl);
     }
-  } catch {
-    // Non-fatal — fall back to original image
-    spec.productCutoutUrl = null;
+    await new Promise(r => setTimeout(r, 500));
   }
 
-  // Step 3 — Creative direction
-  progress(3, "Building creative direction...");
-  const dirRes = await serverFetch("/api/product-video/direction", {
-    method: "POST",
-    body: JSON.stringify({
-      productAnalysis: spec.productAnalysis,
-      videoType: spec.videoType,
-      brandName: spec.brandName,
-    }),
-  });
-  if (!dirRes.ok) throw new Error("Direction step failed");
-  const direction = await dirRes.json();
-  spec.palette = direction.palette;
-  spec.fonts = direction.fonts ?? { headline: "Oswald", body: "Outfit" };
-  spec.font = direction.fonts?.body ?? direction.font ?? "Outfit"; // backward compat
-  spec.tone = direction.tone;
-  spec.energy = direction.energy;
-  spec.musicMood = direction.musicMood;
-  spec.bgImagePrompt = direction.bgImagePrompt;
-  spec.lifestylePrompt = direction.lifestylePrompt;
+  // Step 3 — Convert to timeline (deterministic)
+  progress(3, "Building your video...");
+  const layers = convertScenesToTimeline(aiOutput, shotUrls);
 
-  // Step 4 — Scene plan
-  progress(4, "Planning scenes...");
-  const planRes = await serverFetch("/api/product-video/scene-plan", {
-    method: "POST",
-    body: JSON.stringify({
-      productAnalysis: spec.productAnalysis,
-      direction,
-      videoType: spec.videoType,
-      offerText: spec.offerText,
-      ctaText: spec.ctaText,
-      tagline: spec.tagline,
-      brandName: spec.brandName,
-    }),
-  });
-  if (!planRes.ok) throw new Error("Scene planning failed");
-  const planData = await planRes.json();
-  spec.scenes = planData.scenes ?? [];
-
-  // Step 5 — Generate background images
-  progress(5, "Generating background images...");
-  try {
-    const genRes = await serverFetch("/api/product-video/generate-backgrounds", {
-      method: "POST",
-      body: JSON.stringify({
-        bgImagePrompt: spec.bgImagePrompt,
-        lifestylePrompt: spec.lifestylePrompt,
-        projectId,
-        productImageUrl: spec.productImageUrl,
-      }),
-    });
-    if (genRes.ok) {
-      const genData = await genRes.json();
-      spec.heroBackgroundUrl = genData.heroUrl ?? null;
-      spec.lifestyleImageUrl = genData.lifestyleUrl ?? null;
+  // Ensure every scene has a background image layer
+  const sceneDuration = 2.5;
+  const safetyLayers = [...layers];
+  scenes.forEach((scene, i) => {
+    const start = i * sceneDuration;
+    const end = start + sceneDuration;
+    const shotUrl = shotUrls[i];
+    const hasBg = safetyLayers.some(l => l.start === start && l.type === "image" && l.zIndex === 1);
+    if (!hasBg && shotUrl) {
+      safetyLayers.unshift({
+        id: `s${i}_bg_injected`,
+        trackId: `s${i}_bg_injected`,
+        type: "image",
+        src: shotUrl,
+        objectFit: "cover",
+        start, end,
+        zIndex: 1,
+        visible: true, locked: false, sfx: null,
+        transform: { x: 0, y: 0, width: 1080, height: 1920, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+        keyframes: { x: [], y: [], scale: [{ time: 0, value: 1, easing: "linear" }, { time: end - start, value: 1.06, easing: "linear" }], rotation: [], opacity: [], blur: [] },
+        animation: { in: { type: "fade", duration: 0.5 }, out: { type: "none", duration: 0.3 } },
+        transition: { type: "fade", duration: 0.5 },
+      });
     }
-  } catch {
-    // Non-fatal
-  }
-
-  // Step 6 — Compose timeline
-  progress(6, "Composing timeline...");
-  const composeRes = await serverFetch("/api/product-video/compose", {
-    method: "POST",
-    body: JSON.stringify({ spec }),
   });
-  if (!composeRes.ok) throw new Error("Composition failed");
-  const composeData = await composeRes.json();
-  spec.layers = composeData.layers ?? [];
 
-  // Step 7 — Motion pass
-  progress(7, "Adding motion...");
-  const motionRes = await serverFetch("/api/product-video/motion", {
-    method: "POST",
-    body: JSON.stringify({ layers: spec.layers, direction }),
-  });
-  if (motionRes.ok) {
-    const motionData = await motionRes.json();
-    spec.layers = motionData.layers ?? spec.layers;
-  }
-
-  // Step 8 — Music
-  progress(8, "Adding music...");
+  // Step 4 — Music
+  progress(4, "Adding music...");
+  let finalLayers = safetyLayers;
   try {
-    spec.layers = await injectMusic({ layers: spec.layers, direction });
-  } catch {
-    // Non-fatal
-  }
+    finalLayers = await injectMusic({
+      layers,
+      direction: { musicMood: aiOutput.productDNA?.mood, energy: "medium" },
+    });
+  } catch { /* non-fatal */ }
+
+  const totalDuration = scenes.length * 2.5;
 
   return {
-    layers: spec.layers,
-    direction,
-    productAnalysis: spec.productAnalysis,
-    scenes: spec.scenes,
-    spec,
+    layers: finalLayers,
+    productAnalysis: aiOutput.productDNA || {},
+    totalDuration,
+    shots: shotUrls.map((url, i) => ({ url, purpose: scenes[i]?.purpose })),
   };
 }

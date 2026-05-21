@@ -37,10 +37,12 @@ function TimelineLayer({ layer, currentTime, fps }) {
   const startFrame = Math.round(layer.start * fps);
   const durationFrames = Math.max(1, Math.round((layer.end - layer.start) * fps));
 
+  const CANVAS_W = 1080;
+  const CANVAS_H = 1920;
   const baseStyle = {
     position: "absolute",
-    left: tr.x,
-    top: tr.y,
+    left: CANVAS_W / 2 + tr.x - tr.width / 2,
+    top: CANVAS_H / 2 + tr.y - tr.height / 2,
     width: tr.width,
     height: tr.height,
     opacity: tr.opacity,

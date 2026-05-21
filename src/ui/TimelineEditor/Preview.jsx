@@ -509,7 +509,7 @@ function PersistentVideoTrack({
             overflow: "hidden",
             cursor: isDraggable ? (isDragging ? "grabbing" : "move") : "default",
             pointerEvents: isDraggable ? "auto" : "none",
-            borderRadius: activeClip?.borderRadius ? `${activeClip.borderRadius}px` : undefined,
+            borderRadius: (activeClip?.transform?.borderRadius ?? activeClip?.borderRadius) ? `${activeClip?.transform?.borderRadius ?? activeClip?.borderRadius}px` : undefined,
             border: activeClip?.borderWidth ? `${activeClip.borderWidth}px solid ${activeClip.borderColor ?? "#ffffff"}` : undefined,
             backgroundColor: activeClip?.backgroundColor ?? undefined,
             boxShadow: activeClip?.boxShadow ?? undefined,
@@ -1028,7 +1028,7 @@ function LayerElement({
             overflow: "hidden",
             cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "move") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",
-            borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : undefined,
+            borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
             border: layer.borderWidth ? `${layer.borderWidth}px solid ${layer.borderColor ?? "#ffffff"}` : undefined,
             backgroundColor: layer.backgroundColor ?? undefined,
             boxShadow: layer.boxShadow ?? undefined,
@@ -1253,6 +1253,17 @@ export default function Preview() {
     return () => ro.disconnect();
   }, [computeScale]);
 
+  // Auto-seek when a layer is selected that's outside the current time window
+  useEffect(() => {
+    if (!selectedLayerId) return;
+    const layer = useTimelineStore.getState().project?.layers?.find(l => l.id === selectedLayerId);
+    if (!layer) return;
+    const ct = useTimelineStore.getState().currentTime;
+    if (ct < layer.start || ct >= layer.end) {
+      setCurrentTime(layer.start + 0.01);
+    }
+  }, [selectedLayerId]);
+
   // RAF playback loop
   useEffect(() => {
     if (!isPlaying) return;
@@ -1281,71 +1292,88 @@ export default function Preview() {
     e.stopPropagation();
 
     if (e.shiftKey) { toggleLayerSelection(layer.id); return; }
-    selectLayer(layer.id);
+
+    const { selectedLayerIds: currentMultiIds } = useTimelineStore.getState();
+    const isInMultiSelect = currentMultiIds.length > 1 && currentMultiIds.includes(layer.id);
+
+    if (!isInMultiSelect) selectLayer(layer.id);
     setDraggingLayerId(layer.id);
 
     const startClientX = e.clientX;
     const startClientY = e.clientY;
 
-    // Get fresh layer and currentTime from store at the moment of mousedown
     const storeState = useTimelineStore.getState();
     const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
-    const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
-    const origT = { ...(freshLayer.transform ?? {}) };
 
-    // If keyframes drive x/y, we must drag in keyframe space; otherwise base transform
-    const resolvedT = resolveTransform(freshLayer, ct);
-    const origX = resolvedT.x ?? 0;
-    const origY = resolvedT.y ?? 0;
-    const localTime = Math.max(0, ct - freshLayer.start);
-    const hasXKF = (freshLayer.keyframes?.x?.length ?? 0) > 0;
-    const hasYKF = (freshLayer.keyframes?.y?.length ?? 0) > 0;
-    const origKF = JSON.parse(JSON.stringify(freshLayer.keyframes ?? {}));
+    // Drag all selected layers together, or just this one
+    const dragIds = isInMultiSelect ? currentMultiIds : [layer.id];
 
-    const buildPatch = (clientX, clientY) => {
+    const layerStates = dragIds.map(id => {
+      const fl = storeState.project?.layers?.find((l) => l.id === id);
+      if (!fl) return null;
+      const resolved = resolveTransform(fl, ct);
+      return {
+        id,
+        origT: { ...(fl.transform ?? {}) },
+        origX: resolved.x ?? 0,
+        origY: resolved.y ?? 0,
+        localTime: Math.max(0, ct - fl.start),
+        hasXKF: (fl.keyframes?.x?.length ?? 0) > 0,
+        hasYKF: (fl.keyframes?.y?.length ?? 0) > 0,
+        origKF: JSON.parse(JSON.stringify(fl.keyframes ?? {})),
+      };
+    }).filter(Boolean);
+
+    const buildPatches = (clientX, clientY) => {
       const s = scaleRef.current;
       const { format } = useTimelineStore.getState().project ?? {};
       const cW = format?.width ?? 1080, cH = format?.height ?? 1920;
-      const w = origT.width ?? cW, h = origT.height ?? cH;
-      const rawX = origX + (clientX - startClientX) / s;
-      const rawY = origY + (clientY - startClientY) / s;
-      const { x: newX, y: newY } = snapBody(rawX, rawY, w, h, cW, cH);
-
-      if (hasXKF || hasYKF) {
-        const kf = JSON.parse(JSON.stringify(origKF));
-        const upsert = (arr, time, value) => {
-          const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
-          if (idx >= 0) arr[idx] = { ...arr[idx], value };
-          else { arr.push({ time, value }); arr.sort((a, b) => a.time - b.time); }
-          return arr;
-        };
-        if (hasXKF) kf.x = upsert(kf.x ?? [], localTime, newX);
-        if (hasYKF) kf.y = upsert(kf.y ?? [], localTime, newY);
-        // Also update base transform for non-keyframed axis
-        const transform = { ...origT };
-        if (!hasXKF) transform.x = newX;
-        if (!hasYKF) transform.y = newY;
-        return { keyframes: kf, transform };
-      }
-
-      return { transform: { ...origT, x: newX, y: newY } };
+      return layerStates.map(ls => {
+        const rawX = ls.origX + (clientX - startClientX) / s;
+        const rawY = ls.origY + (clientY - startClientY) / s;
+        const { x: newX, y: newY } = dragIds.length === 1
+          ? snapBody(rawX, rawY, ls.origT.width ?? cW, ls.origT.height ?? cH, cW, cH)
+          : { x: rawX, y: rawY };
+        if (ls.hasXKF || ls.hasYKF) {
+          const kf = JSON.parse(JSON.stringify(ls.origKF));
+          const upsert = (arr, time, value) => {
+            const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
+            if (idx >= 0) arr[idx] = { ...arr[idx], value };
+            else { arr.push({ time, value }); arr.sort((a, b) => a.time - b.time); }
+            return arr;
+          };
+          if (ls.hasXKF) kf.x = upsert(kf.x ?? [], ls.localTime, newX);
+          if (ls.hasYKF) kf.y = upsert(kf.y ?? [], ls.localTime, newY);
+          const transform = { ...ls.origT };
+          if (!ls.hasXKF) transform.x = newX;
+          if (!ls.hasYKF) transform.y = newY;
+          return { id: ls.id, patch: { keyframes: kf, transform } };
+        }
+        return { id: ls.id, patch: { transform: { ...ls.origT, x: newX, y: newY } } };
+      });
     };
 
     const onMove = (me) => {
-      useTimelineStore.getState().updateLayerSilent(layer.id, buildPatch(me.clientX, me.clientY));
+      const store = useTimelineStore.getState();
+      buildPatches(me.clientX, me.clientY).forEach(({ id, patch }) => store.updateLayerSilent(id, patch));
     };
 
     const onUp = (me) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       setDraggingLayerId(null);
-      useTimelineStore.getState().commitDrag(layer.id, buildPatch(me.clientX, me.clientY), preDragProject);
+      const patches = buildPatches(me.clientX, me.clientY);
+      const store = useTimelineStore.getState();
+      patches.forEach(({ id, patch }, i) => {
+        if (i < patches.length - 1) store.updateLayerSilent(id, patch);
+        else store.commitDrag(id, patch, preDragProject);
+      });
     };
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [selectLayer]);
+  }, [selectLayer, toggleLayerSelection]);
 
   const layers = project?.layers ?? [];
 
