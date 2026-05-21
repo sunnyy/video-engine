@@ -290,7 +290,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typography" || path === "/videos/explainer" || path === "/video-captions" || path === "/videos/custom" || path === "/product-video";
+const inVideos  = path === "/videos" || path === "/video-captions" || path === "/product-video";
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -326,10 +326,6 @@ const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typ
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
               <NavItem icon={Icons.ad}         label="Product Video"    sub="Turn photos into video ads"  to="/product-video"      active={path === "/product-video"} />
               <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos" to="/video-captions"     active={path === "/video-captions"} />
-              <NavItem icon={Icons.explainer}  label="Explainer Video"  sub="Talking head + visuals"   to="/videos/explainer"   active={path === "/videos/explainer"} />
-              {isAdmin && <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />}
-              <NavItem icon={Icons.aiVideo}    label="AI Videos"        sub="Generated with AI"        to="/videos"             active={path === "/videos" || path === "/new"} />
-              <NavItem icon={Icons.custom}     label="Custom Videos"    sub="Built from scratch"       to="/videos/custom"      active={path === "/videos/custom"} />
             </FlyoutGroup>
 
             <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>

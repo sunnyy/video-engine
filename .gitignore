@@ -31,13 +31,6 @@ remotion-bundle
 .DS_Store
 
 Info.txt
-Flow.txt
-Tasks.txt
-Features.txt
-Strategy.txt
-SafeProject.txt
 project_structure.text
-ENGINE_SPEC_V1.md
-Prompts.txt
 
 src/server/temp

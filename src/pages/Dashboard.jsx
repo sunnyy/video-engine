@@ -15,12 +15,8 @@ const SECTIONS = [
     label: "Video",
     accent: "#f5c518",
     services: [
-      { emoji: "🎬", title: "AI Video",          desc: "Turn a topic or script into a ready-to-post short-form video.",   href: "/new",                accent: "#f5c518", tag: "Popular" },
-      { emoji: "📝", title: "Typography Video",   desc: "Make quotes, hooks & announcements impossible to scroll past.",   href: "/videos/typography",  accent: "#a78bfa" },
-      { emoji: "🎙", title: "Explainer Video",    desc: "Explain your product or idea clearly — without hiring anyone.",    href: "/videos/explainer",   accent: "#60a5fa" },
       { emoji: "🛍️", title: "Product Video",       desc: "Drop a product photo. Ship a scroll-stopping video ad in minutes.", href: "/product-video",      accent: "#f97316", tag: "Hot 🔥" },
       { emoji: "💬", title: "Video Captions",     desc: "Boost watch time & reach with auto-styled captions on any video.", href: "/video-captions",     accent: "#34d399" },
-      { emoji: "✏️", title: "Custom Video",       desc: "Hand-craft every beat, visual & voiceover — total control.",       href: "/videos/custom",      accent: "#f472b6" },
     ],
   },
   {

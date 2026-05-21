@@ -10,6 +10,24 @@ export const router = express.Router();
 
 const renderJobs = {};
 
+/* ── Clean up stale temp files on startup (leftover from crashes / cancelled renders) ── */
+function cleanupStaleTempFiles() {
+  try {
+    const cutoff = Date.now() - 2 * 60 * 60 * 1000; // 2 hours
+    for (const entry of fs.readdirSync(TEMP_DIR)) {
+      const full = path.join(TEMP_DIR, entry);
+      try {
+        const stat = fs.statSync(full);
+        if (stat.mtimeMs < cutoff) {
+          if (stat.isDirectory()) fs.rmSync(full, { recursive: true, force: true });
+          else fs.unlinkSync(full);
+        }
+      } catch {}
+    }
+  } catch {}
+}
+cleanupStaleTempFiles();
+
 /* ── Persist job state to disk so status survives server restarts / multi-instance ── */
 function jobPath(jobId) { return path.join(TEMP_DIR, `job-${jobId}.json`); }
 
@@ -181,6 +199,8 @@ async function timelineRenderJob(jobId, userId, project, projectId, resolution) 
           file_path: storageKey,
           created_at: new Date().toISOString(),
         }]);
+        // Client will use Supabase URL — local file no longer needed
+        try { fs.unlinkSync(outputPath); } catch {}
       }
     } catch (e) {
       console.warn("[timeline-render] Post-render save failed:", e.message);
@@ -194,6 +214,10 @@ async function timelineRenderJob(jobId, userId, project, projectId, resolution) 
       error: null,
     });
   } catch (err) {
+    // Clean up any partial temp files
+    try { fs.rmSync(path.join(TEMP_DIR, `frames-${jobId}`), { recursive: true, force: true }); } catch {}
+    try { fs.unlinkSync(path.join(TEMP_DIR, `render-${jobId}.mp4`)); } catch {}
+
     if (err.message === "RENDER_CANCELLED") {
       writeJob(jobId, { progress: 0, done: true, url: null, error: null, cancelled: true });
     } else {

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform } from "./keyframeUtils";
-import { SFX_LIBRARY, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
+import { loadSFXLibrary, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import PresetsModal from "./modals/PresetsModal";
 import IconModal from "./modals/IconModal";
@@ -1069,16 +1069,19 @@ function KeyframesSection({ layer }) {
   );
 }
 
-const SFX_OPTIONS = [
-  { key: "", label: "None" },
-  ...Object.entries(SFX_LIBRARY)
-    .sort((a, b) => a[1].label.localeCompare(b[1].label))
-    .map(([key, meta]) => ({ key, label: `${meta.label} (${meta.duration}s)` })),
-];
-
 function SfxSection({ layer, update }) {
   const sfx = layer.sfx ?? null;
   const previewRef = useRef(null);
+  const [sfxOptions, setSfxOptions] = useState([{ key: "", label: "None" }]);
+
+  useEffect(() => {
+    loadSFXLibrary().then(lib => {
+      const opts = Object.entries(lib)
+        .sort((a, b) => (a[1].title || a[0]).localeCompare(b[1].title || b[0]))
+        .map(([key, t]) => ({ key, label: t.duration ? `${t.title || key} (${t.duration}s)` : (t.title || key) }));
+      setSfxOptions([{ key: "", label: "None" }, ...opts]);
+    });
+  }, []);
 
   const updateSfx = (patch) =>
     update({ sfx: { key: sfx?.key ?? "", volume: sfx?.volume ?? 1, delay: sfx?.delay ?? 0, ...patch } });
@@ -1103,7 +1106,7 @@ function SfxSection({ layer, update }) {
             update({ sfx: val ? { key: val, volume: sfx?.volume ?? 1, delay: sfx?.delay ?? 0 } : null });
           }}
         >
-          {SFX_OPTIONS.map(({ key, label }) => (
+          {sfxOptions.map(({ key, label }) => (
             <option key={key} value={key}>{label}</option>
           ))}
         </select>
