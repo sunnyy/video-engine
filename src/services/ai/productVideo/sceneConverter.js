@@ -29,7 +29,7 @@ const PRESETS = {
   "accent-shape": () => ({ keyframes: { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] }, animation: { in: { type: "fade", duration: 0.3 }, out: { type: "none", duration: 0.3 } }, transition: { type: "none", duration: 0.5 } }),
 };
 
-export function convertScenesToTimeline(aiOutput, shotUrls) {
+export function convertScenesToTimeline(aiOutput, shotUrls, logoUrl = null) {
   const layers = [];
   const featureCount = {};
 
@@ -113,6 +113,28 @@ export function convertScenesToTimeline(aiOutput, shotUrls) {
         });
       }
     });
+
+    // Logo — top-left corner, every scene
+    // canvas top-left coords: x=60, y=100, w=200, h=80 → center-origin: x=-380, y=-820
+    if (logoUrl) {
+      layers.push({
+        id: `s${sceneIndex}_logo`,
+        trackId: `s${sceneIndex}_logo`,
+        type: "image",
+        src: logoUrl,
+        objectFit: "contain",
+        start,
+        end,
+        zIndex: 20,
+        visible: true,
+        locked: false,
+        sfx: null,
+        keyframes: { x: [], y: [], scale: [], rotation: [], opacity: [{ time: 0, value: 0, easing: "ease-out" }, { time: 0.4, value: 1, easing: "ease-out" }], blur: [] },
+        animation: { in: { type: "fade", duration: 0.4 }, out: { type: "none", duration: 0.3 } },
+        transition: { type: "none", duration: 0.5 },
+        transform: { x: -380, y: -820, width: 200, height: 80, opacity: 0.92, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+      });
+    }
   });
 
   return layers;

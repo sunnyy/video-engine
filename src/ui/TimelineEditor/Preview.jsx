@@ -304,6 +304,7 @@ function PersistentVideoTrack({
   const videoRef  = useRef(null);
   const wrapperRef = useRef(null);
   const playing   = useRef(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const activeClip  = clips.find((c) => currentTime >= c.start && currentTime < c.end) ?? null;
   const activeClipId = activeClip?.id ?? null;
@@ -520,7 +521,7 @@ function PersistentVideoTrack({
           pointerEvents: "none",
           outline: activeClip && isSelected
             ? isDragging ? "2px solid rgba(124,92,252,0.9)" : "2px dashed rgba(124,92,252,0.55)"
-            : "none",
+            : activeClip && isHovered && !isSelected ? "1px solid rgba(255,255,255,0.5)" : "none",
           outlineOffset: 1,
           overflow: "visible",
         }}
@@ -530,7 +531,7 @@ function PersistentVideoTrack({
             position: "absolute",
             inset: 0,
             overflow: "hidden",
-            cursor: isDraggable ? (isDragging ? "grabbing" : "move") : "default",
+            cursor: isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable ? "auto" : "none",
             borderRadius: (activeClip?.transform?.borderRadius ?? activeClip?.borderRadius) ? `${activeClip?.transform?.borderRadius ?? activeClip?.borderRadius}px` : undefined,
             border: activeClip?.borderWidth ? `${activeClip.borderWidth}px solid ${activeClip.borderColor ?? "#ffffff"}` : undefined,
@@ -540,6 +541,8 @@ function PersistentVideoTrack({
             boxSizing: activeClip?.padding ? "border-box" : undefined,
           }}
           onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, activeClip) : undefined}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
         >
           <video
             ref={videoRef}
@@ -607,6 +610,7 @@ function LayerElement({
   // Must be unconditional — called before the audio early-return below
   const wrapperRef  = useRef(null);
   const textEditRef = useRef(null);
+  const [isHovered, setIsHovered] = useState(false);
 
   // When entering edit mode, set content and move cursor to end
   useEffect(() => {
@@ -857,7 +861,7 @@ function LayerElement({
             display: "flex",
             alignItems: "center",
             justifyContent: s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
-            cursor: isDraggable ? "move" : "default",
+            cursor: "default",
           }}
           onDoubleClick={(e) => { e.stopPropagation(); onStartEdit?.(); }}
         >
@@ -1050,7 +1054,7 @@ function LayerElement({
             ? isDragging
               ? "2px solid rgba(124,92,252,0.9)"
               : "2px dashed rgba(124,92,252,0.55)"
-            : "none",
+            : isHovered ? "1px solid rgba(255,255,255,0.5)" : "none",
           outlineOffset: 1,
         }}
       >
@@ -1060,7 +1064,7 @@ function LayerElement({
             position: "absolute",
             inset: 0,
             overflow: "hidden",
-            cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "move") : "default",
+            cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",
             borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
             border: layer.borderWidth ? `${layer.borderWidth}px solid ${layer.borderColor ?? "#ffffff"}` : undefined,
@@ -1071,6 +1075,8 @@ function LayerElement({
             mixBlendMode: layer.blendMode ?? undefined,
           }}
           onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, layer) : undefined}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
         >
           {content}
         </div>

@@ -4,6 +4,7 @@ import { convertScenesToTimeline } from "./productVideo/sceneConverter";
 
 export async function generateProductVideo({
   productImageUrl,
+  logoUrl = null,
   brandName = "",
   videoType = "promo",
   offerText = "",
@@ -94,7 +95,7 @@ export async function generateProductVideo({
 
   // Step 3 — Convert to timeline (deterministic)
   progress(3, "Building your video...");
-  const layers = convertScenesToTimeline(aiOutput, finalShotUrls);
+  const layers = convertScenesToTimeline(aiOutput, finalShotUrls, logoUrl);
 
   // Ensure every scene has a background image layer
   const sceneDuration = 3.5;

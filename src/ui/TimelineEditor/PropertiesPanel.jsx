@@ -257,12 +257,6 @@ function AudioProps({ layer, update, updateSilent, commit }) {
       </div>
 
       <SrcField layer={layer} update={update} />
-      <Field label="Type">
-        <select style={selectStyle} value={layer.audioType ?? "music"} onChange={(e) => update({ audioType: e.target.value })}>
-          <option value="music">Music</option>
-          <option value="voiceover">Voiceover</option>
-        </select>
-      </Field>
       <Field label="Volume">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <button

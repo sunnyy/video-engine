@@ -1,5 +1,6 @@
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence } from "remotion";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender } from "remotion";
 import { SFX_LIBRARY, getSFXPreviewUrl } from "../core/registries/sfxRegistry";
+import { useMemo, useEffect } from "react";
 
 export default function TimelineComposition({ project }) {
   const frame = useCurrentFrame();
@@ -9,6 +10,31 @@ export default function TimelineComposition({ project }) {
   const layers = [...(project?.layers || [])]
     .filter((l) => l.type === "audio" || l.visible !== false)
     .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+  // Collect unique font families from text/caption layers
+  const fontFamilies = useMemo(() => {
+    const families = new Set(["Outfit"]);
+    for (const l of project?.layers || []) {
+      const f = l.style?.fontFamily || l.captionStyle?.fontFamily;
+      if (f) families.add(f);
+    }
+    return [...families];
+  }, [project]);
+
+  // Load Google Fonts before any frame renders
+  const fontHandle = useMemo(() => delayRender("Loading fonts"), []);
+  useEffect(() => {
+    const links = fontFamilies.map((family) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@100;300;400;500;600;700;800;900&display=swap`;
+      document.head.appendChild(link);
+      return link;
+    });
+    document.fonts.ready.then(() => continueRender(fontHandle));
+    return () => links.forEach((l) => l.remove());
+  }, [fontHandle]);
+
 
   return (
     <AbsoluteFill style={{ background: project?.format?.background || "#000" }}>
