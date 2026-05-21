@@ -23,6 +23,7 @@ const STEP_LABELS = [
   "Creating your visuals...",
   "Building your video...",
   "Adding music...",
+  "Generating voiceovers...",
 ];
 
 const VIDEO_TYPES = [

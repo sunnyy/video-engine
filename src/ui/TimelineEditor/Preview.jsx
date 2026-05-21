@@ -1404,7 +1404,6 @@ export default function Preview() {
   const audioLayers = layers.filter(
     (l) =>
       l.type === "audio" &&
-      l.visible !== false &&
       currentTime >= l.start &&
       currentTime < l.end
   );

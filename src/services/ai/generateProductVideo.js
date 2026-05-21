@@ -13,14 +13,21 @@ export async function generateProductVideo({
   projectId,
   onProgress,
 }) {
-  const TOTAL = 4;
+  const TOTAL = 5;
   const progress = (step, label) => onProgress?.(step, TOTAL, label);
 
   // Step 1 — Generate scenes (GPT-4o vision, direct URL)
   progress(1, "Analyzing your product...");
+  const LAYOUT_SETS = [
+    ["LEFT_COLUMN", "RIGHT_COLUMN", "BOTTOM_STRIP"],
+    ["FULL_BLEED_TYPOGRAPHIC", "CENTERED_MINIMAL", "BOTTOM_STRIP"],
+    ["RIGHT_COLUMN", "BOTTOM_STRIP", "CENTERED_MINIMAL"],
+    ["CENTERED_MINIMAL", "BOTTOM_STRIP", "FULL_BLEED_TYPOGRAPHIC"],
+  ];
+  const forcedLayouts = LAYOUT_SETS[Math.floor(Math.random() * LAYOUT_SETS.length)];
   const scenesRes = await serverFetch("/api/product-video/generate-scenes", {
     method: "POST",
-    body: JSON.stringify({ imageUrl: productImageUrl, brandName, ctaText, offerText, website, tagline }),
+    body: JSON.stringify({ imageUrl: productImageUrl, brandName, ctaText, offerText, website, tagline, forcedLayouts }),
   });
   if (!scenesRes.ok) throw new Error("Scene generation failed");
   const aiOutput = await scenesRes.json();
@@ -63,7 +70,7 @@ export async function generateProductVideo({
   const layers = convertScenesToTimeline(aiOutput, shotUrls);
 
   // Ensure every scene has a background image layer
-  const sceneDuration = 2.5;
+  const sceneDuration = 3.5;
   const safetyLayers = [...layers];
   scenes.forEach((scene, i) => {
     const start = i * sceneDuration;
@@ -90,15 +97,79 @@ export async function generateProductVideo({
 
   // Step 4 — Music
   progress(4, "Adding music...");
+  const totalDuration = scenes.length * 3.5;
+  safetyLayers.push({
+    id: "bg_music",
+    trackId: "bg_music",
+    type: "audio",
+    audioType: "music",
+    start: 0,
+    end: totalDuration,
+    src: null,
+    volume: 0.4,
+    visible: false,
+    locked: false,
+    sfx: null,
+    keyframes: { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
+    transform: { x: 0, y: 0, width: 0, height: 0, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+  });
   let finalLayers = safetyLayers;
   try {
+    const audioSlots = safetyLayers.filter(l => l.type === "audio" && l.audioType === "music" && !l.src);
+    console.log(`[music] audio slots available: ${audioSlots.length}, mood: ${aiOutput.productDNA?.mood}`);
     finalLayers = await injectMusic({
-      layers,
+      layers: safetyLayers,
       direction: { musicMood: aiOutput.productDNA?.mood, energy: "medium" },
     });
-  } catch { /* non-fatal */ }
+    const injected = finalLayers.filter(l => l.type === "audio" && l.audioType === "music" && l.src);
+    console.log(`[music] tracks injected: ${injected.length}`, injected.map(l => ({ src: l.src, name: l.name })));
+  } catch (err) {
+    console.error("[music] injection failed:", err.message);
+  }
 
-  const totalDuration = scenes.length * 2.5;
+  // Step 5 — Voiceovers (one TTS per scene)
+  progress(5, "Generating voiceovers...");
+  for (let i = 0; i < scenes.length; i++) {
+    const script = scenes[i].voiceover?.trim();
+    if (!script) continue;
+    const start = i * 3.5;
+    const end = start + 3.5;
+    try {
+      const ttsRes = await serverFetch("/api/generate-tts", {
+        method: "POST",
+        body: JSON.stringify({ script, voice: "nova", speed: 1.2, projectId }),
+      });
+      if (ttsRes.ok) {
+        const { url } = await ttsRes.json();
+        if (url) {
+          finalLayers.push({
+            id: `voiceover_${i}`,
+            trackId: `voiceover_${i}`,
+            type: "audio",
+            audioType: "voiceover",
+            name: `Voiceover ${i + 1}`,
+            start,
+            end,
+            src: url,
+            volume: 1.0,
+            visible: false,
+            locked: false,
+            muted: false,
+            fadeIn: 0.1,
+            fadeOut: 0.2,
+            sfx: null,
+            keyframes: { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
+            transform: { x: 0, y: 0, width: 0, height: 0, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+          });
+          console.log(`[voiceover] scene ${i} injected:`, url);
+        }
+      } else {
+        console.error(`[voiceover] scene ${i} TTS failed:`, ttsRes.status);
+      }
+    } catch (err) {
+      console.error(`[voiceover] scene ${i} failed:`, err.message);
+    }
+  }
 
   return {
     layers: finalLayers,

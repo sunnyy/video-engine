@@ -5,7 +5,7 @@ export const router = express.Router();
 
 router.post("/generate-scenes", requireAuth, async (req, res) => {
   try {
-    const { imageUrl, brandName, ctaText, offerText, website, tagline } = req.body;
+    const { imageUrl, brandName, ctaText, offerText, website, tagline, forcedLayouts } = req.body;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-5.5",
@@ -53,16 +53,24 @@ CANVAS: 1080x1920 pixels. Top-left origin. x:0,y:0 = top-left corner. x:1080,y:1
 SAFE AREA: x between 60 and 1020. y between 80 and 1840.
 
 Generate exactly 3 scenes. Choose the narrative arc, composition style, and scene purposes freely based on what works best for this product.
-Each scene duration is 2.5 seconds.
+Each scene duration is 3.5 seconds.
 
 VOICEOVER RULES:
-- cinematic, emotional, premium, minimal
-- natural spoken rhythm
-- avoid corporate marketing language
-- 1-2 sentences max per scene
+- Each scene voiceover must be 4-8 words only.
+- Target spoken duration: 1.2-1.8 seconds per scene.
+- Speak at 150-180 WPM — short, punchy, breathable.
+- Do NOT write full sentences. Write spoken fragments.
+- Do NOT repeat on-screen headline text.
+- Do NOT explain the visuals.
+- Examples: "Cherry vanilla. Softer refreshment." / "Prebiotics. Botanicals. Better soda." / "Meet your new favorite sip."
+
+HEADLINE RULES:
+- 2-6 words maximum — bold, punchy, attitude-driven
+- The headline is a design element, not a summary
+- The voiceover tells the story — the headline punctuates it
+- Examples of good headlines: "MADE FOR THE FEW", "OWN THE MOMENT", "BUILT DIFFERENT", "ZERO LIMITS"
 
 TEXT RULES:
-- headlines: 2-5 words, bold, punchy, attitude-driven
 - avoid paragraphs
 - prioritize emotional impact
 - typography integrated into composition
@@ -71,16 +79,16 @@ TYPOGRAPHY SCALE RULES:
 
 Hook:
 - headline: 140–220px
-- subheadline: 42–60px
-- brand: 28–42px
+- subheadline: 63–90px
+- brand: 42–63px
 
 Hero:
 - headline: 100–160px
-- features: 36–52px
+- features: 54–78px
 
 CTA:
 - headline: 120–180px
-- cta-button: 48–72px
+- cta-button: 72–108px
 
 SPACING RULES:
 Every text layer must reserve breathing room.
@@ -343,7 +351,7 @@ RETURN FORMAT:
       "index": 0,
       "purpose": "string",
       "sceneName": "string",
-      "sceneDuration": 2.5,
+      "sceneDuration": 3.5,
       "voiceover": "string",
       "visual": {
         "prompt": "string",
@@ -394,7 +402,7 @@ RETURN FORMAT:
           content: [
             {
               type: "text",
-              text: `Analyze this product and generate 3 premium cinematic advertisement scenes.${brandName ? ` Brand: ${brandName}.` : ""}${ctaText ? ` CTA: ${ctaText}.` : " CTA: Shop Now."}${offerText ? ` Offer: ${offerText}.` : ""}${website ? ` Website: ${website}.` : ""}${tagline ? ` Tagline: ${tagline}.` : ""}`,
+              text: `Analyze this product and generate 3 premium cinematic advertisement scenes.${brandName ? ` Brand: ${brandName}.` : ""}${ctaText ? ` CTA: ${ctaText}.` : " CTA: Shop Now."}${offerText ? ` Offer: ${offerText}.` : ""}${website ? ` Website: ${website}.` : ""}${tagline ? ` Tagline: ${tagline}.` : ""}${forcedLayouts?.length === 3 ? `\n\nMANDATORY LAYOUT ASSIGNMENT\n\nScene 1: ${forcedLayouts[0]}\nScene 2: ${forcedLayouts[1]}\nScene 3: ${forcedLayouts[2]}\n\nThese layouts are mandatory. Do not deviate.\nDo not reuse same text alignment, panel placement, product placement, or composition flow.\nLayout changes structure. Creative direction stays constant.\nAll scenes must still feel like one campaign.` : ""}`,
             },
             {
               type: "image_url",
