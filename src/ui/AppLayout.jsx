@@ -324,8 +324,7 @@ const inVideos  = path === "/videos" || path === "/new" || path === "/videos/typ
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
-              {isAdmin && <NavItem icon={Icons.aiVideo}    label="Product Video (AI)" sub="AI-generated product ads" to="/product-video"      active={path === "/product-video"} />}
-              <NavItem icon={Icons.ad}         label="Product Video"    sub="Ads for your products"    to="/product-video"      active={path === "/product-video"} />
+              <NavItem icon={Icons.ad}         label="Product Video"    sub="Turn photos into video ads"  to="/product-video"      active={path === "/product-video"} />
               <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos" to="/video-captions"     active={path === "/video-captions"} />
               <NavItem icon={Icons.explainer}  label="Explainer Video"  sub="Talking head + visuals"   to="/videos/explainer"   active={path === "/videos/explainer"} />
               {isAdmin && <NavItem icon={Icons.typography} label="Typography Video" sub="Kinetic text videos"       to="/videos/typography"  active={path === "/videos/typography"} />}
