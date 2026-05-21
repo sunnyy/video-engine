@@ -11,7 +11,6 @@ import { serverFetch } from "../services/serverApi";
 import AppLayout from "../ui/AppLayout";
 import Onboarding from "./Onboarding";
 import FeedbackModal from "../ui/components/FeedbackModal";
-import VideoGenerator from "./VideoGenerator";
 
 /* ── Niche → gradient map ── */
 const NICHE_GRADIENTS = {
@@ -297,7 +296,7 @@ export default function Videos() {
           AI Videos
         </h1>
         <div style={{ display: "flex", gap: 4 }}>
-          {[["videos", `My Videos${!loading && videoProjects.length ? ` (${videoProjects.length})` : ""}`], ["create", "Create New"]].map(([id, label]) => (
+          {[["videos", `My Videos${!loading && videoProjects.length ? ` (${videoProjects.length})` : ""}`]].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -316,14 +315,7 @@ export default function Videos() {
         </div>
       </div>
 
-      {/* Create New tab */}
-      {activeTab === "create" && (
-        <div className="flex-1 overflow-y-auto">
-          <VideoGenerator embedded />
-        </div>
-      )}
-
-      {/* Search + Grid */}
+{/* Search + Grid */}
       {activeTab === "videos" && <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="flex items-center justify-between mb-5">
           <div style={{ fontSize: 13, color: "#44444f" }}>
