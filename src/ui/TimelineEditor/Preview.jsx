@@ -1579,6 +1579,7 @@ export default function Preview() {
         overflow: "hidden",
         position: "relative",
         cursor: isHandMode ? "grab" : undefined,
+        userSelect: "none",
       }}
       onMouseDown={handleContainerMouseDown}
     >
