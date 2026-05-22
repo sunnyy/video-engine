@@ -1241,6 +1241,22 @@ export default function Preview() {
     };
   }, []);
 
+  // Clamp pan so the canvas always stays partially in view (80px margin).
+  const clampPan = useCallback((pan) => {
+    const el = containerRef.current;
+    if (!el) return pan;
+    const margin = 80;
+    const sc = scaleRef.current;
+    const cW = canvasW * sc;
+    const cH = canvasH * sc;
+    const maxX = el.offsetWidth  / 2 + cW / 2 - margin;
+    const maxY = el.offsetHeight / 2 + cH / 2 - margin;
+    return {
+      x: Math.max(-maxX, Math.min(maxX, pan.x)),
+      y: Math.max(-maxY, Math.min(maxY, pan.y)),
+    };
+  }, [canvasW, canvasH]);
+
   // ── Ctrl+wheel zoom, plain wheel pan ───────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
@@ -1253,7 +1269,7 @@ export default function Preview() {
       } else {
         e.preventDefault();
         setPanOffset((p) => {
-          const next = { x: p.x - e.deltaX, y: p.y - e.deltaY };
+          const next = clampPan({ x: p.x - e.deltaX, y: p.y - e.deltaY });
           panOffsetRef.current = next;
           return next;
         });
@@ -1261,7 +1277,7 @@ export default function Preview() {
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [clampPan]);
 
   // ── H + drag pan ───────────────────────────────────────────────────────────
   const handleContainerMouseDown = useCallback((e) => {
@@ -1277,7 +1293,7 @@ export default function Preview() {
     const startY = e.clientY;
     const origPan = { ...panOffsetRef.current };
     const onMove = (me) => {
-      const next = { x: origPan.x + me.clientX - startX, y: origPan.y + me.clientY - startY };
+      const next = clampPan({ x: origPan.x + me.clientX - startX, y: origPan.y + me.clientY - startY });
       panOffsetRef.current = next;
       setPanOffset(next);
     };
