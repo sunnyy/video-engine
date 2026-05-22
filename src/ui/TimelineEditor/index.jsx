@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import TopBar from "./TopBar";
 import LeftPanel from "./LeftPanel";
@@ -8,6 +8,25 @@ import TimelineToolbar from "./TimelineToolbar";
 import Timeline from "./Timeline";
 
 export default function TimelineEditor() {
+  const [timelineHeight, setTimelineHeight] = useState(220);
+  const dragRef = useRef(null);
+
+  const onDividerMouseDown = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = timelineHeight;
+    const onMove = (me) => {
+      const delta = startY - me.clientY;
+      setTimelineHeight(Math.max(120, Math.min(window.innerHeight * 0.65, startH + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   useEffect(() => {
     const onKey = (e) => {
       const tag = document.activeElement?.tagName?.toLowerCase();
@@ -137,8 +156,29 @@ export default function TimelineEditor() {
         {/* Center column: canvas on top, timeline below */}
         <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
           <Preview />
-          <TimelineToolbar />
-          <Timeline />
+
+          {/* Drag handle */}
+          <div
+            ref={dragRef}
+            onMouseDown={onDividerMouseDown}
+            style={{
+              height: 6,
+              flexShrink: 0,
+              cursor: "ns-resize",
+              background: "transparent",
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div style={{ width: 32, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.15)" }} />
+          </div>
+
+          <div style={{ height: timelineHeight, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <TimelineToolbar />
+            <Timeline />
+          </div>
         </div>
 
         {/* Right column: properties panel, full height */}
