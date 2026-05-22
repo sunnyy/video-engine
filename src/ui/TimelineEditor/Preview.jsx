@@ -1241,6 +1241,23 @@ export default function Preview() {
     };
   }, []);
 
+  const canvasW = project?.format?.width  ?? 1080;
+  const canvasH = project?.format?.height ?? 1920;
+
+  // Clamp pan so the canvas always stays partially in view (80px margin).
+  const clampPan = useCallback((pan) => {
+    const el = containerRef.current;
+    if (!el) return pan;
+    const margin = 80;
+    const sc = scaleRef.current;
+    const maxX = el.offsetWidth  / 2 + (canvasW * sc) / 2 - margin;
+    const maxY = el.offsetHeight / 2 + (canvasH * sc) / 2 - margin;
+    return {
+      x: Math.max(-maxX, Math.min(maxX, pan.x)),
+      y: Math.max(-maxY, Math.min(maxY, pan.y)),
+    };
+  }, [canvasW, canvasH]);
+
   // ── Ctrl+wheel zoom, plain wheel pan ───────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
@@ -1288,23 +1305,6 @@ export default function Preview() {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }, []);
-
-  const canvasW = project?.format?.width  ?? 1080;
-  const canvasH = project?.format?.height ?? 1920;
-
-  // Clamp pan so the canvas always stays partially in view (80px margin).
-  const clampPan = useCallback((pan) => {
-    const el = containerRef.current;
-    if (!el) return pan;
-    const margin = 80;
-    const sc = scaleRef.current;
-    const maxX = el.offsetWidth  / 2 + (canvasW * sc) / 2 - margin;
-    const maxY = el.offsetHeight / 2 + (canvasH * sc) / 2 - margin;
-    return {
-      x: Math.max(-maxX, Math.min(maxX, pan.x)),
-      y: Math.max(-maxY, Math.min(maxY, pan.y)),
-    };
-  }, [canvasW, canvasH]);
 
   useEffect(() => {
     const es = scale * userZoomRef.current;
