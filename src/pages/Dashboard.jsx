@@ -16,6 +16,7 @@ const SECTIONS = [
     accent: "#f5c518",
     services: [
       { emoji: "🛍️", title: "Product Video",       desc: "Drop a product photo. Ship a scroll-stopping video ad in minutes.", href: "/product-video",      accent: "#f97316", tag: "Hot 🔥" },
+      { emoji: "✍️", title: "Typography Video",   desc: "Bold text animations from a topic or script. No media needed.",    href: "/typography-video",   accent: "#7c5cfc", tag: "New ✨" },
       { emoji: "💬", title: "Video Captions",     desc: "Boost watch time & reach with auto-styled captions on any video.", href: "/video-captions",     accent: "#34d399" },
     ],
   },

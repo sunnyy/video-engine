@@ -56,36 +56,76 @@ export default function TimelineComposition({ project }) {
   );
 }
 
-function getTransitionOpacity(layer, currentTime) {
+const easeOutQuart  = (t) => 1 - Math.pow(1 - t, 4);
+const easeInQuart   = (t) => t * t * t * t;
+const easeInOutQuart = (t) => t < 0.5 ? 8*t*t*t*t : 1 - Math.pow(-2*t+2, 4)/2;
+
+function buildEntranceEffect(type, p, intensity = 1) {
+  const e = easeOutQuart(p);
+  const ef = easeInOutQuart(p);
+  const i = Math.max(0, Math.min(1, intensity));
+  switch (type) {
+    case "crossfade":
+    case "fade":        return { opacity: 1 - i*(1-ef), tX: 0,            tY: 0,             scale: 1 };
+    case "dissolve":    return { opacity: 1 - i*(1-ef), tX: 0,            tY: 0,             scale: 1 };
+    case "slide-left":  return { opacity: 1,            tX: (1-e)*100*i,  tY: 0,             scale: 1 };
+    case "slide-right": return { opacity: 1,            tX: -(1-e)*100*i, tY: 0,             scale: 1 };
+    case "slide-up":    return { opacity: 1,            tX: 0,            tY: (1-e)*100*i,   scale: 1 };
+    case "slide-down":  return { opacity: 1,            tX: 0,            tY: -(1-e)*100*i,  scale: 1 };
+    case "zoom-in":
+    case "zoom":        return { opacity: 1 - i*(1-ef), tX: 0,            tY: 0,             scale: 1 - i*0.2*(1-e) };
+    default:            return { opacity: 1,            tX: 0,            tY: 0,             scale: 1 };
+  }
+}
+
+function buildExitEffect(type, p, intensity = 1) {
+  const e = easeInQuart(p);
+  const ef = easeInOutQuart(p);
+  const i = Math.max(0, Math.min(1, intensity));
+  switch (type) {
+    case "crossfade":
+    case "fade":        return { opacity: (1-i) + i*ef,  tX: 0,             tY: 0,             scale: 1 };
+    case "dissolve":    return { opacity: (1-i) + i*ef,  tX: 0,             tY: 0,             scale: 1 };
+    case "slide-left":  return { opacity: 1,             tX: -(1-e)*100*i,  tY: 0,             scale: 1 };
+    case "slide-right": return { opacity: 1,             tX: (1-e)*100*i,   tY: 0,             scale: 1 };
+    case "slide-up":    return { opacity: 1,             tX: 0,             tY: -(1-e)*100*i,  scale: 1 };
+    case "slide-down":  return { opacity: 1,             tX: 0,             tY: (1-e)*100*i,   scale: 1 };
+    case "zoom-in":
+    case "zoom":        return { opacity: (1-i) + i*ef,  tX: 0,             tY: 0,             scale: 1 - i*0.2*(1-e) };
+    default:            return { opacity: 1,             tX: 0,             tY: 0,             scale: 1 };
+  }
+}
+
+function getTransitionStyle(layer, currentTime) {
   const inCfg  = layer.transition?.in  ?? (layer.transition?.type ? layer.transition : null);
   const outCfg = layer.transition?.out ?? null;
-  const inType  = inCfg?.type  ?? "none";
-  const inDur   = inCfg?.duration ?? 0.5;
-  const outType = outCfg?.type ?? "none";
-  const outDur  = outCfg?.duration ?? 0.5;
+  const inType      = inCfg?.type      ?? "none";
+  const inDur       = inCfg?.duration  ?? 0.5;
+  const inIntensity = inCfg?.intensity ?? 1;
+  const outType      = outCfg?.type      ?? "none";
+  const outDur       = outCfg?.duration  ?? 0.5;
+  const outIntensity = outCfg?.intensity ?? 1;
 
   if (outType !== "none" && outDur > 0) {
     const exitStart = layer.end - outDur;
     if (currentTime >= exitStart && currentTime < layer.end) {
-      return Math.max(0, 1 - (currentTime - exitStart) / outDur);
+      return buildExitEffect(outType, Math.max(0, Math.min(1, 1 - (currentTime - exitStart) / outDur)), outIntensity);
     }
   }
-
   if (inType !== "none" && inDur > 0) {
     const entranceEnd = layer.start + inDur;
     if (currentTime >= layer.start && currentTime < entranceEnd) {
-      return Math.max(0, Math.min(1, (currentTime - layer.start) / inDur));
+      return buildEntranceEffect(inType, Math.max(0, Math.min(1, (currentTime - layer.start) / inDur)), inIntensity);
     }
   }
-
-  return 1;
+  return { opacity: 1, tX: 0, tY: 0, scale: 1 };
 }
 
 function TimelineLayer({ layer, currentTime, fps }) {
   if (currentTime < layer.start || currentTime >= layer.end) return null;
 
   const tr = getInterpolatedTransform(layer, currentTime);
-  const tOpacity = getTransitionOpacity(layer, currentTime);
+  const ts = getTransitionStyle(layer, currentTime);
   const startFrame = Math.round(layer.start * fps);
   const durationFrames = Math.max(1, Math.round((layer.end - layer.start) * fps));
 
@@ -97,8 +137,8 @@ function TimelineLayer({ layer, currentTime, fps }) {
     top: CANVAS_H / 2 + tr.y - tr.height / 2,
     width: tr.width,
     height: tr.height,
-    opacity: tr.opacity * tOpacity,
-    transform: `rotate(${tr.rotation}deg) scale(${tr.scale})`,
+    opacity: tr.opacity * ts.opacity,
+    transform: `${ts.tX ? `translateX(${ts.tX}%) ` : ""}${ts.tY ? `translateY(${ts.tY}%) ` : ""}rotate(${tr.rotation}deg) scale(${tr.scale * ts.scale})`,
     filter: tr.blur > 0 ? `blur(${tr.blur}px)` : undefined,
     zIndex: layer.zIndex,
   };
@@ -139,6 +179,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
             fontFamily: s.fontFamily || "Outfit",
             fontSize: s.fontSize || 48,
             fontWeight: s.fontWeight || 700,
+            fontStyle: s.fontStyle || "normal",
             color: s.color || "#ffffff",
             textAlign: s.textAlign || "center",
             lineHeight: s.lineHeight || 1.2,
@@ -152,12 +193,21 @@ function TimelineLayer({ layer, currentTime, fps }) {
             alignItems: "center",
             justifyContent:
               s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
+            whiteSpace: s.whiteSpace ?? "pre-wrap",
+            wordBreak: s.wordBreak ?? "break-word",
             overflow: "hidden",
           }}
         >
-          {layer.content}
+          {s.accentWord && s.accentColor
+            ? <span style={{ wordBreak: "break-word" }}>
+                {(layer.content || "").split(" ").map((word, i, arr) => (
+                  <span key={i} style={{ color: word === s.accentWord ? s.accentColor : s.color }}>
+                    {word}{i < arr.length - 1 ? " " : ""}
+                  </span>
+                ))}
+              </span>
+            : layer.content
+          }
         </div>
       </Sequence>
     );

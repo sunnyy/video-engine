@@ -311,10 +311,25 @@ function TextProps({ layer, update, updateSilent, commit }) {
       </Field>
       <Row2>
         <Field label="Font Size">
-          <NumberInput value={s.fontSize} onChange={(v) => updateStyle({ fontSize: Math.max(1, v) })} min={1} step={1} />
+          <NumberInput value={s.fontSize} onChange={(v) => {
+            const newFs = Math.max(1, v);
+            const ratio = newFs / (s.fontSize || 48);
+            update({
+              style: { ...s, fontSize: newFs },
+              transform: {
+                ...layer.transform,
+                width:  Math.round(layer.transform.width  * ratio),
+                height: Math.round(layer.transform.height * ratio),
+              },
+            });
+          }} min={1} step={1} />
         </Field>
         <Field label="Weight">
-          <NumberInput value={s.fontWeight} onChange={(v) => updateStyle({ fontWeight: v })} min={100} max={900} step={100} />
+          <select style={selectStyle} value={s.fontWeight ?? 700} onChange={(e) => updateStyle({ fontWeight: parseInt(e.target.value) })}>
+            {[100, 200, 300, 400, 500, 600, 700, 800, 900].map((w) => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+          </select>
         </Field>
       </Row2>
       <Field label="Font">
@@ -339,6 +354,58 @@ function TextProps({ layer, update, updateSilent, commit }) {
             <option value="center">Center</option>
             <option value="right">Right</option>
           </select>
+        </Field>
+      </Row2>
+      <Field label="Style">
+        <div style={{ display: "flex", gap: 5 }}>
+          {[
+            { value: "normal", label: "Normal" },
+            { value: "italic", label: "Italic" },
+          ].map(({ value, label }) => {
+            const active = (s.fontStyle ?? "normal") === value;
+            return (
+              <button key={value} onClick={() => updateStyle({ fontStyle: value })}
+                style={{
+                  flex: 1, padding: "4px 0", borderRadius: 5, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                  background: active ? "rgba(124,92,252,0.2)" : "transparent",
+                  color: active ? "#a78bfa" : "#9090b0",
+                  fontStyle: value,
+                }}
+              >{label}</button>
+            );
+          })}
+        </div>
+      </Field>
+      <Field label="Transform">
+        <div style={{ display: "flex", gap: 5 }}>
+          {[
+            { value: "none",       label: "Aa" },
+            { value: "uppercase",  label: "AA" },
+            { value: "lowercase",  label: "aa" },
+            { value: "capitalize", label: "Aa+" },
+          ].map(({ value, label }) => {
+            const active = (s.textTransform ?? "none") === value;
+            return (
+              <button key={value} onClick={() => updateStyle({ textTransform: value })}
+                style={{
+                  flex: 1, padding: "4px 0", borderRadius: 5, fontSize: 11, cursor: "pointer",
+                  border: `1px solid ${active ? "#7c5cfc" : "rgba(255,255,255,0.1)"}`,
+                  background: active ? "rgba(124,92,252,0.2)" : "transparent",
+                  color: active ? "#a78bfa" : "#9090b0",
+                  fontWeight: active ? 700 : 400,
+                }}
+              >{label}</button>
+            );
+          })}
+        </div>
+      </Field>
+      <Row2>
+        <Field label="Letter Spacing">
+          <NumberInput value={s.letterSpacing ?? 0} onChange={(v) => updateStyle({ letterSpacing: v })} step={0.5} />
+        </Field>
+        <Field label="Line Height">
+          <NumberInput value={s.lineHeight ?? 1.2} onChange={(v) => updateStyle({ lineHeight: Math.max(0.5, v) })} min={0.5} step={0.1} />
         </Field>
       </Row2>
     </Section>
@@ -956,6 +1023,7 @@ function AppearanceSection({ layer, update, updateSilent, commit,
 function TransitionProps({ layer, update }) {
   const tr = layer.transition ?? { type: "none", duration: 0.5 };
   const updateTr = (patch) => update({ transition: { ...tr, ...patch } });
+  const active = (tr.type ?? "none") !== "none";
   return (
     <Section title="Transition">
       <Field label="Type">
@@ -963,14 +1031,23 @@ function TransitionProps({ layer, update }) {
           {TRANSITION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </Field>
-      {(tr.type ?? "none") !== "none" && (
-        <Field label="Duration (s)">
-          <NumberInput
-            value={tr.duration ?? 0.5}
-            onChange={(v) => updateTr({ duration: Math.max(0.1, Math.min(2, v)) })}
-            min={0.1} max={2} step={0.1}
-          />
-        </Field>
+      {active && (
+        <Row2>
+          <Field label="Duration (s)">
+            <NumberInput
+              value={tr.duration ?? 0.5}
+              onChange={(v) => updateTr({ duration: Math.max(0.1, Math.min(2, v)) })}
+              min={0.1} max={2} step={0.1}
+            />
+          </Field>
+          <Field label="Intensity">
+            <NumberInput
+              value={tr.intensity ?? 1}
+              onChange={(v) => updateTr({ intensity: Math.max(0, Math.min(1, v)) })}
+              min={0} max={1} step={0.05}
+            />
+          </Field>
+        </Row2>
       )}
       <div style={{ fontSize: 11, color: "#55557a", marginTop: -4 }}>Applied at the start of this clip (entrance)</div>
     </Section>

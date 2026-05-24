@@ -47,9 +47,13 @@ export function convertScenesToTimeline(aiOutput, shotUrls, logoUrl = null) {
       const cx = ((aiLayer.x ?? 0) + (aiLayer.width ?? 80) / 2) - CANVAS_W / 2;
       const cy = ((aiLayer.y ?? 0) + (aiLayer.height ?? 80) / 2) - CANVAS_H / 2;
 
+      const trackId = role === "feature"
+        ? `track_feature_${fi}`
+        : `track_${role}`;
+
       const base = {
         id: aiLayer.id,
-        trackId: aiLayer.id,
+        trackId,
         start,
         end,
         zIndex: aiLayer.zIndex || 1,
@@ -119,7 +123,7 @@ export function convertScenesToTimeline(aiOutput, shotUrls, logoUrl = null) {
     if (logoUrl) {
       layers.push({
         id: `s${sceneIndex}_logo`,
-        trackId: `s${sceneIndex}_logo`,
+        trackId: "track_logo",
         type: "image",
         src: logoUrl,
         objectFit: "contain",

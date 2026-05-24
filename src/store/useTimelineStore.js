@@ -46,13 +46,25 @@ export const useTimelineStore = create((set, get) => ({
 
   // ── Project actions ──────────────────────────────────────────
   setProject: (project) => {
-    const layers = project?.layers ?? [];
+    // Migrate old typography video layers that have stackLayout:true
+    const migratedLayers = (project?.layers ?? []).map((l) => {
+      if (!l.stackLayout || l.type !== "text") return l;
+      const fontSize  = l.style?.fontSize ?? 120;
+      const charCount = (l.content || "").replace(/\s+/g, "").length || 1;
+      const layerW    = Math.min(960, Math.round(fontSize * charCount * 0.58));
+      const layerH    = Math.round(fontSize * 1.4);
+      const { stackLayout: _dropped, ...rest } = l;
+      return { ...rest, transform: { ...rest.transform, x: 0, y: 0, width: layerW, height: layerH } };
+    });
+    const migratedProject = project ? { ...project, layers: migratedLayers } : project;
+
+    const layers = migratedProject?.layers ?? [];
     const newDuration = layers.length > 0
       ? recalcDuration(layers)
       : (project?.format?.duration ?? 30);
-    const newProject = project
-      ? { ...project, format: { ...project.format, duration: newDuration } }
-      : project;
+    const newProject = migratedProject
+      ? { ...migratedProject, format: { ...migratedProject.format, duration: newDuration } }
+      : migratedProject;
     set({
       project: newProject,
       duration: newDuration,

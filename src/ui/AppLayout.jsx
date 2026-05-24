@@ -290,7 +290,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-const inVideos  = path === "/videos" || path === "/video-captions" || path === "/product-video";
+const inVideos  = path === "/videos" || path === "/video-captions" || path === "/product-video" || path === "/typography-video";
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -325,7 +325,8 @@ const inVideos  = path === "/videos" || path === "/video-captions" || path === "
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
               <NavItem icon={Icons.ad}         label="Product Video"    sub="Turn photos into video ads"  to="/product-video"      active={path === "/product-video"} />
-              <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos" to="/video-captions"     active={path === "/video-captions"} />
+              <NavItem icon={Icons.typography} label="Typography Video" sub="Bold text animations"        to="/typography-video"   active={path === "/typography-video"} />
+              <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos"    to="/video-captions"     active={path === "/video-captions"} />
             </FlyoutGroup>
 
             <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>

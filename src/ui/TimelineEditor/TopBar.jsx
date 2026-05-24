@@ -96,7 +96,13 @@ export default function TopBar() {
       {/* Left: Back */}
       <button
         style={btn}
-        onClick={() => navigate(project?.meta?.source === "product_video" ? "/product-video" : "/videos")}
+        onClick={() => {
+          const src = project?.meta?.source;
+          const dest = src === "product_video"   ? "/product-video"
+                     : src === "typography_video" ? "/typography-video"
+                     : "/dashboard";
+          navigate(dest);
+        }}
         title="Back"
       >
         ← Back

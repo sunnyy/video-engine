@@ -109,7 +109,7 @@ export async function generateProductVideo({
     if (!hasBg && shotUrl) {
       safetyLayers.unshift({
         id: `s${i}_bg_injected`,
-        trackId: `s${i}_bg_injected`,
+        trackId: "track_background-image",
         type: isVideoShot ? "video" : "image",
         src: shotUrl,
         objectFit: "cover",

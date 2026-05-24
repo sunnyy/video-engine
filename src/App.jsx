@@ -33,6 +33,7 @@ import Checkout        from "./pages/Checkout";
 import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
 import ProductVideoGenerator from "./pages/ProductVideoGenerator";
+import TypographyVideo       from "./pages/TypographyVideo";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
@@ -148,6 +149,7 @@ export default function App() {
             <Route path="/settings"         element={<Settings />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
             <Route path="/product-video"      element={<ProductVideoGenerator />} />
+            <Route path="/typography-video"   element={<TypographyVideo />} />
             <Route path="/product-poster"    element={<PosterStudio />} />
             <Route path="/thumbnail"           element={<Thumbnails />} />
             <Route path="/thumbnail/new"       element={<ThumbnailGenerator />} />

@@ -98,47 +98,71 @@ function resolvedObjectFit(layer, currentTime) {
 
 // ── Transition helpers ────────────────────────────────────────────────────────
 
-function buildTransitionEffect(type, p) {
-  // p: 0 = just appeared, 1 = fully visible (entrance progress)
+const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+const easeInQuart  = (t) => t * t * t * t;
+const easeInOutQuart = (t) => t < 0.5 ? 8*t*t*t*t : 1 - Math.pow(-2*t+2, 4)/2;
+
+// p: 0→1 (incoming — just appeared to fully in place)
+function buildEntranceEffect(type, p, intensity = 1) {
+  const e = easeOutQuart(p);
+  const ef = easeInOutQuart(p);
+  const i = Math.max(0, Math.min(1, intensity));
   switch (type) {
     case "crossfade":
-    case "fade":        return { opacity: p,   translateX: 0,               translateY: 0,               addBlur: 0,            scale: 1 };
-    case "dissolve":    return { opacity: p,   translateX: 0,               translateY: 0,               addBlur: (1 - p) * 10, scale: 1 };
-    case "slide-left":  return { opacity: 1,   translateX: -(1 - p) * 100,  translateY: 0,               addBlur: 0,            scale: 1 };
-    case "slide-right": return { opacity: 1,   translateX:  (1 - p) * 100,  translateY: 0,               addBlur: 0,            scale: 1 };
-    case "slide-up":    return { opacity: 1,   translateX: 0,               translateY:  (1 - p) * 100,  addBlur: 0,            scale: 1 };
-    case "slide-down":  return { opacity: 1,   translateX: 0,               translateY: -(1 - p) * 100,  addBlur: 0,            scale: 1 };
+    case "fade":        return { opacity: 1 - i*(1-ef), translateX: 0,             translateY: 0,             addBlur: 0,             scale: 1 };
+    case "dissolve":    return { opacity: 1 - i*(1-ef), translateX: 0,             translateY: 0,             addBlur: (1-e)*12*i,    scale: 1 };
+    case "slide-left":  return { opacity: 1,            translateX: (1-e)*100*i,   translateY: 0,             addBlur: 0,             scale: 1 };
+    case "slide-right": return { opacity: 1,            translateX: -(1-e)*100*i,  translateY: 0,             addBlur: 0,             scale: 1 };
+    case "slide-up":    return { opacity: 1,            translateX: 0,             translateY: (1-e)*100*i,   addBlur: 0,             scale: 1 };
+    case "slide-down":  return { opacity: 1,            translateX: 0,             translateY: -(1-e)*100*i,  addBlur: 0,             scale: 1 };
     case "zoom-in":
-    case "zoom":        return { opacity: p,   translateX: 0,               translateY: 0,               addBlur: 0,            scale: 0.5 + p * 0.5 };
-    default:            return { opacity: 1,   translateX: 0,               translateY: 0,               addBlur: 0,            scale: 1 };
+    case "zoom":        return { opacity: 1 - i*(1-ef), translateX: 0,             translateY: 0,             addBlur: 0,             scale: 1 - i*0.2*(1-e) };
+    default:            return { opacity: 1,            translateX: 0,             translateY: 0,             addBlur: 0,             scale: 1 };
   }
 }
 
-// Returns { opacity, translateX, translateY, addBlur, scale } for a layer at the current time.
-// Handles both entrance (transition.in) and exit (transition.out).
+// p: 1→0 (outgoing — fully visible to gone)
+function buildExitEffect(type, p, intensity = 1) {
+  const e = easeInQuart(p);
+  const ef = easeInOutQuart(p);
+  const i = Math.max(0, Math.min(1, intensity));
+  switch (type) {
+    case "crossfade":
+    case "fade":        return { opacity: (1-i) + i*ef,  translateX: 0,             translateY: 0,             addBlur: 0,             scale: 1 };
+    case "dissolve":    return { opacity: (1-i) + i*ef,  translateX: 0,             translateY: 0,             addBlur: (1-e)*12*i,    scale: 1 };
+    case "slide-left":  return { opacity: 1,             translateX: -(1-e)*100*i,  translateY: 0,             addBlur: 0,             scale: 1 };
+    case "slide-right": return { opacity: 1,             translateX: (1-e)*100*i,   translateY: 0,             addBlur: 0,             scale: 1 };
+    case "slide-up":    return { opacity: 1,             translateX: 0,             translateY: -(1-e)*100*i,  addBlur: 0,             scale: 1 };
+    case "slide-down":  return { opacity: 1,             translateX: 0,             translateY: (1-e)*100*i,   addBlur: 0,             scale: 1 };
+    case "zoom-in":
+    case "zoom":        return { opacity: (1-i) + i*ef,  translateX: 0,             translateY: 0,             addBlur: 0,             scale: 1 - i*0.2*(1-e) };
+    default:            return { opacity: 1,             translateX: 0,             translateY: 0,             addBlur: 0,             scale: 1 };
+  }
+}
+
 function getTransitionStyle(layer, currentTime) {
   const inCfg  = layer.transition?.in  ?? (layer.transition?.type ? layer.transition : null);
   const outCfg = layer.transition?.out ?? null;
-  const inType  = inCfg?.type  ?? "none";
-  const inDur   = inCfg?.duration ?? 0.5;
-  const outType = outCfg?.type ?? "none";
-  const outDur  = outCfg?.duration ?? 0.5;
+  const inType      = inCfg?.type      ?? "none";
+  const inDur       = inCfg?.duration  ?? 0.5;
+  const inIntensity = inCfg?.intensity ?? 1;
+  const outType      = outCfg?.type      ?? "none";
+  const outDur       = outCfg?.duration  ?? 0.5;
+  const outIntensity = outCfg?.intensity ?? 1;
 
-  // Exit — outgoing layer fades out in its last outDur seconds
   if (outType !== "none" && outDur > 0) {
     const exitStart = layer.end - outDur;
     if (currentTime >= exitStart && currentTime < layer.end) {
-      const p = 1 - (currentTime - exitStart) / outDur;
-      return { opacity: Math.max(0, p), translateX: 0, translateY: 0, addBlur: 0, scale: 1 };
+      const p = Math.max(0, Math.min(1, 1 - (currentTime - exitStart) / outDur));
+      return buildExitEffect(outType, p, outIntensity);
     }
   }
 
-  // Entrance
   if (inType !== "none" && inDur > 0) {
     const entranceEnd = layer.start + inDur;
     if (currentTime >= layer.start && currentTime < entranceEnd) {
-      const p = (currentTime - layer.start) / inDur;
-      return buildTransitionEffect(inType, Math.max(0, Math.min(1, p)));
+      const p = Math.max(0, Math.min(1, (currentTime - layer.start) / inDur));
+      return buildEntranceEffect(inType, p, inIntensity);
     }
   }
 
@@ -435,21 +459,17 @@ function PersistentVideoTrack({
     const buildPatch = (me) => {
       const s = scaleRef.current;
       const dx = (me.clientX - startClientX) / s, dy = (me.clientY - startClientY) / s;
-      let newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
-      let newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
-      if (me.shiftKey) {
-        if (cfg.wm !== 0 && cfg.hm !== 0) {
-          Math.abs(cfg.wm * dx) >= Math.abs(cfg.hm * dy)
-            ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
-            : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
-        } else if (cfg.wm !== 0) {
-          newH = Math.max(MIN_SIZE, newW / aspectRatio);
-        } else if (cfg.hm !== 0) {
-          newW = Math.max(MIN_SIZE, newH * aspectRatio);
-        }
+      const edx = me.altKey ? dx * 2 : dx;
+      const edy = me.altKey ? dy * 2 : dy;
+      let newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * edx) : origT.width;
+      let newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * edy) : origT.height;
+      if (me.shiftKey && cfg.wm !== 0 && cfg.hm !== 0) {
+        Math.abs(cfg.wm * edx) >= Math.abs(cfg.hm * edy)
+          ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
+          : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
       }
-      let newX = origT.x + cfg.xa * (newW - origT.width);
-      let newY = origT.y + cfg.ya * (newH - origT.height);
+      let newX = me.altKey ? origT.x : origT.x + cfg.xa * (newW - origT.width);
+      let newY = me.altKey ? origT.y : origT.y + cfg.ya * (newH - origT.height);
       ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
       const transformPatch = { ...freshClip.transform };
@@ -472,7 +492,15 @@ function PersistentVideoTrack({
         if (hasHKF) kf.height = upsert(kf.height ?? [], localTime, newH);
         return { transform: transformPatch, keyframes: kf };
       }
-      return { transform: { ...freshClip.transform, width: newW, height: newH, x: newX, y: newY } };
+      const clipTransformResult = { ...freshClip.transform, width: newW, height: newH, x: newX, y: newY };
+      if (freshClip.type === "text" && cfg.wm !== 0 && !me.shiftKey) {
+        const fsRatio = newW / origT.width;
+        return {
+          transform: clipTransformResult,
+          style: { ...freshClip.style, fontSize: Math.max(1, Math.round((freshClip.style?.fontSize ?? 48) * fsRatio)) },
+        };
+      }
+      return { transform: clipTransformResult };
     };
 
     const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, buildPatch(me));
@@ -692,21 +720,17 @@ function LayerElement({
       const s = scaleRef.current;
       const dx = (me.clientX - startClientX) / s;
       const dy = (me.clientY - startClientY) / s;
-      let newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * dx) : origT.width;
-      let newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * dy) : origT.height;
-      if (me.shiftKey) {
-        if (cfg.wm !== 0 && cfg.hm !== 0) {
-          Math.abs(cfg.wm * dx) >= Math.abs(cfg.hm * dy)
-            ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
-            : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
-        } else if (cfg.wm !== 0) {
-          newH = Math.max(MIN_SIZE, newW / aspectRatio);
-        } else if (cfg.hm !== 0) {
-          newW = Math.max(MIN_SIZE, newH * aspectRatio);
-        }
+      const edx = me.altKey ? dx * 2 : dx;
+      const edy = me.altKey ? dy * 2 : dy;
+      let newW = cfg.wm !== 0 ? Math.max(MIN_SIZE, origT.width + cfg.wm * edx) : origT.width;
+      let newH = cfg.hm !== 0 ? Math.max(MIN_SIZE, origT.height + cfg.hm * edy) : origT.height;
+      if (me.shiftKey && cfg.wm !== 0 && cfg.hm !== 0) {
+        Math.abs(cfg.wm * edx) >= Math.abs(cfg.hm * edy)
+          ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
+          : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
       }
-      let newX = origT.x + cfg.xa * (newW - origT.width);
-      let newY = origT.y + cfg.ya * (newH - origT.height);
+      let newX = me.altKey ? origT.x : origT.x + cfg.xa * (newW - origT.width);
+      let newY = me.altKey ? origT.y : origT.y + cfg.ya * (newH - origT.height);
       ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
       const transformPatch = { ...freshLayer.transform };
@@ -729,7 +753,15 @@ function LayerElement({
         if (hasHKF) kf.height = upsert(kf.height ?? [], localTime, newH);
         return { transform: transformPatch, keyframes: kf };
       }
-      return { transform: { ...freshLayer.transform, width: newW, height: newH, x: newX, y: newY } };
+      const transformResult = { ...freshLayer.transform, width: newW, height: newH, x: newX, y: newY };
+      if (freshLayer.type === "text" && cfg.wm !== 0 && !me.shiftKey) {
+        const fsRatio = newW / origT.width;
+        return {
+          transform: transformResult,
+          style: { ...freshLayer.style, fontSize: Math.max(1, Math.round((freshLayer.style?.fontSize ?? 48) * fsRatio)) },
+        };
+      }
+      return { transform: transformResult };
     };
 
     const onMove = (me) => {
@@ -833,10 +865,12 @@ function LayerElement({
       fontFamily: s.fontFamily ?? "Outfit, sans-serif",
       fontSize: s.fontSize ?? 72,
       fontWeight: s.fontWeight ?? 800,
+      fontStyle: s.fontStyle ?? "normal",
       color: s.color ?? "#ffffff",
       textAlign: s.textAlign ?? "center",
       lineHeight: s.lineHeight ?? 1.2,
       letterSpacing: s.letterSpacing ?? 0,
+      textTransform: s.textTransform ?? "none",
       textShadow: s.textShadow ?? undefined,
       wordBreak: "break-word",
       whiteSpace: "pre-wrap",
@@ -884,7 +918,16 @@ function LayerElement({
           }}
           onDoubleClick={(e) => { e.stopPropagation(); onStartEdit?.(); }}
         >
-          {layer.content || layer.text || ""}
+          {s.accentWord && s.accentColor
+            ? <span style={{ wordBreak: "break-word" }}>
+                {(layer.content || "").split(" ").map((word, i, arr) => (
+                  <span key={i} style={{ color: word === s.accentWord ? s.accentColor : s.color }}>
+                    {word}{i < arr.length - 1 ? " " : ""}
+                  </span>
+                ))}
+              </span>
+            : (layer.content || layer.text || "")
+          }
         </div>
       );
     }
@@ -924,6 +967,10 @@ function LayerElement({
     const registry = layer.registry ?? "decorative";
     const color = layer.color ?? "#ffffff";
     const shapeOpacity = layer.shapeOpacity ?? 1;
+    const stretchSVG = (html) => html.replace(/<svg([^>]*)>/i, (_, attrs) => {
+      const cleaned = attrs.replace(/\s*(?:width|height)="[^"]*"/gi, "");
+      return `<svg${cleaned} width="100%" height="100%" preserveAspectRatio="none">`;
+    });
 
     if (registry === "shape") {
       const rendered = renderDecorativeSVG(layer.shapeId, { color, filled: layer.filled ?? true, strokeWidth: layer.strokeWidth ?? 0, opacity: shapeOpacity });
@@ -947,13 +994,12 @@ function LayerElement({
           }
         }
         content = (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg
-              viewBox={rendered.viewBox}
-              style={{ width: "100%", height: "100%", overflow: "visible" }}
-              dangerouslySetInnerHTML={{ __html: svgHtml }}
-            />
-          </div>
+          <svg
+            viewBox={rendered.viewBox}
+            preserveAspectRatio="none"
+            style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+            dangerouslySetInnerHTML={{ __html: svgHtml }}
+          />
         );
       } else {
         content = null;
@@ -1001,7 +1047,7 @@ function LayerElement({
           );
         } else {
           content = (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: solidColor, opacity, filter: filterStyle }} dangerouslySetInnerHTML={{ __html: svgContent }} />
+            <div style={{ width: "100%", height: "100%", color: solidColor, opacity, filter: filterStyle }} dangerouslySetInnerHTML={{ __html: stretchSVG(svgContent) }} />
           );
         }
       }
@@ -1032,8 +1078,8 @@ function LayerElement({
         if (entry.render === "svg") {
           content = (
             <div
-              style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color }}
-              dangerouslySetInnerHTML={{ __html: svgContent }}
+              style={{ width: "100%", height: "100%", color }}
+              dangerouslySetInnerHTML={{ __html: stretchSVG(svgContent) }}
             />
           );
         } else if (entry.render === "css_repeat") {
@@ -1132,6 +1178,61 @@ function LayerElement({
         handlesEl
       )}
     </>
+  );
+}
+
+// ── Stacked text group (typography video) ────────────────────────────────────
+
+function StackedTextGroup({ groupLayers, currentTime, selectedLayerId }) {
+  return (
+    <div style={{
+      position: "absolute",
+      top: 0, left: 0,
+      width: "100%", height: "100%",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      gap: 12, pointerEvents: "none", zIndex: 4,
+    }}>
+      {groupLayers.map((layer) => {
+        if (currentTime < layer.start || currentTime >= layer.end) return null;
+        const ts         = getTransitionStyle(layer, currentTime);
+        const kf         = resolveTransform(layer, currentTime);
+        const s          = layer.style ?? {};
+        const isSelected = layer.id === selectedLayerId;
+        return (
+          <div
+            key={layer.id}
+            onMouseDown={(e) => { e.stopPropagation(); useTimelineStore.getState().selectLayer(layer.id); }}
+            style={{
+              opacity:         (kf.opacity ?? 1) * (ts.opacity ?? 1),
+              transform:       `${ts.translateX ? `translateX(${ts.translateX}%) ` : ""}${ts.translateY ? `translateY(${ts.translateY}%) ` : ""}scale(${(kf.scale ?? 1) * (ts.scale ?? 1)})`,
+              transformOrigin: "center center",
+              fontFamily:      s.fontFamily    ?? "Outfit, sans-serif",
+              fontSize:        s.fontSize      ?? 48,
+              fontWeight:      s.fontWeight    ?? 700,
+              fontStyle:       s.fontStyle     ?? "normal",
+              color:           s.color         ?? "#ffffff",
+              textAlign:       "center",
+              lineHeight:      s.lineHeight    ?? 1.1,
+              letterSpacing:   s.letterSpacing ?? 0,
+              textTransform:   s.textTransform ?? "none",
+              wordBreak:       "break-word",
+              whiteSpace:      "pre-wrap",
+              maxWidth:        "90%",
+              filter:          ((kf.blur ?? 0) + (ts.addBlur ?? 0)) > 0
+                ? `blur(${(kf.blur ?? 0) + (ts.addBlur ?? 0)}px)`
+                : undefined,
+              pointerEvents:   "auto",
+              cursor:          "default",
+              outline:         isSelected ? "2px dashed rgba(124,92,252,0.55)" : "none",
+              outlineOffset:   4,
+            }}
+          >
+            {layer.content || ""}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1267,7 +1368,7 @@ export default function Preview() {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
         setUserZoom((z) => clampZoom(z + delta));
-      } else {
+      } else if (scaleRef.current > 1) {
         e.preventDefault();
         setPanOffset((p) => {
           const next = clampPan({ x: p.x - e.deltaX, y: p.y - e.deltaY });
@@ -1469,16 +1570,37 @@ export default function Preview() {
   })();
 
   // Non-video visible layers (image, text, sticker, captions) — mount/unmount is fine
+  // stackLayout layers are rendered by StackedTextGroup, not LayerElement
   const visibleLayers = layers
     .filter(
       (l) =>
         l.visible !== false &&
         l.type !== "audio" &&
         l.type !== "video" &&
+        !l.stackLayout &&
         currentTime >= l.start &&
         currentTime < l.end
     )
     .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+  // stackLayout groups — flex-column stacked text (legacy typography video format)
+  const visibleStackGroups = (() => {
+    const map = new Map();
+    for (const l of layers) {
+      if (!l.stackLayout || l.visible === false || l.type !== "text") continue;
+      const gid = l.groupId || l.id;
+      if (!map.has(gid)) map.set(gid, []);
+      map.get(gid).push(l);
+    }
+    const result = [];
+    for (const groupLayers of map.values()) {
+      const sorted     = [...groupLayers].sort((a, b) => a.start - b.start);
+      const firstStart = sorted[0].start;
+      const lastEnd    = Math.max(...sorted.map((l) => l.end));
+      if (currentTime >= firstStart && currentTime < lastEnd) result.push(sorted);
+    }
+    return result;
+  })();
 
   const audioLayers = layers.filter(
     (l) =>
@@ -1679,6 +1801,16 @@ export default function Preview() {
             />
           ))}
 
+          {/* Stack layout groups — legacy typography video flex-column stacking */}
+          {visibleStackGroups.map((groupLayers) => (
+            <StackedTextGroup
+              key={groupLayers[0].groupId || groupLayers[0].id}
+              groupLayers={groupLayers}
+              currentTime={currentTime}
+              selectedLayerId={selectedLayerId}
+            />
+          ))}
+
           {/* Non-video layers — safe to mount/unmount each frame */}
           {visibleLayers.map((layer) => (
             <LayerElement
@@ -1699,6 +1831,7 @@ export default function Preview() {
               handlesEl={handlesEl}
             />
           ))}
+
 
           {layers.length === 0 && (
             <div style={{

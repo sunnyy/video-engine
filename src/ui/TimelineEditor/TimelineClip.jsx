@@ -110,6 +110,11 @@ export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrack
     e.stopPropagation();
     if (e.shiftKey) { toggleLayerSelection(layer.id); return; }
     selectLayer(layer.id);
+    // Seek playhead into the clip so the layer becomes visible on canvas
+    const { currentTime } = useTimelineStore.getState();
+    if (currentTime < layer.start || currentTime >= layer.end) {
+      setCurrentTime(layer.start);
+    }
     if (layer.locked) return;
 
     const preDragProject = JSON.parse(JSON.stringify(useTimelineStore.getState().project));
@@ -290,6 +295,7 @@ export default function TimelineClip({ layer, pps, isCrossTracking, onCrossTrack
           title={layer.locked ? "Unlock layer" : "Lock layer"}
           onMouseDown={(e) => { e.stopPropagation(); updateLayer(layer.id, { locked: !layer.locked }); }}
           style={{
+            backgroundColor: "transparent",
             position: "absolute", right: HANDLE_W + 2, top: "50%", transform: "translateY(-50%)",
             width: 16, height: 16, zIndex: 6, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",

@@ -10,7 +10,7 @@ const TABS = ["Shapes", "Decoratives", "Cinematic"];
 const SHAPE_ENTRIES = Object.entries(shapeRegistry);
 
 function ShapePreview({ shapeId, color }) {
-  const result = renderDecorativeSVG(shapeId, { color, strokeWidth: 3, filled: false });
+  const result = renderDecorativeSVG(shapeId, { color, strokeWidth: 0, filled: true });
   if (!result) return null;
   const { viewBox, content } = result;
   return (
@@ -64,8 +64,8 @@ export default function ShapesModal({ onClose }) {
       shapeId,
       registry: "shape",
       color,
-      filled: false,
-      strokeWidth: 3,
+      filled: true,
+      strokeWidth: 0,
       shapeOpacity: 1,
       objectFit: "cover",
       transform: { x: 0, y: 0, width: 200, height: 200, rotation: 0, scale: 1, opacity: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
@@ -114,8 +114,8 @@ export default function ShapesModal({ onClose }) {
       shapeId: entry.id,
       registry: "decorative",
       color,
-      filled: false,
-      strokeWidth: 3,
+      filled: true,
+      strokeWidth: 0,
       shapeOpacity: 1,
       objectFit: "cover",
       transform: { x: 0, y: 0, width: 200, height: 200, rotation: 0, scale: 1, opacity: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },

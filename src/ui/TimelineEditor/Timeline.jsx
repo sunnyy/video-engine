@@ -193,10 +193,10 @@ export default function Timeline() {
   return (
     <div
       style={{
-        height: TIMELINE_H,
+        flex: 1,
+        minHeight: 0,
         background: "#0d0d18",
         borderTop: "1px solid rgba(255,255,255,0.07)",
-        flexShrink: 0,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
