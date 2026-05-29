@@ -197,12 +197,13 @@ export async function orchestratePromoRender(projectId) {
         const moodTracks = allTracks.filter(t => t.mood === mood);
         const pool  = moodTracks.length ? moodTracks : allTracks;
         const track = pool[Math.floor(Math.random() * pool.length)];
+        const musicDur = finalTimeline.format.duration; // use post-inject duration
         finalTimeline.layers.push({
           id: "music_global", trackId: "track_music",
           type: "audio", audioType: "music", src: track.public_url,
-          start: 0, end: totalDuration, zIndex: 0,
+          start: 0, end: musicDur, zIndex: 0,
           visible: true, locked: false,
-          trimStart: 0, trimEnd: totalDuration,
+          trimStart: 0, trimEnd: musicDur,
           volume: 0.15, muted: false, fadeIn: 1, fadeOut: 1,
           sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
         });

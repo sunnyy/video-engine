@@ -74,11 +74,19 @@ ASSET SOURCE OPTIONS: user_upload, ai_generated, stock, placeholder
 
 Return ONLY a valid JSON array of scene objects. No markdown, no explanation, no code blocks. Just the raw JSON array.
 
+LAYOUT VARIANTS — pick layout_variant per scene based on spoken content and purpose:
+- stock + primary: large centered headline, product name badge below, zoom entrance — hooks, CTAs, strong emotional statements
+- stock + alternate: uppercase text centered, thin accent bar below text, pull motion — feature announcements, credibility or social proof statements
+- full_asset + primary: asset background, text in lower area sliding up, product badge — feature demos, UI showcases
+- full_asset + alternate: asset background, text bottom-anchored in accent yellow, no badge, darker overlay — pain points, before/after, high contrast moments
+Do not use the same layout_variant for more than 2 consecutive scenes.
+
 Each scene object must have exactly these fields:
 {
   "scene_id": <integer, starting at 1>,
   "scene_type": <one of the scene type options>,
   "visual_mode": <one of the valid visual_mode values for this video_type — see rules above>,
+  "layout_variant": <"primary" or "alternate" — choose based on layout variant rules above>,
   "script": <${hasProvidedScript ? "the exact portion of the provided script that belongs in this scene — copy verbatim, no paraphrasing" : "narration or caption text for this scene"}>,
   "duration_seconds": <number — derive from word count of the script field: ≤6 words = 2.0–2.5s, 7–14 words = 3.0–4.0s, 15+ words = 4.0–6.0s. All scenes must sum to exactly ${project.duration_seconds}>,
   "asset_type": <one of the asset type options>,
@@ -209,7 +217,8 @@ export async function generateScenePlan(project) {
     createEmptyScene({
       scene_id:          item.scene_id          ?? null,
       scene_type:        item.scene_type        ?? null,
-      visual_mode:       item.visual_mode        ?? null,
+      visual_mode:       item.visual_mode       ?? null,
+      layout_variant:    item.layout_variant    ?? "primary",
       script:            item.script            ?? "",
       duration_seconds:  item.duration_seconds  ?? 0,
       asset_type:        item.asset_type        ?? ASSET_TYPE.AI_VOICEOVER,

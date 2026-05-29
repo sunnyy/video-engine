@@ -317,6 +317,28 @@ function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
   return out;
 }
 
+// ── full_asset alternate ───────────────────────────────────────────────────────
+// Darker overlay, text bottom-anchored in accent color, no badge — high contrast.
+function fullAssetAlternate(sid, s, e, { script, assetUrl, accentColor }) {
+  const out = [];
+  out.push(assetBg(sid, s, e, assetUrl, "cinematicPush", GRADIENTS.feature_demo));
+  out.push(overlay(`${sid}_ov`, s, e, 0.5));
+  if (script) {
+    out.push(textL(
+      `${sid}_text`, `track_text`, s, e, script,
+      {
+        fontFamily: "Barlow Condensed", fontSize: 62, fontWeight: 700, color: accentColor ?? "#f5c518",
+        textAlign: "center", lineHeight: 1.2, letterSpacing: 0.5,
+        textTransform: "uppercase", textShadow: "0 3px 20px rgba(0,0,0,0.9)",
+        background: null, borderRadius: 0, padding: 0,
+        _captionStyle: "springScaleIn",
+      },
+      480, 420, 10, T.slideUp()
+    ));
+  }
+  return out;
+}
+
 // ── 5. stock ───────────────────────────────────────────────────────────────────
 // Stock image fills frame. Large headline. Product name sub in accent color.
 function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) {
@@ -352,15 +374,47 @@ function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) 
   return out;
 }
 
+// ── stock alternate ────────────────────────────────────────────────────────────
+// Pull motion, large uppercase white headline, thin accent bar below text.
+function stockAlternate(sid, s, e, { script, assetUrl, accentColor }) {
+  const out = [];
+  out.push(assetBg(sid, s, e, assetUrl, "pullSlow", GRADIENTS.default));
+  out.push(overlay(`${sid}_ov`, s, e, 0.55));
+  if (script) {
+    out.push(textL(
+      `${sid}_headline`, `track_text`, s, e, script,
+      {
+        fontFamily: "Outfit", fontSize: 72, fontWeight: 900, color: "#ffffff",
+        textAlign: "center", lineHeight: 1.15, letterSpacing: -1,
+        textTransform: "uppercase", textShadow: "0 4px 28px rgba(0,0,0,0.9)",
+        background: null, borderRadius: 0, padding: 0,
+        _captionStyle: "springScaleIn",
+      },
+      0, 500, 10, T.fade()
+    ));
+    // Thin accent bar below text
+    out.push({
+      id: `${sid}_bar`, trackId: "track_accent",
+      type: "gradient", gradient: accentColor ?? "#f5c518",
+      start: s, end: e, zIndex: 12,
+      visible: true, locked: false, sfx: null,
+      keyframes: fadeKf(0.2),
+      transition: { in: T.fade(), out: { type: "fade", duration: 0.2 } },
+      transform: mtr(0, 280, 200, 4),
+    });
+  }
+  return out;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export const promoLayoutRegistry = {
-  full_avatar:            { primary: fullAvatarLayout           },
-  full_asset:             { primary: fullAssetLayout            },
-  top_asset_bottom_avatar:{ primary: topAssetBottomAvatarLayout },
-  floating_avatar:        { primary: floatingAvatarLayout       },
-  stock:                  { primary: stockLayout                },
-  default:                { primary: stockLayout                },
+  full_avatar:            { primary: fullAvatarLayout,    alternate: fullAvatarLayout           },
+  full_asset:             { primary: fullAssetLayout,     alternate: fullAssetAlternate         },
+  top_asset_bottom_avatar:{ primary: topAssetBottomAvatarLayout                                 },
+  floating_avatar:        { primary: floatingAvatarLayout                                       },
+  stock:                  { primary: stockLayout,         alternate: stockAlternate             },
+  default:                { primary: stockLayout,         alternate: stockAlternate             },
 };
 
 export function getPromoLayout(visualMode, variant = "primary") {

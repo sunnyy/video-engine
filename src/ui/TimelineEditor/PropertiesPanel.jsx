@@ -195,10 +195,10 @@ function SceneSourceSection({ layer, project, updateLayer, addLayer }) {
           <div
             onClick={() => setShowMedia(true)}
             style={{
-              width:"100%", aspectRatio:"9/16", borderRadius:8, overflow:"hidden",
+              width:"55%", aspectRatio:"9/16", borderRadius:8, overflow:"hidden",
               background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)",
               cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-              position:"relative",
+              position:"relative", margin:"0 auto",
             }}
           >
             {bgLayer?.src ? (
