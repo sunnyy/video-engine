@@ -19,11 +19,13 @@ import { router as posterRouter }     from "./routes/poster.js";
 import { router as thumbnailRouter }  from "./routes/thumbnail.js";
 import { router as outfitRouter }     from "./routes/outfit.js";
 import { router as socialPostRouter } from "./routes/socialPost.js";
+import { router as bannerRouter }     from "./routes/banner.js";
 import { router as adminRouter }        from "./routes/admin.js";
 import { router as refundClaimsRouter } from "./routes/refundClaims.js";
 import { router as productVideoRouter } from "./routes/productVideo.js";
 import { router as productVideoSceneRouter } from "./routes/productVideoScene.js";
 import { router as typographyVideoRouter } from "./routes/typographyVideo.js";
+import { router as promoVideoRouter }      from "./routes/promoVideo.js";
 
 console.log("Server starting...", new Date().toISOString());
 
@@ -53,7 +55,7 @@ const generalLimiter = rateLimit({
 
 const generationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 100,
   message: { error: "Generation limit reached, please wait before trying again." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -74,12 +76,13 @@ app.use("/api", (req, res, next) => {
 });
 app.use("/api/generate", generationLimiter);
 app.use("/api/image-generation/generate", generationLimiter);
-app.use("/api/poster", generationLimiter);
-app.use("/api/thumbnail", generationLimiter);
-app.use("/api/outfit", generationLimiter);
-app.use("/api/social-post", generationLimiter);
-app.use("/api/product-ad", generationLimiter);
-app.use("/api/tts", generationLimiter);
+app.use("/api/poster/generate", generationLimiter);
+app.use("/api/thumbnail/generate", generationLimiter);
+app.use("/api/outfit/generate", generationLimiter);
+app.use("/api/social-post/generate", generationLimiter);
+app.use("/api/banner/generate", generationLimiter);
+app.use("/api/product-ad/generate", generationLimiter);
+app.use("/api/tts/generate", generationLimiter);
 app.use("/api/webhooks", authLimiter);
 
 app.use("/renders", express.static(TEMP_DIR));
@@ -109,6 +112,7 @@ cleanTempDir();
 setInterval(cleanTempDir, 6 * 60 * 60 * 1000);
 
 /* ── Route mounts ── */
+app.use("/api/promo-video",       generationLimiter, promoVideoRouter);
 app.use("/api/product-video",    generationLimiter, productVideoRouter);
 app.use("/api/product-video",    generationLimiter, productVideoSceneRouter);
 app.use("/api/typography-video", generationLimiter, typographyVideoRouter);
@@ -118,6 +122,7 @@ app.use("/api/poster",       posterRouter);
 app.use("/api/thumbnail",    thumbnailRouter);
 app.use("/api/outfit",       outfitRouter);
 app.use("/api/social-post",  socialPostRouter);
+app.use("/api/banner",       bannerRouter);
 app.use("/api/admin",        adminRouter);
 app.use("/api",              ttsRouter);
 app.use("/api",              authRouter);
@@ -161,7 +166,8 @@ async function checkPlanExpiry() {
       .select("id, user_id, current_period_end, plans(name)")
       .eq("status", "active")
       .gte("current_period_end", in2Days.toISOString())
-      .lt("current_period_end", in3Days.toISOString());
+      .lt("current_period_end", in3Days.toISOString())
+      .is("expiry_warned_at", null);
 
     for (const sub of expiring || []) {
       const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(sub.user_id);
@@ -171,6 +177,7 @@ async function checkPlanExpiry() {
         const { data: credRow } = await supabaseAdmin.from("user_credits").select("balance").eq("user_id", sub.user_id).maybeSingle();
         const { subject, html } = userPlanExpiringEmail(name, sub.plans?.name || "your", expiryDate, credRow?.balance ?? null);
         sendUserEmail(user.email, subject, html);
+        await supabaseAdmin.from("subscriptions").update({ expiry_warned_at: new Date().toISOString() }).eq("id", sub.id);
       }
     }
     if (expiring?.length) console.log(`[expiry] Sent expiry warnings for ${expiring.length} subscriptions`);
@@ -179,7 +186,6 @@ async function checkPlanExpiry() {
   }
 }
 
-checkPlanExpiry();
 setInterval(checkPlanExpiry, 24 * 60 * 60 * 1000);
 
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));

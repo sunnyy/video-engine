@@ -500,7 +500,7 @@ export function renderDecorativeSVG(shapeId, style = {}, instanceId = "x") {
     case "pill":
     case "gradient_bar": {
       const br    = st.borderRadius ?? 0;
-      const inset = sw / 2 + 2;
+      const inset = useFill ? 0 : sw / 2;
       const size  = 100 - inset * 2;
       content = `${gradDefs}<rect x="${inset.toFixed(1)}" y="${inset.toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" rx="${br}" ry="${br}" fill="${fillAttr}" stroke="${strokeAttr}" stroke-width="${sw}"/>`;
       break;

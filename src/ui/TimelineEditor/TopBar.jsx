@@ -63,8 +63,16 @@ export default function TopBar() {
             setExporting(false);
             if (status.cancelled) return;
             if (status.error) { alert("Export failed: " + status.error); return; }
-            if (status.video_url) window.open(status.video_url, "_blank");
-            else if (status.url) window.open(status.url, "_blank");
+            const videoUrl = status.video_url || status.url;
+            if (videoUrl) {
+              const r    = await fetch(videoUrl);
+              const blob = await r.blob();
+              const a    = document.createElement("a");
+              a.href     = URL.createObjectURL(blob);
+              a.download = `${name || "video"}-${Date.now()}.mp4`;
+              a.click();
+              URL.revokeObjectURL(a.href);
+            }
           }
         } catch (_) {}
       }, 3000);
@@ -96,14 +104,19 @@ export default function TopBar() {
       {/* Left: Back */}
       <button
         style={btn}
-        onClick={() => {
-          const src = project?.meta?.source;
+        onClick={(e) => {
+          const src  = project?.meta?.source;
           const dest = src === "product_video"   ? "/product-video"
                      : src === "typography_video" ? "/typography-video"
+                     : src === "promo_video"      ? "/promo-video"
                      : "/dashboard";
-          navigate(dest);
+          if (e.ctrlKey || e.metaKey) {
+            window.open(dest, "_blank");
+          } else {
+            navigate(-1);
+          }
         }}
-        title="Back"
+        title="Back (Ctrl+click to open in new tab)"
       >
         ← Back
       </button>

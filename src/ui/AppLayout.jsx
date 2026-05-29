@@ -122,6 +122,11 @@ const Icons = {
       <path d="M12 4v16"/>
     </svg>
   ),
+  promo: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+    </svg>
+  ),
   textReel: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 6h16M4 10h16M4 14h10"/>
@@ -290,7 +295,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-const inVideos  = path === "/videos" || path === "/video-captions" || path === "/product-video" || path === "/typography-video";
+const inVideos  = path === "/videos" || path === "/video-captions" || path === "/product-video" || path === "/typography-video" || path === "/promo-video";
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -324,9 +329,10 @@ const inVideos  = path === "/videos" || path === "/video-captions" || path === "
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
-              <NavItem icon={Icons.ad}         label="Product Video"    sub="Turn photos into video ads"  to="/product-video"      active={path === "/product-video"} />
-              <NavItem icon={Icons.typography} label="Typography Video" sub="Bold text animations"        to="/typography-video"   active={path === "/typography-video"} />
-              <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos"    to="/video-captions"     active={path === "/video-captions"} />
+              <NavItem icon={Icons.promo}      label="Promo Video"      sub="AI-planned SaaS promo videos" to="/promo-video"        active={path === "/promo-video"} />
+              <NavItem icon={Icons.ad}         label="Product Video"    sub="Turn photos into video ads"   to="/product-video"     active={path === "/product-video"} />
+              <NavItem icon={Icons.typography} label="Typography Video" sub="Bold text animations"         to="/typography-video"  active={path === "/typography-video"} />
+              <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos"     to="/video-captions"    active={path === "/video-captions"} />
             </FlyoutGroup>
 
             <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>

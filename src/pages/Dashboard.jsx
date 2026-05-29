@@ -15,8 +15,9 @@ const SECTIONS = [
     label: "Video",
     accent: "#f5c518",
     services: [
+      { emoji: "🎬", title: "Promo Video",          desc: "Multi-scene SaaS promo videos from your product details. AI plans every scene.", href: "/promo-video", accent: "#f5c518", tag: "New ✨" },
       { emoji: "🛍️", title: "Product Video",       desc: "Drop a product photo. Ship a scroll-stopping video ad in minutes.", href: "/product-video",      accent: "#f97316", tag: "Hot 🔥" },
-      { emoji: "✍️", title: "Typography Video",   desc: "Bold text animations from a topic or script. No media needed.",    href: "/typography-video",   accent: "#7c5cfc", tag: "New ✨" },
+      { emoji: "✍️", title: "Typography Video",   desc: "Bold text animations from a topic or script. No media needed.",    href: "/typography-video",   accent: "#7c5cfc" },
       { emoji: "💬", title: "Video Captions",     desc: "Boost watch time & reach with auto-styled captions on any video.", href: "/video-captions",     accent: "#34d399" },
     ],
   },

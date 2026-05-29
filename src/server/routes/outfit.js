@@ -1,8 +1,11 @@
 import express from "express";
+import OpenAI from "openai";
 import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export const router = express.Router();
 
@@ -24,6 +27,31 @@ router.get("/models", requireAuth, async (_req, res) => {
   res.json({ models: data || [] });
 });
 
+router.post("/analyze", requireAuth, async (req, res) => {
+  try {
+    const { garmentUrl } = req.body;
+    if (!garmentUrl) return res.status(400).json({ error: "garmentUrl required" });
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 150,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: garmentUrl } },
+          { type: "text", text: `Analyze this product image. Return JSON only, no explanation:\n{"isWearable":true/false,"gender":"female"|"male"|"unisex","category":"short label e.g. kurti, t-shirt, saree","environment":"studio"|"outdoor"|"urban","hasMannequin":true/false,"isNSFW":true/false}` },
+        ],
+      }],
+    });
+    const raw = response.choices?.[0]?.message?.content?.trim() ?? "{}";
+    const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+    if (parsed.isNSFW) return res.status(400).json({ error: "This image contains inappropriate content and cannot be used.", code: "NSFW" });
+    res.json(parsed);
+  } catch (e) {
+    console.error("[outfit/analyze]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
@@ -33,21 +61,21 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     creditAmount = 15;
 
-    const { garmentUrl, modelUrl, hasMannequin, useMyPhoto } = req.body;
+    const { garmentUrl, modelUrl, hasMannequin } = req.body;
     if (!garmentUrl || !modelUrl) return res.status(400).json({ error: "garmentUrl and modelUrl required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
+    const basePrompt = `Use Image 1 as the PERSON IDENTITY reference.\nUse Image 2 as the STYLE + CLOTHING reference.\n\nGenerate a professional fashion portrait.\n\nPERSON RULES\n- Preserve facial identity, skin tone, body proportions, hairstyle, and recognizable appearance from Image 1.\n- Keep the same person; do not redesign facial features.\n\nOUTFIT EXTRACTION RULES\n- Automatically identify only the wearable clothing items from Image 2.\n- Ignore background, props, bags, shoes, sunglasses, decorations, text, hangers, flat-lay styling, mannequins, and non-wearable objects unless explicitly visible as intended outfit pieces.\n- Reconstruct the outfit as if worn naturally on the person.\n\nCLOTHING TRANSFER\n- Preserve colors, garment categories, cuts, silhouette, neckline, sleeve style, textures, patterns, seams, buttons, folds, and fabric behavior.\n- Adapt fit naturally to the person's body while keeping the original design intent.\n- Maintain realistic draping and proportions.\n\nSTYLING\n- Convert the clothing into a premium editorial fashion look.\n- Add natural styling adjustments only where necessary for realism.\n- Keep the outfit wearable and commercially photographed.\n\nPOSE\n- Natural fashion pose, relaxed confidence.\n- Avoid mannequin pose or passport pose.\n\nENVIRONMENT\n- Premium indoor studio or lifestyle setting that matches the outfit mood.\n\nCAMERA\n- Vertical portrait (9:16).\n- Full body visible (or at least knees visible).\n- Fashion photography composition.\n\nLIGHTING\n- Soft studio lighting.\n- Clean skin rendering.\n- Luxury campaign quality.\n\nQUALITY RULES\n- No body distortion.\n- No clothing deformation.\n- No identity drift.\n- No extra limbs.\n- High-end fashion campaign realism.`;
+
     const prompt = hasMannequin
-      ? `The person in image 1 should wear the exact same outfit as the mannequin in image 2. Keep the person from image 1's face, skin tone, hair, and identity completely unchanged. Reproduce every detail of the outfit exactly — same colors, fabric, embroidery, neckline, sleeves, silhouette, borders, and embellishments. Full body visible, natural confident pose, clean studio background, soft professional lighting. Photorealistic, 9:16 vertical portrait.`
-      : useMyPhoto
-      ? `Use the first uploaded image as the garment reference and the second uploaded image as the person reference. Dress the person in the exact garment from the first image and transfer it naturally onto their body while preserving the original garment design exactly as shown. Do not redesign, reinterpret, restyle, or simplify the clothing. Keep the same fabric, color, embroidery, print, stitching, sleeve style, neckline, fit, proportions, hemline, garment length, and silhouette exactly unchanged. The garment must look like the same real piece of clothing, only worn by the person. Preserve all embroidery placement, motifs, borders, textures, folds, and fabric behavior accurately. Fit the garment naturally to the person's body and pose without altering its actual cut or dimensions. Do not crop, shorten, tighten, lengthen, reshape, or modernize the garment. Do not change the garment category. If the garment is topwear only (shirt, blouse, kurti, top), keep the original upper garment unchanged and add a clean, realistic, matching bottom (such as plain trousers, palazzo, skirt, or jeans depending on style) that complements the garment without distracting from it. If the bottom is not visible in the garment reference, generate a simple matching bottom in a neutral coordinated style. Keep the person's face, hairstyle, pose, body shape, expression, jewelry, and environment unchanged unless required for realistic garment fitting. Maintain realistic draping, natural lighting, correct body proportions, and photorealistic textile detail. Final output should look like a real fashion photo of the same person wearing the exact same garment from the reference image.`
-      : `Dress the person from image 1 with the exact garment shown in image 2. Image 2 is a garment product reference. Transfer only the outfit onto the person: preserve exact garment design, fabric, embroidery, colors, neckline, sleeves, silhouette, fit proportions, and all embellishment details. Do not redesign or reinterpret the outfit. Preserve the person's face, identity, skin tone, body shape, pose, and hair. Only replace their clothing with the exact garment from image 2. Photorealistic clothing transfer, 9:16 vertical portrait.`;
+      ? `The outfit in Image 2 is displayed on a mannequin. Extract only the clothing — ignore the mannequin entirely. ${basePrompt}`
+      : basePrompt;
 
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_urls: useMyPhoto ? [garmentUrl, modelUrl] : [modelUrl, garmentUrl], prompt }),
+      body:    JSON.stringify({ image_urls: [modelUrl, garmentUrl], prompt }),
     });
     if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
     const data   = await falRes.json();

@@ -3,9 +3,24 @@ import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
-import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
+
+const BLANK_URLS = {
+  square:       "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/1024x1024.png",
+  portrait_916: "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/680x1080.png",
+  portrait_45:  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/864x1080.png",
+  landscape:    "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/864x1080.png",
+};
+
+const NEGATIVE_PROMPT = "blurry, low quality, distorted, deformed, ugly, bad anatomy, watermark, signature, text errors, cropped elements, cut off text, out of frame, overexposed, underexposed";
+
+const ORIENTATION_NOTE = {
+  square:       "This poster must be designed for a square format (1:1 ratio). Compose the layout for a square canvas.",
+  portrait_45:  "This poster must be designed for a tall vertical portrait format (4:5 ratio). Compose the layout for a tall vertical canvas — headline at top, product in center, features below, bottom strip at the very bottom. Do not compose for square format.",
+  portrait_916: "This poster must be designed for a tall vertical portrait format (9:16 ratio). Compose the layout for a tall vertical canvas — headline at top, product in center, features below, bottom strip at the very bottom. Do not compose for square format.",
+};
+
 
 router.get("/list", requireAuth, async (req, res) => {
   try {
@@ -56,66 +71,90 @@ router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
   try {
-    const recordId = uuidv4();
+    const recordId  = uuidv4();
     const deduction = await deductCredits(userId, 10, "poster_generate", "Poster Studio — poster generation", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     creditAmount = 10;
-    const { productImageUrl, brandName, headline, tagline, colorMood, language = "English" } = req.body;
+
+    const { productImageUrl, goal, style, brandColor, platform } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
-    const { flagged } = await moderateInput([headline, tagline].filter(Boolean).join(" "));
-    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
 
-    const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    const FAL_KEY    = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    const blankUrl   = BLANK_URLS[platform] || BLANK_URLS.square;
+    const orientationNote = ORIENTATION_NOTE[platform] || "";
 
-    const moodMap = {
-      dark:    "dark dramatic background, deep shadows, moody cinematic atmosphere, rich contrast",
-      light:   "bright airy background, soft natural light, clean minimal aesthetic, pastel tones",
-      vibrant: "vibrant bold colors, energetic composition, high saturation, striking color contrast",
-      luxury:  "premium gold and black palette, elegant dark background, sophisticated luxury aesthetic",
-    };
-    const moodDesc  = colorMood === "auto" ? null : (moodMap[colorMood] || moodMap.luxury);
-    const brandLine = brandName ? `Brand name: "${brandName}".` : "";
-    const headLine  = headline  ? `Main headline: "${headline}".` : "";
-    const tagLine   = tagline   ? `Tagline or supporting copy: "${tagline}".` : "";
+    console.log("[poster/generate] platform:", platform, "→ blank:", blankUrl);
 
-    const prompt = `Create a premium commercial poster advertisement using the attached product image as the hero subject. Design a high-end modern poster ad with the product placed prominently as the main focus, styled like a luxury brand campaign. Build a visually striking composition around the product using elegant lighting, premium shadows, refined depth, and a polished advertising layout. Add premium supporting visual elements that match the product category, such as natural props, abstract shapes, ingredients, soft textures, or atmospheric accents to make the composition feel rich and intentional. Include stylish headline typography, short supporting copy, and clean negative space for branding and CTA placement. ${brandLine} ${headLine} ${tagLine} The design should feel like a complete standalone poster ad, not just a product mockup — premium, artistic, scroll-stopping, brand-worthy, and visually polished like a professional luxury campaign poster. Use cinematic composition, modern ad styling, premium color harmony, elegant hierarchy, and high-end commercial design aesthetics.${moodDesc ? ` Style: ${moodDesc}.` : ""} All text in the poster must be written in ${language}.`;
+    const blankLabel = { square: "1024x1024px (square)", portrait_45: "864x1080px (portrait 4:5)", portrait_916: "680x1080px (portrait 9:16)", landscape: "864x1080px (landscape)" };
+    const dimLabel   = blankLabel[platform] || blankLabel.square;
+
+    const userPrompt = `Use the first uploaded image as the product to feature in this poster. The second image is a blank canvas showing the exact required output dimensions (${dimLabel}) — your output must match its size and aspect ratio precisely.
+
+Create a premium, magazine-quality commercial advertising poster for this product.
+
+Goal: ${goal || "Auto"}
+Style: ${style === "auto" ? "Choose the most fitting style based on the product" : style}
+Platform: ${platform || "Auto"}
+${brandColor ? `Brand Colors: ${brandColor}` : ""}
+
+You are a world-class art director. Design a complete advertising poster that looks like it was made by a top creative agency. The composition, layout, hierarchy, and visual storytelling are entirely your creative decision — do not follow a fixed template.
+
+WHAT MUST BE INCLUDED:
+- The exact product from the image as the hero — preserve its colors, shape, materials, and details faithfully
+- A rich atmospheric environment or background scene that elevates the product story
+- Cinematic lighting with depth, shadows, highlights, and color grading
+- Bold campaign headline typography that matches the product's brand voice and typographic style
+- Supporting copy and feature callouts relevant to the product
+- Decorative design elements that serve the composition
+- Props derived ONLY from what is visible on the product or directly associated with how it is used — never add random plants, leaves, fruits, or unrelated organic elements
+- Feature callout list: 2-4 product benefits with circular outline icons, placed naturally within the composition
+- At least one badge or stamp element (circle, ribbon, or seal shape) with a short tagline
+- A bottom section with 3 short benefit labels separated by dividers
+- Campaign headline: bold, large, matches the product's typographic personality
+- Supporting subheadline or tagline below the main headline
+
+QUALITY STANDARD:
+- Think Nike, Apple, Coca-Cola campaign level
+- Rich texture, depth, and atmosphere — not flat or generic
+- Typography must feel designed into the composition, not placed on top
+- Every element must serve the product story
+- Professional retouching quality, 8K sharpness
+- All text and elements must be fully within the frame with generous padding from edges
+
+${orientationNote}
+`;
+
+    console.log("[poster/generate] prompt:\n", userPrompt);
 
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ prompt, image_urls: [productImageUrl] }),
+      body:    JSON.stringify({
+        image_urls:      [productImageUrl, blankUrl],
+        prompt:          userPrompt,
+        negative_prompt: NEGATIVE_PROMPT,
+      }),
     });
+    if (!falRes.ok) throw new Error(`fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
 
-    const rawText = await falRes.text();
-    if (!falRes.ok) throw new Error(`Fal.ai failed: ${rawText.slice(0, 200)}`);
+    const falData = await falRes.json();
+    const falUrl  = falData.images?.[0]?.url;
+    if (!falUrl) throw new Error("No image returned from fal.ai");
 
-    const data   = JSON.parse(rawText);
-    const falUrl = data.images?.[0]?.url;
-    if (!falUrl) throw new Error("No image URL returned");
-
-    const imgRes   = await fetch(falUrl);
-    const buffer   = Buffer.from(await imgRes.arrayBuffer());
-    const ct       = imgRes.headers.get("content-type") || "image/jpeg";
-    const ext      = ct.includes("png") ? "png" : "jpg";
-    const fileName = `poster-${Date.now()}.${ext}`;
-    const key      = `posters/${req.user.id}/${fileName}`;
+    const imgRes = await fetch(falUrl);
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const ct     = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext    = ct.includes("png") ? "png" : "jpg";
+    const key    = `posters/${req.user.id}/poster-${Date.now()}.${ext}`;
     const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
 
-    const { error: dbErr } = await supabaseAdmin.from("posters").insert({
-      id:                recordId,
-      user_id:           req.user.id,
-      product_image_url: productImageUrl,
-      poster_url:        publicUrl,
-      storage_key:       key,
-      brand_name:        brandName || null,
-      headline:          headline  || null,
-      tagline:           tagline   || null,
-      color_mood:        colorMood || null,
-      language:          language,
-    });
-    if (dbErr) console.error("[poster/generate] db insert error:", dbErr.message);
+    await supabaseAdmin.from("posters").insert({
+      id: recordId, user_id: req.user.id, product_image_url: productImageUrl,
+      poster_url: publicUrl, storage_key: key,
+    }).then(({ error }) => { if (error) console.error("[poster/generate] db:", error.message); });
+
     res.json({ posterUrl: publicUrl });
   } catch (e) {
     if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: poster generation failed").catch(() => {});

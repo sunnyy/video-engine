@@ -347,6 +347,7 @@ function PersistentVideoTrack({
   const videoRef  = useRef(null);
   const wrapperRef = useRef(null);
   const playing   = useRef(false);
+  const pendingSeekCleanup = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
 
   const activeClip  = clips.find((c) => currentTime >= c.start && currentTime < c.end) ?? null;
@@ -381,7 +382,10 @@ function PersistentVideoTrack({
     if (!el || !activeClip) return;
     el.playbackRate = rate;
     if (isPlaying) playing.current = true;
-    return seekAndPlay(el, sourceTime, isPlaying);
+    pendingSeekCleanup.current?.();
+    const cleanup = seekAndPlay(el, sourceTime, isPlaying);
+    pendingSeekCleanup.current = cleanup;
+    return () => { cleanup(); pendingSeekCleanup.current = null; };
   }, []);
 
   // Clip transition: active clip id changed → seek the SAME element to new position
@@ -390,7 +394,10 @@ function PersistentVideoTrack({
     if (!el) return;
     if (!activeClip) { el.pause(); playing.current = false; return; }
     playing.current = false;
-    return seekAndPlay(el, sourceTime, isPlaying);
+    pendingSeekCleanup.current?.();
+    const cleanup = seekAndPlay(el, sourceTime, isPlaying);
+    pendingSeekCleanup.current = cleanup;
+    return () => { cleanup(); pendingSeekCleanup.current = null; };
   }, [activeClipId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Play / pause toggle
@@ -398,6 +405,8 @@ function PersistentVideoTrack({
     const el = videoRef.current;
     if (!el || !activeClip) return;
     if (!isPlaying) {
+      pendingSeekCleanup.current?.();
+      pendingSeekCleanup.current = null;
       el.pause();
       el.currentTime = sourceTime;
       playing.current = false;
@@ -405,7 +414,10 @@ function PersistentVideoTrack({
     }
     if (!playing.current) {
       playing.current = true;
-      return seekAndPlay(el, sourceTime, true);
+      pendingSeekCleanup.current?.();
+      const cleanup = seekAndPlay(el, sourceTime, true);
+      pendingSeekCleanup.current = cleanup;
+      return () => { cleanup(); pendingSeekCleanup.current = null; };
     }
   }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -560,6 +572,7 @@ function PersistentVideoTrack({
           top:    activeClip ? top    : 0,
           width:  activeClip ? width  : 0,
           height: activeClip ? height : 0,
+          zIndex: activeClip?.zIndex ?? 0,
           transform: `${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}${activeClip?.flipX ? "scaleX(-1) " : ""}${activeClip?.flipY ? "scaleY(-1) " : ""}rotate(${rotation}deg) scale(${scale * tScale})`,
           transformOrigin: "center center",
           opacity: activeClip ? opacity * tOpacity : 0,
@@ -1109,6 +1122,7 @@ function LayerElement({
           top,
           width,
           height,
+          zIndex: layer.zIndex ?? 0,
           transform: `${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}${layer.flipX ? "scaleX(-1) " : ""}${layer.flipY ? "scaleY(-1) " : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
           transformOrigin: "center center",
           opacity: (opacity ?? 1) * tOpacity,
@@ -1697,7 +1711,7 @@ export default function Preview() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0a0a14",
+        background: "#1A1A2E",
         overflow: "hidden",
         position: "relative",
         cursor: isHandMode ? "grab" : undefined,

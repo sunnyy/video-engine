@@ -34,6 +34,7 @@ import CreditsPage     from "./pages/Credits";
 import Settings        from "./pages/Settings";
 import ProductVideoGenerator from "./pages/ProductVideoGenerator";
 import TypographyVideo       from "./pages/TypographyVideo";
+import PromoVideo            from "./pages/PromoVideo";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
@@ -148,6 +149,7 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
+            <Route path="/promo-video"          element={<PromoVideo />} />
             <Route path="/product-video"      element={<ProductVideoGenerator />} />
             <Route path="/typography-video"   element={<TypographyVideo />} />
             <Route path="/product-poster"    element={<PosterStudio />} />

@@ -3,9 +3,16 @@ import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
-import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
+
+const BLANK_URLS = {
+  square:       "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/1024x1024.png",
+  portrait_45:  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/864x1080.png",
+  portrait_916: "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/680x1080.png",
+};
+
+const NEGATIVE_PROMPT = "ugly, deformed, blurry, low quality, watermark, border, frame, low contrast, small text, unreadable text, cluttered, busy, amateur";
 
 router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, res) => {
   try {
@@ -23,99 +30,86 @@ router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
   try {
-    const recordId = uuidv4();
+    const recordId  = uuidv4();
     const deduction = await deductCredits(userId, 10, "thumbnail_generate", "Thumbnail Generator", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     creditAmount = 10;
 
-    const { imageUrl, headline, subtext, style, niche } = req.body;
-    if (!headline || !niche) return res.status(400).json({ error: "headline and niche required" });
-    const { flagged } = await moderateInput([headline, subtext].filter(Boolean).join(" "));
-    if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
+    const { imageUrl, logoUrl, subText, style, brandColor, platform } = req.body;
+    const title = req.body.title || req.body.headline;
+    if (!title) return res.status(400).json({ error: "title required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    const blankUrl = BLANK_URLS[platform] || BLANK_URLS.square;
 
-    // Step 1 — GPT-4o generates an optimized nano-banana prompt
-    const { getThumbnailAnalysisPrompt } = await import("../prompts/thumbnailAnalysis.js");
-    const analysisPrompt = getThumbnailAnalysisPrompt({ headline, subtext, niche, style, hasImage: !!imageUrl });
+    const userPrompt = `Use the uploaded images to create this thumbnail. The last image is a blank canvas showing the exact required output dimensions — your output must match its size and aspect ratio precisely.
 
-    let optimizedPrompt;
-    try {
-      const { default: OpenAI } = await import("openai");
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const messages = [{ role: "user", content: [] }];
-      if (imageUrl) {
-        const imgFetch  = await fetch(imageUrl);
-        const imgBuffer = Buffer.from(await imgFetch.arrayBuffer());
-        const base64    = imgBuffer.toString("base64");
-        const mimeType  = imgFetch.headers.get("content-type") || "image/jpeg";
-        messages[0].content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } });
-      }
-      messages[0].content.push({ type: "text", text: analysisPrompt });
+Create a viral, ultra click-worthy thumbnail that stops the scroll instantly.
 
-      const gptRes = await openai.chat.completions.create({ model: "gpt-4o", max_tokens: 400, messages });
-      optimizedPrompt = gptRes.choices[0].message.content?.trim();
-    } catch (e) {
-      const STYLE_MAP = { bold: "bold dramatic high-contrast", minimal: "clean minimal elegant", vibrant: "vibrant energetic saturated", dark: "dark moody cinematic" };
-      optimizedPrompt = `${STYLE_MAP[style] || "bold dramatic"} YouTube thumbnail for ${niche} niche. Headline text: "${headline}". ${subtext ? `Subtext: "${subtext}".` : ""} 16:9 horizontal landscape, high contrast, ultra-sharp, professional thumbnail quality, no watermarks.`;
-    }
+Title: "${title}"
+${subText ? `Sub Text: "${subText}"` : ""}
+Style: ${style === "auto" ? "Bold, high energy, maximum impact" : style}
+${brandColor ? `Brand Colors: ${brandColor}` : ""}
 
-    // Step 2 — Upload image to Fal.ai storage (best effort — fallback to direct URL)
-    let falImageUrl = imageUrl || null;
-    if (imageUrl) {
-      try {
-        const imgFetch       = await fetch(imageUrl);
-        const imgBuffer      = Buffer.from(await imgFetch.arrayBuffer());
-        const imgContentType = imgFetch.headers.get("content-type") || "image/jpeg";
-        const ext            = imgContentType.includes("png") ? "png" : "jpg";
-        const falUploadRes   = await fetch("https://fal.run/storage", {
-          method:  "POST",
-          headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": imgContentType, "X-File-Name": `thumb.${ext}` },
-          body:    imgBuffer,
-        });
-        if (falUploadRes.ok) {
-          const uploaded = await falUploadRes.json();
-          falImageUrl = uploaded.url;
-        }
-      } catch (_) {}
+Study the best performing YouTube thumbnails from MrBeast, PewDiePie, Marques Brownlee, Veritasium. Match that level of visual impact.
 
-    }
+MANDATORY ELEMENTS:
+- Title text: massive, bold, high contrast, readable at small size — occupies top 40% of frame
+- If face/person image provided: large, expressive, emotional face taking up significant portion of frame
+- If logo provided: small brand mark top corner only
+- Strong graphic elements: bold arrows, highlight boxes, starbursts, outlined shapes that direct eye to key info
+- Background: dramatic gradient, solid color, or atmospheric scene — never plain white or gray
+- Color contrast: extreme — white text on dark, or dark text on bright. Never low contrast
+- Energy lines, speed lines, or geometric shapes to create dynamism if no face provided
 
-    // Step 3 — Generate via nano-banana
-    const endpoint = falImageUrl
-      ? "https://fal.run/fal-ai/nano-banana/edit"
-      : "https://fal.run/fal-ai/nano-banana";
-    const falBody = falImageUrl
-      ? { image_urls: [falImageUrl], prompt: optimizedPrompt }
-      : { prompt: optimizedPrompt };
+CONTEXT-AWARE VISUALS:
+- If the title or business description suggests a software, app, or digital tool: include a realistic mockup or screenshot of the interface as a key visual element — laptop, phone, or screen showing the product UI
+- If the title suggests finance/money: include cash, coins, charts, or wealth visuals
+- If the title suggests fitness/health: include relevant body, equipment, or transformation visuals
+- If the title suggests food: include the food prominently styled
+- Match the visual props to what the title is actually about — be specific and literal
 
-    const falRes = await fetch(endpoint, {
+THUMBNAIL PSYCHOLOGY:
+- Create curiosity gap — viewer must click to find out
+- Use numbers, shock words, or power words from the title
+- Maximum 6 words visible — prioritize the most impactful words from the title
+- Every pixel must serve the goal of getting the click
+
+TECHNICAL:
+- All text fully readable at 320px wide (mobile size)
+- No watermarks, no borders, no thin fonts
+- Professional retouching quality
+`;
+
+    console.log("[thumbnail/generate] platform:", platform, "title:", title, "prompt:\n", userPrompt);
+
+    const imageUrls = [];
+    if (imageUrl) imageUrls.push(imageUrl);
+    if (logoUrl)  imageUrls.push(logoUrl);
+    imageUrls.push(blankUrl);
+
+    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify(falBody),
+      body:    JSON.stringify({ image_urls: imageUrls, prompt: userPrompt, negative_prompt: NEGATIVE_PROMPT }),
     });
-    if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
+    if (!falRes.ok) throw new Error(`fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
 
-    const data   = await falRes.json();
-    const falUrl = data.images?.[0]?.url;
-    if (!falUrl) throw new Error("No image URL returned");
+    const falData = await falRes.json();
+    const falUrl  = falData.images?.[0]?.url;
+    if (!falUrl) throw new Error("No image returned from fal.ai");
 
-    // Step 4 — Proxy to Supabase permanent storage
     const imgRes = await fetch(falUrl);
     const buffer = Buffer.from(await imgRes.arrayBuffer());
     const ct     = imgRes.headers.get("content-type") || "image/jpeg";
-    const ext2   = ct.includes("png") ? "png" : "jpg";
-    const key    = `thumbnails/${req.user.id}/thumb-${Date.now()}.${ext2}`;
+    const ext    = ct.includes("png") ? "png" : "jpg";
+    const key    = `thumbnails/${req.user.id}/thumb-${Date.now()}.${ext}`;
     const { error: upErr } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: ct, upsert: false });
     if (upErr) throw new Error(upErr.message);
     const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
 
-    // Step 5 — Save metadata (silently skipped if table doesn't exist)
     try {
-      await supabaseAdmin.from("thumbnails").insert({
-        id: recordId, user_id: req.user.id, thumbnail_url: publicUrl, storage_key: key,
-        headline: headline || null, subtext: subtext || null, niche: niche || null, style: style || null,
-      });
+      await supabaseAdmin.from("thumbnails").insert({ id: recordId, user_id: req.user.id, thumbnail_url: publicUrl, storage_key: key });
     } catch (_) {}
 
     res.json({ thumbnailUrl: publicUrl });
