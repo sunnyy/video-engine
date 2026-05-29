@@ -150,60 +150,39 @@ export async function orchestratePromoRender(projectId) {
       ? injectVoiceoversIntoTimeline(timeline, voiceover_results)
       : timeline;
 
-    // ── Step 5c: Inject trim timestamps for talking head video layers ─────
+    // ── Step 5c: Inject TH trim timestamps + hidden audio master ─────────
+    // Per-scene video clips are muted (visual only). One hidden audio master
+    // spans the full duration so audio never stops between scenes.
+    // Since each scene's duration = next_th_start - this_th_start, the timeline
+    // position of each scene equals its th_start — zero drift by construction.
     if (isThVideo) {
-      const trimBySid = {};
-      for (const scene of scenes) {
-        if (scene.th_start !== undefined && scene.th_end !== undefined) {
-          trimBySid[`s${scene.scene_id}`] = {
-            trimStart: scene.th_start,
-            trimEnd:   scene.th_end,
-            clipDur:   scene.th_end - scene.th_start,
-          };
-        }
-      }
       for (const layer of finalTimeline.layers) {
         if (layer.trackId === "track_talking_head" && layer.type === "video") {
-          const sid = layer.id.replace(/_th$/, "");
-          if (trimBySid[sid]) {
-            layer.trimStart = trimBySid[sid].trimStart;
-            layer.trimEnd   = trimBySid[sid].trimEnd;
-            // Mute: audio comes from the persistent master layer
-            layer.muted     = true;
-            layer.volume    = 0;
-            // Do NOT override layer.end — the layout sets it to scene.duration_seconds
-            // which may be longer than clipDur (MIN_SCENE_DUR padding). Playing slightly
-            // past th_end into inter-word silence is natural and avoids a disappearing clip.
-          }
+          const match = layer.id.match(/^s(\d+)_th$/);
+          if (!match) continue;
+          const sid   = Number(match[1]);
+          const scene = scenes.find(sc => sc.scene_id === sid);
+          if (!scene || scene.th_start === undefined) continue;
+          layer.trimStart = scene.th_start;
+          layer.trimEnd   = scene.th_start + (layer.end - layer.start);
+          layer.muted     = true;
+          layer.volume    = 0;
         }
       }
 
-      // Per-scene TH audio clips — each trimmed to match its companion video layer
-      // so audio and video stay frame-accurate regardless of stock-scene gaps.
       if (thUrl) {
-        const thVideoLayers = finalTimeline.layers.filter(
-          l => l.trackId === "track_talking_head" && l.type === "video"
-        );
-        for (const vl of thVideoLayers) {
-          const sid = vl.id.replace(/_th$/, "");
-          const trim = trimBySid[sid];
-          if (!trim) continue;
-          const sceneDur = vl.end - vl.start;
-          finalTimeline.layers.push({
-            id: `${sid}_th_audio`, trackId: "track_th_audio",
-            type: "audio", audioType: "voiceover", src: thUrl,
-            start: vl.start, end: vl.end, zIndex: 0,
-            visible: true, locked: false,
-            trimStart: trim.trimStart,
-            trimEnd:   trim.trimStart + sceneDur,
-            volume: 0.5, muted: false, fadeIn: 0, fadeOut: 0,
-            sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
-          });
-        }
-        console.log(`[renderOrchestrator] TH per-scene audio injected (${thVideoLayers.length} clips)`);
+        // Single continuous audio master — hidden from timeline layer list
+        finalTimeline.layers.push({
+          id: "th_audio_master", trackId: "track_th_audio",
+          type: "audio", audioType: "voiceover", src: thUrl,
+          start: 0, end: totalDuration, zIndex: 0,
+          visible: true, locked: false, _system: true,
+          trimStart: 0, trimEnd: totalDuration,
+          volume: 0.5, muted: false, fadeIn: 0, fadeOut: 0,
+          sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+        });
+        console.log(`[renderOrchestrator] TH audio master + per-scene clips injected`);
       }
-
-      console.log(`[renderOrchestrator] injected trim timestamps for ${Object.keys(trimBySid).length} TH layers`);
     }
 
     // ── Step 5b: Inject background music ─────────────────────────────────
@@ -259,7 +238,16 @@ export async function orchestratePromoRender(projectId) {
       .update({ timeline: finalTimeline, editor_project_id: editorProjectId, updated_at: new Date().toISOString() })
       .eq("id", projectId);
 
-    // ── Step 7: Remotion render ────────────────────────────────────────────
+    // ── TH videos: skip Remotion — timeline JSON is the output ────────────
+    // The editor opens the timeline directly. Export to MP4 is user-triggered
+    // from the editor, same as any other timeline project.
+    if (isThVideo) {
+      await setStatus(projectId, PROJECT_STATUS.RENDERED, { editor_project_id: editorProjectId });
+      console.log(`[renderOrchestrator] ${projectId} → TH timeline ready, opening editor`);
+      return { projectId, video_url: null, editor_project_id: editorProjectId };
+    }
+
+    // ── Step 7: Remotion render (faceless only) ────────────────────────────
     // Drop audio/video layers with null src — Remotion's Html5Audio crashes on non-string src
     const renderTimeline = {
       ...finalTimeline,
@@ -284,8 +272,8 @@ export async function orchestratePromoRender(projectId) {
       inputProps:      { project: renderTimeline },
       outputDir:       framesDir,
       imageFormat:     "jpeg",
-      concurrency:     hasVideo ? 2 : 4,
-      chromiumOptions: { gl: "swangle" },
+      concurrency:     hasVideo ? 4 : 6,
+      chromiumOptions: { gl: "angle" },
     });
 
     await stitchFramesToVideo({

@@ -7,14 +7,42 @@
  * uploads to Supabase storage, and returns audio URLs for injection.
  */
 
-import fs from "fs";
-import path from "path";
-import { openai, supabaseAdmin, TEMP_DIR, uuidv4 } from "../../../server/middleware/shared.js";
+import { openai, supabaseAdmin } from "../../../server/middleware/shared.js";
 
 const VALID_VOICES = ["nova", "shimmer", "coral", "alloy", "sage", "ash", "onyx", "echo", "fable", "verse", "marin", "cedar"];
 const DEFAULT_VOICE = "nova";
 const TTS_MODEL = "tts-1-hd";
 const STORAGE_BUCKET = "user-assets";
+
+// Parse MP3 frame header to get exact duration — pure JS, no subprocess.
+// Skips ID3v2 tags, reads first valid MPEG frame header to find bitrate,
+// then divides file size by bytes-per-second.
+function parseMp3Duration(buffer) {
+  try {
+    let offset = 0;
+    // Skip ID3v2 tag if present
+    if (buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33) {
+      const id3Size = ((buffer[6] & 0x7F) << 21) | ((buffer[7] & 0x7F) << 14) |
+                     ((buffer[8] & 0x7F) << 7)  |  (buffer[9] & 0x7F);
+      offset = 10 + id3Size;
+    }
+    // Find first sync word (0xFF 0xEx or 0xFF 0xFx)
+    for (let i = offset; i < Math.min(offset + 4096, buffer.length - 4); i++) {
+      if (buffer[i] !== 0xFF || (buffer[i + 1] & 0xE0) !== 0xE0) continue;
+      const b1 = buffer[i + 1], b2 = buffer[i + 2];
+      const bitrateIdx   = (b2 >> 4) & 0xF;
+      const sampleIdx    = (b2 >> 2) & 0x3;
+      const bitrateTable = [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0];
+      const sampleTable  = [44100,48000,32000,0];
+      const bitrate      = bitrateTable[bitrateIdx] * 1000;
+      const sampleRate   = sampleTable[sampleIdx];
+      if (bitrate > 0 && sampleRate > 0) {
+        return parseFloat((buffer.length / (bitrate / 8)).toFixed(2));
+      }
+    }
+  } catch {}
+  return null;
+}
 
 /**
  * Generate TTS audio for all scenes in the voiceover_queue.
@@ -48,20 +76,7 @@ export async function generatePromoVoiceovers(voiceover_queue, projectId) {
       });
 
       const buffer     = Buffer.from(await mp3.arrayBuffer());
-
-      // Measure actual audio duration using Remotion's bundled ffprobe
-      let duration_seconds = null;
-      const tmpMp3 = path.join(TEMP_DIR, `tts-dur-${uuidv4()}.mp3`);
-      try {
-        fs.writeFileSync(tmpMp3, buffer);
-        const { getVideoMetadata } = await import("@remotion/renderer");
-        const meta = await getVideoMetadata(tmpMp3);
-        duration_seconds = meta.durationInSeconds ?? null;
-      } catch (e) {
-        console.warn(`[ttsGenerator] scene ${scene_id}: duration probe failed, will estimate`, e.message);
-      } finally {
-        try { fs.unlinkSync(tmpMp3); } catch {}
-      }
+      const duration_seconds = parseMp3Duration(buffer);
 
       const storageKey = `promo-voiceovers/${projectId}/${scene_id}.mp3`;
 

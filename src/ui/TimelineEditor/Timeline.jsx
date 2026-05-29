@@ -46,7 +46,9 @@ export default function Timeline() {
   const totalWidth = Math.max(duration * pps + 80, 200);
 
   const rawLayers = project
-    ? [...project.layers].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))
+    ? [...project.layers]
+        .filter(l => !l._system)
+        .sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))
     : [];
 
   // Group layers by trackId so split clips share the same timeline row.
@@ -165,8 +167,35 @@ export default function Timeline() {
     isDraggingPlayhead.current = true;
     const wasPlaying = useTimelineStore.getState().isPlaying;
     setIsPlaying(false);
-    const onMove = (me) => setCurrentTime(clientXToTime(me.clientX));
+
+    let lastClientX = e.clientX;
+    let rafId = null;
+    const EDGE_ZONE = 60; // px from edge to start scrolling
+    const MAX_SPEED = 18; // max px per frame to scroll
+
+    const autoScroll = () => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const distLeft  = lastClientX - (rect.left + LABEL_W);
+      const distRight = (rect.right) - lastClientX;
+      let scrollDelta = 0;
+      if (distLeft < EDGE_ZONE)  scrollDelta = -Math.round(MAX_SPEED * (1 - distLeft  / EDGE_ZONE));
+      if (distRight < EDGE_ZONE) scrollDelta =  Math.round(MAX_SPEED * (1 - distRight / EDGE_ZONE));
+      if (scrollDelta !== 0) {
+        el.scrollLeft = Math.max(0, el.scrollLeft + scrollDelta);
+        setCurrentTime(clientXToTime(lastClientX));
+      }
+      rafId = requestAnimationFrame(autoScroll);
+    };
+    rafId = requestAnimationFrame(autoScroll);
+
+    const onMove = (me) => {
+      lastClientX = me.clientX;
+      setCurrentTime(clientXToTime(me.clientX));
+    };
     const onUp = (me) => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       isDraggingPlayhead.current = false;
@@ -181,7 +210,7 @@ export default function Timeline() {
     const wasPlaying = useTimelineStore.getState().isPlaying;
     setIsPlaying(false);
     setCurrentTime(clientXToTime(e.clientX));
-    if (wasPlaying) setIsPlaying(true);
+    if (wasPlaying) setTimeout(() => setIsPlaying(true), 50);
   };
 
   const interval = tickInterval(pps);

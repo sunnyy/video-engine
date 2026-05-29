@@ -71,7 +71,8 @@ export default function MusicModal({ onClose }) {
 
   const addMusicLayer = (track) => {
     if (audioRef.current) { audioRef.current.pause(); }
-    const dur = track.duration || 30;
+    const projectDur = project?.format?.duration ?? Infinity;
+    const dur = Math.min(track.duration || 30, projectDur - currentTime);
     const layer = makeLayerAt("audio", project, currentTime, dur, {
       src: track.public_url,
       name: track.title || "Music",
@@ -84,9 +85,11 @@ export default function MusicModal({ onClose }) {
     const file = await pickFile("audio/*");
     if (!file) return;
     const blobUrl = URL.createObjectURL(file);
+    const projectDur = project?.format?.duration ?? Infinity;
     let dur = 30;
     const d = await getFileDuration(file);
     if (d) dur = d;
+    dur = Math.min(dur, projectDur - currentTime);
     const layer = makeLayerAt("audio", project, currentTime, dur, { src: blobUrl, name: file.name });
     addPendingFile(layer.id, file);
     addLayer(layer);

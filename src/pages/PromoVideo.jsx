@@ -387,9 +387,16 @@ function CreateWizard({ prefill, onViewProjects }) {
         const data = await res.json();
         const p    = data.project;
         if (!p) return;
-        if (p.status === "rendered" && p.editor_project_id) {
+        if (p.status === "rendered") {
           clearInterval(pollRef.current);
-          navigate(`/video-editor/${p.editor_project_id}`);
+          if (p.editor_project_id) {
+            navigate(`/video-editor/${p.editor_project_id}`);
+          } else if (p.video_url) {
+            window.open(p.video_url, "_blank");
+            setRenderError("Video ready — editor project not created. Video opened in new tab.");
+          } else {
+            setRenderError("Render completed but no output found. Check the dashboard.");
+          }
         } else if (p.status === "failed") {
           clearInterval(pollRef.current);
           setRenderError(p.error_message || "Render failed. Please try again.");

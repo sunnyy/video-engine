@@ -1399,6 +1399,29 @@ export default function PropertiesPanel() {
               </button>
             </div>
           )}
+          {/* Talking Head source toggle */}
+          {layer.trackId === "track_talking_head" && layer.type === "video" && (
+            <Section title="Talking Head Video">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
+                <span style={{ fontSize: 12, color: "#c0c0d8" }}>Show in this scene</span>
+                <button
+                  onClick={() => update({ visible: !layer.visible })}
+                  style={{
+                    padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    background: layer.visible !== false ? "rgba(124,92,252,0.25)" : "rgba(255,255,255,0.06)",
+                    border: `1px solid ${layer.visible !== false ? "rgba(124,92,252,0.6)" : "rgba(255,255,255,0.12)"}`,
+                    color: layer.visible !== false ? "#a78bfa" : "#55556a",
+                  }}
+                >
+                  {layer.visible !== false ? "Visible" : "Hidden"}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: "#44445a", marginTop: 2 }}>
+                Hide to show asset/image instead. Audio always plays regardless.
+              </div>
+            </Section>
+          )}
+
           {/* Layer info */}
           <Section title="Layer">
             <Field label="Name">

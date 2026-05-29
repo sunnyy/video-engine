@@ -110,7 +110,7 @@ router.post("/create", requireAuth, async (req, res) => {
         thResult = {
           scenes:          preSegments,
           full_transcript: preSegments.map(s => s.spoken).join(" "),
-          total_duration:  preSegments.reduce((sum, s) => sum + (s.duration_seconds || 0), 0),
+          total_duration:  preSegments[preSegments.length - 1]?.end ?? 0,
         };
         console.log(`[promo-video/create] using ${preSegments.length} pre-transcribed segments`);
       } else if (talking_head_url) {
@@ -121,23 +121,28 @@ router.post("/create", requireAuth, async (req, res) => {
       }
       thSegments = thResult.scenes;
 
-      // Convert TH segments to project scene format
-      // th_url holds the TH video clip; asset_url is reserved for per-scene screenshots
-      let thScenes = thResult.scenes.map(s => createEmptyScene({
-        scene_id:         s.scene_id,
-        scene_type:       "talking_head",
-        visual_mode:      null,
-        script:           s.spoken,
-        duration_seconds: s.duration_seconds,
-        asset_type:       ASSET_TYPE.TALKING_HEAD,
-        asset_source:     ASSET_SOURCE.PLACEHOLDER,
-        asset_url:        null,
-        th_url:           talking_head_url,
-        asset_hint:       null,
-        scene_purpose:    null,
-        th_start:         s.start,
-        th_end:           s.end,
-      }));
+      // Convert TH segments to project scene format.
+      // Duration extends to next segment's start so timeline_start_N == th_start_N exactly,
+      // which keeps the persistent audio master in sync with per-scene video clips.
+      let thScenes = thResult.scenes.map((s, idx, arr) => {
+        const nextStart      = arr[idx + 1]?.start ?? thResult.total_duration;
+        const duration       = parseFloat(Math.max(0.1, nextStart - s.start).toFixed(3));
+        return createEmptyScene({
+          scene_id:         s.scene_id,
+          scene_type:       "talking_head",
+          visual_mode:      null,
+          script:           s.spoken,
+          duration_seconds: duration,
+          asset_type:       ASSET_TYPE.TALKING_HEAD,
+          asset_source:     ASSET_SOURCE.PLACEHOLDER,
+          asset_url:        null,
+          th_url:           talking_head_url,
+          asset_hint:       null,
+          scene_purpose:    null,
+          th_start:         s.start,
+          th_end:           s.end,
+        });
+      });
 
       // Assign visual modes and asset hints via GPT (no script rewriting)
       thScenes = await assignVisualModes(thScenes, { ...project, video_type: "talking_head" });

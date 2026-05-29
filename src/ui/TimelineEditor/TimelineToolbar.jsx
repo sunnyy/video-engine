@@ -34,6 +34,7 @@ export default function TimelineToolbar() {
   const zoom             = useTimelineStore((s) => s.zoom);
 
   const setIsPlaying         = useTimelineStore((s) => s.setIsPlaying);
+  const setCurrentTime       = useTimelineStore((s) => s.setCurrentTime);
   const setZoom              = useTimelineStore((s) => s.setZoom);
   const setSnapEnabled       = useTimelineStore((s) => s.setSnapEnabled);
   const removeLayer          = useTimelineStore((s) => s.removeLayer);
@@ -81,6 +82,25 @@ export default function TimelineToolbar() {
         userSelect: "none",
       }}
     >
+      {/* Restart */}
+      <button
+        style={{
+          ...iconBtn(false),
+          color: "#c0c0d8",
+          background: "#1e1e30",
+          border: "1px solid rgba(255,255,255,0.12)",
+          width: 36,
+          height: 36,
+        }}
+        onClick={() => { setIsPlaying(false); setCurrentTime(0); setTimeout(() => setIsPlaying(true), 50); }}
+        title="Restart"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="1 4 1 10 7 10"/>
+          <path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+        </svg>
+      </button>
+
       {/* Play / Pause */}
       <button
         style={{

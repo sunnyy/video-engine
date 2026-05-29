@@ -159,7 +159,7 @@ function fullAvatarLayout(sid, s, e, { script, talkingHeadUrl }) {
   out.push(thLayer(`${sid}_th`, s, e, talkingHeadUrl, { ...BG_TR }));
   if (script) {
     out.push(textL(
-      `${sid}_caption`, `track_caption_${sid}`, s, e, script,
+      `${sid}_caption`, `track_caption`, s, e, script,
       {
         fontFamily: "Outfit", fontSize: 42, fontWeight: 700, color: "#ffffff",
         textAlign: "center", lineHeight: 1.3, letterSpacing: 0,
@@ -181,7 +181,7 @@ function fullAssetLayout(sid, s, e, { script, assetUrl, productName, accentColor
   out.push(overlay(`${sid}_ov`, s, e, 0.45));
   if (script) {
     out.push(textL(
-      `${sid}_text`, `track_text_${sid}`, s, e, script,
+      `${sid}_text`, `track_text`, s, e, script,
       {
         fontFamily: "Outfit", fontSize: 58, fontWeight: 700, color: "#ffffff",
         textAlign: "center", lineHeight: 1.25, letterSpacing: -0.5,
@@ -248,7 +248,7 @@ function topAssetBottomAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUr
   // Caption pill at very bottom
   if (script) {
     out.push(textL(
-      `${sid}_caption`, `track_caption_${sid}`, s, e, script,
+      `${sid}_caption`, `track_caption`, s, e, script,
       {
         fontFamily: "Outfit", fontSize: 38, fontWeight: 700, color: "#ffffff",
         textAlign: "center", lineHeight: 1.3, letterSpacing: 0,
@@ -273,7 +273,7 @@ function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
   // Large text at top
   if (script) {
     out.push(textL(
-      `${sid}_text`, `track_text_${sid}`, s, e, script,
+      `${sid}_text`, `track_text`, s, e, script,
       {
         fontFamily: "Outfit", fontSize: 62, fontWeight: 800, color: "#ffffff",
         textAlign: "center", lineHeight: 1.2, letterSpacing: -1,
@@ -289,7 +289,7 @@ function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
   // Caption pill above the floating head
   if (script) {
     out.push(textL(
-      `${sid}_cap_pill`, `track_caption_${sid}`, s, e, script,
+      `${sid}_cap_pill`, `track_caption`, s, e, script,
       {
         fontFamily: "Outfit", fontSize: 36, fontWeight: 700, color: "#ffffff",
         textAlign: "center", lineHeight: 1.3, letterSpacing: 0,
@@ -325,7 +325,7 @@ function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) 
   out.push(overlay(`${sid}_ov`, s, e, 0.4));
   if (script) {
     out.push(textL(
-      `${sid}_headline`, `track_text_${sid}`, s, e, script,
+      `${sid}_headline`, `track_text`, s, e, script,
       {
         fontFamily: "Outfit", fontSize: 64, fontWeight: 800, color: "#ffffff",
         textAlign: "center", lineHeight: 1.2, letterSpacing: -1,

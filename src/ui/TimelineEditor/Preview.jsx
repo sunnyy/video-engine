@@ -286,6 +286,19 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
   const playing = useRef(false);
   const sourceTime = (layer.trimStart ?? 0) + (currentTime - layer.start);
 
+  // Mount: seek to correct position and start if already playing.
+  // Without this, audio never starts when a layer mounts mid-playback
+  // (isPlaying doesn't change so the isPlaying effect below doesn't fire).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.currentTime = sourceTime;
+    if (isPlaying) {
+      el.play().catch(() => {});
+      playing.current = true;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -298,13 +311,13 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
       el.play().catch(() => {});
       playing.current = true;
     }
-  }, [isPlaying]);
+  }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = ref.current;
     if (!el || isPlaying) return;
     el.currentTime = sourceTime;
-  }, [currentTime]);
+  }, [currentTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = ref.current;
@@ -1659,7 +1672,7 @@ export default function Preview() {
       <div style={{
         display: "flex", alignItems: "center", padding: "5px 12px",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
-        flexShrink: 0, gap: 10, background: "#0d0d18",
+        flexShrink: 0, gap: 10, background: "#0d0d18", userSelect: "none",
       }}>
         {/* Quick hints */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#555", fontFamily: "monospace" }}>

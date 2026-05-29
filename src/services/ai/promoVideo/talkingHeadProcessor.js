@@ -33,7 +33,7 @@ async function transcribeAndSegment(tmpPath) {
     const spoken   = bucket.map(w => w.word.trim()).join(" ").replace(/\s+/g, " ").trim();
     const rawStart = bucket[0].start;
     const rawEnd   = bucket[bucket.length - 1].end;
-    const dur      = Math.max(MIN_SCENE_DUR, parseFloat((rawEnd - rawStart).toFixed(2)));
+    const dur      = parseFloat((rawEnd - rawStart).toFixed(2));
     scenes.push({
       scene_id:         scenes.length + 1,
       spoken,
