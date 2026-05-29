@@ -99,7 +99,7 @@ function VideoCard({ asset, onClick }) {
   );
 }
 
-export default function MediaModal({ onClose }) {
+export default function MediaModal({ onClose, onReplace }) {
   const project     = useTimelineStore((s) => s.project);
   const currentTime = useTimelineStore((s) => s.currentTime);
   const projectId   = useTimelineStore((s) => s.projectId);
@@ -134,6 +134,19 @@ export default function MediaModal({ onClose }) {
     let dur = type === "image" ? 5 : 10;
     if (type === "video") { const d = await getFileDuration(file); if (d) dur = d; }
 
+    if (onReplace) {
+      onReplace(blobUrl, type);
+      onClose();
+      setUploading(true);
+      try {
+        const asset = await uploadUserAsset(file, type, null, "project", projectId);
+        onReplace(asset.url, type);
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) { showToast("Upload failed: " + err.message, "error"); }
+      finally { setUploading(false); }
+      return;
+    }
+
     const layer = makeLayerAt(type, project, currentTime, dur, { src: blobUrl, name: file.name });
     addPendingFile(layer.id, file);
     addLayer(layer);
@@ -159,6 +172,7 @@ export default function MediaModal({ onClose }) {
   };
 
   const addAssetLayer = (asset) => {
+    if (onReplace) { onReplace(asset.url, asset.type); onClose(); return; }
     const type = asset.type === "video" ? "video" : "image";
     const dur = type === "image" ? 5 : 10;
     const layer = makeLayerAt(type, project, currentTime, dur, { src: asset.url, name: asset.name });

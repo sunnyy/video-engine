@@ -5,6 +5,7 @@ import { loadSFXLibrary, getSFXPreviewUrl } from "../../core/registries/sfxRegis
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import PresetsModal from "./modals/PresetsModal";
 import IconModal from "./modals/IconModal";
+import MediaModal from "./modals/MediaModal";
 
 const FONT_FAMILIES = [
   "Outfit", "Inter", "Roboto", "Montserrat",
@@ -99,6 +100,151 @@ function Section({ title, children }) {
       </div>
       {children}
     </div>
+  );
+}
+
+// ── Scene Source Switcher (TH video projects only) ────────────────────────────
+const BG_TRACKS  = new Set(["track_background", "track_asset"]);
+const TH_TRACKS  = new Set(["track_talking_head"]);
+
+function SceneSourceSection({ layer, project, updateLayer, addLayer }) {
+  const [showMedia, setShowMedia] = useState(false);
+  const [activeTab, setActiveTab] = useState(() => TH_TRACKS.has(layer.trackId) ? "th" : "asset");
+
+  const isTHProject = project?.meta?.source === "promo_video" &&
+    project?.layers?.some(l => TH_TRACKS.has(l.trackId) && l.type === "video");
+  if (!isTHProject) return null;
+  if (layer.type === "audio" || layer._system) return null;
+
+  const sceneStart = layer.start;
+  const sceneEnd   = layer.end;
+  const sceneLayers = project.layers.filter(l =>
+    Math.abs(l.start - sceneStart) < 0.05 && l.type !== "audio" && !l._system
+  );
+
+  const thLayer  = sceneLayers.find(l => TH_TRACKS.has(l.trackId) && l.type === "video");
+  const bgLayer  = sceneLayers.find(l => BG_TRACKS.has(l.trackId) && (l.type === "image" || l.type === "video"));
+  const thUrl    = project.layers.find(l => TH_TRACKS.has(l.trackId) && l.type === "video")?.src;
+
+
+  const switchToTH = () => {
+    setActiveTab("th");
+    if (thLayer) {
+      updateLayer(thLayer.id, { visible: true });
+    } else if (thUrl) {
+      addLayer({
+        id: `s_th_${Date.now()}`, trackId: "track_talking_head",
+        type: "video", src: thUrl, objectFit: "cover",
+        start: sceneStart, end: sceneEnd, zIndex: 2,
+        visible: true, locked: false, sfx: null,
+        trimStart: sceneStart, trimEnd: sceneEnd,
+        muted: true, volume: 0,
+        keyframes: { x:[], y:[], scale:[], rotation:[], blur:[], opacity:[] },
+        transition: { in: { type:"none", duration:0 }, out: { type:"none", duration:0 } },
+        transform: { x:0, y:0, width:1080, height:1920, opacity:1, rotation:0, scale:1, blur:0, borderRadius:0, borderWidth:0, borderColor:"#ffffff" },
+      });
+    }
+    if (bgLayer) updateLayer(bgLayer.id, { visible: false });
+  };
+
+  const switchToAsset = () => {
+    setActiveTab("asset");
+    if (thLayer) updateLayer(thLayer.id, { visible: false });
+    if (bgLayer) updateLayer(bgLayer.id, { visible: true });
+    else setShowMedia(true);
+  };
+
+  const handleReplace = (src, type) => {
+    const layerType = type === "video" ? "video" : "image";
+    if (bgLayer) {
+      updateLayer(bgLayer.id, { src, type: layerType, visible: true });
+    } else {
+      addLayer({
+        id: `s_bg_asset_${Date.now()}`,
+        trackId: "track_background",
+        type: layerType, src, objectFit: "cover",
+        start: sceneStart, end: sceneEnd, zIndex: 0,
+        visible: true, locked: false, sfx: null,
+        keyframes: { x:[], y:[], scale:[], rotation:[], blur:[], opacity:[] },
+        transition: { in: { type:"none", duration:0 }, out: { type:"none", duration:0 } },
+        transform: { x:0, y:0, width:1080, height:1920, opacity:1, rotation:0, scale:1, blur:0, borderRadius:0, borderWidth:0, borderColor:"#ffffff" },
+        animation: null,
+      });
+    }
+  };
+
+  const tabBtn = (label, active, onClick) => (
+    <button onClick={onClick} style={{
+      flex: 1, padding: "6px 0", fontSize: 12, fontWeight: 600, cursor: "pointer",
+      borderRadius: 6, border: "none",
+      background: active ? "rgba(124,92,252,0.3)" : "rgba(255,255,255,0.05)",
+      color: active ? "#c4b5fd" : "#666",
+      transition: "background 0.15s",
+    }}>{label}</button>
+  );
+
+  return (
+    <>
+      <Section title="Scene Source">
+        <div style={{ display:"flex", gap:4, marginBottom:10 }}>
+          {tabBtn("Asset", activeTab === "asset", switchToAsset)}
+          {tabBtn("Talking Head", activeTab === "th", switchToTH)}
+        </div>
+
+        {activeTab === "asset" ? (
+          <div
+            onClick={() => setShowMedia(true)}
+            style={{
+              width:"100%", aspectRatio:"9/16", borderRadius:8, overflow:"hidden",
+              background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)",
+              cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+              position:"relative",
+            }}
+          >
+            {bgLayer?.src ? (
+              bgLayer.type === "video"
+                ? <video src={bgLayer.src} style={{ width:"100%", height:"100%", objectFit:"cover", pointerEvents:"none" }} muted />
+                : <img src={bgLayer.src} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+            ) : (
+              <div style={{ textAlign:"center", color:"#555", fontSize:12 }}>
+                <div style={{ fontSize:20, marginBottom:4 }}>+</div>
+                Select asset
+              </div>
+            )}
+            <div style={{
+              position:"absolute", inset:0, background:"rgba(0,0,0,0)", display:"flex",
+              alignItems:"center", justifyContent:"center", opacity:0, transition:"all 0.15s",
+              fontSize:12, fontWeight:600, color:"#fff",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background="rgba(0,0,0,0.55)"; e.currentTarget.style.opacity=1; }}
+              onMouseLeave={e => { e.currentTarget.style.background="rgba(0,0,0,0)"; e.currentTarget.style.opacity=0; }}
+            >
+              {bgLayer?.src ? "Change" : "Select"}
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            width:"100%", aspectRatio:"9/16", borderRadius:8, overflow:"hidden",
+            background:"#0a0a14", border:"1px solid rgba(255,255,255,0.1)",
+          }}>
+            {thUrl && (
+              <video
+                src={thUrl} muted playsInline preload="metadata"
+                style={{ width:"100%", height:"100%", objectFit:"cover", pointerEvents:"none" }}
+                onLoadedMetadata={e => { e.target.currentTime = sceneStart; }}
+              />
+            )}
+          </div>
+        )}
+      </Section>
+
+      {showMedia && (
+        <MediaModal
+          onClose={() => setShowMedia(false)}
+          onReplace={(src, type) => { handleReplace(src, type); setShowMedia(false); }}
+        />
+      )}
+    </>
   );
 }
 
@@ -1399,28 +1545,14 @@ export default function PropertiesPanel() {
               </button>
             </div>
           )}
-          {/* Talking Head source toggle */}
-          {layer.trackId === "track_talking_head" && layer.type === "video" && (
-            <Section title="Talking Head Video">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
-                <span style={{ fontSize: 12, color: "#c0c0d8" }}>Show in this scene</span>
-                <button
-                  onClick={() => update({ visible: !layer.visible })}
-                  style={{
-                    padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                    background: layer.visible !== false ? "rgba(124,92,252,0.25)" : "rgba(255,255,255,0.06)",
-                    border: `1px solid ${layer.visible !== false ? "rgba(124,92,252,0.6)" : "rgba(255,255,255,0.12)"}`,
-                    color: layer.visible !== false ? "#a78bfa" : "#55556a",
-                  }}
-                >
-                  {layer.visible !== false ? "Visible" : "Hidden"}
-                </button>
-              </div>
-              <div style={{ fontSize: 11, color: "#44445a", marginTop: 2 }}>
-                Hide to show asset/image instead. Audio always plays regardless.
-              </div>
-            </Section>
-          )}
+          {/* Scene source switcher */}
+          <SceneSourceSection
+            layer={layer}
+            project={project}
+            updateLayer={updateLayer}
+            addLayer={useTimelineStore.getState().addLayer}
+            key={layer.id}
+          />
 
           {/* Layer info */}
           <Section title="Layer">
