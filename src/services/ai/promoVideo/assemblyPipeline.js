@@ -31,6 +31,7 @@ export function assemblePromoTimeline(project) {
     const sid = `s${scene.scene_id}`;
 
     // visual_mode is the primary key; scene_type as fallback for unrecognised modes
+    console.log(`[assemblyPipeline] scene ${scene.scene_id}: visual_mode=${scene.visual_mode}, layout_variant=${scene.layout_variant}`);
     const layout = getPromoLayout(scene.visual_mode ?? scene.scene_type, scene.layout_variant ?? "primary");
 
     const sceneLayers = layout(sid, s, e, {
