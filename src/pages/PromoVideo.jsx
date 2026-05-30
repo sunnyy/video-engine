@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { serverFetch } from "../services/serverApi";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
@@ -154,7 +154,7 @@ function FileUploadRow({ label, accept, url, uploading, onFile, onClear, inputRe
 
 // ── My Projects tab ───────────────────────────────────────────────────────────
 function ProjectsTab({ onRetry, onCreateNew }) {
-  const navigate           = useNavigate();
+  const navigate                = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
 
@@ -189,6 +189,10 @@ function ProjectsTab({ onRetry, onCreateNew }) {
     } catch {}
   }
 
+  function handleResume(id) {
+    navigate(`/promo-video/${id}`);
+  }
+
   if (loading) return (
     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Spinner size={28} />
@@ -214,7 +218,8 @@ function ProjectsTab({ onRetry, onCreateNew }) {
             <ProjectCard key={p.id} project={p} sm={sm} typeTag={typeTag}
               onDelete={handleDelete}
               onOpenEditor={handleOpenEditor}
-              onRetry={handleRetry} />
+              onRetry={handleRetry}
+              onResume={handleResume} />
           );
         })}
       </div>
@@ -222,9 +227,11 @@ function ProjectsTab({ onRetry, onCreateNew }) {
   );
 }
 
-function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry }) {
+function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry, onResume }) {
   const [hov,  setHov]  = useState(false);
   const [conf, setConf] = useState(false);
+
+  const resumable = ["draft", "script_generated", "waiting_assets", "assets_ready", "ready_for_render", "rendering"].includes(p.status);
 
   function handleDelete(e) {
     e.stopPropagation();
@@ -242,6 +249,7 @@ function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry 
 
   return (
     <div
+      onClick={() => resumable ? onResume(p.id) : undefined}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => { setHov(false); setConf(false); }}
       style={{
@@ -249,6 +257,7 @@ function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry 
         border: `1px solid ${hov ? "rgba(245,197,24,0.3)" : T.border}`,
         transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none",
         boxShadow: hov ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
+        cursor: resumable ? "pointer" : "default",
       }}>
       {/* Header */}
       <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -283,19 +292,22 @@ function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry 
         </div>
       </div>
       {/* Actions */}
-      {(p.status === "rendered" || p.status === "failed") && (
+      {(p.status === "rendered" || p.status === "failed" || resumable) && (
         <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${T.border}` }}>
           {p.status === "rendered" && (
-            <button onClick={() => onOpenEditor(p.id)}
+            <button onClick={e => { e.stopPropagation(); onOpenEditor(p.id); }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", background: "rgba(34,197,94,0.1)", color: T.success, border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               Open in Editor →
             </button>
           )}
           {p.status === "failed" && (
-            <button onClick={() => onRetry(p.id)}
+            <button onClick={e => { e.stopPropagation(); onRetry(p.id); }}
               style={{ ...C.btnG, fontSize: 12, padding: "7px 14px", color: T.accent, borderColor: "rgba(245,197,24,0.3)" }}>
               ↺ Retry
             </button>
+          )}
+          {resumable && p.status !== "draft" && (
+            <span style={{ fontSize: 12, color: T.accent, fontWeight: 600 }}>Resume →</span>
           )}
         </div>
       )}
@@ -304,7 +316,7 @@ function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry 
 }
 
 // ── Create wizard ─────────────────────────────────────────────────────────────
-function CreateWizard({ prefill, onViewProjects }) {
+function CreateWizard({ prefill, initialState, onViewProjects }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
 
@@ -363,6 +375,36 @@ function CreateWizard({ prefill, onViewProjects }) {
     setTone(prefill.tone ?? "professional");
     setStep(0);
   }, [prefill]);
+
+  // Resume an existing project loaded from URL param
+  useEffect(() => {
+    if (!initialState?.project) return;
+    const p = initialState.project;
+
+    // Pre-fill step 1 fields so Back navigation works
+    setProductName(p.product_name || "");
+    setProductUrl(p.product_url || "");
+    setProductDesc(p.product_description || "");
+    setPlatform(p.target_platform || "tiktok");
+    setDuration(p.duration_seconds || 30);
+    setLanguage(p.language || "en");
+    setTone(p.tone || "professional");
+    if (p.video_type === "talking_head" || p.has_talking_head) setVideoType("talking_head");
+
+    setProjectId(p.id);
+    createdRef.current = true; // prevent createProject from running again
+
+    const s = p.status;
+    if (s === "script_generated" || s === "waiting_assets" || s === "assets_ready") {
+      if (initialState.assetManifest) setAssetManifest(initialState.assetManifest);
+      setStep(2);
+    } else if (s === "ready_for_render" || s === "rendering") {
+      setStep(3);
+    } else if (s === "rendered" && p.editor_project_id) {
+      navigate(`/video-editor/${p.editor_project_id}`);
+    }
+    // "draft" → stay on step 0 with pre-filled form
+  }, [initialState]);
 
   // Step 3: create project on entry
   useEffect(() => {
@@ -472,6 +514,7 @@ function CreateWizard({ prefill, onViewProjects }) {
       }
 
       const payload = {
+        project_id:              projectId || undefined, // update existing draft if available
         video_type:              isTH ? "talking_head" : "faceless",
         video_goal:              isTH ? "onboarding_demo" : "saas_promo",
         product_name:            productName.trim(),
@@ -487,8 +530,8 @@ function CreateWizard({ prefill, onViewProjects }) {
         has_logo:                !!logoUrl,
         has_screenshots:         false,
         has_recordings:          false,
-        talking_head_segments:   thSegments,   // pre-transcribed; server skips Whisper
-        talking_head_url:        null,          // injected at render time only
+        talking_head_segments:   thSegments,
+        talking_head_url:        null,
         voiceover_url:           voUrl   || null,
         logo_url:                logoUrl || null,
         script:                  !isTH && hasVoiceover !== "yes" && hasScript === "yes" ? scriptText : null,
@@ -703,7 +746,23 @@ function CreateWizard({ prefill, onViewProjects }) {
                 inputRef={logoRef} />
             </div>
 
-            <button onClick={() => setStep(1)} disabled={!step1Valid}
+            <button onClick={async () => {
+                // Create draft row immediately so URL has an ID for resume
+                if (!projectId) {
+                  try {
+                    const res  = await serverFetch("/api/promo-video/init", {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ product_name: productName.trim(), product_url: productUrl.trim() || null, product_description: productDesc.trim(), target_platform: platform, language, tone, duration_seconds: duration }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.projectId) {
+                      setProjectId(data.projectId);
+                      window.history.replaceState({}, "", `/promo-video/${data.projectId}`);
+                    }
+                  } catch {} // non-critical — proceed regardless
+                }
+                setStep(1);
+              }} disabled={!step1Valid}
               style={{ ...C.btnY, width: "100%", padding: "13px 24px", fontSize: 15, opacity: step1Valid ? 1 : 0.4 }}>
               Next: Video Type →
             </button>
@@ -1003,11 +1062,34 @@ function CreateWizard({ prefill, onViewProjects }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PromoVideo() {
-  const [tab,     setTab]     = useState("create");
-  const [prefill, setPrefill] = useState(null);
+  const navigate                          = useNavigate();
+  const { projectId: paramProjectId }     = useParams();
+  const [tab,          setTab]            = useState("create");
+  const [prefill,      setPrefill]        = useState(null);
+  const [initialState, setInitialState]   = useState(null);
+
+  // When URL has a projectId, fetch the project and resume
+  useEffect(() => {
+    if (!paramProjectId) return;
+    setTab("create");
+    serverFetch(`/api/promo-video/${paramProjectId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.project) setInitialState({ project: d.project, assetManifest: d.assetManifest });
+      })
+      .catch(() => {});
+  }, [paramProjectId]);
 
   function handleRetry(project) {
     setPrefill(project);
+    setInitialState(null);
+    setTab("create");
+  }
+
+  function handleCreateNew() {
+    setInitialState(null);
+    setPrefill(null);
+    window.history.replaceState({}, "", "/promo-video");
     setTab("create");
   }
 
@@ -1028,7 +1110,7 @@ export default function PromoVideo() {
           </h1>
           <div style={{ display: "flex", gap: 4 }}>
             {tabs.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button key={t.id} onClick={() => t.id === "create" ? handleCreateNew() : setTab(t.id)}
                 style={{
                   padding: "16px 28px", border: "none", borderRadius: "8px 8px 0 0",
                   background: tab === t.id ? "rgba(245,197,24,0.1)" : "transparent",
@@ -1044,8 +1126,13 @@ export default function PromoVideo() {
         </div>
 
         {tab === "projects"
-          ? <ProjectsTab onRetry={handleRetry} onCreateNew={() => setTab("create")} />
-          : <CreateWizard key={prefill?.id ?? "new"} prefill={prefill} onViewProjects={() => setTab("projects")} />
+          ? <ProjectsTab onRetry={handleRetry} onCreateNew={handleCreateNew} />
+          : <CreateWizard
+              key={initialState?.project?.id ?? prefill?.id ?? "new"}
+              prefill={prefill}
+              initialState={initialState}
+              onViewProjects={() => setTab("projects")}
+            />
         }
       </div>
     </AppLayout>

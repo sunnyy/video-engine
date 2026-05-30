@@ -18,6 +18,7 @@ function rowToProject(row) {
     id:                  row.id,
     user_id:             row.user_id,
     status:              row.status,
+    video_type:          row.video_type          || null,
     video_goal:          row.video_goal,
     product_name:        row.product_name,
     product_url:         row.product_url,
@@ -65,6 +66,47 @@ router.post("/transcribe-th", requireAuth, express.raw({ type: "*/*", limit: "50
   }
 });
 
+// ── POST /promo-video/init ───────────────────────────────────────────────────
+// Creates a minimal draft row at end of Step 1 so the project has an ID
+// before any AI work begins. Client uses this to update the URL for resume.
+router.post("/init", requireAuth, async (req, res) => {
+  try {
+    const id  = uuidv4();
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.from("promo_videos").insert({
+      id,
+      user_id:             req.user.id,
+      status:              "draft",
+      product_name:        req.body.product_name        ?? "",
+      product_url:         req.body.product_url         ?? null,
+      product_description: req.body.product_description ?? null,
+      target_platform:     req.body.target_platform     ?? null,
+      language:            req.body.language            ?? "en",
+      tone:                req.body.tone                ?? null,
+      duration_seconds:    req.body.duration_seconds    ?? 30,
+      video_goal:          null,
+      video_type:          null,
+      has_script:          false,
+      has_talking_head:    false,
+      has_screenshots:     false,
+      has_recordings:      false,
+      has_logo:            false,
+      has_voiceover:       false,
+      style:               {},
+      scenes:              [],
+      credits_estimated:   null,
+      credits_charged:     0,
+      created_at:          now,
+      updated_at:          now,
+    });
+    if (error) throw new Error(error.message);
+    res.json({ projectId: id });
+  } catch (e) {
+    console.error("[promo-video/init]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── POST /promo-video/create ─────────────────────────────────────────────────
 router.post("/create", requireAuth, async (req, res) => {
   try {
@@ -75,7 +117,14 @@ router.post("/create", requireAuth, async (req, res) => {
       caption_style, transition_style, motion_style, color_palette, music_mood,
     } = req.body;
 
-    const id = uuidv4();
+    // Use existing draft ID (from /init) if provided, otherwise generate new one
+    const id = req.body.project_id || uuidv4();
+    if (req.body.project_id) {
+      const { data: existing } = await supabaseAdmin
+        .from("promo_videos").select("id").eq("id", id).eq("user_id", req.user.id).maybeSingle();
+      if (!existing) return res.status(403).json({ error: "Project not found or access denied" });
+    }
+
     let project = createEmptyProject(req.user.id, {
       video_goal, product_name, product_url, product_description,
       target_platform, language, tone, target_audience,
@@ -198,7 +247,7 @@ router.post("/create", requireAuth, async (req, res) => {
 
     const assetManifest = generateAssetRequirements(project);
 
-    const { error: dbErr } = await supabaseAdmin.from("promo_videos").insert({
+    const { error: dbErr } = await supabaseAdmin.from("promo_videos").upsert({
       id,
       user_id:                  project.user_id,
       status:                   project.status,

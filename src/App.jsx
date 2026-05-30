@@ -149,7 +149,8 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
-            <Route path="/promo-video"          element={<PromoVideo />} />
+            <Route path="/promo-video"             element={<PromoVideo />} />
+            <Route path="/promo-video/:projectId"  element={<PromoVideo />} />
             <Route path="/product-video"      element={<ProductVideoGenerator />} />
             <Route path="/typography-video"   element={<TypographyVideo />} />
             <Route path="/product-poster"    element={<PosterStudio />} />
