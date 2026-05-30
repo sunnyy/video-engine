@@ -1545,14 +1545,16 @@ export default function PropertiesPanel() {
               </button>
             </div>
           )}
-          {/* Scene source switcher */}
-          <SceneSourceSection
-            layer={layer}
-            project={project}
-            updateLayer={updateLayer}
-            addLayer={useTimelineStore.getState().addLayer}
-            key={layer.id}
-          />
+          {/* Scene source switcher — hidden for text layers */}
+          {layer.type !== "text" && (
+            <SceneSourceSection
+              layer={layer}
+              project={project}
+              updateLayer={updateLayer}
+              addLayer={useTimelineStore.getState().addLayer}
+              key={layer.id}
+            />
+          )}
 
           {/* Layer info */}
           <Section title="Layer">

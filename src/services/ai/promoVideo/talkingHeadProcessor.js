@@ -2,10 +2,10 @@ import fs from "fs";
 import path from "path";
 import { openai, TEMP_DIR, uuidv4 } from "../../../server/middleware/shared.js";
 
-const PAUSE_GAP       = 0.4;
-const MAX_SCENE_DUR   = 6.0;
-const MAX_SCENE_WORDS = 14;
-const MIN_SCENE_DUR   = 2.0;
+const PAUSE_GAP       = 0.6;  // raised from 0.4 — catches real sentence boundaries in Hindi/Hinglish
+const MAX_SCENE_DUR   = 4.0;  // lowered from 6.0 — forces more cuts, shorter scenes
+const MAX_SCENE_WORDS = 10;   // lowered from 14 — breaks long spoken lines earlier
+const MIN_SCENE_DUR   = 1.5;  // lowered from 2.0 — allows fast flash cuts
 
 // ── Core: Whisper + segmentation on an already-on-disk file ──────────────────
 async function transcribeAndSegment(tmpPath) {
@@ -60,8 +60,39 @@ async function transcribeAndSegment(tmpPath) {
   }
   flushBucket();
 
-  console.log(`[talkingHeadProcessor] segmented into ${scenes.length} scenes`);
-  return { scenes, full_transcript, total_duration, language };
+  // Hard-split any scene that still exceeds MAX_SCENE_DUR (e.g. no pauses detected)
+  const finalScenes = [];
+  for (const scene of scenes) {
+    if (scene.duration_seconds <= MAX_SCENE_DUR) {
+      finalScenes.push({ ...scene, scene_id: finalScenes.length + 1 });
+      continue;
+    }
+    // Split words evenly into chunks of MAX_SCENE_WORDS
+    const sceneWords = scene.spoken.split(/\s+/);
+    const chunkSize  = Math.ceil(sceneWords.length / Math.ceil(scene.duration_seconds / MAX_SCENE_DUR));
+    const totalDur   = scene.duration_seconds;
+    const perWord    = totalDur / sceneWords.length;
+    for (let i = 0; i < sceneWords.length; i += chunkSize) {
+      const chunk    = sceneWords.slice(i, i + chunkSize);
+      const chunkStart = parseFloat((scene.start + i * perWord).toFixed(3));
+      const chunkEnd   = parseFloat((scene.start + Math.min(i + chunkSize, sceneWords.length) * perWord).toFixed(3));
+      finalScenes.push({
+        scene_id:         finalScenes.length + 1,
+        spoken:           chunk.join(" "),
+        start:            chunkStart,
+        end:              chunkEnd,
+        duration_seconds: parseFloat((chunkEnd - chunkStart).toFixed(2)),
+        word_count:       chunk.length,
+        visual_mode:      null,
+      });
+    }
+  }
+
+  console.log(`[talkingHeadProcessor] segmented into ${finalScenes.length} scenes (${scenes.length} before hard-split)`);
+  for (const sc of finalScenes) {
+    console.log(`[talkingHeadProcessor] scene ${sc.scene_id}: start=${sc.start} end=${sc.end} dur=${sc.duration_seconds} words=${sc.word_count} spoken="${sc.spoken}"`);
+  }
+  return { scenes: finalScenes, full_transcript, total_duration, language };
 }
 
 // ── Public: accepts a file already on disk (caller owns cleanup) ──────────────

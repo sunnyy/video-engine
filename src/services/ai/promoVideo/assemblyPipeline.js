@@ -1,6 +1,16 @@
 import { ASSET_SOURCE, ASSET_TYPE } from "./projectSchema.js";
 import { getPromoLayout } from "../../../core/registries/promoLayoutRegistry.js";
 
+// SFX key assigned per visual_mode — fired on the background layer of each scene.
+// Scene 1 is intentionally skipped (no entry SFX on the very first scene).
+const SFX_BY_MODE = {
+  full_avatar:     { key: "whoosh_soft",      volume: 0.45, delay: 0 },
+  stock:           { key: "whoosh_hard",      volume: 0.6,  delay: 0 },
+  full_asset:      { key: "swoosh_cinematic", volume: 0.6,  delay: 0 },
+  floating_avatar: { key: "whoosh_soft",      volume: 0.5,  delay: 0 },
+  split_view:      { key: "whoosh_soft",      volume: 0.4,  delay: 0 },
+};
+
 const FPS = 30;
 const W   = 1080;
 const H   = 1920;
@@ -43,6 +53,15 @@ export function assemblePromoTimeline(project) {
       accentColor:    accent,
       duration:       scene.duration_seconds,
     });
+
+    // Inject transition SFX on the background layer — skip scene 1 (no entry sound)
+    if (scene.scene_id > 1) {
+      const sfxCfg = SFX_BY_MODE[scene.visual_mode];
+      if (sfxCfg) {
+        const bgLayer = sceneLayers.find(l => l.trackId === "track_background");
+        if (bgLayer) bgLayer.sfx = sfxCfg;
+      }
+    }
 
     layers.push(...sceneLayers);
 

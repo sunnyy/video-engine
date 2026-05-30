@@ -65,6 +65,7 @@ export function getProjectSummary(project) {
     id:                     project.id,
     status:                 project.status,
     video_goal:             project.video_goal,
+    video_type:             project.video_type             || null,
     product_name:           project.product_name,
     duration_seconds:       project.duration_seconds,
     total_scenes:           project.scenes.length,
@@ -73,5 +74,7 @@ export function getProjectSummary(project) {
     credits_charged:        project.credits_charged,
     approved_at:            project.approved_at,
     created_at:             project.created_at,
+    video_url:              project.video_url              || null,
+    editor_project_id:      project.editor_project_id      || null,
   };
 }

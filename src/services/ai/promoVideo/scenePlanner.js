@@ -121,18 +121,32 @@ export async function assignVisualModes(scenes, project) {
     duration_seconds: s.duration_seconds,
   }));
 
+  const totalScenes = sceneList.length;
+  const minStock    = Math.max(1, Math.ceil(totalScenes * 0.30));
+
   const modeRules = isTalkingHead
     ? `VISUAL MODE RULES (video_type = talking_head):
-- full_avatar  → spoken line is informational, conversational, hook, or CTA. No asset needed.
-- split_view   → spoken line describes a specific product feature AND benefits from seeing the screen simultaneously.
-- full_asset   → spoken line is specifically about a visible UI element or screen. Asset fills frame.
-- stock        → general statement that benefits from an atmospheric background image.
 
-STRICT RULES:
+WHAT EACH MODE LOOKS LIKE:
+- full_avatar    → talking head fills the entire frame. Use for hooks, CTAs, conversational lines, emotional moments.
+- split_view     → top half shows a relevant asset (website, feature, product screen), bottom half shows the talking head. Use when the spoken line explicitly references something visual — a feature, a website, a tool. The viewer should see what the speaker is describing.
+- floating_avatar → talking head appears as a smaller overlay on a full atmospheric background. Use for energetic, transitional, or high-energy moments — creates a dynamic shift in visual rhythm.
+- stock          → talking head is hidden; a full-frame stock image fills the screen. Use for general statements, statistics, emotional beats, or credibility moments that benefit from atmosphere rather than the face.
+
+STRICT VARIETY RULES — you MUST follow these exactly:
 1. First scene MUST be full_avatar.
 2. Last scene MUST be full_avatar.
-3. Never use the same visual_mode in two consecutive scenes.
-4. Prefer full_avatar for most scenes — only use split_view/full_asset when the content genuinely needs a visual.`
+3. NEVER use full_avatar more than 2 times in a row. After 2 consecutive full_avatar scenes you MUST switch to stock, split_view, or floating_avatar.
+4. At least ${minStock} scene(s) out of ${totalScenes} MUST be stock or full_asset — no exceptions.
+${totalScenes > 5  ? `5. split_view MUST appear at least once across all scenes.` : ""}
+${totalScenes > 8  ? `6. floating_avatar MUST appear at least once across all scenes.` : ""}
+7. Distribute visual variety evenly — do not cluster all stock or split_view scenes together.
+
+TALKING HEAD PACING RULES — the goal is fast-paced, attention-grabbing video, NOT a long talking head:
+8. full_avatar is for SHORT flash moments only — hook and 1–2 key emotional beats. It must feel like the face FLASHES IN, not lingers.
+9. If the spoken line for a scene would take more than 3 seconds to say, do NOT assign full_avatar. Use floating_avatar (avatar stays visible as overlay) or stock instead.
+10. Prefer floating_avatar over full_avatar for any spoken line longer than 2 seconds — the avatar is still visible but the background shows visual content.
+11. The video should feel like: flash avatar → cut to asset/stock → flash avatar → cut to stock — rapid visual cuts, not long face time.`
     : `VISUAL MODE RULES (video_type = faceless):
 - full_asset → spoken line is about a specific visible UI feature. User uploads screenshot/recording.
 - stock      → everything else. System fetches stock image automatically.
@@ -146,8 +160,8 @@ Description: ${project.product_description || "Not provided"}
 ${modeRules}
 
 For each scene assign: visual_mode and asset_hint.
-- asset_hint for full_asset/split_view: specific, actionable description of the exact screenshot or recording needed. Name the specific UI screen or feature.
-- asset_hint for stock: 2–4 word Pixabay search term, noun-based, no adjectives.
+- asset_hint for split_view/full_asset: specific, actionable description of the exact screenshot or recording needed. Name the specific UI screen or feature.
+- asset_hint for stock/floating_avatar: 2–4 word Pixabay search term, noun-based, no adjectives.
 - asset_hint for full_avatar: empty string.
 
 Scenes to process:

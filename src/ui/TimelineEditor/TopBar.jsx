@@ -113,7 +113,7 @@ export default function TopBar() {
           if (e.ctrlKey || e.metaKey) {
             window.open(dest, "_blank");
           } else {
-            navigate(-1);
+            navigate(dest);
           }
         }}
         title="Back (Ctrl+click to open in new tab)"

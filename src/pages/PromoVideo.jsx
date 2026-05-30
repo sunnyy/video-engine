@@ -94,6 +94,22 @@ async function uploadPromoFile(file, folder) {
   return `${supabase.storageUrl}/object/public/user-assets/${key}`;
 }
 
+// ── Video thumbnail — seeks to first frame so the browser paints it ───────────
+function VideoThumb({ src, style }) {
+  const ref = useRef();
+  return (
+    <video
+      ref={ref}
+      src={src}
+      muted
+      playsInline
+      preload="metadata"
+      onLoadedMetadata={() => { if (ref.current) ref.current.currentTime = 0.1; }}
+      style={style}
+    />
+  );
+}
+
 // ── Small reusables ───────────────────────────────────────────────────────────
 function Spinner({ size = 16, color = T.accent }) {
   return (
@@ -153,18 +169,25 @@ function FileUploadRow({ label, accept, url, uploading, onFile, onClear, inputRe
 }
 
 // ── My Projects tab ───────────────────────────────────────────────────────────
-function ProjectsTab({ onRetry, onCreateNew }) {
-  const navigate                = useNavigate();
-  const [projects, setProjects] = useState([]);
-  const [loading,  setLoading]  = useState(true);
+const PAGE_SIZE = 14;
+
+function ProjectsTab({ onCreateNew }) {
+  const [projects,    setProjects]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [page,        setPage]        = useState(1);
+  const [totalPages,  setTotalPages]  = useState(1);
 
   useEffect(() => {
-    serverFetch("/api/promo-video/list")
+    setLoading(true);
+    serverFetch(`/api/promo-video/list?page=${page}&limit=${PAGE_SIZE}`)
       .then(r => r.json())
-      .then(d => setProjects(d.projects || []))
+      .then(d => {
+        setProjects(d.projects || []);
+        setTotalPages(Math.max(1, Math.ceil((d.total ?? 0) / PAGE_SIZE)));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [page]);
 
   async function handleDelete(id) {
     try {
@@ -173,33 +196,13 @@ function ProjectsTab({ onRetry, onCreateNew }) {
     } catch {}
   }
 
-  async function handleOpenEditor(id) {
-    try {
-      const res  = await serverFetch(`/api/promo-video/${id}`);
-      const data = await res.json();
-      if (data.project?.editor_project_id) navigate(`/video-editor/${data.project.editor_project_id}`);
-    } catch {}
-  }
-
-  async function handleRetry(id) {
-    try {
-      const res  = await serverFetch(`/api/promo-video/${id}`);
-      const data = await res.json();
-      if (data.project) onRetry(data.project);
-    } catch {}
-  }
-
-  function handleResume(id) {
-    navigate(`/promo-video/${id}`);
-  }
-
   if (loading) return (
     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Spinner size={28} />
     </div>
   );
 
-  if (projects.length === 0) return (
+  if (projects.length === 0 && page === 1) return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
       <div style={{ fontSize: 48 }}>🎬</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: T.text }}>No promo videos yet</div>
@@ -209,29 +212,60 @@ function ProjectsTab({ onRetry, onCreateNew }) {
   );
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
-        {projects.map(p => {
-          const sm      = STATUS_META[p.status] || STATUS_META.draft;
-          const typeTag = p.video_goal === "onboarding_demo" ? "Talking Head" : "Faceless";
-          return (
-            <ProjectCard key={p.id} project={p} sm={sm} typeTag={typeTag}
-              onDelete={handleDelete}
-              onOpenEditor={handleOpenEditor}
-              onRetry={handleRetry}
-              onResume={handleResume} />
-          );
-        })}
+    <div style={{ flex: 1, overflowY: "auto", padding: "24px", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+        {projects.map(p => (
+          <ProjectCard key={p.id} project={p} onDelete={handleDelete} />
+        ))}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{ ...C.btnG, padding: "7px 14px", fontSize: 13, opacity: page === 1 ? 0.35 : 1 }}>
+            ←
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+            <button key={n} onClick={() => setPage(n)}
+              style={{
+                width: 34, height: 34, borderRadius: 8, border: "none", cursor: "pointer",
+                fontSize: 13, fontWeight: n === page ? 800 : 500,
+                background: n === page ? T.accent : "rgba(255,255,255,0.06)",
+                color:      n === page ? "#000"   : T.muted,
+              }}>
+              {n}
+            </button>
+          ))}
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            style={{ ...C.btnG, padding: "7px 14px", fontSize: 13, opacity: page === totalPages ? 0.35 : 1 }}>
+            →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry, onResume }) {
-  const [hov,  setHov]  = useState(false);
-  const [conf, setConf] = useState(false);
+function ProjectCard({ project: p, onDelete }) {
+  const navigate               = useNavigate();
+  const [hov,  setHov]         = useState(false);
+  const [conf, setConf]        = useState(false);
+  const isComplete             = p.status === "rendered";
+  const sm                     = STATUS_META[p.status] || STATUS_META.draft;
+  const initial                = (p.product_name || "V")[0].toUpperCase();
+  // First scene image asset for non-rendered preview
+  const previewImage = !isComplete
+    ? (p.scenes?.find(s => s.asset_url && !/\.(mp4|webm|mov)(\?|$)/i.test(s.asset_url))?.asset_url ?? null)
+    : null;
 
-  const resumable = ["draft", "script_generated", "waiting_assets", "assets_ready", "ready_for_render", "rendering"].includes(p.status);
+  function handleClick() {
+    if (isComplete && p.editor_project_id) navigate(`/video-editor/${p.editor_project_id}`);
+    else navigate(`/promo-video/${p.id}`);
+  }
 
   function handleDelete(e) {
     e.stopPropagation();
@@ -249,68 +283,92 @@ function ProjectCard({ project: p, sm, typeTag, onDelete, onOpenEditor, onRetry,
 
   return (
     <div
-      onClick={() => resumable ? onResume(p.id) : undefined}
+      onClick={handleClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => { setHov(false); setConf(false); }}
       style={{
-        background: T.surface, borderRadius: 14, overflow: "hidden",
-        border: `1px solid ${hov ? "rgba(245,197,24,0.3)" : T.border}`,
+        background: T.surface, borderRadius: 14, overflow: "hidden", cursor: "pointer",
+        border: `1px solid ${hov ? "rgba(245,197,24,0.25)" : T.border}`,
         transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none",
         boxShadow: hov ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
-        cursor: resumable ? "pointer" : "default",
       }}>
-      {/* Header */}
-      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {p.product_name}
-          </div>
-          <div style={{ fontSize: 12, color: T.muted, marginTop: 3 }}>{typeTag}</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 5, background: sm.bg, color: sm.color }}>{sm.label}</span>
-          <button onClick={handleDelete} title={conf ? "Click again to confirm" : "Delete"}
-            style={{
-              width: 26, height: 26, borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11,
-              background: conf ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.06)",
-              color:      conf ? T.danger             : "#55556a",
-              opacity: hov ? 1 : 0, transition: "opacity 0.15s",
+
+      {/* Thumbnail */}
+      <div style={{ position: "relative", width: "100%", aspectRatio: "9/16", overflow: "hidden", background: "#0b0b14" }}>
+        {isComplete && p.video_url ? (
+          <VideoThumb src={p.video_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : previewImage ? (
+          <img src={previewImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : (
+          <div style={{
+            width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+            background: "linear-gradient(135deg, #13131f 0%, #1a1a2e 60%, #0d1224 100%)",
+          }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: "50%",
+              background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.18)",
               display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 20, fontWeight: 900, color: "rgba(245,197,24,0.6)",
+              fontFamily: "'Outfit',sans-serif",
             }}>
-            {conf ? "!" : "✕"}
-          </button>
-        </div>
+              {initial}
+            </div>
+          </div>
+        )}
+
+        {/* Play icon overlay on rendered */}
+        {isComplete && (
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            background: hov ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.25)", transition: "background 0.2s",
+          }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: "50%", background: "rgba(245,197,24,0.92)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 13, color: "#000", paddingLeft: 2,
+              transform: hov ? "scale(1.12)" : "scale(1)", transition: "transform 0.15s",
+            }}>▶</div>
+          </div>
+        )}
+
+        {/* Status badge — only non-complete */}
+        {!isComplete && (
+          <div style={{
+            position: "absolute", top: 8, right: 8,
+            fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 5,
+            background: sm.bg, color: sm.color, backdropFilter: "blur(4px)",
+          }}>{sm.label}</div>
+        )}
+
+        {/* Delete button — top-left, hover only */}
+        <button onClick={handleDelete} title={conf ? "Click again to confirm" : "Delete"}
+          style={{
+            position: "absolute", top: 8, left: 8,
+            width: 26, height: 26, borderRadius: 6, border: "none", cursor: "pointer",
+            background: conf ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.55)",
+            color: conf ? "#fff" : "#999", fontSize: 13, fontWeight: 700,
+            opacity: hov ? 1 : 0, transition: "opacity 0.15s",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backdropFilter: "blur(4px)",
+          }}>
+          {conf ? "!" : "✕"}
+        </button>
       </div>
-      {/* Meta */}
-      <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ fontSize: 11, color: "#55556a" }}>
+
+      {/* Info */}
+      <div style={{ padding: "11px 13px" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+          {p.product_name}
+        </div>
+        <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>
+          {p.video_type === "talking_head" ? "Talking Head" : "Faceless"}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", fontSize: 11, color: "#55556a" }}>
           {p.duration_seconds && <span style={{ color: "#7070a0", fontWeight: 600 }}>{p.duration_seconds}s</span>}
-          {p.total_scenes ? <span> · <span style={{ color: "#7070a0", fontWeight: 600 }}>{p.total_scenes}</span> scenes</span> : null}
-        </div>
-        <div style={{ fontSize: 11, color: "#55556a", marginLeft: "auto" }}>
-          {p.created_at ? timeLabel(p.created_at) : ""}
+          {p.total_scenes ? <span style={{ marginLeft: 4 }}>· {p.total_scenes} scenes</span> : null}
+          <span style={{ marginLeft: "auto" }}>{p.created_at ? timeLabel(p.created_at) : ""}</span>
         </div>
       </div>
-      {/* Actions */}
-      {(p.status === "rendered" || p.status === "failed" || resumable) && (
-        <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${T.border}` }}>
-          {p.status === "rendered" && (
-            <button onClick={e => { e.stopPropagation(); onOpenEditor(p.id); }}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", background: "rgba(34,197,94,0.1)", color: T.success, border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              Open in Editor →
-            </button>
-          )}
-          {p.status === "failed" && (
-            <button onClick={e => { e.stopPropagation(); onRetry(p.id); }}
-              style={{ ...C.btnG, fontSize: 12, padding: "7px 14px", color: T.accent, borderColor: "rgba(245,197,24,0.3)" }}>
-              ↺ Retry
-            </button>
-          )}
-          {resumable && p.status !== "draft" && (
-            <span style={{ fontSize: 12, color: T.accent, fontWeight: 600 }}>Resume →</span>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -401,7 +459,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     } else if (s === "ready_for_render" || s === "rendering") {
       setStep(3);
     } else if (s === "rendered" && p.editor_project_id) {
-      navigate(`/video-editor/${p.editor_project_id}`);
+      navigate(`/video-editor/${p.editor_project_id}`, { replace: true });
     }
     // "draft" → stay on step 0 with pre-filled form
   }, [initialState]);
@@ -432,7 +490,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         if (p.status === "rendered") {
           clearInterval(pollRef.current);
           if (p.editor_project_id) {
-            navigate(`/video-editor/${p.editor_project_id}`);
+            navigate(`/video-editor/${p.editor_project_id}`, { replace: true });
           } else if (p.video_url) {
             window.open(p.video_url, "_blank");
             setRenderError("Video ready — editor project not created. Video opened in new tab.");
@@ -1126,7 +1184,7 @@ export default function PromoVideo() {
         </div>
 
         {tab === "projects"
-          ? <ProjectsTab onRetry={handleRetry} onCreateNew={handleCreateNew} />
+          ? <ProjectsTab onCreateNew={handleCreateNew} />
           : <CreateWizard
               key={initialState?.project?.id ?? prefill?.id ?? "new"}
               prefill={prefill}

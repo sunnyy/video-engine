@@ -125,7 +125,7 @@ export default function MediaModal({ onClose, onReplace }) {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleUpload = async () => {
-    const accept = filter === "video" ? "video/*" : "image/*";
+    const accept = "image/*,video/*";
     const file = await pickFile(accept);
     if (!file) return;
 

@@ -423,14 +423,20 @@ router.post("/:projectId/render", requireAuth, async (req, res) => {
 // ── GET /promo-video/list — must be before /:projectId ──────────────────────
 router.get("/list", requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(50, parseInt(req.query.limit) || 18);
+    const from  = (page - 1) * limit;
+    const to    = from + limit - 1;
+
+    const { data, error, count } = await supabaseAdmin
       .from("promo_videos")
-      .select("id, status, video_goal, product_name, duration_seconds, scenes, credits_charged, approved_at, created_at")
+      .select("id, status, video_goal, video_type, product_name, duration_seconds, scenes, credits_charged, approved_at, created_at, video_url, editor_project_id", { count: "exact" })
       .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
     if (error) throw new Error(error.message);
     const projects = (data || []).map(row => getProjectSummary(rowToProject(row)));
-    res.json({ projects });
+    res.json({ projects, total: count ?? 0, page, limit });
   } catch (e) {
     console.error("[promo-video/list]", e.message);
     res.status(500).json({ error: e.message });

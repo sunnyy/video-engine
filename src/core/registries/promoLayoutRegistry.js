@@ -56,51 +56,53 @@ const GRADIENTS = {
 
 // ── Layer primitives ──────────────────────────────────────────────────────────
 
-function bgImage(id, s, e, src, motion = "slowZoom") {
+const TR_NONE = { type: "none", duration: 0 };
+
+function bgImage(id, s, e, src, motion = "slowZoom", inTrans = TR_NONE, outTrans = TR_NONE) {
   return {
     id, trackId: "track_background",
     type: "image", src, objectFit: "cover",
     start: s, end: e, zIndex: 0,
     visible: true, locked: false, sfx: null,
     keyframes: kb(motion, e - s),
-    transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+    transition: { in: inTrans, out: outTrans },
     transform: { ...BG_TR },
   };
 }
 
-function bgVideoLyr(id, s, e, src, motion = "slowZoom") {
+function bgVideoLyr(id, s, e, src, motion = "slowZoom", inTrans = TR_NONE, outTrans = TR_NONE) {
   return {
     id, trackId: "track_background",
     type: "video", src, objectFit: "cover",
     start: s, end: e, zIndex: 0,
     visible: true, locked: false, sfx: null,
     keyframes: kb(motion, e - s),
-    transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+    transition: { in: inTrans, out: outTrans },
     transform: { ...BG_TR },
     volume: 0, muted: true,
   };
 }
 
-function bgGradient(id, s, e, gradient) {
+function bgGradient(id, s, e, gradient, inTrans = TR_NONE, outTrans = TR_NONE) {
   return {
     id, trackId: "track_background",
     type: "gradient", gradient,
     start: s, end: e, zIndex: 0,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+    transition: { in: inTrans, out: outTrans },
     transform: { ...BG_TR },
   };
 }
 
-function overlay(id, s, e, alpha) {
+function overlay(id, s, e, alpha, inTrans = TR_NONE, outTrans = TR_NONE) {
   return {
     id, trackId: "track_overlay",
     type: "gradient", gradient: `rgba(0,0,0,${alpha})`,
     start: s, end: e, zIndex: 1,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+    transition: { in: inTrans, out: outTrans },
     transform: { ...BG_TR },
   };
 }
@@ -130,15 +132,15 @@ const T = {
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-function assetBg(sid, s, e, assetUrl, motion, fallbackGradient) {
-  if (!assetUrl) return bgGradient(`${sid}_bg`, s, e, fallbackGradient ?? GRADIENTS.default);
+function assetBg(sid, s, e, assetUrl, motion, fallbackGradient, inTrans = TR_NONE, outTrans = TR_NONE) {
+  if (!assetUrl) return bgGradient(`${sid}_bg`, s, e, fallbackGradient ?? GRADIENTS.default, inTrans, outTrans);
   const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(assetUrl);
   return isVid
-    ? bgVideoLyr(`${sid}_bg`, s, e, assetUrl, motion)
-    : bgImage(`${sid}_bg`, s, e, assetUrl, motion);
+    ? bgVideoLyr(`${sid}_bg`, s, e, assetUrl, motion, inTrans, outTrans)
+    : bgImage(`${sid}_bg`, s, e, assetUrl, motion, inTrans, outTrans);
 }
 
-function thLayer(id, s, e, src, tr) {
+function thLayer(id, s, e, src, tr, inTrans = TR_NONE, outTrans = TR_NONE) {
   return {
     id, trackId: "track_talking_head",
     type: src ? "video" : "gradient",
@@ -146,7 +148,7 @@ function thLayer(id, s, e, src, tr) {
     start: s, end: e, zIndex: 2,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+    transition: { in: inTrans, out: outTrans },
     transform: tr,
     volume: 0, muted: true,
   };
@@ -156,7 +158,8 @@ function thLayer(id, s, e, src, tr) {
 // Talking head fills the full frame. Caption pill at bottom.
 function fullAvatarLayout(sid, s, e, { script, talkingHeadUrl }) {
   const out = [];
-  out.push(thLayer(`${sid}_th`, s, e, talkingHeadUrl, { ...BG_TR }));
+  out.push(thLayer(`${sid}_th`, s, e, talkingHeadUrl, { ...BG_TR },
+    { type: "fade", duration: 0.3 }, { type: "fade", duration: 0.2 }));
   if (script) {
     out.push(textL(
       `${sid}_caption`, `track_caption`, s, e, script,
@@ -177,8 +180,10 @@ function fullAvatarLayout(sid, s, e, { script, talkingHeadUrl }) {
 // Asset fills full frame. Text overlaid in lower area. Product badge at bottom.
 function fullAssetLayout(sid, s, e, { script, assetUrl, productName, accentColor }) {
   const out = [];
-  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo));
-  out.push(overlay(`${sid}_ov`, s, e, 0.45));
+  const bgIn  = { type: "slide-up", duration: 0.35 };
+  const bgOut = { type: "fade",     duration: 0.2  };
+  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo, bgIn, bgOut));
+  out.push(overlay(`${sid}_ov`, s, e, 0.45, bgIn, bgOut));
   if (script) {
     out.push(textL(
       `${sid}_text`, `track_text`, s, e, script,
@@ -214,7 +219,8 @@ function topAssetBottomAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUr
   const out = [];
   const isVid = assetUrl && /\.(mp4|webm|mov)(\?|$)/i.test(assetUrl);
 
-  out.push(bgGradient(`${sid}_bg`, s, e, GRADIENTS.talking_head));
+  out.push(bgGradient(`${sid}_bg`, s, e, GRADIENTS.talking_head,
+    { type: "fade", duration: 0.3 }, { type: "fade", duration: 0.2 }));
 
   // Asset — top half (center at y=-480 from canvas center)
   if (assetUrl) {
@@ -238,12 +244,13 @@ function topAssetBottomAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUr
     start: s, end: e, zIndex: 3,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: T.none(), out: T.none() },
+    transition: { in: { type: "fade", duration: 0.3 }, out: { type: "fade", duration: 0.2 } },
     transform: mtr(0, -480, W, 960),
   });
 
   // Talking head — bottom half (center at y=480 from canvas center)
-  out.push(thLayer(`${sid}_th`, s, e, talkingHeadUrl, mtr(0, 480, W, 960)));
+  out.push(thLayer(`${sid}_th`, s, e, talkingHeadUrl, mtr(0, 480, W, 960),
+    { type: "fade", duration: 0.3 }, { type: "fade", duration: 0.2 }));
 
   // Caption pill at very bottom
   if (script) {
@@ -266,9 +273,11 @@ function topAssetBottomAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUr
 // Full bleed asset BG. Talking head as floating pip at bottom center. Text at top.
 function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
   const out = [];
+  const bgIn  = { type: "zoom", duration: 0.35 };
+  const bgOut = { type: "fade", duration: 0.2  };
 
-  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo));
-  out.push(overlay(`${sid}_ov`, s, e, 0.35));
+  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo, bgIn, bgOut));
+  out.push(overlay(`${sid}_ov`, s, e, 0.35, bgIn, bgOut));
 
   // Large text at top
   if (script) {
@@ -309,7 +318,7 @@ function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
     start: s, end: e, zIndex: 5,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+    transition: { in: { type: "zoom", duration: 0.35 }, out: { type: "fade", duration: 0.2 } },
     transform: mtr(0, 550, 540, 810),
     volume: 0, muted: true,
   });
@@ -321,8 +330,10 @@ function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
 // Darker overlay, text bottom-anchored in accent color, no badge — high contrast.
 function fullAssetAlternate(sid, s, e, { script, assetUrl, accentColor }) {
   const out = [];
-  out.push(assetBg(sid, s, e, assetUrl, "cinematicPush", GRADIENTS.feature_demo));
-  out.push(overlay(`${sid}_ov`, s, e, 0.5));
+  const bgIn  = { type: "slide-up", duration: 0.35 };
+  const bgOut = { type: "fade",     duration: 0.2  };
+  out.push(assetBg(sid, s, e, assetUrl, "cinematicPush", GRADIENTS.feature_demo, bgIn, bgOut));
+  out.push(overlay(`${sid}_ov`, s, e, 0.5, bgIn, bgOut));
   if (script) {
     out.push(textL(
       `${sid}_text`, `track_text`, s, e, script,
@@ -343,8 +354,10 @@ function fullAssetAlternate(sid, s, e, { script, assetUrl, accentColor }) {
 // Stock image fills frame. Large headline. Product name sub in accent color.
 function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) {
   const out = [];
-  out.push(assetBg(sid, s, e, assetUrl, "microZoom", GRADIENTS.default));
-  out.push(overlay(`${sid}_ov`, s, e, 0.4));
+  const bgIn  = { type: "zoom", duration: 0.4 };
+  const bgOut = { type: "fade", duration: 0.2 };
+  out.push(assetBg(sid, s, e, assetUrl, "microZoom", GRADIENTS.default, bgIn, bgOut));
+  out.push(overlay(`${sid}_ov`, s, e, 0.4, bgIn, bgOut));
   if (script) {
     out.push(textL(
       `${sid}_headline`, `track_text`, s, e, script,
@@ -378,8 +391,10 @@ function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) 
 // Pull motion, large uppercase white headline, thin accent bar below text.
 function stockAlternate(sid, s, e, { script, assetUrl, accentColor }) {
   const out = [];
-  out.push(assetBg(sid, s, e, assetUrl, "pullSlow", GRADIENTS.default));
-  out.push(overlay(`${sid}_ov`, s, e, 0.55));
+  const bgIn  = { type: "fade", duration: 0.3 };
+  const bgOut = { type: "fade", duration: 0.2 };
+  out.push(assetBg(sid, s, e, assetUrl, "pullSlow", GRADIENTS.default, bgIn, bgOut));
+  out.push(overlay(`${sid}_ov`, s, e, 0.55, bgIn, bgOut));
   if (script) {
     out.push(textL(
       `${sid}_headline`, `track_text`, s, e, script,
