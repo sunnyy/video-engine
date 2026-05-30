@@ -28,7 +28,6 @@ import { router as typographyVideoRouter } from "./routes/typographyVideo.js";
 import { router as promoVideoRouter }      from "./routes/promoVideo.js";
 
 console.log("Server starting...", new Date().toISOString());
-console.log("[config] APP_URL =", process.env.APP_URL || "(not set, using default)");
 
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
