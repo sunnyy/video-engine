@@ -25,6 +25,15 @@ async function transcribeAndSegment(tmpPath) {
 
   console.log(`[talkingHeadProcessor] transcribed ${words.length} words, ${total_duration.toFixed(1)}s`);
 
+  // Log gaps > 3s between consecutive word timestamps so we can see where Whisper
+  // detected silence or dropped coverage in the source video.
+  for (let i = 1; i < words.length; i++) {
+    const gap = words[i].start - words[i - 1].end;
+    if (gap > 3) {
+      console.log(`[talkingHeadProcessor] gap ${gap.toFixed(2)}s between "${words[i-1].word.trim()}" (end ${words[i-1].end.toFixed(2)}s) → "${words[i].word.trim()}" (start ${words[i].start.toFixed(2)}s)`);
+    }
+  }
+
   const scenes = [];
   let bucket   = [];
 
@@ -88,11 +97,38 @@ async function transcribeAndSegment(tmpPath) {
     }
   }
 
-  console.log(`[talkingHeadProcessor] segmented into ${finalScenes.length} scenes (${scenes.length} before hard-split)`);
-  for (const sc of finalScenes) {
-    console.log(`[talkingHeadProcessor] scene ${sc.scene_id}: start=${sc.start} end=${sc.end} dur=${sc.duration_seconds} words=${sc.word_count} spoken="${sc.spoken}"`);
+  // Merge any scene shorter than MIN_SCENE_DUR with the adjacent scene that
+  // produces a total closest to half of MAX_SCENE_DUR (≈2s target).
+  let merged = [...finalScenes];
+  let changed = true;
+  while (changed && merged.length > 1) {
+    changed = false;
+    for (let i = 0; i < merged.length; i++) {
+      if (merged[i].duration_seconds < MIN_SCENE_DUR) {
+        const target   = MAX_SCENE_DUR / 2;
+        const prevSum  = i > 0                  ? merged[i - 1].duration_seconds + merged[i].duration_seconds : Infinity;
+        const nextSum  = i < merged.length - 1  ? merged[i].duration_seconds + merged[i + 1].duration_seconds : Infinity;
+        const useNext  = i === 0 || Math.abs(nextSum - target) < Math.abs(prevSum - target);
+        const [a, b]   = useNext ? [i, i + 1] : [i - 1, i];
+        const ma = merged[a], mb = merged[b];
+        merged.splice(a, 2, {
+          scene_id:         ma.scene_id,
+          spoken:           `${ma.spoken} ${mb.spoken}`.trim(),
+          start:            ma.start,
+          end:              mb.end,
+          duration_seconds: parseFloat((mb.end - ma.start).toFixed(2)),
+          word_count:       (ma.word_count || 0) + (mb.word_count || 0),
+          visual_mode:      null,
+        });
+        changed = true;
+        break;
+      }
+    }
   }
-  return { scenes: finalScenes, full_transcript, total_duration, language };
+  const result = merged.map((s, idx) => ({ ...s, scene_id: idx + 1 }));
+
+  console.log(`[talkingHeadProcessor] ${result.length} scenes after merge (was ${finalScenes.length})`);
+  return { scenes: result, full_transcript, total_duration, language };
 }
 
 // ── Public: accepts a file already on disk (caller owns cleanup) ──────────────
