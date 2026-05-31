@@ -1,5 +1,5 @@
 import { ASSET_SOURCE, ASSET_TYPE } from "./projectSchema.js";
-import { getPromoLayout } from "../../../core/registries/promoLayoutRegistry.js";
+import { getPromoLayoutForScene } from "../../../core/registries/promoLayoutRegistry.js";
 
 // SFX key assigned per visual_mode — fired on the background layer of each scene.
 // Scene 1 is intentionally skipped (no entry SFX on the very first scene).
@@ -32,26 +32,82 @@ export function assemblePromoTimeline(project) {
   const voiceover_queue = [];
   const asset_queue     = [];
 
+  // Max th_end across all scenes — used to cap trimEnd buffer.
+  const thMaxEnd = project.scenes.reduce((max, s) =>
+    s.th_end !== undefined ? Math.max(max, s.th_end) : max, 0);
+
+  // Group consecutive TH scenes into shared audio layers.
+  // Scenes split by duration/word-count have th_end ≈ th_start of the next scene
+  // (no real pause), so they share one audio element — no seek at those cuts.
+  // Scenes split by an actual pause (> TH_GAP in source) start a new group,
+  // paying one seek per group instead of one per scene.
+  const TH_GAP = 0.1; // seconds — gaps larger than this start a new audio element
+  const thGroups = [];   // { url, trimStart, trimEnd, tlStart, tlEnd }
+  const sceneGroup = new Map(); // scene_id → group object
+  {
+    let grp = null;
+    for (const scene of project.scenes) {
+      if (scene.th_start === undefined) continue;
+      const url = scene.th_url || project.talking_head_url || null;
+      if (!url) continue;
+      if (!grp || scene.th_start - grp.trimEnd > TH_GAP) {
+        grp = { url, trimStart: scene.th_start, trimEnd: scene.th_end, tlStart: null, tlEnd: null };
+        thGroups.push(grp);
+      } else {
+        grp.trimEnd = scene.th_end;
+      }
+      sceneGroup.set(scene.scene_id, grp);
+    }
+  }
+
   let cursor = 0;
 
   for (const scene of project.scenes) {
+    const thUrl     = scene.th_url || project.talking_head_url || null;
+    const isTHScene = scene.th_start !== undefined && scene.th_end !== undefined;
+
+    // For TH scenes, segment duration = th_end - th_start (actual video segment).
+    // This ensures audio trim offsets always match timeline positions — no drift.
+    const segmentDuration = isTHScene
+      ? parseFloat((scene.th_end - scene.th_start).toFixed(4))
+      : scene.duration_seconds;
+
     const s   = cursor;
-    const e   = cursor + scene.duration_seconds;
+    const e   = parseFloat((cursor + segmentDuration).toFixed(4));
     cursor    = e;
     const sid = `s${scene.scene_id}`;
 
-    // visual_mode is the primary key; scene_type as fallback for unrecognised modes
-    const layout = getPromoLayout(scene.visual_mode ?? scene.scene_type, scene.layout_variant ?? "primary");
+    // scene_type takes priority; falls back to visual_mode
+    const layout = getPromoLayoutForScene(scene.scene_type, scene.visual_mode, scene.layout_variant ?? "primary");
 
     const sceneLayers = layout(sid, s, e, {
       script:         (scene.script || "").trim(),
       assetUrl:       scene.asset_url           || null,
-      talkingHeadUrl: scene.th_url || project.talking_head_url || null,
+      talkingHeadUrl: thUrl,
       productName:    project.product_name       || null,
       productUrl:     project.product_url        || null,
       accentColor:    accent,
-      duration:       scene.duration_seconds,
+      duration:       segmentDuration,
+      sceneData:      scene.scene_data           || {},
+      logoUrl:        project.logo_url           || null,
     });
+
+    // TH scenes: set trimStart/trimEnd on video layer; update group timeline bounds.
+    if (isTHScene) {
+      for (const layer of sceneLayers) {
+        if (layer.trackId === "track_talking_head" && layer.type === "video") {
+          layer.trimStart = scene.th_start;
+          layer.trimEnd   = scene.th_end;
+          layer.muted     = true;
+          layer.volume    = 0;
+        }
+      }
+      const grp = sceneGroup.get(scene.scene_id);
+      if (grp) {
+        if (grp.tlStart === null) grp.tlStart = s;
+        grp.tlEnd = e;
+      }
+    }
 
     // Inject transition SFX on the background layer — skip scene 1 (no entry sound)
     if (scene.scene_id > 1) {
@@ -90,11 +146,33 @@ export function assemblePromoTimeline(project) {
     }
   }
 
+  // cursor now holds the true total duration (sum of actual TH segment lengths)
+  const totalDuration = parseFloat(cursor.toFixed(4));
+
+  // One audio layer per consecutive TH group.
+  // Within a group, source timestamps === timeline offsets from tlStart, so sync is
+  // exact with no seeks at scene cuts. A new group only starts at a real pause in the
+  // source (> TH_GAP), paying one seek there instead of one per scene.
+  for (let gi = 0; gi < thGroups.length; gi++) {
+    const grp = thGroups[gi];
+    if (grp.tlStart === null) continue;
+    layers.push({
+      id: `th_audio_grp_${gi}`, trackId: `th_audio_grp_${gi}`,
+      type: "audio", audioType: "voiceover", src: grp.url,
+      start: grp.tlStart, end: grp.tlEnd, zIndex: 0,
+      visible: true, locked: false,
+      trimStart: grp.trimStart,
+      trimEnd:   parseFloat(Math.min(grp.trimEnd + 0.15, thMaxEnd).toFixed(4)),
+      volume: 0.5, muted: false, fadeIn: 0.05, fadeOut: 0.05,
+      sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+    });
+  }
+
   const timeline = {
     version: "2.0",
     id:      project.id,
     name:    project.product_name ?? "Promo Video",
-    format:  { width: W, height: H, fps: FPS, duration: project.duration_seconds },
+    format:  { width: W, height: H, fps: FPS, duration: totalDuration },
     layers,
     meta: {
       source:           "promo_video",

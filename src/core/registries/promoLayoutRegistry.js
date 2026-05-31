@@ -58,51 +58,51 @@ const GRADIENTS = {
 
 const TR_NONE = { type: "none", duration: 0 };
 
-function bgImage(id, s, e, src, motion = "slowZoom", inTrans = TR_NONE, outTrans = TR_NONE) {
+function bgImage(id, s, e, src, motion = "slowZoom", inTrans = TR_NONE) {
   return {
     id, trackId: "track_background",
     type: "image", src, objectFit: "cover",
     start: s, end: e, zIndex: 0,
     visible: true, locked: false, sfx: null,
     keyframes: kb(motion, e - s),
-    transition: { in: inTrans, out: outTrans },
+    transition: { in: inTrans, out: TR_NONE },
     transform: { ...BG_TR },
   };
 }
 
-function bgVideoLyr(id, s, e, src, motion = "slowZoom", inTrans = TR_NONE, outTrans = TR_NONE) {
+function bgVideoLyr(id, s, e, src, motion = "slowZoom", inTrans = TR_NONE) {
   return {
     id, trackId: "track_background",
     type: "video", src, objectFit: "cover",
     start: s, end: e, zIndex: 0,
     visible: true, locked: false, sfx: null,
     keyframes: kb(motion, e - s),
-    transition: { in: inTrans, out: outTrans },
+    transition: { in: inTrans, out: TR_NONE },
     transform: { ...BG_TR },
     volume: 0, muted: true,
   };
 }
 
-function bgGradient(id, s, e, gradient, inTrans = TR_NONE, outTrans = TR_NONE) {
+function bgGradient(id, s, e, gradient, inTrans = TR_NONE) {
   return {
     id, trackId: "track_background",
     type: "gradient", gradient,
     start: s, end: e, zIndex: 0,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: inTrans, out: outTrans },
+    transition: { in: inTrans, out: TR_NONE },
     transform: { ...BG_TR },
   };
 }
 
-function overlay(id, s, e, alpha, inTrans = TR_NONE, outTrans = TR_NONE) {
+function overlay(id, s, e, alpha, inTrans = TR_NONE) {
   return {
     id, trackId: "track_overlay",
     type: "gradient", gradient: `rgba(0,0,0,${alpha})`,
     start: s, end: e, zIndex: 1,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: inTrans, out: outTrans },
+    transition: { in: inTrans, out: TR_NONE },
     transform: { ...BG_TR },
   };
 }
@@ -132,12 +132,12 @@ const T = {
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-function assetBg(sid, s, e, assetUrl, motion, fallbackGradient, inTrans = TR_NONE, outTrans = TR_NONE) {
-  if (!assetUrl) return bgGradient(`${sid}_bg`, s, e, fallbackGradient ?? GRADIENTS.default, inTrans, outTrans);
+function assetBg(sid, s, e, assetUrl, motion, fallbackGradient, inTrans = TR_NONE) {
+  if (!assetUrl) return bgGradient(`${sid}_bg`, s, e, fallbackGradient ?? GRADIENTS.default, inTrans);
   const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(assetUrl);
   return isVid
-    ? bgVideoLyr(`${sid}_bg`, s, e, assetUrl, motion, inTrans, outTrans)
-    : bgImage(`${sid}_bg`, s, e, assetUrl, motion, inTrans, outTrans);
+    ? bgVideoLyr(`${sid}_bg`, s, e, assetUrl, motion, inTrans)
+    : bgImage(`${sid}_bg`, s, e, assetUrl, motion, inTrans);
 }
 
 function thLayer(id, s, e, src, tr, inTrans = TR_NONE, outTrans = TR_NONE) {
@@ -154,12 +154,25 @@ function thLayer(id, s, e, src, tr, inTrans = TR_NONE, outTrans = TR_NONE) {
   };
 }
 
+function logoLayer(sid, s, e, logoUrl) {
+  return {
+    id: `${sid}_logo`, trackId: "track_logo",
+    type: "image", src: logoUrl, objectFit: "contain",
+    start: s, end: e, zIndex: 20,
+    visible: true, locked: false, sfx: null,
+    keyframes: fadeKf(0.1),
+    transition: { in: T.fade(0.3), out: { type: "fade", duration: 0.2 } },
+    transform: mtr(0, -800, 200, 80),
+  };
+}
+
 // ── 1. full_avatar ─────────────────────────────────────────────────────────────
 // Talking head fills the full frame. Caption pill at bottom.
-function fullAvatarLayout(sid, s, e, { script, talkingHeadUrl }) {
+function fullAvatarLayout(sid, s, e, { script, talkingHeadUrl, logoUrl }) {
   const out = [];
   out.push(thLayer(`${sid}_th`, s, e, talkingHeadUrl, { ...BG_TR },
     { type: "fade", duration: 0.3 }, { type: "fade", duration: 0.2 }));
+  if (logoUrl) out.push(logoLayer(sid, s, e, logoUrl));
   if (script) {
     out.push(textL(
       `${sid}_caption`, `track_caption`, s, e, script,
@@ -181,9 +194,9 @@ function fullAvatarLayout(sid, s, e, { script, talkingHeadUrl }) {
 function fullAssetLayout(sid, s, e, { script, assetUrl, productName, accentColor }) {
   const out = [];
   const bgIn  = { type: "slide-up", duration: 0.35 };
-  const bgOut = { type: "fade",     duration: 0.2  };
-  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo, bgIn, bgOut));
-  out.push(overlay(`${sid}_ov`, s, e, 0.45, bgIn, bgOut));
+
+  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo, bgIn));
+  out.push(overlay(`${sid}_ov`, s, e, 0.45, bgIn));
   if (script) {
     out.push(textL(
       `${sid}_text`, `track_text`, s, e, script,
@@ -244,7 +257,7 @@ function topAssetBottomAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUr
     start: s, end: e, zIndex: 3,
     visible: true, locked: false, sfx: null,
     keyframes: { ...NO_KF },
-    transition: { in: { type: "fade", duration: 0.3 }, out: { type: "fade", duration: 0.2 } },
+    transition: { in: { type: "fade", duration: 0.3 }, out: TR_NONE },
     transform: mtr(0, -480, W, 960),
   });
 
@@ -276,26 +289,10 @@ function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
   const bgIn  = { type: "zoom", duration: 0.35 };
   const bgOut = { type: "fade", duration: 0.2  };
 
-  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo, bgIn, bgOut));
-  out.push(overlay(`${sid}_ov`, s, e, 0.35, bgIn, bgOut));
+  out.push(assetBg(sid, s, e, assetUrl, "slowZoom", GRADIENTS.feature_demo, bgIn));
+  out.push(overlay(`${sid}_ov`, s, e, 0.35, bgIn));
 
-  // Large text at top
-  if (script) {
-    out.push(textL(
-      `${sid}_text`, `track_text`, s, e, script,
-      {
-        fontFamily: "Outfit", fontSize: 62, fontWeight: 800, color: "#ffffff",
-        textAlign: "center", lineHeight: 1.2, letterSpacing: -1,
-        textTransform: "none",
-        textShadow: "0 4px 24px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,0.8)",
-        background: null, borderRadius: 0, padding: 0,
-        _captionStyle: "wordBlaze",
-      },
-      -600, 300, 4, T.fade(0.4), fadeKf(0.1)
-    ));
-  }
-
-  // Caption pill above the floating head
+  // Caption pill above the floating head — single text layer, no duplication
   if (script) {
     out.push(textL(
       `${sid}_cap_pill`, `track_caption`, s, e, script,
@@ -331,9 +328,9 @@ function floatingAvatarLayout(sid, s, e, { script, assetUrl, talkingHeadUrl }) {
 function fullAssetAlternate(sid, s, e, { script, assetUrl, accentColor }) {
   const out = [];
   const bgIn  = { type: "slide-up", duration: 0.35 };
-  const bgOut = { type: "fade",     duration: 0.2  };
-  out.push(assetBg(sid, s, e, assetUrl, "cinematicPush", GRADIENTS.feature_demo, bgIn, bgOut));
-  out.push(overlay(`${sid}_ov`, s, e, 0.5, bgIn, bgOut));
+
+  out.push(assetBg(sid, s, e, assetUrl, "cinematicPush", GRADIENTS.feature_demo, bgIn));
+  out.push(overlay(`${sid}_ov`, s, e, 0.5, bgIn));
   if (script) {
     out.push(textL(
       `${sid}_text`, `track_text`, s, e, script,
@@ -352,12 +349,12 @@ function fullAssetAlternate(sid, s, e, { script, assetUrl, accentColor }) {
 
 // ── 5. stock ───────────────────────────────────────────────────────────────────
 // Stock image fills frame. Large headline. Product name sub in accent color.
-function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) {
+function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor, logoUrl }) {
   const out = [];
   const bgIn  = { type: "zoom", duration: 0.4 };
-  const bgOut = { type: "fade", duration: 0.2 };
-  out.push(assetBg(sid, s, e, assetUrl, "microZoom", GRADIENTS.default, bgIn, bgOut));
-  out.push(overlay(`${sid}_ov`, s, e, 0.4, bgIn, bgOut));
+
+  out.push(assetBg(sid, s, e, assetUrl, "microZoom", GRADIENTS.default, bgIn));
+  out.push(overlay(`${sid}_ov`, s, e, 0.4, bgIn));
   if (script) {
     out.push(textL(
       `${sid}_headline`, `track_text`, s, e, script,
@@ -384,6 +381,7 @@ function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) 
       200, 100, 11, T.fade(0.5), fadeKf(0.4)
     ));
   }
+  if (logoUrl) out.push(logoLayer(sid, s, e, logoUrl));
   return out;
 }
 
@@ -392,9 +390,9 @@ function stockLayout(sid, s, e, { script, assetUrl, productName, accentColor }) 
 function stockAlternate(sid, s, e, { script, assetUrl, accentColor }) {
   const out = [];
   const bgIn  = { type: "fade", duration: 0.3 };
-  const bgOut = { type: "fade", duration: 0.2 };
-  out.push(assetBg(sid, s, e, assetUrl, "pullSlow", GRADIENTS.default, bgIn, bgOut));
-  out.push(overlay(`${sid}_ov`, s, e, 0.55, bgIn, bgOut));
+
+  out.push(assetBg(sid, s, e, assetUrl, "pullSlow", GRADIENTS.default, bgIn));
+  out.push(overlay(`${sid}_ov`, s, e, 0.55, bgIn));
   if (script) {
     out.push(textL(
       `${sid}_headline`, `track_text`, s, e, script,
@@ -421,6 +419,100 @@ function stockAlternate(sid, s, e, { script, assetUrl, accentColor }) {
   return out;
 }
 
+// ── listicle ──────────────────────────────────────────────────────────────────
+// Stacked item list with staggered fade-in. Optional floating avatar pip.
+function listicleLayout(sid, s, e, { assetUrl, talkingHeadUrl, accentColor, sceneData, logoUrl }) {
+  const out = [];
+  const bgIn  = { type: "zoom",  duration: 0.35 };
+  const bgOut = { type: "fade",  duration: 0.2  };
+
+  out.push(assetBg(sid, s, e, assetUrl, "microZoom", GRADIENTS.default, bgIn));
+  out.push(overlay(`${sid}_ov`, s, e, 0.55, bgIn));
+
+  const items = (sceneData?.items?.length ? sceneData.items : []).slice(0, 5);
+  if (items.length) {
+    const spacing   = 180;
+    const totalH    = (items.length - 1) * spacing;
+    const startY    = -(totalH / 2);
+
+    items.forEach((item, idx) => {
+      const y     = Math.round(startY + idx * spacing);
+      const delay = 0.1 + idx * 0.3;
+      out.push(textL(
+        `${sid}_item${idx}`, `track_text_${idx}`, s, e, `• ${item}`,
+        {
+          fontFamily: "Outfit", fontSize: 52, fontWeight: 700, color: "#ffffff",
+          textAlign: "center", lineHeight: 1.3, letterSpacing: 0,
+          textTransform: "none", textShadow: "0 3px 16px rgba(0,0,0,0.8)",
+          background: null, borderRadius: 0, padding: 0,
+          _captionStyle: null,
+        },
+        y, 100, 10 + idx, T.fade(0.35), fadeKf(delay)
+      ));
+    });
+  }
+
+  // Floating avatar pip bottom-right when TH video is present
+  if (talkingHeadUrl) {
+    out.push({
+      id: `${sid}_th_pip`, trackId: "track_talking_head",
+      type: "video", src: talkingHeadUrl, objectFit: "cover",
+      start: s, end: e, zIndex: 5,
+      visible: true, locked: false, sfx: null,
+      keyframes: { ...NO_KF },
+      transition: { in: { type: "fade", duration: 0.3 }, out: { type: "fade", duration: 0.2 } },
+      transform: mtr(350, 600, 320, 480),
+      volume: 0, muted: true,
+    });
+  }
+
+  if (logoUrl) out.push(logoLayer(sid, s, e, logoUrl));
+  return out;
+}
+
+// ── stat_highlight ─────────────────────────────────────────────────────────────
+// Large metric value in accent color + label below.
+function statHighlightLayout(sid, s, e, { assetUrl, accentColor, sceneData, script }) {
+  const out = [];
+  const bgIn  = { type: "zoom", duration: 0.4 };
+
+
+  out.push(assetBg(sid, s, e, assetUrl, "microZoom", GRADIENTS.hook ?? GRADIENTS.default, bgIn));
+  out.push(overlay(`${sid}_ov`, s, e, 0.4, bgIn));
+
+  const statValue = sceneData?.stat_value || script || "";
+  const statLabel = sceneData?.stat_label || "";
+
+  if (statValue) {
+    out.push(textL(
+      `${sid}_stat`, `track_text`, s, e, statValue,
+      {
+        fontFamily: "Outfit", fontSize: 120, fontWeight: 900, color: accentColor ?? "#f5c518",
+        textAlign: "center", lineHeight: 1.0, letterSpacing: -2,
+        textTransform: "none", textShadow: "0 6px 32px rgba(0,0,0,0.9)",
+        background: null, borderRadius: 0, padding: 0,
+        _captionStyle: null,
+      },
+      -100, 180, 10, T.zoom(0.4)
+    ));
+  }
+  if (statLabel) {
+    out.push(textL(
+      `${sid}_label`, `track_badge`, s, e, statLabel,
+      {
+        fontFamily: "Outfit", fontSize: 44, fontWeight: 500, color: "#ffffff",
+        textAlign: "center", lineHeight: 1.3, letterSpacing: 0,
+        textTransform: "none", textShadow: "0 3px 16px rgba(0,0,0,0.8)",
+        background: null, borderRadius: 0, padding: 0,
+        _captionStyle: null,
+      },
+      120, 120, 11, T.fade(0.4), fadeKf(0.3)
+    ));
+  }
+
+  return out;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export const promoLayoutRegistry = {
@@ -432,7 +524,22 @@ export const promoLayoutRegistry = {
   default:                { primary: stockLayout,         alternate: stockAlternate             },
 };
 
+// Semantic scene-type registry — checked before visual_mode
+const sceneTypeRegistry = {
+  listicle:       { primary: listicleLayout      },
+  stat_highlight: { primary: statHighlightLayout },
+};
+
 export function getPromoLayout(visualMode, variant = "primary") {
   const entry = promoLayoutRegistry[visualMode] ?? promoLayoutRegistry.default;
   return entry[variant] ?? entry.primary;
+}
+
+// Returns the right layout function: scene_type wins, falls back to visual_mode.
+export function getPromoLayoutForScene(sceneType, visualMode, variant = "primary") {
+  if (sceneType) {
+    const entry = sceneTypeRegistry[sceneType];
+    if (entry) return entry[variant] ?? entry.primary;
+  }
+  return getPromoLayout(visualMode, variant);
 }
