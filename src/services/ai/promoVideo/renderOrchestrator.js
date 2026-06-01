@@ -150,41 +150,6 @@ export async function orchestratePromoRender(projectId) {
       ? injectVoiceoversIntoTimeline(timeline, voiceover_results)
       : timeline;
 
-    // ── Step 5c: Inject TH trim timestamps + hidden audio master ─────────
-    // Per-scene video clips are muted (visual only). One hidden audio master
-    // spans the full duration so audio never stops between scenes.
-    // Since each scene's duration = next_th_start - this_th_start, the timeline
-    // position of each scene equals its th_start — zero drift by construction.
-    if (isThVideo) {
-      for (const layer of finalTimeline.layers) {
-        if (layer.trackId === "track_talking_head" && layer.type === "video") {
-          const match = layer.id.match(/^s(\d+)_th$/);
-          if (!match) continue;
-          const sid   = Number(match[1]);
-          const scene = scenes.find(sc => sc.scene_id === sid);
-          if (!scene || scene.th_start === undefined) continue;
-          layer.trimStart = scene.th_start;
-          layer.trimEnd   = scene.th_start + (layer.end - layer.start);
-          layer.muted     = true;
-          layer.volume    = 0;
-        }
-      }
-
-      if (thUrl) {
-        // Single continuous audio master — hidden from timeline layer list
-        finalTimeline.layers.push({
-          id: "th_audio_master", trackId: "track_th_audio",
-          type: "audio", audioType: "voiceover", src: thUrl,
-          start: 0, end: totalDuration, zIndex: 0,
-          visible: true, locked: false, _system: true,
-          trimStart: 0, trimEnd: totalDuration,
-          volume: 0.5, muted: false, fadeIn: 0, fadeOut: 0,
-          sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
-        });
-        console.log(`[renderOrchestrator] TH audio master + per-scene clips injected`);
-      }
-    }
-
     // ── Step 5b: Inject background music ─────────────────────────────────
     try {
       const mood = pickAutoMood(row.video_goal, row.tone);

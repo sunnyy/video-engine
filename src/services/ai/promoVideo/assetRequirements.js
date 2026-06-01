@@ -9,21 +9,21 @@ export function generateAssetRequirements(project) {
   for (const scene of project.scenes) {
     const { scene_id, scene_type, asset_source, asset_hint, visual_mode } = scene;
 
-    // full_avatar and split_view need no user asset — talking head video is handled separately
-    if (visual_mode === "full_avatar" || visual_mode === "split_view") {
+    // full_avatar needs no user asset — skip it
+    if (visual_mode === "full_avatar") {
       placeholders.push({ scene_id, scene_type });
       continue;
     }
 
+    const ASSET_SCENE_TYPES = new Set(["screenshot_focus", "screen_recording_focus", "feature_showcase"]);
+    const needsUserAsset = visual_mode === "full_asset" || visual_mode === "split_view" || ASSET_SCENE_TYPES.has(scene_type);
+
     switch (asset_source) {
       case ASSET_SOURCE.USER_UPLOAD:
-        // Only request upload when visual_mode explicitly requires a user asset
-        if (visual_mode === "full_asset") {
+        if (needsUserAsset) {
           user_required.push({
             scene_id,
-            // TH scenes that show a product screenshot have misleading asset_type=talking_head;
-            // use a clearer label in the manifest
-            scene_type: scene.th_url ? "ui_screenshot" : scene_type,
+            scene_type: scene.th_url ? "ui_screenshot" : (scene_type || "asset"),
             asset_type: scene.asset_type || null,
             asset_hint: asset_hint || "Upload an asset for this scene.",
             status:     "pending",

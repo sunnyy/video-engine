@@ -68,7 +68,34 @@ ${assetFlags ? `ASSET AVAILABILITY — follow these instructions:\n${assetFlags}
 
 ${visualModeRules}
 
-SCENE TYPE OPTIONS: hook, talking_head, feature_demo, ui_showcase, pain_point, before_after, cta, logo_outro, montage
+SEMANTIC SCENE TYPES — classify the content meaning:
+- hook_scene         → question, attention grab, or product name reveal
+- listicle           → script enumerates multiple items, tools, platforms, categories
+- feature_showcase   → highlights a specific feature with a visual
+- stat_highlight     → states a number, percentage, or metric
+- process_steps      → describes a step-by-step process
+- benefit_highlight  → states a clear benefit or value proposition
+- cta                → asks viewer to follow, comment, save, or visit a URL
+- comparison         → before vs after or option A vs option B
+- screenshot_focus   → focuses on a specific UI screen
+- screen_recording_focus → focuses on a product recording
+
+SCENE DATA — extract per type (include in "scene_data" field):
+- listicle:          { "items": ["item1", "item2", ...] }  max 5 items
+- stat_highlight:    { "stat_value": "50+", "stat_label": "tools available" }
+- process_steps:     { "steps": ["step1", "step2", ...] }  max 5 steps
+- benefit_highlight: { "benefit_text": "the main benefit" }
+- cta:               { "cta_text": "Follow for more", "url": null }
+- feature_showcase:  { "feature_name": "the feature name" }
+- all others:        {}
+
+SCENE TYPE → recommended visual_mode:
+- listicle           → stock or full_asset
+- stat_highlight     → stock
+- hook_scene         → full_avatar or stock (use stock for faceless)
+- cta                → stock
+- feature_showcase, screenshot_focus, screen_recording_focus → full_asset
+
 ASSET TYPE OPTIONS: ai_voiceover, user_recording_audio, silent, music_only, talking_head
 ASSET SOURCE OPTIONS: user_upload, ai_generated, stock, placeholder
 
@@ -84,7 +111,8 @@ Do not use the same layout_variant for more than 2 consecutive scenes.
 Each scene object must have exactly these fields:
 {
   "scene_id": <integer, starting at 1>,
-  "scene_type": <one of the scene type options>,
+  "scene_type": <semantic scene type from the list above>,
+  "scene_data": <structured data object per scene type rules above>,
   "visual_mode": <one of the valid visual_mode values for this video_type — see rules above>,
   "layout_variant": <"primary" or "alternate" — choose based on layout variant rules above>,
   "script": <${hasProvidedScript ? "the exact portion of the provided script that belongs in this scene — copy verbatim, no paraphrasing" : "narration or caption text for this scene"}>,
@@ -152,15 +180,44 @@ TALKING HEAD PACING RULES — the goal is fast-paced, attention-grabbing video, 
 - stock      → everything else. System fetches stock image automatically.
 - Never use full_avatar or split_view.`;
 
-  const prompt = `You are a video editor assigning visual modes to scenes from a talking head video.
+  const prompt = `You are a video editor assigning visual modes and semantic scene types to scenes.
 
 Product: ${project.product_name || "Unknown"}
 Description: ${project.product_description || "Not provided"}
 
 ${modeRules}
 
-For each scene assign: visual_mode and asset_hint.
-- asset_hint for split_view/full_asset: specific, actionable description of the exact screenshot or recording needed. Name the specific UI screen or feature.
+SCENE TYPE — determine the semantic meaning of each spoken line:
+- hook_scene         → question, attention grab, or product name reveal
+- listicle           → spoken text enumerates multiple items, tools, platforms, or categories (e.g. "Free Games, Open Source Software, Learning Materials")
+- feature_showcase   → mentions a specific product feature with a visual
+- stat_highlight     → states a number, percentage, or metric
+- process_steps      → describes steps or a sequence
+- benefit_highlight  → states a clear benefit or value proposition
+- cta                → asks viewer to follow, comment, DM, save, or visit a URL
+- talking_head_full  → conversational line with no specific visual need
+- talking_head_split → talking while describing something that benefits from a visual
+
+SCENE DATA — extract structured data per type:
+- listicle:        { "items": ["item1", "item2", ...] }  max 5 items — split semantically, not by punctuation
+- stat_highlight:  { "stat_value": "50+", "stat_label": "free tools" }
+- process_steps:   { "steps": ["step1", "step2", ...] }  max 5 steps
+- benefit_highlight: { "benefit_text": "the main benefit" }
+- cta:             { "cta_text": "Follow for more", "url": null }
+- feature_showcase: { "feature_name": "the feature name" }
+- all others:      {}
+
+SCENE TYPE → recommended visual_mode:
+- listicle           → stock or floating_avatar
+- stat_highlight     → stock
+- hook_scene         → full_avatar or stock
+- cta                → full_avatar or stock
+- talking_head_full  → full_avatar
+- talking_head_split → split_view or floating_avatar
+- feature_showcase, screenshot_focus → full_asset
+
+For each scene assign: visual_mode, asset_hint, scene_type, scene_data.
+- asset_hint for split_view/full_asset: specific, actionable description of the exact screenshot or recording needed.
 - asset_hint for stock/floating_avatar: 2–4 word Pixabay search term, noun-based, no adjectives.
 - asset_hint for full_avatar: empty string.
 
@@ -168,12 +225,12 @@ Scenes to process:
 ${JSON.stringify(sceneList, null, 2)}
 
 Return ONLY a valid JSON array. No markdown, no explanation, no code blocks.
-Each element: { "scene_id": <int>, "visual_mode": <string>, "asset_hint": <string> }`;
+Each element: { "scene_id": <int>, "visual_mode": <string>, "asset_hint": <string>, "scene_type": <string>, "scene_data": <object> }`;
 
   const response = await openai.chat.completions.create({
     model:       "gpt-4.1",
     temperature: 0.4,
-    max_tokens:  1500,
+    max_tokens:  2500,
     messages: [
       { role: "system", content: "You are a video production AI. Return only valid JSON arrays." },
       { role: "user",   content: prompt },
@@ -191,7 +248,40 @@ Each element: { "scene_id": <int>, "visual_mode": <string>, "asset_hint": <strin
     ...scene,
     visual_mode: byId[scene.scene_id]?.visual_mode ?? (isTalkingHead ? "full_avatar" : "stock"),
     asset_hint:  byId[scene.scene_id]?.asset_hint  ?? null,
+    scene_type:  byId[scene.scene_id]?.scene_type  ?? null,
+    scene_data:  byId[scene.scene_id]?.scene_data  ?? {},
   }));
+}
+
+// ── mergeConsecutiveListicles ─────────────────────────────────────────────────
+// Collapses consecutive scenes all tagged scene_type=listicle into one scene
+// with a combined items[] array. Merges durations and TH timestamps.
+export function mergeConsecutiveListicles(scenes) {
+  const result = [];
+  let i = 0;
+  while (i < scenes.length) {
+    if (scenes[i].scene_type !== "listicle") { result.push(scenes[i]); i++; continue; }
+    // Collect contiguous listicle group
+    const group = [scenes[i]];
+    while (i + group.length < scenes.length && scenes[i + group.length].scene_type === "listicle") {
+      group.push(scenes[i + group.length]);
+    }
+    if (group.length === 1) { result.push(scenes[i]); i++; continue; }
+
+    const allItems = group.flatMap(s => s.scene_data?.items?.length ? s.scene_data.items : [s.spoken || s.script || ""].filter(Boolean));
+    const merged = {
+      ...group[0],
+      spoken:           group.map(s => s.spoken || s.script || "").join(" ").trim(),
+      script:           group.map(s => s.script || s.spoken || "").join(" ").trim(),
+      duration_seconds: parseFloat(group.reduce((sum, s) => sum + (s.duration_seconds || 0), 0).toFixed(3)),
+      word_count:       group.reduce((sum, s) => sum + (s.word_count || 0), 0),
+      th_end:           group[group.length - 1].th_end,
+      scene_data:       { items: allItems.slice(0, 7) },
+    };
+    result.push(merged);
+    i += group.length;
+  }
+  return result.map((s, idx) => ({ ...s, scene_id: idx + 1 }));
 }
 
 // ── generateScenePlan ─────────────────────────────────────────────────────────
@@ -231,6 +321,7 @@ export async function generateScenePlan(project) {
     createEmptyScene({
       scene_id:          item.scene_id          ?? null,
       scene_type:        item.scene_type        ?? null,
+      scene_data:        item.scene_data        ?? {},
       visual_mode:       item.visual_mode       ?? null,
       layout_variant:    item.layout_variant    ?? "primary",
       script:            item.script            ?? "",

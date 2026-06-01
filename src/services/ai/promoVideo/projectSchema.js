@@ -70,7 +70,8 @@ export const REGENERATION_SCOPE = {
 function createEmptyScene(overrides = {}) {
   return {
     scene_id:           null,
-    scene_type:         null,
+    scene_type:         null,   // semantic: hook_scene, listicle, stat_highlight, cta, etc.
+    scene_data:         {},     // type-specific payload: items[], steps[], stat_value, etc.
     script:             "",
     duration_seconds:   0,
     asset_type:         ASSET_TYPE.AI_VOICEOVER,

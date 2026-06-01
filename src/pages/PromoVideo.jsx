@@ -70,7 +70,7 @@ const RENDER_MESSAGES = [
   "Rendering video…",
 ];
 
-const WIZARD_STEPS = ["Product Info", "Video Type", "Assets", "Generating"];
+const WIZARD_STEPS = ["Video Type", "Setup", "Assets", "Generating"];
 
 // ── Upload helper (client-side Supabase, promo-specific paths) ────────────────
 async function uploadPromoFile(file, folder) {
@@ -450,7 +450,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     if (p.video_type === "talking_head" || p.has_talking_head) setVideoType("talking_head");
 
     setProjectId(p.id);
-    createdRef.current = true; // prevent createProject from running again
 
     const s = p.status;
     if (s === "script_generated" || s === "waiting_assets" || s === "assets_ready") {
@@ -463,13 +462,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     }
     // "draft" → stay on step 0 with pre-filled form
   }, [initialState]);
-
-  // Step 3: create project on entry
-  useEffect(() => {
-    if (step !== 2 || createdRef.current) return;
-    createdRef.current = true;
-    createProject();
-  }, [step]);
 
   // Step 4: status message cycling
   useEffect(() => {
@@ -507,12 +499,13 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   }, [step, projectId, renderError]);
 
   // Derived validation
-  const step1Valid = productName.trim().length > 0 && productDesc.trim().length > 0;
-  const step2Valid =
-    (videoType === "talking_head" && hasTHVideo === "yes" && !!thUrl) ||
-    (videoType === "faceless" && hasVoiceover === "yes" && !!voUrl) ||
-    (videoType === "faceless" && hasVoiceover === "no" && hasScript === "yes" && scriptText.trim().length > 0) ||
-    (videoType === "faceless" && hasVoiceover === "no" && hasScript === "no");
+  const step1ValidTH = !!thUrl;
+  const step1ValidFaceless =
+    productName.trim().length > 0 && productDesc.trim().length > 0 &&
+    (hasVoiceover === "yes" && !!voUrl ||
+     hasVoiceover === "no" && hasScript === "yes" && scriptText.trim().length > 0 ||
+     hasVoiceover === "no" && hasScript === "no");
+  const step1Valid = videoType === "talking_head" ? step1ValidTH : step1ValidFaceless;
 
   // ── File upload helpers ──
   async function handleLogoFile(file) {
@@ -621,10 +614,13 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         const freshData = await freshRes.json();
         if (freshData.assetManifest) setAssetManifest(freshData.assetManifest);
       }
+      return true;
     } catch (e) {
       setCreateError(e.message);
+      return false;
+    } finally {
+      setCreating(false);
     }
-    setCreating(false);
   }
 
   async function autoUploadScene(pid, sceneId, url) {
@@ -719,8 +715,118 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "36px 24px 80px" }}>
         <StepBar />
 
-        {/* ─── Step 1: Product Info ─── */}
+        {/* ─── Step 0: Video Type ─── */}
         {step === 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: T.text, marginBottom: 6 }}>What kind of video?</div>
+              <div style={{ fontSize: 14, color: T.muted }}>Choose the style that fits your brand.</div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              {[
+                { id: "faceless",     icon: "🎬", title: "Faceless",      desc: "Stock footage, captions, and AI voiceover. No camera required." },
+                { id: "talking_head", icon: "🎥", title: "Talking Head",  desc: "You on camera. Personal, direct, and authentic." },
+              ].map(({ id, icon, title, desc }) => (
+                <button key={id} onClick={() => setVideoType(id)}
+                  style={{
+                    padding: 28, borderRadius: 14, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                    background: videoType === id ? "rgba(245,197,24,0.06)" : "rgba(255,255,255,0.02)",
+                    border: videoType === id ? "2px solid rgba(245,197,24,0.55)" : "2px solid rgba(255,255,255,0.1)",
+                  }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>{icon}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: videoType === id ? T.accent : T.text, marginBottom: 6 }}>{title}</div>
+                  <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.5 }}>{desc}</div>
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => setStep(1)} style={{ ...C.btnY, width: "100%", padding: "13px 24px", fontSize: 15 }}>
+              Next: Setup →
+            </button>
+          </div>
+        )}
+
+        {/* ─── Step 1: Type-specific setup ─── */}
+        {step === 1 && videoType === "talking_head" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+
+            <div>
+              <label style={C.lbl}>Upload Your Video <span style={{ color: T.danger }}>*</span></label>
+              <FileUploadRow
+                label="Upload talking head video" accept="video/*"
+                url={thUrl} uploading={thLoading}
+                loadingLabel="Transcribing…"
+                doneLabel="Video ready — transcription done"
+                onFile={handleThFile}
+                onClear={() => { setThUrl(null); thFileRef.current = null; bgTranscribeRef.current = null; }}
+                inputRef={thRef} />
+              <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Your audio becomes the voiceover. We transcribe it automatically.</div>
+            </div>
+
+            <div>
+              <label style={C.lbl}>Product Name <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — used for branding)</span></label>
+              <input style={C.inp} value={productName} onChange={e => setProductName(e.target.value)}
+                placeholder="e.g. Vidquence" maxLength={80} />
+            </div>
+
+            <div>
+              <label style={C.lbl}>Target Platform</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {PLATFORMS.map(p => (
+                  <button key={p.id} onClick={() => setPlatform(p.id)}
+                    style={{ padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                      background: platform === p.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
+                      border: platform === p.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
+                      color: platform === p.id ? T.accent : T.muted }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div>
+                <label style={C.lbl}>Language</label>
+                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
+                  {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={C.lbl}>Tone</label>
+                <select value={tone} onChange={e => setTone(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
+                  {TONES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
+              <FileUploadRow label="Upload Logo" accept="image/*" url={logoUrl} uploading={logoLoading}
+                onFile={handleLogoFile} onClear={() => setLogoUrl(null)} inputRef={logoRef} />
+            </div>
+
+            {createError && (
+              <div style={{ padding: "14px 18px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+                ✕ {createError}
+                <button onClick={() => setCreateError("")} style={{ ...C.btnG, fontSize: 11, padding: "3px 10px", marginLeft: 12 }}>Dismiss</button>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
+              <button
+                onClick={async () => { const ok = await createProject(); if (ok) setStep(2); }}
+                disabled={!step1ValidTH || creating}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidTH && !creating ? 1 : 0.4,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {creating ? <><Spinner size={14} color="#000" /> Building plan…</> : "Next: Review Assets →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 1 && videoType === "faceless" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
 
             <div>
@@ -804,164 +910,115 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 inputRef={logoRef} />
             </div>
 
-            <button onClick={async () => {
-                // Create draft row immediately so URL has an ID for resume
-                if (!projectId) {
-                  try {
-                    const res  = await serverFetch("/api/promo-video/init", {
-                      method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ product_name: productName.trim(), product_url: productUrl.trim() || null, product_description: productDesc.trim(), target_platform: platform, language, tone, duration_seconds: duration }),
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.projectId) {
-                      setProjectId(data.projectId);
-                      window.history.replaceState({}, "", `/promo-video/${data.projectId}`);
-                    }
-                  } catch {} // non-critical — proceed regardless
-                }
-                setStep(1);
-              }} disabled={!step1Valid}
-              style={{ ...C.btnY, width: "100%", padding: "13px 24px", fontSize: 15, opacity: step1Valid ? 1 : 0.4 }}>
-              Next: Video Type →
-            </button>
-          </div>
-        )}
-
-        {/* ─── Step 2: Video Type ─── */}
-        {step === 1 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div>
+              <label style={C.lbl}>Product Description <span style={{ color: T.danger }}>*</span></label>
+              <textarea style={{ ...C.inp, resize: "vertical", minHeight: 90, lineHeight: 1.5 }}
+                value={productDesc} onChange={e => setProductDesc(e.target.value)}
+                placeholder="What does your product do? What problem does it solve?" maxLength={500} />
+              <div style={{ fontSize: 11, color: "#55556a", marginTop: 3, textAlign: "right" }}>{productDesc.length}/500</div>
+            </div>
 
             <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 6 }}>What kind of video?</div>
-              <div style={{ fontSize: 13, color: T.muted }}>Choose the style that fits your brand.</div>
+              <label style={C.lbl}>Target Platform</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {PLATFORMS.map(p => (
+                  <button key={p.id} onClick={() => setPlatform(p.id)}
+                    style={{ padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                      background: platform === p.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
+                      border: platform === p.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
+                      color: platform === p.id ? T.accent : T.muted }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {[
-                { id: "faceless",      icon: "🎬", title: "Faceless",      desc: "Stock footage, captions, and AI voiceover. No camera required." },
-                { id: "talking_head",  icon: "🎥", title: "Talking Head",  desc: "You on camera. Personal, direct, and authentic." },
-              ].map(({ id, icon, title, desc }) => (
-                <button key={id} onClick={() => { setVideoType(id); setHasTHVideo(null); }}
-                  style={{
-                    padding: 24, borderRadius: 14, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                    background: videoType === id ? "rgba(245,197,24,0.06)" : "rgba(255,255,255,0.02)",
-                    border: videoType === id ? "2px solid rgba(245,197,24,0.55)" : "2px solid rgba(255,255,255,0.1)",
-                  }}>
-                  <div style={{ fontSize: 38, marginBottom: 10 }}>{icon}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: videoType === id ? T.accent : T.text, marginBottom: 6 }}>{title}</div>
-                  <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.5 }}>{desc}</div>
-                </button>
-              ))}
+            <div>
+              <label style={C.lbl}>Duration</label>
+              <div style={{ display: "flex", gap: 10 }}>
+                {DURATIONS.map(d => (
+                  <button key={d.id} onClick={() => setDuration(d.id)}
+                    style={{ flex: 1, padding: "14px 0", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                      fontSize: 15, fontWeight: 800,
+                      background: duration === d.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.03)",
+                      border: duration === d.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
+                      color: duration === d.id ? T.accent : T.muted }}>
+                    {d.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Talking Head sub-options */}
-            {videoType === "talking_head" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-                <div>
-                  <label style={{ ...C.lbl, marginBottom: 10 }}>Do you have a talking head video?</label>
-                  <YesNo value={hasTHVideo} onChange={setHasTHVideo} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div>
+                <label style={C.lbl}>Language</label>
+                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
+                  {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={C.lbl}>Tone</label>
+                <select value={tone} onChange={e => setTone(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
+                  {TONES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
+              <FileUploadRow label="Upload Logo" accept="image/*" url={logoUrl} uploading={logoLoading}
+                onFile={handleLogoFile} onClear={() => setLogoUrl(null)} inputRef={logoRef} />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "18px", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+              <label style={{ ...C.lbl, marginBottom: 6 }}>Do you have a voiceover recording?</label>
+              <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />
+              {hasVoiceover === "yes" && (
+                <div style={{ marginTop: 8 }}>
+                  <FileUploadRow label="Upload voiceover" accept="audio/*" url={voUrl} uploading={voLoading}
+                    onFile={handleVoFile} onClear={() => setVoUrl(null)} inputRef={voRef} />
                 </div>
+              )}
+              {hasVoiceover === "no" && (
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <label style={{ ...C.lbl, marginBottom: 6 }}>Do you have a script?</label>
+                  <YesNo value={hasScript} onChange={setHasScript} />
+                  {hasScript === "yes" && (
+                    <textarea style={{ ...C.inp, marginTop: 6, resize: "vertical", minHeight: 80, lineHeight: 1.5 }}
+                      placeholder="Paste your script here…" value={scriptText} onChange={e => setScriptText(e.target.value)} />
+                  )}
+                  {hasScript === "no" && (
+                    <div style={{ fontSize: 11, color: T.muted }}>AI will write the script and voiceover automatically.</div>
+                  )}
+                </div>
+              )}
+            </div>
 
-                {hasTHVideo === "yes" && (
-                  <div>
-                    <label style={C.lbl}>Upload Your Video</label>
-                    <FileUploadRow
-                      label="Upload video" accept="video/*"
-                      url={thUrl} uploading={thLoading}
-                      loadingLabel="Transcribing…"
-                      doneLabel="Video ready — transcription done"
-                      onFile={handleThFile}
-                      onClear={() => { setThUrl(null); thFileRef.current = null; bgTranscribeRef.current = null; }}
-                      inputRef={thRef} />
-                    <div style={{ fontSize: 11, color: T.muted, marginTop: 8 }}>
-                      This video will be used as-is. Your audio becomes the voiceover.
-                    </div>
-                  </div>
-                )}
-
-                {hasTHVideo === "no" && (
-                  <div style={{ padding: "20px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px dashed rgba(255,255,255,0.1)", textAlign: "center" }}>
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>🤖</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: T.muted }}>AI Avatar</div>
-                    <div style={{ fontSize: 12, color: "#55556a", marginTop: 4 }}>Coming soon — choose Faceless for now</div>
-                  </div>
-                )}
+            {createError && (
+              <div style={{ padding: "14px 18px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+                ✕ {createError}
+                <button onClick={() => setCreateError("")} style={{ ...C.btnG, fontSize: 11, padding: "3px 10px", marginLeft: 12 }}>Dismiss</button>
               </div>
             )}
 
-            {/* Faceless sub-options */}
-            {videoType === "faceless" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 18, padding: "20px", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-                <div>
-                  <label style={{ ...C.lbl, marginBottom: 10 }}>Do you have a voiceover recording?</label>
-                  <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />
-
-                  {hasVoiceover === "yes" && (
-                    <div style={{ marginTop: 10 }}>
-                      <FileUploadRow
-                        label="Upload voiceover" accept="audio/*"
-                        url={voUrl} uploading={voLoading}
-                        onFile={handleVoFile}
-                        onClear={() => setVoUrl(null)}
-                        inputRef={voRef} />
-                      <div style={{ fontSize: 11, color: T.muted, marginTop: 8 }}>
-                        Script will be extracted from your audio automatically.
-                      </div>
-                    </div>
-                  )}
-
-                  {hasVoiceover === "no" && (
-                    <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                      <label style={{ ...C.lbl, marginBottom: 10 }}>Do you have a script?</label>
-                      <YesNo value={hasScript} onChange={setHasScript} />
-                      {hasScript === "yes" && (
-                        <textarea style={{ ...C.inp, marginTop: 6, resize: "vertical", minHeight: 80, lineHeight: 1.5 }}
-                          placeholder="Paste your script here…"
-                          value={scriptText} onChange={e => setScriptText(e.target.value)} />
-                      )}
-                      {hasScript === "no" && (
-                        <div style={{ fontSize: 11, color: T.muted }}>AI will write the script and generate a voiceover automatically.</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
+            <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
-              <button onClick={() => setStep(2)} disabled={!step2Valid}
-                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step2Valid ? 1 : 0.4 }}>
-                Next: Assets →
+              <button
+                onClick={async () => { const ok = await createProject(); if (ok) setStep(2); }}
+                disabled={!step1ValidFaceless || creating}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidFaceless && !creating ? 1 : 0.4,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {creating ? <><Spinner size={14} color="#000" /> Building plan…</> : "Next: Review Assets →"}
               </button>
             </div>
           </div>
         )}
 
-        {/* ─── Step 3: Asset Collection ─── */}
+        {/* ─── Step 2: Asset Collection ─── */}
         {step === 2 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {creating && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "60px 0" }}>
-                <Spinner size={36} />
-                <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>Generating scene plan…</div>
-                <div style={{ fontSize: 13, color: T.muted }}>Our AI is designing your video structure.</div>
-              </div>
-            )}
-
-            {createError && (
-              <div style={{ padding: "14px 18px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
-                ✕ {createError}
-                <br />
-                <button onClick={() => { createdRef.current = false; createProject(); }}
-                  style={{ ...C.btnG, fontSize: 12, padding: "5px 14px", marginTop: 10 }}>
-                  Try Again
-                </button>
-              </div>
-            )}
-
-            {!creating && assetManifest && (
+            {assetManifest && (
               <>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 6 }}>
