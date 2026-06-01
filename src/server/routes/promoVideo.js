@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { supabaseAdmin, openai, requireAuth, deductCredits, addCredits, uuidv4, TEMP_DIR } from "../middleware/shared.js";
 import { createEmptyProject, createEmptyScene, PROJECT_STATUS, ASSET_TYPE, ASSET_SOURCE } from "../../services/ai/promoVideo/projectSchema.js";
-import { generateScenePlan, assignVisualModes } from "../../services/ai/promoVideo/scenePlanner.js";
+import { generateScenePlan, assignVisualModes, mergeConsecutiveListicles } from "../../services/ai/promoVideo/scenePlanner.js";
 import { generateAssetRequirements, updateAssetStatus } from "../../services/ai/promoVideo/assetRequirements.js";
 import { markProjectApproved, transitionProjectStatus, getProjectSummary } from "../../services/ai/promoVideo/projectStateManager.js";
 import { orchestratePromoRender } from "../../services/ai/promoVideo/renderOrchestrator.js";
@@ -34,6 +34,7 @@ function rowToProject(row) {
     has_recordings:      row.has_recordings,
     has_logo:            row.has_logo,
     has_voiceover:       row.has_voiceover,
+    logo_url:            row.logo_url            || null,
     style:               row.style || {},
     scenes:              row.scenes || [],
     credits_estimated:   row.credits_estimated,
@@ -132,7 +133,7 @@ router.post("/create", requireAuth, async (req, res) => {
       caption_style, transition_style, motion_style, color_palette, music_mood,
     });
 
-    const { voiceover_url, talking_head_url, script: scriptInput } = req.body;
+    const { voiceover_url, talking_head_url, logo_url, script: scriptInput } = req.body;
     const resolvedVideoType = video_type || (has_talking_head ? "talking_head" : "faceless");
 
     project = {
@@ -145,6 +146,7 @@ router.post("/create", requireAuth, async (req, res) => {
       has_recordings:   !!has_recordings,
       has_logo:         !!has_logo,
       has_voiceover:    !!has_voiceover,
+      logo_url:         logo_url || null,
     };
 
     let thSegments = null; // raw segments with timestamps, saved to talking_head_segments column
@@ -171,11 +173,10 @@ router.post("/create", requireAuth, async (req, res) => {
       thSegments = thResult.scenes;
 
       // Convert TH segments to project scene format.
-      // Duration extends to next segment's start so timeline_start_N == th_start_N exactly,
-      // which keeps the persistent audio master in sync with per-scene video clips.
-      let thScenes = thResult.scenes.map((s, idx, arr) => {
-        const nextStart      = arr[idx + 1]?.start ?? thResult.total_duration;
-        const duration       = parseFloat(Math.max(0.1, nextStart - s.start).toFixed(3));
+      // Use actual spoken duration (s.end - s.start) so timeline is sequential.
+      // trimStart/trimEnd on the video layer handle the correct video segment.
+      let thScenes = thResult.scenes.map((s) => {
+        const duration = parseFloat(Math.max(0.1, s.end - s.start).toFixed(3));
         return createEmptyScene({
           scene_id:         s.scene_id,
           scene_type:       "talking_head",
@@ -193,14 +194,17 @@ router.post("/create", requireAuth, async (req, res) => {
         });
       });
 
-      // Assign visual modes and asset hints via GPT (no script rewriting)
+      // Assign visual modes, scene types, and asset hints via GPT
       thScenes = await assignVisualModes(thScenes, { ...project, video_type: "talking_head" });
+      // Merge consecutive listicle scenes into one combined scene
+      thScenes = mergeConsecutiveListicles(thScenes);
 
       // Set asset_source based on resolved visual_mode
+      const ASSET_SCENE_TYPES = new Set(["screenshot_focus", "screen_recording_focus", "feature_showcase"]);
       thScenes = thScenes.map(s => ({
         ...s,
         asset_source:
-          s.visual_mode === "full_asset" || s.visual_mode === "split_view"
+          s.visual_mode === "full_asset" || s.visual_mode === "split_view" || ASSET_SCENE_TYPES.has(s.scene_type)
             ? ASSET_SOURCE.USER_UPLOAD
             : s.visual_mode === "stock"
             ? ASSET_SOURCE.STOCK
@@ -267,6 +271,7 @@ router.post("/create", requireAuth, async (req, res) => {
       has_recordings:           project.has_recordings,
       has_logo:                 project.has_logo,
       has_voiceover:            project.has_voiceover,
+      logo_url:                 project.logo_url || null,
       style: {
         caption_style:    project.caption_style    ?? null,
         transition_style: project.transition_style ?? null,
