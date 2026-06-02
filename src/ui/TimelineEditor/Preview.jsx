@@ -7,67 +7,63 @@ import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeR
 import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import {
-  Package, Star, ShieldCheck, Truck, Heart, CheckCircle, Lightning, Leaf, Drop, Fire,
-  SealCheck, Sparkle, ArrowRight, Tag, Certificate,
-  ArrowLeft, ArrowUp, ArrowDown, Bell, Bookmark, Camera, Car, ChatCircle, Clock, Cloud,
-  Coffee, CreditCard, Crown, Cube, Diamond, Download, Envelope, Eye, Fingerprint, Flag,
-  Flower, Gear, Gift, Globe, Headphones, House, Image, Info, Infinity, Key, Laptop,
-  Lightbulb, Link, Lock, MagicWand, MapPin, Medal, Megaphone, Moon, MusicNote,
-  PaperPlaneTilt, Pencil, Phone, Plant, Plus, Question, Rainbow, Rocket, MagnifyingGlass,
-  ShareNetwork, Shield, ShoppingBag, Smiley, Stack, Sun, Target, ThumbsUp, Timer,
-  Trash, Trophy, TShirt, Umbrella, Upload, User, Video, Wallet, Warning, WifiHigh, Wind,
-} from "@phosphor-icons/react";
+  Zap, BarChart2, BarChart3, TrendingUp, CheckCircle, Star,
+  Settings, Clock, Shield, Lock, Video, Play, Download,
+  Share2, Users, User, Bot, Wand2, DollarSign, GraduationCap,
+  Gamepad2, Code2, Globe, Smartphone, Monitor, Flame, Heart,
+  Trophy, Medal, Flag, Search, Mail, Bell, AlertTriangle, Info,
+  Rocket, Target, Layers, Cpu, Database, Cloud,
+  ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown, Gem,
+  LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
+  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
+} from "lucide-react";
 
-const PHOSPHOR_ICONS = {
-  Package, Star, ShieldCheck, Truck, Heart, CheckCircle, Lightning, Leaf, Drop, Fire,
-  SealCheck, Sparkle, ArrowRight, Tag, Certificate,
-  ArrowLeft, ArrowUp, ArrowDown, Bell, Bookmark, Camera, Car, ChatCircle, Clock, Cloud,
-  Coffee, CreditCard, Crown, Cube, Diamond, Download, Envelope, Eye, Fingerprint, Flag,
-  Flower, Gear, Gift, Globe, Headphones, House, Image, Info, Infinity, Key, Laptop,
-  Lightbulb, Link, Lock, MagicWand, MapPin, Medal, Megaphone, Moon, MusicNote,
-  PaperPlaneTilt, Pencil, Phone, Plant, Plus, Question, Rainbow, Rocket, MagnifyingGlass,
-  ShareNetwork, Shield, ShoppingBag, Smiley, Stack, Sun, Target, ThumbsUp, Timer,
-  Trash, Trophy, TShirt, Umbrella, Upload, User, Video, Wallet, Warning, WifiHigh, Wind,
+const LUCIDE_ICONS = {
+  Zap, Lightning: Zap, BarChart2, BarChart3, TrendingUp,
+  CheckCircle, Star, Settings, Clock, Shield, Lock, Video,
+  Play, Download, Share2, Users, User, Bot, Wand2, DollarSign,
+  GraduationCap, Gamepad2, Code2, Globe, Smartphone, Monitor,
+  Flame, Heart, Trophy, Medal, Flag, Search, Mail, Bell,
+  AlertTriangle, Info, Rocket, Target, Layers, Cpu, Database,
+  Cloud, ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown,
+  Gem, LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
+  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
 };
 
 const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape", "icon"]);
 const SNAP_T = 12; // canvas-space pixels
 
-// Snap layer center (x,y) to canvas edges and center during body drag
+// Snap layer top-left (x,y) to canvas edges and center during body drag
 function snapBody(x, y, w, h, cW, cH) {
   let sx = x, sy = y;
-  const lEdge = cW / 2 + x - w / 2, rEdge = cW / 2 + x + w / 2;
-  if      (Math.abs(lEdge)       < SNAP_T) sx = -cW / 2 + w / 2;
-  else if (Math.abs(rEdge - cW)  < SNAP_T) sx =  cW / 2 - w / 2;
-  else if (Math.abs(x)           < SNAP_T) sx = 0;
-  const tEdge = cH / 2 + y - h / 2, bEdge = cH / 2 + y + h / 2;
-  if      (Math.abs(tEdge)       < SNAP_T) sy = -cH / 2 + h / 2;
-  else if (Math.abs(bEdge - cH)  < SNAP_T) sy =  cH / 2 - h / 2;
-  else if (Math.abs(y)           < SNAP_T) sy = 0;
+  if      (Math.abs(x)               < SNAP_T) sx = 0;
+  else if (Math.abs(x + w - cW)      < SNAP_T) sx = cW - w;
+  else if (Math.abs(x + w/2 - cW/2)  < SNAP_T) sx = cW/2 - w/2;
+  if      (Math.abs(y)               < SNAP_T) sy = 0;
+  else if (Math.abs(y + h - cH)      < SNAP_T) sy = cH - h;
+  else if (Math.abs(y + h/2 - cH/2)  < SNAP_T) sy = cH/2 - h/2;
   return { x: sx, y: sy };
 }
 
 // Snap the moving edge of a resize handle to the canvas boundary
 function snapResize(newX, newY, newW, newH, cfg, origT, cW, cH) {
   let x = newX, y = newY, w = newW, h = newH;
-  const origR = cW / 2 + origT.x + origT.width  / 2;
-  const origL = cW / 2 + origT.x - origT.width  / 2;
-  const origB = cH / 2 + origT.y + origT.height / 2;
-  const origTo = cH / 2 + origT.y - origT.height / 2;
+  const origR  = origT.x + origT.width;
+  const origL  = origT.x;
+  const origB  = origT.y + origT.height;
+  const origTo = origT.y;
   if (cfg.wm !== 0) {
-    const lEdge = cW / 2 + x - w / 2, rEdge = cW / 2 + x + w / 2;
-    if (cfg.xa < 0 && Math.abs(lEdge) < SNAP_T) {
-      w = origR; x = origR / 2 - cW / 2;
-    } else if (cfg.xa > 0 && Math.abs(rEdge - cW) < SNAP_T) {
-      w = cW - origL; x = (origL + cW) / 2 - cW / 2;
+    if (cfg.xa < 0 && Math.abs(x) < SNAP_T) {
+      w = origR; x = 0;
+    } else if (cfg.xa > 0 && Math.abs(x + w - cW) < SNAP_T) {
+      w = cW - origL; x = origL;
     }
   }
   if (cfg.hm !== 0) {
-    const tEdge = cH / 2 + y - h / 2, bEdge = cH / 2 + y + h / 2;
-    if (cfg.ya < 0 && Math.abs(tEdge) < SNAP_T) {
-      h = origB; y = origB / 2 - cH / 2;
-    } else if (cfg.ya > 0 && Math.abs(bEdge - cH) < SNAP_T) {
-      h = cH - origTo; y = (origTo + cH) / 2 - cH / 2;
+    if (cfg.ya < 0 && Math.abs(y) < SNAP_T) {
+      h = origB; y = 0;
+    } else if (cfg.ya > 0 && Math.abs(y + h - cH) < SNAP_T) {
+      h = cH - origTo; y = origTo;
     }
   }
   return { x, y, w, h };
@@ -458,8 +454,8 @@ function PersistentVideoTrack({
   const isDraggable = !!(activeClip && !activeClip.locked);
   const isResizable = isSelected && isDraggable;
 
-  const left = canvasW / 2 + x - width / 2;
-  const top  = canvasH / 2 + y - height / 2;
+  const left = x;
+  const top  = y;
 
   const { opacity: tOpacity = 1, translateX: tX = 0, translateY: tY = 0, addBlur: tBlur = 0, scale: tScale = 1 } =
     activeClip ? getTransitionStyle(activeClip, currentTime) : {};
@@ -501,8 +497,8 @@ function PersistentVideoTrack({
           ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
           : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
       }
-      let newX = me.altKey ? origT.x : origT.x + cfg.xa * (newW - origT.width);
-      let newY = me.altKey ? origT.y : origT.y + cfg.ya * (newH - origT.height);
+      let newX = me.altKey ? origT.x : cfg.wm < 0 ? origT.x + (origT.width - newW) : origT.x;
+      let newY = me.altKey ? origT.y : cfg.hm < 0 ? origT.y + (origT.height - newH) : origT.y;
       ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
       const transformPatch = { ...freshClip.transform };
@@ -719,8 +715,8 @@ function LayerElement({
   const isDraggable = DRAGGABLE_TYPES.has(layer.type) && !layer.locked && !isEditing;
   const isResizable = isSelected && !layer.locked && DRAGGABLE_TYPES.has(layer.type) && !isEditing;
 
-  const left = canvasW / 2 + x - width / 2;
-  const top  = canvasH / 2 + y - height / 2;
+  const left = x;
+  const top  = y;
 
   // ── Handle resize mousedown ────────────────────────────────────────────────
   const onResizeMouseDown = (e, handleId) => {
@@ -763,8 +759,8 @@ function LayerElement({
           ? (newH = Math.max(MIN_SIZE, newW / aspectRatio))
           : (newW = Math.max(MIN_SIZE, newH * aspectRatio));
       }
-      let newX = me.altKey ? origT.x : origT.x + cfg.xa * (newW - origT.width);
-      let newY = me.altKey ? origT.y : origT.y + cfg.ya * (newH - origT.height);
+      let newX = me.altKey ? origT.x : cfg.wm < 0 ? origT.x + (origT.width - newW) : origT.x;
+      let newY = me.altKey ? origT.y : cfg.hm < 0 ? origT.y + (origT.height - newH) : origT.y;
       ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
       const transformPatch = { ...freshLayer.transform };
@@ -863,13 +859,12 @@ function LayerElement({
   let content = null;
 
   if (layer.type === "icon") {
-    const IconComponent = PHOSPHOR_ICONS[layer.iconName];
-    console.log("[icon layer]", layer.iconName, "→ component found:", !!IconComponent, "size:", width, height);
+    const IconComponent = LUCIDE_ICONS[layer.iconName];
     content = IconComponent ? (
       <IconComponent
         size={Math.min(width, height)}
         color={layer.style?.color || "#ffffff"}
-        weight={layer.style?.weight || "regular"}
+        strokeWidth={1.5}
         style={{ display: "block" }}
       />
     ) : null;
@@ -906,7 +901,7 @@ function LayerElement({
       letterSpacing: s.letterSpacing ?? 0,
       textTransform: s.textTransform ?? "none",
       textShadow: s.textShadow ?? undefined,
-      wordBreak: "break-word",
+      wordBreak: "normal",
       whiteSpace: "pre-wrap",
       boxSizing: "border-box",
     };
@@ -1163,7 +1158,7 @@ function LayerElement({
           style={{
             position: "absolute",
             inset: 0,
-            overflow: "hidden",
+            overflow: layer.type === "text" ? "visible" : "hidden",
             cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",
             borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
@@ -1172,7 +1167,10 @@ function LayerElement({
             boxShadow: layer.boxShadow ?? undefined,
             padding: layer.padding ? `${layer.padding}px` : undefined,
             boxSizing: layer.padding ? "border-box" : undefined,
-            mixBlendMode: layer.blendMode ?? undefined,
+            mixBlendMode: layer.mixBlendMode ?? layer.blendMode ?? undefined,
+            filter: layer.filter ?? undefined,
+            backdropFilter: layer.backdropFilter ?? undefined,
+            WebkitBackdropFilter: layer.backdropFilter ?? undefined,
           }}
           onMouseDown={isDraggable ? (e) => onBodyMouseDown(e, layer) : undefined}
           onMouseEnter={() => setIsHovered(true)}

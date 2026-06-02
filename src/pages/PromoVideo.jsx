@@ -586,6 +586,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         voiceover_url:           voUrl   || null,
         logo_url:                logoUrl || null,
         script:                  !isTH && hasVoiceover !== "yes" && hasScript === "yes" ? scriptText : null,
+        pipeline_version:        isTH ? undefined : "v2", // TEMP: force V2 for testing
       };
 
       const res  = await serverFetch("/api/promo-video/create", {

@@ -3,11 +3,12 @@ import fs from "fs";
 import path from "path";
 import { supabaseAdmin, openai, requireAuth, deductCredits, addCredits, uuidv4, TEMP_DIR } from "../middleware/shared.js";
 import { createEmptyProject, createEmptyScene, PROJECT_STATUS, ASSET_TYPE, ASSET_SOURCE } from "../../services/ai/promoVideo/projectSchema.js";
-import { generateScenePlan, generateDSLScenePlan, assignVisualModes, mergeConsecutiveListicles } from "../../services/ai/promoVideo/scenePlanner.js";
+import { generateScenePlan, assignVisualModes, mergeConsecutiveListicles } from "../../services/ai/promoVideo/scenePlanner.js";
 import { generateAssetRequirements, updateAssetStatus } from "../../services/ai/promoVideo/assetRequirements.js";
 import { markProjectApproved, transitionProjectStatus, getProjectSummary } from "../../services/ai/promoVideo/projectStateManager.js";
 import { orchestratePromoRender } from "../../services/ai/promoVideo/renderOrchestrator.js";
 import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../services/ai/promoVideo/talkingHeadProcessor.js";
+import { runV2Pipeline } from "../../services/ai/promoVideo/v2/pipelineOrchestrator.js";
 
 export const router = express.Router();
 
@@ -44,6 +45,7 @@ function rowToProject(row) {
     error_message:       row.error_message      || null,
     editor_project_id:   row.editor_project_id  || null,
     scene_format:        row.scene_format        || null,
+    pipeline_version:    row.pipeline_version    || null,
     created_at:          row.created_at,
     updated_at:          row.updated_at,
   };
@@ -247,7 +249,7 @@ router.post("/create", requireAuth, async (req, res) => {
         project.script = scriptInput.trim();
       }
 
-      project = await generateDSLScenePlan(project);
+      project = await runV2Pipeline(project);
     }
 
     const assetManifest = generateAssetRequirements(project);
@@ -282,6 +284,8 @@ router.post("/create", requireAuth, async (req, res) => {
       },
       scenes:                   project.scenes || [],
       scene_format:             project.scene_format || null,
+      pipeline_version:         project.pipeline_version || null,
+      editor_project_id:        project.editor_project_id || null,
       asset_manifest:           assetManifest,
       full_transcript:          project.script || null,
       talking_head_segments:    thSegments,
@@ -469,7 +473,7 @@ router.delete("/:projectId", requireAuth, async (req, res) => {
 
     // Also remove the editor project row if one was created
     if (row.editor_project_id) {
-      await supabaseAdmin.from("projects").delete().eq("id", row.editor_project_id).catch(() => {});
+      try { await supabaseAdmin.from("projects").delete().eq("id", row.editor_project_id); } catch {}
     }
 
     res.json({ success: true });

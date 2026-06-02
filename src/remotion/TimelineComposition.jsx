@@ -1,6 +1,29 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender } from "remotion";
 import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../core/registries/sfxRegistry";
 import { useMemo, useEffect } from "react";
+import {
+  Zap, BarChart2, BarChart3, TrendingUp, CheckCircle, Star,
+  Settings, Clock, Shield, Lock, Video as VideoIcon, Play, Download,
+  Share2, Users, User, Bot, Wand2, DollarSign, GraduationCap,
+  Gamepad2, Code2, Globe, Smartphone, Monitor, Flame, Heart,
+  Trophy, Medal, Flag, Search, Mail, Bell, AlertTriangle, Info,
+  Rocket, Target, Layers, Cpu, Database, Cloud,
+  ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown, Gem,
+  LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
+  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
+} from "lucide-react";
+
+const LUCIDE_ICONS = {
+  Zap, Lightning: Zap, BarChart2, BarChart3, TrendingUp,
+  CheckCircle, Star, Settings, Clock, Shield, Lock, Video: VideoIcon,
+  Play, Download, Share2, Users, User, Bot, Wand2, DollarSign,
+  GraduationCap, Gamepad2, Code2, Globe, Smartphone, Monitor,
+  Flame, Heart, Trophy, Medal, Flag, Search, Mail, Bell,
+  AlertTriangle, Info, Rocket, Target, Layers, Cpu, Database,
+  Cloud, ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown,
+  Gem, LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
+  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
+};
 
 export default function TimelineComposition({ project }) {
   const frame = useCurrentFrame();
@@ -133,13 +156,18 @@ function TimelineLayer({ layer, currentTime, fps }) {
   const CANVAS_H = 1920;
   const baseStyle = {
     position: "absolute",
-    left: CANVAS_W / 2 + tr.x - tr.width / 2,
-    top: CANVAS_H / 2 + tr.y - tr.height / 2,
+    left: tr.x,
+    top: tr.y,
     width: tr.width,
     height: tr.height,
     opacity: tr.opacity * ts.opacity,
     transform: `${ts.tX ? `translateX(${ts.tX}%) ` : ""}${ts.tY ? `translateY(${ts.tY}%) ` : ""}rotate(${tr.rotation}deg) scale(${tr.scale * ts.scale})`,
-    filter: tr.blur > 0 ? `blur(${tr.blur}px)` : undefined,
+    filter: [tr.blur > 0 ? `blur(${tr.blur}px)` : "", layer.filter || ""].filter(Boolean).join(" ") || undefined,
+    backdropFilter: layer.backdropFilter || undefined,
+    mixBlendMode: layer.mixBlendMode || layer.blendMode || undefined,
+    borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
+    border: layer.borderWidth ? `${layer.borderWidth}px solid ${layer.borderColor ?? "#ffffff"}` : undefined,
+    boxShadow: layer.boxShadow || undefined,
     zIndex: layer.zIndex,
   };
 
@@ -194,8 +222,8 @@ function TimelineLayer({ layer, currentTime, fps }) {
             justifyContent:
               s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
             whiteSpace: s.whiteSpace ?? "pre-wrap",
-            wordBreak: s.wordBreak ?? "break-word",
-            overflow: "hidden",
+            wordBreak: s.wordBreak ?? "normal",
+            overflow: "visible",
           }}
         >
           {s.accentWord && s.accentColor
@@ -259,6 +287,23 @@ function TimelineLayer({ layer, currentTime, fps }) {
         <div style={{ ...baseStyle, position: "absolute", background: layer.gradient || "#000000" }} />
       </Sequence>
     );
+  }
+
+  if (layer.type === "icon") {
+    const IconComponent = LUCIDE_ICONS[layer.iconName];
+    if (IconComponent) {
+      return (
+        <Sequence from={startFrame} durationInFrames={durationFrames}>
+          <AbsoluteFill style={{ ...baseStyle, position: "absolute", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <IconComponent
+              size={Math.min(layer.transform?.width ?? 120, layer.transform?.height ?? 120)}
+              color={layer.style?.color || "#ffffff"}
+              strokeWidth={1.5}
+            />
+          </AbsoluteFill>
+        </Sequence>
+      );
+    }
   }
 
   return null;
