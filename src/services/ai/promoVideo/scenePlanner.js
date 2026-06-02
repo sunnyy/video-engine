@@ -6,6 +6,8 @@ import {
   ASSET_TYPE,
   ASSET_SOURCE,
 } from "./projectSchema.js";
+import { DSL_SPEC } from "./dsl/dslSpec.js";
+import { parseDSL, validateDSL } from "./dsl/dslParser.js";
 
 function buildPrompt(project) {
   const hasProvidedScript = project.has_script && project.script?.trim();
@@ -338,5 +340,77 @@ export async function generateScenePlan(project) {
     scenes,
     status:     PROJECT_STATUS.SCRIPT_GENERATED,
     updated_at: new Date().toISOString(),
+  };
+}
+
+// ── generateDSLScenePlan ───────────────────────────────────────────────────────
+// DSL-based alternative to generateScenePlan. GPT outputs DSL text; dslParser
+// converts it to scene objects; dslLayoutEngine renders layers.
+// generateScenePlan() remains intact as the fallback for existing projects.
+export async function generateDSLScenePlan(project) {
+  const userPrompt = `You are generating a Visual Intent DSL script for a short-form product video.
+
+Product Name: ${project.product_name || "Unknown"}
+Product Description: ${project.product_description || "Not provided"}
+Video Goal: ${project.video_goal || "Not specified"}
+Target Audience: ${project.target_audience || "General"}
+Niche: ${project.style?.niche || "saas"}
+
+CONSTRAINT DOCUMENT — follow every rule exactly:
+${DSL_SPEC}
+
+Generate a complete promo video script as Visual Intent DSL.
+
+ADDITIONAL RULES:
+1. Output 5-8 scenes for a 45-60 second video. Each scene represents one idea.
+2. Follow this narrative flow: hook → problem or benefit → features or list → proof or stat → cta
+3. Set SECTION_ROLE on every single scene (one of: hook, body, proof, cta)
+4. The very last scene MUST have INTENT cta and SECTION_ROLE cta
+5. Output ONLY valid DSL text — start directly with SCENE on the very first line
+6. No preamble, no explanation, no markdown, no backticks, no JSON — only DSL keywords
+
+ASSET REQUIREMENTS — CRITICAL:
+- For any scene showcasing the product UI, dashboard, or interface: set ASSET_REQUIREMENT screenshot
+- For any scene demonstrating a workflow or feature in action: set ASSET_REQUIREMENT recording
+- For any scene that would benefit from a relevant background image (hook scenes, benefit scenes, proof scenes): set ASSET_REQUIREMENT image and write a specific ASSET_HINT describing the ideal image (e.g. ASSET_HINT person using laptop at modern desk)
+- Only use ASSET_REQUIREMENT none for scenes that are purely text-based (statistics, process steps, CTA)
+- At minimum, 2-3 scenes in every video MUST have ASSET_REQUIREMENT image with a specific ASSET_HINT`;
+
+  const response = await openai.chat.completions.create({
+    model:       "gpt-4.1",
+    temperature: 0.6,
+    max_tokens:  3000,
+    messages: [
+      {
+        role:    "system",
+        content: "You are a video production AI that outputs Visual Intent DSL only. Your entire response must start with SCENE and contain only valid DSL keywords as defined in the constraint document. No JSON, no markdown, no backticks, no explanation.",
+      },
+      {
+        role:    "user",
+        content: userPrompt,
+      },
+    ],
+  });
+
+  const raw          = (response.choices[0].message.content || "").trim();
+  const parsedScenes = parseDSL(raw);
+
+  const { valid, errors } = validateDSL(raw);
+  if (!valid) {
+    console.warn(`[generateDSLScenePlan] DSL validation warnings for ${project.id}:`, errors);
+  }
+
+  if (parsedScenes.length === 0) {
+    throw new Error(`DSL scene plan returned 0 scenes. Raw GPT output:\n${raw.slice(0, 500)}`);
+  }
+
+  console.log(`[generateDSLScenePlan] ${parsedScenes.length} scenes parsed for ${project.id}`);
+
+  return {
+    ...project,
+    scenes:       parsedScenes,
+    scene_format: "dsl",
+    status:       PROJECT_STATUS.SCRIPT_GENERATED,
+    updated_at:   new Date().toISOString(),
   };
 }

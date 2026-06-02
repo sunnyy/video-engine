@@ -1,5 +1,6 @@
 import { ASSET_SOURCE, ASSET_TYPE } from "./projectSchema.js";
 import { getPromoLayoutForScene } from "../../../core/registries/promoLayoutRegistry.js";
+import { buildSceneLayers } from "./dsl/dslLayoutEngine.js";
 
 // SFX key assigned per visual_mode — fired on the background layer of each scene.
 // Scene 1 is intentionally skipped (no entry SFX on the very first scene).
@@ -15,6 +16,118 @@ const FPS = 30;
 const W   = 1080;
 const H   = 1920;
 
+// SFX key assigned per DSL intent — parallels SFX_BY_MODE for the legacy path.
+const SFX_BY_INTENT = {
+  hook:       { key: "whoosh_hard",      volume: 0.6,  delay: 0 },
+  list:       { key: "whoosh_soft",      volume: 0.5,  delay: 0 },
+  feature:    { key: "swoosh_cinematic", volume: 0.55, delay: 0 },
+  statistic:  { key: "whoosh_hard",      volume: 0.55, delay: 0 },
+  process:    { key: "whoosh_soft",      volume: 0.45, delay: 0 },
+  benefit:    { key: "whoosh_soft",      volume: 0.45, delay: 0 },
+  comparison: { key: "whoosh_hard",      volume: 0.5,  delay: 0 },
+  proof:      { key: "whoosh_soft",      volume: 0.4,  delay: 0 },
+  cta:        { key: "whoosh_hard",      volume: 0.6,  delay: 0 },
+  statement:  { key: "whoosh_soft",      volume: 0.4,  delay: 0 },
+};
+
+// Estimate scene duration from spoken word count (used when no TTS result yet).
+function estimateSpokenDuration(spoken) {
+  const words = (spoken || "").trim().split(/\s+/).filter(Boolean).length;
+  if (words <= 6)  return 2.5;
+  if (words <= 14) return 3.5;
+  return Math.min(6.0, parseFloat((4.0 + (words - 14) / 10).toFixed(2)));
+}
+
+// ── DSL timeline assembly ─────────────────────────────────────────────────────
+// Used when project.scene_format === 'dsl'. Scenes are DSL scene objects from
+// dslParser. Visual layers come from dslLayoutEngine, not promoLayoutRegistry.
+// All other pipeline logic (music, SFX, voiceovers, asset queue) is unchanged.
+function assembleDSLTimeline(project) {
+  const captionStyle    = project.style?.caption_style    ?? "minimal";
+  const transitionStyle = project.style?.transition_style ?? "cut";
+  const musicMood       = project.style?.music_mood       ?? "upbeat";
+  const accent          = getAccent(project.style?.color_palette);
+
+  const layers          = [];
+  const voiceover_queue = [];
+  const asset_queue     = [];
+
+  const projectContext = {
+    accentColor: accent,
+    productName: project.product_name || null,
+    logoUrl:     project.logo_url     || null,
+    niche:       project.style?.niche || null,
+    fps:         FPS,
+  };
+
+  let cursor = 0;
+
+  for (let i = 0; i < project.scenes.length; i++) {
+    const scene    = project.scenes[i];
+    const duration = parseFloat(Math.max(3.0, scene.duration_seconds ?? estimateSpokenDuration(scene.spoken)).toFixed(4));
+    const s        = cursor;
+    const e        = parseFloat((cursor + duration).toFixed(4));
+    cursor         = e;
+
+    // Visual layers from DSL layout engine
+    const sceneLayers = buildSceneLayers(scene, s, e, projectContext);
+
+    // Inject transition SFX on background layer — skip first scene
+    if (i > 0) {
+      const sfxCfg = SFX_BY_INTENT[scene.intent];
+      if (sfxCfg) {
+        const bgLayer = sceneLayers.find(l => l.trackId === "track_background");
+        if (bgLayer) bgLayer.sfx = sfxCfg;
+      }
+    }
+
+    layers.push(...sceneLayers);
+
+    // Voiceover queue — DSL uses scene.spoken as the script
+    if (scene.spoken?.trim()) {
+      voiceover_queue.push({ scene_id: i + 1, script: scene.spoken.trim(), voice: "nova" });
+    }
+
+    // Asset queue — driven by asset_requirement field
+    if (scene.asset_requirement === "screenshot" || scene.asset_requirement === "recording") {
+      asset_queue.push({ scene_id: i + 1, asset_hint: scene.asset_hint ?? "", type: "user_upload_pending" });
+    } else if (scene.asset_requirement === "image") {
+      asset_queue.push({ scene_id: i + 1, asset_hint: scene.asset_hint ?? "", type: "stock" });
+    }
+  }
+
+  const totalDuration = parseFloat(cursor.toFixed(4));
+
+  const timeline = {
+    version: "2.0",
+    id:      project.id,
+    name:    project.product_name ?? "Promo Video",
+    format:  { width: W, height: H, fps: FPS, duration: totalDuration },
+    layers,
+    meta: {
+      source:           "promo_video",
+      thumbnail:        null,
+      editor_version:   "timeline",
+      caption_style:    captionStyle,
+      transition_style: transitionStyle,
+      music_mood:       musicMood,
+      product_name:     project.product_name,
+      video_goal:       project.video_goal,
+      scene_format:     "dsl",
+      createdAt:        new Date().toISOString(),
+      updatedAt:        new Date().toISOString(),
+    },
+  };
+
+  return {
+    timeline,
+    voiceover_queue,
+    asset_queue,
+    total_frames: project.duration_seconds * FPS,
+    fps:          FPS,
+  };
+}
+
 function getAccent(palette) {
   if (!palette) return "#f5c518";
   if (typeof palette === "string") return palette;
@@ -23,6 +136,9 @@ function getAccent(palette) {
 }
 
 export function assemblePromoTimeline(project) {
+  // DSL-format projects use a separate assembly path — promoLayoutRegistry is bypassed.
+  if (project.scene_format === "dsl") return assembleDSLTimeline(project);
+
   const captionStyle    = project.style?.caption_style    ?? "minimal";
   const transitionStyle = project.style?.transition_style ?? "cut";
   const musicMood       = project.style?.music_mood       ?? "upbeat";
@@ -163,7 +279,7 @@ export function assemblePromoTimeline(project) {
       visible: true, locked: false,
       trimStart: grp.trimStart,
       trimEnd:   parseFloat(Math.min(grp.trimEnd + 0.15, thMaxEnd).toFixed(4)),
-      volume: 0.5, muted: false, fadeIn: 0.05, fadeOut: 0.05,
+      volume: 1.0, muted: false, fadeIn: 0.05, fadeOut: 0.05,
       sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
     });
   }

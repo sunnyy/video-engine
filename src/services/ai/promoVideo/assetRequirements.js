@@ -9,6 +9,35 @@ export function generateAssetRequirements(project) {
   for (const scene of project.scenes) {
     const { scene_id, scene_type, asset_source, asset_hint, visual_mode } = scene;
 
+    // ── DSL scenes: use asset_requirement field, not asset_source ────────────
+    if (scene.asset_requirement !== undefined) {
+      switch (scene.asset_requirement) {
+        case "screenshot":
+        case "recording":
+          user_required.push({
+            scene_id,
+            scene_type: scene.asset_requirement,
+            asset_type: null,
+            asset_hint: asset_hint || "Upload an asset for this scene.",
+            status:     "pending",
+            asset_url:  null,
+          });
+          break;
+        case "image":
+          stock_fetch.push({
+            scene_id,
+            asset_hint: asset_hint || "Stock image for this scene.",
+            status:     "pending",
+            asset_url:  null,
+          });
+          break;
+        default:
+          placeholders.push({ scene_id, scene_type: scene_type ?? null });
+          break;
+      }
+      continue;
+    }
+
     // full_avatar needs no user asset — skip it
     if (visual_mode === "full_avatar") {
       placeholders.push({ scene_id, scene_type });

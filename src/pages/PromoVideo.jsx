@@ -910,66 +910,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 inputRef={logoRef} />
             </div>
 
-            <div>
-              <label style={C.lbl}>Product Description <span style={{ color: T.danger }}>*</span></label>
-              <textarea style={{ ...C.inp, resize: "vertical", minHeight: 90, lineHeight: 1.5 }}
-                value={productDesc} onChange={e => setProductDesc(e.target.value)}
-                placeholder="What does your product do? What problem does it solve?" maxLength={500} />
-              <div style={{ fontSize: 11, color: "#55556a", marginTop: 3, textAlign: "right" }}>{productDesc.length}/500</div>
-            </div>
-
-            <div>
-              <label style={C.lbl}>Target Platform</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {PLATFORMS.map(p => (
-                  <button key={p.id} onClick={() => setPlatform(p.id)}
-                    style={{ padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                      background: platform === p.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
-                      border: platform === p.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
-                      color: platform === p.id ? T.accent : T.muted }}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label style={C.lbl}>Duration</label>
-              <div style={{ display: "flex", gap: 10 }}>
-                {DURATIONS.map(d => (
-                  <button key={d.id} onClick={() => setDuration(d.id)}
-                    style={{ flex: 1, padding: "14px 0", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
-                      fontSize: 15, fontWeight: 800,
-                      background: duration === d.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.03)",
-                      border: duration === d.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
-                      color: duration === d.id ? T.accent : T.muted }}>
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div>
-                <label style={C.lbl}>Language</label>
-                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
-                  {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={C.lbl}>Tone</label>
-                <select value={tone} onChange={e => setTone(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
-                  {TONES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
-              <FileUploadRow label="Upload Logo" accept="image/*" url={logoUrl} uploading={logoLoading}
-                onFile={handleLogoFile} onClear={() => setLogoUrl(null)} inputRef={logoRef} />
-            </div>
-
             <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "18px", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
               <label style={{ ...C.lbl, marginBottom: 6 }}>Do you have a voiceover recording?</label>
               <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />

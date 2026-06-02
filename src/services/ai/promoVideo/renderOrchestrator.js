@@ -96,11 +96,23 @@ export async function orchestratePromoRender(projectId) {
     // Work on cloned scenes so we can mutate durations and asset_urls
     let scenes = (row.scenes || []).map(s => ({ ...s }));
     const isThVideo = row.video_type === "talking_head";
+    const isDSL     = row.scene_format === "dsl";
 
-    // ── Step 1: Generate TTS (skip for talking head — audio is the video itself) ──
-    const voiceover_queue = isThVideo ? [] : scenes
-      .filter(s => s.asset_type === ASSET_TYPE.AI_VOICEOVER && s.script?.trim())
-      .map(s => ({ scene_id: s.scene_id, script: s.script, voice: "nova" }));
+    // ── Step 1: Build voiceover queue + generate TTS ─────────────────────────
+    // DSL: preliminary assembly extracts queue from scene.spoken.
+    // Faceless: filter scenes with AI_VOICEOVER asset_type.
+    // TH: no TTS — audio is the video file itself.
+    let voiceover_queue;
+    if (isThVideo) {
+      voiceover_queue = [];
+    } else if (isDSL) {
+      const { voiceover_queue: q } = assemblePromoTimeline({ ...row, style, scenes });
+      voiceover_queue = q || [];
+    } else {
+      voiceover_queue = scenes
+        .filter(s => s.asset_type === ASSET_TYPE.AI_VOICEOVER && s.script?.trim())
+        .map(s => ({ scene_id: s.scene_id, script: s.script, voice: "nova" }));
+    }
 
     let voiceover_results = [];
     if (voiceover_queue.length > 0) {
@@ -114,13 +126,24 @@ export async function orchestratePromoRender(projectId) {
       for (const r of voiceover_results) {
         if (r.duration_seconds != null) durBySid[r.scene_id] = r.duration_seconds;
       }
-      for (const scene of scenes) {
-        if (scene.asset_type === ASSET_TYPE.AI_VOICEOVER && scene.script?.trim()) {
-          // Prefer measured duration; fall back to word-count estimate
-          const measured = durBySid[scene.scene_id];
-          scene.duration_seconds = measured != null
-            ? parseFloat((measured + 0.3).toFixed(2))  // 0.3s trailing buffer
-            : estimateTtsDuration(scene.script);
+      if (isDSL) {
+        // DSL voiceover_queue uses scene_id = array index + 1 for every scene with spoken text.
+        for (let i = 0; i < scenes.length; i++) {
+          if (scenes[i].spoken?.trim()) {
+            const measured = durBySid[i + 1];
+            scenes[i].duration_seconds = measured != null
+              ? parseFloat((measured + 0.3).toFixed(2))
+              : estimateTtsDuration(scenes[i].spoken);
+          }
+        }
+      } else {
+        for (const scene of scenes) {
+          if (scene.asset_type === ASSET_TYPE.AI_VOICEOVER && scene.script?.trim()) {
+            const measured = durBySid[scene.scene_id];
+            scene.duration_seconds = measured != null
+              ? parseFloat((measured + 0.3).toFixed(2))
+              : estimateTtsDuration(scene.script);
+          }
         }
       }
     }
@@ -138,6 +161,18 @@ export async function orchestratePromoRender(projectId) {
       }));
     }
 
+    // ── Step 3b: DSL stock images — asset_requirement === 'image' ───────────
+    if (isDSL) {
+      const dslImageScenes = scenes.filter(s => s.asset_requirement === "image" && !s.asset_url);
+      if (dslImageScenes.length > 0) {
+        await Promise.all(dslImageScenes.map(async scene => {
+          const query = extractSearchQuery(scene.asset_hint || row.product_name || "");
+          const imageUrl = await fetchPixabayImage(query);
+          if (imageUrl) scene.asset_url = imageUrl;
+        }));
+      }
+    }
+
     // ── Step 4: Assemble timeline with corrected durations + stock images ──
     const totalDuration = scenes.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
     const thUrl = scenes.find(s => s.th_url)?.th_url ?? null;
@@ -146,9 +181,43 @@ export async function orchestratePromoRender(projectId) {
     const { timeline } = assemblePromoTimeline(project);
 
     // ── Step 5: Inject TTS audio layers ───────────────────────────────────
-    const finalTimeline = voiceover_results.length > 0
-      ? injectVoiceoversIntoTimeline(timeline, voiceover_results)
-      : timeline;
+    // DSL layer IDs are time-based (e.g. "0.00_bg"), not "s{N}_*", so
+    // injectVoiceoversIntoTimeline can't find scene boundaries. For DSL we
+    // reconstruct start times from the updated scene durations directly.
+    let finalTimeline;
+    if (isDSL && voiceover_results.length > 0) {
+      let cur = 0;
+      const sceneStartBySid = {};
+      for (let i = 0; i < scenes.length; i++) {
+        sceneStartBySid[i + 1] = parseFloat(cur.toFixed(4));
+        cur = parseFloat((cur + parseFloat(Math.max(3.0, scenes[i].duration_seconds || 3).toFixed(4))).toFixed(4));
+      }
+      const voiceoverLayers = voiceover_results
+        .filter(r => r.audio_url && sceneStartBySid[r.scene_id] != null)
+        .map(({ scene_id, audio_url, duration_seconds }) => {
+          const start    = sceneStartBySid[scene_id];
+          const audioLen = duration_seconds ?? 3;
+          return {
+            id:        `voiceover_s${scene_id}`,
+            trackId:   `voiceover_track_${scene_id}`,
+            type:      "audio", audioType: "voiceover",
+            src:       audio_url,
+            start,
+            end:       parseFloat((start + audioLen + 0.3).toFixed(4)),
+            zIndex:    0, visible: true, locked: false,
+            trimStart: 0, trimEnd: audioLen,
+            volume:    1.0, muted: false, fadeIn: 0.1, fadeOut: 0.2,
+            sfx:       null, keyframes: {}, animation: null, transition: null, transform: null,
+          };
+        });
+      const mergedLayers  = [...timeline.layers, ...voiceoverLayers];
+      const actualDuration = parseFloat(mergedLayers.reduce((max, l) => Math.max(max, l.end ?? 0), 0).toFixed(4));
+      finalTimeline = { ...timeline, layers: mergedLayers, format: { ...timeline.format, duration: actualDuration } };
+    } else {
+      finalTimeline = voiceover_results.length > 0
+        ? injectVoiceoversIntoTimeline(timeline, voiceover_results)
+        : timeline;
+    }
 
     // ── Step 5b: Inject background music ─────────────────────────────────
     try {
@@ -204,22 +273,38 @@ export async function orchestratePromoRender(projectId) {
       .update({ timeline: finalTimeline, editor_project_id: editorProjectId, updated_at: new Date().toISOString() })
       .eq("id", projectId);
 
-    // ── TH videos: skip Remotion — timeline JSON is the output ────────────
+    // ── TH + DSL videos: skip Remotion — timeline JSON is the output ─────────
     // The editor opens the timeline directly. Export to MP4 is user-triggered
     // from the editor, same as any other timeline project.
-    if (isThVideo) {
+    if (isThVideo || row.scene_format === 'dsl') {
       await setStatus(projectId, PROJECT_STATUS.RENDERED, { editor_project_id: editorProjectId });
-      console.log(`[renderOrchestrator] ${projectId} → TH timeline ready, opening editor`);
+      console.log(`[renderOrchestrator] ${projectId} → ${isThVideo ? 'TH' : 'DSL'} timeline ready, opening editor`);
       return { projectId, video_url: null, editor_project_id: editorProjectId };
     }
 
     // ── Step 7: Remotion render (faceless only) ────────────────────────────
-    // Drop audio/video layers with null src — Remotion's Html5Audio crashes on non-string src
+    // Resolve sfx keys → Supabase storage public URLs before handing to Remotion.
+    // Drop audio/video layers with null src.
+    let sfxUrlMap = {};
+    try {
+      const sfxKeys = [...new Set(finalTimeline.layers.filter(l => l.sfx?.key).map(l => l.sfx.key))];
+      if (sfxKeys.length > 0) {
+        const { data: sfxRows } = await supabaseAdmin
+          .from("sfx_tracks").select("key, public_url").in("key", sfxKeys).eq("is_active", true);
+        sfxUrlMap = Object.fromEntries((sfxRows || []).map(r => [r.key, r.public_url]));
+      }
+    } catch (e) {
+      console.warn("[renderOrchestrator] SFX lookup skipped:", e.message);
+    }
+
     const renderTimeline = {
       ...finalTimeline,
-      layers: finalTimeline.layers.filter(l =>
-        l.type !== "audio" && l.type !== "video" ? true : !!l.src
-      ),
+      layers: finalTimeline.layers
+        .filter(l => l.type !== "audio" && l.type !== "video" ? true : !!l.src)
+        .map(l => l.sfx?.key && sfxUrlMap[l.sfx.key]
+          ? { ...l, sfx: { ...l.sfx, src: sfxUrlMap[l.sfx.key] } }
+          : l.sfx ? { ...l, sfx: null } : l  // strip sfx if URL not found — don't crash render
+        ),
     };
 
     const serveUrl = await getBundle();

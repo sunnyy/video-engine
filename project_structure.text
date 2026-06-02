@@ -242,6 +242,7 @@
       - motionsRegistry.js
       - musicRegistry.js
       - nichePaletteRegistry.js
+      - promoLayoutRegistry.js
       - sfxRegistry.js
       - shapeRegistry.js
       - transitionsRegistry.js
@@ -292,6 +293,7 @@
     - Onboarding.jsx
     - ProductPoster.jsx
     - ProductVideoGenerator.jsx
+    - PromoVideo.jsx
     - ResetPassword.jsx
     - Settings.jsx
     - SpeechToText.jsx
@@ -330,6 +332,8 @@
       - productAd.js
       - productVideo.js
       - productVideoScene.js
+      - promoVideo.js
+      - promoVideo.sql
       - refundClaims.js
       - render.js
       - socialPost.js
@@ -356,6 +360,15 @@
         - timelineComposer.js
         - visionJsonReference.js
         - voiceoverInjector.js
+      - promoVideo
+        - assemblyPipeline.js
+        - assetRequirements.js
+        - projectSchema.js
+        - projectStateManager.js
+        - renderOrchestrator.js
+        - scenePlanner.js
+        - talkingHeadProcessor.js
+        - ttsGenerator.js
       - typographyVideo
         - generateTypographyVideo.js
         - printTestScene.js

@@ -32,6 +32,7 @@ export const useTimelineStore = create((set, get) => ({
   // Timeline UI
   zoom: 1,
   snapEnabled: true,
+  playbackSpeed: 1,
 
   // History
   _history: [],
@@ -341,6 +342,8 @@ export const useTimelineStore = create((set, get) => ({
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(10, zoom)) }),
 
   setSnapEnabled: (snap) => set({ snapEnabled: snap }),
+
+  setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
 
   // ── History ──────────────────────────────────────────────────
   undo: () => {

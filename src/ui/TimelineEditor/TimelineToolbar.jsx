@@ -32,11 +32,19 @@ export default function TimelineToolbar() {
   const selectedLayerId  = useTimelineStore((s) => s.selectedLayerId);
   const snapEnabled      = useTimelineStore((s) => s.snapEnabled);
   const zoom             = useTimelineStore((s) => s.zoom);
+  const playbackSpeed    = useTimelineStore((s) => s.playbackSpeed);
 
   const setIsPlaying         = useTimelineStore((s) => s.setIsPlaying);
   const setCurrentTime       = useTimelineStore((s) => s.setCurrentTime);
   const setZoom              = useTimelineStore((s) => s.setZoom);
   const setSnapEnabled       = useTimelineStore((s) => s.setSnapEnabled);
+  const setPlaybackSpeed     = useTimelineStore((s) => s.setPlaybackSpeed);
+
+  const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
+  const cycleSpeed = () => {
+    const next = SPEEDS[(SPEEDS.indexOf(playbackSpeed) + 1) % SPEEDS.length];
+    setPlaybackSpeed(next);
+  };
   const removeLayer          = useTimelineStore((s) => s.removeLayer);
   const duplicateLayer       = useTimelineStore((s) => s.duplicateLayer);
   const splitLayerAtPlayhead = useTimelineStore((s) => s.splitLayerAtPlayhead);
@@ -123,6 +131,27 @@ export default function TimelineToolbar() {
             <polygon points="5 3 19 12 5 21"/>
           </svg>
         )}
+      </button>
+
+      {/* Playback speed */}
+      <button
+        style={{
+          ...iconBtn(playbackSpeed !== 1),
+          fontFamily: "ui-monospace, monospace",
+          fontSize: 12,
+          fontWeight: 700,
+          minWidth: 38,
+          letterSpacing: "-0.5px",
+          ...(playbackSpeed !== 1 && {
+            color: "#f5c518",
+            borderColor: "rgba(245,197,24,0.4)",
+            background: "rgba(245,197,24,0.12)",
+          }),
+        }}
+        onClick={cycleSpeed}
+        title="Playback speed (cycles 1× → 1.5× → 2× → 4×)"
+      >
+        {playbackSpeed}×
       </button>
 
       {/* Time display */}

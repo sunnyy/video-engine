@@ -284,6 +284,7 @@ function SfxLayerEl({ layer, currentTime, isPlaying }) {
 function AudioLayerEl({ layer, currentTime, isPlaying }) {
   const ref = useRef(null);
   const playing = useRef(false);
+  const playbackSpeed = useTimelineStore((s) => s.playbackSpeed);
   const sourceTime = (layer.trimStart ?? 0) + (currentTime - layer.start);
 
   // Mount: seek to correct position and start if already playing.
@@ -292,6 +293,7 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    el.playbackRate = useTimelineStore.getState().playbackSpeed ?? 1;
     el.currentTime = sourceTime;
     if (isPlaying) {
       el.play().catch(() => {});
@@ -330,6 +332,12 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
     if (!el) return;
     el.muted = layer.muted ?? false;
   }, [layer.muted]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.playbackRate = playbackSpeed ?? 1;
+  }, [playbackSpeed]);
 
   return (
     <audio
@@ -1480,7 +1488,7 @@ export default function Preview() {
       const delta = (now - lastTime) / 1000;
       lastTime = now;
       const store = useTimelineStore.getState();
-      const next = store.currentTime + delta;
+      const next = store.currentTime + delta * (store.playbackSpeed ?? 1);
       if (next >= store.duration) {
         setIsPlaying(false);
         setCurrentTime(0);

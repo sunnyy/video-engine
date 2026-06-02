@@ -48,7 +48,7 @@ export default function TimelineComposition({ project }) {
           const sfxDur = Math.max(1, Math.round(getSFXDuration(l.sfx.key) * fps));
           return (
             <Sequence key={`sfx-${l.id}`} from={sfxStart} durationInFrames={sfxDur}>
-              <Audio src={getSFXPreviewUrl(l.sfx.key)} volume={l.sfx.volume ?? 1} />
+              <Audio src={l.sfx.src ?? getSFXPreviewUrl(l.sfx.key)} volume={l.sfx.volume ?? 1} />
             </Sequence>
           );
         })}

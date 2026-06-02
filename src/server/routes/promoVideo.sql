@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS promo_videos (
   has_voiceover       boolean       DEFAULT false,
   style               jsonb         DEFAULT '{}',
   scenes              jsonb         DEFAULT '[]',
+  scene_format        text          DEFAULT NULL,
   asset_manifest      jsonb         DEFAULT '{}',
   credits_estimated   integer       DEFAULT 10,
   credits_charged     integer       DEFAULT 0,

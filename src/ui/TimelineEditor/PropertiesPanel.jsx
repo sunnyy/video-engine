@@ -111,8 +111,7 @@ function SceneSourceSection({ layer, project, updateLayer, addLayer }) {
   const [showMedia, setShowMedia] = useState(false);
   const [activeTab, setActiveTab] = useState(() => TH_TRACKS.has(layer.trackId) ? "th" : "asset");
 
-  const isTHProject = project?.meta?.source === "promo_video" &&
-    project?.layers?.some(l => TH_TRACKS.has(l.trackId) && l.type === "video");
+  const isTHProject = project?.meta?.source === "promo_video";
   if (!isTHProject) return null;
   if (layer.type === "audio" || layer._system) return null;
 
