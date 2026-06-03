@@ -289,7 +289,7 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.playbackRate = useTimelineStore.getState().playbackSpeed ?? 1;
+    el.playbackRate = (layer.playbackRate ?? 1) * (useTimelineStore.getState().playbackSpeed ?? 1);
     el.currentTime = sourceTime;
     if (isPlaying) {
       el.play().catch(() => {});
@@ -332,7 +332,7 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.playbackRate = playbackSpeed ?? 1;
+    el.playbackRate = (layer.playbackRate ?? 1) * (playbackSpeed ?? 1);
   }, [playbackSpeed]);
 
   return (

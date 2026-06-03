@@ -43,8 +43,10 @@ DO:
 - Make benefits specific and tangible: "cuts your editing time from 3 hours to 3 minutes" not "saves time"
 - Flow naturally between scenes — each scene's spoken text should feel connected to the previous one
 - End CTA with a direct, energetic call: "Try Vidquence free today." not "Consider trying our platform."
-- Max 10 words per scene — one punchy thought, never a full sentence with multiple clauses
-- Think TikTok pacing: each line should feel like a cut, not a paragraph
+- HARD LIMIT: Maximum 8 words per scene spoken field. Count the words. If over 8, cut it.
+- Each spoken line is ONE short phrase. Never a full sentence with a comma or "and".
+- Good examples: "Still editing by hand?", "Your video. Done in seconds.", "No skills needed.", "Try it free today."
+- Bad examples: anything over 8 words, anything with two clauses, anything that sounds like an ad copy paragraph
 
 DON'T:
 - Start with the product name: never "Vidquence is a platform that..."

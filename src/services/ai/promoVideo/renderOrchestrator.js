@@ -198,7 +198,7 @@ export async function orchestratePromoRender(projectId) {
           start: 0, end: musicDur, zIndex: 0,
           visible: true, locked: false,
           trimStart: 0, trimEnd: musicDur,
-          volume: 0.07, muted: false, fadeIn: 1, fadeOut: 1,
+          volume: 0.15, muted: false, fadeIn: 1, fadeOut: 1,
           sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
         });
         console.log(`[renderOrchestrator] music injected: "${track.title}" (${mood})`);

@@ -19,9 +19,9 @@ import { generateAssetRequirements }                  from "../assetRequirements
 
 function estimateTtsDuration(script) {
   const words = script.trim().split(/\s+/).filter(Boolean).length;
-  if (words <= 5)  return parseFloat((1.5 + Math.random() * 0.3).toFixed(1));
-  if (words <= 10) return parseFloat((2.0 + (words - 5) / 8).toFixed(1));
-  return Math.min(4.0, parseFloat((2.8 + (words - 10) / 10).toFixed(1)));
+  if (words <= 4)  return 1.5;
+  if (words <= 7)  return parseFloat((1.8 + (words - 4) * 0.2).toFixed(1));
+  return Math.min(3.0, parseFloat((2.4 + (words - 7) * 0.15).toFixed(1)));
 }
 
 const SKIP_WORDS = new Set(["a","an","the","of","for","with","and","or","in","on","at","to","is","are","be","was","were","that","this","it","as","by","from","into","about","showing","featuring","displaying","dynamic","short","quick","simple","clean","professional","modern","background","scene","shot","image","video","photo","showing"]);
@@ -130,7 +130,10 @@ export async function runV2Pipeline(project) {
   }
 
   // ── Step 6: Update scene durations from actual TTS audio lengths ──────────
-  // voiceover_queue uses scene_id = i + 1 (1-based scene index)
+  // Hard scene cap: 3.5s max. If audio is longer, speed it up to 1.1x so it fits.
+  const MAX_SCENE = 3.5;
+  const MAX_AUDIO = MAX_SCENE - 0.1; // leave 0.1s tail
+
   const durBySid = {};
   for (const r of voiceover_results) {
     if (r.duration_seconds != null) durBySid[r.scene_id] = r.duration_seconds;
@@ -138,9 +141,15 @@ export async function runV2Pipeline(project) {
   for (let i = 0; i < scenes.length; i++) {
     if (scenes[i].spoken?.trim()) {
       const measured = durBySid[i + 1];
-      scenes[i].duration_seconds = measured != null
-        ? parseFloat((measured + 0.1).toFixed(2))
-        : estimateTtsDuration(scenes[i].spoken);
+      if (measured != null) {
+        const rate = measured > MAX_AUDIO ? Math.min(1.3, measured / MAX_AUDIO) : 1.0;
+        const effectiveLen = measured / rate;
+        scenes[i].duration_seconds = parseFloat(Math.min(MAX_SCENE, effectiveLen + 0.1).toFixed(2));
+        scenes[i]._voiceoverRate   = rate > 1.0 ? parseFloat(rate.toFixed(3)) : 1.0;
+      } else {
+        scenes[i].duration_seconds = estimateTtsDuration(scenes[i].spoken);
+        scenes[i]._voiceoverRate   = 1.0;
+      }
     }
   }
 
@@ -155,22 +164,24 @@ export async function runV2Pipeline(project) {
     const sceneStartBySid = {};
     for (let i = 0; i < scenes.length; i++) {
       sceneStartBySid[i + 1] = parseFloat(cur.toFixed(4));
-      cur = parseFloat((cur + parseFloat(Math.max(3.0, scenes[i].duration_seconds || 3).toFixed(4))).toFixed(4));
+      cur = parseFloat((cur + parseFloat(Math.max(2.0, scenes[i].duration_seconds || 2).toFixed(4))).toFixed(4));
     }
 
     const voiceoverLayers = voiceover_results
       .filter(r => r.audio_url && sceneStartBySid[r.scene_id] != null)
       .map(({ scene_id, audio_url, duration_seconds }) => {
-        const start    = sceneStartBySid[scene_id];
-        const audioLen = duration_seconds ?? 3;
+        const start        = sceneStartBySid[scene_id];
+        const sceneDur     = scenes[scene_id - 1]?.duration_seconds ?? Math.min(MAX_SCENE, (duration_seconds ?? 3) + 0.1);
+        const playbackRate = scenes[scene_id - 1]?._voiceoverRate   ?? 1.0;
         return {
           id:        `voiceover_s${scene_id}`,
           trackId:   `voiceover_track_${scene_id}`,
           type:      "audio", audioType: "voiceover",
           src:       audio_url,
           start,
-          end:       parseFloat((start + audioLen + 0.3).toFixed(4)),
+          end:       parseFloat((start + sceneDur).toFixed(4)),
           zIndex:    0, visible: true, locked: false,
+          playbackRate,
           trimStart: 0, trimEnd: audioLen,
           volume:    1.5, muted: false, fadeIn: 0.1, fadeOut: 0.2,
           sfx:       null, keyframes: {}, animation: null, transition: null, transform: null,
@@ -201,7 +212,7 @@ export async function runV2Pipeline(project) {
         start: 0, end: musicDur, zIndex: 0,
         visible: true, locked: false,
         trimStart: 0, trimEnd: musicDur,
-        volume: 0.07, muted: false, fadeIn: 1, fadeOut: 1,
+        volume: 0.15, muted: false, fadeIn: 1, fadeOut: 1,
         sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
       });
       console.log(`[v2/pipeline] music injected: "${track.title}" (${mood})`);

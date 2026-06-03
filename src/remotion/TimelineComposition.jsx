@@ -248,6 +248,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
           src={layer.src}
           volume={layer.muted ? 0 : (layer.volume ?? 1)}
           startFrom={Math.round((layer.trimStart || 0) * fps)}
+          playbackRate={layer.playbackRate ?? 1}
         />
       </Sequence>
     );
