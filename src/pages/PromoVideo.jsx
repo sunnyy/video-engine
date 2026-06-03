@@ -70,7 +70,34 @@ const RENDER_MESSAGES = [
   "Rendering video…",
 ];
 
-const WIZARD_STEPS = ["Video Type", "Setup", "Assets", "Generating"];
+const WIZARD_STEPS = ["Video Type", "Setup", "Style", "Assets", "Generating"];
+
+const VISUAL_STYLES = [
+  { id: "radiant",      label: "Radiant",       desc: "Glows, gradients, depth layers" },
+  { id: "minimal",      label: "Minimal",        desc: "Clean, flat, lots of whitespace" },
+  { id: "professional", label: "Professional",   desc: "Structured, corporate, dark" },
+  { id: "high-contrast",label: "High Contrast",  desc: "Bold colors, sharp edges" },
+  { id: "soothing",     label: "Soothing",       desc: "Soft gradients, muted tones" },
+  { id: "cinematic",    label: "Cinematic",       desc: "Dramatic, deep dark, film-like" },
+];
+
+const ACCENT_SWATCHES = [
+  { hex: "#6366f1", label: "Electric Blue" },
+  { hex: "#8b5cf6", label: "Violet"        },
+  { hex: "#10b981", label: "Emerald"       },
+  { hex: "#f59e0b", label: "Amber"         },
+  { hex: "#f43f5e", label: "Rose"          },
+  { hex: "#f97316", label: "Coral"         },
+  { hex: "#06b6d4", label: "Cyan"          },
+];
+
+const TYPOGRAPHY_STYLES = [
+  { id: "modern",     label: "Modern",     desc: "Inter, DM Sans" },
+  { id: "bold",       label: "Bold",       desc: "Bebas Neue, Barlow Condensed" },
+  { id: "editorial",  label: "Editorial",  desc: "Playfair Display, Lora" },
+  { id: "minimal",    label: "Minimal",    desc: "Josefin Sans" },
+  { id: "energetic",  label: "Energetic",  desc: "Barlow Condensed, Oswald" },
+];
 
 // ── Upload helper (client-side Supabase, promo-specific paths) ────────────────
 async function uploadPromoFile(file, folder) {
@@ -403,6 +430,12 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const thRef = useRef();
   const voRef = useRef();
 
+  // Step 2 — Style Preferences
+  const [visualStyle,     setVisualStyle]     = useState("radiant");
+  const [accentColor,     setAccentColor]     = useState("#6366f1");
+  const [customAccent,    setCustomAccent]    = useState("");
+  const [typographyStyle, setTypographyStyle] = useState("modern");
+
   // Step 3 — Asset Collection
   const [projectId,     setProjectId]     = useState(null);
   const [assetManifest, setAssetManifest] = useState(null);
@@ -454,9 +487,9 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     const s = p.status;
     if (s === "script_generated" || s === "waiting_assets" || s === "assets_ready") {
       if (initialState.assetManifest) setAssetManifest(initialState.assetManifest);
-      setStep(2);
-    } else if (s === "ready_for_render" || s === "rendering") {
       setStep(3);
+    } else if (s === "ready_for_render" || s === "rendering") {
+      setStep(4);
     } else if (s === "rendered" && p.editor_project_id) {
       navigate(`/video-editor/${p.editor_project_id}`, { replace: true });
     }
@@ -465,14 +498,14 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
   // Step 4: status message cycling
   useEffect(() => {
-    if (step !== 3 || renderError) return;
+    if (step !== 4 || renderError) return;
     const iv = setInterval(() => setMsgIdx(i => (i + 1) % RENDER_MESSAGES.length), 4000);
     return () => clearInterval(iv);
   }, [step, renderError]);
 
   // Step 4: polling
   useEffect(() => {
-    if (step !== 3 || !projectId || renderError) return;
+    if (step !== 4 || !projectId || renderError) return;
     pollRef.current = setInterval(async () => {
       try {
         const res  = await serverFetch(`/api/promo-video/${projectId}`);
@@ -586,7 +619,10 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         voiceover_url:           voUrl   || null,
         logo_url:                logoUrl || null,
         script:                  !isTH && hasVoiceover !== "yes" && hasScript === "yes" ? scriptText : null,
-        pipeline_version:        isTH ? undefined : "v2", // TEMP: force V2 for testing
+        pipeline_version:        isTH ? undefined : "v2",
+        visual_style:            visualStyle,
+        accent_color:            customAccent || accentColor,
+        typography_style:        typographyStyle,
       };
 
       const res  = await serverFetch("/api/promo-video/create", {
@@ -676,7 +712,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         const d = await res.json();
         throw new Error(d.error || "Failed to start render");
       }
-      setStep(3);
+      setStep(4);
     } catch (e) {
       setGenError(e.message);
     }
@@ -685,10 +721,10 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
   // ── Step indicator ──
   function StepBar() {
-    if (step === 3) return null;
+    if (step === 4) return null;
     return (
       <div style={{ display: "flex", alignItems: "center", marginBottom: 32, gap: 0 }}>
-        {WIZARD_STEPS.slice(0, 3).map((label, i) => (
+        {WIZARD_STEPS.slice(0, 4).map((label, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <div style={{
@@ -703,7 +739,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 {label}
               </span>
             </div>
-            {i < 2 && <div style={{ flex: 1, height: 1, background: i < step ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)", margin: "0 10px" }} />}
+            {i < 3 && <div style={{ flex: 1, height: 1, background: i < step ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)", margin: "0 10px" }} />}
           </div>
         ))}
       </div>
@@ -817,11 +853,10 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
               <button
-                onClick={async () => { const ok = await createProject(); if (ok) setStep(2); }}
-                disabled={!step1ValidTH || creating}
-                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidTH && !creating ? 1 : 0.4,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                {creating ? <><Spinner size={14} color="#000" /> Building plan…</> : "Next: Review Assets →"}
+                onClick={() => setStep(2)}
+                disabled={!step1ValidTH}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidTH ? 1 : 0.4 }}>
+                Next: Style →
               </button>
             </div>
           </div>
@@ -945,18 +980,113 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
               <button
-                onClick={async () => { const ok = await createProject(); if (ok) setStep(2); }}
-                disabled={!step1ValidFaceless || creating}
-                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidFaceless && !creating ? 1 : 0.4,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                {creating ? <><Spinner size={14} color="#000" /> Building plan…</> : "Next: Review Assets →"}
+                onClick={() => setStep(2)}
+                disabled={!step1ValidFaceless}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidFaceless ? 1 : 0.4 }}>
+                Next: Style →
               </button>
             </div>
           </div>
         )}
 
-        {/* ─── Step 2: Asset Collection ─── */}
+        {/* ─── Step 2: Style Preferences ─── */}
         {step === 2 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: T.text, marginBottom: 6 }}>Customise the look</div>
+              <div style={{ fontSize: 14, color: T.muted }}>All optional — AI picks sensible defaults if you skip.</div>
+            </div>
+
+            {/* Visual Style */}
+            <div>
+              <label style={C.lbl}>Visual Style</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {VISUAL_STYLES.map(s => (
+                  <button key={s.id} onClick={() => setVisualStyle(s.id)}
+                    style={{
+                      padding: "14px 16px", borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                      background: visualStyle === s.id ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
+                      border: visualStyle === s.id ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
+                    }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: visualStyle === s.id ? "#a5b4fc" : T.text, marginBottom: 3 }}>{s.label}</div>
+                    <div style={{ fontSize: 11, color: T.muted }}>{s.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Accent Color */}
+            <div>
+              <label style={C.lbl}>Accent Color</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                {ACCENT_SWATCHES.map(sw => (
+                  <button key={sw.hex} onClick={() => { setAccentColor(sw.hex); setCustomAccent(""); }}
+                    title={sw.label}
+                    style={{
+                      width: 34, height: 34, borderRadius: "50%", cursor: "pointer",
+                      background: sw.hex, border: "none",
+                      outline: (accentColor === sw.hex && !customAccent) ? `3px solid ${sw.hex}` : "3px solid transparent",
+                      outlineOffset: 2,
+                    }} />
+                ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: customAccent || "#444", border: "1.5px dashed rgba(255,255,255,0.3)", flexShrink: 0 }} />
+                  <input
+                    value={customAccent}
+                    onChange={e => { setCustomAccent(e.target.value); if (e.target.value) setAccentColor(""); }}
+                    placeholder="#hex"
+                    maxLength={7}
+                    style={{ ...C.inp, width: 80, fontFamily: "monospace", fontSize: 12, padding: "7px 10px" }}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 18, height: 18, borderRadius: "50%", background: customAccent || accentColor, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: T.muted, fontFamily: "monospace" }}>{customAccent || accentColor}</span>
+              </div>
+            </div>
+
+            {/* Typography */}
+            <div>
+              <label style={C.lbl}>Typography</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {TYPOGRAPHY_STYLES.map(t => (
+                  <button key={t.id} onClick={() => setTypographyStyle(t.id)}
+                    style={{
+                      padding: "12px 16px", borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      background: typographyStyle === t.id ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
+                      border: typographyStyle === t.id ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
+                    }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: typographyStyle === t.id ? "#a5b4fc" : T.text }}>{t.label}</span>
+                    <span style={{ fontSize: 11, color: T.muted }}>{t.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {createError && (
+              <div style={{ padding: "14px 18px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+                ✕ {createError}
+                <button onClick={() => setCreateError("")} style={{ ...C.btnG, fontSize: 11, padding: "3px 10px", marginLeft: 12 }}>Dismiss</button>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setStep(1)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
+              <button
+                onClick={async () => { const ok = await createProject(); if (ok) setStep(3); }}
+                disabled={creating}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: creating ? 0.4 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {creating ? <><Spinner size={14} color="#000" /> Building plan…</> : "Build Plan →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Step 3: Asset Collection ─── */}
+        {step === 3 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             {assetManifest && (
@@ -1053,7 +1183,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "center" }}>
-                  <button onClick={() => { setStep(1); }} style={{ ...C.btnG, fontSize: 12, padding: "6px 16px" }}>
+                  <button onClick={() => { setStep(2); }} style={{ ...C.btnG, fontSize: 12, padding: "6px 16px" }}>
                     ← Back
                   </button>
                 </div>
@@ -1063,7 +1193,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         )}
 
         {/* ─── Step 4: Generating ─── */}
-        {step === 3 && (
+        {step === 4 && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 28, paddingTop: 60, textAlign: "center" }}>
             {!renderError ? (
               <>
@@ -1103,7 +1233,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                     {renderError}
                   </div>
                 </div>
-                <button onClick={() => { setStep(0); setRenderError(""); setProjectId(null); setAssetManifest(null); createdRef.current = false; }}
+                <button onClick={() => { setStep(0); setRenderError(""); setProjectId(null); setAssetManifest(null); createdRef.current = false; setVisualStyle("radiant"); setAccentColor("#6366f1"); setCustomAccent(""); setTypographyStyle("modern"); }}
                   style={{ ...C.btnY, padding: "11px 28px" }}>
                   Try Again
                 </button>

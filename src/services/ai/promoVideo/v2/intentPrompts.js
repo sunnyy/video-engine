@@ -9,6 +9,19 @@
 import { getPaletteForProject } from "../../../../core/registries/paletteRegistry.js";
 import { getTypographyPreset }  from "../../../../core/registries/typographyRegistry.js";
 
+// Derives a very dark tinted background from the accent color so the canvas
+// background actually reflects the user's chosen accent rather than always
+// being the same dark purple/navy regardless of accent.
+function darkAccentBackground(hex) {
+  if (!hex || !hex.startsWith("#") || hex.length < 7) return null;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const top = `#${Math.round(r * 0.14).toString(16).padStart(2, "0")}${Math.round(g * 0.14).toString(16).padStart(2, "0")}${Math.round(b * 0.14).toString(16).padStart(2, "0")}`;
+  const bot = `#${Math.round(r * 0.05).toString(16).padStart(2, "0")}${Math.round(g * 0.05).toString(16).padStart(2, "0")}${Math.round(b * 0.05).toString(16).padStart(2, "0")}`;
+  return `radial-gradient(ellipse at 50% 0%, ${top} 0%, ${bot} 70%)`;
+}
+
 export const BASE_SYSTEM_PROMPT = `You are a world-class motion graphics art director creating frames for premium SaaS promo videos. Output a single self-contained HTML file with inline CSS only.
 
 Rules:
@@ -39,8 +52,8 @@ Do NOT use CSS classes for position, size, or visual properties of data-role ele
 
 Required inline style properties on every data-role element:
 - position: absolute (always)
-- left: [px value] (x position from left edge of 1080px canvas)
-- top: [px value] (y position from top edge of 1920px canvas)
+- left: [px value] (x position from left edge of 1080px canvas — use the FULL 0–1080px range, not just 0–300px)
+- top: [px value] (y position from top edge of 1920px canvas — use the FULL 0–1920px range)
 - width: [px value] (explicit pixel width)
 - height: [px value] (explicit pixel height, or 'auto' for text)
 - z-index: [number]
@@ -95,14 +108,66 @@ Example CORRECT glass card (backdrop-filter MUST be inline):
 COMPOSITION RULES:
 - Create one dominant focal area
 - Use overlap, depth, scale contrast, asymmetry
-- Major elements may overlap or intersect
 - Design for impact first
-- Use the full 1080x1920 frame — no large dead zones
-- Avoid concentrating all content in one area
+- Use the FULL 1080x1920 frame — no large dead zones
+- Distribute elements across the FULL 1080px width — do NOT cluster everything in the left 300px
+- Background glows should span the full width (left:-100px to left:800px range)
+- Text elements start at left: 60-120px minimum
+- Hero visual elements (cards, rings, stats) should be centered: left 200-650px range
+- Decorative elements can be positioned at left: 600-900px for depth and balance
+
+ELEMENT COUNT — STRICT LIMIT:
+- Maximum 10 data-role elements total per scene
+- Background layers (glow, gradient): maximum 3
+- Text elements: maximum 3 (headline + subhead + one label/badge)
+- Decoration/card elements: maximum 3
+- Stat numbers, icons: maximum 1 each
+- If you exceed 10 elements, remove the least impactful ones
+
+TEXT SPACING — CRITICAL:
+- Text elements must be separated by at least 80px vertically
+- Never place two text blocks within 60px of each other
+- Stat numbers need at least 600px width to prevent wrapping (font-size 120px+ needs 600px+ width)
+- Headlines at 80-100px font need at least 800px width
+- Do NOT stack multiple small text labels in the same vertical zone
+
+MINIMUM FONT SIZES — STRICT:
+- headline: 72px minimum, 82-100px preferred
+- subhead / body: 36px minimum
+- label / badge / kicker / divider text: 32px minimum — NEVER use 22px or below
+- stat-number: 120px minimum
+- icon text inside circles: 48px minimum
 
 VISUAL ELEMENTS — only meaningful elements:
 - text, cards, glows, rings, gradients, connector lines, image placeholders
 - NO fake charts, NO fake analytics, NO placeholder text lines, NO progress bars
+- NO more than 1 decorative card element per scene
+
+## LOGO & PRODUCT NAME RULES
+
+Product name must appear in:
+- Hook scene always — as a badge, kicker, or subtle label
+- CTA scene always — prominently
+- Maximum 2-3 scenes total — do not repeat product name in every scene
+
+Logo (if a URL is provided):
+- Render as: <img data-role="logo" data-layer="image" data-animation="fade-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:[z];opacity:1;" src="[logoUrl]" />
+- MINIMUM SIZES: hook scene → 160×160px minimum; CTA scene → 260×260px minimum; other scenes → 140×140px minimum
+- Appears in hook scene top-left or top-center area
+- Appears in CTA scene center or bottom — large and prominent
+- Never appears in process, statistic, or list scenes
+- If no logo URL is provided, use product name as text instead
+
+Product name as text:
+- Hook scene: small, uppercase, letter-spaced, subtle — top area
+- CTA scene: medium size, prominent position
+- Never as the headline — always as a supporting element
+- Style: accent color or white at 60-70% opacity
+
+Badge treatment for product name:
+- Pill shape, font-size 20-24px, uppercase, letter-spacing 0.1em
+- background: rgba of accent color at 10-15% opacity
+- border: 1px solid accent color at 20-30% opacity
 
 OUTPUT: Only the HTML. Nothing else.`;
 
@@ -145,6 +210,8 @@ Create strong contrast and visual impact.
 Avoid multiple competing focal points.
 Avoid dashboards and analytics screens.
 Favor simplicity and confidence.
+The stat number element must have width: at least 700px and height: auto so it never wraps.
+Use only: 1 stat number, 1 label below it, 1 subhead, 1 background glow. Nothing else.
 The viewer should understand the statistic within one second.`,
 
   feature: `Intent: FEATURE
@@ -155,7 +222,11 @@ Create clear visual focus around the featured capability.
 Use supporting callouts only when necessary.
 Avoid dashboard layouts.
 The scene should feel like a premium product reveal.
-The viewer should immediately understand what feature is being highlighted.`,
+The viewer should immediately understand what feature is being highlighted.
+
+REQUIRED: Always include an image placeholder element for the feature asset:
+<img data-role="feature-asset" data-layer="image" data-animation="scale-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:5;opacity:1;object-fit:cover;border-radius:24px;" src="" />
+Size and position this as the dominant visual in the frame. Leave src="" — it will be filled in when the user uploads their screenshot.`,
 
   statement: `Intent: STATEMENT
 The scene exists to communicate one powerful idea.
@@ -164,13 +235,41 @@ Avoid multiple competing messages.
 The viewer should feel the weight of the statement.
 Strong typography. Strong contrast. Minimal decoration.`,
 
+  benefit: `Intent: BENEFIT
+The scene exists to communicate one emotional value to the viewer.
+One benefit dominates. Make it feel personal and real.
+Avoid generic claims. Be specific: time saved, money saved, effort removed.
+Supporting icon or visual reinforces the benefit.
+Do not use lists. One statement, one visual, one feeling.
+Maximum 3 text elements: one headline, one subhead, one optional small label.
+The viewer should feel: "this is for me."`,
+
+  comparison: `Intent: COMPARISON
+The scene exists to show contrast between two states.
+Left or top: the old way (manual, slow, painful).
+Right or bottom: the new way (Vidquence, fast, easy).
+Visual split must be immediately obvious — no reading required.
+Use labels: "Before" / "After", "Without" / "With", "Manual" / "AI".
+Avoid describing the comparison in text only — show it visually.
+The contrast should feel dramatic.`,
+
+  proof: `Intent: PROOF
+The scene exists to build trust.
+Use: large numbers, specific metrics, user counts, time saved, videos created.
+One primary proof element dominates.
+Supporting context below or beside the main proof.
+Avoid vague claims. Specific numbers are more believable than adjectives.
+The viewer should think: "this actually works."`,
+
   cta: `Intent: CTA
 The scene exists to drive one action.
-One clear instruction dominates.
-Product name or logo present.
-Supporting elements reinforce the action.
-Clean, confident, uncluttered.
-The viewer should know exactly what to do next.`,
+One instruction. One button or URL treatment. One product name.
+No competing messages. No feature lists. No empty placeholder cards.
+Product name or logo must be visible and prominent.
+The action should feel easy and low-risk.
+End with energy — not a question, a statement.
+Maximum elements: headline, subhead, one CTA button/badge, product name, background. That's it.
+The viewer should feel compelled to act immediately.`,
 };
 
 const PALETTE_MOOD_LABELS = {
@@ -216,13 +315,17 @@ ${intentPrompt}
 
 ## PRODUCT
 Product: ${projectContext.productName ?? "Product"}
+Logo URL: ${projectContext.logoUrl || "none"}
 Category: ${projectContext.niche ?? "saas"}
 Accent Color: ${palette.accent}
 Secondary Color: ${palette.accentSecondary}
 Background: ${palette.backgroundDeep}
 Mood: ${moodLabel}
 Text Color: ${palette.text}
-Muted Text: ${palette.textMuted}
+Muted Text: ${palette.textMuted}${projectContext.logoUrl ? `
+
+A logo image is available. Render it using this exact tag (fill in position/size):
+<img data-role="logo" data-layer="image" data-animation="fade-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:[z];opacity:1;" src="${projectContext.logoUrl}" />` : ""}
 
 ## SCENE CONTENT
 ${contentLines}
@@ -232,6 +335,31 @@ Headline font: ${typo.headline.fontFamily} — ${typo.headline.fontSize}px, weig
 Body font: ${typo.body.fontFamily} — ${typo.body.fontSize}px, weight ${typo.body.fontWeight}
 Label font: ${typo.label.fontFamily} — ${typo.label.fontSize}px, weight ${typo.label.fontWeight}
 Stat font: ${typo.stat.fontFamily} — ${typo.stat.fontSize}px, weight ${typo.stat.fontWeight}
+
+## STYLE PREFERENCES
+Visual Style: ${projectContext.visualStyle ?? "radiant"}
+Accent Color: ${projectContext.accentColor ?? "#6366f1"}
+Typography: ${projectContext.typographyStyle ?? "modern"}
+Base Background: ${darkAccentBackground(projectContext.accentColor) ?? "radial-gradient(ellipse at 50% 0%, #1a1050 0%, #060614 70%)"}
+
+CRITICAL — Use the Base Background above for all full-canvas background layers. Do NOT use hardcoded #1a1050 or #060614 navy colors — those are the default purple palette and will look wrong when the user has chosen a different accent color.
+
+Typography fonts to use:
+- modern: Inter for all text
+- bold: Bebas Neue for headlines, Inter for body
+- editorial: Playfair Display for headlines, Lora for body
+- minimal: Josefin Sans for all text
+- energetic: Barlow Condensed for headlines, Inter for body
+
+Visual style guidelines:
+- radiant: Use glows, radial gradients, blur effects, depth layers, purple/indigo tones with accent color
+- minimal: Flat backgrounds, clean typography, generous whitespace, no glow effects, subtle dividers only
+- professional: Dark structured backgrounds, grid-like layouts, strong hierarchy, minimal decoration
+- high-contrast: Maximum contrast, bold type, sharp color blocks, strong accent color usage
+- soothing: Soft gradient backgrounds, low opacity overlays, gentle blur, muted complementary colors
+- cinematic: Deep dark backgrounds, dramatic single light source, film-like color grading, wide letterbox feel
+
+The accent color ${projectContext.accentColor ?? "#6366f1"} MUST be used consistently for highlights, dividers, badges, emphasis text, and icon backgrounds. Do not use a different accent color.
 
 ## OUTPUT
 Output only the HTML. Start directly with <!DOCTYPE html>.`;

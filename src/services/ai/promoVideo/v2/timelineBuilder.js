@@ -16,7 +16,36 @@ const NO_KF = { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] };
 
 function estimateDuration(spoken) {
   const words = (spoken ?? "").trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(3.0, parseFloat((words / 2.5).toFixed(2)));
+  return Math.max(2.0, parseFloat((words / 2.8).toFixed(2)));
+}
+
+// ── Stagger delay by scene-element group ─────────────────────────────────────
+
+const STAGGER_BASE = {
+  background: 0,
+  decoration: 0.1,
+  supporting: 0.25,
+  hero:       0.35,
+  workflow:   0.45,
+};
+
+// Returns the base stagger delay for a scene-element group + a small per-layer
+// nudge so elements within the same group don't all appear simultaneously.
+function staggerDelay(sceneElement, indexWithinGroup) {
+  const base = STAGGER_BASE[sceneElement] ?? 0.2;
+  return parseFloat((base + indexWithinGroup * 0.08).toFixed(3));
+}
+
+// Shift every keyframe time value forward by `delay` seconds.
+function applyDelay(keyframes, delay) {
+  if (!delay) return keyframes;
+  const result = {};
+  for (const [prop, kfs] of Object.entries(keyframes)) {
+    result[prop] = Array.isArray(kfs)
+      ? kfs.map(kf => ({ ...kf, time: parseFloat((kf.time + delay).toFixed(3)) }))
+      : kfs;
+  }
+  return result;
 }
 
 // ── Animation → keyframes ─────────────────────────────────────────────────────
@@ -71,7 +100,8 @@ function defaultTransition(animation) {
 
 // ── Scene graph entry → timeline layer ───────────────────────────────────────
 
-function graphEntryToLayer(entry, start, end) {
+function graphEntryToLayer(entry, start, end, delay = 0) {
+  const rawKf = animationToKeyframes(entry.animation, entry.x, entry.y);
   const base = {
     id:        entry.id,
     trackId:   entry.trackId,
@@ -86,7 +116,7 @@ function graphEntryToLayer(entry, start, end) {
     boxShadow:      entry.boxShadow      || null,
     mixBlendMode:   entry.mixBlendMode   || null,
     backdropFilter: entry.backdropFilter || null,
-    keyframes: animationToKeyframes(entry.animation, entry.x, entry.y),
+    keyframes: applyDelay(rawKf, delay),
     transition: defaultTransition(entry.animation),
     transform: {
       x:            entry.x,
@@ -174,15 +204,29 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
 
     console.log(`[timelineBuilder] scene ${i} (${scene.intent}): ${graph.length} graph entries, start=${start} end=${end}`);
 
+    // Sort by zIndex so stagger order matches visual depth (background first)
+    const sorted = [...graph].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+    // Track per-group counters for the within-group nudge
+    const groupCount = {};
+
     // Convert each graph entry to a timeline layer
     // Skip gradient layers with no real visual (transparent background)
-    for (const entry of graph) {
+    for (const entry of sorted) {
       if (entry.type === "gradient") {
         const bg = (entry.background ?? "").trim().toLowerCase();
         const hasBorder = (entry.borderWidth ?? 0) > 0;
         if (!hasBorder && (bg === "transparent" || bg === "none" || bg === "")) continue;
       }
-      layers.push(graphEntryToLayer(entry, start, end));
+
+      // Background layers with no animation get zero delay; everything else staggers
+      const group = entry.sceneElement ?? "decoration";
+      const delay = entry.animation === "none"
+        ? 0
+        : staggerDelay(group, groupCount[group] ?? 0);
+      groupCount[group] = (groupCount[group] ?? 0) + 1;
+
+      layers.push(graphEntryToLayer(entry, start, end, delay));
     }
 
     // Voiceover queue

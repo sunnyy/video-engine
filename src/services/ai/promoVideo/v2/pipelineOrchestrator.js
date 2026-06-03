@@ -13,14 +13,15 @@ import { generateScriptV2 }                           from "./scriptGenerator.js
 import { designAllScenes }                            from "./sceneDesigner.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
 import { buildTimeline }                              from "./timelineBuilder.js";
+import { generateAssetRequirements }                  from "../assetRequirements.js";
 
 // ── Helpers mirrored from renderOrchestrator ──────────────────────────────────
 
 function estimateTtsDuration(script) {
   const words = script.trim().split(/\s+/).filter(Boolean).length;
-  if (words <= 6)  return parseFloat((2.0 + Math.random() * 0.5).toFixed(1));
-  if (words <= 14) return parseFloat((3.0 + (words - 6) / 8).toFixed(1));
-  return Math.min(6.0, parseFloat((4.0 + (words - 14) / 10).toFixed(1)));
+  if (words <= 5)  return parseFloat((1.5 + Math.random() * 0.3).toFixed(1));
+  if (words <= 10) return parseFloat((2.0 + (words - 5) / 8).toFixed(1));
+  return Math.min(4.0, parseFloat((2.8 + (words - 10) / 10).toFixed(1)));
 }
 
 const SKIP_WORDS = new Set(["a","an","the","of","for","with","and","or","in","on","at","to","is","are","be","was","were","that","this","it","as","by","from","into","about","showing","featuring","displaying","dynamic","short","quick","simple","clean","professional","modern","background","scene","shot","image","video","photo","showing"]);
@@ -73,19 +74,35 @@ export async function runV2Pipeline(project) {
   // ── Build projectContext (V2 design system) ────────────────────────────────
   const projectContext = {
     projectId,
-    productName: project.product_name ?? "Product",
-    niche:       project.style?.niche            ?? "saas",
-    accentColor: project.style?.color_palette    ?? "#f5c518",
-    logoUrl:     project.logo_url                ?? null,
-    fps:         30,
-    mood:        project.style?.music_mood       ?? null,
-    musicMood:   project.style?.music_mood       ?? "upbeat",
+    productName:     project.product_name          ?? "Product",
+    niche:           project.style?.niche           ?? "saas",
+    accentColor:     project.accent_color           ?? project.style?.color_palette ?? "#6366f1",
+    visualStyle:     project.visual_style           ?? "radiant",
+    typographyStyle: project.typography_style       ?? "modern",
+    logoUrl:         project.logo_url               ?? null,
+    fps:             30,
+    mood:            project.style?.music_mood      ?? null,
+    musicMood:       project.style?.music_mood      ?? "upbeat",
   };
 
   // ── Step 1: Generate scene script ─────────────────────────────────────────
   console.log(`[v2/pipeline] ${projectId} — generating script`);
   const scriptResult = await generateScriptV2(project);
   let scenes = scriptResult.scenes.map(s => ({ ...s }));
+
+  // ── Step 1.5: Asset manifest — computed from script, saved early ──────────
+  // This lets the frontend show asset collection UI before the expensive design
+  // step runs. Uses the asset_requirement / asset_hint fields on each scene.
+  const assetManifest = generateAssetRequirements({ ...project, scenes });
+  console.log(`[v2/pipeline] ${projectId} — asset manifest: ${assetManifest.total_user_uploads_required} user uploads required`);
+  try {
+    await supabaseAdmin
+      .from("promo_videos")
+      .update({ asset_manifest: assetManifest })
+      .eq("id", projectId);
+  } catch (e) {
+    console.warn("[v2/pipeline] early asset manifest save failed (non-fatal):", e.message);
+  }
 
   // ── Step 2: Design all scenes as HTML ─────────────────────────────────────
   console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes`);
@@ -122,7 +139,7 @@ export async function runV2Pipeline(project) {
     if (scenes[i].spoken?.trim()) {
       const measured = durBySid[i + 1];
       scenes[i].duration_seconds = measured != null
-        ? parseFloat((measured + 0.3).toFixed(2))
+        ? parseFloat((measured + 0.1).toFixed(2))
         : estimateTtsDuration(scenes[i].spoken);
     }
   }
@@ -155,7 +172,7 @@ export async function runV2Pipeline(project) {
           end:       parseFloat((start + audioLen + 0.3).toFixed(4)),
           zIndex:    0, visible: true, locked: false,
           trimStart: 0, trimEnd: audioLen,
-          volume:    1.0, muted: false, fadeIn: 0.1, fadeOut: 0.2,
+          volume:    1.5, muted: false, fadeIn: 0.1, fadeOut: 0.2,
           sfx:       null, keyframes: {}, animation: null, transition: null, transform: null,
         };
       });
@@ -184,7 +201,7 @@ export async function runV2Pipeline(project) {
         start: 0, end: musicDur, zIndex: 0,
         visible: true, locked: false,
         trimStart: 0, trimEnd: musicDur,
-        volume: 0.15, muted: false, fadeIn: 1, fadeOut: 1,
+        volume: 0.07, muted: false, fadeIn: 1, fadeOut: 1,
         sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
       });
       console.log(`[v2/pipeline] music injected: "${track.title}" (${mood})`);
@@ -247,6 +264,7 @@ export async function runV2Pipeline(project) {
     editor_project_id:  editorProjectId,
     _timeline:          finalTimeline,   // private — used by /create for upsert
     _asset_queue:       asset_queue,
+    _assetManifest:     assetManifest,  // pre-computed from script; route uses this directly
     updated_at:         new Date().toISOString(),
   };
 }

@@ -154,6 +154,7 @@ function roleToTrackId(role) {
     divider:       "track_accent",
     step:          "track_text",
     icon:          "track_icon",
+    logo:          "track_logo",
   };
   return map[role] ?? "track_text";
 }
@@ -213,6 +214,7 @@ export function parseSceneHTML(htmlString, sceneIndex) {
   console.log(`[htmlParser] scene ${sceneIndex} — CSS rules parsed: ${Object.keys(cssRules).length} selectors`);
 
   const root     = parse(htmlString, { comment: false });
+  // Select both div/span elements AND img elements that carry data-role
   const elements = root.querySelectorAll("[data-role]");
 
   console.log(`[htmlParser] scene ${sceneIndex} — found ${elements.length} elements with data-role`);
@@ -263,7 +265,13 @@ export function parseSceneHTML(htmlString, sceneIndex) {
     if (type === "gradient" && rawText && !hasDataRoleChildren) type = "text";
 
     const trackId = roleToTrackId(role);
-    const { x, y, width, height } = resolveTransform(effectiveStyle, type);
+    let { x, y, width, height } = resolveTransform(effectiveStyle, type);
+
+    // Clamp to canvas bounds — allow slight bleed for intentional off-edge glow/crop effects
+    x      = Math.max(-200, Math.min(x,      1080));
+    y      = Math.max(-200, Math.min(y,      1920));
+    width  = Math.min(width,  1280);
+    height = Math.min(height, 2120);
 
     const zIndex = cssNum(style["z-index"]) ?? (
       role === "background"                    ? 0  :
@@ -318,8 +326,10 @@ export function parseSceneHTML(htmlString, sceneIndex) {
     } else if (type === "gradient") {
       entry.background = style["background"] ?? style["background-color"] ?? null;
     } else if (type === "image") {
-      entry.src       = null;
-      entry.objectFit = style["object-fit"] ?? "cover";
+      // For <img> elements (e.g. data-role="logo"), extract the src attribute directly.
+      const imgSrc = el.tagName?.toLowerCase() === "img" ? (el.getAttribute("src") || null) : null;
+      entry.src       = imgSrc;
+      entry.objectFit = style["object-fit"] ?? "contain";
     }
 
     graph.push(entry);

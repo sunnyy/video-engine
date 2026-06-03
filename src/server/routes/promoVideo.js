@@ -46,6 +46,9 @@ function rowToProject(row) {
     editor_project_id:   row.editor_project_id  || null,
     scene_format:        row.scene_format        || null,
     pipeline_version:    row.pipeline_version    || null,
+    visual_style:        row.visual_style        || "radiant",
+    accent_color:        row.accent_color        || "#6366f1",
+    typography_style:    row.typography_style    || "modern",
     created_at:          row.created_at,
     updated_at:          row.updated_at,
   };
@@ -119,6 +122,7 @@ router.post("/create", requireAuth, async (req, res) => {
       target_platform, language, tone, target_audience, duration_seconds,
       has_script, has_talking_head, has_screenshots, has_recordings, has_logo, has_voiceover,
       caption_style, transition_style, motion_style, color_palette, music_mood,
+      visual_style, accent_color, typography_style,
     } = req.body;
 
     // Use existing draft ID (from /init) if provided, otherwise generate new one
@@ -150,6 +154,9 @@ router.post("/create", requireAuth, async (req, res) => {
       has_logo:         !!has_logo,
       has_voiceover:    !!has_voiceover,
       logo_url:         logo_url || null,
+      visual_style:     visual_style     || "radiant",
+      accent_color:     accent_color     || "#6366f1",
+      typography_style: typography_style || "modern",
     };
 
     let thSegments = null; // raw segments with timestamps, saved to talking_head_segments column
@@ -252,7 +259,8 @@ router.post("/create", requireAuth, async (req, res) => {
       project = await runV2Pipeline(project);
     }
 
-    const assetManifest = generateAssetRequirements(project);
+    // v2 pipeline pre-computes the manifest from the script; other paths compute it now.
+    const assetManifest = project._assetManifest ?? generateAssetRequirements(project);
 
     const { error: dbErr } = await supabaseAdmin.from("promo_videos").upsert({
       id,
@@ -287,6 +295,9 @@ router.post("/create", requireAuth, async (req, res) => {
       pipeline_version:         project.pipeline_version || null,
       editor_project_id:        project.editor_project_id || null,
       asset_manifest:           assetManifest,
+      visual_style:             project.visual_style     || "radiant",
+      accent_color:             project.accent_color     || "#6366f1",
+      typography_style:         project.typography_style || "modern",
       full_transcript:          project.script || null,
       talking_head_segments:    thSegments,
       credits_estimated:        project.credits_estimated,
@@ -375,6 +386,40 @@ router.post("/:projectId/upload-asset", requireAuth, async (req, res) => {
       .update({ status: newStatus, asset_manifest: updatedManifest, scenes: updatedScenes, updated_at: updatedAt })
       .eq("id", req.params.projectId);
     if (updErr) throw new Error(updErr.message);
+
+    // Inject the uploaded asset URL into matching image layers in the editor timeline.
+    // scene_id is 1-based; timeline layer IDs use 0-based scene_index (s0_, s1_, ...).
+    if (row.editor_project_id && asset_url) {
+      try {
+        const sceneIndex = scene_id - 1;
+        const prefix = `s${sceneIndex}_`;
+        const { data: editorRow } = await supabaseAdmin
+          .from("projects")
+          .select("safe_project_json")
+          .eq("id", row.editor_project_id)
+          .single();
+        if (editorRow?.safe_project_json) {
+          const timeline = editorRow.safe_project_json;
+          let injected = false;
+          const updatedLayers = timeline.layers.map(layer => {
+            if (layer.type === "image" && layer.id?.startsWith(prefix) && !layer.src) {
+              injected = true;
+              return { ...layer, src: asset_url };
+            }
+            return layer;
+          });
+          if (injected) {
+            await supabaseAdmin
+              .from("projects")
+              .update({ safe_project_json: { ...timeline, layers: updatedLayers }, updated_at: updatedAt })
+              .eq("id", row.editor_project_id);
+            console.log(`[upload-asset] injected asset into editor project ${row.editor_project_id} scene ${sceneIndex}`);
+          }
+        }
+      } catch (e) {
+        console.warn("[upload-asset] editor timeline injection failed (non-fatal):", e.message);
+      }
+    }
 
     const project = { ...rowToProject(row), status: newStatus, updated_at: updatedAt };
     res.json({ assetManifest: updatedManifest, project });

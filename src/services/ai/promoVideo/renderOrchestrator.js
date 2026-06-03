@@ -21,11 +21,25 @@ import { generatePromoVoiceovers, injectVoiceoversIntoTimeline } from "./ttsGene
 import { PROJECT_STATUS, ASSET_SOURCE, ASSET_TYPE } from "./projectSchema.js";
 import { pickAutoMood } from "../../../core/registries/musicRegistry.js";
 
+// Bump this version string whenever TimelineComposition.jsx positioning logic changes.
+// The bundle cache is invalidated when the version file changes, forcing a rebuild.
+const BUNDLE_VERSION = "v2-topleft-coords";
+
 async function getBundle() {
   const prebundleDir = path.join(PROJECT_ROOT, "remotion-bundle");
-  if (fs.existsSync(path.join(prebundleDir, "index.html"))) return prebundleDir;
+  const versionFile  = path.join(prebundleDir, "bundle-version.txt");
+
+  const cachedVersion = fs.existsSync(versionFile) ? fs.readFileSync(versionFile, "utf8").trim() : null;
+  const bundleReady   = fs.existsSync(path.join(prebundleDir, "index.html"));
+
+  if (bundleReady && cachedVersion === BUNDLE_VERSION) return prebundleDir;
+
+  console.log(`[renderOrchestrator] building Remotion bundle (version: ${BUNDLE_VERSION})…`);
   const { bundle } = await import("@remotion/bundler");
-  return bundle({ entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx") });
+  const outDir = await bundle({ entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx") });
+  // Write version marker so cache is reused until next code change
+  fs.writeFileSync(path.join(outDir, "bundle-version.txt"), BUNDLE_VERSION, "utf8");
+  return outDir;
 }
 
 async function setStatus(projectId, status, extra = {}) {
@@ -184,7 +198,7 @@ export async function orchestratePromoRender(projectId) {
           start: 0, end: musicDur, zIndex: 0,
           visible: true, locked: false,
           trimStart: 0, trimEnd: musicDur,
-          volume: 0.15, muted: false, fadeIn: 1, fadeOut: 1,
+          volume: 0.07, muted: false, fadeIn: 1, fadeOut: 1,
           sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
         });
         console.log(`[renderOrchestrator] music injected: "${track.title}" (${mood})`);
