@@ -122,7 +122,7 @@ router.post("/create", requireAuth, async (req, res) => {
       target_platform, language, tone, target_audience, duration_seconds,
       has_script, has_talking_head, has_screenshots, has_recordings, has_logo, has_voiceover,
       caption_style, transition_style, motion_style, color_palette, music_mood,
-      visual_style, accent_color, typography_style,
+      visual_style, accent_color, typography_style, voice_id, scene_count,
     } = req.body;
 
     // Use existing draft ID (from /init) if provided, otherwise generate new one
@@ -157,6 +157,8 @@ router.post("/create", requireAuth, async (req, res) => {
       visual_style:     visual_style     || "radiant",
       accent_color:     accent_color     || "#6366f1",
       typography_style: typography_style || "modern",
+      voice_id:         voice_id         || "21m00Tcm4TlvDq8ikWAM",
+      scene_count:      scene_count      ?? "auto",
     };
 
     let thSegments = null; // raw segments with timestamps, saved to talking_head_segments column

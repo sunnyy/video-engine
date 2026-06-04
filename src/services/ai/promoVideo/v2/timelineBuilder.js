@@ -12,6 +12,27 @@ const H    = 1920;
 
 const NO_KF = { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] };
 
+const ROLE_LABEL = {
+  headline:           "Headline",
+  subhead:            "Subhead",
+  body:               "Body",
+  kicker:             "Kicker",
+  badge:              "Badge",
+  label:              "Label",
+  "stat-number":      "Stat",
+  background:         "BG",
+  glow:               "Glow",
+  card:               "Card",
+  decoration:         "Deco",
+  divider:            "Divider",
+  step:               "Step",
+  icon:               "Icon",
+  logo:               "Logo",
+  "image-placeholder": "Image",
+};
+
+function roleToLabel(role) { return ROLE_LABEL[role] ?? role; }
+
 // ── Timing ────────────────────────────────────────────────────────────────────
 
 function estimateDuration(spoken) {
@@ -19,21 +40,26 @@ function estimateDuration(spoken) {
   return Math.max(2.0, parseFloat((words / 2.8).toFixed(2)));
 }
 
-// ── Stagger delay by scene-element group ─────────────────────────────────────
+// ── Proportional element spread across scene duration ────────────────────────
 
-const STAGGER_BASE = {
-  background: 0,
-  decoration: 0.1,
-  supporting: 0.25,
-  hero:       0.35,
-  workflow:   0.45,
+const SPREAD_WINDOWS = {
+  background: { start: 0,    end: 0    }, // always instant
+  decoration: { start: 0.02, end: 0.08 }, // very early, atmospheric
+  hero:       { start: 0.08, end: 0.55 }, // spread across first half
+  supporting: { start: 0.35, end: 0.80 }, // spread across middle-late
+  workflow:   { start: 0.45, end: 0.92 }, // spread across late portion
 };
 
-// Returns the base stagger delay for a scene-element group + a small per-layer
-// nudge so elements within the same group don't all appear simultaneously.
-function staggerDelay(sceneElement, indexWithinGroup) {
-  const base = STAGGER_BASE[sceneElement] ?? 0.2;
-  return parseFloat((base + indexWithinGroup * 0.08).toFixed(3));
+function calculateElementDelay(entry, groupIndex, groupSize, sceneDuration) {
+  const group  = entry.sceneElement ?? "supporting";
+  const window = SPREAD_WINDOWS[group] ?? SPREAD_WINDOWS.supporting;
+
+  const windowDuration = (window.end - window.start) * sceneDuration;
+  const spacing        = groupSize > 1 ? windowDuration / groupSize : 0;
+  const delay          = (window.start * sceneDuration) + (groupIndex * spacing);
+
+  const maxDelay = Math.max(0, sceneDuration - 0.35 - 0.3);
+  return parseFloat(Math.min(delay, maxDelay).toFixed(3));
 }
 
 // Shift every keyframe time value forward by `delay` seconds.
@@ -101,10 +127,16 @@ function defaultTransition(animation) {
 // ── Scene graph entry → timeline layer ───────────────────────────────────────
 
 function graphEntryToLayer(entry, start, end, delay = 0) {
-  const rawKf = animationToKeyframes(entry.animation, entry.x, entry.y);
+  const shouldAnimate =
+    entry.animation !== "none" &&
+    entry.sceneElement !== "background";
+  const rawKf = shouldAnimate
+    ? animationToKeyframes(entry.animation, entry.x, entry.y)
+    : { ...NO_KF };
   const base = {
     id:        entry.id,
-    trackId:   entry.trackId,
+    trackId:   entry.id,
+    name:      roleToLabel(entry.role),
     type:      entry.type,
     start,
     end,
@@ -157,8 +189,10 @@ function graphEntryToLayer(entry, start, end, delay = 0) {
   if (entry.type === "image") {
     return {
       ...base,
-      src:       entry.src ?? null,
+      src:       entry.src       ?? null,
       objectFit: entry.objectFit ?? "cover",
+      assetType: entry.assetType ?? null,
+      assetHint: entry.assetHint ?? null,
     };
   }
 
@@ -183,9 +217,8 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
     console.warn(`[timelineBuilder] sceneGraphs[0] is empty or undefined`);
   }
 
-  const layers          = [];
-  const voiceover_queue = [];
-  const asset_queue     = [];
+  const layers      = [];
+  const asset_queue = [];
 
   let cursor = 0;
 
@@ -207,35 +240,39 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
     // Sort by zIndex so stagger order matches visual depth (background first)
     const sorted = [...graph].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
-    // Track per-group counters for the within-group nudge
-    const groupCount = {};
+    const isHook = i === 0;
+    const isCTA  = i === scenes.length - 1;
 
-    // Convert each graph entry to a timeline layer
-    // Skip gradient layers with no real visual (transparent background)
-    for (const entry of sorted) {
+    // Pre-filter to match what will actually be pushed, so group sizes are accurate
+    const visible = sorted.filter(entry => {
       if (entry.type === "gradient") {
         const bg = (entry.background ?? "").trim().toLowerCase();
         const hasBorder = (entry.borderWidth ?? 0) > 0;
-        if (!hasBorder && (bg === "transparent" || bg === "none" || bg === "")) continue;
+        if (!hasBorder && (bg === "transparent" || bg === "none" || bg === "")) return false;
       }
+      if (!isHook && !isCTA && entry.trackId === "track_logo") return false;
+      return true;
+    });
 
-      // Background layers with no animation get zero delay; everything else staggers
-      const group = entry.sceneElement ?? "decoration";
-      const delay = entry.animation === "none"
-        ? 0
-        : staggerDelay(group, groupCount[group] ?? 0);
-      groupCount[group] = (groupCount[group] ?? 0) + 1;
-
-      layers.push(graphEntryToLayer(entry, start, end, delay));
+    // Count elements per sceneElement group for proportional spacing
+    const groupSizes  = {};
+    const groupIndex  = {};
+    for (const entry of visible) {
+      const g = entry.sceneElement ?? "supporting";
+      groupSizes[g] = (groupSizes[g] ?? 0) + 1;
     }
 
-    // Voiceover queue
-    if (scene.spoken?.trim()) {
-      voiceover_queue.push({
-        scene_id: i + 1,
-        script:   scene.spoken.trim(),
-        voice:    "nova",
-      });
+    for (const entry of visible) {
+      const group = entry.sceneElement ?? "supporting";
+      const idx   = groupIndex[group] ?? 0;
+      groupIndex[group] = idx + 1;
+
+      const isBackground = group === "background";
+      const delay = (entry.animation === "none" || isBackground)
+        ? 0
+        : calculateElementDelay(entry, idx, groupSizes[group], duration);
+
+      layers.push(graphEntryToLayer(entry, start, end, delay));
     }
 
     // Asset queue
@@ -278,7 +315,6 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
 
   return {
     timeline,
-    voiceover_queue,
     asset_queue,
     total_frames: Math.round(totalDuration * FPS),
     fps:          FPS,

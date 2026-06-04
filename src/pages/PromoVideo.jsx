@@ -73,12 +73,18 @@ const RENDER_MESSAGES = [
 const WIZARD_STEPS = ["Video Type", "Setup", "Style", "Assets", "Generating"];
 
 const VISUAL_STYLES = [
-  { id: "radiant",      label: "Radiant",       desc: "Glows, gradients, depth layers" },
-  { id: "minimal",      label: "Minimal",        desc: "Clean, flat, lots of whitespace" },
-  { id: "professional", label: "Professional",   desc: "Structured, corporate, dark" },
-  { id: "high-contrast",label: "High Contrast",  desc: "Bold colors, sharp edges" },
-  { id: "soothing",     label: "Soothing",       desc: "Soft gradients, muted tones" },
-  { id: "cinematic",    label: "Cinematic",       desc: "Dramatic, deep dark, film-like" },
+  { id: "radiant",       label: "Radiant",       desc: "Glows & depth",
+    bg: "#06040e", glow: "radial-gradient(circle at 50% 35%, rgba(99,102,241,0.85) 0%, transparent 65%)", accent: "#6366f1", light: false },
+  { id: "minimal",       label: "Minimal",        desc: "Clean & flat",
+    bg: "#f2f2f6", glow: null, accent: "#111111", light: true },
+  { id: "professional",  label: "Professional",   desc: "Structured, dark",
+    bg: "#0c1118", glow: "linear-gradient(180deg, rgba(56,189,248,0.2) 0%, transparent 60%)", accent: "#38bdf8", light: false },
+  { id: "high-contrast", label: "High Contrast",  desc: "Bold & sharp",
+    bg: "#000000", glow: null, accent: "#f5c518", light: false },
+  { id: "soothing",      label: "Soothing",       desc: "Soft & muted",
+    bg: "linear-gradient(160deg,#1a0e2e,#0e1a2e)", glow: "radial-gradient(circle at 50% 50%, rgba(167,139,250,0.4) 0%, transparent 65%)", accent: "#a78bfa", light: false },
+  { id: "cinematic",     label: "Cinematic",       desc: "Dramatic dark",
+    bg: "#010101", glow: "radial-gradient(ellipse at 50% 20%, rgba(200,160,80,0.24) 0%, transparent 55%)", accent: "#c9a227", light: false },
 ];
 
 const ACCENT_SWATCHES = [
@@ -91,12 +97,33 @@ const ACCENT_SWATCHES = [
   { hex: "#06b6d4", label: "Cyan"          },
 ];
 
+const PROMO_VOICES = [
+  { id: "21m00Tcm4TlvDq8ikWAM", label: "Rachel",  gender: "female", desc: "Calm & professional"  },
+  { id: "EXAVITQu4vr4xnSDxMaL", label: "Bella",   gender: "female", desc: "Warm & expressive"    },
+  { id: "XrExE9yKIg1WjnnlVkGX", label: "Matilda", gender: "female", desc: "Friendly & natural"   },
+  { id: "onwK4e9ZLuTAKqWW03F9", label: "Daniel",  gender: "male",   desc: "Deep & authoritative" },
+  { id: "pNInz6obpgDQGcFmaJgB", label: "Adam",    gender: "male",   desc: "Bold & commanding"    },
+];
+
+const GENDER_COLORS = {
+  female: { bg: "rgba(244,114,182,0.12)", border: "rgba(244,114,182,0.3)", color: "#f472b6" },
+  male:   { bg: "rgba(96,165,250,0.12)",  border: "rgba(96,165,250,0.3)",  color: "#60a5fa" },
+};
+
+const SCENE_COUNT_OPTIONS = [
+  { value: "auto", label: "Auto",     description: "AI decides (5-7 scenes)" },
+  { value: 1,      label: "1 Scene",  description: "Single hook — for testing" },
+  { value: 3,      label: "3 Scenes", description: "Quick and punchy" },
+  { value: 5,      label: "5 Scenes", description: "Standard promo" },
+  { value: 7,      label: "7 Scenes", description: "Comprehensive story" },
+];
+
 const TYPOGRAPHY_STYLES = [
-  { id: "modern",     label: "Modern",     desc: "Inter, DM Sans" },
-  { id: "bold",       label: "Bold",       desc: "Bebas Neue, Barlow Condensed" },
-  { id: "editorial",  label: "Editorial",  desc: "Playfair Display, Lora" },
-  { id: "minimal",    label: "Minimal",    desc: "Josefin Sans" },
-  { id: "energetic",  label: "Energetic",  desc: "Barlow Condensed, Oswald" },
+  { id: "modern",    label: "Modern",    fonts: "Inter, DM Sans",          ff: "'Inter',sans-serif",            fw: 600, ls: "-0.02em", tt: "none"      },
+  { id: "bold",      label: "Bold",      fonts: "Bebas Neue",               ff: "'Bebas Neue',sans-serif",       fw: 400, ls: "0.05em",  tt: "uppercase" },
+  { id: "editorial", label: "Editorial", fonts: "Playfair Display, Lora",   ff: "'Playfair Display',serif",      fw: 700, ls: "0em",     tt: "none"      },
+  { id: "minimal",   label: "Minimal",   fonts: "Josefin Sans",             ff: "'Josefin Sans',sans-serif",     fw: 600, ls: "0.14em",  tt: "uppercase" },
+  { id: "energetic", label: "Energetic", fonts: "Barlow Condensed, Oswald", ff: "'Barlow Condensed',sans-serif", fw: 700, ls: "0.02em",  tt: "uppercase" },
 ];
 
 // ── Upload helper (client-side Supabase, promo-specific paths) ────────────────
@@ -413,8 +440,9 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [duration,    setDuration]    = useState(prefill?.duration_seconds ?? 15);
   const [language,    setLanguage]    = useState(prefill?.language ?? "en");
   const [tone,        setTone]        = useState(prefill?.tone ?? "professional");
-  const [logoUrl,     setLogoUrl]     = useState(null);
-  const [logoLoading, setLogoLoading] = useState(false);
+  const [logoUrl,        setLogoUrl]        = useState(null);
+  const [logoDimensions, setLogoDimensions] = useState(null);
+  const [logoLoading,    setLogoLoading]    = useState(false);
   const logoRef = useRef();
 
   // Step 2 — Video Type
@@ -435,6 +463,12 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [accentColor,     setAccentColor]     = useState("#6366f1");
   const [customAccent,    setCustomAccent]    = useState("");
   const [typographyStyle, setTypographyStyle] = useState("modern");
+  const [voiceId,         setVoiceId]         = useState("21m00Tcm4TlvDq8ikWAM");
+  const [sceneCount,      setSceneCount]      = useState("auto");
+  const [promoVoices,     setPromoVoices]     = useState(PROMO_VOICES);
+  const [playingVoiceId,  setPlayingVoiceId]  = useState(null);
+  const voiceAudioRef    = useRef(null);
+  const requestedVoiceRef = useRef(null);
 
   // Step 3 — Asset Collection
   const [projectId,     setProjectId]     = useState(null);
@@ -453,6 +487,66 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [msgIdx,       setMsgIdx]       = useState(0);
   const [renderError,  setRenderError]  = useState("");
   const pollRef = useRef(null);
+
+  // Fetch ElevenLabs preview URLs for promo voices when step 2 becomes visible
+  useEffect(() => {
+    if (step !== 2) return;
+    serverFetch("/api/promo-video/voices")
+      .then(r => r.json())
+      .then(d => { if (d.voices?.length) setPromoVoices(d.voices); })
+      .catch(() => {});
+  }, [step]);
+
+  // Stop any playing voice preview when leaving step 2
+  useEffect(() => {
+    if (step !== 2) {
+      voiceAudioRef.current?.pause();
+      voiceAudioRef.current = null;
+      requestedVoiceRef.current = null;
+      setPlayingVoiceId(null);
+    }
+  }, [step]);
+
+  async function handleVoicePlay(voice) {
+    // Toggle off if already playing this voice
+    if (playingVoiceId === voice.id) {
+      voiceAudioRef.current?.pause();
+      voiceAudioRef.current = null;
+      requestedVoiceRef.current = null;
+      setPlayingVoiceId(null);
+      return;
+    }
+    // Stop anything currently playing
+    voiceAudioRef.current?.pause();
+    voiceAudioRef.current = null;
+
+    // Mark this voice as the current request — used to abort stale fetches
+    requestedVoiceRef.current = voice.id;
+    setPlayingVoiceId(voice.id);
+
+    try {
+      let url = voice.preview_url;
+      if (!url) {
+        const res = await serverFetch(`/api/promo-video/voice-sample/${voice.id}`);
+        if (!res.ok) throw new Error(`Sample fetch failed: ${res.status}`);
+        const blob = await res.blob();
+        url = URL.createObjectURL(blob);
+      }
+      // Another voice was clicked while we were fetching — abort
+      if (requestedVoiceRef.current !== voice.id) return;
+
+      const audio = new Audio(url);
+      audio.onended = () => { voiceAudioRef.current = null; setPlayingVoiceId(null); };
+      voiceAudioRef.current = audio;
+      await audio.play();
+    } catch (err) {
+      console.error("[voicePlay]", err?.message || err);
+      if (requestedVoiceRef.current === voice.id) {
+        voiceAudioRef.current = null;
+        setPlayingVoiceId(null);
+      }
+    }
+  }
 
   // Reset prefill when it changes
   useEffect(() => {
@@ -543,8 +637,13 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   // ── File upload helpers ──
   async function handleLogoFile(file) {
     setLogoLoading(true);
-    try { setLogoUrl(await uploadPromoFile(file, "logos")); }
-    catch { /* ignore */ }
+    try {
+      const url = await uploadPromoFile(file, "logos");
+      setLogoUrl(url);
+      const img = new window.Image();
+      img.onload = () => setLogoDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      img.src = url;
+    } catch { /* ignore */ }
     setLogoLoading(false);
   }
 
@@ -618,11 +717,15 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         talking_head_url:        null,
         voiceover_url:           voUrl   || null,
         logo_url:                logoUrl || null,
+        logo_width:              logoDimensions?.width  || null,
+        logo_height:             logoDimensions?.height || null,
         script:                  !isTH && hasVoiceover !== "yes" && hasScript === "yes" ? scriptText : null,
         pipeline_version:        isTH ? undefined : "v2",
         visual_style:            visualStyle,
         accent_color:            customAccent || accentColor,
         typography_style:        typographyStyle,
+        voice_id:                voiceId,
+        scene_count:             sceneCount,
       };
 
       const res  = await serverFetch("/api/promo-video/create", {
@@ -1000,18 +1103,49 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             {/* Visual Style */}
             <div>
               <label style={C.lbl}>Visual Style</label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {VISUAL_STYLES.map(s => (
-                  <button key={s.id} onClick={() => setVisualStyle(s.id)}
-                    style={{
-                      padding: "14px 16px", borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                      background: visualStyle === s.id ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
-                      border: visualStyle === s.id ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
-                    }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: visualStyle === s.id ? "#a5b4fc" : T.text, marginBottom: 3 }}>{s.label}</div>
-                    <div style={{ fontSize: 11, color: T.muted }}>{s.desc}</div>
-                  </button>
-                ))}
+              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+                {VISUAL_STYLES.map(s => {
+                  const sel = visualStyle === s.id;
+                  return (
+                    <button key={s.id} onClick={() => setVisualStyle(s.id)}
+                      style={{
+                        minWidth: 112, flexShrink: 0, padding: 0, border: "none",
+                        borderRadius: 10, cursor: "pointer", background: "none",
+                        overflow: "hidden",
+                        outline: sel ? `2px solid ${s.accent}` : "2px solid rgba(255,255,255,0.09)",
+                        outlineOffset: 0,
+                      }}>
+                      {/* Mini preview frame */}
+                      <div style={{ width: "100%", height: 86, background: s.bg, position: "relative", overflow: "hidden" }}>
+                        {s.glow && <div style={{ position: "absolute", inset: 0, background: s.glow, filter: "blur(8px)" }} />}
+                        {s.id === "cinematic" && <>
+                          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: "#000", zIndex: 2 }} />
+                          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 8, background: "#000", zIndex: 2 }} />
+                        </>}
+                        {/* headline mock */}
+                        <div style={{ position: "absolute", top: s.id === "cinematic" ? 18 : 14, left: 10, right: 10,
+                          height: s.id === "high-contrast" ? 6 : 4, borderRadius: 2,
+                          background: s.light ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.7)" }} />
+                        {/* accent element */}
+                        {s.id === "high-contrast"
+                          ? <div style={{ position: "absolute", top: 25, left: 10, right: 10, height: 20, borderRadius: 3, background: s.accent }} />
+                          : <div style={{ position: "absolute", top: 24, left: 10, width: "52%", height: 3, borderRadius: 2, background: `${s.accent}dd` }} />
+                        }
+                        {/* CTA button mock */}
+                        <div style={{ position: "absolute", bottom: s.id === "cinematic" ? 16 : 12,
+                          left: "50%", transform: "translateX(-50%)",
+                          width: 34, height: 10, borderRadius: s.light ? 2 : 5, background: s.accent }} />
+                      </div>
+                      {/* Label */}
+                      <div style={{ padding: "7px 10px 8px",
+                        background: sel ? `${s.accent}1a` : "rgba(255,255,255,0.04)",
+                        borderTop: `1px solid ${sel ? s.accent + "50" : "rgba(255,255,255,0.07)"}` }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: sel ? s.accent : T.text, marginBottom: 1 }}>{s.label}</div>
+                        <div style={{ fontSize: 10, color: T.muted }}>{s.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1048,20 +1182,91 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
             {/* Typography */}
             <div>
+              <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@700&family=Josefin+Sans:wght@600&family=Barlow+Condensed:wght@700&display=swap');`}</style>
               <label style={C.lbl}>Typography</label>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {TYPOGRAPHY_STYLES.map(t => (
-                  <button key={t.id} onClick={() => setTypographyStyle(t.id)}
-                    style={{
-                      padding: "12px 16px", borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      background: typographyStyle === t.id ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
-                      border: typographyStyle === t.id ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
-                    }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: typographyStyle === t.id ? "#a5b4fc" : T.text }}>{t.label}</span>
-                    <span style={{ fontSize: 11, color: T.muted }}>{t.desc}</span>
-                  </button>
-                ))}
+              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+                {TYPOGRAPHY_STYLES.map(t => {
+                  const sel = typographyStyle === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setTypographyStyle(t.id)}
+                      style={{
+                        minWidth: 112, flexShrink: 0, padding: "16px 10px 12px",
+                        borderRadius: 10, cursor: "pointer", textAlign: "center",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                        background: sel ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
+                      }}>
+                      <span style={{ fontSize: 38, fontFamily: t.ff, fontWeight: t.fw, letterSpacing: t.ls,
+                        textTransform: t.tt, color: sel ? "#a5b4fc" : T.text, lineHeight: 1, display: "block" }}>
+                        Aa
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: sel ? "#a5b4fc" : T.text, fontFamily: "inherit" }}>{t.label}</span>
+                      <span style={{ fontSize: 10, color: T.muted, fontFamily: "inherit" }}>{t.fonts}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Voice */}
+            <div>
+              <label style={C.lbl}>Voiceover</label>
+              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+                {promoVoices.map(v => {
+                  const sel     = voiceId === v.id;
+                  const playing = playingVoiceId === v.id;
+                  const gc      = GENDER_COLORS[v.gender] ?? GENDER_COLORS.male;
+                  return (
+                    <button key={v.id} onClick={() => setVoiceId(v.id)}
+                      style={{
+                        minWidth: 112, flexShrink: 0, padding: "14px 10px 12px",
+                        borderRadius: 10, cursor: "pointer", textAlign: "center",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                        background: sel ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
+                      }}>
+                      <div
+                        onClick={e => { e.stopPropagation(); handleVoicePlay(v); }}
+                        style={{
+                          width: 36, height: 36, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                          background: playing ? "rgba(99,102,241,0.35)" : sel ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.07)",
+                          border: `1.5px solid ${playing ? "rgba(99,102,241,0.9)" : sel ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.15)"}`,
+                          color: playing ? "#c4b5fd" : "#a5b4fc",
+                          fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                        {playing ? "■" : "▶"}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: sel ? "#a5b4fc" : T.text }}>{v.label}</span>
+                      <span style={{ fontSize: 10, color: T.muted, textAlign: "center", lineHeight: 1.4 }}>{v.desc}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
+                        background: gc.bg, border: `1px solid ${gc.border}`, color: gc.color }}>
+                        {v.gender}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Video Length */}
+            <div>
+              <label style={C.lbl}>Video Length</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {SCENE_COUNT_OPTIONS.map(opt => {
+                  const sel = sceneCount === opt.value;
+                  return (
+                    <button key={opt.value} onClick={() => setSceneCount(opt.value)}
+                      style={{
+                        padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                        textAlign: "left", display: "flex", flexDirection: "column", gap: 2,
+                        background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
+                      }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: sel ? T.accent : T.text }}>{opt.label}</span>
+                      <span style={{ fontSize: 11, color: T.muted }}>{opt.description}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

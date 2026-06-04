@@ -133,6 +133,63 @@ router.get("/tts/voices", requireAuth, async (_req, res) => {
   res.json({ voices: result });
 });
 
+// Curated voices for promo video — returns id, label, gender, desc, preview_url
+const PROMO_VOICE_META = [
+  { id: "21m00Tcm4TlvDq8ikWAM", label: "Rachel",  gender: "female", desc: "Calm & professional"  },
+  { id: "EXAVITQu4vr4xnSDxMaL", label: "Bella",   gender: "female", desc: "Warm & expressive"    },
+  { id: "XrExE9yKIg1WjnnlVkGX", label: "Matilda", gender: "female", desc: "Friendly & natural"   },
+  { id: "onwK4e9ZLuTAKqWW03F9", label: "Daniel",  gender: "male",   desc: "Deep & authoritative" },
+  { id: "pNInz6obpgDQGcFmaJgB", label: "Adam",    gender: "male",   desc: "Bold & commanding"    },
+];
+
+router.get("/promo-video/voices", requireAuth, async (_req, res) => {
+  try {
+    const elRes = await fetch("https://api.elevenlabs.io/v1/voices", {
+      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
+    });
+    const data = elRes.ok ? await elRes.json() : { voices: [] };
+    const byId = Object.fromEntries((data.voices || []).map(v => [v.voice_id, v]));
+    const voices = PROMO_VOICE_META.map(meta => ({
+      ...meta,
+      preview_url: byId[meta.id]?.preview_url ?? null,
+    }));
+    res.json({ voices });
+  } catch (err) {
+    // Return voices without preview_url if ElevenLabs is unreachable
+    res.json({ voices: PROMO_VOICE_META.map(v => ({ ...v, preview_url: null })) });
+  }
+});
+
+const SAMPLE_TEXT = "Hey, this is how I sound. I can narrate your promo videos with clarity and energy.";
+
+router.get("/promo-video/voice-sample/:voiceId", requireAuth, async (req, res) => {
+  const { voiceId } = req.params;
+  const storageKey  = `promo-voice-samples/${voiceId}.mp3`;
+
+  // Serve cached sample if it already exists
+  const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
+  const head = await fetch(publicUrl, { method: "HEAD" }).catch(() => ({ ok: false }));
+  if (head.ok) return res.redirect(publicUrl);
+
+  // Generate via ElevenLabs and cache
+  try {
+    const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method:  "POST",
+      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY, "Content-Type": "application/json", "Accept": "audio/mpeg" },
+      body: JSON.stringify({ text: SAMPLE_TEXT, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
+    });
+    if (!elRes.ok) return res.status(502).json({ error: "ElevenLabs sample generation failed" });
+
+    const buffer = Buffer.from(await elRes.arrayBuffer());
+    await supabaseAdmin.storage.from("user-assets").upload(storageKey, buffer, { contentType: "audio/mpeg", upsert: true });
+
+    res.set("Content-Type", "audio/mpeg");
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/elevenlabs/voices", requireAuth, async (_req, res) => {
   try {
     const elRes = await fetch("https://api.elevenlabs.io/v1/voices", {

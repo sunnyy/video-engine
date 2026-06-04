@@ -10,7 +10,7 @@
  */
 
 import { openai } from "../../../../server/middleware/shared.js";
-import { BASE_SYSTEM_PROMPT, buildSceneDesignerPrompt } from "./intentPrompts.js";
+import { buildSceneDesignerPrompt } from "./intentPrompts.js";
 
 const SCENE_DESIGNER_MODEL = "gpt-5.4";
 
@@ -22,14 +22,17 @@ const SCENE_DESIGNER_MODEL = "gpt-5.4";
  * @returns {string}              — raw HTML string for this scene
  */
 export async function designScene(scene, projectContext) {
-  const userPrompt = buildSceneDesignerPrompt(scene.intent, scene, projectContext);
+  const prompt = buildSceneDesignerPrompt(scene.script_segment, {
+    ...projectContext,
+    layoutVariant: scene.layout_variant ?? null,
+  });
 
   const response = await openai.chat.completions.create({
     model:       SCENE_DESIGNER_MODEL,
     max_completion_tokens: 16000,
     messages: [
-      { role: "system", content: BASE_SYSTEM_PROMPT },
-      { role: "user",   content: userPrompt         },
+      { role: "system", content: prompt.system },
+      { role: "user",   content: prompt.user   },
     ],
   });
 

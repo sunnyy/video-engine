@@ -1,10 +1,47 @@
+import fs   from "fs";
+import path from "path";
+import { tmpdir } from "os";
+import ffmpeg     from "fluent-ffmpeg";
+import ffmpegPath from "ffmpeg-static";
 import { openai, supabaseAdmin } from "../../../server/middleware/shared.js";
 
-const VALID_VOICES = ["nova", "shimmer", "coral", "alloy", "sage", "ash", "onyx", "echo", "fable", "verse", "marin", "cedar"];
-const DEFAULT_VOICE = "nova";
-const TTS_MODEL = "tts-1-hd";
-const STORAGE_BUCKET = "user-assets";
-const TRAILING_BUFFER = 0.3; // seconds of silence kept after audio ends
+ffmpeg.setFfmpegPath(ffmpegPath);
+
+/* Normalize audio to -9 LUFS — identical filter to tts.js */
+function normalizeLoudness(inputBuffer) {
+  return new Promise((resolve, reject) => {
+    const tag     = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const rawPath = path.join(tmpdir(), `promo-raw-${tag}.mp3`);
+    const outPath = path.join(tmpdir(), `promo-norm-${tag}.mp3`);
+    fs.writeFileSync(rawPath, inputBuffer);
+    ffmpeg(rawPath)
+      .audioFilters("loudnorm=I=-9:TP=-1:LRA=7")
+      .audioCodec("libmp3lame")
+      .audioBitrate("192k")
+      .output(outPath)
+      .on("end", () => {
+        const normalized = fs.readFileSync(outPath);
+        try { fs.unlinkSync(rawPath); } catch {}
+        try { fs.unlinkSync(outPath); } catch {}
+        resolve(normalized);
+      })
+      .on("error", (err) => {
+        try { fs.unlinkSync(rawPath); } catch {}
+        try { fs.unlinkSync(outPath); } catch {}
+        reject(err);
+      })
+      .run();
+  });
+}
+
+const STORAGE_BUCKET    = "user-assets";
+const TRAILING_BUFFER   = 0.3;
+const DEFAULT_VOICE     = "nova";           // OpenAI fallback (kept for injectVoiceoversIntoTimeline)
+const TTS_MODEL         = "tts-1-hd";
+
+// ElevenLabs — curated voices for promo videos
+const ELEVENLABS_API    = "https://api.elevenlabs.io/v1/text-to-speech";
+const DEFAULT_EL_VOICE  = "21m00Tcm4TlvDq8ikWAM"; // Rachel
 
 // Word-count based floor — 160 WPM is conservative for OpenAI TTS at speed 1.0
 function estimateScriptDuration(script) {
@@ -86,6 +123,88 @@ export async function generatePromoVoiceovers(voiceover_queue, projectId) {
   }
 
   return results;
+}
+
+/**
+ * generateFullVoiceover(script, projectId, voiceId?)
+ * Generates a single ElevenLabs MP3 for the entire video script.
+ * Returns { audio_url, duration_seconds, buffer }
+ */
+export async function generateFullVoiceover(script, projectId, voiceId) {
+  if (!script?.trim()) return { audio_url: null, duration_seconds: 0, buffer: null };
+
+  const vid = voiceId || DEFAULT_EL_VOICE;
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
+
+  const response = await fetch(`${ELEVENLABS_API}/${vid}`, {
+    method:  "POST",
+    headers: {
+      "xi-api-key":   apiKey,
+      "Content-Type": "application/json",
+      "Accept":       "audio/mpeg",
+    },
+    body: JSON.stringify({
+      text:           script.trim(),
+      model_id:       "eleven_multilingual_v2",
+      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`ElevenLabs TTS error ${response.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const rawBuffer = Buffer.from(await response.arrayBuffer());
+
+  // Normalize loudness to -9 LUFS — matches tts.js and typographyVideo.js pipelines
+  let buffer = rawBuffer;
+  try {
+    buffer = await normalizeLoudness(rawBuffer);
+  } catch (normErr) {
+    console.warn("[ttsGenerator] loudnorm failed, uploading raw audio:", normErr.message);
+  }
+
+  const parsed           = parseMp3Duration(buffer);
+  const estimated        = estimateScriptDuration(script.trim());
+  const duration_seconds = parsed != null ? Math.max(parsed, estimated) : estimated;
+
+  const storageKey = `promo-voiceovers/${projectId}/full.mp3`;
+  const { error: uploadErr } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .upload(storageKey, buffer, { contentType: "audio/mpeg", upsert: true });
+  if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message}`);
+
+  const { data: { publicUrl } } = supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(storageKey);
+
+  console.log(`[ttsGenerator] ElevenLabs voiceover (${vid}): ${duration_seconds.toFixed(2)}s → ${storageKey}`);
+  return { audio_url: publicUrl, duration_seconds, buffer };
+}
+
+/**
+ * transcribeWithTimestamps(buffer)
+ * Calls Whisper on a Buffer of MP3 audio, returns word-level timestamps.
+ * Returns Array<{ word: string, start: number, end: number }>
+ */
+export async function transcribeWithTimestamps(buffer) {
+  try {
+    const file = new File([buffer], "audio.mp3", { type: "audio/mpeg" });
+    const transcription = await openai.audio.transcriptions.create({
+      model:                    "whisper-1",
+      file,
+      response_format:          "verbose_json",
+      timestamp_granularities:  ["word"],
+    });
+    const words = transcription.words ?? [];
+    console.log(`[ttsGenerator] Whisper: ${words.length} words transcribed`);
+    return words;
+  } catch (err) {
+    console.warn("[ttsGenerator] Whisper transcription failed (non-fatal):", err.message);
+    return [];
+  }
 }
 
 export function injectVoiceoversIntoTimeline(timeline, voiceover_results) {

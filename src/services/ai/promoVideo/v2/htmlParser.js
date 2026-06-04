@@ -107,7 +107,22 @@ function resolveElementStyles(el, cssRules) {
 
 // ── Transform resolution ──────────────────────────────────────────────────────
 
-function resolveTransform(style, layerType = "gradient") {
+// Lines to reserve for `height:auto` text elements, keyed by role.
+// Single-line roles get 1.3; multi-line roles get more.
+const AUTO_HEIGHT_LINES = {
+  "stat-number": 1.3,
+  kicker:        1.3,
+  label:         1.3,
+  badge:         1.5,
+  divider:       1.2,
+  icon:          1.5,
+  headline:      2.5,
+  subhead:       3.0,
+  body:          4.0,
+  step:          2.0,
+};
+
+function resolveTransform(style, layerType = "gradient", role = "") {
   const left   = cssNum(style["left"]);
   const top    = cssNum(style["top"]);
   const right  = cssNum(style["right"]);
@@ -119,9 +134,11 @@ function resolveTransform(style, layerType = "gradient") {
   if (rawHeight && rawHeight !== "auto") height = cssNum(rawHeight) ?? null;
   if (height == null) {
     if (layerType === "text") {
-      const fontSize   = cssNum(style["font-size"])   ?? 48;
-      const lineHeight = cssNum(style["line-height"]) ?? 1.3;
-      height = Math.round(fontSize * lineHeight * 4);
+      const fontSize      = cssNum(style["font-size"])   ?? 48;
+      const rawLineHeight = cssNum(style["line-height"]) ?? 1.3;
+      const lineHeight    = rawLineHeight > 4 ? rawLineHeight / fontSize : rawLineHeight;
+      const lines         = AUTO_HEIGHT_LINES[role] ?? 2.0;
+      height = Math.round(fontSize * lineHeight * lines);
     } else {
       height = width; // square fallback for non-text (circles etc.)
     }
@@ -154,7 +171,8 @@ function roleToTrackId(role) {
     divider:       "track_accent",
     step:          "track_text",
     icon:          "track_icon",
-    logo:          "track_logo",
+    logo:               "track_logo",
+    "image-placeholder": "track_overlay",
   };
   return map[role] ?? "track_text";
 }
@@ -219,7 +237,7 @@ export function parseSceneHTML(htmlString, sceneIndex) {
 
   console.log(`[htmlParser] scene ${sceneIndex} — found ${elements.length} elements with data-role`);
 
-  const graph   = [];
+  let graph     = [];
   const usedIds = new Set();
 
   for (const el of elements) {
@@ -238,34 +256,14 @@ export function parseSceneHTML(htmlString, sceneIndex) {
     // Merge CSS class styles + inline styles
     const style = resolveElementStyles(el, cssRules);
 
-    // Nested [data-role] elements use parent-relative CSS coordinates.
-    // Walk up and accumulate parent left/top so positions become canvas-absolute.
-    let parentOffsetLeft = 0, parentOffsetTop = 0;
-    let parentEl = el.parentNode;
-    while (parentEl) {
-      if (parentEl.getAttribute?.("data-role")) {
-        const ps = resolveElementStyles(parentEl, cssRules);
-        parentOffsetLeft += cssNum(ps["left"]) ?? 0;
-        parentOffsetTop  += cssNum(ps["top"])  ?? 0;
-      }
-      parentEl = parentEl.parentNode;
-    }
-    const effectiveStyle = (parentOffsetLeft || parentOffsetTop)
-      ? { ...style, left: `${(cssNum(style["left"]) ?? 0) + parentOffsetLeft}px`, top: `${(cssNum(style["top"]) ?? 0) + parentOffsetTop}px` }
-      : style;
-
-    // Gradient elements that contain visible text act as text layers
-    // (background is preserved in style.background by the text branch below).
-    // Exception: if the element has [data-role] children, those children are
-    // parsed as their own layers — don't steal their text or the parent becomes
-    // a duplicate text layer stacked on top of the child.
+    // All elements use canvas-absolute coordinates — no parent offset needed.
     const rawText = el.text?.trim() ?? "";
     const hasDataRoleChildren = !!el.querySelector("[data-role]");
     let type = layerToType(layer, role);
     if (type === "gradient" && rawText && !hasDataRoleChildren) type = "text";
 
     const trackId = roleToTrackId(role);
-    let { x, y, width, height } = resolveTransform(effectiveStyle, type);
+    let { x, y, width, height } = resolveTransform(style, type, role);
 
     // Clamp to canvas bounds — allow slight bleed for intentional off-edge glow/crop effects
     x      = Math.max(-200, Math.min(x,      1080));
@@ -303,7 +301,10 @@ export function parseSceneHTML(htmlString, sceneIndex) {
     };
 
     if (type === "text") {
-      entry.text = rawText;
+      entry.text = rawText
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/[ \t]+\n/g, "\n")
+        .trim();
       // Badge/pill wrappers put text styling on a child <span>, not the container.
       // Inherit missing font properties from the first child span's inline style.
       const firstSpan = el.querySelector("span");
@@ -315,7 +316,7 @@ export function parseSceneHTML(htmlString, sceneIndex) {
         fontWeight:    cssNum(ts("font-weight"))    ?? 700,
         color:         ts("color")                  ?? "#ffffff",
         letterSpacing: cssNum(ts("letter-spacing")) ?? 0,
-        lineHeight:    cssNum(style["line-height"]) ?? 1.2,
+        lineHeight:    (() => { const r = cssNum(style["line-height"]) ?? 1.2; const fs = cssNum(style["font-size"]) ?? 48; return r > 4 ? r / fs : r; })(),
         textAlign:     style["text-align"]          ?? "left",
         textTransform: style["text-transform"]      ?? "none",
         textShadow:    style["text-shadow"]         ?? null,
@@ -326,14 +327,78 @@ export function parseSceneHTML(htmlString, sceneIndex) {
     } else if (type === "gradient") {
       entry.background = style["background"] ?? style["background-color"] ?? null;
     } else if (type === "image") {
-      // For <img> elements (e.g. data-role="logo"), extract the src attribute directly.
-      const imgSrc = el.tagName?.toLowerCase() === "img" ? (el.getAttribute("src") || null) : null;
-      entry.src       = imgSrc;
-      entry.objectFit = style["object-fit"] ?? "contain";
+      if (role === "image-placeholder") {
+        entry.src       = null;
+        entry.assetType = el.getAttribute("data-asset-type") || "stock";
+        entry.assetHint = el.getAttribute("data-asset-hint") || null;
+        entry.objectFit = "cover";
+      } else {
+        // For <img> elements (e.g. data-role="logo"), extract the src attribute directly.
+        const imgSrc = el.tagName?.toLowerCase() === "img" ? (el.getAttribute("src") || null) : null;
+        entry.src       = imgSrc;
+        entry.objectFit = style["object-fit"] ?? "contain";
+      }
+    }
+
+    // Fix 1 — skip image layers with no src (except placeholders — they get resolved later)
+    if (entry.type === "image" && !entry.src && role !== "image-placeholder") continue;
+
+    // Fix 2 — cap text element width based on x position
+    if (entry.type === "text") {
+      const maxWidth = Math.max(100, (1080 - entry.x - 90));
+      if (entry.width > maxWidth) entry.width = maxWidth;
+    }
+
+    // Recalculate text height from content metrics — never trust GPT's hardcoded height
+    if (entry.type === "text" && entry.text) {
+      const fontSize     = entry.style.fontSize || 16;
+      const lh           = entry.style.lineHeight || 1.2;
+      const lineHeightPx = lh > 4 ? lh : lh * fontSize;
+      const charsPerLine = Math.floor(entry.width / (fontSize * 0.55));
+      const lines        = Math.ceil(entry.text.length / Math.max(1, charsPerLine));
+      entry.height       = Math.ceil(lines * lineHeightPx) + 20;
+    }
+
+    // Fix 4 — skip elements whose text content is a GPT design note
+    if (entry.type === "text" && entry.text) {
+      const designNotePatterns = [
+        /a hook scene built to/i,
+        /because that's the problem/i,
+        /designed to feel/i,
+        /this scene/i,
+        /visual metaphor for/i,
+        /radiant visual metaphor/i,
+        /cluttered editing stack/i,
+        /radiant.*metaphor/i,
+        /visual.*metaphor/i,
+        /frustration of work/i,
+        /slipping time/i,
+      ];
+      if (designNotePatterns.some(p => p.test(entry.text))) continue;
     }
 
     graph.push(entry);
   }
+
+  // Fix 3 — limit glow layers to 4 per scene
+  const glowLayers = graph.filter(e => e.role === "glow");
+  if (glowLayers.length > 4) {
+    const glowIds = new Set(glowLayers.slice(4).map(e => e.id));
+    graph = graph.filter(e => !glowIds.has(e.id));
+  }
+
+  // Fix 4 — deduplicate elements at exact same x/y position, keep highest zIndex
+  const positionMap = new Map();
+  for (const entry of graph) {
+    const key = `${entry.x},${entry.y}`;
+    if (positionMap.has(key)) {
+      const existing = positionMap.get(key);
+      if (entry.zIndex > existing.zIndex) positionMap.set(key, entry);
+    } else {
+      positionMap.set(key, entry);
+    }
+  }
+  graph = Array.from(positionMap.values());
 
   // If no explicit data-role="background" element exists, synthesize one from
   // the body/html CSS background. AI often places the canvas BG on body {} only.

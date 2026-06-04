@@ -278,23 +278,24 @@ function SfxLayerEl({ layer, currentTime, isPlaying }) {
 }
 
 function AudioLayerEl({ layer, currentTime, isPlaying }) {
-  const ref = useRef(null);
+  const ref     = useRef(null);
   const playing = useRef(false);
   const playbackSpeed = useTimelineStore((s) => s.playbackSpeed);
   const sourceTime = (layer.trimStart ?? 0) + (currentTime - layer.start);
 
+  function startAudio(el) {
+    el.volume = Math.max(0, Math.min(1, layer.volume ?? 1));
+    el.play().catch(() => {});
+    playing.current = true;
+  }
+
   // Mount: seek to correct position and start if already playing.
-  // Without this, audio never starts when a layer mounts mid-playback
-  // (isPlaying doesn't change so the isPlaying effect below doesn't fire).
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.playbackRate = (layer.playbackRate ?? 1) * (useTimelineStore.getState().playbackSpeed ?? 1);
-    el.currentTime = sourceTime;
-    if (isPlaying) {
-      el.play().catch(() => {});
-      playing.current = true;
-    }
+    el.currentTime = Math.max(0, sourceTime);
+    if (isPlaying) startAudio(el);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -302,19 +303,18 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
     if (!el) return;
     if (!isPlaying) {
       el.pause();
-      el.currentTime = sourceTime;
+      el.currentTime = Math.max(0, sourceTime);
       playing.current = false;
     } else if (!playing.current) {
-      el.currentTime = sourceTime;
-      el.play().catch(() => {});
-      playing.current = true;
+      el.currentTime = Math.max(0, sourceTime);
+      startAudio(el);
     }
   }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = ref.current;
     if (!el || isPlaying) return;
-    el.currentTime = sourceTime;
+    el.currentTime = Math.max(0, sourceTime);
   }, [currentTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

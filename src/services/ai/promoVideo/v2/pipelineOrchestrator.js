@@ -136,6 +136,7 @@ export async function runV2Pipeline(project) {
     mood:            project.style?.music_mood      ?? null,
     musicMood:       project.style?.music_mood      ?? "upbeat",
     voiceId:         project.voice_id               ?? null,
+    sceneCount:      project.scene_count            ?? "auto",
   };
 
   // ── Step 1: Generate script ───────────────────────────────────────────────
@@ -143,9 +144,6 @@ export async function runV2Pipeline(project) {
   const scriptResult = await generateScriptV2(project);
   let scenes     = scriptResult.scenes.map(s => ({ ...s }));
   const full_script = scriptResult.full_script ?? "";
-
-  // DEV: cap at 3 scenes to speed up iteration
-  if (process.env.NODE_ENV !== "production") scenes = scenes.slice(0, 3);
 
   // ── Step 1.5: Asset manifest (saved early so frontend can show it) ────────
   const assetManifest = generateAssetRequirements({ ...project, scenes });

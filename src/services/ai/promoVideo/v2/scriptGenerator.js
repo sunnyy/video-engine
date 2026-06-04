@@ -2,149 +2,193 @@
  * scriptGenerator.js
  * src/services/ai/promoVideo/v2/scriptGenerator.js
  *
- * Generates the structured scene array for a v2 promo video.
- * Each scene has spoken voiceover text, intent, section role,
- * and semantic content fields (headline, stat, items, steps, etc.).
+ * Generates one continuous full_script + scene array for a v2 promo video.
+ * Scene durations are intent-driven budgets; actual timing comes from Whisper
+ * transcription of the single voiceover in pipelineOrchestrator.
  */
 
 import { openai } from "../../../../server/middleware/shared.js";
 
-const SYSTEM_PROMPT = `You are a video script generator for premium SaaS promo videos.
+const INTENT_DURATIONS = {
+  hook:        2.5,
+  frustration: 4.0,
+  benefit:     3.5,
+  feature:     5.0,
+  process:     6.0,
+  statistic:   3.5,
+  proof:       3.5,
+  comparison:  4.5,
+  list:        4.0,
+  statement:   3.0,
+  cta:         2.5,
+};
 
-Generate a promo video script as a structured JSON array. Each element is a scene with spoken voiceover text and semantic content fields.
+export const INTENT_SEQUENCES = {
+  1:    ["hook"],
+  3:    ["hook", "feature", "cta"],
+  5:    ["hook", "frustration", "feature", "benefit", "cta"],
+  7:    ["hook", "frustration", "benefit", "process", "feature", "proof", "cta"],
+  auto: null, // GPT decides, 5-7 scenes
+};
 
-Valid intents: hook, list, process, statistic, feature, benefit, comparison, proof, cta
-Valid section_roles: hook, body, proof, cta
-Narrative flow: hook → benefit or comparison → feature or process → proof or statistic → cta
-5-7 scenes. Every scene must have a distinct intent. No two consecutive scenes with the same intent.
+function buildSystemPrompt(sceneCountInstruction) {
+  return `You are an elite SaaS promo video copywriter who writes scripts that make people stop scrolling.
 
-Rules:
-- Output 5–8 scenes for a 30–60 second video
-- Each scene has a single clear intent
-- Headline is the on-screen text — shorter and more visual than spoken
-- Only populate fields relevant to the intent (e.g. stat+label for statistic, items for list, steps for process)
-- The last scene MUST be intent: "cta"
-- Output JSON array only — no markdown, no explanation, no code blocks
+Your job is to read a product description and write a short-form promo video script that feels human, specific, and emotionally persuasive.
 
-ASSET REQUIREMENTS:
-- feature scenes: always set asset_requirement to "screenshot" and write a specific asset_hint describing exactly what UI screen or feature to show (e.g. "Screenshot of the Vidquence dashboard showing the video timeline editor")
-- comparison scenes: set asset_requirement to "screenshot" with asset_hint describing the before/after context (e.g. "Screenshot of a cluttered manual video editing timeline vs Vidquence's clean one-click interface")
-- hook scenes: set asset_requirement to "image" with asset_hint describing a relevant atmospheric background image (e.g. "content creator at desk looking frustrated at laptop")
-- benefit, process, statistic, proof, list, cta scenes: set asset_requirement to "none"
+Before writing anything, think through:
+1. Who specifically uses this product? What does their day look like? What frustrates them?
+2. What specific painful thing does this product eliminate or replace?
+3. What does success feel like for this customer after using the product?
 
-VOICEOVER RULES — CRITICAL:
-The spoken text must sound like a real human talking, not an AI announcement.
+Then write the script from inside that frustration — not from a feature list.
 
-DO:
-- Write conversational, direct, slightly informal
-- Use contractions: "you're", "it's", "we've", "don't"
-- Start hook with a problem or question the viewer feels: "Still editing videos by hand?", "What if your next video was ready in 60 seconds?"
-- Reference the viewer directly: "you", "your business", "your content"
-- Make benefits specific and tangible: "cuts your editing time from 3 hours to 3 minutes" not "saves time"
-- Flow naturally between scenes — each scene's spoken text should feel connected to the previous one
-- End CTA with a direct, energetic call: "Try Vidquence free today." not "Consider trying our platform."
-- HARD LIMIT: Maximum 8 words per scene spoken field. Count the words. If over 8, cut it.
-- Each spoken line is ONE short phrase. Never a full sentence with a comma or "and".
-- Good examples: "Still editing by hand?", "Your video. Done in seconds.", "No skills needed.", "Try it free today."
-- Bad examples: anything over 8 words, anything with two clauses, anything that sounds like an ad copy paragraph
+SCRIPT RULES:
+- Open with the customer's specific pain. Make them feel seen.
+- Build frustration before introducing the product.
+- Introduce the product as relief, not as a feature.
+- Show the outcome — what their life looks like after.
+- End with one direct, energetic CTA.
+- Sound like a founder talking to a friend. Casual, direct, confident.
+- Use short punchy sentences. One idea per line.
+- Never list features. Never use buzzwords.
+- Never say: revolutionize, unlock, game-changing, next-generation, cutting-edge, leverage, utilize.
+- The product should feel like the solution, not the subject.
 
-DON'T:
-- Start with the product name: never "Vidquence is a platform that..."
-- Use corporate speak: "leverage", "utilize", "cutting-edge", "revolutionary", "game-changing"
-- Make vague claims: "saves time", "easy to use", "powerful features"
-- Sound like a press release or feature list
-- Repeat the same sentence structure scene after scene
+STRUCTURE — follow this arc:
+1. Problem — the customer's specific daily pain
+2. Frustration — what makes it worse, the attempted solutions that fail
+3. Better way — hint that there's a different approach
+4. Product — introduce naturally as the relief
+5. Outcome — specific result the customer experiences
+6. CTA — one direct action, energetic
 
-TONE: Confident, direct, slightly energetic. Like a founder talking to a friend about something they genuinely believe in.
-
-EXAMPLE — BAD spoken text:
-"Vidquence is a revolutionary AI-powered video creation platform that leverages cutting-edge technology to streamline your content creation workflow."
-
-EXAMPLE — GOOD spoken text:
-"Still spending hours editing videos? There's a faster way. Vidquence turns your idea into a ready-to-post short video — in under 60 seconds."
-
-Scene object shape:
+OUTPUT FORMAT — return only valid JSON:
 {
-  "scene_index": 0,
-  "spoken": "...",
-  "intent": "hook",
-  "section_role": "hook",
-  "mood": null,
-  "headline": "...",
-  "subhead": "...",
-  "body": null,
-  "stat": null,
-  "label": null,
-  "emphasis": null,
-  "steps": [],
-  "items": [],
-  "icon": null,
-  "asset_requirement": "none",
-  "asset_hint": null
-}`;
+  "full_script": "complete voiceover from start to finish as natural flowing speech",
+  "scenes": [
+    {
+      "scene_index": 0,
+      "intent": "hook",
+      "duration": 3,
+      "script_segment": "exact words from full_script for this scene",
+      "layout_variant": "one of the layout variant descriptions for this scene's intent — pick whichever best fits the emotional content of this scene's script_segment. Pick a different variant for each scene."
+    }
+  ]
+}
+
+${sceneCountInstruction}
+
+SCENE RULES:
+- One beat per scene. Never combine two beats into one scene.
+- script_segment values must be consecutive substrings of full_script with no gaps.
+- scene intents: hook | frustration | benefit | process | feature | proof | cta
+
+LAYOUT VARIETY RULE:
+Each scene must use a different layout composition. Never use the same layout structure twice in one video.
+When choosing layout_variant, consider what best serves the emotional content of that scene's script_segment.
+
+DURATION RULES — strictly follow these. Shorter is always better:
+- hook: 1.5-2.5 seconds — grab attention fast, no time to breathe
+- frustration: 2.5-3.5 seconds — build the pain quickly
+- benefit: 2-3 seconds — one outcome, stated clearly
+- process: 3-4 seconds — show the flow, not every detail
+- feature: 2.5-3.5 seconds — one feature, one proof
+- proof: 2-3 seconds — one number, full impact
+- comparison: 3-4 seconds — contrast must be instant
+- cta: 1.5-2.5 seconds — one action, high energy
+
+Total video target:
+- 1 scene: 2-3 seconds
+- 3 scenes: 8-15 seconds
+- 5 scenes: 15-25 seconds
+- 7 scenes: 25-40 seconds
+
+Never exceed these. Short-form video moves fast. Dead air kills engagement.`;
+}
 
 /**
  * generateScriptV2(project)
- * Returns { ...project, scenes: parsedScenes, scene_format: 'v2' }
+ * Returns { ...project, scenes, full_script, scene_format: 'v2' }
  */
 export async function generateScriptV2(project) {
-  const userPrompt = `Generate a promo video script for this product:
+  const sceneCount = project.scene_count ?? "auto";
+  const sequence   = INTENT_SEQUENCES[sceneCount] ?? null;
 
-Product: ${project.product_name ?? "Unknown"}
-Description: ${project.product_description ?? "Not provided"}
-Goal: ${project.video_goal ?? "Not specified"}
-Target Audience: ${project.target_audience ?? "General"}
-Niche: ${project.style?.niche ?? "saas"}
-Tone: ${project.tone ?? "professional"}`;
+  const sceneCountInstruction = sequence
+    ? `SCENE COUNT — MANDATORY:
+Generate EXACTLY ${sequence.length} scene${sequence.length === 1 ? "" : "s"} in this exact intent order: ${sequence.join(" → ")}.
+Each scene covers exactly one intent. No more, no fewer.
+The full_script voiceover must be written for exactly ${sequence.length} scene${sequence.length === 1 ? "" : "s"}.
+Total video duration must be ${sequence.length <= 1 ? "3-8" : sequence.length <= 3 ? "10-20" : sequence.length <= 5 ? "20-35" : "35-50"} seconds.`
+    : `SCENE COUNT:
+Generate between 5 and 7 scenes. Choose the best intent sequence for this product.
+Total video duration must be 35-50 seconds.`;
+
+  const systemPrompt = buildSystemPrompt(sceneCountInstruction);
+
+  const userPrompt = `Product Name: ${project.product_name ?? "Unknown"}
+Product Description: ${project.product_description ?? "Not provided"}
+Visual Style: ${project.visual_style ?? project.style?.visualStyle ?? "radiant"}
+Accent Color: ${project.accent_color ?? project.style?.accentColor ?? "#6366f1"}
+Scene Count: ${sceneCount === "auto" ? "Auto (5-7 scenes, you decide)" : sceneCount}
+${sequence ? `Intent sequence to follow exactly: ${sequence.join(" → ")}` : ""}`;
 
   const response = await openai.chat.completions.create({
-    model:      "gpt-4.1",
+    model:       "gpt-4.1",
     temperature: 0.7,
     max_tokens:  4000,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user",   content: userPrompt    },
+      { role: "system", content: systemPrompt },
+      { role: "user",   content: userPrompt   },
     ],
   });
 
   const raw = (response.choices[0].message.content ?? "").trim();
 
-  let parsedScenes;
+  let parsed;
   try {
-    parsedScenes = JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch {
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (match) {
-      parsedScenes = JSON.parse(match[0]);
-    } else {
-      throw new Error(`scriptGenerator: JSON parse failed. GPT returned:\n${raw.slice(0, 500)}`);
-    }
+    const match = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (match) parsed = JSON.parse(match[0]);
+    else throw new Error(`scriptGenerator: JSON parse failed. GPT returned:\n${raw.slice(0, 500)}`);
   }
 
-  if (!Array.isArray(parsedScenes)) {
-    throw new Error(`scriptGenerator: expected JSON array, got ${typeof parsedScenes}`);
+  // Support both new object format and legacy array format
+  const full_script = typeof parsed.full_script === "string" ? parsed.full_script : null;
+  const rawScenes   = Array.isArray(parsed) ? parsed
+    : Array.isArray(parsed.scenes)          ? parsed.scenes
+    : [];
+
+  if (!rawScenes.length) {
+    throw new Error(`scriptGenerator: no scenes found in response`);
   }
 
-  // Normalise — ensure required fields exist on every scene
-  const scenes = parsedScenes.map((s, i) => ({
-    scene_index:      i,
-    scene_id:         i + 1,   // 1-based, matches assetRequirements / upload-asset convention
-    spoken:           s.spoken           ?? "",
-    intent:           s.intent           ?? "statement",
-    section_role:     s.section_role     ?? "body",
-    mood:             s.mood             ?? null,
-    headline:         s.headline         ?? null,
-    subhead:          s.subhead          ?? null,
-    body:             s.body             ?? null,
-    stat:             s.stat             ?? null,
-    label:            s.label            ?? null,
-    emphasis:         s.emphasis         ?? null,
-    steps:            Array.isArray(s.steps) ? s.steps : [],
-    items:            Array.isArray(s.items) ? s.items : [],
-    icon:             s.icon             ?? null,
+  const scenes = rawScenes.map((s, i) => ({
+    scene_index:       i,
+    scene_id:          i + 1,
+    // spoken = script_segment so sceneDesigner still gets per-scene text for the HTML prompt
+    spoken:            s.script_segment ?? s.spoken ?? "",
+    script_segment:    s.script_segment ?? s.spoken ?? "",
+    intent:            s.intent         ?? "statement",
+    section_role:      s.section_role   ?? "body",
+    mood:              s.mood           ?? null,
+    headline:          s.headline       ?? null,
+    subhead:           s.subhead        ?? null,
+    body:              s.body           ?? null,
+    stat:              s.stat           ?? null,
+    label:             s.label          ?? null,
+    emphasis:          s.emphasis       ?? null,
+    steps:             Array.isArray(s.steps) ? s.steps : [],
+    items:             Array.isArray(s.items) ? s.items : [],
+    icon:              s.icon           ?? null,
     asset_requirement: s.asset_requirement ?? "none",
-    asset_hint:       s.asset_hint       ?? null,
-    duration_seconds: null, // filled after TTS
+    asset_hint:        s.asset_hint     ?? null,
+    layout_variant:    s.layout_variant  ?? null,
+    // duration = intent budget; overwritten by Whisper timestamps in the orchestrator
+    duration:          s.duration       ?? INTENT_DURATIONS[s.intent ?? "statement"] ?? 3.0,
+    duration_seconds:  s.duration       ?? INTENT_DURATIONS[s.intent ?? "statement"] ?? 3.0,
   }));
 
   console.log(`[scriptGenerator] ${scenes.length} scenes for ${project.id}`);
@@ -152,8 +196,9 @@ Tone: ${project.tone ?? "professional"}`;
   return {
     ...project,
     scenes,
+    full_script: full_script ?? scenes.map(s => s.script_segment).join(" "),
     scene_format: "v2",
-    status: "script_generated",
-    updated_at: new Date().toISOString(),
+    status:       "script_generated",
+    updated_at:   new Date().toISOString(),
   };
 }
