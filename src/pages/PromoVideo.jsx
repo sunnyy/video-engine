@@ -46,12 +46,6 @@ const TONES = [
   { id: "minimal",      label: "Minimal"      },
 ];
 
-const DURATIONS = [
-  { id: 15, label: "15s" },
-  { id: 30, label: "30s" },
-  { id: 60, label: "60s" },
-  { id: 90, label: "90s" },
-];
 
 const STATUS_META = {
   draft:            { label: "Draft",        color: "#9090c0", bg: "rgba(144,144,192,0.12)" },
@@ -111,11 +105,9 @@ const GENDER_COLORS = {
 };
 
 const SCENE_COUNT_OPTIONS = [
-  { value: "auto", label: "Auto",     description: "AI decides (5-7 scenes)" },
-  { value: 1,      label: "1 Scene",  description: "Single hook — for testing" },
-  { value: 3,      label: "3 Scenes", description: "Quick and punchy" },
-  { value: 5,      label: "5 Scenes", description: "Standard promo" },
-  { value: 7,      label: "7 Scenes", description: "Comprehensive story" },
+  { value: 1, label: "1 Scene",  description: "Single hook — for testing" },
+  { value: 3, label: "3 Scenes", description: "Quick and punchy" },
+  { value: 5, label: "5 Scenes", description: "Standard promo" },
 ];
 
 const TYPOGRAPHY_STYLES = [
@@ -437,7 +429,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [productUrl,  setProductUrl]  = useState(prefill?.product_url ?? "https://vidquence.com/");
   const [productDesc, setProductDesc] = useState(prefill?.product_description ?? "Vidquence is a full-stack AI-powered short-form video creation platform built for content creators, marketers, and agencies. At its core is an automated video generation engine that takes a topic or script, runs it through a multi-stage AI pipeline — script generation, beat classification, layout selection, asset sourcing, DNA-based styling — and produces a complete 9:16 video ready for TikTok, Instagram Reels, and YouTube Shorts.");
   const [platform,    setPlatform]    = useState(prefill?.target_platform ?? "tiktok");
-  const [duration,    setDuration]    = useState(prefill?.duration_seconds ?? 15);
   const [language,    setLanguage]    = useState(prefill?.language ?? "en");
   const [tone,        setTone]        = useState(prefill?.tone ?? "professional");
   const [logoUrl,        setLogoUrl]        = useState(null);
@@ -464,7 +455,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [customAccent,    setCustomAccent]    = useState("");
   const [typographyStyle, setTypographyStyle] = useState("modern");
   const [voiceId,         setVoiceId]         = useState("21m00Tcm4TlvDq8ikWAM");
-  const [sceneCount,      setSceneCount]      = useState("auto");
+  const [sceneCount,      setSceneCount]      = useState(3);
   const [promoVoices,     setPromoVoices]     = useState(PROMO_VOICES);
   const [playingVoiceId,  setPlayingVoiceId]  = useState(null);
   const voiceAudioRef    = useRef(null);
@@ -555,7 +546,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     setProductUrl(prefill.product_url ?? "");
     setProductDesc(prefill.product_description ?? "");
     setPlatform(prefill.target_platform ?? "tiktok");
-    setDuration(prefill.duration_seconds ?? 30);
     setLanguage(prefill.language ?? "en");
     setTone(prefill.tone ?? "professional");
     setStep(0);
@@ -571,7 +561,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     setProductUrl(p.product_url || "");
     setProductDesc(p.product_description || "");
     setPlatform(p.target_platform || "tiktok");
-    setDuration(p.duration_seconds || 30);
     setLanguage(p.language || "en");
     setTone(p.tone || "professional");
     if (p.video_type === "talking_head" || p.has_talking_head) setVideoType("talking_head");
@@ -706,7 +695,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         target_platform:         platform,
         language,
         tone,
-        duration_seconds:        duration,
+
         has_talking_head:        isTH && hasTHVideo === "yes",
         has_voiceover:           !isTH && hasVoiceover === "yes",
         has_script:              !isTH && (hasVoiceover === "yes" || hasScript === "yes"),
@@ -1007,20 +996,23 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             </div>
 
             <div>
-              <label style={C.lbl}>Duration</label>
-              <div style={{ display: "flex", gap: 10 }}>
-                {DURATIONS.map(d => (
-                  <button key={d.id} onClick={() => setDuration(d.id)}
-                    style={{
-                      flex: 1, padding: "14px 0", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
-                      fontSize: 15, fontWeight: 800,
-                      background: duration === d.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.03)",
-                      border: duration === d.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
-                      color: duration === d.id ? T.accent : T.muted,
-                    }}>
-                    {d.label}
-                  </button>
-                ))}
+              <label style={C.lbl}>Video Length</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {SCENE_COUNT_OPTIONS.map(opt => {
+                  const sel = sceneCount === opt.value;
+                  return (
+                    <button key={opt.value} onClick={() => setSceneCount(opt.value)}
+                      style={{
+                        padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                        textAlign: "left", display: "flex", flexDirection: "column", gap: 2,
+                        background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
+                      }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: sel ? T.accent : T.text }}>{opt.label}</span>
+                      <span style={{ fontSize: 11, color: T.muted }}>{opt.description}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1242,28 +1234,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                         background: gc.bg, border: `1px solid ${gc.border}`, color: gc.color }}>
                         {v.gender}
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Video Length */}
-            <div>
-              <label style={C.lbl}>Video Length</label>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {SCENE_COUNT_OPTIONS.map(opt => {
-                  const sel = sceneCount === opt.value;
-                  return (
-                    <button key={opt.value} onClick={() => setSceneCount(opt.value)}
-                      style={{
-                        padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
-                        textAlign: "left", display: "flex", flexDirection: "column", gap: 2,
-                        background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.03)",
-                        border: sel ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
-                      }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: sel ? T.accent : T.text }}>{opt.label}</span>
-                      <span style={{ fontSize: 11, color: T.muted }}>{opt.description}</span>
                     </button>
                   );
                 })}

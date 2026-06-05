@@ -24,11 +24,33 @@ const INTENT_DURATIONS = {
 };
 
 export const INTENT_SEQUENCES = {
-  1:    ["hook"],
-  3:    ["hook", "feature", "cta"],
-  5:    ["hook", "frustration", "feature", "benefit", "cta"],
-  7:    ["hook", "frustration", "benefit", "process", "feature", "proof", "cta"],
-  auto: null, // GPT decides, 5-7 scenes
+  1: ["hook"],
+  3: ["hook", "solution", "cta"],
+  5: ["hook", "frustration", "solution", "feature", "cta"],
+};
+
+const SCENE_WORD_BUDGETS = {
+  hook:        { duration: 4,   words: 16 },
+  frustration: { duration: 5,   words: 20 },
+  solution:    { duration: 4,   words: 16 },
+  benefit:     { duration: 4,   words: 16 },
+  process:     { duration: 6,   words: 24 },
+  feature:     { duration: 5,   words: 20 },
+  proof:       { duration: 4,   words: 16 },
+  comparison:  { duration: 5,   words: 20 },
+  cta:         { duration: 4,   words: 16 },
+};
+
+const INTENT_DESCRIPTIONS = {
+  hook:        "open with a specific recognizable question that signals the product category immediately — the viewer must know within 2 seconds what kind of product this is for. Follow with a rapid-fire list of specific painful tasks the target customer actually does. Never open with abstract mood or atmosphere.",
+  frustration: "build the frustration — what makes it worse",
+  solution:    "introduce the product by name — what it is, what it does, why it exists. This is the first time the product name appears in the video",
+  benefit:     "one specific emotional outcome",
+  process:     "show how it works, briefly",
+  feature:     "one specific capability, one proof",
+  proof:       "one number or metric that proves it works",
+  comparison:  "before vs after, make the contrast obvious",
+  cta:         "one direct energetic action — product name + call to action as a single flowing thought. No em dashes. No full stops mid-sentence.",
 };
 
 function buildSystemPrompt(sceneCountInstruction) {
@@ -44,24 +66,45 @@ Before writing anything, think through:
 Then write the script from inside that frustration — not from a feature list.
 
 SCRIPT RULES:
-- Open with the customer's specific pain. Make them feel seen.
-- Build frustration before introducing the product.
-- Introduce the product as relief, not as a feature.
-- Show the outcome — what their life looks like after.
-- End with one direct, energetic CTA.
 - Sound like a founder talking to a friend. Casual, direct, confident.
-- Use short punchy sentences. One idea per line.
+- Write in short fragments, not complete sentences. One idea per line. Like a human talking fast.
+- Vary sentence length dramatically — mix very short punchy lines with slightly longer ones for rhythm.
+- For problem/frustration scenes: use a rapid-fire list of specific pain points the customer recognizes from their own life. Not a paragraph — each item 2–4 words. "Writing scripts. Finding assets. Tweaking layouts. Fixing captions."
 - Never list features. Never use buzzwords.
 - Never say: revolutionize, unlock, game-changing, next-generation, cutting-edge, leverage, utilize.
 - The product should feel like the solution, not the subject.
+- Every word must earn its place. Cut anything that doesn't move the story forward.
+- Read the script out loud. If it sounds like a press release, rewrite it. If it sounds like a founder venting to a friend, it's right.
 
-STRUCTURE — follow this arc:
-1. Problem — the customer's specific daily pain
-2. Frustration — what makes it worse, the attempted solutions that fail
-3. Better way — hint that there's a different approach
-4. Product — introduce naturally as the relief
-5. Outcome — specific result the customer experiences
-6. CTA — one direct action, energetic
+PRODUCT NAME RULE:
+Never mention "AI" in the script. Refer to the product by name instead.
+Wrong: "AI builds your video in seconds"
+Right: "[Product name] turns your topic into a finished video in seconds"
+The product name must appear at least twice: once in the solution scene, once in the CTA.
+
+SOLUTION SCENE RULE:
+The solution scene introduces the product for the first time. Name it directly.
+Tell the viewer what it does in one clear line, then show the relief — what changes for the customer.
+Structure: "[Product] is your [what it does]. [What the customer gets]."
+
+PUNCTUATION RULE:
+- Periods: use after each complete pain point or statement. Each item in a list of frustrations gets its own period — natural breath between each one.
+- Commas: use only to connect fragments that are part of the same single thought. Never for separating list items.
+- Em dash (—): dramatic pause between two contrasting beats. "Stuck for hours — done in seconds."
+- Question marks: perfect for opening hooks that address the viewer directly.
+
+PAIN POINT LISTS — always use periods, never commas:
+WRONG: "Writing scripts, finding stock, endless cuts, audio won't sync."
+RIGHT: "Writing scripts. Finding stock. Endless cuts. Audio won't sync."
+
+FLOWING SINGLE THOUGHTS — use commas:
+RIGHT: "Just drop your topic and get a finished video, done."
+
+CTA PUNCTUATION — never use em dash in CTA. Use a comma instead.
+The CTA must read as one continuous energetic thought, not two separate statements.
+WRONG: "Stop wasting hours — try Vidquence free today"
+RIGHT: "Stop wasting hours, try Vidquence free today"
+RIGHT: "Skip the grind, launch Vidquence now"
 
 OUTPUT FORMAT — return only valid JSON:
 {
@@ -72,7 +115,7 @@ OUTPUT FORMAT — return only valid JSON:
       "intent": "hook",
       "duration": 3,
       "script_segment": "exact words from full_script for this scene",
-      "layout_variant": "one of the layout variant descriptions for this scene's intent — pick whichever best fits the emotional content of this scene's script_segment. Pick a different variant for each scene."
+      "visual_concept": "one short phrase describing the visual approach for this scene — e.g. 'typography hero — single giant statement, dark atmosphere' or 'split composition — stock photo right, pain points list left'"
     }
   ]
 }
@@ -84,27 +127,21 @@ SCENE RULES:
 - script_segment values must be consecutive substrings of full_script with no gaps.
 - scene intents: hook | frustration | benefit | process | feature | proof | cta
 
-LAYOUT VARIETY RULE:
-Each scene must use a different layout composition. Never use the same layout structure twice in one video.
-When choosing layout_variant, consider what best serves the emotional content of that scene's script_segment.
+VARIETY RULE:
+Every scene must have a different visual_concept. Never repeat the same compositional approach twice.
+Plan the full video's visual arc before assigning concepts — ensure the sequence feels dynamic and varied.
+Examples of visual_concept:
+- "typography hero — single giant statement, dark atmosphere, no cards"
+- "split composition — frustrated person stock photo right, pain points list left"
+- "hub and spoke diagram — product center, inputs radiating outward"
+- "full-bleed AI image background, headline overlay bottom third"
+- "numbered steps left panel, product visual right"
+- "single metric enormous centered, deep atmospheric glow"
+- "product name giant with gradient, clean minimal CTA"
 
-DURATION RULES — strictly follow these. Shorter is always better:
-- hook: 1.5-2.5 seconds — grab attention fast, no time to breathe
-- frustration: 2.5-3.5 seconds — build the pain quickly
-- benefit: 2-3 seconds — one outcome, stated clearly
-- process: 3-4 seconds — show the flow, not every detail
-- feature: 2.5-3.5 seconds — one feature, one proof
-- proof: 2-3 seconds — one number, full impact
-- comparison: 3-4 seconds — contrast must be instant
-- cta: 1.5-2.5 seconds — one action, high energy
-
-Total video target:
-- 1 scene: 2-3 seconds
-- 3 scenes: 8-15 seconds
-- 5 scenes: 15-25 seconds
-- 7 scenes: 25-40 seconds
-
-Never exceed these. Short-form video moves fast. Dead air kills engagement.`;
+WORD COUNT IS MANDATORY:
+Each scene's script_segment must not exceed the word limit shown. Count the words before submitting. If over limit, cut until within budget. This is not a suggestion.
+Do not pad. Do not add filler sentences to reach a duration.`;
 }
 
 /**
@@ -112,18 +149,23 @@ Never exceed these. Short-form video moves fast. Dead air kills engagement.`;
  * Returns { ...project, scenes, full_script, scene_format: 'v2' }
  */
 export async function generateScriptV2(project) {
-  const sceneCount = project.scene_count ?? "auto";
-  const sequence   = INTENT_SEQUENCES[sceneCount] ?? null;
+  const sceneCount = INTENT_SEQUENCES[project.scene_count] ? project.scene_count : 3;
+  const sequence   = INTENT_SEQUENCES[sceneCount];
 
-  const sceneCountInstruction = sequence
-    ? `SCENE COUNT — MANDATORY:
-Generate EXACTLY ${sequence.length} scene${sequence.length === 1 ? "" : "s"} in this exact intent order: ${sequence.join(" → ")}.
-Each scene covers exactly one intent. No more, no fewer.
-The full_script voiceover must be written for exactly ${sequence.length} scene${sequence.length === 1 ? "" : "s"}.
-Total video duration must be ${sequence.length <= 1 ? "3-8" : sequence.length <= 3 ? "10-20" : sequence.length <= 5 ? "20-35" : "35-50"} seconds.`
-    : `SCENE COUNT:
-Generate between 5 and 7 scenes. Choose the best intent sequence for this product.
-Total video duration must be 35-50 seconds.`;
+  const totalDuration  = sequence.reduce((s, intent) => s + (SCENE_WORD_BUDGETS[intent]?.duration ?? 3), 0);
+  const structureLines = sequence.map((intent, i) => {
+    const budget = SCENE_WORD_BUDGETS[intent] ?? { duration: 3, words: 8 };
+    return `  Scene ${i + 1} — ${intent} (~${budget.duration}s, maximum ${budget.words} words): ${INTENT_DESCRIPTIONS[intent] ?? intent}`;
+  }).join("\n");
+
+  const sceneCountInstruction = `SCENE COUNT — MANDATORY:
+Generate EXACTLY ${sequence.length} scene${sequence.length === 1 ? "" : "s"}. No more, no fewer.
+
+STRUCTURE AND WORD LIMITS FOR THIS VIDEO:
+${structureLines}
+Total estimated duration: ~${totalDuration}s
+
+Each scene's script_segment must stay within its word limit. Count the words.`;
 
   const systemPrompt = buildSystemPrompt(sceneCountInstruction);
 
@@ -185,7 +227,7 @@ ${sequence ? `Intent sequence to follow exactly: ${sequence.join(" → ")}` : ""
     icon:              s.icon           ?? null,
     asset_requirement: s.asset_requirement ?? "none",
     asset_hint:        s.asset_hint     ?? null,
-    layout_variant:    s.layout_variant  ?? null,
+    visual_concept:    s.visual_concept  ?? null,
     // duration = intent budget; overwritten by Whisper timestamps in the orchestrator
     duration:          s.duration       ?? INTENT_DURATIONS[s.intent ?? "statement"] ?? 3.0,
     duration_seconds:  s.duration       ?? INTENT_DURATIONS[s.intent ?? "statement"] ?? 3.0,

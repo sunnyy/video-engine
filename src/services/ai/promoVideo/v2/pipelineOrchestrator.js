@@ -23,7 +23,7 @@ import { supabaseAdmin }                              from "../../../../server/m
 import { generateFullVoiceover, transcribeWithTimestamps } from "../ttsGenerator.js";
 import { pickAutoMood }                               from "../../../../core/registries/musicRegistry.js";
 import { generateScriptV2 }                           from "./scriptGenerator.js";
-import { designAllScenes }                            from "./sceneDesigner.js";
+import { designScene }                                from "./sceneDesigner.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
 import { buildTimeline }                              from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "../assetRequirements.js";
@@ -157,20 +157,28 @@ export async function runV2Pipeline(project) {
     console.warn("[v2/pipeline] early asset manifest save failed (non-fatal):", e.message);
   }
 
-  // ── Step 2: Design all scenes as HTML ────────────────────────────────────
-  console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes`);
-  const designResults = await designAllScenes(scenes, projectContext);
-
-  // ── Step 3: Parse HTML → scene graphs ────────────────────────────────────
-  const sceneGraphs = designResults.map((result, i) => {
-    if (result.error || !result.html) {
-      console.warn(`[v2/pipeline] scene ${i} design failed: ${result.error}`);
-      return [];
-    }
-    const graph = parseSceneHTML(result.html, i);
-    console.log(`[v2/pipeline] scene ${i} graph: ${graph.length} layers${graph.length > 0 ? ` — first: ${JSON.stringify(graph[0]).slice(0, 120)}` : " — EMPTY"}`);
-    return graph;
-  });
+  // ── Steps 2+3: Design scenes in parallel (visual_concept planned upfront, no sequential dependency) ──
+  console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes in parallel`);
+  const sceneGraphs = await Promise.all(
+    scenes.map(async (scene, index) => {
+      try {
+        const html = await designScene(scene, {
+          ...projectContext,
+          visualConcept:  scene.visual_concept ?? null,
+          previousScenes: scenes
+            .filter((_, i) => i !== index)
+            .map(s => ({ index: s.scene_index, intent: s.intent, visual_concept: s.visual_concept })),
+        });
+        console.log(`[v2/pipeline] scene ${scene.scene_index} (${scene.intent}) — ${html?.length ?? 0} chars`);
+        const graph = parseSceneHTML(html || "", scene.scene_index);
+        console.log(`[v2/pipeline] scene ${scene.scene_index} graph: ${graph.length} layers${graph.length > 0 ? ` — first: ${JSON.stringify(graph[0]).slice(0, 120)}` : " — EMPTY"}`);
+        return graph;
+      } catch (err) {
+        console.error(`[v2/pipeline] scene ${scene.scene_index} design failed:`, err.message);
+        return [];
+      }
+    })
+  );
 
   // ── Step 4: Single TTS for the full continuous voiceover ──────────────────
   // Trim full_script to dev-capped scenes if needed
@@ -206,12 +214,16 @@ export async function runV2Pipeline(project) {
   // Whisper timestamps often leave a small gap at the end because the last word
   // boundary doesn't perfectly align with the actual audio file length.
   if (voiceoverDuration > 0 && scenes.length > 0) {
+    const TRAIL_BUFFER = 0.4;
     const sumDurations = scenes.reduce((acc, s) => acc + (s.duration_seconds ?? 0), 0);
+    const last = scenes[scenes.length - 1];
     if (voiceoverDuration > sumDurations) {
-      const last = scenes[scenes.length - 1];
-      last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + (voiceoverDuration - sumDurations)).toFixed(3));
-      console.log(`[v2/pipeline] extended last scene by ${(voiceoverDuration - sumDurations).toFixed(3)}s to match voiceover`);
+      const extension = parseFloat((voiceoverDuration - sumDurations).toFixed(3));
+      last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + extension).toFixed(3));
+      console.log(`[v2/pipeline] extended last scene by ${extension}s to match voiceover`);
     }
+    last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + TRAIL_BUFFER).toFixed(3));
+    console.log(`[v2/pipeline] added ${TRAIL_BUFFER}s trail buffer to last scene`);
   }
 
   // ── Step 6: Build final timeline ──────────────────────────────────────────
@@ -238,7 +250,7 @@ export async function runV2Pipeline(project) {
           visible:   true,
           locked:    false,
           trimStart: 0,
-          trimEnd:   Math.min(voiceoverDuration, totalDur),
+          trimEnd:   totalDur,
           volume:    1.5,
           muted:     false,
           fadeIn:    0.1,
@@ -272,7 +284,7 @@ export async function runV2Pipeline(project) {
         start: 0, end: musicDur, zIndex: 0,
         visible: true, locked: false,
         trimStart: 0, trimEnd: musicDur,
-        volume: 0.15, muted: false, fadeIn: 1, fadeOut: 1,
+        volume: 0.25, muted: false, fadeIn: 1, fadeOut: 1,
         sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
       });
       console.log(`[v2/pipeline] music injected: "${track.title}" (${mood})`);
@@ -331,7 +343,7 @@ export async function runV2Pipeline(project) {
         mode:              "timeline",
         source:            "promo_video_v2",
         editor_version:    "timeline",
-        raw_ai_json:       { scenes_html: designResults.map(r => ({ sceneIndex: r.sceneIndex, html: r.html, error: r.error })) },
+        raw_ai_json:       { scenes: scenes.map(s => ({ sceneIndex: s.scene_index, intent: s.intent, visual_concept: s.visual_concept })) },
       })
       .select("id")
       .single();

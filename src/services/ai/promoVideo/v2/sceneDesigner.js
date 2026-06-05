@@ -22,10 +22,7 @@ const SCENE_DESIGNER_MODEL = "gpt-5.4";
  * @returns {string}              — raw HTML string for this scene
  */
 export async function designScene(scene, projectContext) {
-  const prompt = buildSceneDesignerPrompt(scene.script_segment, {
-    ...projectContext,
-    layoutVariant: scene.layout_variant ?? null,
-  });
+  const prompt = buildSceneDesignerPrompt(scene.script_segment, { ...projectContext, sceneIntent: scene.intent });
 
   const response = await openai.chat.completions.create({
     model:       SCENE_DESIGNER_MODEL,

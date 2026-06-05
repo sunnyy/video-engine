@@ -43,12 +43,33 @@ function estimateDuration(spoken) {
 // ── Proportional element spread across scene duration ────────────────────────
 
 const SPREAD_WINDOWS = {
-  background: { start: 0,    end: 0    }, // always instant
-  decoration: { start: 0.02, end: 0.08 }, // very early, atmospheric
-  hero:       { start: 0.08, end: 0.55 }, // spread across first half
-  supporting: { start: 0.35, end: 0.80 }, // spread across middle-late
-  workflow:   { start: 0.45, end: 0.92 }, // spread across late portion
+  background: { start: 0.00, end: 0.00 },
+  decoration: { start: 0.00, end: 0.04 },
+  hero:       { start: 0.00, end: 0.25 }, // headline at t=0
+  supporting: { start: 0.15, end: 0.40 },
+  workflow:   { start: 0.25, end: 0.50 },
 };
+
+// Within each group, higher-priority roles appear first
+const ROLE_PRIORITY = {
+  headline:        0,
+  kicker:          1,
+  subhead:         2,
+  "stat-number":   3,
+  badge:           4,
+  label:           5,
+  "image-placeholder": 6,
+  card:            7,
+  step:            8,
+  icon:            9,
+  divider:         10,
+  glow:            11,
+  decoration:      12,
+  background:      13,
+};
+
+const MAX_SPREAD    = 0.50; // all elements fully visible by 50% of scene duration
+const ANIM_DURATION = 0.30; // time the animation itself takes (fade/slide)
 
 function calculateElementDelay(entry, groupIndex, groupSize, sceneDuration) {
   const group  = entry.sceneElement ?? "supporting";
@@ -58,7 +79,7 @@ function calculateElementDelay(entry, groupIndex, groupSize, sceneDuration) {
   const spacing        = groupSize > 1 ? windowDuration / groupSize : 0;
   const delay          = (window.start * sceneDuration) + (groupIndex * spacing);
 
-  const maxDelay = Math.max(0, sceneDuration - 0.35 - 0.3);
+  const maxDelay = Math.max(0, (sceneDuration * MAX_SPREAD) - ANIM_DURATION);
   return parseFloat(Math.min(delay, maxDelay).toFixed(3));
 }
 
@@ -254,15 +275,27 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
       return true;
     });
 
+    // Sort within each sceneElement group by role priority so headline
+    // always gets groupIndex=0 regardless of HTML DOM order
+    const GROUP_ORDER = { background: 0, decoration: 1, hero: 2, supporting: 3, workflow: 4 };
+    const prioritized = [...visible].sort((a, b) => {
+      const ga = GROUP_ORDER[a.sceneElement ?? "supporting"] ?? 3;
+      const gb = GROUP_ORDER[b.sceneElement ?? "supporting"] ?? 3;
+      if (ga !== gb) return ga - gb;
+      const pa = ROLE_PRIORITY[a.role] ?? 99;
+      const pb = ROLE_PRIORITY[b.role] ?? 99;
+      return pa - pb;
+    });
+
     // Count elements per sceneElement group for proportional spacing
     const groupSizes  = {};
     const groupIndex  = {};
-    for (const entry of visible) {
+    for (const entry of prioritized) {
       const g = entry.sceneElement ?? "supporting";
       groupSizes[g] = (groupSizes[g] ?? 0) + 1;
     }
 
-    for (const entry of visible) {
+    for (const entry of prioritized) {
       const group = entry.sceneElement ?? "supporting";
       const idx   = groupIndex[group] ?? 0;
       groupIndex[group] = idx + 1;
