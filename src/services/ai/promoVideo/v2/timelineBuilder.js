@@ -6,9 +6,9 @@
  * Output is compatible with the timeline editor and Remotion renderer.
  */
 
-const FPS  = 30;
-const W    = 1080;
-const H    = 1920;
+const FPS      = 30;
+const W_DEFAULT = 1080;
+const H_DEFAULT = 1920;
 
 const NO_KF = { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] };
 
@@ -231,6 +231,8 @@ function graphEntryToLayer(entry, start, end, delay = 0) {
  * @returns {object}                   — complete timeline JSON
  */
 export function buildTimeline(sceneGraphs, scenes, projectContext) {
+  const canvasW = projectContext.canvasWidth  ?? W_DEFAULT;
+  const canvasH = projectContext.canvasHeight ?? H_DEFAULT;
   console.log(`[timelineBuilder] called with ${sceneGraphs.length} graphs, ${scenes.length} scenes`);
   if (sceneGraphs[0]?.length) {
     console.log(`[timelineBuilder] sceneGraphs[0] length: ${sceneGraphs[0].length}, first entry: ${(JSON.stringify(sceneGraphs[0][0]) ?? "").slice(0, 200)}`);
@@ -330,7 +332,7 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
     version: "2.0",
     id:      projectContext.projectId ?? null,
     name:    `${projectContext.productName ?? "Promo Video"} — Promo`,
-    format:  { width: W, height: H, fps: FPS, duration: totalDuration },
+    format:  { width: canvasW, height: canvasH, fps: FPS, duration: totalDuration },
     layers,
     meta: {
       source:           "promo_video_v2",

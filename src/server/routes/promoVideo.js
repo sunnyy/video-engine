@@ -49,6 +49,8 @@ function rowToProject(row) {
     visual_style:        row.visual_style        || "radiant",
     accent_color:        row.accent_color        || "#6366f1",
     typography_style:    row.typography_style    || "modern",
+    format_ratio:        row.style?.format_ratio ?? '9:16',
+    theme:               row.style?.theme        ?? 'dark',
     created_at:          row.created_at,
     updated_at:          row.updated_at,
   };
@@ -154,11 +156,14 @@ router.post("/create", requireAuth, async (req, res) => {
       has_logo:         !!has_logo,
       has_voiceover:    !!has_voiceover,
       logo_url:         logo_url || null,
+      language:         language         || "en",
       visual_style:     visual_style     || "radiant",
+      theme:            req.body.theme   || "dark",
       accent_color:     accent_color     || "#6366f1",
       typography_style: typography_style || "modern",
       voice_id:         voice_id         || "21m00Tcm4TlvDq8ikWAM",
       scene_count:      scene_count      ?? "auto",
+      format_ratio:     req.body.format_ratio || '9:16',
     };
 
     let thSegments = null; // raw segments with timestamps, saved to talking_head_segments column
@@ -291,6 +296,8 @@ router.post("/create", requireAuth, async (req, res) => {
         motion_style:     project.motion_style     ?? null,
         color_palette:    project.color_palette    ?? null,
         music_mood:       project.music_mood       ?? null,
+        format_ratio:     project.format_ratio     ?? '9:16',
+        theme:            project.theme            ?? 'dark',
       },
       scenes:                   project.scenes || [],
       scene_format:             project.scene_format || null,
@@ -527,6 +534,63 @@ router.delete("/:projectId", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("[promo-video/delete]", e.message);
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET /promo-video/voices ──────────────────────────────────────────────────
+// Must be defined before /:projectId to prevent the wildcard from intercepting it.
+const PROMO_VOICE_META = [
+  { id: "21m00Tcm4TlvDq8ikWAM", label: "Rachel",  gender: "female", desc: "Calm & professional"  },
+  { id: "EXAVITQu4vr4xnSDxMaL", label: "Bella",   gender: "female", desc: "Warm & expressive"    },
+  { id: "XrExE9yKIg1WjnnlVkGX", label: "Matilda", gender: "female", desc: "Friendly & natural"   },
+  { id: "onwK4e9ZLuTAKqWW03F9", label: "Daniel",  gender: "male",   desc: "Deep & authoritative" },
+  { id: "pNInz6obpgDQGcFmaJgB", label: "Adam",    gender: "male",   desc: "Bold & commanding"    },
+];
+
+const LANG_TO_EL_CODE = { hinglish: "hi", es: "es" };
+
+router.get("/voices", requireAuth, async (req, res) => {
+  const lang   = req.query.lang;
+  const elCode = LANG_TO_EL_CODE[lang];
+
+  // Non-English: fetch top voices from ElevenLabs shared library filtered by language.
+  // Shared-voice preview_url is already recorded in the target language — no sample generation needed.
+  if (elCode) {
+    try {
+      const elRes = await fetch(
+        `https://api.elevenlabs.io/v1/shared-voices?language=${elCode}&page_size=6&sort=usage`,
+        { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }
+      );
+      if (!elRes.ok) throw new Error(`ElevenLabs ${elRes.status}`);
+      const data   = await elRes.json();
+      const voices = (data.voices || []).slice(0, 5).map(v => ({
+        id:          v.voice_id,
+        label:       v.name,
+        gender:      v.labels?.gender ?? "female",
+        desc:        v.description?.slice(0, 40) ?? "",
+        preview_url: v.preview_url ?? null,
+      }));
+      return res.json({ voices });
+    } catch (err) {
+      console.warn("[promo-video/voices] ElevenLabs shared-voices failed:", err.message);
+      return res.json({ voices: [] });
+    }
+  }
+
+  // English: return curated list enriched with ElevenLabs preview URLs.
+  try {
+    const elRes = await fetch("https://api.elevenlabs.io/v1/voices", {
+      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
+    });
+    const data = elRes.ok ? await elRes.json() : { voices: [] };
+    const byId = Object.fromEntries((data.voices || []).map(v => [v.voice_id, v]));
+    const voices = PROMO_VOICE_META.map(meta => ({
+      ...meta,
+      preview_url: byId[meta.id]?.preview_url ?? null,
+    }));
+    res.json({ voices });
+  } catch {
+    res.json({ voices: PROMO_VOICE_META.map(v => ({ ...v, preview_url: null })) });
   }
 });
 

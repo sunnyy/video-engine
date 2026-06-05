@@ -10,8 +10,8 @@
 
 import { parse } from "node-html-parser";
 
-const CANVAS_W = 1080;
-const CANVAS_H = 1920;
+const CANVAS_W_DEFAULT = 1080;
+const CANVAS_H_DEFAULT = 1920;
 
 // ── CSS helpers ───────────────────────────────────────────────────────────────
 
@@ -122,12 +122,12 @@ const AUTO_HEIGHT_LINES = {
   step:          2.0,
 };
 
-function resolveTransform(style, layerType = "gradient", role = "") {
+function resolveTransform(style, layerType = "gradient", role = "", canvasW = CANVAS_W_DEFAULT, canvasH = CANVAS_H_DEFAULT) {
   const left   = cssNum(style["left"]);
   const top    = cssNum(style["top"]);
   const right  = cssNum(style["right"]);
   const bottom = cssNum(style["bottom"]);
-  const width  = cssNum(style["width"]) ?? CANVAS_W;
+  const width  = cssNum(style["width"]) ?? canvasW;
 
   const rawHeight = style["height"];
   let height;
@@ -146,9 +146,9 @@ function resolveTransform(style, layerType = "gradient", role = "") {
 
   let x = 0, y = 0;
   if (left != null)        x = left;
-  else if (right != null)  x = CANVAS_W - right - width;
+  else if (right != null)  x = canvasW - right - width;
   if (top != null)         y = top;
-  else if (bottom != null) y = CANVAS_H - bottom - height;
+  else if (bottom != null) y = canvasH - bottom - height;
 
   return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
 }
@@ -220,9 +220,11 @@ function parseBorder(style) {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
- * parseSceneHTML(htmlString, sceneIndex)
+ * parseSceneHTML(htmlString, sceneIndex, canvas)
  */
-export function parseSceneHTML(htmlString, sceneIndex) {
+export function parseSceneHTML(htmlString, sceneIndex, canvas = { width: CANVAS_W_DEFAULT, height: CANVAS_H_DEFAULT }) {
+  const canvasW = canvas.width;
+  const canvasH = canvas.height;
   if (!htmlString) return [];
 
   console.log(`[htmlParser] scene ${sceneIndex} — html length: ${htmlString.length}`);
@@ -263,13 +265,13 @@ export function parseSceneHTML(htmlString, sceneIndex) {
     if (type === "gradient" && rawText && !hasDataRoleChildren) type = "text";
 
     const trackId = roleToTrackId(role);
-    let { x, y, width, height } = resolveTransform(style, type, role);
+    let { x, y, width, height } = resolveTransform(style, type, role, canvasW, canvasH);
 
     // Clamp to canvas bounds — allow slight bleed for intentional off-edge glow/crop effects
-    x      = Math.max(-200, Math.min(x,      1080));
-    y      = Math.max(-200, Math.min(y,      1920));
-    width  = Math.min(width,  1280);
-    height = Math.min(height, 2120);
+    x      = Math.max(-200, Math.min(x,      canvasW));
+    y      = Math.max(-200, Math.min(y,      canvasH));
+    width  = Math.min(width,  canvasW + 200);
+    height = Math.min(height, canvasH + 200);
 
     const zIndex = cssNum(style["z-index"]) ?? (
       role === "background"                    ? 0  :
@@ -345,7 +347,7 @@ export function parseSceneHTML(htmlString, sceneIndex) {
 
     // Fix 2 — cap text element width based on x position
     if (entry.type === "text") {
-      const maxWidth = Math.max(100, (1080 - entry.x - 90));
+      const maxWidth = Math.max(100, (canvasW - entry.x - 90));
       if (entry.width > maxWidth) entry.width = maxWidth;
     }
 
@@ -413,13 +415,30 @@ export function parseSceneHTML(htmlString, sceneIndex) {
         id: `s${sceneIndex}_background`,
         role: "background", layer: "gradient", animation: "none", sceneElement: "background",
         type: "gradient", trackId: "track_background",
-        x: 0, y: 0, width: CANVAS_W, height: CANVAS_H,
+        x: 0, y: 0, width: canvasW, height: canvasH,
         rotation: 0, zIndex: 0, opacity: 1,
         borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
         filter: null, boxShadow: null, mixBlendMode: null, backdropFilter: null,
         background: bg, text: null, style: {},
       });
     }
+  }
+
+  // Vertical reflow — push text elements down if they overlap elements above them.
+  // GPT often positions elements using estimated headline heights that are too small.
+  // After height recalculation above, this pass corrects downstream y values.
+  const textEls = graph
+    .filter(e => e.type === "text")
+    .sort((a, b) => a.y - b.y);
+
+  for (let i = 1; i < textEls.length; i++) {
+    const prev = textEls[i - 1];
+    const curr = textEls[i];
+    // Only reflow elements that share horizontal space — leave side-by-side columns alone
+    const hOverlap = curr.x < prev.x + prev.width && curr.x + curr.width > prev.x;
+    if (!hOverlap) continue;
+    const minY = prev.y + prev.height + 40;
+    if (curr.y < minY) curr.y = minY;
   }
 
   graph.sort((a, b) => a.zIndex - b.zIndex);

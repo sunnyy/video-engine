@@ -24,12 +24,13 @@ const INTENT_DURATIONS = {
 };
 
 export const INTENT_SEQUENCES = {
-  1: ["hook"],
+  1: ["standalone"],
   3: ["hook", "solution", "cta"],
   5: ["hook", "frustration", "solution", "feature", "cta"],
 };
 
 const SCENE_WORD_BUDGETS = {
+  standalone:  { duration: 8,   words: 32 },
   hook:        { duration: 4,   words: 16 },
   frustration: { duration: 5,   words: 20 },
   solution:    { duration: 4,   words: 16 },
@@ -42,6 +43,7 @@ const SCENE_WORD_BUDGETS = {
 };
 
 const INTENT_DESCRIPTIONS = {
+  standalone:  "complete self-contained video in one scene — (1) open with the customer pain using a specific recognizable question or rapid-fire list, (2) introduce the product by name as the direct solution, (3) end with a clear energetic CTA. All three beats in one flowing script. The product name must appear at least once. Never leave the viewer without knowing what the product is and what to do next.",
   hook:        "open with a specific recognizable question that signals the product category immediately — the viewer must know within 2 seconds what kind of product this is for. Follow with a rapid-fire list of specific painful tasks the target customer actually does. Never open with abstract mood or atmosphere.",
   frustration: "build the frustration — what makes it worse",
   solution:    "introduce the product by name — what it is, what it does, why it exists. This is the first time the product name appears in the video",
@@ -53,7 +55,27 @@ const INTENT_DESCRIPTIONS = {
   cta:         "one direct energetic action — product name + call to action as a single flowing thought. No em dashes. No full stops mid-sentence.",
 };
 
-function buildSystemPrompt(sceneCountInstruction) {
+const TONE_INSTRUCTIONS = {
+  professional: `TONE — PROFESSIONAL:
+Write with authority and measured confidence. Credible, direct, business-appropriate language.
+No casual slang. Longer, complete thoughts where needed. Still human — never corporate jargon.
+Energy: calm and assured. Pace: measured. Every line should feel considered.`,
+  casual: `TONE — CASUAL:
+Write exactly like a founder talking to a friend. Contractions everywhere. Loose conversational rhythm.
+Slang is fine. Informal phrasing is good. If it sounds like a real person, it's right.
+Energy: relaxed and warm. Pace: natural speech. Never stiff.`,
+  energetic: `TONE — ENERGETIC:
+Maximum energy throughout. Short, sharp, punchy lines. FOMO-driven urgency in every sentence.
+Imperatives everywhere. Fast pace. Like a hype reel. Make the viewer feel they're missing out right now.
+Energy: electric. Pace: fast. Every word should have momentum.`,
+  minimal: `TONE — MINIMAL:
+Strip everything back. Only say what absolutely must be said — nothing more.
+No enthusiasm markers. No filler words. No "amazing" or "powerful". Just clean precise statements.
+Energy: quiet confidence. Pace: deliberate. Fewer words is always better.`,
+};
+
+function buildSystemPrompt(sceneCountInstruction, languageInstruction, tone = "professional") {
+  const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.professional;
   return `You are an elite SaaS promo video copywriter who writes scripts that make people stop scrolling.
 
 Your job is to read a product description and write a short-form promo video script that feels human, specific, and emotionally persuasive.
@@ -64,6 +86,9 @@ Before writing anything, think through:
 3. What does success feel like for this customer after using the product?
 
 Then write the script from inside that frustration — not from a feature list.
+
+${languageInstruction}
+${toneInstruction}
 
 SCRIPT RULES:
 - Sound like a founder talking to a friend. Casual, direct, confident.
@@ -158,8 +183,15 @@ export async function generateScriptV2(project) {
     return `  Scene ${i + 1} — ${intent} (~${budget.duration}s, maximum ${budget.words} words): ${INTENT_DESCRIPTIONS[intent] ?? intent}`;
   }).join("\n");
 
-  const sceneCountInstruction = `SCENE COUNT — MANDATORY:
-Generate EXACTLY ${sequence.length} scene${sequence.length === 1 ? "" : "s"}. No more, no fewer.
+  const sceneCountInstruction = sceneCount === 1
+    ? `SCENE COUNT — MANDATORY:
+Generate EXACTLY 1 scene with intent: standalone.
+This is a complete self-contained video — problem, product introduction, and CTA all in one scene.
+Maximum ${SCENE_WORD_BUDGETS.standalone.words} words. Target duration: ~${SCENE_WORD_BUDGETS.standalone.duration}s.
+The product name must appear at least once. End with a clear call to action.
+Count the words before submitting.`
+    : `SCENE COUNT — MANDATORY:
+Generate EXACTLY ${sequence.length} scenes. No more, no fewer.
 
 STRUCTURE AND WORD LIMITS FOR THIS VIDEO:
 ${structureLines}
@@ -167,12 +199,47 @@ Total estimated duration: ~${totalDuration}s
 
 Each scene's script_segment must stay within its word limit. Count the words.`;
 
-  const systemPrompt = buildSystemPrompt(sceneCountInstruction);
+  const languageInstruction =
+    project.language === "hinglish" ? `LANGUAGE — HINGLISH:
+Write the full_script entirely in Hinglish — the natural mix of Hindi and English with respect.
+Tone: casual, energetic, relatable, FOMO-driven. Like a friend talking, not a formal voiceover.
+Rules:
+- Product name always in English
+- Technical terms in English (video, script, caption, timeline, upload, AI, content)
+- Emotion, flow, and conversational hooks in Hindi
+- Never write pure formal Hindi — it must sound like how someone actually talks in a reel
+- Use FOMO triggers naturally: "sab kar rahe hain", "peeche mat raho", "abhi try karo"
+
+Example Hinglish style:
+"Kya, abhi bhi hours waste kar rahe ho videos banane mein? Scripts likhna, assets dhundhna, captions fix karna — sab manually? [Product] try karo — topic daalo, video ready. Baki sab [Product] handle karega. Abhi start karo, free mein."
+
+The full_script must be speakable naturally by an ElevenLabs multilingual voice at 1.1x speed.
+`
+    : project.language === "es" ? `LANGUAGE — SPANISH:
+Write the full_script in conversational Latin American Spanish.
+Tone: casual, energetic, direct, relatable. Like a creator talking to their audience.
+Rules:
+- Product name always in English
+- Technical terms in English (video, script, caption, timeline, upload)
+- Everything else in natural conversational Spanish
+- Always use "tú" — never formal "usted"
+- Use FOMO triggers naturally: "todos lo están usando", "no te quedes atrás", "pruébalo ahora"
+
+Example Spanish style:
+"¿Todavía pasas horas editando videos cortos? Escribiendo scripts, buscando assets, ajustando captions — todo a mano. [Product] lo hace por ti. Pon tu tema, el video está listo. Pruébalo gratis ahora."
+
+The full_script must be speakable naturally by an ElevenLabs multilingual voice at 1.1x speed.
+`
+    : `LANGUAGE — ENGLISH:
+Write the full_script in English.
+`;
+
+  const tone = project.tone ?? "professional";
+  const systemPrompt = buildSystemPrompt(sceneCountInstruction, languageInstruction, tone);
 
   const userPrompt = `Product Name: ${project.product_name ?? "Unknown"}
 Product Description: ${project.product_description ?? "Not provided"}
-Visual Style: ${project.visual_style ?? project.style?.visualStyle ?? "radiant"}
-Accent Color: ${project.accent_color ?? project.style?.accentColor ?? "#6366f1"}
+Tone: ${tone}
 Scene Count: ${sceneCount === "auto" ? "Auto (5-7 scenes, you decide)" : sceneCount}
 ${sequence ? `Intent sequence to follow exactly: ${sequence.join(" → ")}` : ""}`;
 

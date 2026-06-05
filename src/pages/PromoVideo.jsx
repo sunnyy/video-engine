@@ -25,18 +25,16 @@ const C = {
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PLATFORMS = [
-  { id: "tiktok",         label: "TikTok"         },
-  { id: "reels",          label: "Reels"          },
-  { id: "youtube_shorts", label: "YouTube Shorts" },
-  { id: "linkedin",       label: "LinkedIn"       },
+const FORMAT_OPTIONS = [
+  { value: "9:16", label: "Vertical",   hint: "TikTok · Reels",   shape: { w: 7,  h: 13 } },
+  { value: "16:9", label: "Horizontal", hint: "YouTube · LinkedIn", shape: { w: 15, h: 9  } },
+  { value: "1:1",  label: "Square",     hint: "Instagram · Feed",  shape: { w: 11, h: 11 } },
 ];
 
 const LANGUAGES = [
-  { id: "en", label: "English" }, { id: "es", label: "Spanish" },
-  { id: "fr", label: "French"  }, { id: "de", label: "German"  },
-  { id: "pt", label: "Portuguese" }, { id: "hi", label: "Hindi" },
-  { id: "ja", label: "Japanese" }, { id: "zh", label: "Chinese" },
+  { id: "en",       label: "English"              },
+  { id: "hinglish", label: "Hinglish (Hindi + EN)" },
+  { id: "es",       label: "Spanish"              },
 ];
 
 const TONES = [
@@ -64,21 +62,17 @@ const RENDER_MESSAGES = [
   "Rendering video…",
 ];
 
-const WIZARD_STEPS = ["Video Type", "Setup", "Style", "Assets", "Generating"];
+const WIZARD_STEPS = ["Video Type", "Product", "Settings", "Style"];
 
 const VISUAL_STYLES = [
   { id: "radiant",       label: "Radiant",       desc: "Glows & depth",
     bg: "#06040e", glow: "radial-gradient(circle at 50% 35%, rgba(99,102,241,0.85) 0%, transparent 65%)", accent: "#6366f1", light: false },
-  { id: "minimal",       label: "Minimal",        desc: "Clean & flat",
+  { id: "minimal",       label: "Minimal",       desc: "Clean & flat",
     bg: "#f2f2f6", glow: null, accent: "#111111", light: true },
-  { id: "professional",  label: "Professional",   desc: "Structured, dark",
+  { id: "professional",  label: "Professional",  desc: "Structured, dark",
     bg: "#0c1118", glow: "linear-gradient(180deg, rgba(56,189,248,0.2) 0%, transparent 60%)", accent: "#38bdf8", light: false },
-  { id: "high-contrast", label: "High Contrast",  desc: "Bold & sharp",
+  { id: "high-contrast", label: "High Contrast", desc: "Bold & sharp",
     bg: "#000000", glow: null, accent: "#f5c518", light: false },
-  { id: "soothing",      label: "Soothing",       desc: "Soft & muted",
-    bg: "linear-gradient(160deg,#1a0e2e,#0e1a2e)", glow: "radial-gradient(circle at 50% 50%, rgba(167,139,250,0.4) 0%, transparent 65%)", accent: "#a78bfa", light: false },
-  { id: "cinematic",     label: "Cinematic",       desc: "Dramatic dark",
-    bg: "#010101", glow: "radial-gradient(ellipse at 50% 20%, rgba(200,160,80,0.24) 0%, transparent 55%)", accent: "#c9a227", light: false },
 ];
 
 const ACCENT_SWATCHES = [
@@ -99,15 +93,35 @@ const PROMO_VOICES = [
   { id: "pNInz6obpgDQGcFmaJgB", label: "Adam",    gender: "male",   desc: "Bold & commanding"    },
 ];
 
+// Voices tuned for Hinglish — all use eleven_multilingual_v2
+const HINGLISH_VOICES = [
+  { id: "9BWtsMINqrJLrRacOk9x", label: "Aria",    gender: "female", desc: "Natural Hinglish" },
+  { id: "XB0fDUnXU5powFXDhCwa", label: "Sarah",   gender: "female", desc: "Warm & relatable"       },
+  { id: "IKne3meq5aSn9XLyUdCD", label: "Charlie", gender: "male",   desc: "Energetic, casual"      },
+];
+
+// Voices tuned for Spanish — all use eleven_multilingual_v2
+const SPANISH_VOICES = [
+  { id: "XB0fDUnXU5powFXDhCwa", label: "Charlotte", gender: "female", desc: "Natural, warm Latina"     },
+  { id: "pFZP5JQG7iQjIQuC4Bku", label: "Lily",      gender: "female", desc: "Energetic, young"          },
+  { id: "onwK4e9ZLuTAKqWW03F9", label: "Daniel",    gender: "male",   desc: "Confident, professional"   },
+];
+
 const GENDER_COLORS = {
   female: { bg: "rgba(244,114,182,0.12)", border: "rgba(244,114,182,0.3)", color: "#f472b6" },
   male:   { bg: "rgba(96,165,250,0.12)",  border: "rgba(96,165,250,0.3)",  color: "#60a5fa" },
 };
 
 const SCENE_COUNT_OPTIONS = [
-  { value: 1, label: "1 Scene",  description: "Single hook — for testing" },
-  { value: 3, label: "3 Scenes", description: "Quick and punchy" },
-  { value: 5, label: "5 Scenes", description: "Standard promo" },
+  { value: 1, label: "1 Scene",  description: "Single hook — for testing", dots: 1 },
+  { value: 3, label: "3 Scenes", description: "Quick and punchy",          dots: 3 },
+  { value: 5, label: "5 Scenes", description: "Standard promo",            dots: 5 },
+];
+
+const THEME_OPTIONS = [
+  { value: "dark",   label: "Dark",   description: "Deep dark backgrounds" },
+  { value: "medium", label: "Medium", description: "Balanced mid-tone"     },
+  { value: "light",  label: "Light",  description: "Clean light backgrounds"},
 ];
 
 const TYPOGRAPHY_STYLES = [
@@ -309,7 +323,7 @@ function ProjectCard({ project: p, onDelete }) {
     : null;
 
   function handleClick() {
-    if (isComplete && p.editor_project_id) navigate(`/video-editor/${p.editor_project_id}`);
+    if (isComplete && p.editor_project_id) navigate(`/video-editor/${p.editor_project_id}`, { state: { from: "/promo-video" } });
     else navigate(`/promo-video/${p.id}`);
   }
 
@@ -428,7 +442,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [productName, setProductName] = useState(prefill?.product_name ?? "Vidquence");
   const [productUrl,  setProductUrl]  = useState(prefill?.product_url ?? "https://vidquence.com/");
   const [productDesc, setProductDesc] = useState(prefill?.product_description ?? "Vidquence is a full-stack AI-powered short-form video creation platform built for content creators, marketers, and agencies. At its core is an automated video generation engine that takes a topic or script, runs it through a multi-stage AI pipeline — script generation, beat classification, layout selection, asset sourcing, DNA-based styling — and produces a complete 9:16 video ready for TikTok, Instagram Reels, and YouTube Shorts.");
-  const [platform,    setPlatform]    = useState(prefill?.target_platform ?? "tiktok");
+  const [formatRatio, setFormatRatio] = useState("9:16");
   const [language,    setLanguage]    = useState(prefill?.language ?? "en");
   const [tone,        setTone]        = useState(prefill?.tone ?? "professional");
   const [logoUrl,        setLogoUrl]        = useState(null);
@@ -451,15 +465,20 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
   // Step 2 — Style Preferences
   const [visualStyle,     setVisualStyle]     = useState("radiant");
+  const [theme,           setTheme]           = useState("dark");
   const [accentColor,     setAccentColor]     = useState("#6366f1");
   const [customAccent,    setCustomAccent]    = useState("");
   const [typographyStyle, setTypographyStyle] = useState("modern");
   const [voiceId,         setVoiceId]         = useState("21m00Tcm4TlvDq8ikWAM");
   const [sceneCount,      setSceneCount]      = useState(3);
   const [promoVoices,     setPromoVoices]     = useState(PROMO_VOICES);
+  const [langVoices,      setLangVoices]      = useState({});
   const [playingVoiceId,  setPlayingVoiceId]  = useState(null);
   const voiceAudioRef    = useRef(null);
   const requestedVoiceRef = useRef(null);
+
+  // Step 4/5
+  const [editorProjectId, setEditorProjectId] = useState(null);
 
   // Step 3 — Asset Collection
   const [projectId,     setProjectId]     = useState(null);
@@ -479,16 +498,34 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [renderError,  setRenderError]  = useState("");
   const pollRef = useRef(null);
 
-  // Fetch ElevenLabs preview URLs for promo voices when step 2 becomes visible
+  // Fetch voices from ElevenLabs when Settings step (2) becomes visible.
   useEffect(() => {
     if (step !== 2) return;
-    serverFetch("/api/promo-video/voices")
-      .then(r => r.json())
-      .then(d => { if (d.voices?.length) setPromoVoices(d.voices); })
-      .catch(() => {});
-  }, [step]);
+    if (language === "en") {
+      serverFetch("/api/promo-video/voices")
+        .then(r => r.json())
+        .then(d => { if (d.voices?.length) setPromoVoices(d.voices); })
+        .catch(() => {});
+    } else if (language === "hinglish" || language === "es") {
+      if (langVoices[language]) return; // already fetched
+      serverFetch(`/api/promo-video/voices?lang=${language}`)
+        .then(r => r.json())
+        .then(d => { if (d.voices?.length) setLangVoices(prev => ({ ...prev, [language]: d.voices })); })
+        .catch(() => {});
+    }
+  }, [step, language]);
 
-  // Stop any playing voice preview when leaving step 2
+  // Reset voice selection to first available voice when language or fetched voice list changes
+  useEffect(() => {
+    const voices =
+      language === "hinglish" ? (langVoices.hinglish?.length ? langVoices.hinglish : HINGLISH_VOICES) :
+      language === "es"       ? (langVoices.es?.length       ? langVoices.es       : SPANISH_VOICES)  :
+      promoVoices;
+    const first = voices[0]?.id;
+    if (first) setVoiceId(first);
+  }, [language, langVoices, promoVoices]);
+
+  // Stop any playing voice preview when leaving the Settings step
   useEffect(() => {
     if (step !== 2) {
       voiceAudioRef.current?.pause();
@@ -518,7 +555,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     try {
       let url = voice.preview_url;
       if (!url) {
-        const res = await serverFetch(`/api/promo-video/voice-sample/${voice.id}`);
+        const res = await serverFetch(`/api/promo-video/voice-sample/${voice.id}?lang=${language}`);
         if (!res.ok) throw new Error(`Sample fetch failed: ${res.status}`);
         const blob = await res.blob();
         url = URL.createObjectURL(blob);
@@ -527,7 +564,13 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
       if (requestedVoiceRef.current !== voice.id) return;
 
       const audio = new Audio(url);
-      audio.onended = () => { voiceAudioRef.current = null; setPlayingVoiceId(null); };
+      const ctx   = new AudioContext();
+      const src   = ctx.createMediaElementSource(audio);
+      const gain  = ctx.createGain();
+      gain.gain.value = 2.5;
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      audio.onended = () => { voiceAudioRef.current = null; setPlayingVoiceId(null); ctx.close(); };
       voiceAudioRef.current = audio;
       await audio.play();
     } catch (err) {
@@ -545,7 +588,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     setProductName(prefill.product_name ?? "");
     setProductUrl(prefill.product_url ?? "");
     setProductDesc(prefill.product_description ?? "");
-    setPlatform(prefill.target_platform ?? "tiktok");
     setLanguage(prefill.language ?? "en");
     setTone(prefill.tone ?? "professional");
     setStep(0);
@@ -560,7 +602,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     setProductName(p.product_name || "");
     setProductUrl(p.product_url || "");
     setProductDesc(p.product_description || "");
-    setPlatform(p.target_platform || "tiktok");
+    setFormatRatio(p.format_ratio || "9:16");
+    setTheme(p.theme || "dark");
     setLanguage(p.language || "en");
     setTone(p.tone || "professional");
     if (p.video_type === "talking_head" || p.has_talking_head) setVideoType("talking_head");
@@ -568,20 +611,34 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     setProjectId(p.id);
 
     const s = p.status;
+    const manifest = initialState.assetManifest;
     if (s === "script_generated" || s === "waiting_assets" || s === "assets_ready") {
-      if (initialState.assetManifest) setAssetManifest(initialState.assetManifest);
-      setStep(3);
+      if (manifest) setAssetManifest(manifest);
+      if ((manifest?.total_user_uploads_required ?? 0) > 0) {
+        if (p.editor_project_id) setEditorProjectId(p.editor_project_id);
+        setStep(5);
+      } else if (p.editor_project_id) {
+        navigate(`/video-editor/${p.editor_project_id}`, { replace: true, state: { from: "/promo-video" } });
+      } else {
+        setStep(4);
+      }
     } else if (s === "ready_for_render" || s === "rendering") {
       setStep(4);
     } else if (s === "rendered" && p.editor_project_id) {
-      navigate(`/video-editor/${p.editor_project_id}`, { replace: true });
+      if ((manifest?.total_user_uploads_required ?? 0) > 0) {
+        if (manifest) setAssetManifest(manifest);
+        setEditorProjectId(p.editor_project_id);
+        setStep(5);
+      } else {
+        navigate(`/video-editor/${p.editor_project_id}`, { replace: true, state: { from: "/promo-video" } });
+      }
     }
     // "draft" → stay on step 0 with pre-filled form
   }, [initialState]);
 
   // Step 4: status message cycling
   useEffect(() => {
-    if (step !== 4 || renderError) return;
+    if (step !== 4 || renderError) return;  // step 4 = generating
     const iv = setInterval(() => setMsgIdx(i => (i + 1) % RENDER_MESSAGES.length), 4000);
     return () => clearInterval(iv);
   }, [step, renderError]);
@@ -598,7 +655,12 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         if (p.status === "rendered") {
           clearInterval(pollRef.current);
           if (p.editor_project_id) {
-            navigate(`/video-editor/${p.editor_project_id}`, { replace: true });
+            if ((assetManifest?.total_user_uploads_required ?? 0) > 0) {
+              setEditorProjectId(p.editor_project_id);
+              setStep(5);
+            } else {
+              navigate(`/video-editor/${p.editor_project_id}`, { replace: true, state: { from: "/promo-video" } });
+            }
           } else if (p.video_url) {
             window.open(p.video_url, "_blank");
             setRenderError("Video ready — editor project not created. Video opened in new tab.");
@@ -615,13 +677,15 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   }, [step, projectId, renderError]);
 
   // Derived validation
-  const step1ValidTH = !!thUrl;
-  const step1ValidFaceless =
-    productName.trim().length > 0 && productDesc.trim().length > 0 &&
-    (hasVoiceover === "yes" && !!voUrl ||
-     hasVoiceover === "no" && hasScript === "yes" && scriptText.trim().length > 0 ||
-     hasVoiceover === "no" && hasScript === "no");
-  const step1Valid = videoType === "talking_head" ? step1ValidTH : step1ValidFaceless;
+  const step1ValidTH       = !!thUrl;
+  const step1ValidFaceless = productName.trim().length > 0 && productDesc.trim().length > 0;
+  const step1Valid         = videoType === "talking_head" ? step1ValidTH : step1ValidFaceless;
+
+  const step2ValidFaceless =
+    hasVoiceover === "yes" && !!voUrl ||
+    hasVoiceover === "no" && hasScript === "yes" && scriptText.trim().length > 0 ||
+    hasVoiceover === "no" && hasScript === "no";
+  const step2Valid = videoType === "talking_head" ? true : step2ValidFaceless;
 
   // ── File upload helpers ──
   async function handleLogoFile(file) {
@@ -692,7 +756,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         product_name:            productName.trim(),
         product_url:             productUrl.trim() || null,
         product_description:     productDesc.trim(),
-        target_platform:         platform,
+        format_ratio:            formatRatio,
         language,
         tone,
 
@@ -711,6 +775,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         script:                  !isTH && hasVoiceover !== "yes" && hasScript === "yes" ? scriptText : null,
         pipeline_version:        isTH ? undefined : "v2",
         visual_style:            visualStyle,
+        theme,
         accent_color:            customAccent || accentColor,
         typography_style:        typographyStyle,
         voice_id:                voiceId,
@@ -743,10 +808,10 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         const freshData = await freshRes.json();
         if (freshData.assetManifest) setAssetManifest(freshData.assetManifest);
       }
-      return true;
+      return { ok: true, assetManifest: data.assetManifest, pid: data.project.id };
     } catch (e) {
       setCreateError(e.message);
-      return false;
+      return { ok: false };
     } finally {
       setCreating(false);
     }
@@ -785,7 +850,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   }
 
   // ── Generate video ──
-  async function handleGenerate() {
+  async function handleGenerate(overridePid) {
+    const pid = overridePid ?? projectId;
     setGenerating(true);
     setGenError("");
     try {
@@ -795,7 +861,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         thUploadedUrl = await uploadPromoFile(thFileRef.current, "talking-head");
       }
 
-      const res = await serverFetch(`/api/promo-video/${projectId}/render`, {
+      const res = await serverFetch(`/api/promo-video/${pid}/render`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ talking_head_url: thUploadedUrl }),
@@ -811,13 +877,21 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     setGenerating(false);
   }
 
+  // ── Generate Video — always goes to step 4 (generating). Asset collection is step 5 after render. ──
+  async function handleBuildPlan() {
+    const result = await createProject();
+    if (!result?.ok) return;
+    setStep(4);
+    handleGenerate(result.pid);
+  }
+
   // ── Step indicator ──
   function StepBar() {
-    if (step === 4) return null;
+    if (step >= 4) return null;
     return (
       <div style={{ display: "flex", alignItems: "center", marginBottom: 32, gap: 0 }}>
-        {WIZARD_STEPS.slice(0, 4).map((label, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : 0 }}>
+        {WIZARD_STEPS.map((label, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", flex: i < WIZARD_STEPS.length - 1 ? 1 : 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <div style={{
                 width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
@@ -831,12 +905,20 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 {label}
               </span>
             </div>
-            {i < 3 && <div style={{ flex: 1, height: 1, background: i < step ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)", margin: "0 10px" }} />}
+            {i < WIZARD_STEPS.length - 1 && <div style={{ flex: 1, height: 1, background: i < step ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)", margin: "0 10px" }} />}
           </div>
         ))}
       </div>
     );
   }
+
+  // ── Derived voice list ──
+  // langVoices[language] is populated by the server fetch (native voices from ElevenLabs library).
+  // Fall back to hardcoded constants if the fetch hasn't returned yet or returned empty.
+  const currentVoices =
+    language === "hinglish" ? (langVoices.hinglish?.length ? langVoices.hinglish : HINGLISH_VOICES) :
+    language === "es"       ? (langVoices.es?.length       ? langVoices.es       : SPANISH_VOICES)  :
+    promoVoices;
 
   // ── Render ──
   return (
@@ -871,84 +953,34 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             </div>
 
             <button onClick={() => setStep(1)} style={{ ...C.btnY, width: "100%", padding: "13px 24px", fontSize: 15 }}>
-              Next: Setup →
+              Next →
             </button>
           </div>
         )}
 
-        {/* ─── Step 1: Type-specific setup ─── */}
+        {/* ─── Step 1: Product Info ─── */}
         {step === 1 && videoType === "talking_head" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-
             <div>
               <label style={C.lbl}>Upload Your Video <span style={{ color: T.danger }}>*</span></label>
               <FileUploadRow
                 label="Upload talking head video" accept="video/*"
                 url={thUrl} uploading={thLoading}
-                loadingLabel="Transcribing…"
-                doneLabel="Video ready — transcription done"
+                loadingLabel="Transcribing…" doneLabel="Video ready — transcription done"
                 onFile={handleThFile}
                 onClear={() => { setThUrl(null); thFileRef.current = null; bgTranscribeRef.current = null; }}
                 inputRef={thRef} />
               <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Your audio becomes the voiceover. We transcribe it automatically.</div>
             </div>
-
             <div>
               <label style={C.lbl}>Product Name <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — used for branding)</span></label>
-              <input style={C.inp} value={productName} onChange={e => setProductName(e.target.value)}
-                placeholder="e.g. Vidquence" maxLength={80} />
+              <input style={C.inp} value={productName} onChange={e => setProductName(e.target.value)} placeholder="e.g. Vidquence" maxLength={80} />
             </div>
-
-            <div>
-              <label style={C.lbl}>Target Platform</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {PLATFORMS.map(p => (
-                  <button key={p.id} onClick={() => setPlatform(p.id)}
-                    style={{ padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                      background: platform === p.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
-                      border: platform === p.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
-                      color: platform === p.id ? T.accent : T.muted }}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div>
-                <label style={C.lbl}>Language</label>
-                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
-                  {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={C.lbl}>Tone</label>
-                <select value={tone} onChange={e => setTone(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
-                  {TONES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
-              <FileUploadRow label="Upload Logo" accept="image/*" url={logoUrl} uploading={logoLoading}
-                onFile={handleLogoFile} onClear={() => setLogoUrl(null)} inputRef={logoRef} />
-            </div>
-
-            {createError && (
-              <div style={{ padding: "14px 18px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
-                ✕ {createError}
-                <button onClick={() => setCreateError("")} style={{ ...C.btnG, fontSize: 11, padding: "3px 10px", marginLeft: 12 }}>Dismiss</button>
-              </div>
-            )}
-
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
-              <button
-                onClick={() => setStep(2)}
-                disabled={!step1ValidTH}
+              <button onClick={() => setStep(2)} disabled={!step1ValidTH}
                 style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidTH ? 1 : 0.4 }}>
-                Next: Style →
+                Next: Settings →
               </button>
             </div>
           </div>
@@ -956,66 +988,146 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
         {step === 1 && videoType === "faceless" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-
             <div>
               <label style={C.lbl}>Product Name <span style={{ color: T.danger }}>*</span></label>
-              <input style={C.inp} value={productName} onChange={e => setProductName(e.target.value)}
-                placeholder="e.g. Vidquence" maxLength={80} />
+              <input style={C.inp} value={productName} onChange={e => setProductName(e.target.value)} placeholder="e.g. Vidquence" maxLength={80} />
             </div>
-
             <div>
               <label style={C.lbl}>Product URL <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
-              <input style={C.inp} value={productUrl} onChange={e => setProductUrl(e.target.value)}
-                placeholder="https://yourproduct.com" />
+              <input style={C.inp} value={productUrl} onChange={e => setProductUrl(e.target.value)} placeholder="https://yourproduct.com" />
             </div>
-
             <div>
               <label style={C.lbl}>Product Description <span style={{ color: T.danger }}>*</span></label>
               <textarea style={{ ...C.inp, resize: "vertical", minHeight: 90, lineHeight: 1.5 }}
                 value={productDesc} onChange={e => setProductDesc(e.target.value)}
-                placeholder="What does your product do? What problem does it solve?"
-                maxLength={500} />
+                placeholder="What does your product do? What problem does it solve?" maxLength={500} />
               <div style={{ fontSize: 11, color: "#55556a", marginTop: 3, textAlign: "right" }}>{productDesc.length}/500</div>
             </div>
-
-            <div>
-              <label style={C.lbl}>Target Platform</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {PLATFORMS.map(p => (
-                  <button key={p.id} onClick={() => setPlatform(p.id)}
-                    style={{
-                      padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                      background: platform === p.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
-                      border: platform === p.id ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
-                      color: platform === p.id ? T.accent : T.muted,
-                    }}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
+              <button onClick={() => setStep(2)} disabled={!step1ValidFaceless}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidFaceless ? 1 : 0.4 }}>
+                Next: Settings →
+              </button>
             </div>
+          </div>
+        )}
 
+        {/* ─── Step 2: Video Settings ─── */}
+        {step === 2 && videoType === "talking_head" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
             <div>
-              <label style={C.lbl}>Video Length</label>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {SCENE_COUNT_OPTIONS.map(opt => {
-                  const sel = sceneCount === opt.value;
+              <label style={C.lbl}>Format</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {FORMAT_OPTIONS.map(f => {
+                  const sel = formatRatio === f.value;
+                  const col = sel ? T.accent : T.muted;
                   return (
-                    <button key={opt.value} onClick={() => setSceneCount(opt.value)}
-                      style={{
-                        padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
-                        textAlign: "left", display: "flex", flexDirection: "column", gap: 2,
+                    <button key={f.value} onClick={() => setFormatRatio(f.value)}
+                      style={{ flex: 1, padding: "10px 8px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
                         background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.03)",
-                        border: sel ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
-                      }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: sel ? T.accent : T.text }}>{opt.label}</span>
-                      <span style={{ fontSize: 11, color: T.muted }}>{opt.description}</span>
+                        border: sel ? "1.5px solid rgba(245,197,24,0.45)" : "1.5px solid rgba(255,255,255,0.1)" }}>
+                      <div style={{ width: f.shape.w, height: f.shape.h, border: `1.5px solid ${col}`, borderRadius: 2, background: sel ? `${T.accent}18` : "transparent" }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: col }}>{f.label}</span>
+                      <span style={{ fontSize: 10, color: "#55556a", textAlign: "center" }}>{f.hint}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div>
+                <label style={C.lbl}>Language</label>
+                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
+                  {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={C.lbl}>Tone</label>
+                <select value={tone} onChange={e => setTone(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
+                  {TONES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setStep(1)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
+              <button onClick={() => setStep(3)}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15 }}>
+                Next: Style →
+              </button>
+            </div>
+          </div>
+        )}
 
+        {step === 2 && videoType === "faceless" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: T.text, marginBottom: 6 }}>Video settings</div>
+              <div style={{ fontSize: 14, color: T.muted }}>Choose length, language, and voice.</div>
+            </div>
+
+            {/* Video Length + Format */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div>
+                <label style={C.lbl}>Video Length</label>
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  {SCENE_COUNT_OPTIONS.map(opt => {
+                    const sel = sceneCount === opt.value;
+                    const col = sel ? T.accent : T.muted;
+                    return (
+                      <button key={opt.value} onClick={() => setSceneCount(opt.value)}
+                        style={{
+                          flex: 1, padding: "8px 6px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                          background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.04)",
+                          border: sel ? "1.5px solid rgba(245,197,24,0.45)" : "1.5px solid rgba(255,255,255,0.1)",
+                        }}>
+                        <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                          {Array.from({ length: opt.dots }).map((_, i) => (
+                            <div key={i} style={{
+                              width: 6, height: 8, borderRadius: 2,
+                              background: sel ? T.accent : "rgba(255,255,255,0.2)",
+                            }} />
+                          ))}
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: col, lineHeight: 1 }}>{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label style={C.lbl}>Format</label>
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  {FORMAT_OPTIONS.map(f => {
+                    const sel = formatRatio === f.value;
+                    const col = sel ? T.accent : T.muted;
+                    return (
+                      <button key={f.value} onClick={() => setFormatRatio(f.value)}
+                        style={{
+                          flex: 1, padding: "8px 6px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                          background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.04)",
+                          border: sel ? "1.5px solid rgba(245,197,24,0.45)" : "1.5px solid rgba(255,255,255,0.1)",
+                        }}>
+                        <div style={{
+                          width: f.shape.w, height: f.shape.h,
+                          border: `1.5px solid ${col}`,
+                          borderRadius: 2, flexShrink: 0,
+                          background: sel ? `${T.accent}18` : "transparent",
+                        }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: col, lineHeight: 1 }}>{f.label}</span>
+                        <span style={{ fontSize: 9, color: "#55556a", lineHeight: 1, textAlign: "center" }}>{f.hint}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Language + Tone */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={C.lbl}>Language</label>
@@ -1031,61 +1143,84 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
               </div>
             </div>
 
+            {/* Voice */}
             <div>
-              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — adds a logo outro scene)</span></label>
-              <FileUploadRow
-                label="Upload Logo" accept="image/*"
-                url={logoUrl} uploading={logoLoading}
-                onFile={handleLogoFile}
-                onClear={() => setLogoUrl(null)}
-                inputRef={logoRef} />
+              <label style={C.lbl}>Voice</label>
+              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+                {currentVoices.map(v => {
+                  const sel = voiceId === v.id;
+                  const playing = playingVoiceId === v.id;
+                  const gc = GENDER_COLORS[v.gender] ?? GENDER_COLORS.male;
+                  return (
+                    <button key={v.id} onClick={() => setVoiceId(v.id)}
+                      style={{
+                        minWidth: 108, flexShrink: 0, padding: "12px 10px 10px",
+                        borderRadius: 10, cursor: "pointer", textAlign: "center",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                        background: sel ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
+                      }}>
+                      <div onClick={e => { e.stopPropagation(); handleVoicePlay(v); }}
+                        style={{
+                          width: 32, height: 32, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                          background: playing ? "rgba(99,102,241,0.35)" : sel ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.07)",
+                          border: `1.5px solid ${playing ? "rgba(99,102,241,0.9)" : sel ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.15)"}`,
+                          color: playing ? "#c4b5fd" : "#a5b4fc",
+                          fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                        {playing ? "■" : "▶"}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: sel ? "#a5b4fc" : T.text }}>{v.label}</span>
+                      <span style={{ fontSize: 10, color: T.muted, textAlign: "center", lineHeight: 1.3 }}>{v.desc}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
+                        background: gc.bg, border: `1px solid ${gc.border}`, color: gc.color }}>
+                        {v.gender}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "18px", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-              <label style={{ ...C.lbl, marginBottom: 6 }}>Do you have a voiceover recording?</label>
-              <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />
-              {hasVoiceover === "yes" && (
-                <div style={{ marginTop: 8 }}>
+            {/* Voiceover / Script */}
+            <div>
+              <label style={C.lbl}>Do you have a voiceover recording?</label>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
+                <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />
+                {hasVoiceover === "yes" && (
                   <FileUploadRow label="Upload voiceover" accept="audio/*" url={voUrl} uploading={voLoading}
                     onFile={handleVoFile} onClear={() => setVoUrl(null)} inputRef={voRef} />
-                </div>
-              )}
-              {hasVoiceover === "no" && (
-                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
-                  <label style={{ ...C.lbl, marginBottom: 6 }}>Do you have a script?</label>
-                  <YesNo value={hasScript} onChange={setHasScript} />
-                  {hasScript === "yes" && (
-                    <textarea style={{ ...C.inp, marginTop: 6, resize: "vertical", minHeight: 80, lineHeight: 1.5 }}
-                      placeholder="Paste your script here…" value={scriptText} onChange={e => setScriptText(e.target.value)} />
-                  )}
-                  {hasScript === "no" && (
-                    <div style={{ fontSize: 11, color: T.muted }}>AI will write the script and voiceover automatically.</div>
-                  )}
-                </div>
-              )}
+                )}
+                {hasVoiceover === "no" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <label style={{ ...C.lbl, marginBottom: 2 }}>Do you have a script?</label>
+                    <YesNo value={hasScript} onChange={setHasScript} />
+                    {hasScript === "yes" && (
+                      <textarea style={{ ...C.inp, resize: "vertical", minHeight: 80, lineHeight: 1.5 }}
+                        placeholder="Paste your script here…" value={scriptText} onChange={e => setScriptText(e.target.value)} />
+                    )}
+                    {hasScript === "no" && (
+                      <div style={{ fontSize: 12, color: T.muted, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 8, border: `1px solid ${T.border}` }}>
+                        AI will write the script and voiceover automatically.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {createError && (
-              <div style={{ padding: "14px 18px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
-                ✕ {createError}
-                <button onClick={() => setCreateError("")} style={{ ...C.btnG, fontSize: 11, padding: "3px 10px", marginLeft: 12 }}>Dismiss</button>
-              </div>
-            )}
-
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
-              <button
-                onClick={() => setStep(2)}
-                disabled={!step1ValidFaceless}
-                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step1ValidFaceless ? 1 : 0.4 }}>
+              <button onClick={() => setStep(1)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
+              <button onClick={() => setStep(3)} disabled={!step2ValidFaceless}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step2ValidFaceless ? 1 : 0.4 }}>
                 Next: Style →
               </button>
             </div>
           </div>
         )}
 
-        {/* ─── Step 2: Style Preferences ─── */}
-        {step === 2 && (
+        {/* ─── Step 3: Style ─── */}
+        {step === 3 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             <div>
               <div style={{ fontSize: 22, fontWeight: 800, color: T.text, marginBottom: 6 }}>Customise the look</div>
@@ -1135,6 +1270,28 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                         <div style={{ fontSize: 11, fontWeight: 700, color: sel ? s.accent : T.text, marginBottom: 1 }}>{s.label}</div>
                         <div style={{ fontSize: 10, color: T.muted }}>{s.desc}</div>
                       </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Theme */}
+            <div>
+              <label style={C.lbl}>Theme</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {THEME_OPTIONS.map(t => {
+                  const sel = theme === t.value;
+                  return (
+                    <button key={t.value} onClick={() => setTheme(t.value)}
+                      style={{
+                        flex: 1, padding: "10px 12px", borderRadius: 10, cursor: "pointer",
+                        fontFamily: "inherit", textAlign: "center", display: "flex", flexDirection: "column", gap: 3,
+                        background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
+                      }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: sel ? T.accent : T.text }}>{t.label}</span>
+                      <span style={{ fontSize: 11, color: T.muted }}>{t.description}</span>
                     </button>
                   );
                 })}
@@ -1200,44 +1357,11 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
               </div>
             </div>
 
-            {/* Voice */}
+            {/* Logo */}
             <div>
-              <label style={C.lbl}>Voiceover</label>
-              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
-                {promoVoices.map(v => {
-                  const sel     = voiceId === v.id;
-                  const playing = playingVoiceId === v.id;
-                  const gc      = GENDER_COLORS[v.gender] ?? GENDER_COLORS.male;
-                  return (
-                    <button key={v.id} onClick={() => setVoiceId(v.id)}
-                      style={{
-                        minWidth: 112, flexShrink: 0, padding: "14px 10px 12px",
-                        borderRadius: 10, cursor: "pointer", textAlign: "center",
-                        display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                        background: sel ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.03)",
-                        border: sel ? "1.5px solid rgba(99,102,241,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
-                      }}>
-                      <div
-                        onClick={e => { e.stopPropagation(); handleVoicePlay(v); }}
-                        style={{
-                          width: 36, height: 36, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
-                          background: playing ? "rgba(99,102,241,0.35)" : sel ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.07)",
-                          border: `1.5px solid ${playing ? "rgba(99,102,241,0.9)" : sel ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.15)"}`,
-                          color: playing ? "#c4b5fd" : "#a5b4fc",
-                          fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                        {playing ? "■" : "▶"}
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: sel ? "#a5b4fc" : T.text }}>{v.label}</span>
-                      <span style={{ fontSize: 10, color: T.muted, textAlign: "center", lineHeight: 1.4 }}>{v.desc}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
-                        background: gc.bg, border: `1px solid ${gc.border}`, color: gc.color }}>
-                        {v.gender}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — adds a logo outro scene)</span></label>
+              <FileUploadRow label="Upload Logo" accept="image/*" url={logoUrl} uploading={logoLoading}
+                onFile={handleLogoFile} onClear={() => setLogoUrl(null)} inputRef={logoRef} />
             </div>
 
             {createError && (
@@ -1248,122 +1372,15 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             )}
 
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setStep(1)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
+              <button onClick={() => setStep(2)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
               <button
-                onClick={async () => { const ok = await createProject(); if (ok) setStep(3); }}
+                onClick={handleBuildPlan}
                 disabled={creating}
                 style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: creating ? 0.4 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                {creating ? <><Spinner size={14} color="#000" /> Building plan…</> : "Build Plan →"}
+                {creating ? <><Spinner size={14} color="#000" /> Generating…</> : "✦ Generate Video →"}
               </button>
             </div>
-          </div>
-        )}
-
-        {/* ─── Step 3: Asset Collection ─── */}
-        {step === 3 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {assetManifest && (
-              <>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 6 }}>
-                    {(assetManifest.user_required || []).length === 0
-                      ? "Ready to generate your video"
-                      : "Your video needs these assets"}
-                  </div>
-                  {(assetManifest.user_required || []).length > 0 && (
-                    <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
-                      Upload what you have. Skip anything — you can add it in the editor later.
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {(assetManifest.user_required || []).map((item) => {
-                    const upSt = uploadStatus[item.scene_id];
-                    const isDone = item.status === "resolved" || upSt === "done";
-                    const ref   = getSceneRef(item.scene_id);
-                    return (
-                      <div key={item.scene_id} style={{ background: T.surface, border: `1px solid ${isDone ? "rgba(34,197,94,0.2)" : T.border}`, borderRadius: 12, overflow: "hidden" }}>
-                        <div style={{ padding: "12px 16px", borderBottom: `1px solid rgba(255,255,255,0.05)`, display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: T.muted, flexShrink: 0 }}>
-                            {item.scene_id}
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: "rgba(255,255,255,0.06)", color: "#9090c0" }}>
-                            {(item.scene_type || "scene").toUpperCase()}
-                          </span>
-                          {isDone && <span style={{ fontSize: 12, color: T.success, marginLeft: "auto" }}>✓ Uploaded</span>}
-                        </div>
-                        <div style={{ padding: "14px 16px" }}>
-                          {item.asset_hint && (
-                            <div style={{ fontSize: 12, color: T.muted, marginBottom: 12, lineHeight: 1.5 }}>
-                              {item.asset_hint}
-                            </div>
-                          )}
-                          {!isDone && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <button
-                                  disabled={upSt === "uploading"}
-                                  onClick={() => ref.current?.click()}
-                                  style={{ ...C.btnG, fontSize: 12, padding: "7px 16px", display: "flex", alignItems: "center", gap: 6, opacity: upSt === "uploading" ? 0.6 : 1, cursor: upSt === "uploading" ? "not-allowed" : "pointer" }}>
-                                  {upSt === "uploading" ? <Spinner size={12} /> : "↑"}
-                                  {upSt === "uploading" ? "Uploading…" : "Upload File"}
-                                </button>
-                                {upSt === "error" && <span style={{ fontSize: 11, color: T.danger }}>Failed — try again</span>}
-                              </div>
-                              <button onClick={() => setUploadStatus(s => ({ ...s, [item.scene_id]: "done" }))}
-                                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: T.muted, textAlign: "left", padding: 0, textDecoration: "underline" }}>
-                                Skip — add in editor later
-                              </button>
-                            </div>
-                          )}
-                          <input ref={el => { ref.current = el; }} type="file" accept="image/*,video/*,audio/*" style={{ display: "none" }}
-                            onChange={e => { const f = e.target.files?.[0]; if (f) handleSceneFile(item.scene_id, f); e.target.value = ""; }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {genError && (
-                  <div style={{ padding: "10px 14px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, fontSize: 13, color: T.danger }}>
-                    ✕ {genError}
-                  </div>
-                )}
-
-                {(() => {
-                  const required = assetManifest.user_required || [];
-                  const anyUploading = required.some(item => uploadStatus[item.scene_id] === "uploading");
-                  const allDecided  = required.every(item =>
-                    item.status === "resolved" ||
-                    uploadStatus[item.scene_id] === "done" ||
-                    uploadStatus[item.scene_id] === "error"
-                  );
-                  const canGenerate = !generating && !anyUploading && allDecided;
-                  return (
-                    <button onClick={handleGenerate} disabled={!canGenerate}
-                      style={{ ...C.btnY, width: "100%", padding: "15px 24px", fontSize: 16, opacity: canGenerate ? 1 : 0.4, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: canGenerate ? "pointer" : "not-allowed" }}>
-                      {generating    ? <><Spinner size={16} color="#000" /> Starting…</>   :
-                       anyUploading  ? <><Spinner size={16} color="#000" /> Uploading…</>  :
-                       !allDecided   ? "Upload or skip each asset to continue"             :
-                       "✦ Generate Video"}
-                    </button>
-                  );
-                })()}
-
-                <div style={{ fontSize: 11, color: "#55556a", textAlign: "center" }}>
-                  Skipped assets will appear as placeholders in the editor.
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                  <button onClick={() => { setStep(2); }} style={{ ...C.btnG, fontSize: 12, padding: "6px 16px" }}>
-                    ← Back
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         )}
 
@@ -1408,12 +1425,94 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                     {renderError}
                   </div>
                 </div>
-                <button onClick={() => { setStep(0); setRenderError(""); setProjectId(null); setAssetManifest(null); createdRef.current = false; setVisualStyle("radiant"); setAccentColor("#6366f1"); setCustomAccent(""); setTypographyStyle("modern"); }}
+                <button onClick={() => { setStep(0); setRenderError(""); setProjectId(null); setAssetManifest(null); createdRef.current = false; setVisualStyle("radiant"); setTheme("dark"); setAccentColor("#6366f1"); setCustomAccent(""); setTypographyStyle("modern"); }}
                   style={{ ...C.btnY, padding: "11px 28px" }}>
                   Try Again
                 </button>
               </>
             )}
+          </div>
+        )}
+
+        {/* ─── Step 5: Asset Collection (conditional — only reached if assets were queued) ─── */}
+        {step === 5 && assetManifest && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 6 }}>Your video is ready — add screenshots</div>
+              <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
+                Upload product screenshots to replace placeholders. Skip anything — you can always add them in the editor.
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {(assetManifest.user_required || []).map((item) => {
+                const upSt  = uploadStatus[item.scene_id];
+                const isDone = item.status === "resolved" || upSt === "done";
+                const ref   = getSceneRef(item.scene_id);
+                return (
+                  <div key={item.scene_id} style={{ background: T.surface, border: `1px solid ${isDone ? "rgba(34,197,94,0.2)" : T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ padding: "12px 16px", borderBottom: `1px solid rgba(255,255,255,0.05)`, display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: T.muted, flexShrink: 0 }}>
+                        {item.scene_id}
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: "rgba(255,255,255,0.06)", color: "#9090c0" }}>
+                        SCREENSHOT
+                      </span>
+                      {isDone && <span style={{ fontSize: 12, color: T.success, marginLeft: "auto" }}>✓ Uploaded</span>}
+                    </div>
+                    <div style={{ padding: "14px 16px" }}>
+                      {item.asset_hint && (
+                        <div style={{ fontSize: 12, color: T.muted, marginBottom: 12, lineHeight: 1.5 }}>{item.asset_hint}</div>
+                      )}
+                      {!isDone && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <button disabled={upSt === "uploading"} onClick={() => ref.current?.click()}
+                              style={{ ...C.btnG, fontSize: 12, padding: "7px 16px", display: "flex", alignItems: "center", gap: 6, opacity: upSt === "uploading" ? 0.6 : 1, cursor: upSt === "uploading" ? "not-allowed" : "pointer" }}>
+                              {upSt === "uploading" ? <Spinner size={12} /> : "↑"}
+                              {upSt === "uploading" ? "Uploading…" : "Upload Screenshot"}
+                            </button>
+                            {upSt === "error" && <span style={{ fontSize: 11, color: T.danger }}>Failed — try again</span>}
+                          </div>
+                          <button onClick={() => setUploadStatus(s => ({ ...s, [item.scene_id]: "done" }))}
+                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: T.muted, textAlign: "left", padding: 0, textDecoration: "underline" }}>
+                            Skip — add in editor later
+                          </button>
+                        </div>
+                      )}
+                      <input ref={el => { ref.current = el; }} type="file" accept="image/*,video/*" style={{ display: "none" }}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleSceneFile(item.scene_id, f); e.target.value = ""; }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {(() => {
+              const required    = assetManifest.user_required || [];
+              const anyUploading = required.some(item => uploadStatus[item.scene_id] === "uploading");
+              const allDecided   = required.every(item =>
+                item.status === "resolved" ||
+                uploadStatus[item.scene_id] === "done" ||
+                uploadStatus[item.scene_id] === "error"
+              );
+              const canOpen = allDecided && !anyUploading && editorProjectId;
+              return (
+                <button
+                  onClick={() => navigate(`/video-editor/${editorProjectId}`, { state: { from: "/promo-video" } })}
+                  disabled={!canOpen}
+                  style={{ ...C.btnY, width: "100%", padding: "15px 24px", fontSize: 16, opacity: canOpen ? 1 : 0.4,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: canOpen ? "pointer" : "not-allowed" }}>
+                  {anyUploading ? <><Spinner size={16} color="#000" /> Uploading…</> :
+                   !allDecided  ? "Upload or skip each asset to continue" :
+                   "Open Editor →"}
+                </button>
+              );
+            })()}
+
+            <div style={{ fontSize: 11, color: "#55556a", textAlign: "center" }}>
+              Skipped assets will appear as placeholders in the editor.
+            </div>
           </div>
         )}
       </div>

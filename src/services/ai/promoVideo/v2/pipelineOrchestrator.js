@@ -118,8 +118,17 @@ function assignWhisperTimestamps(scenes, whisperWords) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
+const CANVAS_SIZES = {
+  '9:16': { width: 1080, height: 1920 },
+  '16:9': { width: 1920, height: 1080 },
+  '1:1':  { width: 1080, height: 1080 },
+};
+
 export async function runV2Pipeline(project) {
   const projectId = project.id;
+
+  const formatRatio = project.format_ratio ?? '9:16';
+  const canvas      = CANVAS_SIZES[formatRatio] ?? CANVAS_SIZES['9:16'];
 
   // ── Build projectContext ──────────────────────────────────────────────────
   const projectContext = {
@@ -137,6 +146,12 @@ export async function runV2Pipeline(project) {
     musicMood:       project.style?.music_mood      ?? "upbeat",
     voiceId:         project.voice_id               ?? null,
     sceneCount:      project.scene_count            ?? "auto",
+    language:        project.language               ?? "en",
+    canvasWidth:     canvas.width,
+    canvasHeight:    canvas.height,
+    formatRatio,
+    theme:           project.theme ?? 'dark',
+    tone:            project.tone  ?? 'professional',
   };
 
   // ── Step 1: Generate script ───────────────────────────────────────────────
@@ -144,18 +159,6 @@ export async function runV2Pipeline(project) {
   const scriptResult = await generateScriptV2(project);
   let scenes     = scriptResult.scenes.map(s => ({ ...s }));
   const full_script = scriptResult.full_script ?? "";
-
-  // ── Step 1.5: Asset manifest (saved early so frontend can show it) ────────
-  const assetManifest = generateAssetRequirements({ ...project, scenes });
-  console.log(`[v2/pipeline] ${projectId} — asset manifest: ${assetManifest.total_user_uploads_required} user uploads required`);
-  try {
-    await supabaseAdmin
-      .from("promo_videos")
-      .update({ asset_manifest: assetManifest })
-      .eq("id", projectId);
-  } catch (e) {
-    console.warn("[v2/pipeline] early asset manifest save failed (non-fatal):", e.message);
-  }
 
   // ── Steps 2+3: Design scenes in parallel (visual_concept planned upfront, no sequential dependency) ──
   console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes in parallel`);
@@ -170,7 +173,7 @@ export async function runV2Pipeline(project) {
             .map(s => ({ index: s.scene_index, intent: s.intent, visual_concept: s.visual_concept })),
         });
         console.log(`[v2/pipeline] scene ${scene.scene_index} (${scene.intent}) — ${html?.length ?? 0} chars`);
-        const graph = parseSceneHTML(html || "", scene.scene_index);
+        const graph = parseSceneHTML(html || "", scene.scene_index, canvas);
         console.log(`[v2/pipeline] scene ${scene.scene_index} graph: ${graph.length} layers${graph.length > 0 ? ` — first: ${JSON.stringify(graph[0]).slice(0, 120)}` : " — EMPTY"}`);
         return graph;
       } catch (err) {
@@ -330,6 +333,41 @@ export async function runV2Pipeline(project) {
   // Embed full_script in the timeline JSON so it's accessible from the saved project
   if (full_script) finalTimeline.full_script = full_script;
 
+  // ── Build asset manifest from actual queued layers (after placeholder resolution) ──
+  // Step 1.5 was removed — v2 scene objects don't carry asset requirements, the
+  // timeline layers do. We scan here when the truth is known.
+  const queuedLayers = finalTimeline.layers.filter(
+    l => l.type === "image" && l.assetQueued === true && l.assetType === "asset"
+  );
+  const userRequired = queuedLayers.map(layer => {
+    const sceneIndex = parseInt((layer.id.match(/^s(\d+)_/) || [])[1] ?? "0", 10);
+    return {
+      scene_id:   sceneIndex + 1,
+      layer_id:   layer.id,
+      asset_hint: layer.assetHint || "product interface screenshot",
+      asset_type: "asset",
+      status:     "pending",
+      asset_url:  null,
+    };
+  });
+  const assetManifest = {
+    user_required:               userRequired,
+    ai_generate:                 [],
+    stock_fetch:                 [],
+    placeholders:                [],
+    total_user_uploads_required: userRequired.length,
+    all_assets_provided:         userRequired.length === 0,
+  };
+  console.log(`[v2/pipeline] ${projectId} — asset manifest: ${userRequired.length} user uploads required`);
+  try {
+    await supabaseAdmin
+      .from("promo_videos")
+      .update({ asset_manifest: assetManifest })
+      .eq("id", projectId);
+  } catch (e) {
+    console.warn("[v2/pipeline] asset manifest save failed (non-fatal):", e.message);
+  }
+
   // ── Step 10: Save timeline to projects table ──────────────────────────────
   let editorProjectId = null;
   try {
@@ -339,7 +377,7 @@ export async function runV2Pipeline(project) {
         user_id:           project.user_id,
         name:              `${project.product_name ?? "Promo Video"} — Promo`,
         safe_project_json: finalTimeline,
-        orientation:       "9:16",
+        orientation:       formatRatio,
         mode:              "timeline",
         source:            "promo_video_v2",
         editor_version:    "timeline",
