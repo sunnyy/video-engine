@@ -796,12 +796,11 @@ async function runTHPipeline(project) {
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
 
-    // TEST: th_full skip disabled — all scenes designed by GPT-5.4
-    // if (scene.thPattern === 'th_full') {
-    //   console.log(`[v2/pipeline-th] scene ${i} — th_full (${scene.duration_seconds?.toFixed(1)}s) — fullscreen`);
-    //   sceneGraphs.push([]);
-    //   continue;
-    // }
+    if (scene.thPattern === 'th_full') {
+      console.log(`[v2/pipeline-th] scene ${i} — th_full (${scene.duration_seconds?.toFixed(1)}s) — fullscreen`);
+      sceneGraphs.push([]);
+      continue;
+    }
 
     try {
       const sceneProjectContext = {
@@ -836,8 +835,26 @@ async function runTHPipeline(project) {
   const totalDur      = rawTimeline.format.duration;
   const finalTimeline = {
     ...rawTimeline,
-    // TEST: th_video_base temporarily disabled
     layers: [
+      {
+        id:          'th_video_base',
+        trackId:     'track_th_base',
+        name:        'TH Video',
+        type:        'video',
+        src:         null,
+        objectFit:   'cover',
+        start:       0,
+        end:         totalDur,
+        zIndex:      0,
+        visible:     true,
+        locked:      false,
+        sfx:         null,
+        keyframes:   { x: [], y: [], blur: [], scale: [], opacity: [], rotation: [] },
+        transition:  { in: { type: 'none', duration: 0 }, out: { type: 'none', duration: 0 } },
+        transform:   { x: 0, y: 0, blur: 0, scale: 1, width: canvas.width, height: canvas.height, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 0, borderRadius: 0 },
+        volume:      1,
+        muted:       false,
+      },
       ...rawTimeline.layers,
     ],
   };
@@ -853,8 +870,76 @@ async function runTHPipeline(project) {
       const tEnd   = parseFloat((tc + dur).toFixed(4));
       tc = tEnd;
 
-      // TEST: all TH clip layer injection temporarily disabled
-      continue; // eslint-disable-line no-unreachable
+      if (scene.thPattern === 'th_full' || scene.thPattern === 'content_only' || !scene.thPattern) continue;
+
+      const sid = `s${i}_th`;
+      let clipLayer = null;
+
+      if (scene.thPattern === 'hero') {
+        clipLayer = {
+          id:         `${sid}_hero`,
+          trackId:    'track_th_clip',
+          name:       'TH Hero',
+          type:       'video',
+          src:        '__TH_VIDEO__',
+          objectFit:  'cover',
+          start:      tStart,
+          end:        tEnd,
+          zIndex:     2,
+          visible:    true,
+          locked:     false,
+          sfx:        null,
+          keyframes:  { x: [], y: [], blur: [], scale: [], opacity: [], rotation: [] },
+          transition: { in: { type: 'none', duration: 0 }, out: { type: 'none', duration: 0 } },
+          transform:  { x: 0, y: 0, blur: 0, scale: 1, width: canvas.width, height: canvas.height, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 0, borderRadius: 0 },
+          volume:     0,
+          muted:      true,
+        };
+      } else if (scene.thPattern === 'split') {
+        const splitH = Math.round(canvas.height * 0.45);
+        clipLayer = {
+          id:         `${sid}_split`,
+          trackId:    'track_th_clip',
+          name:       'TH Split',
+          type:       'video',
+          src:        '__TH_VIDEO__',
+          objectFit:  'cover',
+          start:      tStart,
+          end:        tEnd,
+          zIndex:     2,
+          visible:    true,
+          locked:     false,
+          sfx:        null,
+          keyframes:  { x: [], y: [], blur: [], scale: [], opacity: [], rotation: [] },
+          transition: { in: { type: 'none', duration: 0 }, out: { type: 'none', duration: 0 } },
+          transform:  { x: 0, y: 0, blur: 0, scale: 1, width: canvas.width, height: splitH, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 0, borderRadius: 0 },
+          volume:     0,
+          muted:      true,
+        };
+      } else if (scene.thPattern === 'pip') {
+        const pipSize = 220;
+        clipLayer = {
+          id:         `${sid}_pip`,
+          trackId:    'track_th_clip',
+          name:       'TH PiP',
+          type:       'video',
+          src:        '__TH_VIDEO__',
+          objectFit:  'cover',
+          start:      tStart,
+          end:        tEnd,
+          zIndex:     50,
+          visible:    true,
+          locked:     false,
+          sfx:        null,
+          keyframes:  { x: [], y: [], blur: [], scale: [], opacity: [{ time: 0.1, value: 0 }, { time: 0.4, value: 1 }], rotation: [] },
+          transition: { in: { type: 'fade', duration: 0.3 }, out: { type: 'none', duration: 0 } },
+          transform:  { x: 40, y: canvas.height - pipSize - 40, blur: 0, scale: 1, width: pipSize, height: pipSize, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 3, borderRadius: pipSize / 2 },
+          volume:     0,
+          muted:      true,
+        };
+      }
+
+      if (clipLayer) finalTimeline.layers.push(clipLayer);
     }
   }
 
