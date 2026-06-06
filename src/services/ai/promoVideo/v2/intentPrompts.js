@@ -182,7 +182,7 @@ ASSET REQUIREMENTS BY INTENT — this is mandatory, not optional:
 - process: MUST include one image-placeholder with data-asset-type="asset". Shows the workflow or onboarding.
 - proof: SHOULD include one image-placeholder with data-asset-type="asset" if showing results or metrics.
 - hook: NEVER use data-asset-type="asset" — use stock or ai only. Hook shows pain, not product.
-- frustration: NEVER use data-asset-type="asset" — use stock or ai only.
+- problem: NEVER use data-asset-type="asset" — use stock or ai only.
 - cta: NEVER use data-asset-type="asset" — keep clean and typographic.
 - standalone: MUST include one image-placeholder with data-asset-type="asset". Shows the product.
 
@@ -219,7 +219,7 @@ SOLUTION SCENE DIRECTIVE:
 This scene introduces the product for the first time. Feature the product name "${projectContext.productName}" as the dominant typographic element — large, bold, unmissable. Use a clean, minimal composition that lets the name breathe. Include a product screenshot placeholder (data-asset-type="asset") prominently.` : ""}
 ${["solution", "feature", "process", "standalone"].includes(projectContext.sceneIntent) ? `
 ASSET DIRECTIVE: You MUST include exactly one image-placeholder with data-asset-type="asset" in this scene. This is not optional. The product must be visually present.` : ""}
-${["hook", "frustration", "cta"].includes(projectContext.sceneIntent) ? `
+${["hook", "problem", "cta"].includes(projectContext.sceneIntent) ? `
 ASSET DIRECTIVE: Do NOT use data-asset-type="asset" in this scene. Use stock or ai imagery only, or no image at all.` : ""}
 
 ${previousScenesContext}
@@ -231,6 +231,8 @@ ${projectContext.logoUrl ? `LOGO: ${projectContext.logoUrl}
 Logo dimensions: ${projectContext.logoWidth || "unknown"}x${projectContext.logoHeight || "unknown"}px
 Render logo at natural aspect ratio in hook and CTA scenes only.` : ""}
 ${projectContext.assetUrl ? `PRODUCT SCREENSHOT: ${projectContext.assetUrl}
-Use as hero visual where relevant: <img data-role="card" data-layer="image" data-animation="scale-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:[z];opacity:1;object-fit:contain;" src="${projectContext.assetUrl}" />` : ""}`,
+Use as hero visual where relevant: <img data-role="card" data-layer="image" data-animation="scale-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:[z];opacity:1;object-fit:contain;" src="${projectContext.assetUrl}" />` : ""}
+${projectContext.patternName === 'custom' ? `
+NOTE: The voiceover script was written by the user. Design visuals that complement this exact script. Do not suggest alternative copy.` : ""}`,
   };
 }

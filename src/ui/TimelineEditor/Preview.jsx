@@ -1271,7 +1271,7 @@ function StackedTextGroup({ groupLayers, currentTime, selectedLayerId }) {
 
 // ── Preview ───────────────────────────────────────────────────────────────────
 
-export default function Preview() {
+export default function Preview({ fullscreenRef }) {
   const project        = useTimelineStore((s) => s.project);
   const currentTime    = useTimelineStore((s) => s.currentTime);
   const isPlaying      = useTimelineStore((s) => s.isPlaying);
@@ -1313,7 +1313,7 @@ export default function Preview() {
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen();
+      (fullscreenRef?.current ?? containerRef.current)?.requestFullscreen();
     } else {
       document.exitFullscreen();
     }

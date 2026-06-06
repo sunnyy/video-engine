@@ -10,49 +10,67 @@
 import { openai } from "../../../../server/middleware/shared.js";
 
 const INTENT_DURATIONS = {
-  hook:        2.5,
-  frustration: 4.0,
-  benefit:     3.5,
+  hook:        4.0,
+  problem:     5.0,
+  solution:    4.0,
+  benefit:     4.0,
   feature:     5.0,
   process:     6.0,
-  statistic:   3.5,
-  proof:       3.5,
-  comparison:  4.5,
-  list:        4.0,
-  statement:   3.0,
-  cta:         2.5,
+  proof:       4.0,
+  cta:         4.0,
+  standalone:  8.0,
 };
 
-export const INTENT_SEQUENCES = {
-  1: ["standalone"],
-  3: ["hook", "solution", "cta"],
-  5: ["hook", "frustration", "solution", "feature", "cta"],
+export const INTENT_PATTERNS = {
+  1: [
+    { name: 'standalone', intents: ['standalone'], tone: 'Complete story in one scene — pain, product, CTA.' },
+  ],
+  3: [
+    { name: 'classic',       intents: ['hook', 'solution', 'cta'],    tone: 'Pain opens the story, product is the answer, CTA closes it.' },
+    { name: 'product_first', intents: ['solution', 'benefit', 'cta'], tone: 'Lead with the product confidently. Skip the pain setup. Show what it does and what the viewer gets.' },
+    { name: 'challenge',     intents: ['hook', 'benefit', 'cta'],     tone: 'Open with a direct challenge or provocative question to the viewer. Skip naming the product until benefit scene.' },
+  ],
+  5: [
+    { name: 'full_arc',     intents: ['hook', 'problem', 'solution', 'benefit', 'cta'],   tone: 'Classic narrative. Pain → deepen pain → product reveal → outcome → action.' },
+    { name: 'product_led',  intents: ['solution', 'benefit', 'feature', 'proof', 'cta'], tone: 'No pain setup. Lead with the product, show the outcome, prove it works, drive action.' },
+    { name: 'early_reveal', intents: ['hook', 'solution', 'feature', 'benefit', 'cta'],  tone: 'Quick pain hook, then reveal the product early. Spend more time on what it does.' },
+    { name: 'deep_problem', intents: ['problem', 'hook', 'solution', 'benefit', 'cta'],  tone: 'Start deep in the problem, use the hook to make it personal, then reveal the product as relief.' },
+  ],
+  7: [
+    { name: 'full_funnel',        intents: ['hook', 'problem', 'solution', 'benefit', 'feature', 'proof', 'cta'],  tone: 'Complete funnel. Awareness → pain → product → outcome → capability → proof → action.' },
+    { name: 'product_first_full', intents: ['solution', 'benefit', 'feature', 'proof', 'hook', 'problem', 'cta'], tone: 'Confident product-first open. Show the product working before explaining the pain it solves.' },
+    { name: 'early_reveal_full',  intents: ['hook', 'solution', 'feature', 'benefit', 'proof', 'problem', 'cta'], tone: 'Hook the viewer, reveal product early, build desire, then remind them of the pain they had before.' },
+    { name: 'double_problem',     intents: ['problem', 'hook', 'solution', 'feature', 'benefit', 'proof', 'cta'], tone: 'Double down on pain before revealing the product. For cold audiences who need convincing they have a problem.' },
+  ],
 };
 
-const SCENE_WORD_BUDGETS = {
-  standalone:  { duration: 8,   words: 32 },
-  hook:        { duration: 4,   words: 16 },
-  frustration: { duration: 5,   words: 20 },
-  solution:    { duration: 4,   words: 16 },
-  benefit:     { duration: 4,   words: 16 },
-  process:     { duration: 6,   words: 24 },
-  feature:     { duration: 5,   words: 20 },
-  proof:       { duration: 4,   words: 16 },
-  comparison:  { duration: 5,   words: 20 },
-  cta:         { duration: 4,   words: 16 },
+// Legacy flat export for any callers that still reference INTENT_SEQUENCES
+export const INTENT_SEQUENCES = Object.fromEntries(
+  Object.entries(INTENT_PATTERNS).map(([k, patterns]) => [k, patterns[0].intents])
+);
+
+export const SCENE_WORD_BUDGETS = {
+  hook:       { duration: 4, words: 16 },
+  problem:    { duration: 5, words: 20 },
+  solution:   { duration: 4, words: 16 },
+  benefit:    { duration: 4, words: 16 },
+  feature:    { duration: 5, words: 20 },
+  process:    { duration: 6, words: 24 },
+  proof:      { duration: 4, words: 16 },
+  cta:        { duration: 4, words: 16 },
+  standalone: { duration: 8, words: 32 },
 };
 
-const INTENT_DESCRIPTIONS = {
-  standalone:  "complete self-contained video in one scene — (1) open with the customer pain using a specific recognizable question or rapid-fire list, (2) introduce the product by name as the direct solution, (3) end with a clear energetic CTA. All three beats in one flowing script. The product name must appear at least once. Never leave the viewer without knowing what the product is and what to do next.",
-  hook:        "open with a specific recognizable question that signals the product category immediately — the viewer must know within 2 seconds what kind of product this is for. Follow with a rapid-fire list of specific painful tasks the target customer actually does. Never open with abstract mood or atmosphere.",
-  frustration: "build the frustration — what makes it worse",
-  solution:    "introduce the product by name — what it is, what it does, why it exists. This is the first time the product name appears in the video",
-  benefit:     "one specific emotional outcome",
-  process:     "show how it works, briefly",
-  feature:     "one specific capability, one proof",
-  proof:       "one number or metric that proves it works",
-  comparison:  "before vs after, make the contrast obvious",
-  cta:         "one direct energetic action — product name + call to action as a single flowing thought. No em dashes. No full stops mid-sentence.",
+export const INTENT_DESCRIPTIONS = {
+  hook:       'Open with a specific recognizable question or statement that signals the product category instantly. Viewer must know within 2 seconds what kind of product this is for. Never abstract or poetic.',
+  problem:    'Deepen the pain with specific tasks or scenarios the target customer lives through daily. Make it feel personal and real. Do not introduce the product here.',
+  solution:   'Introduce the product by name. One clear line on what it does. Show the relief — what changes after using it. This is the first time the product name appears unless the pattern is product_first.',
+  benefit:    'One clear customer outcome. Focus on what the customer gets, not what the product does. Time saved, results achieved, simplicity gained. Make it feel attainable.',
+  feature:    'One specific capability shown in action. Concrete, visual, demonstrable. Not a feature list — one feature done well.',
+  process:    'Show how it works step by step. Simple, fast, logical sequence. Make the workflow feel effortless.',
+  proof:      'Social proof, numbers, or results. Real and specific. e.g. a concrete stat or "Creators are already posting today."',
+  cta:        'One direct energetic action — product name + call to action as a single flowing thought. No em dashes. No full stops mid-sentence. Comma only.',
+  standalone: 'Complete self-contained video. Must include: pain, product introduction by name, CTA. All three beats in one flowing script. Never leave viewer without knowing what product is and what to do next.',
 };
 
 const TONE_INSTRUCTIONS = {
@@ -150,7 +168,7 @@ ${sceneCountInstruction}
 SCENE RULES:
 - One beat per scene. Never combine two beats into one scene.
 - script_segment values must be consecutive substrings of full_script with no gaps.
-- scene intents: hook | frustration | benefit | process | feature | proof | cta
+- scene intents: hook | problem | solution | benefit | process | feature | proof | cta | standalone
 
 VARIETY RULE:
 Every scene must have a different visual_concept. Never repeat the same compositional approach twice.
@@ -174,8 +192,12 @@ Do not pad. Do not add filler sentences to reach a duration.`;
  * Returns { ...project, scenes, full_script, scene_format: 'v2' }
  */
 export async function generateScriptV2(project) {
-  const sceneCount = INTENT_SEQUENCES[project.scene_count] ? project.scene_count : 3;
-  const sequence   = INTENT_SEQUENCES[sceneCount];
+  const sceneCount = INTENT_PATTERNS[project.scene_count] ? project.scene_count : 3;
+  const patterns        = INTENT_PATTERNS[sceneCount] ?? INTENT_PATTERNS[3];
+  const selectedPattern = patterns[Math.floor(Math.random() * patterns.length)];
+  const sequence        = selectedPattern.intents;
+  const patternName     = selectedPattern.name;
+  const patternTone     = selectedPattern.tone;
 
   const totalDuration  = sequence.reduce((s, intent) => s + (SCENE_WORD_BUDGETS[intent]?.duration ?? 3), 0);
   const structureLines = sequence.map((intent, i) => {
@@ -197,7 +219,11 @@ STRUCTURE AND WORD LIMITS FOR THIS VIDEO:
 ${structureLines}
 Total estimated duration: ~${totalDuration}s
 
-Each scene's script_segment must stay within its word limit. Count the words.`;
+Each scene's script_segment must stay within its word limit. Count the words.
+
+NARRATIVE PATTERN: ${patternName}
+PATTERN TONE: ${patternTone}
+Follow this narrative structure strictly. The pattern tone describes the overall feel and pacing of the script.`;
 
   const languageInstruction =
     project.language === "hinglish" ? `LANGUAGE — HINGLISH:
@@ -306,8 +332,10 @@ ${sequence ? `Intent sequence to follow exactly: ${sequence.join(" → ")}` : ""
     ...project,
     scenes,
     full_script: full_script ?? scenes.map(s => s.script_segment).join(" "),
-    scene_format: "v2",
-    status:       "script_generated",
-    updated_at:   new Date().toISOString(),
+    scene_format:  "v2",
+    pattern_name:  patternName,
+    pattern_tone:  patternTone,
+    status:        "script_generated",
+    updated_at:    new Date().toISOString(),
   };
 }

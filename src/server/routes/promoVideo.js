@@ -12,7 +12,10 @@ import { runV2Pipeline } from "../../services/ai/promoVideo/v2/pipelineOrchestra
 
 export const router = express.Router();
 
-const PROMO_VIDEO_CREDITS = 10;
+const PROMO_VIDEO_CREDITS = { 1: 8, 3: 20, 5: 30 };
+function promoCredits(sceneCount) {
+  return PROMO_VIDEO_CREDITS[sceneCount] ?? 20;
+}
 
 function rowToProject(row) {
   return {
@@ -325,7 +328,6 @@ router.post("/create", requireAuth, async (req, res) => {
 
 // ── POST /promo-video/:projectId/approve ─────────────────────────────────────
 router.post("/:projectId/approve", requireAuth, async (req, res) => {
-  let creditAmount = 0;
   try {
     const { data: row, error: fetchErr } = await supabaseAdmin
       .from("promo_videos")
@@ -335,30 +337,20 @@ router.post("/:projectId/approve", requireAuth, async (req, res) => {
       .single();
     if (fetchErr || !row) return res.status(404).json({ error: "Project not found" });
 
-    const deduction = await deductCredits(
-      req.user.id, PROMO_VIDEO_CREDITS,
-      "promo_video", "SaaS/Promo Video generation",
-      req.params.projectId
-    );
-    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = PROMO_VIDEO_CREDITS;
-
-    const project = markProjectApproved(rowToProject(row), PROMO_VIDEO_CREDITS);
+    const project = markProjectApproved(rowToProject(row), 0);
 
     const { error: updErr } = await supabaseAdmin
       .from("promo_videos")
       .update({
-        status:          project.status,
-        credits_charged: project.credits_charged,
-        approved_at:     project.approved_at,
-        updated_at:      project.updated_at,
+        status:      project.status,
+        approved_at: project.approved_at,
+        updated_at:  project.updated_at,
       })
       .eq("id", req.params.projectId);
     if (updErr) throw new Error(updErr.message);
 
     res.json({ project, assetManifest: row.asset_manifest });
   } catch (e) {
-    if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: promo video approval failed").catch(() => {});
     console.error("[promo-video/approve]", e.message);
     res.status(500).json({ error: e.message });
   }
@@ -444,20 +436,23 @@ router.post("/:projectId/render", requireAuth, async (req, res) => {
   try {
     const { data: row, error: fetchErr } = await supabaseAdmin
       .from("promo_videos")
-      .select("id, status, user_id")
+      .select("id, status, user_id, style")
       .eq("id", req.params.projectId)
       .eq("user_id", req.user.id)
       .single();
 
     if (fetchErr || !row) return res.status(404).json({ error: "Project not found" });
 
+    const sceneCount      = row.style?.scene_count ?? 3;
+    const creditsToDeduct = promoCredits(sceneCount);
+
     const deduction = await deductCredits(
-      req.user.id, PROMO_VIDEO_CREDITS,
-      "promo_video", "SaaS/Promo Video render",
+      req.user.id, creditsToDeduct,
+      "promo_video", `SaaS/Promo Video render (${sceneCount} scenes)`,
       req.params.projectId
     );
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = PROMO_VIDEO_CREDITS;
+    creditAmount = creditsToDeduct;
 
     // If TH URL just uploaded by client, inject it into scenes before render
     const { talking_head_url: thUrl } = req.body || {};

@@ -9,7 +9,15 @@ import Timeline from "./Timeline";
 
 export default function TimelineEditor() {
   const [timelineHeight, setTimelineHeight] = useState(220);
-  const dragRef = useRef(null);
+  const dragRef        = useRef(null);
+  const fullscreenRef  = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
 
   const onDividerMouseDown = (e) => {
     e.preventDefault();
@@ -150,39 +158,57 @@ export default function TimelineEditor() {
       {/* Main body below the top bar */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-        {/* Left panel — full height, narrow */}
-        <LeftPanel />
+        {/* Left panel — hidden when fullscreen */}
+        {!isFullscreen && <LeftPanel />}
 
-        {/* Center column: canvas on top, timeline below */}
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
-          <Preview />
+        {/* Fullscreen wrapper — contains canvas + properties panel.
+            This is the element that goes fullscreen so both remain visible. */}
+        <div
+          ref={fullscreenRef}
+          style={{
+            display: "flex",
+            flex: 1,
+            overflow: "hidden",
+            minWidth: 0,
+            background: "#0d0d18",
+          }}
+        >
+          {/* Center column: canvas on top, timeline below */}
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
+            <Preview fullscreenRef={fullscreenRef} />
 
-          {/* Drag handle */}
-          <div
-            ref={dragRef}
-            onMouseDown={onDividerMouseDown}
-            style={{
-              height: 6,
-              flexShrink: 0,
-              cursor: "ns-resize",
-              background: "transparent",
-              borderTop: "1px solid rgba(255,255,255,0.06)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div style={{ width: 32, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.15)" }} />
+            {/* Drag handle — hidden when fullscreen */}
+            {!isFullscreen && (
+              <div
+                ref={dragRef}
+                onMouseDown={onDividerMouseDown}
+                style={{
+                  height: 6,
+                  flexShrink: 0,
+                  cursor: "ns-resize",
+                  background: "transparent",
+                  borderTop: "1px solid rgba(255,255,255,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <div style={{ width: 32, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.15)" }} />
+              </div>
+            )}
+
+            {/* Timeline — hidden when fullscreen */}
+            {!isFullscreen && (
+              <div style={{ height: timelineHeight, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <TimelineToolbar />
+                <Timeline />
+              </div>
+            )}
           </div>
 
-          <div style={{ height: timelineHeight, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <TimelineToolbar />
-            <Timeline />
-          </div>
+          {/* Right column: properties panel, full height */}
+          <PropertiesPanel />
         </div>
-
-        {/* Right column: properties panel, full height */}
-        <PropertiesPanel />
 
       </div>
     </div>

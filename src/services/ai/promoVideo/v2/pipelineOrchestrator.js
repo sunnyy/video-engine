@@ -22,7 +22,7 @@
 import { supabaseAdmin }                              from "../../../../server/middleware/shared.js";
 import { generateFullVoiceover, transcribeWithTimestamps } from "../ttsGenerator.js";
 import { pickAutoMood }                               from "../../../../core/registries/musicRegistry.js";
-import { generateScriptV2 }                           from "./scriptGenerator.js";
+import { generateScriptV2, INTENT_PATTERNS, SCENE_WORD_BUDGETS } from "./scriptGenerator.js";
 import { designScene }                                from "./sceneDesigner.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
 import { buildTimeline }                              from "./timelineBuilder.js";
@@ -124,6 +124,40 @@ const CANVAS_SIZES = {
   '1:1':  { width: 1080, height: 1080 },
 };
 
+// -- Custom script parser -------------------------------------------------------
+// Skips GPT script generation when the user provides their own script.
+function parseCustomScript(script, project) {
+  const sceneCount      = project.scene_count ?? 3;
+  const patterns        = INTENT_PATTERNS?.[sceneCount] ?? [{ intents: ['hook', 'solution', 'cta'] }];
+  const selectedPattern = patterns[0];
+  const intents         = selectedPattern.intents;
+
+  const sentences = script
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const perScene = Math.ceil(sentences.length / sceneCount);
+  const sceneSentences = Array.from({ length: sceneCount }, (_, i) =>
+    sentences.slice(i * perScene, (i + 1) * perScene).join(' ')
+  );
+
+  const scenes = intents.map((intent, i) => {
+    const budget      = SCENE_WORD_BUDGETS[intent] ?? { duration: 4, words: 16 };
+    const segmentText = sceneSentences[i] ?? '';
+    return {
+      scene_index:      i,
+      intent,
+      script_segment:   segmentText,
+      spoken:           segmentText,
+      visual_concept:   `${intent} scene — ${segmentText.slice(0, 60)}`,
+      duration_seconds: budget.duration,
+    };
+  });
+
+  console.log(`[v2/pipeline] custom script: ${scenes.length} scenes parsed from user-provided text`);
+  return { full_script: script, scenes, pattern_name: 'custom', pattern_tone: 'User-provided script — follow the text exactly as written.' };
+}
 export async function runV2Pipeline(project) {
   const projectId = project.id;
 
@@ -154,11 +188,20 @@ export async function runV2Pipeline(project) {
     tone:            project.tone  ?? 'professional',
   };
 
-  // ── Step 1: Generate script ───────────────────────────────────────────────
-  console.log(`[v2/pipeline] ${projectId} — generating script`);
-  const scriptResult = await generateScriptV2(project);
-  let scenes     = scriptResult.scenes.map(s => ({ ...s }));
+  // ── Step 1: Generate or parse script ────────────────────────────────────────
+  let scriptResult;
+  if (project.script?.trim()) {
+    console.log(`[v2/pipeline] ${projectId} — using user-provided script (skipping GPT generation)`);
+    scriptResult = parseCustomScript(project.script.trim(), project);
+  } else {
+    console.log(`[v2/pipeline] ${projectId} — generating script`);
+    scriptResult = await generateScriptV2(project);
+  }
+  let scenes        = scriptResult.scenes.map(s => ({ ...s }));
   const full_script = scriptResult.full_script ?? "";
+
+  // Expose pattern name so scene designer knows if script is user-provided
+  projectContext.patternName = scriptResult.pattern_name ?? null;
 
   // ── Steps 2+3: Design scenes in parallel (visual_concept planned upfront, no sequential dependency) ──
   console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes in parallel`);
@@ -336,18 +379,33 @@ export async function runV2Pipeline(project) {
   // ── Build asset manifest from actual queued layers (after placeholder resolution) ──
   // Step 1.5 was removed — v2 scene objects don't carry asset requirements, the
   // timeline layers do. We scan here when the truth is known.
+  function deriveAspectRatio(w, h) {
+    if (!w || !h) return null;
+    const r = w / h;
+    if (r >= 1.6)            return '16:9 — Landscape';
+    if (r <= 0.65)           return '9:16 — Portrait';
+    if (r > 0.9 && r < 1.1) return '1:1 — Square';
+    if (r > 1.1 && r < 1.6) return '4:3 — Landscape';
+    return '3:4 — Portrait';
+  }
+
   const queuedLayers = finalTimeline.layers.filter(
-    l => l.type === "image" && l.assetQueued === true && l.assetType === "asset"
+    l => l.type === 'image' && l.assetQueued === true && l.assetType === 'asset'
   );
   const userRequired = queuedLayers.map(layer => {
-    const sceneIndex = parseInt((layer.id.match(/^s(\d+)_/) || [])[1] ?? "0", 10);
+    const sceneIndex = parseInt((layer.id.match(/^s(d+)_/) || [])[1] ?? '0', 10);
+    const w = Math.round(layer.transform?.width  ?? 0);
+    const h = Math.round(layer.transform?.height ?? 0);
     return {
-      scene_id:   sceneIndex + 1,
-      layer_id:   layer.id,
-      asset_hint: layer.assetHint || "product interface screenshot",
-      asset_type: "asset",
-      status:     "pending",
-      asset_url:  null,
+      scene_id:     sceneIndex + 1,
+      layer_id:     layer.id,
+      asset_hint:   layer.assetHint || 'product interface screenshot',
+      asset_type:   'asset',
+      width:        w || null,
+      height:       h || null,
+      aspect_ratio: deriveAspectRatio(w, h),
+      status:       'pending',
+      asset_url:    null,
     };
   });
   const assetManifest = {

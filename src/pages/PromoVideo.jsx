@@ -57,9 +57,14 @@ const STATUS_META = {
 };
 
 const RENDER_MESSAGES = [
-  "Generating your voiceovers…",
-  "Assembling scenes…",
-  "Rendering video…",
+  "Building your video…",
+  "Writing your script…",
+  "Adding visuals…",
+  "Putting it all together…",
+  "Almost ready…",
+  "Adding the finishing touches…",
+  "Your video is nearly done…",
+  "Hang tight, almost there…",
 ];
 
 const WIZARD_STEPS = ["Video Type", "Product", "Settings", "Style"];
@@ -113,10 +118,13 @@ const GENDER_COLORS = {
 };
 
 const SCENE_COUNT_OPTIONS = [
-  { value: 1, label: "1 Scene",  description: "Single hook — for testing", dots: 1 },
+  { value: 1, label: "1 Scene",  description: "Quick test",                dots: 1 },
   { value: 3, label: "3 Scenes", description: "Quick and punchy",          dots: 3 },
   { value: 5, label: "5 Scenes", description: "Standard promo",            dots: 5 },
 ];
+
+const PROMO_CREDITS  = { 1: 8, 3: 20, 5: 30 };
+const PROMO_GEN_TIME = { 1: "~30 sec", 3: "~1 min", 5: "~2 min" };
 
 const THEME_OPTIONS = [
   { value: "dark",   label: "Dark",   description: "Deep dark backgrounds" },
@@ -936,7 +944,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               {[
-                { id: "faceless",     icon: "🎬", title: "Faceless",      desc: "Stock footage, captions, and AI voiceover. No camera required." },
+                { id: "faceless",     icon: "🎬", title: "Faceless",      desc: "We handle everything — visuals, captions, and narration." },
                 { id: "talking_head", icon: "🎥", title: "Talking Head",  desc: "You on camera. Personal, direct, and authentic." },
               ].map(({ id, icon, title, desc }) => (
                 <button key={id} onClick={() => setVideoType(id)}
@@ -970,7 +978,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 onFile={handleThFile}
                 onClear={() => { setThUrl(null); thFileRef.current = null; bgTranscribeRef.current = null; }}
                 inputRef={thRef} />
-              <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Your audio becomes the voiceover. We transcribe it automatically.</div>
+              <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Your audio is used as the narration. We handle the rest automatically.</div>
             </div>
             <div>
               <label style={C.lbl}>Product Name <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — used for branding)</span></label>
@@ -1184,16 +1192,16 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
             {/* Voiceover / Script */}
             <div>
-              <label style={C.lbl}>Do you have a voiceover recording?</label>
+              <label style={C.lbl}>Do you have a recording?</label>
               <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
                 <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />
                 {hasVoiceover === "yes" && (
-                  <FileUploadRow label="Upload voiceover" accept="audio/*" url={voUrl} uploading={voLoading}
+                  <FileUploadRow label="Upload recording" accept="audio/*" url={voUrl} uploading={voLoading}
                     onFile={handleVoFile} onClear={() => setVoUrl(null)} inputRef={voRef} />
                 )}
                 {hasVoiceover === "no" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <label style={{ ...C.lbl, marginBottom: 2 }}>Do you have a script?</label>
+                    <label style={{ ...C.lbl, marginBottom: 2 }}>Do you have a written script?</label>
                     <YesNo value={hasScript} onChange={setHasScript} />
                     {hasScript === "yes" && (
                       <textarea style={{ ...C.inp, resize: "vertical", minHeight: 80, lineHeight: 1.5 }}
@@ -1201,7 +1209,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                     )}
                     {hasScript === "no" && (
                       <div style={{ fontSize: 12, color: T.muted, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 8, border: `1px solid ${T.border}` }}>
-                        AI will write the script and voiceover automatically.
+                        We'll write the script and narration for you.
                       </div>
                     )}
                   </div>
@@ -1224,7 +1232,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             <div>
               <div style={{ fontSize: 22, fontWeight: 800, color: T.text, marginBottom: 6 }}>Customise the look</div>
-              <div style={{ fontSize: 14, color: T.muted }}>All optional — AI picks sensible defaults if you skip.</div>
+              <div style={{ fontSize: 14, color: T.muted }}>All optional — we pick sensible defaults if you skip.</div>
             </div>
 
             {/* Visual Style */}
@@ -1359,7 +1367,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
             {/* Logo */}
             <div>
-              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — adds a logo outro scene)</span></label>
+              <label style={C.lbl}>Logo <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — appears at the end)</span></label>
               <FileUploadRow label="Upload Logo" accept="image/*" url={logoUrl} uploading={logoLoading}
                 onFile={handleLogoFile} onClear={() => setLogoUrl(null)} inputRef={logoRef} />
             </div>
@@ -1378,9 +1386,16 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 disabled={creating}
                 style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: creating ? 0.4 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                {creating ? <><Spinner size={14} color="#000" /> Generating…</> : "✦ Generate Video →"}
+                {creating
+                  ? <><Spinner size={14} color="#000" /> Creating…</>
+                  : `✦ Create My Video · ${PROMO_CREDITS[sceneCount] ?? 20} ✦`}
               </button>
             </div>
+            {!creating && (
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", textAlign: "center", margin: "8px 0 0" }}>
+                {PROMO_CREDITS[sceneCount] ?? 20} credits · {PROMO_GEN_TIME[sceneCount] ?? "~1 min"} to generate
+              </p>
+            )}
           </div>
         )}
 
@@ -1399,7 +1414,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: T.text, marginBottom: 10 }}>
-                    Creating Your Video
+                    We're on it
                   </div>
                   <div style={{ fontSize: 15, color: T.accent, fontWeight: 600, minHeight: 24 }}>
                     {RENDER_MESSAGES[msgIdx]}
@@ -1407,7 +1422,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 </div>
 
                 <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.7, maxWidth: 380 }}>
-                  This usually takes 2–5 minutes. You'll be taken directly to the editor when it's ready.
+                  This usually takes about a minute.
+You'll land straight in the editor when it's ready.
                 </div>
 
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
@@ -1420,7 +1436,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
               <>
                 <div style={{ fontSize: 48 }}>⚠️</div>
                 <div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: T.text, marginBottom: 8 }}>Render Failed</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: T.text, marginBottom: 8 }}>Something went wrong</div>
                   <div style={{ fontSize: 13, color: T.muted, maxWidth: 380, lineHeight: 1.6 }}>
                     {renderError}
                   </div>
@@ -1435,86 +1451,152 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         )}
 
         {/* ─── Step 5: Asset Collection (conditional — only reached if assets were queued) ─── */}
-        {step === 5 && assetManifest && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 6 }}>Your video is ready — add screenshots</div>
-              <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
-                Upload product screenshots to replace placeholders. Skip anything — you can always add them in the editor.
+        {step === 5 && assetManifest && (() => {
+          const RATIO_PREVIEW = {
+            '16:9 — Landscape': { w: 80, h: 45 },
+            '9:16 — Portrait':  { w: 45, h: 80 },
+            '1:1 — Square':     { w: 64, h: 64 },
+            '4:3 — Landscape':  { w: 80, h: 60 },
+            '3:4 — Portrait':   { w: 60, h: 80 },
+          };
+          const required     = assetManifest.user_required || [];
+          const anyUploading = required.some(i => uploadStatus[i.scene_id] === "uploading");
+          const allDecided   = required.every(i =>
+            i.status === "resolved" || uploadStatus[i.scene_id] === "done" || uploadStatus[i.scene_id] === "error"
+          );
+          const canOpen   = allDecided && !anyUploading && editorProjectId;
+          const btnAccent = customAccent || accentColor || "#6366f1";
+          return (
+            <div style={{ display: "flex", flexDirection: "column", maxWidth: 600, margin: "0 auto", width: "100%" }}>
+              {/* Header */}
+              <div style={{ marginBottom: 28 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", margin: "0 0 8px" }}>
+                  One last thing
+                </h2>
+                <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
+                  Add a screenshot of your product to make the video feel real. Skip anything — you can always swap it in the editor.
+                </p>
               </div>
-            </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {(assetManifest.user_required || []).map((item) => {
-                const upSt  = uploadStatus[item.scene_id];
-                const isDone = item.status === "resolved" || upSt === "done";
-                const ref   = getSceneRef(item.scene_id);
-                return (
-                  <div key={item.scene_id} style={{ background: T.surface, border: `1px solid ${isDone ? "rgba(34,197,94,0.2)" : T.border}`, borderRadius: 12, overflow: "hidden" }}>
-                    <div style={{ padding: "12px 16px", borderBottom: `1px solid rgba(255,255,255,0.05)`, display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: T.muted, flexShrink: 0 }}>
-                        {item.scene_id}
+              {/* Cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+                {required.map((item) => {
+                  const upSt    = uploadStatus[item.scene_id];
+                  const isDone  = item.status === "resolved" || upSt === "done";
+                  const ref     = getSceneRef(item.scene_id);
+                  const preview = RATIO_PREVIEW[item.aspect_ratio] ?? { w: 80, h: 60 };
+                  const thumbUrl = item.asset_url || null;
+                  return (
+                    <div key={item.scene_id} style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
+                      borderRadius: 16,
+                      padding: 20,
+                      display: "flex",
+                      gap: 16,
+                      alignItems: "flex-start",
+                    }}>
+                      {/* Aspect ratio preview box */}
+                      <div style={{
+                        width: preview.w, height: preview.h,
+                        background: thumbUrl ? "transparent" : "rgba(255,255,255,0.06)",
+                        border: thumbUrl ? "none" : "1px dashed rgba(255,255,255,0.15)",
+                        borderRadius: 8,
+                        flexShrink: 0,
+                        position: "relative",
+                        overflow: "hidden",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {thumbUrl
+                          ? <img src={thumbUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          : <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", fontWeight: 700, letterSpacing: 0.5 }}>
+                              {item.aspect_ratio?.split(" — ")[0] ?? "IMG"}
+                            </span>
+                        }
+                        {isDone && (
+                          <div style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: "50%", background: "rgba(34,197,94,0.9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 800 }}>
+                            ✓
+                          </div>
+                        )}
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: "rgba(255,255,255,0.06)", color: "#9090c0" }}>
-                        SCREENSHOT
-                      </span>
-                      {isDone && <span style={{ fontSize: 12, color: T.success, marginLeft: "auto" }}>✓ Uploaded</span>}
-                    </div>
-                    <div style={{ padding: "14px 16px" }}>
-                      {item.asset_hint && (
-                        <div style={{ fontSize: 12, color: T.muted, marginBottom: 12, lineHeight: 1.5 }}>{item.asset_hint}</div>
-                      )}
-                      {!isDone && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+
+                      {/* Right content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>
+                          Screenshot {item.scene_id}
+                        </div>
+                        {item.asset_hint && (
+                          <div style={{ fontSize: 14, fontWeight: 500, color: "#ffffff", lineHeight: 1.5, marginBottom: 8 }}>
+                            {item.asset_hint}
+                          </div>
+                        )}
+                        {item.aspect_ratio && (
+                          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginBottom: 14 }}>
+                            {item.aspect_ratio}{item.width && item.height ? ` · min ${item.width}×${item.height}px` : ""}
+                          </div>
+                        )}
+
+                        {/* Action row */}
+                        {isDone ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <button disabled={upSt === "uploading"} onClick={() => ref.current?.click()}
-                              style={{ ...C.btnG, fontSize: 12, padding: "7px 16px", display: "flex", alignItems: "center", gap: 6, opacity: upSt === "uploading" ? 0.6 : 1, cursor: upSt === "uploading" ? "not-allowed" : "pointer" }}>
-                              {upSt === "uploading" ? <Spinner size={12} /> : "↑"}
-                              {upSt === "uploading" ? "Uploading…" : "Upload Screenshot"}
+                            <span style={{ fontSize: 12, color: "rgba(34,197,94,0.9)", fontWeight: 600 }}>✓ Uploaded</span>
+                            <button onClick={() => ref.current?.click()}
+                              style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "4px 10px", fontSize: 11, color: "rgba(255,255,255,0.45)", cursor: "pointer" }}>
+                              Change
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <button
+                              disabled={upSt === "uploading"}
+                              onClick={() => ref.current?.click()}
+                              style={{
+                                background: btnAccent, color: "#fff", border: "none", borderRadius: 8,
+                                padding: "8px 18px", fontSize: 13, fontWeight: 600,
+                                cursor: upSt === "uploading" ? "not-allowed" : "pointer",
+                                display: "flex", alignItems: "center", gap: 6,
+                                opacity: upSt === "uploading" ? 0.6 : 1,
+                              }}>
+                              {upSt === "uploading" ? <><Spinner size={12} color="#fff" /> Uploading…</> : "↑ Upload Screenshot"}
+                            </button>
+                            <button
+                              onClick={() => setUploadStatus(s => ({ ...s, [item.scene_id]: "done" }))}
+                              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "rgba(255,255,255,0.35)", padding: 0 }}>
+                              Skip for now
                             </button>
                             {upSt === "error" && <span style={{ fontSize: 11, color: T.danger }}>Failed — try again</span>}
                           </div>
-                          <button onClick={() => setUploadStatus(s => ({ ...s, [item.scene_id]: "done" }))}
-                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: T.muted, textAlign: "left", padding: 0, textDecoration: "underline" }}>
-                            Skip — add in editor later
-                          </button>
-                        </div>
-                      )}
-                      <input ref={el => { ref.current = el; }} type="file" accept="image/*,video/*" style={{ display: "none" }}
-                        onChange={e => { const f = e.target.files?.[0]; if (f) handleSceneFile(item.scene_id, f); e.target.value = ""; }} />
+                        )}
+                        <input ref={el => { ref.current = el; }} type="file" accept="image/*,video/*" style={{ display: "none" }}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleSceneFile(item.scene_id, f); e.target.value = ""; }} />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
 
-            {(() => {
-              const required    = assetManifest.user_required || [];
-              const anyUploading = required.some(item => uploadStatus[item.scene_id] === "uploading");
-              const allDecided   = required.every(item =>
-                item.status === "resolved" ||
-                uploadStatus[item.scene_id] === "done" ||
-                uploadStatus[item.scene_id] === "error"
-              );
-              const canOpen = allDecided && !anyUploading && editorProjectId;
-              return (
-                <button
-                  onClick={() => navigate(`/video-editor/${editorProjectId}`, { state: { from: "/promo-video" } })}
-                  disabled={!canOpen}
-                  style={{ ...C.btnY, width: "100%", padding: "15px 24px", fontSize: 16, opacity: canOpen ? 1 : 0.4,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: canOpen ? "pointer" : "not-allowed" }}>
-                  {anyUploading ? <><Spinner size={16} color="#000" /> Uploading…</> :
-                   !allDecided  ? "Upload or skip each asset to continue" :
-                   "Open Editor →"}
-                </button>
-              );
-            })()}
+              {/* CTA */}
+              <button
+                onClick={() => navigate(`/video-editor/${editorProjectId}`, { state: { from: "/promo-video" } })}
+                disabled={!canOpen}
+                style={{
+                  width: "100%", padding: "15px 24px", fontSize: 16, fontWeight: 700,
+                  borderRadius: 12, border: "none", cursor: canOpen ? "pointer" : "not-allowed",
+                  background: canOpen ? btnAccent : "rgba(255,255,255,0.06)",
+                  color: canOpen ? "#ffffff" : "rgba(255,255,255,0.25)",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                }}>
+                {anyUploading ? <><Spinner size={16} color="#fff" /> Uploading…</> :
+                 !allDecided  ? "Upload or skip each asset to continue" :
+                 "Open Editor →"}
+              </button>
 
-            <div style={{ fontSize: 11, color: "#55556a", textAlign: "center" }}>
-              Skipped assets will appear as placeholders in the editor.
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", marginTop: 14 }}>
+                Skipped assets will appear as placeholders in the editor.
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
