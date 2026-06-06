@@ -112,6 +112,7 @@ export function buildSceneDesignerPrompt(sceneScript, projectContext) {
   const accentColor = projectContext.accentColor  || "#6366f1";
   const visualStyle = projectContext.visualStyle  || "radiant";
   const theme       = projectContext.theme        || "dark";
+  const isTH        = projectContext.videoType === 'talking_head';
   const previousScenesContext = projectContext.previousScenes?.length > 0
     ? `PREVIOUS SCENES ALREADY DESIGNED:
 ${projectContext.previousScenes.map(s => `Scene ${s.index} (${s.intent}): ${s.visual_concept}`).join("\n")}
@@ -176,7 +177,11 @@ BAD: "frustrated creator staring at screen" — GOOD: "creator at editing desk, 
 BAD: "person feeling overwhelmed with work" — GOOD: "cluttered desk, laptop with video editor open, warm overhead lighting"
 BAD: "abstract creative frustration concept" — GOOD: "dark studio workspace, multiple screens, glowing UI, blue cinematic light"
 
-ASSET REQUIREMENTS BY INTENT — this is mandatory, not optional:
+${isTH ? `ASSET REQUIREMENTS FOR THIS SCENE:
+Asset placeholders are OPTIONAL for TH video scenes.
+Only include an image-placeholder if the visual_concept explicitly calls for a product screenshot or UI mockup.
+NEVER include an image-placeholder for hook or cta scenes.
+When in doubt, do NOT include a placeholder — use typography, cards, icons, and gradients instead.` : `ASSET REQUIREMENTS BY INTENT — this is mandatory, not optional:
 - solution: MUST include one image-placeholder with data-asset-type="asset". Shows the actual product interface.
 - feature: MUST include one image-placeholder with data-asset-type="asset". Shows the feature in action.
 - process: MUST include one image-placeholder with data-asset-type="asset". Shows the workflow or onboarding.
@@ -190,7 +195,7 @@ For asset hints on product scenes, be specific:
 - solution: "product dashboard or main interface showing [product name] in action"
 - feature: "close-up of [specific feature] in the [product name] interface"
 - process: "step-by-step view of [product name] workflow or onboarding screen"
-- standalone: "product main interface or dashboard screenshot"
+- standalone: "product main interface or dashboard screenshot"`}
 ${buildDesignMandate(accentColor, visualStyle, theme)}
 VISUAL LANGUAGE:
 All text elements in the scene must be in English regardless of the voiceover language.
@@ -204,23 +209,50 @@ Read the script and determine the emotional message, visual story, focal point, 
 Design the scene the way a professional motion designer would.
 Think: Apple, Stripe, Linear, Arc, modern SaaS launch videos.
 
+ARCHETYPE EXECUTION RULES:
+The LAYOUT TYPE above defines what this scene must NOT default to. Each archetype breaks the standard template in a specific way:
+
+typography_hero — text IS the visual. No cards, no image placeholder. Large type dominates. Decoration only.
+single_stat — one number owns the canvas. Everything else is subordinate. No competing headlines.
+split_composition — two distinct zones required. Clear visual separation. Not a card with two columns inside.
+numbered_list — numbers are primary visible elements. Stacked rows. Not a paragraph with numbers embedded.
+feature_grid — multiple distinct card/tile elements required. No single dominant headline. No one card containing all items as text.
+full_bleed_image — image covers 70%+ of canvas. Text is overlay only, not a separate section below.
+minimal_cta — typography dominant. Maximum 3 elements total. No image placeholder.
+proof_social — social proof format: comment, testimonial, or review style. Not a headline+subhead layout.
+process_steps — sequential flow required. Steps must read as a progression. Not a static card.
+quote_statement — one quote dominates. Attribution below. Nothing else competes with the quote.
+
+These rules define what to AVOID, not what to build. Design freely within these constraints.
+
 OUTPUT: Only the HTML. Nothing before DOCTYPE.
 The html and body must use: width:${canvasW}px; height:${canvasH}px; overflow:hidden; margin:0;`,
 
-    user: `SCENE INTENT: ${projectContext.sceneIntent || "unknown"}
+    user: `${projectContext.archetype ? `LAYOUT TYPE: ${projectContext.archetype}\n\n` : ''}SCENE INTENT: ${projectContext.sceneIntent || "unknown"}
 CANVAS FORMAT: ${formatRatio} — ${FORMAT_GUIDANCE[formatRatio] ?? FORMAT_GUIDANCE['9:16']}
 SCENE SCRIPT:
 ${sceneScript}
 
 VISUAL CONCEPT FOR THIS SCENE:
 ${projectContext.visualConcept || "Choose the best visual approach for this script"}
+${projectContext.visual_source === 'categories' ? `
+VISUAL SOURCE: CATEGORIES
+The spoken content is a list of categories, features, or items.
+Build the visual entirely in HTML — cards, tiles, icon grid, or bento layout.
+DO NOT create any image-placeholder element.
+The items themselves are the visual. Each item gets its own card with icon and label.
+` : ''}
+${projectContext.visual_source === 'asset' ? `
+VISUAL SOURCE: ASSET
+Include exactly one image-placeholder for the product screenshot or UI mockup.
+` : ''}
 ${projectContext.sceneIntent === "solution" ? `
 SOLUTION SCENE DIRECTIVE:
 This scene introduces the product for the first time. Feature the product name "${projectContext.productName}" as the dominant typographic element — large, bold, unmissable. Use a clean, minimal composition that lets the name breathe. Include a product screenshot placeholder (data-asset-type="asset") prominently.` : ""}
-${["solution", "feature", "process", "standalone"].includes(projectContext.sceneIntent) ? `
+${!isTH ? `${["solution", "feature", "process", "standalone"].includes(projectContext.sceneIntent) ? `
 ASSET DIRECTIVE: You MUST include exactly one image-placeholder with data-asset-type="asset" in this scene. This is not optional. The product must be visually present.` : ""}
 ${["hook", "problem", "cta"].includes(projectContext.sceneIntent) ? `
-ASSET DIRECTIVE: Do NOT use data-asset-type="asset" in this scene. Use stock or ai imagery only, or no image at all.` : ""}
+ASSET DIRECTIVE: Do NOT use data-asset-type="asset" in this scene. Use stock or ai imagery only, or no image at all.` : ""}` : ""}
 
 ${previousScenesContext}
 

@@ -24,11 +24,18 @@ const SCENE_DESIGNER_MODEL = "gpt-5.4";
 export async function designScene(scene, projectContext) {
   const prompt = buildSceneDesignerPrompt(scene.script_segment, { ...projectContext, sceneIntent: scene.intent });
 
+  const thGuidance = projectContext.videoType === 'talking_head' ? `
+THIS IS A TALKING HEAD VIDEO. The speaker's video plays continuously as a base layer beneath your design.
+Your design must work AROUND the TH video area defined in the layout directive below.
+NEVER place text or elements in the reserved TH video area.
+Design overlays, text, and visuals only in the non-reserved areas of the canvas.
+` : '';
+
   const response = await openai.chat.completions.create({
     model:       SCENE_DESIGNER_MODEL,
     max_completion_tokens: 16000,
     messages: [
-      { role: "system", content: prompt.system },
+      { role: "system", content: prompt.system + thGuidance },
       { role: "user",   content: prompt.user   },
     ],
   });

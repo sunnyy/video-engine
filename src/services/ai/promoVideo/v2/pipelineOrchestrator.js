@@ -19,11 +19,11 @@
  *  11.  Save timeline to projects table
  */
 
-import { supabaseAdmin }                              from "../../../../server/middleware/shared.js";
+import { supabaseAdmin, openai }                      from "../../../../server/middleware/shared.js";
 import { generateFullVoiceover, transcribeWithTimestamps } from "../ttsGenerator.js";
 import { pickAutoMood }                               from "../../../../core/registries/musicRegistry.js";
 import { generateScriptV2, INTENT_PATTERNS, SCENE_WORD_BUDGETS } from "./scriptGenerator.js";
-import { designScene }                                from "./sceneDesigner.js";
+import { designScene }                               from "./sceneDesigner.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
 import { buildTimeline }                              from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "../assetRequirements.js";
@@ -159,6 +159,10 @@ function parseCustomScript(script, project) {
   return { full_script: script, scenes, pattern_name: 'custom', pattern_tone: 'User-provided script — follow the text exactly as written.' };
 }
 export async function runV2Pipeline(project) {
+  if (project.video_type === 'talking_head') {
+    return await runTHPipeline(project);
+  }
+
   const projectId = project.id;
 
   const formatRatio = project.format_ratio ?? '9:16';
@@ -208,13 +212,15 @@ export async function runV2Pipeline(project) {
   const sceneGraphs = await Promise.all(
     scenes.map(async (scene, index) => {
       try {
-        const html = await designScene(scene, {
+        const sceneProjectContext = {
           ...projectContext,
+          archetype:      scene.archetype      ?? null,
           visualConcept:  scene.visual_concept ?? null,
           previousScenes: scenes
             .filter((_, i) => i !== index)
-            .map(s => ({ index: s.scene_index, intent: s.intent, visual_concept: s.visual_concept })),
-        });
+            .map(s => ({ index: s.scene_index, intent: s.intent, archetype: s.archetype ?? null, visual_concept: s.visual_concept })),
+        };
+        const html = await designScene(scene, sceneProjectContext);
         console.log(`[v2/pipeline] scene ${scene.scene_index} (${scene.intent}) — ${html?.length ?? 0} chars`);
         const graph = parseSceneHTML(html || "", scene.scene_index, canvas);
         console.log(`[v2/pipeline] scene ${scene.scene_index} graph: ${graph.length} layers${graph.length > 0 ? ` — first: ${JSON.stringify(graph[0]).slice(0, 120)}` : " — EMPTY"}`);
@@ -464,5 +470,422 @@ export async function runV2Pipeline(project) {
     _asset_queue:       asset_queue,
     _assetManifest:     assetManifest,
     updated_at:         new Date().toISOString(),
+  };
+}
+
+// ── Shared pipeline helpers (used by both runV2Pipeline and runTHPipeline) ─────
+
+async function resolveImagePlaceholders(finalTimeline, project) {
+  const placeholderLayers = finalTimeline.layers.filter(l => l.type === "image" && !l.src && l.assetHint);
+  if (!placeholderLayers.length) return;
+  await Promise.all(placeholderLayers.map(async (layer) => {
+    if (layer.assetType === "stock") {
+      const query = extractSearchQuery(layer.assetHint);
+      layer.src = await fetchPixabayImage(query);
+    } else if (layer.assetType === "ai") {
+      layer.src = await generateFalImage(layer.assetHint, project.id);
+    } else if (layer.assetType === "asset") {
+      layer.assetQueued = true;
+    }
+    if (layer.src) console.log(`[v2/pipeline] resolved ${layer.assetType} placeholder: ${layer.id}`);
+  }));
+}
+
+async function injectBackgroundMusic(finalTimeline, project, volume = 0.25) {
+  try {
+    const mood = pickAutoMood(project.video_goal, project.tone);
+    const { data: allTracks } = await supabaseAdmin
+      .from("music_tracks").select("public_url, title, mood").eq("is_active", true);
+    if (allTracks?.length) {
+      const moodTracks = allTracks.filter(t => t.mood === mood);
+      const pool  = moodTracks.length ? moodTracks : allTracks;
+      const track = pool[Math.floor(Math.random() * pool.length)];
+      const musicDur = finalTimeline.format.duration;
+      finalTimeline.layers.push({
+        id: "music_global", trackId: "track_music",
+        type: "audio", audioType: "music", src: track.public_url,
+        start: 0, end: musicDur, zIndex: 0,
+        visible: true, locked: false, trimStart: 0, trimEnd: musicDur,
+        volume, muted: false, fadeIn: 1, fadeOut: 1,
+        sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+      });
+      console.log(`[v2/pipeline] music injected: "${track.title}" (${mood})`);
+    }
+  } catch (e) {
+    console.warn("[v2/pipeline] music injection skipped:", e.message);
+  }
+}
+
+function buildAssetManifest(finalTimeline) {
+  function deriveAspectRatio(w, h) {
+    if (!w || !h) return null;
+    const r = w / h;
+    if (r >= 1.6)            return '16:9 — Landscape';
+    if (r <= 0.65)           return '9:16 — Portrait';
+    if (r > 0.9 && r < 1.1) return '1:1 — Square';
+    if (r > 1.1 && r < 1.6) return '4:3 — Landscape';
+    return '3:4 — Portrait';
+  }
+  const queuedLayers = finalTimeline.layers.filter(
+    l => l.type === 'image' && l.assetQueued === true && l.assetType === 'asset'
+  );
+  const userRequired = queuedLayers.map(layer => {
+    const sceneIndex = parseInt((layer.id.match(/^s(\d+)_/) || [])[1] ?? '0', 10);
+    const w = Math.round(layer.transform?.width  ?? 0);
+    const h = Math.round(layer.transform?.height ?? 0);
+    return {
+      scene_id:     sceneIndex + 1,
+      layer_id:     layer.id,
+      asset_hint:   layer.assetHint || 'product interface screenshot',
+      asset_type:   'asset',
+      width:        w || null,
+      height:       h || null,
+      aspect_ratio: deriveAspectRatio(w, h),
+      status:       'pending',
+      asset_url:    null,
+    };
+  });
+  return {
+    user_required:               userRequired,
+    ai_generate:                 [],
+    stock_fetch:                 [],
+    placeholders:                [],
+    total_user_uploads_required: userRequired.length,
+    all_assets_provided:         userRequired.length === 0,
+  };
+}
+
+async function persistAssetManifest(assetManifest, projectId) {
+  console.log(`[v2/pipeline] asset manifest: ${assetManifest.user_required.length} user uploads required`);
+  try {
+    await supabaseAdmin.from("promo_videos")
+      .update({ asset_manifest: assetManifest }).eq("id", projectId);
+  } catch (e) {
+    console.warn("[v2/pipeline] asset manifest save failed (non-fatal):", e.message);
+  }
+}
+
+async function saveTimeline(finalTimeline, project, source = 'promo_video_v2', rawAiJson = null) {
+  try {
+    const { data: editorRow } = await supabaseAdmin
+      .from("projects")
+      .insert({
+        user_id:           project.user_id,
+        name:              `${project.product_name ?? "Promo Video"} — Promo`,
+        safe_project_json: finalTimeline,
+        orientation:       project.format_ratio ?? '9:16',
+        mode:              "timeline",
+        source,
+        editor_version:    "timeline",
+        raw_ai_json:       rawAiJson,
+      })
+      .select("id")
+      .single();
+    const editorProjectId = editorRow?.id ?? null;
+    console.log(`[v2/pipeline] timeline saved to projects (editor: ${editorProjectId})`);
+    return editorProjectId;
+  } catch (e) {
+    console.warn("[v2/pipeline] projects insert failed (non-fatal):", e.message);
+    return null;
+  }
+}
+
+// ── TH transcript normalizer ───────────────────────────────────────────────────
+
+async function normalizeTHTranscript(project) {
+  const { scenes: whisperSegments, full_transcript } = project.th_transcript ?? {};
+
+  if (!whisperSegments?.length) {
+    throw new Error('No transcript found.');
+  }
+
+  const prompt = `You are a short-form video editor making visual decisions for a talking-head video (TikTok/Reels/Shorts style).
+
+The speaker's video plays as the base layer throughout. Your job is to decide, for each spoken moment, what visual treatment to apply — and to synchronize visuals tightly to the speech.
+
+TRANSCRIPT (with timestamps):
+${whisperSegments.map(s => `[${s.start}s–${s.end}s]: "${s.spoken}"`).join('\n')}
+
+---
+
+CORE RULE — SPEECH-SYNCED VISUALS:
+Visuals must appear the moment the corresponding information is spoken. Do NOT keep th_full running while the speaker says something visual. Every noun, category, list, feature, statistic, product, website, or claim triggers a visual within 0–1 seconds of being spoken.
+
+CRITICAL: The purpose of grouping is NOT to preserve sentences. The purpose of grouping is to maximize visual storytelling. Split based on visual beats, not grammar.
+
+A new group must be created whenever:
+- A new concept is introduced
+- A list begins
+- A feature or category is mentioned
+- A comparison is introduced
+- A CTA begins
+- A reveal begins
+- Any visual opportunity appears
+
+GROUPING RULES:
+- Split on every new concept, category, or topic shift — even if only 1.5–2 seconds long.
+- If the speaker reads a list of related categories, features, examples, resources, or benefits in rapid succession, keep them in a SINGLE visual scene. Animate items appearing progressively as they are spoken. Do NOT create a new scene for every list item. A list that takes 6 seconds to speak is ONE 6-second scene, not 6 scenes.
+- Maximum group duration: 5 seconds. Split anything longer.
+- Minimum group duration: 1.5 seconds. Merge only if truly no visual opportunity exists.
+- Talking-head fullscreen (th_full) scenes must never exceed 3 seconds.
+- Maximum total groups: 10.
+
+CRITICAL LIST RULE — this overrides everything else:
+When the speaker reads multiple items that are clearly part of the same list — even if they span many Whisper segments — they form ONE single group. Do not start a new group mid-list. The list ends when the speaker moves to a completely different topic.
+
+CONCRETE EXAMPLE using this exact type of script:
+WRONG (what you must NOT do):
+Group 2: "Free Games" → th_pip (1.6s)
+Group 3: "Open Source Software, Learning Materials, Public Domain Books" → th_pip (3.1s)
+Group 4: "Tools" → th_split (0.8s)
+Group 5: "Extensions और काफी इंटरेस्टिंग कलेक्शन्स" → th_pip (1.8s)
+
+CORRECT (what you must do):
+Group 2: "Free Games, Open Source Software, Learning Materials, Public Domain Books, Tools, Extensions और काफी इंटरेस्टिंग कलेक्शन्स" → th_pip (7.4s, visual_source: "categories", archetype: feature_grid)
+The entire list = ONE group. One card grid showing all 6 categories.
+
+TREATMENT RULES:
+
+"th_full": Use ONLY for the opening 2–3 seconds of the hook, pure transitions, or goodbyes. If the speaker says ANYTHING that can be shown visually, do NOT use th_full.
+
+"th_hero": TH video fills canvas. GPT-5.4 overlays a title/badge/stat in top safe zone (y 0–15%) or bottom safe zone (y 68–100%) only. Use for: key one-liner statements where speaker stays prominent but a text overlay reinforces the point.
+
+"th_pip": Full canvas generated visual. Speaker appears as small circular PiP bottom-left. Use for: lists, category grids, feature showcases, resource libraries, UI demos — when content needs full screen but speaker should stay visible.
+
+"th_split": TH video top 45%, generated visual bottom 55%. Use for: when speaker references one specific thing to show below them — a named feature, a comparison, a step.
+
+"content_only": Full screen generated visual, speaker hidden. Use for: dramatic reveals, key stats, product name reveal, save/follow CTA takeover. Max 1–2 per video.
+
+VARIETY RULE: Never use the same treatment more than once in a row (exception: th_full at the very start only).
+
+TIMING EXAMPLE for a script like this one:
+- "Today I found a website..." → th_full (2s, opening hook only)
+- "...with rare internet resources" → th_hero (2s, overlay title "RARE INTERNET RESOURCES")
+- "Free Games, Open Source, Books, Tools..." → th_pip (4s, animated category grid fills screen)
+- "Save this reel right now" → content_only (2s, bold CTA)
+- "These sites don't show up on Google" → th_split (3s, Google vs hidden comparison)
+- "Just open the website, select a category..." → th_pip (3s, UI walkthrough mockup)
+- "The website is called DeepWebNest" → content_only (2s, hero name reveal)
+- "Save and follow for daily websites" → content_only (2s, CTA)
+
+---
+
+VISUAL DIRECTION (required for all non-th_full scenes):
+One short phrase describing what to show visually — must match the archetype.
+Examples:
+- feature_grid: "6 resource category cards, icon per card, staggered reveal"
+- split_composition: "Google search bar left, hidden gems vault right"
+- minimal_cta: "bold save CTA, animated bookmark icon"
+- typography_hero: "RARE INTERNET RESOURCES title overlay, bottom safe zone"
+- process_steps: "3 numbered steps, sequential reveal"
+- single_stat: "one dominant number, radial glow behind"
+Do NOT write layout instructions, pixel sizes, animation timing, or color details. GPT-5.4 handles all of that.
+
+ARCHETYPE — pick one per non-th_full scene:
+typography_hero | single_stat | split_composition | numbered_list | feature_grid | full_bleed_image | minimal_cta | proof_social | process_steps | quote_statement
+
+VISUAL SOURCE — pick one per non-th_full scene:
+- "categories": the spoken content is a list, grid, features, or named items — build cards, tiles, or a grid entirely in HTML, NO image placeholder
+- "asset": a specific product screenshot or UI mockup is needed — include one image-placeholder
+- null: th_full scenes only
+
+---
+
+Return ONLY valid JSON:
+{
+  "groups": [
+    {
+      "group_index": 0,
+      "intent": "hook",
+      "treatment": "th_full",
+      "script_segment": "exact spoken text",
+      "start": 0.0,
+      "end": 2.5,
+      "duration_seconds": 2.5,
+      "visual_direction": null,
+      "visual_source": null,
+      "archetype": null
+    }
+  ],
+  "full_transcript": "complete transcript"
+}
+
+intent options: "hook" | "problem" | "solution" | "feature" | "proof" | "cta"
+treatment options: "th_full" | "th_hero" | "th_pip" | "th_split" | "content_only"
+visual_direction: detailed string for non-th_full scenes, null for th_full
+visual_source: "categories" | "asset" | null
+archetype: pick one for non-th_full scenes, null for th_full`;
+
+  const response = await openai.chat.completions.create({
+    model:           'gpt-4.1',
+    messages:        [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+    temperature:     0.1,
+  });
+
+  const { groups, full_transcript: cleanedTranscript } = JSON.parse(
+    response.choices[0].message.content
+  );
+  console.log('[normalizeTHTranscript] raw groups:', JSON.stringify(groups, null, 2));
+
+  const thPatternMap = {
+    th_full:      'th_full',
+    th_hero:      'hero',
+    th_pip:       'pip',
+    th_split:     'split',
+    content_only: 'content_only',
+  };
+
+  const scenes = (groups ?? []).map(g => ({
+    ...g,
+    scene_index:    g.group_index,
+    spoken:         g.script_segment,
+    thPattern:      thPatternMap[g.treatment] ?? 'th_full',
+    visual_concept: g.visual_direction ?? '',
+    visual_source:  g.visual_source ?? null,
+    archetype:      g.archetype ?? null,
+    classification: g.treatment === 'th_full' ? 'th_only' : 'generate_scene',
+  }));
+
+  const genCount = scenes.filter(s => s.classification === 'generate_scene').length;
+  console.log(`[v2/pipeline-th] grouped into ${scenes.length} scenes: ${genCount} with visuals, ${scenes.length - genCount} th_full`);
+  return { scenes, full_transcript: cleanedTranscript ?? full_transcript, groups };
+}
+
+// ── TH v2 pipeline ─────────────────────────────────────────────────────────────
+
+async function runTHPipeline(project) {
+  const projectId   = project.id;
+  const formatRatio = project.format_ratio ?? '9:16';
+  const canvas      = CANVAS_SIZES[formatRatio] ?? CANVAS_SIZES['9:16'];
+
+  console.log(`[v2/pipeline-th] ${projectId} — starting TH pipeline`);
+
+  // Step 1 — Normalize Whisper transcript into intent-tagged scene segments
+  const { scenes, full_transcript, groups: rawGroups } = await normalizeTHTranscript(project);
+
+  // Step 2 — Build project context
+  const projectContext = {
+    projectId,
+    productName:        project.product_name     ?? 'Product',
+    productDescription: project.product_description ?? '',
+    niche:              project.style?.niche     ?? 'saas',
+    accentColor:        project.accent_color     ?? '#6366f1',
+    visualStyle:        project.visual_style     ?? 'radiant',
+    typographyStyle:    project.typography_style ?? 'modern',
+    theme:              project.theme            ?? 'dark',
+    language:           project.language         ?? 'en',
+    tone:               project.tone             ?? 'professional',
+    logoUrl:            project.logo_url         ?? null,
+    logoWidth:          project.logo_width       ?? null,
+    logoHeight:         project.logo_height      ?? null,
+    canvasWidth:        canvas.width,
+    canvasHeight:       canvas.height,
+    formatRatio,
+    videoType:          'talking_head',
+    fps:                30,
+    patternName:        null,
+  };
+
+  // Step 3 — Design scenes: th_full = fullscreen TH video only, split/content_only = generate visuals
+  const genNeeded = scenes.filter(s => s.thPattern !== 'th_full').length;
+  console.log(`[v2/pipeline-th] ${projectId} — designing ${genNeeded} of ${scenes.length} scenes`);
+  const sceneGraphs     = [];
+  const generatedScenes = [];
+
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
+
+    // TEST: th_full skip disabled — all scenes designed by GPT-5.4
+    // if (scene.thPattern === 'th_full') {
+    //   console.log(`[v2/pipeline-th] scene ${i} — th_full (${scene.duration_seconds?.toFixed(1)}s) — fullscreen`);
+    //   sceneGraphs.push([]);
+    //   continue;
+    // }
+
+    try {
+      const sceneProjectContext = {
+        ...projectContext,
+        archetype:      scene.archetype      ?? null,
+        sceneIntent:    scene.intent,
+        visualConcept:  scene.visual_concept,
+        visual_source:  scene.visual_source  ?? null,
+        previousScenes: generatedScenes.slice(-2).map(s => ({
+          index:          s.scene_index,
+          intent:         s.intent,
+          archetype:      s.archetype        ?? null,
+          visual_concept: s.visual_concept,
+        })),
+      };
+      const html = await designScene(scene, sceneProjectContext);
+      const graph = parseSceneHTML(html || '', i, canvas);
+      console.log(`[v2/pipeline-th] scene ${i} (${scene.intent}/${scene.thPattern}) — ${graph.length} layers`);
+      sceneGraphs.push(graph);
+      generatedScenes.push(scene);
+    } catch (err) {
+      console.error(`[v2/pipeline-th] scene ${i} design failed:`, err.message);
+      sceneGraphs.push([]);
+    }
+  }
+
+  // Step 4 — Build timeline from scene graphs
+  const { timeline: rawTimeline, asset_queue } = buildTimeline(sceneGraphs, scenes, projectContext);
+
+  // Step 5 — Inject TH video layer spanning full duration
+  // src is null here — filled in at render time when user uploads the video to Supabase
+  const totalDur      = rawTimeline.format.duration;
+  const finalTimeline = {
+    ...rawTimeline,
+    // TEST: th_video_base temporarily disabled
+    layers: [
+      ...rawTimeline.layers,
+    ],
+  };
+
+  // Step 5b — Inject positioned TH video clip layers for hero/split/pip scenes
+  // Compute scene start/end timings by walking cumulative durations (mirrors buildTimeline cursor)
+  {
+    let tc = 0;
+    for (let i = 0; i < scenes.length; i++) {
+      const scene  = scenes[i];
+      const dur    = parseFloat((scene.duration_seconds ?? 0).toFixed(4));
+      const tStart = parseFloat(tc.toFixed(4));
+      const tEnd   = parseFloat((tc + dur).toFixed(4));
+      tc = tEnd;
+
+      // TEST: all TH clip layer injection temporarily disabled
+      continue; // eslint-disable-line no-unreachable
+    }
+  }
+
+  // Step 6 — Resolve image placeholders
+  await resolveImagePlaceholders(finalTimeline, project);
+
+  // Step 7 — Background music (quiet — TH audio is the primary track)
+  await injectBackgroundMusic(finalTimeline, project, 0.12);
+
+  // Step 8 — Asset manifest
+  const assetManifest = buildAssetManifest(finalTimeline);
+  await persistAssetManifest(assetManifest, projectId);
+
+  // Step 9 — Save timeline
+  if (full_transcript) finalTimeline.full_script = full_transcript;
+  const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video_th_v2', rawGroups ?? null);
+
+  return {
+    ...project,
+    scenes,
+    script:            full_transcript,
+    full_script:       full_transcript,
+    scene_format:      'v2',
+    pipeline_version:  'v2',
+    status:            'script_generated',
+    has_script:        true,
+    duration_seconds:  parseFloat(totalDur.toFixed(2)),
+    editor_project_id: editorProjectId,
+    _timeline:         finalTimeline,
+    _asset_queue:      asset_queue,
+    _assetManifest:    assetManifest,
+    updated_at:        new Date().toISOString(),
   };
 }
