@@ -9,24 +9,12 @@ import { serverFetch, SERVER } from "../services/serverApi";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useProjectsStore } from "../store/useProjectsStore";
 import { createProject, deleteProject } from "../services/projects/projectService";
-import { captionStyleRegistry, captionStyleKeys } from "../core/registries/captionStyleRegistry.jsx";
+import { captionStylePresets, captionStyleLabels, captionStyleAccents } from "../core/registries/captionTimelineRegistry";
 import { getCredits } from "../services/credits/creditService";
 import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 
-const STYLE_LABELS = {
-  wordBlaze:      "Word Blaze",
-  karaokeFlip:    "Karaoke",
-  stackReveal:    "Stack Reveal",
-  markerPen:      "Marker Pen",
-  glitchStamp:    "Glitch Stamp",
-  editorialSerif: "Editorial",
-  neonTicker:     "Neon Ticker",
-  pillDrop:       "Pill Drop",
-  brutalSlam:     "Brutal Slam",
-  luxuryGold:     "Luxury Gold",
-};
 
 /* ── Static caption style thumbnails (no Remotion hooks, pure CSS) ── */
 const PREVIEWS = {
@@ -139,11 +127,73 @@ function CaptionStylePreview({ styleKey, selected, onClick }) {
         {PreviewFn ? <PreviewFn /> : null}
       </div>
       <div style={{ padding: "5px 8px", fontSize: 10, fontWeight: 700, color: selected ? "#c4b0ff" : "#6b6b82", textTransform: "uppercase", letterSpacing: "0.06em", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-        {STYLE_LABELS[styleKey] || styleKey}
+        {captionStyleLabels[styleKey] || styleKey}
       </div>
     </button>
   );
 }
+
+function chunkSegments(segments, wordsPerChunk = 3) {
+  const result = [];
+  for (const seg of segments) {
+    const words = seg.text.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) continue;
+    const dur = Math.max(0.3, seg.end - seg.start);
+    const timePerWord = dur / words.length;
+    for (let i = 0; i < words.length; i += wordsPerChunk) {
+      const count = Math.min(wordsPerChunk, words.length - i);
+      result.push({
+        text:  words.slice(i, i + count).join(" "),
+        start: parseFloat((seg.start + i * timePerWord).toFixed(3)),
+        end:   parseFloat((seg.start + (i + count) * timePerWord).toFixed(3)),
+      });
+    }
+  }
+  return result;
+}
+
+const captionStylePresets = {
+  wordBlaze: {
+    style:      { fontFamily: "'Bebas Neue',sans-serif",       fontSize: 84, fontWeight: "400", color: "#ffffff", textAlign: "center", letterSpacing: 1,      textShadow: "0 0 20px rgba(245,197,24,0.5)" },
+    transition: { in: { type: "zoom",       duration: 0.12, intensity: 0.7 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
+  },
+  karaokeFill: {
+    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 70, fontWeight: "800", color: "#ffffff", textAlign: "center" },
+    transition: { in: { type: "slide-up",   duration: 0.12, intensity: 0.6 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
+  },
+  stackReveal: {
+    style:      { fontFamily: "'Unbounded',sans-serif",        fontSize: 58, fontWeight: "900", color: "#ffffff", textAlign: "center" },
+    transition: { in: { type: "fade",       duration: 0.15, intensity: 1   }, out: { type: "fade",    duration: 0.1,  intensity: 1   } },
+  },
+  markerPen: {
+    style:      { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 72, fontWeight: "900", color: "#ffffff", textAlign: "center", textShadow: "0 2px 0 rgba(0,0,0,0.5)" },
+    transition: { in: { type: "slide-right",duration: 0.12, intensity: 0.5 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
+  },
+  glitchStamp: {
+    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 68, fontWeight: "800", color: "#ffffff", textAlign: "center", textShadow: "-2px 0 #ff003c, 2px 0 #00f7ff" },
+    transition: { in: { type: "zoom",       duration: 0.08, intensity: 0.9 }, out: { type: "dissolve",duration: 0.1,  intensity: 0.8 } },
+  },
+  editorialSerif: {
+    style:      { fontFamily: "'Playfair Display',serif",      fontSize: 52, fontWeight: "700", color: "#14120f", textAlign: "left",   letterSpacing: 0 },
+    transition: { in: { type: "fade",       duration: 0.2,  intensity: 1   }, out: { type: "fade",    duration: 0.15, intensity: 1   } },
+  },
+  neonTicker: {
+    style:      { fontFamily: "'JetBrains Mono',monospace",    fontSize: 62, fontWeight: "700", color: "#00e5c3", textAlign: "center", letterSpacing: "0.04em", textShadow: "0 0 12px rgba(0,229,195,0.7)" },
+    transition: { in: { type: "slide-up",   duration: 0.1,  intensity: 0.5 }, out: { type: "dissolve",duration: 0.12, intensity: 0.7 } },
+  },
+  pillDrop: {
+    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 66, fontWeight: "800", color: "#ffffff", textAlign: "center", textShadow: "0 0 20px rgba(124,92,252,0.6)" },
+    transition: { in: { type: "slide-down", duration: 0.12, intensity: 0.6 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
+  },
+  brutalSlam: {
+    style:      { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 92, fontWeight: "900", color: "#ff2d55", textAlign: "center", letterSpacing: -1,     textShadow: "2px 2px 0 #000, -1px -1px 0 #000" },
+    transition: { in: { type: "zoom",       duration: 0.07, intensity: 0.95}, out: { type: "fade",    duration: 0.06, intensity: 1   } },
+  },
+  luxuryGold: {
+    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 56, fontWeight: "800", color: "#ffd700", textAlign: "center", letterSpacing: -0.5,   textShadow: "0 0 16px rgba(255,215,0,0.5)" },
+    transition: { in: { type: "dissolve",   duration: 0.2,  intensity: 0.8 }, out: { type: "dissolve",duration: 0.15, intensity: 0.8 } },
+  },
+};
 
 function positionLabel(v) {
   if (v >= 70) return "Bottom";
@@ -165,9 +215,10 @@ function formatTime(s) {
 function CaptionCard({ project, onDelete }) {
   const [hov,  setHov]  = useState(false);
   const [conf, setConf] = useState(false);
-  const avatarSrc = project.safe_project_json?.avatar?.src || null;
+  const pj = project.safe_project_json;
+  const avatarSrc = pj?.layers?.find(l => l.type === "video")?.src || pj?.avatar?.src || null;
   return (
-    <a href={`/editor/${project.id}`}
+    <a href={`/video-editor/${project.id}`}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => { setHov(false); setConf(false); }}
       style={{ display: "block", textDecoration: "none", background: "#111118", border: `1px solid ${hov ? "rgba(124,92,252,0.4)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, overflow: "hidden", transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none" }}>
@@ -322,68 +373,65 @@ function GeneratorForm() {
     if (!segments?.length || !videoUrl) return;
     setCreating(true);
     try {
-      let currentTime = 0;
-      const beats = segments.map((seg, i) => {
-        const duration  = Math.max(0.5, seg.end - seg.start);
-        const start_sec = currentTime;
-        const end_sec   = currentTime + duration;
-        currentTime = end_sec;
-        return {
-          id:        crypto.randomUUID(),
-          order:     i,
-          layout:      null,
-          layoutBackground: { type: "color", value: "transparent" },
-          deletedZones: ["z2"],
-          avatarZone:  "z1",
-          zones: {
-            z1: {
-              type:    "avatar",
-              x: 0, y: 0, width: 100, height: 100, zIndex: 1,
-              content: { kind: "avatar" },
-              style:   { objectFit: "cover" },
-              background: {},
-            },
-          },
-          overlays:    [],
-          audio_cues:  [],
-          spoken:      seg.text.trim(),
-          caption: {
-            show:      true,
-            text:      seg.text.trim(),
-            style:     captionStyle,
-            animation: "fade",
-            position:  captionPos,
-          },
-          transition:   { type: "cut", duration: 0 },
-          intent:       "explanation",
-          energy:       0.5,
-          beatType:     null,
-          duration_sec: duration,
-          start_sec,
-          end_sec,
-        };
-      });
+      const fps = 30;
+      const captionW = 980;
+      const captionH = 220;
+      const captionX = (1080 - captionW) / 2; // 50px
 
-      const totalDuration = currentTime;
-      const project = {
-        id:           crypto.randomUUID(),
-        meta:         { width: 1080, height: 1920, fps: 25, orientation: "9:16", mode: "talking_head", continuous_avatar: true },
-        beats,
-        duration_sec: totalDuration,
-        audio:        { music: null },
-        avatar:       { src: videoUrl, type: "video" },
-        dna:          null,
+      const preset  = captionStylePresets[captionStyle] ?? captionStylePresets.wordBlaze;
+      const yCenter = (captionPos / 100) * 1920;
+      const captionY = Math.max(0, Math.min(1920 - captionH, yCenter - captionH / 2));
+
+      const chunks = chunkSegments(segments, 3);
+      const captionLayers = chunks.map((chunk, i) => ({
+        id:        `caption_${i}`,
+        trackId:   `caption_${i}`,
+        name:      `Caption ${i + 1}`,
+        type:      "text",
+        content:   chunk.text,
+        style:     { ...preset.style, _captionStyle: captionStyle },
+        captionStyle,
+        start:     chunk.start,
+        end:       chunk.end,
+        zIndex:    10,
+        visible:   true,
+        locked:    false,
+        sfx:       null,
+        animation: null,
+        keyframes:  { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
+        transition: preset.transition,
+        transform:  { x: captionX, y: captionY, width: captionW, height: captionH, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+      }));
+
+      const totalDuration = (segments[segments.length - 1]?.end ?? 0) + 0.3;
+
+      const timelineProject = {
+        version: "2.0",
+        format:  { width: 1080, height: 1920, fps, duration: totalDuration },
+        layers:  [
+          {
+            id: "base_video", trackId: "track_base_video", name: "Video",
+            type: "video", src: videoUrl, objectFit: "cover",
+            start: 0, end: totalDuration, zIndex: 0,
+            visible: true, locked: false, sfx: null, animation: null,
+            volume: 1, muted: false, trimStart: 0, trimEnd: totalDuration, fadeIn: 0, fadeOut: 0,
+            keyframes:  { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
+            transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+            transform:  { x: 0, y: 0, width: 1080, height: 1920, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+          },
+          ...captionLayers,
+        ],
       };
 
       const saved = await createProject({
         name:        projectName || file.name.replace(/\.[^.]+$/, ""),
-        rawAI:       {},
-        safeProject: project,
+        rawAI:       { captionStyle, captionPos, segmentCount: segments.length },
+        safeProject: timelineProject,
         source:      "caption_studio",
       });
       if (!saved?.id) throw new Error("Failed to create project");
 
-      navigate(`/videos`);
+      navigate(`/video-editor/${saved.id}`);
     } catch (e) { setError(e.message); setCreating(false); }
   }
 
@@ -472,7 +520,7 @@ function GeneratorForm() {
             <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Caption Style</div>
             <div style={{ maxHeight: 240, overflowY: "auto", paddingRight: 2 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                {captionStyleKeys.map(key => (
+                {Object.keys(captionStylePresets).map(key => (
                   <CaptionStylePreview
                     key={key}
                     styleKey={key}

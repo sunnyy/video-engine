@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
 import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../../core/registries/sfxRegistry";
+import { captionTimelineRegistry } from "../../core/registries/captionTimelineRegistry";
 import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeRegistry";
 import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
@@ -911,6 +912,30 @@ function LayerElement({
           }}
         />
       );
+    } else if (layer.captionStyle && captionTimelineRegistry[layer.captionStyle]) {
+      const CaptionComp  = captionTimelineRegistry[layer.captionStyle];
+      const localTime    = Math.max(0, currentTime - layer.start);
+      const duration     = Math.max(0.1, layer.end - layer.start);
+      const captionCfg    = layer.captionConfig ?? {};
+      const captionColor  = captionCfg.color      ?? "#ffffff";
+      const captionBrand  = captionCfg.brandColor  ?? layer.style?.brandColor ?? "#f5c518";
+      const captionScale  = captionCfg.scale       ?? 1;
+      content = (
+        <div
+          style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible", color: captionColor }}
+          onDoubleClick={(e) => { e.stopPropagation(); onStartEdit?.(); }}
+        >
+          <div style={{ transform: `scale(${captionScale})`, transformOrigin: "center center" }}>
+            <CaptionComp
+              text={layer.content || ""}
+              localTime={localTime}
+              duration={duration}
+              brandColor={captionBrand}
+              textColor={captionColor}
+            />
+          </div>
+        </div>
+      );
     } else {
       content = (
         <div
@@ -1548,7 +1573,15 @@ export default function Preview({ fullscreenRef }) {
       });
     };
 
+    let didDrag = false;
+
     const onMove = (me) => {
+      if (!didDrag) {
+        const dx = me.clientX - startClientX;
+        const dy = me.clientY - startClientY;
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+        didDrag = true;
+      }
       const store = useTimelineStore.getState();
       buildPatches(me.clientX, me.clientY).forEach(({ id, patch }) => store.updateLayerSilent(id, patch));
     };
@@ -1557,6 +1590,11 @@ export default function Preview({ fullscreenRef }) {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       setDraggingLayerId(null);
+      // Plain click on a multi-selected layer (no drag) — collapse to single selection
+      if (isInMultiSelect && !didDrag) {
+        selectLayer(layer.id);
+        return;
+      }
       const patches = buildPatches(me.clientX, me.clientY);
       const store = useTimelineStore.getState();
       patches.forEach(({ id, patch }, i) => {

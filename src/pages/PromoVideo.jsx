@@ -1377,8 +1377,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
               <button onClick={() => setStep(2)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
               <button
                 onClick={handleBuildPlan}
-                disabled={creating}
-                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: creating ? 0.4 : 1,
+                disabled={creating || logoLoading}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: (creating || logoLoading) ? 0.4 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {creating
                   ? <><Spinner size={14} color="#000" /> Creating…</>

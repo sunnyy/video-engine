@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform } from "./keyframeUtils";
 import { loadSFXLibrary, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
+import { captionStylePresets, captionStyleLabels, captionStyleAccents } from "../../core/registries/captionTimelineRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import PresetsModal from "./modals/PresetsModal";
 import IconModal from "./modals/IconModal";
@@ -1045,14 +1046,14 @@ function AppearanceSection({ layer, update, updateSilent, commit,
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
               type="range" min={0} max={500} step={1}
-              value={layer.borderRadius ?? 0}
+              value={layer.transform?.borderRadius ?? layer.borderRadius ?? 0}
               onMouseDown={snap}
-              onChange={(e) => updateSilent({ borderRadius: parseInt(e.target.value) })}
-              onMouseUp={(e) => commit({ borderRadius: parseInt(e.target.value) }, pre.current)}
+              onChange={(e) => updateSilent({ transform: { ...layer.transform, borderRadius: parseInt(e.target.value) } })}
+              onMouseUp={(e) => commit({ transform: { ...layer.transform, borderRadius: parseInt(e.target.value) } }, pre.current)}
               style={{ flex: 1, accentColor: "#7c5cfc", margin: 0 }}
             />
             <span style={{ fontSize: 11, color: "#7070a0", minWidth: 30, textAlign: "right" }}>
-              {layer.borderRadius ?? 0}px
+              {layer.transform?.borderRadius ?? layer.borderRadius ?? 0}px
             </span>
           </div>
         </Field>
@@ -1379,6 +1380,167 @@ function SfxSection({ layer, update }) {
   );
 }
 
+function CaptionStyleSection({ layer }) {
+  const layers      = useTimelineStore((s) => s.project?.layers ?? []);
+  const updateLayer = useTimelineStore((s) => s.updateLayer);
+  const current     = layer.captionStyle ?? "wordBlaze";
+  const cfg           = layer.captionConfig ?? {};
+  const captionColor  = cfg.color      ?? "#ffffff";
+  const captionBrand  = cfg.brandColor ?? captionStyleAccents[current] ?? "#f5c518";
+  const captionScale  = cfg.scale      ?? 1;
+  const CAPTION_H    = 220;
+  const CANVAS_H     = 1920;
+  const currentY     = layer.transform?.y ?? (CANVAS_H * 0.8 - CAPTION_H / 2);
+  const captionPos   = Math.round(Math.min(90, Math.max(10, ((currentY + CAPTION_H / 2) / CANVAS_H) * 100)));
+
+  function applyToAll(patch) {
+    layers.filter(l => l.captionStyle).forEach(l => updateLayer(l.id, patch));
+  }
+
+  function applyStyle(key) {
+    const preset = captionStylePresets[key];
+    if (!preset) return;
+    applyToAll({
+      captionStyle:  key,
+      style:         { ...preset.style, _captionStyle: key },
+      transition:    preset.transition,
+      captionConfig: { ...cfg, brandColor: captionStyleAccents[key] ?? "#f5c518" },
+    });
+  }
+
+  function applyColor(color) {
+    applyToAll({ captionConfig: { ...cfg, color } });
+  }
+
+  function applyBrandColor(brandColor) {
+    applyToAll({ captionConfig: { ...cfg, brandColor } });
+  }
+
+  function applyScale(scale) {
+    applyToAll({ captionConfig: { ...cfg, scale } });
+  }
+
+  function applyPosition(pct) {
+    const yCenter = (pct / 100) * CANVAS_H;
+    const y = Math.max(0, Math.min(CANVAS_H - CAPTION_H, yCenter - CAPTION_H / 2));
+    layers.filter(l => l.captionStyle).forEach(l =>
+      updateLayer(l.id, { transform: { ...l.transform, y } })
+    );
+  }
+
+  function posLabel(v) {
+    if (v >= 70) return "Bottom";
+    if (v >= 40) return "Middle";
+    return "Top";
+  }
+
+  return (
+    <Section title="Caption Style">
+      <div style={{ fontSize: 11, color: "#55556a", marginBottom: 8 }}>Changes apply to all caption layers</div>
+
+      {/* Style grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 12 }}>
+        {Object.keys(captionStylePresets).map(key => {
+          const isSelected = key === current;
+          const accent     = captionStyleAccents[key] ?? "#fff";
+          return (
+            <button
+              key={key}
+              onClick={() => applyStyle(key)}
+              style={{
+                display:      "flex",
+                alignItems:   "center",
+                gap:          6,
+                padding:      "6px 8px",
+                background:   isSelected ? "rgba(124,92,252,0.15)" : "rgba(255,255,255,0.03)",
+                border:       `1px solid ${isSelected ? "rgba(124,92,252,0.6)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 6,
+                cursor:       "pointer",
+                textAlign:    "left",
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: accent, flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: isSelected ? 700 : 500, color: isSelected ? "#c4b0ff" : "#9090b0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {captionStyleLabels[key] ?? key}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Colors */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+        <div>
+          <span style={labelStyle}>Text</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="color"
+              value={captionColor}
+              onChange={(e) => applyColor(e.target.value)}
+              style={{ width: 28, height: 26, padding: 2, background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 5, cursor: "pointer" }}
+            />
+            <span style={{ fontSize: 11, color: "#9090b0", fontFamily: "monospace" }}>{captionColor.toUpperCase()}</span>
+          </div>
+        </div>
+        <div>
+          <span style={labelStyle}>Highlight</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="color"
+              value={captionBrand}
+              onChange={(e) => applyBrandColor(e.target.value)}
+              style={{ width: 28, height: 26, padding: 2, background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 5, cursor: "pointer" }}
+            />
+            <span style={{ fontSize: 11, color: "#9090b0", fontFamily: "monospace" }}>{captionBrand.toUpperCase()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Size */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <span style={labelStyle}>Size</span>
+          <span style={{ fontSize: 11, color: "#9090b0" }}>{Math.round(captionScale * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min={0.4}
+          max={1.8}
+          step={0.05}
+          value={captionScale}
+          onChange={(e) => applyScale(parseFloat(e.target.value))}
+          style={{ width: "100%", accentColor: "#7c5cfc" }}
+        />
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+          <span style={{ fontSize: 10, color: "#44444f" }}>40%</span>
+          <span style={{ fontSize: 10, color: "#44444f" }}>180%</span>
+        </div>
+      </div>
+
+      {/* Position */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <span style={labelStyle}>Position</span>
+          <span style={{ fontSize: 11, color: "#9090b0" }}>{posLabel(captionPos)}</span>
+        </div>
+        <input
+          type="range"
+          min={10}
+          max={90}
+          step={1}
+          value={captionPos}
+          onChange={(e) => applyPosition(Number(e.target.value))}
+          style={{ width: "100%", accentColor: "#7c5cfc" }}
+        />
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+          <span style={{ fontSize: 10, color: "#44444f" }}>Top</span>
+          <span style={{ fontSize: 10, color: "#44444f" }}>Bottom</span>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 export default function PropertiesPanel() {
   const project = useTimelineStore((s) => s.project);
   const selectedLayerId = useTimelineStore((s) => s.selectedLayerId);
@@ -1677,6 +1839,7 @@ export default function PropertiesPanel() {
           {/* Type-specific props */}
           {layer.type === "video"    && <VideoProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
           {layer.type === "audio"   && <AudioProps layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
+          {layer.type === "text" && layer.captionStyle && <CaptionStyleSection layer={layer} />}
           {layer.type === "text"    && <TextProps  layer={layer} update={update} updateSilent={updateSilent} commit={commit} />}
           {(layer.type === "image" || layer.type === "sticker") && <ImageProps layer={layer} update={update} resolvedObjectFitVal={resolvedObjectFitVal} updateObjectFit={updateObjectFit} />}
           {layer.type === "shape"    && <ShapeProps    layer={layer} update={update} />}
@@ -1698,7 +1861,7 @@ export default function PropertiesPanel() {
           )}
           {layer.type === "shape" && (
             <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit}
-              showBlendMode />
+              showBorderRadius showBlendMode />
           )}
 
           {/* Transitions — image and video only */}
