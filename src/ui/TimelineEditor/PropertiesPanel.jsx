@@ -1388,7 +1388,8 @@ export default function PropertiesPanel() {
   const updateLayerSilent = useTimelineStore((s) => s.updateLayerSilent);
   const commitDrag = useTimelineStore((s) => s.commitDrag);
   const currentTime = useTimelineStore((s) => s.currentTime);
-  const addKeyframeAction = useTimelineStore((s) => s.addKeyframe);
+  const addKeyframeAction    = useTimelineStore((s) => s.addKeyframe);
+  const keyframeRecording    = useTimelineStore((s) => s.keyframeRecording);
 
   const layer = project?.layers?.find((l) => l.id === selectedLayerId);
   const canvasW = project?.format?.width  ?? 1080;
@@ -1403,12 +1404,12 @@ export default function PropertiesPanel() {
   const localTime = layer ? Math.max(0, currentTime - layer.start) : 0;
   const resolvedObjectFitVal = layer?.objectFit ?? "cover";
 
-  // For the 6 keyframeable props: show resolved value; write to keyframe if KFs are active,
-  // otherwise write to base transform. Width/height are NOT keyframeable — always base transform.
+  // If keyframes already exist for this prop, update the keyframe at current time (intentional editing).
+  // If no keyframes exist, update base transform. Recording mode only governs drag-based keyframe creation.
   const updateOrKeyframe = (prop, val) => {
     if (!layer) return;
     const hasKF = (layer.keyframes?.[prop]?.length ?? 0) > 0;
-    if (hasKF) {
+    if (hasKF || keyframeRecording) {
       addKeyframeAction(layer.id, prop, localTime, val);
     } else {
       updateLayer(layer.id, { transform: { ...layer.transform, [prop]: val } });

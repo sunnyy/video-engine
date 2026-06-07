@@ -45,13 +45,15 @@ export default function TimelineToolbar() {
     const next = SPEEDS[(SPEEDS.indexOf(playbackSpeed) + 1) % SPEEDS.length];
     setPlaybackSpeed(next);
   };
-  const removeLayer          = useTimelineStore((s) => s.removeLayer);
-  const duplicateLayer       = useTimelineStore((s) => s.duplicateLayer);
-  const splitLayerAtPlayhead = useTimelineStore((s) => s.splitLayerAtPlayhead);
-  const addKeyframe          = useTimelineStore((s) => s.addKeyframe);
-  const updateLayer          = useTimelineStore((s) => s.updateLayer);
-  const bringForward         = useTimelineStore((s) => s.bringForward);
-  const sendBack             = useTimelineStore((s) => s.sendBack);
+  const removeLayer            = useTimelineStore((s) => s.removeLayer);
+  const duplicateLayer         = useTimelineStore((s) => s.duplicateLayer);
+  const splitLayerAtPlayhead   = useTimelineStore((s) => s.splitLayerAtPlayhead);
+  const addKeyframe            = useTimelineStore((s) => s.addKeyframe);
+  const updateLayer            = useTimelineStore((s) => s.updateLayer);
+  const bringForward           = useTimelineStore((s) => s.bringForward);
+  const sendBack               = useTimelineStore((s) => s.sendBack);
+  const keyframeRecording      = useTimelineStore((s) => s.keyframeRecording);
+  const setKeyframeRecording   = useTimelineStore((s) => s.setKeyframeRecording);
 
   const hasSelection = !!selectedLayerId;
   const selectedLayer = project?.layers?.find((l) => l.id === selectedLayerId) ?? null;
@@ -63,17 +65,6 @@ export default function TimelineToolbar() {
   const hasKeyframes = selectedLayer
     ? Object.values(selectedLayer.keyframes ?? {}).some((arr) => arr?.length > 0)
     : false;
-
-  const stampKeyframes = () => {
-    if (!selectedLayer) return;
-    const localTime = Math.max(0, currentTime - selectedLayer.start);
-    // Use the resolved (visually displayed) values, not just the base transform,
-    // so stamping while keyframes are active captures the correct interpolated position.
-    const tr = resolveTransform(selectedLayer, currentTime);
-    for (const prop of ["x", "y", "width", "height", "scale", "rotation", "opacity", "blur"]) {
-      addKeyframe(selectedLayer.id, prop, localTime, tr[prop] ?? 0);
-    }
-  };
 
   return (
     <div
@@ -187,15 +178,13 @@ export default function TimelineToolbar() {
       </button>
       <button
         style={{
-          ...iconBtn(hasKeyframes),
-          opacity: hasSelection ? 1 : 0.3,
-          color: hasKeyframes ? "#f5c518" : undefined,
-          borderColor: hasKeyframes ? "rgba(245,197,24,0.4)" : undefined,
-          background: hasKeyframes ? "rgba(245,197,24,0.12)" : undefined,
+          ...iconBtn(keyframeRecording),
+          color: keyframeRecording ? "#ff4f4f" : undefined,
+          borderColor: keyframeRecording ? "rgba(255,79,79,0.5)" : undefined,
+          background: keyframeRecording ? "rgba(255,79,79,0.15)" : undefined,
         }}
-        onClick={stampKeyframes}
-        disabled={!hasSelection}
-        title="Add keyframe at current time"
+        onClick={() => setKeyframeRecording(!keyframeRecording)}
+        title={keyframeRecording ? "Keyframe recording ON — click to disable" : "Enable keyframe recording"}
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
           <path d="M12 2L22 12L12 22L2 12Z"/>

@@ -292,32 +292,31 @@ export const useTimelineStore = create((set, get) => ({
   alignSelectedLayers: (type) => {
     const { project, _history, selectedLayerIds } = get();
     if (!project || selectedLayerIds.length < 2) return;
-    const canvasW = project.format?.width ?? 1080;
-    const canvasH = project.format?.height ?? 1920;
     const layers = project.layers.filter((l) => selectedLayerIds.includes(l.id));
 
-    const leftEdge  = (l) => canvasW / 2 + (l.transform?.x ?? 0) - (l.transform?.width ?? 100) / 2;
-    const rightEdge = (l) => canvasW / 2 + (l.transform?.x ?? 0) + (l.transform?.width ?? 100) / 2;
-    const topEdge   = (l) => canvasH / 2 + (l.transform?.y ?? 0) - (l.transform?.height ?? 100) / 2;
-    const botEdge   = (l) => canvasH / 2 + (l.transform?.y ?? 0) + (l.transform?.height ?? 100) / 2;
+    // Top-left origin: x/y are the top-left corner of the layer in canvas space.
+    const leftEdge  = (l) => l.transform?.x ?? 0;
+    const rightEdge = (l) => (l.transform?.x ?? 0) + (l.transform?.width ?? 100);
+    const topEdge   = (l) => l.transform?.y ?? 0;
+    const botEdge   = (l) => (l.transform?.y ?? 0) + (l.transform?.height ?? 100);
 
-    const minLeft   = Math.min(...layers.map(leftEdge));
-    const maxRight  = Math.max(...layers.map(rightEdge));
-    const minTop    = Math.min(...layers.map(topEdge));
-    const maxBot    = Math.max(...layers.map(botEdge));
-    const centerX   = (minLeft + maxRight) / 2;
-    const centerY   = (minTop + maxBot) / 2;
+    const minLeft  = Math.min(...layers.map(leftEdge));
+    const maxRight = Math.max(...layers.map(rightEdge));
+    const minTop   = Math.min(...layers.map(topEdge));
+    const maxBot   = Math.max(...layers.map(botEdge));
+    const centerX  = (minLeft + maxRight) / 2;
+    const centerY  = (minTop  + maxBot)  / 2;
 
     const getNewTransform = (l) => {
-      const w = l.transform?.width ?? 100;
+      const w = l.transform?.width  ?? 100;
       const h = l.transform?.height ?? 100;
       switch (type) {
-        case "left":     return { x: minLeft  - canvasW / 2 + w / 2 };
-        case "right":    return { x: maxRight - canvasW / 2 - w / 2 };
-        case "centerH":  return { x: centerX  - canvasW / 2 };
-        case "top":      return { y: minTop   - canvasH / 2 + h / 2 };
-        case "bottom":   return { y: maxBot   - canvasH / 2 - h / 2 };
-        case "centerV":  return { y: centerY  - canvasH / 2 };
+        case "left":    return { x: minLeft };
+        case "right":   return { x: maxRight - w };
+        case "centerH": return { x: centerX  - w / 2 };
+        case "top":     return { y: minTop };
+        case "bottom":  return { y: maxBot - h };
+        case "centerV": return { y: centerY - h / 2 };
         default: return {};
       }
     };
@@ -344,6 +343,9 @@ export const useTimelineStore = create((set, get) => ({
   setSnapEnabled: (snap) => set({ snapEnabled: snap }),
 
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
+
+  keyframeRecording: false,
+  setKeyframeRecording: (val) => set({ keyframeRecording: val }),
 
   // ── History ──────────────────────────────────────────────────
   undo: () => {

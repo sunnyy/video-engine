@@ -447,12 +447,9 @@ function PersistentVideoTrack({
     const storeState = useTimelineStore.getState();
     const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
+    const recording = storeState.keyframeRecording;
     const freshClip = storeState.project?.layers?.find((l) => l.id === activeClip.id) ?? activeClip;
     const localTime = Math.max(0, ct - freshClip.start);
-    const hasXKF = (freshClip.keyframes?.x?.length ?? 0) > 0;
-    const hasYKF = (freshClip.keyframes?.y?.length ?? 0) > 0;
-    const hasWKF = (freshClip.keyframes?.width?.length ?? 0) > 0;
-    const hasHKF = (freshClip.keyframes?.height?.length ?? 0) > 0;
     const resolved = resolveTransform(freshClip, ct);
     const origT = {
       ...freshClip.transform,
@@ -479,13 +476,7 @@ function PersistentVideoTrack({
       let newY = me.altKey ? origT.y : cfg.hm < 0 ? origT.y + (origT.height - newH) : origT.y;
       ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
-      const transformPatch = { ...freshClip.transform };
-      if (!hasXKF) transformPatch.x = newX;
-      if (!hasYKF) transformPatch.y = newY;
-      if (!hasWKF) transformPatch.width = newW;
-      if (!hasHKF) transformPatch.height = newH;
-
-      if (hasXKF || hasYKF || hasWKF || hasHKF) {
+      if (recording) {
         const kf = JSON.parse(JSON.stringify(origKF));
         const upsert = (arr, time, val) => {
           const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
@@ -493,21 +484,26 @@ function PersistentVideoTrack({
           else { arr.push({ time, value: val }); arr.sort((a, b) => a.time - b.time); }
           return arr;
         };
-        if (hasXKF) kf.x = upsert(kf.x ?? [], localTime, newX);
-        if (hasYKF) kf.y = upsert(kf.y ?? [], localTime, newY);
-        if (hasWKF) kf.width = upsert(kf.width ?? [], localTime, newW);
-        if (hasHKF) kf.height = upsert(kf.height ?? [], localTime, newH);
-        return { transform: transformPatch, keyframes: kf };
+        kf.x      = upsert(kf.x      ?? [], localTime, newX);
+        kf.y      = upsert(kf.y      ?? [], localTime, newY);
+        kf.width  = upsert(kf.width  ?? [], localTime, newW);
+        kf.height = upsert(kf.height ?? [], localTime, newH);
+        return { transform: { ...freshClip.transform }, keyframes: kf };
       }
       const clipTransformResult = { ...freshClip.transform, width: newW, height: newH, x: newX, y: newY };
+      const dX = newX - origT.x, dY = newY - origT.y;
+      const kf = JSON.parse(JSON.stringify(origKF));
+      if (dX !== 0 && kf.x?.length > 0) kf.x = kf.x.map(k => ({ ...k, value: k.value + dX }));
+      if (dY !== 0 && kf.y?.length > 0) kf.y = kf.y.map(k => ({ ...k, value: k.value + dY }));
       if (freshClip.type === "text" && cfg.wm !== 0 && !me.shiftKey) {
         const fsRatio = newW / origT.width;
         return {
           transform: clipTransformResult,
+          keyframes: kf,
           style: { ...freshClip.style, fontSize: Math.max(1, Math.round((freshClip.style?.fontSize ?? 48) * fsRatio)) },
         };
       }
-      return { transform: clipTransformResult };
+      return { transform: clipTransformResult, keyframes: kf };
     };
 
     const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, buildPatch(me));
@@ -527,9 +523,9 @@ function PersistentVideoTrack({
     const storeState = useTimelineStore.getState();
     const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
+    const recording = storeState.keyframeRecording;
     const freshClip = storeState.project?.layers?.find((l) => l.id === activeClip.id) ?? activeClip;
     const localTime = Math.max(0, ct - freshClip.start);
-    const hasRotKF = (freshClip.keyframes?.rotation?.length ?? 0) > 0;
     const origRotation = resolveTransform(freshClip, ct).rotation ?? 0;
     const origT = { ...freshClip.transform };
     const origKF = JSON.parse(JSON.stringify(freshClip.keyframes ?? {}));
@@ -539,7 +535,8 @@ function PersistentVideoTrack({
 
     const buildPatch = (me) => {
       const newRotation = Math.atan2(me.clientY - centerY, me.clientX - centerX) * (180 / Math.PI) + angleOffset;
-      if (hasRotKF) {
+      const dRot = newRotation - origRotation;
+      if (recording) {
         const kf = JSON.parse(JSON.stringify(origKF));
         kf.rotation = kf.rotation ?? [];
         const idx = kf.rotation.findIndex((k) => Math.abs(k.time - localTime) < 0.001);
@@ -547,7 +544,9 @@ function PersistentVideoTrack({
         else { kf.rotation.push({ time: localTime, value: newRotation }); kf.rotation.sort((a, b) => a.time - b.time); }
         return { keyframes: kf };
       }
-      return { transform: { ...origT, rotation: newRotation } };
+      const kf = JSON.parse(JSON.stringify(origKF));
+      if (kf.rotation?.length > 0) kf.rotation = kf.rotation.map(k => ({ ...k, value: k.value + dRot }));
+      return { transform: { ...origT, rotation: origT.rotation + dRot }, keyframes: kf };
     };
 
     const onMove = (me) => useTimelineStore.getState().updateLayerSilent(activeClip.id, buildPatch(me));
@@ -708,12 +707,9 @@ function LayerElement({
     const storeState = useTimelineStore.getState();
     const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
+    const recording = storeState.keyframeRecording;
     const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
     const localTime = Math.max(0, ct - freshLayer.start);
-    const hasXKF = (freshLayer.keyframes?.x?.length ?? 0) > 0;
-    const hasYKF = (freshLayer.keyframes?.y?.length ?? 0) > 0;
-    const hasWKF = (freshLayer.keyframes?.width?.length ?? 0) > 0;
-    const hasHKF = (freshLayer.keyframes?.height?.length ?? 0) > 0;
     const resolved = resolveTransform(freshLayer, ct);
     const origT = {
       ...freshLayer.transform,
@@ -741,13 +737,7 @@ function LayerElement({
       let newY = me.altKey ? origT.y : cfg.hm < 0 ? origT.y + (origT.height - newH) : origT.y;
       ({ x: newX, y: newY, w: newW, h: newH } = snapResize(newX, newY, newW, newH, cfg, origT, canvasW, canvasH));
 
-      const transformPatch = { ...freshLayer.transform };
-      if (!hasXKF) transformPatch.x = newX;
-      if (!hasYKF) transformPatch.y = newY;
-      if (!hasWKF) transformPatch.width = newW;
-      if (!hasHKF) transformPatch.height = newH;
-
-      if (hasXKF || hasYKF || hasWKF || hasHKF) {
+      if (recording) {
         const kf = JSON.parse(JSON.stringify(origKF));
         const upsert = (arr, time, val) => {
           const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
@@ -755,21 +745,26 @@ function LayerElement({
           else { arr.push({ time, value: val }); arr.sort((a, b) => a.time - b.time); }
           return arr;
         };
-        if (hasXKF) kf.x = upsert(kf.x ?? [], localTime, newX);
-        if (hasYKF) kf.y = upsert(kf.y ?? [], localTime, newY);
-        if (hasWKF) kf.width = upsert(kf.width ?? [], localTime, newW);
-        if (hasHKF) kf.height = upsert(kf.height ?? [], localTime, newH);
-        return { transform: transformPatch, keyframes: kf };
+        kf.x      = upsert(kf.x      ?? [], localTime, newX);
+        kf.y      = upsert(kf.y      ?? [], localTime, newY);
+        kf.width  = upsert(kf.width  ?? [], localTime, newW);
+        kf.height = upsert(kf.height ?? [], localTime, newH);
+        return { transform: { ...freshLayer.transform }, keyframes: kf };
       }
       const transformResult = { ...freshLayer.transform, width: newW, height: newH, x: newX, y: newY };
+      const dX = newX - origT.x, dY = newY - origT.y;
+      const kf = JSON.parse(JSON.stringify(origKF));
+      if (dX !== 0 && kf.x?.length > 0) kf.x = kf.x.map(k => ({ ...k, value: k.value + dX }));
+      if (dY !== 0 && kf.y?.length > 0) kf.y = kf.y.map(k => ({ ...k, value: k.value + dY }));
       if (freshLayer.type === "text" && cfg.wm !== 0 && !me.shiftKey) {
         const fsRatio = newW / origT.width;
         return {
           transform: transformResult,
+          keyframes: kf,
           style: { ...freshLayer.style, fontSize: Math.max(1, Math.round((freshLayer.style?.fontSize ?? 48) * fsRatio)) },
         };
       }
-      return { transform: transformResult };
+      return { transform: transformResult, keyframes: kf };
     };
 
     const onMove = (me) => {
@@ -798,9 +793,9 @@ function LayerElement({
     const storeState = useTimelineStore.getState();
     const preDragProject = JSON.parse(JSON.stringify(storeState.project));
     const ct = storeState.currentTime;
+    const recording = storeState.keyframeRecording;
     const freshLayer = storeState.project?.layers?.find((l) => l.id === layer.id) ?? layer;
     const localTime = Math.max(0, ct - freshLayer.start);
-    const hasRotKF = (freshLayer.keyframes?.rotation?.length ?? 0) > 0;
     const origRotation = resolveTransform(freshLayer, ct).rotation ?? 0;
     const origT = { ...freshLayer.transform };
     const origKF = JSON.parse(JSON.stringify(freshLayer.keyframes ?? {}));
@@ -810,7 +805,8 @@ function LayerElement({
 
     const buildPatch = (me) => {
       const newRotation = Math.atan2(me.clientY - centerY, me.clientX - centerX) * (180 / Math.PI) + angleOffset;
-      if (hasRotKF) {
+      const dRot = newRotation - origRotation;
+      if (recording) {
         const kf = JSON.parse(JSON.stringify(origKF));
         kf.rotation = kf.rotation ?? [];
         const idx = kf.rotation.findIndex((k) => Math.abs(k.time - localTime) < 0.001);
@@ -818,7 +814,9 @@ function LayerElement({
         else { kf.rotation.push({ time: localTime, value: newRotation }); kf.rotation.sort((a, b) => a.time - b.time); }
         return { keyframes: kf };
       }
-      return { transform: { ...origT, rotation: newRotation } };
+      const kf = JSON.parse(JSON.stringify(origKF));
+      if (kf.rotation?.length > 0) kf.rotation = kf.rotation.map(k => ({ ...k, value: k.value + dRot }));
+      return { transform: { ...origT, rotation: origT.rotation + dRot }, keyframes: kf };
     };
 
     const onMove = (me) => {
@@ -1500,6 +1498,8 @@ export default function Preview({ fullscreenRef }) {
     // Drag all selected layers together, or just this one
     const dragIds = isInMultiSelect ? currentMultiIds : [layer.id];
 
+    const recording = storeState.keyframeRecording;
+
     const layerStates = dragIds.map(id => {
       const fl = storeState.project?.layers?.find((l) => l.id === id);
       if (!fl) return null;
@@ -1510,8 +1510,6 @@ export default function Preview({ fullscreenRef }) {
         origX: resolved.x ?? 0,
         origY: resolved.y ?? 0,
         localTime: Math.max(0, ct - fl.start),
-        hasXKF: (fl.keyframes?.x?.length ?? 0) > 0,
-        hasYKF: (fl.keyframes?.y?.length ?? 0) > 0,
         origKF: JSON.parse(JSON.stringify(fl.keyframes ?? {})),
       };
     }).filter(Boolean);
@@ -1526,7 +1524,7 @@ export default function Preview({ fullscreenRef }) {
         const { x: newX, y: newY } = dragIds.length === 1
           ? snapBody(rawX, rawY, ls.origT.width ?? cW, ls.origT.height ?? cH, cW, cH)
           : { x: rawX, y: rawY };
-        if (ls.hasXKF || ls.hasYKF) {
+        if (recording) {
           const kf = JSON.parse(JSON.stringify(ls.origKF));
           const upsert = (arr, time, value) => {
             const idx = arr.findIndex((k) => Math.abs(k.time - time) < 0.001);
@@ -1534,14 +1532,19 @@ export default function Preview({ fullscreenRef }) {
             else { arr.push({ time, value }); arr.sort((a, b) => a.time - b.time); }
             return arr;
           };
-          if (ls.hasXKF) kf.x = upsert(kf.x ?? [], ls.localTime, newX);
-          if (ls.hasYKF) kf.y = upsert(kf.y ?? [], ls.localTime, newY);
-          const transform = { ...ls.origT };
-          if (!ls.hasXKF) transform.x = newX;
-          if (!ls.hasYKF) transform.y = newY;
-          return { id: ls.id, patch: { keyframes: kf, transform } };
+          kf.x = upsert(kf.x ?? [], ls.localTime, newX);
+          kf.y = upsert(kf.y ?? [], ls.localTime, newY);
+          return { id: ls.id, patch: { keyframes: kf, transform: { ...ls.origT } } };
         }
-        return { id: ls.id, patch: { transform: { ...ls.origT, x: newX, y: newY } } };
+        // Non-recording: shift base transform AND any existing keyframe values by the
+        // same drag delta so animation-driven layers (fade-up, slide) still move correctly.
+        const dX = newX - ls.origX;
+        const dY = newY - ls.origY;
+        const transform = { ...ls.origT, x: ls.origT.x + dX, y: ls.origT.y + dY };
+        const kf = JSON.parse(JSON.stringify(ls.origKF));
+        if (kf.x?.length > 0) kf.x = kf.x.map(k => ({ ...k, value: k.value + dX }));
+        if (kf.y?.length > 0) kf.y = kf.y.map(k => ({ ...k, value: k.value + dY }));
+        return { id: ls.id, patch: { transform, keyframes: kf } };
       });
     };
 
