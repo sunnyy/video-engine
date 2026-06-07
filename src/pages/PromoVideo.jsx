@@ -463,11 +463,12 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [hasTHVideo,   setHasTHVideo]   = useState(null); // null | "yes" | "no"
   const [thUrl,        setThUrl]        = useState(null);
   const [thLoading,    setThLoading]    = useState(false);
-  const [hasScript,    setHasScript]    = useState(null);
-  const [scriptText,   setScriptText]   = useState("");
-  const [hasVoiceover, setHasVoiceover] = useState(null);
-  const [voUrl,        setVoUrl]        = useState(null);
-  const [voLoading,    setVoLoading]    = useState(false);
+  const [hasScript,       setHasScript]       = useState(null);
+  const [scriptText,      setScriptText]      = useState("");
+  const [hasVoiceover,    setHasVoiceover]    = useState(null);
+  const [voUrl,           setVoUrl]           = useState(null);
+  const [voLoading,       setVoLoading]       = useState(false);
+  const [thTranscriptData, setThTranscriptData] = useState(null);
   const thRef = useRef();
   const voRef = useRef();
 
@@ -725,12 +726,14 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         if (!res.ok) throw new Error(data.error || "Transcription failed");
         return data;
       });
-      await bgTranscribeRef.current;
+      const transcriptResult = await bgTranscribeRef.current;
+      setThTranscriptData(transcriptResult);
       setThUrl("ready"); // sentinel — actual file is in thFileRef
     } catch (e) {
       console.error("[handleThFile]", e.message);
-      thFileRef.current   = null;
+      thFileRef.current       = null;
       bgTranscribeRef.current = null;
+      setThTranscriptData(null);
       setThUrl(null);
     }
     setThLoading(false);
@@ -768,7 +771,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         language,
         tone,
 
-        has_talking_head:        isTH && hasTHVideo === "yes",
+        has_talking_head:        isTH,
         has_voiceover:           !isTH && hasVoiceover === "yes",
         has_script:              !isTH && (hasVoiceover === "yes" || hasScript === "yes"),
         has_logo:                !!logoUrl,
@@ -781,7 +784,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         logo_width:              logoDimensions?.width  || null,
         logo_height:             logoDimensions?.height || null,
         script:                  !isTH && hasVoiceover !== "yes" && hasScript === "yes" ? scriptText : null,
-        pipeline_version:        isTH ? undefined : "v2",
+        pipeline_version:        "v2",
         visual_style:            visualStyle,
         theme,
         accent_color:            customAccent || accentColor,
@@ -974,9 +977,12 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
               <FileUploadRow
                 label="Upload talking head video" accept="video/*"
                 url={thUrl} uploading={thLoading}
-                loadingLabel="Transcribing…" doneLabel="Video ready — transcription done"
+                loadingLabel="Transcribing…"
+                doneLabel={thTranscriptData?.scenes?.length
+                  ? `Video ready — ${thTranscriptData.scenes.length} scenes detected`
+                  : "Video ready — transcription done"}
                 onFile={handleThFile}
-                onClear={() => { setThUrl(null); thFileRef.current = null; bgTranscribeRef.current = null; }}
+                onClear={() => { setThUrl(null); thFileRef.current = null; bgTranscribeRef.current = null; setThTranscriptData(null); }}
                 inputRef={thRef} />
               <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>Your audio is used as the narration. We handle the rest automatically.</div>
             </div>
@@ -1042,20 +1048,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                     </button>
                   );
                 })}
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div>
-                <label style={C.lbl}>Language</label>
-                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
-                  {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={C.lbl}>Tone</label>
-                <select value={tone} onChange={e => setTone(e.target.value)} style={{ ...C.inp, cursor: "pointer" }}>
-                  {TONES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
               </div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
@@ -1388,12 +1380,15 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {creating
                   ? <><Spinner size={14} color="#000" /> Creating…</>
-                  : `✦ Create My Video · ${PROMO_CREDITS[sceneCount] ?? 20} ✦`}
+                  : `✦ Create My Video · ${PROMO_CREDITS[videoType === "talking_head" ? (thTranscriptData?.scenes?.length ?? 3) : sceneCount] ?? 20} ✦`}
               </button>
             </div>
             {!creating && (
               <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", textAlign: "center", margin: "8px 0 0" }}>
-                {PROMO_CREDITS[sceneCount] ?? 20} credits · {PROMO_GEN_TIME[sceneCount] ?? "~1 min"} to generate
+                {(() => {
+                  const sc = videoType === "talking_head" ? (thTranscriptData?.scenes?.length ?? 3) : sceneCount;
+                  return `${PROMO_CREDITS[sc] ?? 20} credits · ${PROMO_GEN_TIME[sc] ?? "~1 min"} to generate`;
+                })()}
               </p>
             )}
           </div>
@@ -1476,6 +1471,17 @@ You'll land straight in the editor when it's ready.
                 <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
                   Add a screenshot of your product to make the video feel real. Skip anything — you can always swap it in the editor.
                 </p>
+                {required.some(item => item.status !== "resolved" && uploadStatus[item.scene_id] !== "done" && uploadStatus[item.scene_id] !== "error") && (
+                  <button
+                    onClick={() => setUploadStatus(prev => {
+                      const next = { ...prev };
+                      required.forEach(item => { if (item.status !== "resolved") next[item.scene_id] = "done"; });
+                      return next;
+                    })}
+                    style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, color: "rgba(255,255,255,0.5)", fontSize: 13, padding: "6px 14px", cursor: "pointer", marginTop: 12 }}>
+                    Skip all — add in editor
+                  </button>
+                )}
               </div>
 
               {/* Cards */}

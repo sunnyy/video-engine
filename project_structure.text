@@ -75,8 +75,10 @@
 - nixpacks.toml
 - package-lock.json
 - package.json
+- patch_customscript.cjs
 - picons.txt
 - postcss.config.js
+- promoPrompts.js
 - public
   - assets
     - images
@@ -242,10 +244,12 @@
       - motionsRegistry.js
       - musicRegistry.js
       - nichePaletteRegistry.js
+      - paletteRegistry.js
       - promoLayoutRegistry.js
       - sfxRegistry.js
       - shapeRegistry.js
       - transitionsRegistry.js
+      - typographyRegistry.js
     - resolveColor.js
     - utils
       - creditCosts.js
@@ -343,6 +347,8 @@
     - services
       - emailService.js
     - temp
+      - job-18d6a7a0-eed6-4be4-9d3f-757d5ed4e75f.json
+      - job-488fb39f-f72e-475f-9d1a-07f9bb707b70.json
   - services
     - ai
       - generateProductVideo.js
@@ -369,6 +375,14 @@
         - scenePlanner.js
         - talkingHeadProcessor.js
         - ttsGenerator.js
+        - v2
+          - htmlParser.js
+          - intentPrompts.js
+          - PIPELINE.md
+          - pipelineOrchestrator.js
+          - sceneDesigner.js
+          - scriptGenerator.js
+          - timelineBuilder.js
       - typographyVideo
         - generateTypographyVideo.js
         - printTestScene.js
@@ -445,4 +459,5 @@
       - index.ts
 - tailwind.config.js
 - temp.json
+- test.html
 - vite.config.js

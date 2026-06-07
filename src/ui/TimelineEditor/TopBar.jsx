@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { serverFetch } from "../../services/serverApi";
 
@@ -17,6 +17,7 @@ const btnDisabled = { ...btn, color: "#3a3a52", cursor: "default" };
 
 export default function TopBar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const project = useTimelineStore((s) => s.project);
   const projectId = useTimelineStore((s) => s.projectId);
   const _history = useTimelineStore((s) => s._history);
@@ -106,10 +107,11 @@ export default function TopBar() {
         style={btn}
         onClick={(e) => {
           const src  = project?.meta?.source;
-          const dest = src === "product_video"   ? "/product-video"
-                     : src === "typography_video" ? "/typography-video"
-                     : src === "promo_video"      ? "/promo-video"
-                     : "/dashboard";
+          const dest = location.state?.from
+                     ?? (src === "product_video"                  ? "/product-video"
+                       : src === "typography_video"               ? "/typography-video"
+                       : src === "promo_video" || src === "promo_video_v2" ? "/promo-video"
+                       : "/dashboard");
           if (e.ctrlKey || e.metaKey) {
             window.open(dest, "_blank");
           } else {

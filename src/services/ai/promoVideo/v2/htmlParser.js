@@ -10,6 +10,17 @@
 
 import { parse } from "node-html-parser";
 
+function normalizeIconName(str) {
+  if (!str) return null;
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1-$2') // camelCase to kebab
+    .toLowerCase()
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('');
+}
+
 const CANVAS_W_DEFAULT = 1080;
 const CANVAS_H_DEFAULT = 1920;
 
@@ -340,6 +351,16 @@ export function parseSceneHTML(htmlString, sceneIndex, canvas = { width: CANVAS_
         entry.src       = imgSrc;
         entry.objectFit = style["object-fit"] ?? "contain";
       }
+    }
+
+    // Icon layer — normalize data-icon to PascalCase Lucide name
+    const dataIcon = el.getAttribute('data-icon');
+    const iconName = normalizeIconName(dataIcon);
+    if (iconName) {
+      entry.type = 'icon';
+      entry.iconName = iconName;
+      entry.style = entry.style ?? {};
+      entry.style.color = entry.style.color ?? '#ffffff';
     }
 
     // Fix 1 — skip image layers with no src (except placeholders — they get resolved later)

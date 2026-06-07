@@ -170,6 +170,14 @@ When an image would strengthen the scene add:
 - asset: product screenshot or recording
 Maximum 1 placeholder per scene.
 
+ICONS:
+Use real Lucide icons instead of gradient boxes or CSS tricks whenever a concept can be represented iconically.
+To use an icon, add data-icon="icon-name" to any data-role="icon" element.
+Use standard Lucide icon names in kebab-case: bookmark, trending-up, graduation-cap, search, globe, wrench, zap, shield, star, heart, check-circle, arrow-right, book-open, code, terminal, users, lock, package, layers, bar-chart, etc.
+The full Lucide library is available — use any icon name that exists in Lucide.
+Style the icon container with a background color or gradient as usual. Set CSS color on the element to control the icon color.
+Icons can replace image-placeholders for concepts that don't need a photo — a "save" concept needs a bookmark icon, not a stock photo.
+
 AI IMAGE HINT RULES:
 Write hints as one line, maximum 15 words. Describe what the camera sees — never describe emotions or feelings.
 Always include: subject + context + lighting style.
@@ -210,20 +218,27 @@ Design the scene the way a professional motion designer would.
 Think: Apple, Stripe, Linear, Arc, modern SaaS launch videos.
 
 ARCHETYPE EXECUTION RULES:
-The LAYOUT TYPE above defines what this scene must NOT default to. Each archetype breaks the standard template in a specific way:
+Every element must earn its place by directly representing something spoken. Design for instant comprehension of the spoken concept. Every element either communicates that concept or does not exist.
 
-typography_hero — text IS the visual. No cards, no image placeholder. Large type dominates. Decoration only.
-single_stat — one number owns the canvas. Everything else is subordinate. No competing headlines.
-split_composition — two distinct zones required. Clear visual separation. Not a card with two columns inside.
-numbered_list — numbers are primary visible elements. Stacked rows. Not a paragraph with numbers embedded.
-feature_grid — multiple distinct card/tile elements required. No single dominant headline. No one card containing all items as text.
-full_bleed_image — image covers 70%+ of canvas. Text is overlay only, not a separate section below.
-minimal_cta — typography dominant. Maximum 3 elements total. No image placeholder.
-proof_social — social proof format: comment, testimonial, or review style. Not a headline+subhead layout.
-process_steps — sequential flow required. Steps must read as a progression. Not a static card.
-quote_statement — one quote dominates. Attribution below. Nothing else competes with the quote.
+A meaningful headline that reinforces the concept is always allowed. Beyond that, build only what the spoken content explicitly shows.
 
-These rules define what to AVOID, not what to build. Design freely within these constraints.
+EXAMPLES OF CORRECT EXECUTION:
+- "Save this reel" → bookmark icon + bold CTA text. Nothing else.
+- "Google doesn't highlight these websites" → Google search UI mockup. Nothing else.
+- "Free Games, Open Source, Books, Tools" → grid of cards, one per category with icon and label. Nothing else.
+- "The website is called Deep Web Nest" → product name large on screen. Nothing else.
+
+ARCHETYPE PRIMARY ELEMENT — what owns the canvas:
+typography_hero — large text owns the canvas. Everything else is subordinate.
+single_stat — one dominant number owns the canvas. Everything else is subordinate.
+split_composition — two clearly separated zones own the canvas. Each zone has one idea.
+numbered_list — the numbered rows own the canvas. Each row is one item.
+feature_grid — the card grid owns the canvas. Cards are primary, everything else is minimal.
+full_bleed_image — the image owns 70%+ of the canvas. Text is overlay only.
+minimal_cta — the CTA text and action element own the canvas. Nothing else competes.
+proof_social — the social proof element (comment/review/testimonial) owns the canvas.
+process_steps — the sequential steps own the canvas. Each step reads as a clear progression.
+quote_statement — the quote owns the canvas. Attribution below. Nothing else.
 
 OUTPUT: Only the HTML. Nothing before DOCTYPE.
 The html and body must use: width:${canvasW}px; height:${canvasH}px; overflow:hidden; margin:0;`,

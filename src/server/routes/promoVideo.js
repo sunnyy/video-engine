@@ -68,7 +68,7 @@ router.post("/transcribe-th", requireAuth, express.raw({ type: "*/*", limit: "50
   try {
     fs.writeFileSync(tmpPath, req.body);
     console.log(`[promo-video/transcribe-th] received ${req.body.length} bytes (.${ext})`);
-    const result = await processTalkingHeadFromPath(tmpPath);
+    const result = await processTalkingHeadFromPath(tmpPath, true);
     res.json({ scenes: result.scenes, full_transcript: result.full_transcript, total_duration: result.total_duration });
   } catch (e) {
     console.error("[promo-video/transcribe-th]", e.message);
@@ -172,12 +172,11 @@ router.post("/create", requireAuth, async (req, res) => {
     let thSegments = null; // raw segments with timestamps, saved to talking_head_segments column
 
     if (resolvedVideoType === "talking_head") {
-      // ── Talking Head path: segments may be pre-transcribed by /transcribe-th ─
-      console.log(`[promo-video/create] talking head path for ${id}`);
+      // ── Talking Head v2 path: transcript → runV2Pipeline (forks to runTHPipeline) ─
+      console.log(`[promo-video/create] talking head v2 path for ${id}`);
       const preSegments = req.body.talking_head_segments;
       let thResult;
       if (preSegments?.length > 0) {
-        // Fast path: client already ran /transcribe-th, skip download+Whisper
         thResult = {
           scenes:          preSegments,
           full_transcript: preSegments.map(s => s.spoken).join(" "),
@@ -185,62 +184,22 @@ router.post("/create", requireAuth, async (req, res) => {
         };
         console.log(`[promo-video/create] using ${preSegments.length} pre-transcribed segments`);
       } else if (talking_head_url) {
-        // Fallback: download from Supabase and transcribe (original path)
         thResult = await processTalkingHeadVideo(talking_head_url, id);
       } else {
         throw new Error("Talking head video requires either talking_head_segments or talking_head_url");
       }
       thSegments = thResult.scenes;
 
-      // Convert TH segments to project scene format.
-      // Use actual spoken duration (s.end - s.start) so timeline is sequential.
-      // trimStart/trimEnd on the video layer handle the correct video segment.
-      let thScenes = thResult.scenes.map((s) => {
-        const duration = parseFloat(Math.max(0.1, s.end - s.start).toFixed(3));
-        return createEmptyScene({
-          scene_id:         s.scene_id,
-          scene_type:       "talking_head",
-          visual_mode:      null,
-          script:           s.spoken,
-          duration_seconds: duration,
-          asset_type:       ASSET_TYPE.TALKING_HEAD,
-          asset_source:     ASSET_SOURCE.PLACEHOLDER,
-          asset_url:        null,
-          th_url:           talking_head_url,
-          asset_hint:       null,
-          scene_purpose:    null,
-          th_start:         s.start,
-          th_end:           s.end,
-        });
-      });
-
-      // Assign visual modes, scene types, and asset hints via GPT
-      thScenes = await assignVisualModes(thScenes, { ...project, video_type: "talking_head" });
-      // Merge consecutive listicle scenes into one combined scene
-      thScenes = mergeConsecutiveListicles(thScenes);
-
-      // Set asset_source based on resolved visual_mode
-      const ASSET_SCENE_TYPES = new Set(["screenshot_focus", "screen_recording_focus", "feature_showcase"]);
-      thScenes = thScenes.map(s => ({
-        ...s,
-        asset_source:
-          s.visual_mode === "full_asset" || s.visual_mode === "split_view" || ASSET_SCENE_TYPES.has(s.scene_type)
-            ? ASSET_SOURCE.USER_UPLOAD
-            : s.visual_mode === "stock"
-            ? ASSET_SOURCE.STOCK
-            : ASSET_SOURCE.PLACEHOLDER,
-      }));
-
-      const totalDur = thScenes.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
       project = {
         ...project,
-        scenes:           thScenes,
-        script:           thResult.full_transcript,
-        has_script:       true,
-        duration_seconds: parseFloat(totalDur.toFixed(2)),
-        status:           "script_generated",
-        updated_at:       new Date().toISOString(),
+        th_transcript: {
+          scenes:         thResult.scenes,
+          full_transcript: thResult.full_transcript,
+          total_duration:  thResult.total_duration ?? 0,
+        },
+        has_script:  true,
       };
+      project = await runV2Pipeline(project);
 
     } else {
       // ── Faceless path: optional voiceover transcription → GPT scene plan ───
@@ -454,15 +413,36 @@ router.post("/:projectId/render", requireAuth, async (req, res) => {
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     creditAmount = creditsToDeduct;
 
-    // If TH URL just uploaded by client, inject it into scenes before render
+    // If TH URL just uploaded by client, inject it into scenes + editor timeline
     const { talking_head_url: thUrl } = req.body || {};
     if (thUrl) {
       const { data: projRow } = await supabaseAdmin
-        .from("promo_videos").select("scenes").eq("id", req.params.projectId).single();
+        .from("promo_videos").select("scenes, editor_project_id").eq("id", req.params.projectId).single();
       if (projRow?.scenes) {
         const updatedScenes = projRow.scenes.map(s => ({ ...s, th_url: thUrl }));
         await supabaseAdmin.from("promo_videos")
           .update({ scenes: updatedScenes }).eq("id", req.params.projectId);
+      }
+      if (projRow?.editor_project_id) {
+        try {
+          const { data: editorRow } = await supabaseAdmin
+            .from("projects").select("safe_project_json").eq("id", projRow.editor_project_id).single();
+          if (editorRow?.safe_project_json) {
+            const tl = editorRow.safe_project_json;
+            const totalDur = tl.format?.duration ?? 0;
+            const updatedLayers = tl.layers.map(l => {
+              if (l.id === 'th_video_base') return { ...l, src: thUrl, end: totalDur, trimEnd: totalDur };
+              if (l.src === '__TH_VIDEO__')  return { ...l, src: thUrl };
+              return l;
+            });
+            await supabaseAdmin.from("projects")
+              .update({ safe_project_json: { ...tl, layers: updatedLayers } })
+              .eq("id", projRow.editor_project_id);
+            console.log(`[promo-video/render] injected th_url into editor timeline ${projRow.editor_project_id}`);
+          }
+        } catch (e) {
+          console.warn("[promo-video/render] th_url timeline injection failed (non-fatal):", e.message);
+        }
       }
     }
 

@@ -217,6 +217,14 @@ function graphEntryToLayer(entry, start, end, delay = 0) {
     };
   }
 
+  if (entry.type === "icon") {
+    return {
+      ...base,
+      iconName: entry.iconName ?? null,
+      style:    { color: entry.style?.color ?? "#ffffff" },
+    };
+  }
+
   return base;
 }
 

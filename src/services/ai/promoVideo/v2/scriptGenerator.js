@@ -156,9 +156,10 @@ OUTPUT FORMAT — return only valid JSON:
     {
       "scene_index": 0,
       "intent": "hook",
-      "duration": 3,
+      "archetype": "typography_hero",
       "script_segment": "exact words from full_script for this scene",
-      "visual_concept": "one short phrase describing the visual approach for this scene — e.g. 'typography hero — single giant statement, dark atmosphere' or 'split composition — stock photo right, pain points list left'"
+      "visual_concept": "one short phrase describing what to show visually — should match the archetype",
+      "duration_seconds": 4
     }
   ]
 }
@@ -170,17 +171,15 @@ SCENE RULES:
 - script_segment values must be consecutive substrings of full_script with no gaps.
 - scene intents: hook | problem | solution | benefit | process | feature | proof | cta | standalone
 
+SCENE ARCHETYPE:
+Assign one archetype per scene from this list. No two scenes in the same video may use the same archetype. Pick based on the scene content and what would look most visually interesting and varied.
+
+Available archetypes:
+typography_hero | single_stat | split_composition | numbered_list | feature_grid | full_bleed_image | minimal_cta | proof_social | process_steps | quote_statement
+
 VARIETY RULE:
-Every scene must have a different visual_concept. Never repeat the same compositional approach twice.
-Plan the full video's visual arc before assigning concepts — ensure the sequence feels dynamic and varied.
-Examples of visual_concept:
-- "typography hero — single giant statement, dark atmosphere, no cards"
-- "split composition — frustrated person stock photo right, pain points list left"
-- "hub and spoke diagram — product center, inputs radiating outward"
-- "full-bleed AI image background, headline overlay bottom third"
-- "numbered steps left panel, product visual right"
-- "single metric enormous centered, deep atmospheric glow"
-- "product name giant with gradient, clean minimal CTA"
+Every scene must have a different archetype AND a different visual_concept. Never repeat the same compositional approach twice.
+Plan the full video's visual arc before assigning — ensure the sequence feels dynamic and varied.
 
 WORD COUNT IS MANDATORY:
 Each scene's script_segment must not exceed the word limit shown. Count the words before submitting. If over limit, cut until within budget. This is not a suggestion.
@@ -320,6 +319,7 @@ ${sequence ? `Intent sequence to follow exactly: ${sequence.join(" → ")}` : ""
     icon:              s.icon           ?? null,
     asset_requirement: s.asset_requirement ?? "none",
     asset_hint:        s.asset_hint     ?? null,
+    archetype:         s.archetype       ?? null,
     visual_concept:    s.visual_concept  ?? null,
     // duration = intent budget; overwritten by Whisper timestamps in the orchestrator
     duration:          s.duration       ?? INTENT_DURATIONS[s.intent ?? "statement"] ?? 3.0,

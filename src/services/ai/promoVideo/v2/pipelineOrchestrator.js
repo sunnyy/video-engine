@@ -917,7 +917,8 @@ async function runTHPipeline(project) {
           muted:      true,
         };
       } else if (scene.thPattern === 'pip') {
-        const pipSize = 220;
+        const pipSize = Math.floor(canvas.width * 0.305); // ~330px at 1080
+        const pipY = canvas.height - pipSize - 40; // ~1550px at 1920
         clipLayer = {
           id:         `${sid}_pip`,
           trackId:    'track_th_clip',
@@ -933,7 +934,7 @@ async function runTHPipeline(project) {
           sfx:        null,
           keyframes:  { x: [], y: [], blur: [], scale: [], opacity: [{ time: 0.1, value: 0 }, { time: 0.4, value: 1 }], rotation: [] },
           transition: { in: { type: 'fade', duration: 0.3 }, out: { type: 'none', duration: 0 } },
-          transform:  { x: 40, y: canvas.height - pipSize - 40, blur: 0, scale: 1, width: pipSize, height: pipSize, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 3, borderRadius: pipSize / 2 },
+          transform:  { x: 40, y: pipY, blur: 0, scale: 1, width: pipSize, height: pipSize, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 3, borderRadius: pipSize / 2 },
           volume:     0,
           muted:      true,
         };

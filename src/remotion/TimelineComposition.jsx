@@ -1,29 +1,7 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender } from "remotion";
 import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../core/registries/sfxRegistry";
 import { useMemo, useEffect } from "react";
-import {
-  Zap, BarChart2, BarChart3, TrendingUp, CheckCircle, Star,
-  Settings, Clock, Shield, Lock, Video as VideoIcon, Play, Download,
-  Share2, Users, User, Bot, Wand2, DollarSign, GraduationCap,
-  Gamepad2, Code2, Globe, Smartphone, Monitor, Flame, Heart,
-  Trophy, Medal, Flag, Search, Mail, Bell, AlertTriangle, Info,
-  Rocket, Target, Layers, Cpu, Database, Cloud,
-  ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown, Gem,
-  LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
-  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
-} from "lucide-react";
-
-const LUCIDE_ICONS = {
-  Zap, Lightning: Zap, BarChart2, BarChart3, TrendingUp,
-  CheckCircle, Star, Settings, Clock, Shield, Lock, Video: VideoIcon,
-  Play, Download, Share2, Users, User, Bot, Wand2, DollarSign,
-  GraduationCap, Gamepad2, Code2, Globe, Smartphone, Monitor,
-  Flame, Heart, Trophy, Medal, Flag, Search, Mail, Bell,
-  AlertTriangle, Info, Rocket, Target, Layers, Cpu, Database,
-  Cloud, ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown,
-  Gem, LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
-  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
-};
+import * as LucideIcons from "lucide-react";
 
 export default function TimelineComposition({ project }) {
   const frame = useCurrentFrame();
@@ -54,7 +32,8 @@ export default function TimelineComposition({ project }) {
       document.head.appendChild(link);
       return link;
     });
-    Promise.all([document.fonts.ready, loadSFXLibrary()]).then(() => continueRender(fontHandle));
+    const timeout = new Promise(resolve => setTimeout(resolve, 5000));
+    Promise.all([Promise.race([document.fonts.ready, timeout]), loadSFXLibrary()]).then(() => continueRender(fontHandle));
     return () => links.forEach((l) => l.remove());
   }, [fontHandle]);
 
@@ -186,6 +165,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
   }
 
   if (layer.type === "image" || layer.type === "sticker") {
+    if (!layer.src) return null;
     return (
       <Sequence from={startFrame} durationInFrames={durationFrames}>
         <Img
@@ -291,7 +271,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
   }
 
   if (layer.type === "icon") {
-    const IconComponent = LUCIDE_ICONS[layer.iconName];
+    const IconComponent = LucideIcons[layer.iconName];
     if (IconComponent) {
       return (
         <Sequence from={startFrame} durationInFrames={durationFrames}>
@@ -305,6 +285,12 @@ function TimelineLayer({ layer, currentTime, fps }) {
         </Sequence>
       );
     }
+    // fall back to gradient box if icon name not found in lucide-react
+    return (
+      <Sequence from={startFrame} durationInFrames={durationFrames}>
+        <div style={{ ...baseStyle, position: "absolute", background: layer.gradient || layer.background || "#ffffff26" }} />
+      </Sequence>
+    );
   }
 
   return null;

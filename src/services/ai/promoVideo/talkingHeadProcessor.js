@@ -8,7 +8,7 @@ const MAX_SCENE_WORDS = 10;   // lowered from 14 — breaks long spoken lines ea
 const MIN_SCENE_DUR   = 1.5;  // lowered from 2.0 — allows fast flash cuts
 
 // ── Core: Whisper + segmentation on an already-on-disk file ──────────────────
-async function transcribeAndSegment(tmpPath) {
+async function transcribeAndSegment(tmpPath, skipMerge = false) {
   const transcription = await openai.audio.transcriptions.create({
     model:                   "whisper-1",
     file:                    fs.createReadStream(tmpPath),
@@ -97,31 +97,32 @@ async function transcribeAndSegment(tmpPath) {
     }
   }
 
-  // Merge any scene shorter than MIN_SCENE_DUR with the adjacent scene that
-  // produces a total closest to half of MAX_SCENE_DUR (≈2s target).
+  // Merge short scenes into neighbours — skipped for TH pipeline (normalizeTHTranscript does its own grouping)
   let merged = [...finalScenes];
-  let changed = true;
-  while (changed && merged.length > 1) {
-    changed = false;
-    for (let i = 0; i < merged.length; i++) {
-      if (merged[i].duration_seconds < MIN_SCENE_DUR) {
-        const target   = MAX_SCENE_DUR / 2;
-        const prevSum  = i > 0                  ? merged[i - 1].duration_seconds + merged[i].duration_seconds : Infinity;
-        const nextSum  = i < merged.length - 1  ? merged[i].duration_seconds + merged[i + 1].duration_seconds : Infinity;
-        const useNext  = i === 0 || Math.abs(nextSum - target) < Math.abs(prevSum - target);
-        const [a, b]   = useNext ? [i, i + 1] : [i - 1, i];
-        const ma = merged[a], mb = merged[b];
-        merged.splice(a, 2, {
-          scene_id:         ma.scene_id,
-          spoken:           `${ma.spoken} ${mb.spoken}`.trim(),
-          start:            ma.start,
-          end:              mb.end,
-          duration_seconds: parseFloat((mb.end - ma.start).toFixed(2)),
-          word_count:       (ma.word_count || 0) + (mb.word_count || 0),
-          visual_mode:      null,
-        });
-        changed = true;
-        break;
+  if (!skipMerge) {
+    let changed = true;
+    while (changed && merged.length > 1) {
+      changed = false;
+      for (let i = 0; i < merged.length; i++) {
+        if (merged[i].duration_seconds < MIN_SCENE_DUR) {
+          const target   = MAX_SCENE_DUR / 2;
+          const prevSum  = i > 0                  ? merged[i - 1].duration_seconds + merged[i].duration_seconds : Infinity;
+          const nextSum  = i < merged.length - 1  ? merged[i].duration_seconds + merged[i + 1].duration_seconds : Infinity;
+          const useNext  = i === 0 || Math.abs(nextSum - target) < Math.abs(prevSum - target);
+          const [a, b]   = useNext ? [i, i + 1] : [i - 1, i];
+          const ma = merged[a], mb = merged[b];
+          merged.splice(a, 2, {
+            scene_id:         ma.scene_id,
+            spoken:           `${ma.spoken} ${mb.spoken}`.trim(),
+            start:            ma.start,
+            end:              mb.end,
+            duration_seconds: parseFloat((mb.end - ma.start).toFixed(2)),
+            word_count:       (ma.word_count || 0) + (mb.word_count || 0),
+            visual_mode:      null,
+          });
+          changed = true;
+          break;
+        }
       }
     }
   }
@@ -132,9 +133,9 @@ async function transcribeAndSegment(tmpPath) {
 }
 
 // ── Public: accepts a file already on disk (caller owns cleanup) ──────────────
-export async function processTalkingHeadFromPath(tmpPath) {
+export async function processTalkingHeadFromPath(tmpPath, skipMerge = false) {
   try {
-    return await transcribeAndSegment(tmpPath);
+    return await transcribeAndSegment(tmpPath, skipMerge);
   } catch (err) {
     throw new Error(`[talkingHeadProcessor] ${err.message}`);
   }

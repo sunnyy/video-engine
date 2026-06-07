@@ -102,11 +102,13 @@ router.post("/timeline", requireAuth, async (req, res) => {
 
 async function timelineRenderJob(jobId, userId, project, projectId, resolution) {
   try {
-    /* ── Sanitise blob: asset URLs ── */
-    const cleanLayers = (project?.layers || []).map((layer) => ({
-      ...layer,
-      src: resolveAssetUrl(layer.src),
-    }));
+    /* ── Sanitise blob: asset URLs and drop image layers with no resolvable src ── */
+    const cleanLayers = (project?.layers || [])
+      .map((layer) => ({ ...layer, src: resolveAssetUrl(layer.src) }))
+      .filter((layer) => {
+        if (layer.type === "image" || layer.type === "sticker") return !!layer.src;
+        return true;
+      });
     const cleanProject = { ...project, layers: cleanLayers };
 
     /* ── Cap duration to max visual layer end (prevents long audio tracks from bloating export) ── */

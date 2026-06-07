@@ -6,29 +6,7 @@ import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../../core/reg
 import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeRegistry";
 import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
-import {
-  Zap, BarChart2, BarChart3, TrendingUp, CheckCircle, Star,
-  Settings, Clock, Shield, Lock, Video, Play, Download,
-  Share2, Users, User, Bot, Wand2, DollarSign, GraduationCap,
-  Gamepad2, Code2, Globe, Smartphone, Monitor, Flame, Heart,
-  Trophy, Medal, Flag, Search, Mail, Bell, AlertTriangle, Info,
-  Rocket, Target, Layers, Cpu, Database, Cloud,
-  ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown, Gem,
-  LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
-  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
-} from "lucide-react";
-
-const LUCIDE_ICONS = {
-  Zap, Lightning: Zap, BarChart2, BarChart3, TrendingUp,
-  CheckCircle, Star, Settings, Clock, Shield, Lock, Video,
-  Play, Download, Share2, Users, User, Bot, Wand2, DollarSign,
-  GraduationCap, Gamepad2, Code2, Globe, Smartphone, Monitor,
-  Flame, Heart, Trophy, Medal, Flag, Search, Mail, Bell,
-  AlertTriangle, Info, Rocket, Target, Layers, Cpu, Database,
-  Cloud, ArrowRight, ChevronRight, CheckCheck, Sparkles, Crown,
-  Gem, LayoutDashboard, FileVideo, Mic, Camera, Image, PenTool,
-  BarChart, LineChart, PieChart, Activity, Timer, Infinity,
-};
+import * as LucideIcons from "lucide-react";
 
 const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape", "icon"]);
 const SNAP_T = 12; // canvas-space pixels
@@ -859,7 +837,7 @@ function LayerElement({
   let content = null;
 
   if (layer.type === "icon") {
-    const IconComponent = LUCIDE_ICONS[layer.iconName];
+    const IconComponent = LucideIcons[layer.iconName];
     content = IconComponent ? (
       <IconComponent
         size={Math.min(width, height)}

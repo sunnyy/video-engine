@@ -160,11 +160,17 @@ router.get("/promo-video/voices", requireAuth, async (_req, res) => {
   }
 });
 
-const SAMPLE_TEXT = "Hey, this is how I sound. I can narrate your promo videos with clarity and energy.";
+const SAMPLE_TEXTS = {
+  en:       "Hey, this is how I sound. I can narrate your promo videos with clarity and energy.",
+  hinglish: "Yaar, sunlo. Main aapke promo videos ke liye perfect awaaz hoon. Ek baar try karo, acha lagega.",
+  es:       "Hola, así es como sueno. Puedo narrar tus videos con energía y claridad total. Pruébalo ahora.",
+};
 
 router.get("/promo-video/voice-sample/:voiceId", requireAuth, async (req, res) => {
   const { voiceId } = req.params;
-  const storageKey  = `promo-voice-samples/${voiceId}.mp3`;
+  const lang        = ["hinglish", "es"].includes(req.query.lang) ? req.query.lang : "en";
+  const sampleText  = SAMPLE_TEXTS[lang];
+  const storageKey  = `promo-voice-samples/${voiceId}-${lang}.mp3`;
 
   // Serve cached sample if it already exists
   const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
@@ -176,7 +182,7 @@ router.get("/promo-video/voice-sample/:voiceId", requireAuth, async (req, res) =
     const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method:  "POST",
       headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY, "Content-Type": "application/json", "Accept": "audio/mpeg" },
-      body: JSON.stringify({ text: SAMPLE_TEXT, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
+      body: JSON.stringify({ text: sampleText, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
     });
     if (!elRes.ok) return res.status(502).json({ error: "ElevenLabs sample generation failed" });
 

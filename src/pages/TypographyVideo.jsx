@@ -49,7 +49,7 @@ function VideoCard({ project, onDelete }) {
 
   return (
     <div
-      onClick={() => navigate(`/video-editor/${project.id}`)}
+      onClick={() => navigate(`/video-editor/${project.id}`, { state: { from: "/typography-video" } })}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false); }}
       style={{
@@ -190,7 +190,7 @@ function GeneratorForm() {
         source: "typography_video",
       });
 
-      navigate(`/video-editor/${project.id}`);
+      navigate(`/video-editor/${project.id}`, { state: { from: "/typography-video" } });
     } catch (err) {
       clearInterval(stepTimer);
       setError(err.message || "Generation failed. Please try again.");

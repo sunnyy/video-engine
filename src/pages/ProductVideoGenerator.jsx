@@ -61,7 +61,7 @@ function VideoCard({ project, onDelete }) {
 
   return (
     <div
-      onClick={() => navigate(`/video-editor/${project.id}`)}
+      onClick={() => navigate(`/video-editor/${project.id}`, { state: { from: "/product-video" } })}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false); }}
       style={{
@@ -345,7 +345,7 @@ function GeneratorForm() {
         .eq("id", projectId);
 
       if (updateError) throw updateError;
-      navigate(`/video-editor/${projectId}`);
+      navigate(`/video-editor/${projectId}`, { state: { from: "/product-video" } });
     } catch (err) {
       console.error("[ProductVideoGenerator]", err);
       setError(err.message || "Something went wrong. Please try again.");
