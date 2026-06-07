@@ -27,7 +27,8 @@ export const CREDIT_COSTS = {
   outfit_tryon:          15,  // Virtual Try-On
   social_post:           15,  // Banner Design / Social Post
   caption_studio:         8,  // Caption Studio (render)
-  promo_video:           { 1: 8, 3: 20, 5: 30 },  // SaaS/Promo Video — per scene count
+  promo_video:           { 1: 50, 3: 120, 5: 200 }, // SaaS/Promo Video — per scene count
+  promo_video_th:        180,                       // Talking Head video — flat rate
 };
 
 // Full cost estimates per service — used by CreditConfirmModal

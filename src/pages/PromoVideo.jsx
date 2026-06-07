@@ -81,6 +81,7 @@ const VISUAL_STYLES = [
 ];
 
 const ACCENT_SWATCHES = [
+  { hex: "#f5c518", label: "Vidquence"     },
   { hex: "#6366f1", label: "Electric Blue" },
   { hex: "#8b5cf6", label: "Violet"        },
   { hex: "#10b981", label: "Emerald"       },
@@ -123,7 +124,8 @@ const SCENE_COUNT_OPTIONS = [
   { value: 5, label: "5 Scenes", description: "Standard promo",            dots: 5 },
 ];
 
-const PROMO_CREDITS  = { 1: 8, 3: 20, 5: 30 };
+const PROMO_CREDITS  = { 1: 50, 3: 120, 5: 200 };
+const TH_CREDITS     = 180;
 const PROMO_GEN_TIME = { 1: "~30 sec", 3: "~1 min", 5: "~2 min" };
 
 const THEME_OPTIONS = [
@@ -1380,15 +1382,15 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {creating
                   ? <><Spinner size={14} color="#000" /> Creating…</>
-                  : `✦ Create My Video · ${PROMO_CREDITS[videoType === "talking_head" ? (thTranscriptData?.scenes?.length ?? 3) : sceneCount] ?? 20} ✦`}
+                  : `✦ Create My Video · ${videoType === "talking_head" ? TH_CREDITS : (PROMO_CREDITS[sceneCount] ?? 120)} ✦`}
               </button>
             </div>
             {!creating && (
               <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", textAlign: "center", margin: "8px 0 0" }}>
-                {(() => {
-                  const sc = videoType === "talking_head" ? (thTranscriptData?.scenes?.length ?? 3) : sceneCount;
-                  return `${PROMO_CREDITS[sc] ?? 20} credits · ${PROMO_GEN_TIME[sc] ?? "~1 min"} to generate`;
-                })()}
+                {videoType === "talking_head"
+                  ? `${TH_CREDITS} credits · ~1 min to generate`
+                  : `${PROMO_CREDITS[sceneCount] ?? 120} credits · ${PROMO_GEN_TIME[sceneCount] ?? "~1 min"} to generate`
+                }
               </p>
             )}
           </div>
@@ -1459,8 +1461,7 @@ You'll land straight in the editor when it's ready.
           const allDecided   = required.every(i =>
             i.status === "resolved" || uploadStatus[i.scene_id] === "done" || uploadStatus[i.scene_id] === "error"
           );
-          const canOpen   = allDecided && !anyUploading && editorProjectId;
-          const btnAccent = customAccent || accentColor || "#6366f1";
+          const canOpen = allDecided && !anyUploading && editorProjectId;
           return (
             <div style={{ display: "flex", flexDirection: "column", maxWidth: 600, margin: "0 auto", width: "100%" }}>
               {/* Header */}
@@ -1557,7 +1558,7 @@ You'll land straight in the editor when it's ready.
                               disabled={upSt === "uploading"}
                               onClick={() => ref.current?.click()}
                               style={{
-                                background: btnAccent, color: "#fff", border: "none", borderRadius: 8,
+                                background: "#f5c518", color: "#000", border: "none", borderRadius: 8,
                                 padding: "8px 18px", fontSize: 13, fontWeight: 600,
                                 cursor: upSt === "uploading" ? "not-allowed" : "pointer",
                                 display: "flex", alignItems: "center", gap: 6,
@@ -1588,8 +1589,8 @@ You'll land straight in the editor when it's ready.
                 style={{
                   width: "100%", padding: "15px 24px", fontSize: 16, fontWeight: 700,
                   borderRadius: 12, border: "none", cursor: canOpen ? "pointer" : "not-allowed",
-                  background: canOpen ? btnAccent : "rgba(255,255,255,0.06)",
-                  color: canOpen ? "#ffffff" : "rgba(255,255,255,0.25)",
+                  background: canOpen ? "#f5c518" : "rgba(255,255,255,0.06)",
+                  color: canOpen ? "#000000" : "rgba(255,255,255,0.25)",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                 }}>
                 {anyUploading ? <><Spinner size={16} color="#fff" /> Uploading…</> :

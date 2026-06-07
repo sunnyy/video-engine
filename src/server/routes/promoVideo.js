@@ -12,9 +12,10 @@ import { runV2Pipeline } from "../../services/ai/promoVideo/v2/pipelineOrchestra
 
 export const router = express.Router();
 
-const PROMO_VIDEO_CREDITS = { 1: 8, 3: 20, 5: 30 };
+const PROMO_VIDEO_CREDITS = { 1: 50, 3: 120, 5: 200 };
+const TH_VIDEO_CREDITS    = 180;
 function promoCredits(sceneCount) {
-  return PROMO_VIDEO_CREDITS[sceneCount] ?? 20;
+  return PROMO_VIDEO_CREDITS[sceneCount] ?? 120;
 }
 
 function rowToProject(row) {
@@ -395,15 +396,16 @@ router.post("/:projectId/render", requireAuth, async (req, res) => {
   try {
     const { data: row, error: fetchErr } = await supabaseAdmin
       .from("promo_videos")
-      .select("id, status, user_id, style")
+      .select("id, status, user_id, style, video_type")
       .eq("id", req.params.projectId)
       .eq("user_id", req.user.id)
       .single();
 
     if (fetchErr || !row) return res.status(404).json({ error: "Project not found" });
 
+    const isTH            = row.video_type === "talking_head";
     const sceneCount      = row.style?.scene_count ?? 3;
-    const creditsToDeduct = promoCredits(sceneCount);
+    const creditsToDeduct = isTH ? TH_VIDEO_CREDITS : promoCredits(sceneCount);
 
     const deduction = await deductCredits(
       req.user.id, creditsToDeduct,
