@@ -125,24 +125,47 @@ export async function generatePromoVoiceovers(voiceover_queue, projectId) {
   return results;
 }
 
+function charAlignmentToWords(alignment) {
+  const chars  = alignment.characters                    ?? [];
+  const starts = alignment.character_start_times_seconds ?? [];
+  const ends   = alignment.character_end_times_seconds   ?? [];
+  const words  = [];
+  let word = "", wordStart = 0;
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    if (ch === " " || ch === "\n" || ch === "\r" || ch === "\t") {
+      if (word) {
+        words.push({ word, start: wordStart, end: ends[i - 1] ?? wordStart });
+        word = "";
+      }
+    } else {
+      if (!word) wordStart = starts[i] ?? 0;
+      word += ch;
+    }
+  }
+  if (word) words.push({ word, start: wordStart, end: ends[ends.length - 1] ?? wordStart });
+  return words;
+}
+
 /**
  * generateFullVoiceover(script, projectId, voiceId?)
  * Generates a single ElevenLabs MP3 for the entire video script.
- * Returns { audio_url, duration_seconds, buffer }
+ * Uses /with-timestamps endpoint to get character alignment — no Whisper needed.
+ * Returns { audio_url, duration_seconds, buffer, wordTimestamps }
  */
 export async function generateFullVoiceover(script, projectId, voiceId) {
-  if (!script?.trim()) return { audio_url: null, duration_seconds: 0, buffer: null };
+  if (!script?.trim()) return { audio_url: null, duration_seconds: 0, buffer: null, wordTimestamps: [] };
 
   const vid = voiceId || DEFAULT_EL_VOICE;
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
 
-  const response = await fetch(`${ELEVENLABS_API}/${vid}`, {
+  const response = await fetch(`${ELEVENLABS_API}/${vid}/with-timestamps`, {
     method:  "POST",
     headers: {
       "xi-api-key":   apiKey,
       "Content-Type": "application/json",
-      "Accept":       "audio/mpeg",
+      "Accept":       "application/json",
     },
     body: JSON.stringify({
       text:           script.trim(),
@@ -156,7 +179,9 @@ export async function generateFullVoiceover(script, projectId, voiceId) {
     throw new Error(`ElevenLabs TTS error ${response.status}: ${errText.slice(0, 200)}`);
   }
 
-  const rawBuffer = Buffer.from(await response.arrayBuffer());
+  const json         = await response.json();
+  const wordTimestamps = charAlignmentToWords(json.alignment ?? {});
+  const rawBuffer    = Buffer.from(json.audio_base64, "base64");
 
   // Normalize loudness to -9 LUFS — matches tts.js and typographyVideo.js pipelines
   let buffer = rawBuffer;
@@ -180,8 +205,8 @@ export async function generateFullVoiceover(script, projectId, voiceId) {
     .from(STORAGE_BUCKET)
     .getPublicUrl(storageKey);
 
-  console.log(`[ttsGenerator] ElevenLabs voiceover (${vid}): ${duration_seconds.toFixed(2)}s → ${storageKey}`);
-  return { audio_url: publicUrl, duration_seconds, buffer };
+  console.log(`[ttsGenerator] ElevenLabs voiceover (${vid}): ${duration_seconds.toFixed(2)}s, ${wordTimestamps.length} words → ${storageKey}`);
+  return { audio_url: publicUrl, duration_seconds, buffer, wordTimestamps };
 }
 
 /**

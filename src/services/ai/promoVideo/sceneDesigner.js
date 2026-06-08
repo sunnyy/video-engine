@@ -9,7 +9,7 @@
  * model ID is confirmed. Swap SCENE_DESIGNER_MODEL when known.
  */
 
-import { openai } from "../../../../server/middleware/shared.js";
+import { openai } from "../../../server/middleware/shared.js";
 import { buildSceneDesignerPrompt } from "./intentPrompts.js";
 
 const SCENE_DESIGNER_MODEL = "gpt-5.4";

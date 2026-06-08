@@ -7,7 +7,7 @@
  * transcription of the single voiceover in pipelineOrchestrator.
  */
 
-import { openai } from "../../../../server/middleware/shared.js";
+import { openai } from "../../../server/middleware/shared.js";
 
 const INTENT_DURATIONS = {
   hook:        4.0,

@@ -152,49 +152,6 @@ function chunkSegments(segments, wordsPerChunk = 3) {
   return result;
 }
 
-const captionStylePresets = {
-  wordBlaze: {
-    style:      { fontFamily: "'Bebas Neue',sans-serif",       fontSize: 84, fontWeight: "400", color: "#ffffff", textAlign: "center", letterSpacing: 1,      textShadow: "0 0 20px rgba(245,197,24,0.5)" },
-    transition: { in: { type: "zoom",       duration: 0.12, intensity: 0.7 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
-  },
-  karaokeFill: {
-    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 70, fontWeight: "800", color: "#ffffff", textAlign: "center" },
-    transition: { in: { type: "slide-up",   duration: 0.12, intensity: 0.6 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
-  },
-  stackReveal: {
-    style:      { fontFamily: "'Unbounded',sans-serif",        fontSize: 58, fontWeight: "900", color: "#ffffff", textAlign: "center" },
-    transition: { in: { type: "fade",       duration: 0.15, intensity: 1   }, out: { type: "fade",    duration: 0.1,  intensity: 1   } },
-  },
-  markerPen: {
-    style:      { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 72, fontWeight: "900", color: "#ffffff", textAlign: "center", textShadow: "0 2px 0 rgba(0,0,0,0.5)" },
-    transition: { in: { type: "slide-right",duration: 0.12, intensity: 0.5 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
-  },
-  glitchStamp: {
-    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 68, fontWeight: "800", color: "#ffffff", textAlign: "center", textShadow: "-2px 0 #ff003c, 2px 0 #00f7ff" },
-    transition: { in: { type: "zoom",       duration: 0.08, intensity: 0.9 }, out: { type: "dissolve",duration: 0.1,  intensity: 0.8 } },
-  },
-  editorialSerif: {
-    style:      { fontFamily: "'Playfair Display',serif",      fontSize: 52, fontWeight: "700", color: "#14120f", textAlign: "left",   letterSpacing: 0 },
-    transition: { in: { type: "fade",       duration: 0.2,  intensity: 1   }, out: { type: "fade",    duration: 0.15, intensity: 1   } },
-  },
-  neonTicker: {
-    style:      { fontFamily: "'JetBrains Mono',monospace",    fontSize: 62, fontWeight: "700", color: "#00e5c3", textAlign: "center", letterSpacing: "0.04em", textShadow: "0 0 12px rgba(0,229,195,0.7)" },
-    transition: { in: { type: "slide-up",   duration: 0.1,  intensity: 0.5 }, out: { type: "dissolve",duration: 0.12, intensity: 0.7 } },
-  },
-  pillDrop: {
-    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 66, fontWeight: "800", color: "#ffffff", textAlign: "center", textShadow: "0 0 20px rgba(124,92,252,0.6)" },
-    transition: { in: { type: "slide-down", duration: 0.12, intensity: 0.6 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
-  },
-  brutalSlam: {
-    style:      { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 92, fontWeight: "900", color: "#ff2d55", textAlign: "center", letterSpacing: -1,     textShadow: "2px 2px 0 #000, -1px -1px 0 #000" },
-    transition: { in: { type: "zoom",       duration: 0.07, intensity: 0.95}, out: { type: "fade",    duration: 0.06, intensity: 1   } },
-  },
-  luxuryGold: {
-    style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 56, fontWeight: "800", color: "#ffd700", textAlign: "center", letterSpacing: -0.5,   textShadow: "0 0 16px rgba(255,215,0,0.5)" },
-    transition: { in: { type: "dissolve",   duration: 0.2,  intensity: 0.8 }, out: { type: "dissolve",duration: 0.15, intensity: 0.8 } },
-  },
-};
-
 function positionLabel(v) {
   if (v >= 70) return "Bottom";
   if (v >= 40) return "Middle";

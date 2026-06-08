@@ -3,12 +3,11 @@ import fs from "fs";
 import path from "path";
 import { supabaseAdmin, openai, requireAuth, deductCredits, addCredits, uuidv4, TEMP_DIR } from "../middleware/shared.js";
 import { createEmptyProject, createEmptyScene, PROJECT_STATUS, ASSET_TYPE, ASSET_SOURCE } from "../../services/ai/promoVideo/projectSchema.js";
-import { generateScenePlan, assignVisualModes, mergeConsecutiveListicles } from "../../services/ai/promoVideo/scenePlanner.js";
 import { generateAssetRequirements, updateAssetStatus } from "../../services/ai/promoVideo/assetRequirements.js";
 import { markProjectApproved, transitionProjectStatus, getProjectSummary } from "../../services/ai/promoVideo/projectStateManager.js";
 import { orchestratePromoRender } from "../../services/ai/promoVideo/renderOrchestrator.js";
 import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../services/ai/promoVideo/talkingHeadProcessor.js";
-import { runV2Pipeline } from "../../services/ai/promoVideo/v2/pipelineOrchestrator.js";
+import { runV2Pipeline } from "../../services/ai/promoVideo/pipelineOrchestrator.js";
 
 export const router = express.Router();
 

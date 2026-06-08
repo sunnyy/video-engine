@@ -16,7 +16,6 @@
 import fs from "fs";
 import path from "path";
 import { supabaseAdmin, TEMP_DIR, PROJECT_ROOT, uuidv4 } from "../../../server/middleware/shared.js";
-import { assemblePromoTimeline } from "./assemblyPipeline.js";
 import { generatePromoVoiceovers, injectVoiceoversIntoTimeline } from "./ttsGenerator.js";
 import { PROJECT_STATUS, ASSET_SOURCE, ASSET_TYPE } from "./projectSchema.js";
 import { pickAutoMood } from "../../../core/registries/musicRegistry.js";
@@ -168,7 +167,7 @@ export async function orchestratePromoRender(projectId) {
     const thUrl = scenes.find(s => s.th_url)?.th_url ?? null;
     const project = { ...row, style, scenes, duration_seconds: totalDuration, talking_head_url: thUrl };
 
-    const { timeline } = assemblePromoTimeline(project);
+    throw new Error("Legacy non-v2 promo render is no longer supported. Re-create the project to use the current pipeline.");
 
     // ── Step 5: Inject TTS audio layers ───────────────────────────────────
     const finalTimeline = voiceover_results.length > 0

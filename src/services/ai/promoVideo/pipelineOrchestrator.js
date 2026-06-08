@@ -19,14 +19,14 @@
  *  11.  Save timeline to projects table
  */
 
-import { supabaseAdmin, openai }                      from "../../../../server/middleware/shared.js";
-import { generateFullVoiceover, transcribeWithTimestamps } from "../ttsGenerator.js";
-import { pickAutoMood }                               from "../../../../core/registries/musicRegistry.js";
+import { supabaseAdmin, openai }                      from "../../../server/middleware/shared.js";
+import { generateFullVoiceover } from "./ttsGenerator.js";
+import { pickAutoMood }                               from "../../../core/registries/musicRegistry.js";
 import { generateScriptV2, INTENT_PATTERNS, SCENE_WORD_BUDGETS } from "./scriptGenerator.js";
 import { designScene }                               from "./sceneDesigner.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
 import { buildTimeline }                              from "./timelineBuilder.js";
-import { generateAssetRequirements }                  from "../assetRequirements.js";
+import { generateAssetRequirements }                  from "./assetRequirements.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -249,17 +249,15 @@ export async function runV2Pipeline(project) {
       voiceoverAudioUrl = result.audio_url;
       voiceoverDuration = result.duration_seconds;
       voiceoverBuffer   = result.buffer;
+      if (result.wordTimestamps?.length) assignWhisperTimestamps(scenes, result.wordTimestamps);
     } catch (err) {
       console.error("[v2/pipeline] TTS failed (non-fatal):", err.message);
     }
   }
 
-  // ── Step 5: Whisper transcription → word-level timestamps ─────────────────
-  if (voiceoverBuffer) {
-    const whisperWords = await transcribeWithTimestamps(voiceoverBuffer);
-    assignWhisperTimestamps(scenes, whisperWords);
-  } else {
-    console.warn("[v2/pipeline] no audio buffer — using intent-based durations");
+  // ── Step 5: timestamps already assigned from ElevenLabs during TTS step ───
+  if (!voiceoverBuffer) {
+    console.warn("[v2/pipeline] no audio — using intent-based durations");
   }
 
   // Extend last scene so total scene duration covers the full voiceover audio.

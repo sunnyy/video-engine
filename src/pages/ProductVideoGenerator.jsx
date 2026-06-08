@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { generateProductVideo } from "../services/ai/generateProductVideo";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 import { serverFetch } from "../services/serverApi";
 import { getProductVideoProjects, deleteProject } from "../services/projects/projectService";
@@ -20,17 +19,16 @@ const T = {
 
 const STEP_LABELS = [
   "Analyzing your product...",
-  "Creating your visuals...",
+  "Designing scenes...",
+  "Generating voiceover...",
+  "Creating product shots...",
   "Building your video...",
-  "Adding music...",
-  "Generating voiceovers...",
 ];
 
-const VIDEO_TYPES = [
-  { id: "promo",   label: "Promo"   },
-  { id: "launch",  label: "Launch"  },
-  { id: "feature", label: "Feature" },
-  { id: "brand",   label: "Brand"   },
+const SCENE_COUNT_OPTIONS = [
+  { value: 1, label: "1 Scene",  desc: "Quick showcase",   dots: 1 },
+  { value: 3, label: "3 Scenes", desc: "Short & punchy",   dots: 3 },
+  { value: 5, label: "5 Scenes", desc: "Full product ad",  dots: 5 },
 ];
 
 function timeLabel(dateStr) {
@@ -205,19 +203,21 @@ function GeneratorForm() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoUrl,     setLogoUrl]     = useState(null);
 
-  // Ad fields — dev defaults
+  // Ad fields
   const [brandName,  setBrandName]  = useState("");
-  const [videoType,  setVideoType]  = useState("promo");
   const [offerText,  setOfferText]  = useState("");
   const [ctaText,    setCtaText]    = useState("Shop Now");
   const [website,    setWebsite]    = useState("");
+
+  // Scene count
+  const [sceneCount, setSceneCount] = useState(3);
 
   // Visual mode
   const [visualMode, setVisualMode] = useState("image");
 
   // Voiceover
   const [voices,        setVoices]        = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState("nova");
+  const [selectedVoice, setSelectedVoice] = useState(null);
   const [voiceOpen,     setVoiceOpen]     = useState(false);
 
   // State
@@ -229,7 +229,11 @@ function GeneratorForm() {
   useEffect(() => {
     serverFetch("/api/tts/voices")
       .then(r => r.json())
-      .then(data => setVoices(data.voices || []))
+      .then(data => {
+        const list = data.voices || [];
+        setVoices(list);
+        if (list.length) setSelectedVoice(v => v ?? list[0].id);
+      })
       .catch(() => {});
   }, []);
 
@@ -259,99 +263,45 @@ function GeneratorForm() {
     if (!imageFile) { setError("Please upload a product image first."); return; }
     setError(null);
     setGenerating(true);
-    setStep(0);
+    setStep(1);
     setStepLabel("Uploading image...");
 
-    let projectId = null;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
       // Upload product image
       const assetRow = await uploadUserAsset(imageFile, "image", null, "project", null);
       const productImageUrl = assetRow.url;
 
-      // Create project row
-      const projectName = brandName
-        ? `${brandName} — ${new Date().toLocaleDateString()}`
-        : `Product Video — ${new Date().toLocaleDateString()}`;
+      setStep(2);
+      setStepLabel("Designing scenes...");
 
-      const emptyProjectJson = {
-        version: "2.0",
-        id: crypto.randomUUID(),
-        name: projectName,
-        format: { width: 1080, height: 1920, fps: 30, duration: 30 },
-        layers: [],
-        meta: {
-          thumbnail: null,
-          source: "product_video",
-          editor_version: "timeline",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      };
-
-      const { data: projectRow, error: insertError } = await supabase
-        .from("projects")
-        .insert([{
-          user_id:           user.id,
-          name:              projectName,
-          safe_project_json: emptyProjectJson,
-          orientation:       "9:16",
-          mode:              "timeline",
-          source:            "product_video",
-          editor_version:    "timeline",
-        }])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-      projectId = projectRow.id;
-
-      // Run pipeline
-      const result = await generateProductVideo({
-        productImageUrl,
-        logoUrl:    logoUrl ?? null,
-        brandName:  brandName.trim(),
-        videoType,
-        offerText:  offerText.trim(),
-        ctaText:    ctaText.trim() || "Shop Now",
-        website:    website.trim(),
-        tagline:    "",
-        visualMode,
-        projectId,
-        onProgress: (s) => {
-          setStep(s);
-          setStepLabel(STEP_LABELS[s - 1] ?? "");
-        },
+      // Run the v2 pipeline server-side (single call)
+      const res = await serverFetch("/api/product-video/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          productImageUrl,
+          logoUrl:    logoUrl    ?? null,
+          brandName:  brandName.trim(),
+          ctaText:    ctaText.trim()   || "Shop Now",
+          offerText:  offerText.trim() || "",
+          website:    website.trim()   || "",
+          visualMode,
+          voice_id:   selectedVoice ?? null,
+          sceneCount,
+        }),
       });
 
-      // Save final project
-      const finalProjectJson = {
-        ...emptyProjectJson,
-        layers: result.layers,
-        format: { ...emptyProjectJson.format, duration: result.totalDuration },
-        meta: {
-          ...emptyProjectJson.meta,
-          productAnalysis: result.productAnalysis,
-          shots:           result.shots,
-          voiceoverScript: result.aiOutput?.voiceoverScript ?? "",
-          updatedAt:       new Date().toISOString(),
-        },
-      };
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Pipeline failed (${res.status})`);
+      }
 
-      const { error: updateError } = await supabase
-        .from("projects")
-        .update({ safe_project_json: finalProjectJson, raw_ai_json: result.aiOutput })
-        .eq("id", projectId);
+      const { editor_project_id } = await res.json();
+      if (!editor_project_id) throw new Error("No editor project returned from pipeline");
 
-      if (updateError) throw updateError;
-      navigate(`/video-editor/${projectId}`, { state: { from: "/product-video" } });
+      navigate(`/video-editor/${editor_project_id}`, { state: { from: "/product-video" } });
     } catch (err) {
       console.error("[ProductVideoGenerator]", err);
       setError(err.message || "Something went wrong. Please try again.");
-      if (projectId) {
-        supabase.from("projects").delete().eq("id", projectId).then(() => {});
-      }
     } finally {
       setGenerating(false);
     }
@@ -402,30 +352,6 @@ function GeneratorForm() {
         <div style={{ marginBottom: 18 }}>
           <Label>Brand Name</Label>
           <TextInput value={brandName} onChange={setBrandName} placeholder="e.g. Glow Skincare" disabled={generating} />
-        </div>
-
-        {/* Video type */}
-        <div style={{ marginBottom: 18 }}>
-          <Label>Video Type</Label>
-          <div style={{ display: "flex", gap: 8 }}>
-            {VIDEO_TYPES.map(vt => (
-              <button
-                key={vt.id}
-                onClick={() => !generating && setVideoType(vt.id)}
-                disabled={generating}
-                style={{
-                  flex: 1, padding: "9px 0", border: "none", borderRadius: 10,
-                  background: videoType === vt.id ? T.accent : "rgba(255,255,255,0.05)",
-                  color:      videoType === vt.id ? "#fff"   : T.muted,
-                  fontSize: 13, fontWeight: videoType === vt.id ? 700 : 500,
-                  fontFamily: "inherit", cursor: generating ? "not-allowed" : "pointer",
-                  transition: "all 0.15s", opacity: generating ? 0.6 : 1,
-                }}
-              >
-                {vt.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* CTA + Offer */}
@@ -529,6 +455,42 @@ function GeneratorForm() {
           </div>
         )}
 
+        {/* Scene count */}
+        <div style={{ marginBottom: 24 }}>
+          <Label>Video Length</Label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {SCENE_COUNT_OPTIONS.map(opt => {
+              const sel = sceneCount === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => { if (generating) return; setSceneCount(opt.value); if (opt.value === 1 && visualMode === "hybrid") setVisualMode("image"); }}
+                  disabled={generating}
+                  style={{
+                    flex: 1, padding: "10px 8px", borderRadius: 10,
+                    background: sel ? "rgba(124,92,252,0.10)" : "rgba(255,255,255,0.04)",
+                    border: `1.5px solid ${sel ? "rgba(124,92,252,0.5)" : T.border}`,
+                    cursor: generating ? "not-allowed" : "pointer", fontFamily: "inherit",
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                    opacity: generating ? 0.6 : 1, transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                    {Array.from({ length: opt.dots }).map((_, i) => (
+                      <div key={i} style={{
+                        width: 6, height: 8, borderRadius: 2,
+                        background: sel ? T.accent : "rgba(255,255,255,0.2)",
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: sel ? "#c4b5fd" : T.text }}>{opt.label}</span>
+                  <span style={{ fontSize: 10, color: T.muted }}>{opt.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Visual mode */}
         <div style={{ marginBottom: 28 }}>
           <Label>Visuals</Label>
@@ -548,6 +510,7 @@ function GeneratorForm() {
                 credits: "~160 credits",
                 desc: "Hook and hero scenes as video clips, CTA as image",
                 recommended: true,
+                multiSceneOnly: true,
               },
               {
                 id: "video",
@@ -556,7 +519,7 @@ function GeneratorForm() {
                 credits: "~230 credits",
                 desc: "All scenes as video clips for maximum impact",
               },
-            ].map(opt => {
+            ].filter(opt => !(opt.multiSceneOnly && sceneCount === 1)).map(opt => {
               const active = visualMode === opt.id;
               return (
                 <button
