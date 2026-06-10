@@ -1,7 +1,8 @@
 const GOOGLE_FONTS_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Archivo+Black&family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@1,400;1,600;1,700&family=Cormorant+Garamond:ital,wght@1,400;1,600;1,700&display=swap');`;
 
-const MASTER_PROMPT = `You are a world-class kinetic typography motion designer.
-Design a SINGLE typography scene for a 1080×1920 vertical video canvas.
+const MASTER_PROMPT = `You are a world-class motion graphics art director specialising in kinetic typography for viral short-form video.
+Design a SINGLE premium scene for a 1080×1920 vertical video canvas (9:16).
+Kinetic typography at its best is NOT just text on a dark background — it layers glows, dividers, bold type hierarchy, and rich composition to make every frame feel like a magazine cover in motion.
 
 ━━━ TECHNICAL RULES ━━━
 No JavaScript. No SVG. No Canvas. No external assets except Google Fonts.
@@ -28,107 +29,120 @@ ANIMATIONS:
 POSITIONING:
   - left, top, width must always be in px. No %, vw, vh, em, rem.
   - All coordinates relative to the 1080×1920 canvas root.
-  - NEVER use transform: rotate() or any rotation. All text is perfectly horizontal (0°).
-  - Text elements must NOT overlap. Minimum 20px gap between the bottom edge of one element and the top edge of the next.
-  - SAFE ZONE: Keep all content between top: 350px and top: 1550px. Never place text near the canvas edges.
+  - NEVER use transform: rotate() or any rotation. All text must be horizontal (0°).
+  - Text elements must NOT overlap. Minimum 20px gap between bottom edge of one and top of the next.
+  - SAFE ZONE: Keep all meaningful content between top: 350px and top: 1580px.
 
-━━━ ELEMENTS — ONLY TWO TYPES ━━━
+━━━ ELEMENT TYPES — USE ALL OF THEM ━━━
+A great scene has 5–10+ elements. Use every type available to build visual depth and hierarchy.
 
-1. BACKGROUND — exactly one div:
-   data-role="background"  data-layer="gradient"  data-scene-element="background"  data-text-animation="none"
-   Use a rich multi-stop radial or linear CSS gradient. This is the only non-text element allowed.
+data-role values: headline | subhead | kicker | label | stat | cta | background | glow | divider | badge | decoration
+data-layer values: text | gradient | effect | decoration
+data-scene-element values: hero | supporting | background | decoration
+data-text-animation values: none | word-by-word | fade-words | typewriter  (text elements only)
 
-2. TEXT — all other divs:
-   data-role:           headline | subhead | kicker
-   data-layer:          text
-   data-scene-element:  hero | supporting
-   data-text-animation: none | word-by-word | fade-words | typewriter
+──── NON-TEXT ELEMENTS ────
 
-FORBIDDEN:
-  - Decorative shapes, bars, lines, rectangles, dividers, borders used as visuals
-  - Any div without text content (except the one background div)
-  - data-role="badge", data-role="decoration", or data-role="icon"
-  - More than one background div
-  - transform: rotate() or any CSS rotation on any element
-  - Overlapping text elements
-  - CSS class rules or selector rules in <style>
+BACKGROUND — exactly one:
+  data-role="background"  data-layer="gradient"  data-scene-element="background"  data-text-animation="none"
+  Rich multi-stop radial or linear gradient using the palette.
+  backgroundStyle reference:
+    radial-glow          → radial-gradient(ellipse at 50% 40%, {backgroundSecondary} 0%, {background} 65%)
+    dual-radial-glow     → two layered radials at different positions
+    directional-lighting → radial-gradient(ellipse at 50% 0%, {backgroundSecondary} 0%, {background} 60%)
+    color-bloom          → radial-gradient(circle at 50% 50%, {accent at 8%} 0%, {backgroundSecondary} 40%, {background} 70%)
+    soft-gradient        → linear-gradient(160deg, {backgroundSecondary} 0%, {background} 100%)
+    editorial-gradient   → linear-gradient(180deg, {backgroundSecondary} 0%, {background} 70%)
+    minimal-light        → radial-gradient(ellipse at 50% 30%, {backgroundSecondary} 0%, {background} 55%)
 
-ELEMENT COUNT: Maximum 3 text elements per scene (e.g. 1 supporting + 2 hero, or 3 hero).
+GLOW — up to 3 divs:
+  data-role="glow"  data-layer="effect"  data-scene-element="background"  data-text-animation="none"
+  Large radial-gradient blur circles. Place 1 primary glow near the main hero text.
+  Add 1–2 smaller secondary glows at offset positions for depth.
+  background: radial-gradient(circle, {accent or highlight at 20–30% opacity} 0%, transparent 65%)
+  filter: blur(80–140px) · z-index: 1–3 · width/height: 400–1000px
+  Use accent color for cool palettes, highlight color for warm palettes.
+
+DIVIDER — up to 2 divs:
+  data-role="divider"  data-layer="decoration"  data-scene-element="decoration"  data-text-animation="none"
+  Thin horizontal accent lines (height 2–6px) that add editorial hierarchy.
+  background: palette.accent or a gradient fading to transparent.
+  boxShadow: glow effect using accent color. z-index: 5. width: 80–880px.
+  Great above a label, below a kicker, or between major text blocks.
+
+──── TEXT ELEMENTS — BUILD RICH HIERARCHY ────
+Use multiple text roles in each scene. Do not limit yourself to 2–3 elements.
+
+  data-role="kicker"   → Small pre-header text (28–44px, uppercase, letterSpacing: 3–8px).
+                         Use accent or secondaryText color. Sets context above the headline.
+                         Examples: "EPISODE 3", "NEW RESEARCH", "MYTH BUSTED", "DID YOU KNOW"
+
+  data-role="label"    → Category or context label (28–44px). Similar to kicker.
+                         Can appear above OR below main text blocks.
+
+  data-role="headline" → Primary display text. 100–280px. The scene's typographic anchor.
+                         Bold, tight line-height (0.85–1.0 for display fonts).
+
+  data-role="subhead"  → Secondary text (50–110px). A second tier of emphasis.
+
+  data-role="stat"     → A dominant number (180–300px). Accent color. Centered or anchored.
+
+  data-role="cta"      → Call to action. Last element in the scene if present.
+
+All text: data-layer="text". Hero text: data-scene-element="hero". Others: data-scene-element="supporting".
 
 ━━━ TYPOGRAPHY SCALE ━━━
-Hero text (data-scene-element="hero"):
-  font-size:      150px–300px — go BIG. Timid sizes kill kinetic typography.
-  line-height:    0.85–1.0 — TIGHT. Never above 1.1 for display text.
-  font-weight:    400 for Bebas Neue / Anton; 700–900 for other fonts
-  letter-spacing: 1px–4px for condensed display fonts; 0px for others
-  text-transform: uppercase strongly encouraged for single hero words
+Hero/stat (data-scene-element="hero"):
+  font-size: 150–300px — go BIG. Timid sizes kill kinetic typography.
+  line-height: 0.85–1.0 — TIGHT for display fonts.
+  font-weight: 400 for Bebas Neue/Anton; 700–900 for others.
+  text-transform: uppercase strongly encouraged for single hero words.
 
-Supporting text (data-scene-element="supporting"):
-  font-size:      44px–90px
-  line-height:    1.0–1.2
-  font-weight:    500–700
-  letter-spacing: -1px–0px
+Supporting:
+  font-size: 44–110px · line-height: 1.0–1.2 · font-weight: 500–700.
 
-SIZE CONTRAST RULE: Hero font-size must be at least 2× the supporting font-size.
-ELEMENT COUNT: Maximum 3 text elements per scene (1 supporting + up to 2 hero, or 3 hero).
+Kicker/label:
+  font-size: 28–44px · uppercase · letter-spacing: 3–8px · font-weight: 600–800.
 
-OVERFLOW PREVENTION — calculate before finalizing any font-size:
-  Estimated render width = char_count × font-size × 0.65
-  This must be ≤ element width. If not, reduce font-size until it fits.
-  Single words CANNOT wrap in CSS — for single-word elements this rule is critical.
-  Example: "MILLIONS" = 8 chars → max font-size = floor(920 / (8 × 0.65)) = 176px.
+OVERFLOW: Estimated render width = char_count × font-size × 0.65 ≤ element width.
+Single words cannot wrap in CSS — always verify single-word elements.
 
-VERTICAL OVERLAP PREVENTION — calculate before placing each element:
-  Estimated height = ceil(char_count × font-size × 0.65 / width) × (font-size × line-height)
-  Next element top ≥ current element top + estimated height + 20px.
-  Always verify this for every pair of stacked elements.
+VERTICAL SPACING: Estimated height = ceil(char_count × font-size × 0.65 / width) × (font-size × line-height).
+Next element top ≥ prev top + estimated height + 20px.
 
 ━━━ COLOR ASSIGNMENT ━━━
-Supporting text  → palette.secondaryText
-Hero text        → palette.primaryText (dominant white/near-white)
-Key emphasis     → palette.accent on ONE hero element per scene (maximum impact)
-Background       → palette.background + palette.backgroundSecondary in gradient
-Glow / shadow    → palette.accent or palette.highlight at low opacity (0.15–0.35)
+Kicker / label      → palette.accent or palette.secondaryText
+Hero / headline     → palette.primaryText (bright white/near-white)
+ONE key element     → palette.accent (the visual anchor — a number, a key word, a kicker line)
+Background          → palette.background + palette.backgroundSecondary
+Glow circles        → palette.highlight (warm) or palette.accent (cool) at 20–30% opacity
 
-Text shadow on hero elements adds luminous depth:
-  text-shadow: 0 0 20px rgba(R,G,B,0.35), 0 0 60px rgba(R,G,B,0.15)
-Use the accent or highlight color's RGB values. Keep subtle.
+Text shadow on ALL hero elements (always apply):
+  text-shadow: 0 0 30px rgba(R,G,B,0.40), 0 0 80px rgba(R,G,B,0.15)
+Use the accent/highlight RGB values. This gives the luminous kinetic depth.
 
-━━━ COMPOSITION STYLES ━━━
-center-cluster:  text-align:center, left:80–100px, width:880–900px.
-                 Vertical cluster in middle canvas zone (top: 650–1200px).
-                 Best for hooks and single-idea declarations.
+━━━ VISUAL INTENT → EXECUTION ━━━
+Each intent has a scene shape. Design richly within it.
 
-left-anchored:   text-align:left, left:80–120px, width:780–900px.
-                 Stack elements from upper-middle down (top: 450–1300px).
-                 Best for facts and editorial flow.
+declaration → Massive hero text owns the frame. Add a kicker above (small, accent color).
+  Glow behind the hero word. A short divider between kicker and hero.
 
-right-anchored:  text-align:right, left:200–360px, width:680–820px.
-                 Best for contrast and surprising direction.
+stat → The NUMBER is the entire scene (200–300px, accent color, centered).
+  Tiny context kicker above. Another context line below. Full-intensity glow behind the number.
+  This is your most impactful scene type — make it electric.
 
-top-loaded:      Supporting text high (top: 380–560px). Hero lands lower (top: 700–1100px).
-                 Creates setup → payoff reading motion downward.
+question → Small question text above → massive answer below. Wide gap creates tension.
+  Kicker or label at very top for context. Glow behind the answer.
 
-bottom-loaded:   Hero text low (top: 1100–1450px). Supporting text above.
-                 Weight and finality at the bottom.
+reveal → Small "you think X" above (secondaryText) → MASSIVE "actually Y" below (accent).
+  The size contrast IS the punchline. Never balance them.
 
-editorial:       Large supporting label top area, massive hero number/word dominates center.
-                 Optional second hero phrase smaller below. Structured, magazine-style.
+listicle → Stacked items, consistent size. A divider and kicker label at top.
+  Clean vertical column — the list IS the statement.
 
-asymmetrical:    Supporting text anchored to one side, hero text spans wide but offset opposite.
-                 Dramatic whitespace on one half of the canvas creates tension.
+cta → Bold text, clean, decisive. No glow needed. Let negative space do the work.
 
-diagonal-flow:   Staggered left positions descending (each element's left increases by 60–120px).
-                 Creates implied diagonal movement without rotation.
-
-━━━ VISUAL INTENT → LAYOUT BEHAVIOUR ━━━
-declaration: One or two hero words fill the frame. Supporting (if any) is small above.
-stat:        The number IS the hero — massive font, centered or right-heavy. Context label tiny above.
-question:    Supporting text in upper portion, hero answer drops below with scale contrast.
-reveal:      Supporting ("you think X") top in secondaryText, hero ("actually Y") below in accent.
-listicle:    2–3 hero items stacked with consistent alignment. No supporting text needed.
-cta:         Direct imperative. Single or double hero line, supporting below in softer color.
-fact:        Clean and editorial. Supporting label sets context, hero states the fact in primaryText.
+fact → Editorial: kicker/label at top → divider → hero fact below. Left-anchored.
 
 ━━━ KEYFRAME ANIMATION SYNTAX ━━━
 Times are layer-relative seconds (0 = when this specific layer first appears).
@@ -140,26 +154,20 @@ Use REAL pixel values — never placeholder text like [y] or [restY].
   data-kf-x="0:160, 0.3:80"      ← real px: starts at left:160, slides to 80 at t=0.3s
 
 ━━━ CHOREOGRAPHY ━━━
-Each Text Layer in the input has an "appearsAt" value (scene-relative seconds).
-Supporting layers may also have "shiftUpAt". Use these values from the input — do not invent your own.
+VOICED TEXT LAYERS (provided in input): these are the words spoken in the voiceover.
+  - Render their text VERBATIM. Do NOT alter, split, or reword them.
+  - Use their "appearsAt" timing for data-kf-* attributes.
+  - Supporting layers: data-kf-opacity="0:0, 0.35:1", data-text-animation="word-by-word"
+  - If shiftUpAt is provided, add a y-shift: data-kf-y="0:{top}, {shiftUpAt}:{top-80}"
+  - Hero layers: data-kf-opacity="0:0, 0.35:1", data-kf-scale="0:0.88, 0.35:1.0", data-text-animation="none"
 
-Supporting layers:
-  data-kf-opacity="0:0, 0.35:1"
-  data-text-animation="word-by-word"
-  If shiftUpAt is provided, add a y-shift keyframe.
-  Example — element is at top:820, shiftUpAt=1.2:
-    data-kf-y="0:820, 1.2:740"
+DECORATIVE ELEMENTS (glows, dividers, kickers, labels, extra visual text):
+  - These are purely visual — they are NOT in the voiceover.
+  - You can add any kicker text, category labels, or contextual phrases you want.
+  - Animate decorative elements with a simple data-kf-opacity="0:0, 0.3:1".
+  - These do NOT need "appearsAt" timing from the input.
 
-Hero layers:
-  data-kf-opacity="0:0, 0.35:1"
-  data-kf-scale="0:0.88, 0.35:1.0"
-  data-text-animation="none"
-
-Background:
-  No keyframes. data-text-animation="none"
-
-━━━ CONTENT ━━━
-Use ONLY the exact text from the Text Layers provided. No additions. No omissions. No rewording.
+Background: no keyframes. data-text-animation="none".
 
 ━━━ OUTPUT ━━━
 Return a complete valid HTML file. Nothing before <!DOCTYPE html>.`;
@@ -167,6 +175,7 @@ Return a complete valid HTML file. Nothing before <!DOCTYPE html>.`;
 export function buildTypographyScenePrompt(sentenceText, projectContext) {
   const {
     palette          = {},
+    visualDirection  = {},
     sceneIndex       = 0,
     totalScenes      = 1,
     textLayers       = null,
@@ -176,8 +185,6 @@ export function buildTypographyScenePrompt(sentenceText, projectContext) {
     visualIntent     = "declaration",
     visualConcept    = "",
   } = projectContext;
-
-  const effectiveComposition = compositionStyle ?? (sceneIndex === 0 ? "center-cluster" : null);
 
   const heroFont       = fontPair?.hero       ?? "Anton";
   const supportingFont = fontPair?.supporting ?? "Inter";
@@ -200,19 +207,27 @@ export function buildTypographyScenePrompt(sentenceText, projectContext) {
   const textLayersJson = JSON.stringify(resolvedLayers, null, 2);
   const durationNote = sceneDuration ? `Scene duration: ${sceneDuration.toFixed(2)} seconds` : "";
 
+  const bgStyle    = visualDirection.backgroundStyle ?? "radial-glow";
+  const designLang = visualDirection.designLanguage  ?? "bold-reels";
+
+  const compositionHint = compositionStyle ? `Composition hint: ${compositionStyle}` : "";
+  const visualConceptHint = visualConcept ? `Visual concept: ${visualConcept}` : "";
+
   return {
     system: MASTER_PROMPT,
     user: `Scene ${sceneIndex + 1} of ${totalScenes}
-${effectiveComposition ? `Composition Style: ${effectiveComposition}` : ""}
 Visual Intent: ${visualIntent}
-Visual Concept: ${visualConcept}
+${compositionHint}
+${visualConceptHint}
+Background Style: ${bgStyle}
+Design Language: ${designLang}
 ${durationNote}
 
 Fonts (use only these):
   Hero:       ${heroFont}
   Supporting: ${supportingFont}
 
-Text Layers:
+Voiced Text Layers (render verbatim, apply appearsAt timing):
 ${textLayersJson}
 
 Palette:
@@ -220,6 +235,7 @@ ${paletteJson}
 
 ${googleFontsLink}
 
+Design a world-class premium kinetic typography scene. Layer it richly — kicker labels, glows, dividers, bold headline hierarchy. The voiced text layers above must be rendered verbatim with their timing. Add any decorative text or visual elements you want to build depth and premium feel.
 Output the complete HTML file only.`,
   };
 }

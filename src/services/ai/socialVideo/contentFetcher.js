@@ -15,13 +15,18 @@ export function detectPlatform(url) {
   return "generic";
 }
 
-function extractTweetId(url) {
-  const m = url.match(/\/status\/(\d+)/);
-  return m ? m[1] : null;
+function extractTweetMeta(url) {
+  const idMatch   = url.match(/\/status\/(\d+)/);
+  const userMatch = url.match(/(?:twitter\.com|x\.com)\/([^/]+)\/status/i);
+  return {
+    tweetId:  idMatch   ? idMatch[1]   : null,
+    username: userMatch ? userMatch[1] : null,
+  };
 }
 
-async function fetchOneTweet(tweetId) {
-  const res = await fetch(`${FXTWITTER_API}/status/${tweetId}`, {
+async function fetchOneTweet(tweetId, username = null) {
+  const path = username ? `/${username}/status/${tweetId}` : `/status/${tweetId}`;
+  const res = await fetch(`${FXTWITTER_API}${path}`, {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; SocialVideoBot/1.0)" },
     signal: AbortSignal.timeout(10000),
   });
@@ -32,23 +37,27 @@ async function fetchOneTweet(tweetId) {
 }
 
 async function fetchTwitterContent(url) {
-  const tweetId = extractTweetId(url);
+  const { tweetId, username } = extractTweetMeta(url);
   if (!tweetId) throw new Error("Could not extract tweet ID — make sure the URL contains /status/...");
 
-  const rootTweet = await fetchOneTweet(tweetId);
+  const rootTweet = await fetchOneTweet(tweetId, username);
 
   // Follow thread: fxtwitter returns tweet.thread for self-replies by the same author
   const threadTexts  = [rootTweet.text ?? ""];
   const MAX_THREAD   = 15;
   let   cursor       = rootTweet;
 
+  console.log(`[contentFetcher] root tweet fetched, thread field: ${JSON.stringify(rootTweet.thread)?.slice(0, 200)}`);
+
   while (threadTexts.length < MAX_THREAD) {
-    const next = cursor.thread?.tweet ?? cursor.thread ?? null;
+    // fxtwitter may nest the next tweet under .thread.tweet or directly under .thread
+    const next = cursor.thread?.tweet ?? (cursor.thread?.id ? cursor.thread : null);
     if (!next?.id) break;
     // Only follow if same author (self-reply thread, not a reply from someone else)
     if (next.author?.screen_name !== rootTweet.author?.screen_name) break;
     threadTexts.push(next.text ?? "");
     cursor = next;
+    console.log(`[contentFetcher] thread tweet ${threadTexts.length}: "${(next.text ?? "").slice(0, 60)}"`);
   }
 
   const combinedText = threadTexts.join("\n\n").trim();

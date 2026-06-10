@@ -186,10 +186,17 @@ export async function generateFullVoiceover(script, projectId, voiceId) {
   // Normalize loudness to -9 LUFS — matches tts.js and typographyVideo.js pipelines
   let buffer = rawBuffer;
   try {
-    buffer = await normalizeLoudness(rawBuffer);
+    const normalized = await normalizeLoudness(rawBuffer);
+    if (normalized && normalized.length > 1024) {
+      buffer = normalized;
+    } else {
+      console.warn("[ttsGenerator] loudnorm produced empty/tiny buffer, using raw audio");
+    }
   } catch (normErr) {
     console.warn("[ttsGenerator] loudnorm failed, uploading raw audio:", normErr.message);
   }
+
+  if (!buffer || buffer.length === 0) throw new Error("Audio buffer is empty after TTS generation");
 
   const parsed           = parseMp3Duration(buffer);
   const estimated        = estimateScriptDuration(script.trim());
@@ -199,7 +206,7 @@ export async function generateFullVoiceover(script, projectId, voiceId) {
   const { error: uploadErr } = await supabaseAdmin.storage
     .from(STORAGE_BUCKET)
     .upload(storageKey, buffer, { contentType: "audio/mpeg", upsert: true });
-  if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message}`);
+  if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message} (buffer: ${buffer.length} bytes)`);
 
   const { data: { publicUrl } } = supabaseAdmin.storage
     .from(STORAGE_BUCKET)

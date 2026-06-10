@@ -5,18 +5,6 @@
 
 import { openai } from "../../../server/middleware/shared.js";
 
-function formatMetrics(metrics) {
-  if (!metrics) return "";
-  const fmt = n =>
-    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
-    : n >= 1_000   ? `${Math.round(n / 1_000)}K`
-    : String(n);
-  const parts = [];
-  if (metrics.views    > 0) parts.push(`${fmt(metrics.views)} views`);
-  if (metrics.likes    > 0) parts.push(`${fmt(metrics.likes)} likes`);
-  if (metrics.retweets > 0) parts.push(`${fmt(metrics.retweets)} retweets`);
-  return parts.join(", ");
-}
 
 const SCRIPT_SYSTEM = `You are a viral social media video producer.
 
@@ -39,11 +27,13 @@ For threads: cover the key points across scenes — hook → main ideas → CTA.
 ━━━ SCENE STRUCTURE ━━━
   hook:  Opening. The single most scroll-stopping element — a number, a claim, a shock.
   quote: The key message from the post, displayed as a premium quote card.
-  stat:  An impressive engagement or content metric shown as a massive number.
+  stat:  A striking number FROM THE POST'S CONTENT (e.g. "10x faster", "$2M raised", "3 hours"). NEVER use views, likes, retweets, or any engagement count.
+  list:  When the post contains a list of items. Show 8–10 of the most compelling items per scene (pick the most surprising or valuable ones). For long lists use multiple list scenes. visual_text MUST be the actual list items newline-separated (e.g. "AI Video Generator\nBaby Heartbeat App\nBible Widget"). Do NOT summarise — show the real items.
   image: The post's media image as the visual hero of the scene.
   cta:   Call to action. Always the final scene. Never attribution — focus on the action (save, follow, share).
 
 Use 3–4 scenes for text-only posts. Use 4–5 scenes when an image is available.
+When the post is primarily a list, use: hook → 2–3 list scenes covering different items → cta.
 Always end with a cta scene. Always start with a hook scene.
 
 ━━━ ASSET STRATEGY ━━━
@@ -54,6 +44,7 @@ Always end with a cta scene. Always start with a hook scene.
   typography_hero   → hook scenes — massive text, nothing else
   single_stat       → stat scenes — one number dominates
   quote_statement   → quote scenes — premium quote card layout
+  list_reveal       → list scenes — vertical stack of items, one per line. Use this for list intent ONLY.
   full_bleed_image  → image scenes — fetched image fills canvas
   split_composition → image scenes — image on one side, text on other
   minimal_cta       → cta scenes — clean attribution and action
@@ -98,15 +89,13 @@ Match the emotional tone:
 }`;
 
 export async function generateSocialScript({ content, targetDuration = 25 }) {
-  const metricsStr = formatMetrics(content.metrics);
-
   const postText = (content.text || content.title || "").slice(0, 1500);
   const threadNote = content.isThread
     ? `\nThis is a ${content.threadLength}-tweet thread — all tweets are combined above. Cover the full thread's ideas across scenes.`
     : "";
 
   const userText = `Post text:
-"${postText}"${metricsStr ? `\nEngagement: ${metricsStr}` : ""}
+"${postText}"
 Image available: ${!!content.imageUrl}
 Target duration: ~${targetDuration} seconds${threadNote}`;
 

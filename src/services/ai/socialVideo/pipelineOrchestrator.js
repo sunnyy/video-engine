@@ -52,7 +52,7 @@ function assignWordTimestamps(scenes, wordTimestamps) {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function runSocialPipeline(params, onStep) {
-  const { url, userId, voiceId = null, targetDuration = 25 } = params;
+  const { url, userId, voiceId = null, targetDuration = 25, includeAuthor = false } = params;
 
   const step = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
 
@@ -77,12 +77,13 @@ export async function runSocialPipeline(params, onStep) {
     palette,
     fontPair,
     musicMood,
-    author:      content.author      ?? "",
-    authorHandle: content.authorHandle ?? "",
-    platform:    content.platform    ?? "twitter",
-    canvasWidth:  CANVAS.width,
-    canvasHeight: CANVAS.height,
-    fps:         FPS,
+    author:        content.author      ?? "",
+    authorHandle:  content.authorHandle ?? "",
+    platform:      content.platform    ?? "twitter",
+    includeAuthor: includeAuthor && !!(content.author || content.authorHandle),
+    canvasWidth:   CANVAS.width,
+    canvasHeight:  CANVAS.height,
+    fps:           FPS,
     voiceId,
   };
 

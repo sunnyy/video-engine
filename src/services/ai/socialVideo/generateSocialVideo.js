@@ -1,9 +1,9 @@
 import { serverFetch } from "../../serverApi";
 
-export async function generateSocialVideo({ url, targetDuration = 25 }, onProgress) {
+export async function generateSocialVideo({ url, targetDuration = 25, includeAuthor = false }, onProgress) {
   const res = await serverFetch("/api/social-video/generate", {
     method: "POST",
-    body: JSON.stringify({ url, targetDuration }),
+    body: JSON.stringify({ url, targetDuration, includeAuthor }),
   });
 
   if (!res.ok && res.status !== 200) {

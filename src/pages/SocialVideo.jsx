@@ -165,10 +165,11 @@ function VideoListing() {
 
 function GeneratorForm() {
   const navigate = useNavigate();
-  const [url,         setUrl]         = useState("");
-  const [loading,     setLoading]     = useState(false);
-  const [statusStep,  setStatusStep]  = useState(0);
-  const [error,       setError]       = useState(null);
+  const [url,           setUrl]           = useState("");
+  const [includeAuthor, setIncludeAuthor] = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [statusStep,    setStatusStep]    = useState(0);
+  const [error,         setError]         = useState(null);
 
   const platformLabel = detectPlatformLabel(url.trim());
   const canGenerate   = !!url.trim() && !loading;
@@ -181,7 +182,7 @@ function GeneratorForm() {
 
     try {
       const result = await generateSocialVideo(
-        { url: url.trim() },
+        { url: url.trim(), includeAuthor },
         ({ step }) => {
           const idx = STATUS_STEPS.indexOf(step);
           if (idx !== -1) setStatusStep(idx);
@@ -242,6 +243,41 @@ function GeneratorForm() {
                 pointerEvents: "none",
               }}>{platformLabel}</span>
             )}
+          </div>
+        </div>
+
+        {/* Author toggle */}
+        <div
+          onClick={() => !loading && setIncludeAuthor(v => !v)}
+          style={{
+            marginBottom: 24, display: "flex", alignItems: "flex-start", gap: 12,
+            padding: "14px 16px", borderRadius: 10,
+            background: includeAuthor ? "rgba(29,155,240,0.08)" : "rgba(255,255,255,0.03)",
+            border: `1px solid ${includeAuthor ? "rgba(29,155,240,0.3)" : T.border}`,
+            cursor: loading ? "not-allowed" : "pointer", transition: "all 0.2s",
+            opacity: loading ? 0.5 : 1,
+          }}
+        >
+          <div style={{
+            width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1,
+            background: includeAuthor ? T.accent : "transparent",
+            border: `2px solid ${includeAuthor ? T.accent : "#445566"}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.15s",
+          }}>
+            {includeAuthor && (
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: includeAuthor ? T.text : T.muted, lineHeight: 1.3 }}>
+              Include author credit
+            </div>
+            <div style={{ fontSize: 12, color: "#45556a", marginTop: 3, lineHeight: 1.4 }}>
+              Shows the author's handle on the final scene as a small attribution
+            </div>
           </div>
         </div>
 

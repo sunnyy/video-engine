@@ -200,21 +200,28 @@ function roleToTrackId(role) {
     headline:   "track_text",
     subhead:    "track_text",
     kicker:     "track_badge",
+    label:      "track_badge",
     badge:      "track_badge",
+    stat:       "track_text",
+    cta:        "track_text",
     background: "track_background",
     glow:       "track_background",
+    divider:    "track_overlay",
     decoration: "track_overlay",
     icon:       "track_icon",
   };
   return map[role] ?? "track_text";
 }
 
+// Non-text gradient roles — anything that isn't voiced text
+const GRADIENT_ROLES = new Set(["background", "glow", "divider", "badge", "decoration", "overlay"]);
+
 function layerToType(layer, role) {
   if (layer === "text")       return "text";
   if (layer === "gradient")   return "gradient";
   if (layer === "effect")     return "gradient";
   if (layer === "decoration") return "gradient";
-  if (role === "background" || role === "glow") return "gradient";
+  if (GRADIENT_ROLES.has(role)) return "gradient";
   return "text";
 }
 
@@ -328,8 +335,10 @@ export function parseTypographySceneHTML(htmlString, sceneIndex, canvas = { widt
       role === "background"  ? 0 :
       role === "glow"        ? 1 :
       role === "decoration"  ? 2 :
+      role === "divider"     ? 5 :
       role === "kicker"      ? 6 :
-      role === "badge"       ? 8 : 10
+      role === "label"       ? 6 :
+      role === "badge"       ? 7 : 10
     );
 
     const opacity = cssNum(style["opacity"]) ?? 1;
@@ -412,11 +421,17 @@ export function parseTypographySceneHTML(htmlString, sceneIndex, canvas = { widt
     graph.push(entry);
   }
 
-  // Drop non-background gradient elements — decorative shapes, bars, lines, etc.
-  // Only the background div is allowed to be a gradient; everything else must be text.
-  graph = graph.filter(e => e.type !== "gradient" || e.role === "background");
+  // Keep all gradient elements — background, glow, divider, badge, decoration, etc.
+  // The only gradient we drop is a completely transparent/empty one that adds nothing.
+  graph = graph.filter(e => {
+    if (e.type !== "gradient") return true;
+    const bg = (e.background ?? "").trim().toLowerCase();
+    const hasBorder = (e.borderWidth ?? 0) > 0;
+    if (!hasBorder && (bg === "transparent" || bg === "none" || bg === "")) return false;
+    return true;
+  });
 
-  // Keep only the first background element if GPT generated multiple
+  // Enforce exactly one background element
   let bgSeen = false;
   graph = graph.filter(e => {
     if (e.role === "background") {

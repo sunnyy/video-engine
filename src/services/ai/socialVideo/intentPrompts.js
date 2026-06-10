@@ -13,12 +13,15 @@
 
 export function buildSocialScenePrompt(visualText, sceneContext) {
   const {
-    sceneIntent   = "quote",
-    archetype     = null,
-    visualConcept = "",
-    hasFetchedImage = false,
-    palette = {},
-    fontPair = {},
+    sceneIntent      = "quote",
+    archetype        = null,
+    visualConcept    = "",
+    hasFetchedImage  = false,
+    palette          = {},
+    fontPair         = {},
+    showAttribution  = false,
+    author           = "",
+    authorHandle     = "",
   } = sceneContext;
 
   const bg   = palette.background          ?? "#0A0A0A";
@@ -81,6 +84,7 @@ ARCHETYPE EXECUTION:
   typography_hero  → massive headline text owns the canvas. Accent color for key words. Minimal decoration. Nothing competes with text.
   quote_statement  → the quote owns the canvas. Large quotation marks in accent color. Attribution below in muted color. Premium card or no card at all.
   single_stat      → one massive number in accent color, plus a short label above or below. Radial glow behind the number. Nothing else competes.
+  list_reveal      → STRICT RULES: Parse DISPLAY TEXT by newlines — each line is one list item. Render each line as a separate positioned text element in a tight vertical stack. Layout: title label at top (~y:200), items start at ~y:340, each item ~90px taller than the previous (y += 90). Item style: font-size 46–52px, body font, primaryText color, left ~80px, width ~900px. Prefix each item with "→ " or a bullet "• ". Add a short header above the list (what this list is about). Animate: each item data-animation="fade-up", staggered. Do NOT scatter items — they must form a clean readable column.
   full_bleed_image → social-image placeholder fills 70%+ of canvas (top portion). Short caption or title text at bottom, overlaid on dark gradient.
   split_composition→ social-image on top half (~55%), bold text block on bottom half. Clear horizontal separation.
   minimal_cta      → bold CTA text dominates (e.g. "SAVE THIS", "FOLLOW FOR MORE"). No author name, no platform name.
@@ -94,9 +98,9 @@ ANIMATION:
   CTA:              data-animation="scale-in"
 
 ABSOLUTE PROHIBITIONS — violating any of these invalidates the entire scene:
-- NEVER display any author name, username, or @handle anywhere in the scene
+- NEVER display any author name, username, or @handle UNLESS the AUTHOR ATTRIBUTION directive explicitly instructs it
 - NEVER display any platform name (Twitter, X, Instagram, TikTok, etc.) anywhere in the scene
-- NEVER use the words "FOLLOW", "@", or any social handle as text content
+- NEVER make author credit prominent — if shown, it is always small, muted, bottom-corner only
 - The video is about the IDEA, not who said it or where
 
 OUTPUT: Only the HTML. Nothing before <!DOCTYPE html>.`;
@@ -105,17 +109,28 @@ OUTPUT: Only the HTML. Nothing before <!DOCTYPE html>.`;
     ? `USE FETCHED IMAGE: true — include exactly one data-asset-type="social-image" placeholder where the post image belongs.`
     : `USE FETCHED IMAGE: false — do NOT include any image placeholder.`;
 
+  const attributionDirective = showAttribution
+    ? `
+AUTHOR ATTRIBUTION (this scene only):
+Place the author credit in the bottom-left corner of the canvas, small and tasteful.
+  - Handle: "${authorHandle || author}"${author && authorHandle ? `\n  - Name: "${author}"` : ""}
+  - Style: font-size 28–32px, muted color (secondaryText from palette), font="${fontPair.supporting ?? "Inter"}"
+  - Position: left ~80px, bottom ~60px (top = canvasHeight − 60 − element height)
+  - Do NOT make this prominent — it is a credit, not a headline
+  - One line only: handle preferred, or "name · handle" if both present`
+    : "";
+
   const user = `ARCHETYPE: ${archetype ?? sceneIntent}
 INTENT: ${sceneIntent}
 VISUAL CONCEPT: ${visualConcept || "(choose best approach)"}
 ${useFetchedImageNote}
-
+${attributionDirective}
 DISPLAY TEXT (show in scene):
 "${visualText}"
 
 Design a stunning, viral-quality social video scene for this content.
 Make it look premium, bold, and shareable.
-Remember: NO author names, NO handles, NO platform names — anywhere.`;
+${showAttribution ? "Author credit is allowed on this scene only — small, bottom-left, as described above." : "Remember: NO author names, NO handles, NO platform names — anywhere."}`;
 
   return { system, user };
 }

@@ -4,13 +4,19 @@ import { buildSocialScenePrompt } from "./intentPrompts.js";
 const MODEL = "gpt-5.4";
 
 export async function designSocialScene(scene, projectContext, attempt = 1) {
+  const isCta          = scene.intent === "cta";
+  const showAttribution = isCta && projectContext.includeAuthor === true;
+
   const { system, user } = buildSocialScenePrompt(scene.visual_text || scene.script_segment, {
     sceneIntent:     scene.intent,
     archetype:       scene.archetype       ?? null,
     visualConcept:   scene.visual_concept  ?? "",
     hasFetchedImage: scene.use_fetched_image === true,
-    palette:         projectContext.palette  ?? {},
-    fontPair:        projectContext.fontPair ?? {},
+    palette:         projectContext.palette      ?? {},
+    fontPair:        projectContext.fontPair     ?? {},
+    showAttribution,
+    author:          showAttribution ? (projectContext.author       ?? "") : "",
+    authorHandle:    showAttribution ? (projectContext.authorHandle ?? "") : "",
   });
 
   const response = await openai.chat.completions.create({
