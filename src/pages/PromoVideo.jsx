@@ -164,17 +164,30 @@ async function uploadPromoFile(file, folder) {
   return `${supabase.storageUrl}/object/public/user-assets/${key}`;
 }
 
-// ── Video thumbnail — seeks to first frame so the browser paints it ───────────
-function VideoThumb({ src, style }) {
+// ── Video thumbnail — plays on hover, shows first frame at rest ───────────────
+function VideoThumb({ src, style, playing }) {
   const ref = useRef();
+
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (playing) {
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+      v.currentTime = 0.1;
+    }
+  }, [playing]);
+
   return (
     <video
       ref={ref}
       src={src}
       muted
       playsInline
-      preload="metadata"
-      onLoadedMetadata={() => { if (ref.current) ref.current.currentTime = 0.1; }}
+      loop
+      preload="auto"
+      onLoadedData={e => { if (ref.current && !playing) ref.current.currentTime = 0.1; }}
       style={style}
     />
   );
@@ -327,10 +340,9 @@ function ProjectCard({ project: p, onDelete }) {
   const isComplete             = p.status === "rendered";
   const sm                     = STATUS_META[p.status] || STATUS_META.draft;
   const initial                = (p.product_name || "V")[0].toUpperCase();
-  // First scene image asset for non-rendered preview
-  const previewImage = !isComplete
-    ? (p.scenes?.find(s => s.asset_url && !/\.(mp4|webm|mov)(\?|$)/i.test(s.asset_url))?.asset_url ?? null)
-    : null;
+  const aspectRatio            = (p.format_ratio || "9:16").replace(":", "/");
+  const thumbSrc               = p.video_url || p.preview_url || null;
+  const thumbIsVideo           = !!thumbSrc && /\.(mp4|webm|mov)(\?|$)/i.test(thumbSrc);
 
   function handleClick() {
     if (isComplete && p.editor_project_id) navigate(`/video-editor/${p.editor_project_id}`, { state: { from: "/promo-video" } });
@@ -364,39 +376,52 @@ function ProjectCard({ project: p, onDelete }) {
       }}>
 
       {/* Thumbnail */}
-      <div style={{ position: "relative", width: "100%", aspectRatio: "9/16", overflow: "hidden", background: "#0b0b14" }}>
-        {isComplete && p.video_url ? (
-          <VideoThumb src={p.video_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        ) : previewImage ? (
-          <img src={previewImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      <div style={{ position: "relative", width: "100%", aspectRatio, overflow: "hidden", background: "#0b0b14" }}>
+        {thumbIsVideo ? (
+          <VideoThumb src={thumbSrc} playing={hov} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : thumbSrc ? (
+          <img src={thumbSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : (
           <div style={{
-            width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-            background: "linear-gradient(135deg, #13131f 0%, #1a1a2e 60%, #0d1224 100%)",
+            width: "100%", height: "100%", display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: 10, padding: "16px 12px",
+            background: p.preview_bg || "linear-gradient(135deg, #13131f 0%, #1a1a2e 60%, #0d1224 100%)",
           }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: "50%",
-              background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.18)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 20, fontWeight: 900, color: "rgba(245,197,24,0.6)",
-              fontFamily: "'Outfit',sans-serif",
-            }}>
-              {initial}
-            </div>
+            {p.preview_script ? (
+              <div style={{
+                fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.75)",
+                textAlign: "center", lineHeight: 1.45, padding: "0 4px",
+                overflow: "hidden", display: "-webkit-box",
+                WebkitLineClamp: 6, WebkitBoxOrient: "vertical",
+              }}>
+                {p.preview_script}
+              </div>
+            ) : (
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%",
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, fontWeight: 900, color: "rgba(255,255,255,0.5)",
+                fontFamily: "'Outfit',sans-serif",
+              }}>
+                {initial}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Play icon overlay on rendered */}
-        {isComplete && (
+        {/* Play icon — shown at rest; fades out while video is playing on hover */}
+        {thumbIsVideo && (
           <div style={{
             position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-            background: hov ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.25)", transition: "background 0.2s",
+            background: hov ? "rgba(0,0,0,0)" : "rgba(0,0,0,0.22)", transition: "background 0.3s",
+            pointerEvents: "none",
           }}>
             <div style={{
               width: 38, height: 38, borderRadius: "50%", background: "rgba(245,197,24,0.92)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 13, color: "#000", paddingLeft: 2,
-              transform: hov ? "scale(1.12)" : "scale(1)", transition: "transform 0.15s",
+              opacity: hov ? 0 : 1, transition: "opacity 0.25s",
             }}>▶</div>
           </div>
         )}

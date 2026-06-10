@@ -32,5 +32,9 @@ remotion-bundle
 
 Info.txt
 project_structure.text
+html.json
+temp.json
+test.html
+promoPrompts.js
 
 src/server/temp

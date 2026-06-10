@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
@@ -9,7 +9,7 @@ import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import * as LucideIcons from "lucide-react";
 
-const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape", "icon"]);
+const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape", "icon", "html_block"]);
 const SNAP_T = 12; // canvas-space pixels
 
 // Snap layer top-left (x,y) to canvas edges and center during body drag
@@ -663,9 +663,24 @@ function LayerElement({
   handlesEl,
 }) {
   // Must be unconditional — called before the audio early-return below
-  const wrapperRef  = useRef(null);
-  const textEditRef = useRef(null);
+  const wrapperRef    = useRef(null);
+  const textEditRef   = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [domHeight, setDomHeight] = useState(0);
+  const domHeightRef  = useRef(0);
+
+  // For autoHeight layers (height:0 in transform), measure the actual rendered
+  // height after every DOM update so resize/rotate handles use the real bounding box.
+  // Runs synchronously before the browser paints so handles are correct on first frame.
+  useLayoutEffect(() => {
+    const isAutoH = layer.style?.autoHeight || layer.type === "html_block";
+    if (!isAutoH || !wrapperRef.current) return;
+    const h = wrapperRef.current.offsetHeight;
+    if (h > 0) {
+      domHeightRef.current = h;
+      if (h !== domHeight) setDomHeight(h);
+    }
+  });  // intentionally no deps — re-measures after every render, guard prevents loop
 
   // When entering edit mode, set content and move cursor to end
   useEffect(() => {
@@ -864,10 +879,19 @@ function LayerElement({
         No source
       </div>
     );
+  } else if (layer.type === "html_block") {
+    content = (
+      <div
+        style={{ width: "100%", fontFamily: "Anton, Poppins, sans-serif" }}
+        dangerouslySetInnerHTML={{ __html: layer.html ?? "" }}
+      />
+    );
   } else if (layer.type === "text") {
     const s = layer.style ?? {};
+    const autoSize = !isEditing && !!s.autoWidth;
     const baseTextStyle = {
-      width: "100%", height: "100%",
+      width: autoSize ? undefined : "100%",
+      height: autoSize ? undefined : "100%",
       fontFamily: s.fontFamily ?? "Outfit, sans-serif",
       fontSize: s.fontSize ?? 72,
       fontWeight: s.fontWeight ?? 800,
@@ -937,10 +961,58 @@ function LayerElement({
         </div>
       );
     } else {
+      const textAnim  = layer.textAnimation;
+      const localTime = Math.max(0, currentTime - layer.start);
+
+      let textContent;
+      if (textAnim === "word-by-word" || textAnim === "fade-words") {
+        const words = (layer.content || layer.text || "").split(/\s+/).filter(Boolean);
+        const wts   = layer.wordTimestamps;
+        const FADE_DUR = textAnim === "fade-words" ? 0.25 : 0.15;
+        textContent = (
+          <span style={{ wordBreak: "break-word" }}>
+            {words.map((word, i) => {
+              const wordTime = wts?.[i]?.time ?? i * 0.28;
+              const progress = Math.min(1, Math.max(0, (localTime - wordTime) / FADE_DUR));
+              const dy = textAnim === "fade-words" ? (1 - progress) * 10 : 0;
+              return (
+                <span key={i} style={{
+                  opacity: progress,
+                  display: "inline-block",
+                  transform: dy ? `translateY(${dy}px)` : undefined,
+                }}>
+                  {word}{i < words.length - 1 ? " " : ""}
+                </span>
+              );
+            })}
+          </span>
+        );
+      } else if (textAnim === "typewriter") {
+        const text = layer.content || layer.text || "";
+        const charsPerSecond = 18;
+        const visibleChars = Math.floor(localTime * charsPerSecond);
+        textContent = text.slice(0, Math.min(visibleChars + 1, text.length));
+      } else if (s.accentWord && s.accentColor) {
+        textContent = (
+          <span style={{ wordBreak: "break-word" }}>
+            {(layer.content || "").split(" ").map((word, i, arr) => (
+              <span key={i} style={{ color: word === s.accentWord ? s.accentColor : s.color }}>
+                {word}{i < arr.length - 1 ? " " : ""}
+              </span>
+            ))}
+          </span>
+        );
+      } else {
+        textContent = layer.content || layer.text || "";
+      }
+
       content = (
         <div
           style={{
             ...baseTextStyle,
+            background:   s.background   ?? undefined,
+            borderRadius: s.borderRadius ? `${s.borderRadius}px` : undefined,
+            padding:      s.padding      ?? undefined,
             display: "flex",
             alignItems: "center",
             justifyContent: s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
@@ -948,16 +1020,7 @@ function LayerElement({
           }}
           onDoubleClick={(e) => { e.stopPropagation(); onStartEdit?.(); }}
         >
-          {s.accentWord && s.accentColor
-            ? <span style={{ wordBreak: "break-word" }}>
-                {(layer.content || "").split(" ").map((word, i, arr) => (
-                  <span key={i} style={{ color: word === s.accentWord ? s.accentColor : s.color }}>
-                    {word}{i < arr.length - 1 ? " " : ""}
-                  </span>
-                ))}
-              </span>
-            : (layer.content || layer.text || "")
-          }
+          {textContent}
         </div>
       );
     }
@@ -1137,10 +1200,11 @@ function LayerElement({
           position: "absolute",
           left,
           top,
-          width,
-          height,
+          width:    layer.type === "html_block" ? width : layer.style?.autoWidth  ? "fit-content" : width,
+          maxWidth: layer.style?.autoWidth  ? Math.max(80, canvasW - left - 24) : undefined,
+          height:   layer.type === "html_block" ? "fit-content" : layer.style?.autoHeight ? "fit-content" : height,
           zIndex: layer.zIndex ?? 0,
-          transform: `${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}${layer.flipX ? "scaleX(-1) " : ""}${layer.flipY ? "scaleY(-1) " : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
+          transform: `${layer.type === "html_block" ? "translateY(-50%) " : ""}${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}${layer.flipX ? "scaleX(-1) " : ""}${layer.flipY ? "scaleY(-1) " : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
           transformOrigin: "center center",
           opacity: (opacity ?? 1) * tOpacity,
           filter: (blur || tBlur) ? `blur(${(blur ?? 0) + tBlur}px)` : undefined,
@@ -1157,9 +1221,9 @@ function LayerElement({
         {/* Inner content — overflow clipped here, drag events here */}
         <div
           style={{
-            position: "absolute",
-            inset: 0,
-            overflow: layer.type === "text" ? "visible" : "hidden",
+            position: (layer.style?.autoWidth || layer.type === "html_block") ? "relative" : "absolute",
+            inset: (layer.style?.autoWidth || layer.type === "html_block") ? undefined : 0,
+            overflow: "visible",
             cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",
             borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
@@ -1184,7 +1248,10 @@ function LayerElement({
       {/* Resize + rotate handles — portaled outside clipped canvas so they're never cropped */}
       {handlesEl && isResizable && createPortal(
         <div style={{
-          position: "absolute", left, top, width, height, pointerEvents: "none",
+          position: "absolute", left, top,
+          width,
+          height: (layer.style?.autoHeight || layer.type === "html_block") ? (domHeight || height) : height,
+          pointerEvents: "none",
           transform: `${tX ? `translateX(${tX}%) ` : ""}${tY ? `translateY(${tY}%) ` : ""}rotate(${rotation ?? 0}deg) scale(${(scale ?? 1) * tScale})`,
           transformOrigin: "center center",
         }}>
@@ -1273,6 +1340,16 @@ function StackedTextGroup({ groupLayers, currentTime, selectedLayerId }) {
 // ── Preview ───────────────────────────────────────────────────────────────────
 
 export default function Preview({ fullscreenRef }) {
+  useEffect(() => {
+    const id = "typo-google-fonts";
+    if (!document.getElementById(id)) {
+      const link = document.createElement("link");
+      link.id = id; link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Archivo+Black&family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@1,400;1,600;1,700&family=Cormorant+Garamond:ital,wght@1,400;1,500;1,600&family=Pacifico&display=swap";
+      document.head.appendChild(link);
+    }
+  }, []);
+
   const project        = useTimelineStore((s) => s.project);
   const currentTime    = useTimelineStore((s) => s.currentTime);
   const isPlaying      = useTimelineStore((s) => s.isPlaying);

@@ -61,6 +61,10 @@ export function getProjectSummary(project) {
   const scenes_ready          = project.scenes.filter(s => s.status === SCENE_STATUS.ASSET_READY).length;
   const scenes_missing_assets = project.scenes.filter(s => s.status === SCENE_STATUS.ASSET_MISSING).length;
 
+  const preview_url = project.video_type === "talking_head"
+    ? (project.scenes.find(s => s.th_url)?.th_url ?? null)
+    : (project.scenes.find(s => s.asset_url)?.asset_url ?? null);
+
   return {
     id:                     project.id,
     status:                 project.status,
@@ -76,5 +80,7 @@ export function getProjectSummary(project) {
     created_at:             project.created_at,
     video_url:              project.video_url              || null,
     editor_project_id:      project.editor_project_id      || null,
+    preview_url,
+    format_ratio:           project.format_ratio           || '9:16',
   };
 }

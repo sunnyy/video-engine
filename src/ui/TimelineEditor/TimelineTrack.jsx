@@ -10,6 +10,7 @@ const LAYER_ICONS = {
   video: "▶",
   image: "🖼",
   text: "T",
+  html_block: "T",
   audio: "♪",
   captions: "CC",
   sticker: "★",

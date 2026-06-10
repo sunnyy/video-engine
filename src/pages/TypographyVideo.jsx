@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { generateTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
-import { createProject } from "../services/projects/projectService";
 import { getTypographyVideoProjects, deleteProject } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 
@@ -16,13 +15,17 @@ const T = {
   danger:  "#f87171",
 };
 
-const STYLES = ["Bold & Minimal", "High Energy", "Dark & Moody", "Clean & Professional"];
+const DURATION_OPTIONS = [
+  { value: 20, label: "Quick",      description: "~15–20s · 3–5 scenes",  hint: "Single idea or hook" },
+  { value: 40, label: "Standard",   description: "~35–45s · 7–10 scenes", hint: "Facts, story, 5 tools" },
+  { value: 75, label: "Deep Dive",  description: "~60–80s · 12–18 scenes", hint: "Full breakdown" },
+];
 
 const STATUS_STEPS = [
   "Writing script…",
   "Generating voiceover…",
-  "Syncing word timestamps…",
-  "Building timeline…",
+  "Designing scenes…",
+  "Parsing & building timeline…",
   "Saving project…",
 ];
 
@@ -152,10 +155,10 @@ function VideoListing() {
 /* ── Generator form tab ── */
 function GeneratorForm() {
   const navigate = useNavigate();
-  const [inputType, setInputType] = useState("topic");
-  const [input,     setInput]     = useState("");
-  const [style,     setStyle]     = useState("Bold & Minimal");
-  const [loading,   setLoading]   = useState(false);
+  const [inputType,      setInputType]      = useState("topic");
+  const [input,          setInput]          = useState("What happens if you stop blinking");
+  const [targetDuration, setTargetDuration] = useState(40);
+  const [loading,        setLoading]        = useState(false);
   const [statusIdx, setStatusIdx] = useState(0);
   const [error,     setError]     = useState(null);
 
@@ -165,34 +168,13 @@ function GeneratorForm() {
     setError(null);
     setStatusIdx(0);
 
-    const stepTimer = setInterval(() => {
-      setStatusIdx((i) => Math.min(i + 1, STATUS_STEPS.length - 2));
-    }, 3500);
-
     try {
-      const result = await generateTypographyVideo({ input: input.trim(), inputType, style });
-
-      clearInterval(stepTimer);
-      setStatusIdx(STATUS_STEPS.length - 1);
-
-      const project = await createProject({
-        name: result.projectName,
-        rawAI: { projectName: result.projectName },
-        safeProject: {
-          layers: result.layers,
-          meta: {
-            fps:         result.fps,
-            duration:    result.duration,
-            orientation: "9:16",
-            mode:        "faceless",
-          },
-        },
-        source: "typography_video",
-      });
-
-      navigate(`/video-editor/${project.id}`, { state: { from: "/typography-video" } });
+      const result = await generateTypographyVideo(
+        { input: input.trim(), inputType, targetDuration },
+        ({ step }) => setStatusIdx(step),
+      );
+      navigate(`/video-editor/${result.projectId}`, { state: { from: "/typography-video" } });
     } catch (err) {
-      clearInterval(stepTimer);
       setError(err.message || "Generation failed. Please try again.");
       setLoading(false);
     }
@@ -267,29 +249,33 @@ function GeneratorForm() {
           )}
         </div>
 
-        {/* Style */}
+        {/* Duration */}
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.muted, marginBottom: 7, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            Style
+            Length
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {STYLES.map((s) => (
-              <button
-                key={s}
-                onClick={() => !loading && setStyle(s)}
-                disabled={loading}
-                style={{
-                  padding: "9px 16px", border: "none", borderRadius: 10,
-                  background: style === s ? T.accent : "rgba(255,255,255,0.05)",
-                  color:      style === s ? "#fff"   : T.muted,
-                  fontSize: 13, fontWeight: style === s ? 700 : 500,
-                  fontFamily: "inherit", cursor: loading ? "not-allowed" : "pointer",
-                  transition: "all 0.15s", opacity: loading ? 0.6 : 1,
-                }}
-              >
-                {s}
-              </button>
-            ))}
+          <div style={{ display: "flex", gap: 8 }}>
+            {DURATION_OPTIONS.map(opt => {
+              const sel = targetDuration === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => !loading && setTargetDuration(opt.value)}
+                  disabled={loading}
+                  style={{
+                    flex: 1, padding: "12px 8px", borderRadius: 10, cursor: loading ? "not-allowed" : "pointer",
+                    fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                    background: sel ? "rgba(124,92,252,0.1)" : "rgba(255,255,255,0.04)",
+                    border: sel ? `1.5px solid rgba(124,92,252,0.45)` : `1.5px solid ${T.border}`,
+                    opacity: loading ? 0.6 : 1, transition: "all 0.15s",
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 700, color: sel ? T.accent : T.text }}>{opt.label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: sel ? "rgba(167,139,250,0.9)" : T.muted }}>{opt.description}</span>
+                  <span style={{ fontSize: 10, color: "#55556a" }}>{opt.hint}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

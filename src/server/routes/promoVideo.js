@@ -471,12 +471,42 @@ router.get("/list", requireAuth, async (req, res) => {
 
     const { data, error, count } = await supabaseAdmin
       .from("promo_videos")
-      .select("id, status, video_goal, video_type, product_name, duration_seconds, scenes, credits_charged, approved_at, created_at, video_url, editor_project_id", { count: "exact" })
+      .select("id, status, video_goal, video_type, product_name, duration_seconds, scenes, style, credits_charged, approved_at, created_at, video_url, editor_project_id", { count: "exact" })
       .eq("user_id", req.user.id)
       .order("created_at", { ascending: false })
       .range(from, to);
     if (error) throw new Error(error.message);
-    const projects = (data || []).map(row => getProjectSummary(rowToProject(row)));
+
+    // For faceless projects, grab the first image asset + background color from the editor timeline
+    const editorIds = (data || []).map(r => r.editor_project_id).filter(Boolean);
+    const editorThumbs = {};
+    if (editorIds.length > 0) {
+      const { data: editorRows } = await supabaseAdmin
+        .from("projects")
+        .select("id, safe_project_json")
+        .in("id", editorIds);
+      for (const row of editorRows || []) {
+        const layers = row.safe_project_json?.layers || [];
+        const firstImg = layers.find(l => l.type === "image" && l.src);
+        const firstBg  = layers.find(l => (l.type === "gradient" || l.type === "solid") && (l.gradient || l.color));
+        const fullScript   = row.safe_project_json?.full_script || "";
+        const firstSentence = fullScript.split(/(?<=[.!?])\s+/)[0]?.trim() || null;
+        editorThumbs[row.id] = {
+          src:    firstImg?.src ?? null,
+          bg:     firstBg?.gradient || firstBg?.color || null,
+          script: firstSentence,
+        };
+      }
+    }
+
+    const projects = (data || []).map(row => {
+      const summary = getProjectSummary(rowToProject(row));
+      const ed = row.editor_project_id ? editorThumbs[row.editor_project_id] : null;
+      if (ed?.src && !summary.preview_url) summary.preview_url    = ed.src;
+      if (ed?.bg)                          summary.preview_bg     = ed.bg;
+      if (ed?.script)                      summary.preview_script = ed.script;
+      return summary;
+    });
     res.json({ projects, total: count ?? 0, page, limit });
   } catch (e) {
     console.error("[promo-video/list]", e.message);
