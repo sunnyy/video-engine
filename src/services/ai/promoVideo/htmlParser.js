@@ -45,71 +45,90 @@ function parseDeclarations(block) {
 }
 
 /**
- * Parse the <style> block into a flat map of selector → property object.
- * Handles: .class, #id, element, and simple comma-separated selectors.
- * Skips @keyframes, @media, pseudo-elements.
+ * Parse the <style> block into { rules, attrRules }.
+ * rules: flat map of selector → property object (class/id/tag)
+ * attrRules: array of { tag, attrs, nthType, declarations } for attribute selectors
  */
 function parseStyleBlock(htmlString) {
   const styleMatch = htmlString.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-  if (!styleMatch) return {};
+  if (!styleMatch) return { rules: {}, attrRules: [] };
 
   const css = styleMatch[1];
-  const rules = {};
 
-  // Remove @keyframes blocks entirely (they confuse our rule parser)
   const noKeyframes = css.replace(/@keyframes[\s\S]*?\{[\s\S]*?\}\s*\}/g, "");
-  // Remove @media blocks (we target 1080×1920 fixed canvas, no responsiveness)
-  const noMedia = noKeyframes.replace(/@media[\s\S]*?\{[\s\S]*?\}\s*\}/g, "");
-  // Remove CSS comments — without this, a comment before a class rule (e.g.
-  // /* Glow effects */ \n .purple-glow { ... }) bleeds into the selector name,
-  // so cssRules[".purple-glow"] is never set and class lookups silently return nothing.
-  const noComments = noMedia.replace(/\/\*[\s\S]*?\*\//g, "");
+  const noMedia     = noKeyframes.replace(/@media[\s\S]*?\{[\s\S]*?\}\s*\}/g, "");
+  // Remove CSS comments — without this, a comment before a class rule bleeds into the selector name
+  const noComments  = noMedia.replace(/\/\*[\s\S]*?\*\//g, "");
 
+  const rules    = {};
+  const attrRules = [];
   const ruleRegex = /([^{@]+)\{([^}]+)\}/g;
   let match;
   while ((match = ruleRegex.exec(noComments)) !== null) {
     const selectorBlock = match[1].trim();
     const declarations  = parseDeclarations(match[2]);
 
-    // Skip pseudo-elements and pseudo-classes (::before, :hover, etc.)
-    if (selectorBlock.includes("::") || selectorBlock.includes(":hover") || selectorBlock.includes(":nth")) continue;
+    if (selectorBlock.includes("::") || selectorBlock.includes(":hover")) continue;
 
     for (const rawSel of selectorBlock.split(",")) {
       const sel = rawSel.trim();
       if (!sel) continue;
-      if (!rules[sel]) rules[sel] = {};
-      Object.assign(rules[sel], declarations);
+      if (sel.includes("[")) {
+        // Attribute selector — parse tag, attribute conditions, optional :nth-of-type
+        const tagMatch = sel.match(/^([a-zA-Z][a-zA-Z0-9]*)/);
+        const tag = tagMatch ? tagMatch[1].toLowerCase() : null;
+        const attrs = {};
+        const attrPattern = /\[([^\]=\]]+)(?:=["']?([^\]"']*)["']?)?\]/g;
+        let am;
+        while ((am = attrPattern.exec(sel)) !== null) {
+          if (am[2] !== undefined) attrs[am[1].trim()] = am[2];
+        }
+        const nthMatch = sel.match(/:nth-of-type\((\d+)\)/);
+        const nthType  = nthMatch ? parseInt(nthMatch[1]) : null;
+        if (Object.keys(attrs).length > 0) {
+          attrRules.push({ tag, attrs, nthType, declarations });
+        }
+      } else if (!sel.includes(":nth")) {
+        if (!rules[sel]) rules[sel] = {};
+        Object.assign(rules[sel], declarations);
+      }
     }
   }
 
-  return rules;
+  return { rules, attrRules };
 }
 
 /**
  * Compute effective styles for an element by merging:
- *   tag rules < class rules < id rules < inline styles
- * This approximates browser CSS cascade (ignoring specificity details).
+ *   tag rules < class rules < id rules < attr selector rules < inline styles
  */
-function resolveElementStyles(el, cssRules) {
+function resolveElementStyles(el, cssRules, attrRules = [], nthIndex = 0) {
   const merged = {};
 
-  // 1. Tag-level rules (e.g. "div", "p")
   const tag = el.tagName?.toLowerCase() ?? "";
   if (tag && cssRules[tag]) Object.assign(merged, cssRules[tag]);
 
-  // 2. Class rules — applied in order
   const classes = (el.getAttribute("class") || "").split(/\s+/).filter(Boolean);
   for (const cls of classes) {
     if (cssRules[`.${cls}`]) Object.assign(merged, cssRules[`.${cls}`]);
-    // Also try tag.class combinations e.g. "div.headline"
     if (tag && cssRules[`${tag}.${cls}`]) Object.assign(merged, cssRules[`${tag}.${cls}`]);
   }
 
-  // 3. ID rule
   const id = el.getAttribute("id");
   if (id && cssRules[`#${id}`]) Object.assign(merged, cssRules[`#${id}`]);
 
-  // 4. Inline styles win
+  // Apply attribute selector rules (e.g. div[data-role="headline"], :nth-of-type)
+  for (const rule of attrRules) {
+    if (rule.tag && rule.tag !== tag) continue;
+    let allMatch = true;
+    for (const [attr, val] of Object.entries(rule.attrs)) {
+      if (el.getAttribute(attr) !== val) { allMatch = false; break; }
+    }
+    if (!allMatch) continue;
+    if (rule.nthType !== null && rule.nthType !== nthIndex) continue;
+    Object.assign(merged, rule.declarations);
+  }
+
   const inlineStyle = parseDeclarations(el.getAttribute("style") || "");
   Object.assign(merged, inlineStyle);
 
@@ -240,12 +259,19 @@ export function parseSceneHTML(htmlString, sceneIndex, canvas = { width: CANVAS_
 
   console.log(`[htmlParser] scene ${sceneIndex} — html length: ${htmlString.length}`);
 
-  // Parse the <style> block into a CSS rule map
-  const cssRules = parseStyleBlock(htmlString);
-  console.log(`[htmlParser] scene ${sceneIndex} — CSS rules parsed: ${Object.keys(cssRules).length} selectors`);
+  const { rules: cssRules, attrRules } = parseStyleBlock(htmlString);
+  console.log(`[htmlParser] scene ${sceneIndex} — CSS rules parsed: ${Object.keys(cssRules).length} selectors, ${attrRules.length} attr rules`);
 
   const root     = parse(htmlString, { comment: false });
-  // Select both div/span elements AND img elements that carry data-role
+
+  // Pre-compute nth-of-type index for each div (1-based, among all divs in DOM order).
+  // Required to resolve CSS rules like div[data-role="headline"]:nth-of-type(3).
+  const bodyNode = root.querySelector("body") || root;
+  const allDivs  = Array.from(bodyNode.querySelectorAll("div"));
+  const nthMap   = new Map();
+  let nthCounter = 1;
+  for (const div of allDivs) nthMap.set(div, nthCounter++);
+
   const elements = root.querySelectorAll("[data-role]");
 
   console.log(`[htmlParser] scene ${sceneIndex} — found ${elements.length} elements with data-role`);
@@ -266,8 +292,7 @@ export function parseSceneHTML(htmlString, sceneIndex, canvas = { width: CANVAS_
     while (usedIds.has(id)) { suffix++; id = `${baseId}_${suffix}`; }
     usedIds.add(id);
 
-    // Merge CSS class styles + inline styles
-    const style = resolveElementStyles(el, cssRules);
+    const style = resolveElementStyles(el, cssRules, attrRules, nthMap.get(el) ?? 0);
 
     // All elements use canvas-absolute coordinates — no parent offset needed.
     const rawText = el.text?.trim() ?? "";

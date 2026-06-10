@@ -198,13 +198,6 @@ function injectLogo(timeline, logoUrl, scenes) {
     .filter(({ intent }) => intent === "hook" || intent === "cta")
     .map(({ i }) => i);
 
-  for (const layer of timeline.layers) {
-    const match = layer.id?.match(/^s(\d+)_/);
-    if (!match) continue;
-    const si = parseInt(match[1], 10);
-    if (!logoSceneIndices.includes(si)) continue;
-  }
-
   // Add logo layers for hook and cta scenes
   let cursor = 0;
   for (let i = 0; i < scenes.length; i++) {
@@ -273,7 +266,11 @@ async function saveTimeline(timeline, project) {
         mode:              "timeline",
         source:            "product_video_v2",
         editor_version:    "timeline",
-        raw_ai_json:       { scenes: project._scenes?.map(s => ({ intent: s.intent, visual_concept: s.visual_concept })) ?? null },
+        raw_ai_json:       {
+          script:     project._scriptMeta ?? null,
+          scenes:     project._scenes?.map(s => ({ intent: s.intent, archetype: s.archetype ?? null, visual_concept: s.visual_concept, script_segment: s.script_segment })) ?? null,
+          sceneHTMLs: project._sceneHTMLs ?? null,
+        },
       })
       .select("id")
       .single();
@@ -333,19 +330,21 @@ export async function runProductVideoPipeline(project) {
 
   // ── Step 2: Design all scenes in parallel (HTML/CSS) ─────────────────────
   console.log(`[productPipeline] step 2 — designing ${scenes.length} scenes`);
-  const sceneGraphs = await Promise.all(
+  const sceneResults = await Promise.all(
     scenes.map(async (scene) => {
       try {
         const html  = await designProductScene(scene, projectContext);
         const graph = parseSceneHTML(html || "", scene.scene_index, CANVAS);
         console.log(`[productPipeline] scene ${scene.scene_index} (${scene.intent}) → ${graph.length} layers`);
-        return graph;
+        return { graph, html };
       } catch (err) {
         console.error(`[productPipeline] scene ${scene.scene_index} design failed:`, err.message);
-        return [];
+        return { graph: [], html: null };
       }
     })
   );
+  const sceneGraphs = sceneResults.map(r => r.graph);
+  const sceneHTMLs  = sceneResults.map(r => r.html);
 
   // ── Step 3: TTS ───────────────────────────────────────────────────────────
   console.log("[productPipeline] step 3 — generating voiceover");
@@ -418,7 +417,7 @@ export async function runProductVideoPipeline(project) {
       locked:    false,
       trimStart: 0,
       trimEnd:   totalDur,
-      volume:    1.5,
+      volume:    1.0,
       muted:     false,
       fadeIn:    0.1,
       fadeOut:   0.3,
@@ -439,7 +438,18 @@ export async function runProductVideoPipeline(project) {
   }
 
   // ── Step 13: Save ─────────────────────────────────────────────────────────
-  const projectWithMeta = { ...project, productMood, _scenes: scenes };
+  const projectWithMeta = {
+    ...project,
+    productMood,
+    _scenes:     scenes,
+    _sceneHTMLs: sceneHTMLs,
+    _scriptMeta: {
+      accent_color:     accentColor,
+      product_mood:     productMood,
+      product_theme:    productTheme,
+      product_category: scriptResult.product_category ?? null,
+    },
+  };
   const editorProjectId = await saveTimeline(timeline, projectWithMeta);
 
   const totalDuration = parseFloat(timeline.format.duration.toFixed(2));

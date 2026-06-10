@@ -209,29 +209,6 @@ export async function generateFullVoiceover(script, projectId, voiceId) {
   return { audio_url: publicUrl, duration_seconds, buffer, wordTimestamps };
 }
 
-/**
- * transcribeWithTimestamps(buffer)
- * Calls Whisper on a Buffer of MP3 audio, returns word-level timestamps.
- * Returns Array<{ word: string, start: number, end: number }>
- */
-export async function transcribeWithTimestamps(buffer) {
-  try {
-    const file = new File([buffer], "audio.mp3", { type: "audio/mpeg" });
-    const transcription = await openai.audio.transcriptions.create({
-      model:                    "whisper-1",
-      file,
-      response_format:          "verbose_json",
-      timestamp_granularities:  ["word"],
-    });
-    const words = transcription.words ?? [];
-    console.log(`[ttsGenerator] Whisper: ${words.length} words transcribed`);
-    return words;
-  } catch (err) {
-    console.warn("[ttsGenerator] Whisper transcription failed (non-fatal):", err.message);
-    return [];
-  }
-}
-
 export function injectVoiceoversIntoTimeline(timeline, voiceover_results) {
   if (!voiceover_results.length) return timeline;
 

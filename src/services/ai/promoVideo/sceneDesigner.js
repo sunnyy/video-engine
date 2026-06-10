@@ -21,7 +21,7 @@ const SCENE_DESIGNER_MODEL = "gpt-5.4";
  * @param {object} projectContext — { productName, niche, accentColor, logoUrl, fps }
  * @returns {string}              — raw HTML string for this scene
  */
-export async function designScene(scene, projectContext) {
+export async function designScene(scene, projectContext, attempt = 1) {
   const prompt = buildSceneDesignerPrompt(scene.script_segment, { ...projectContext, sceneIntent: scene.intent });
 
   const thGuidance = projectContext.videoType === 'talking_head' ? `
@@ -43,22 +43,21 @@ Design overlays, text, and visuals only in the non-reserved areas of the canvas.
   const choice = response.choices[0];
   const raw    = (choice.message.content ?? "").trim();
 
-  if (!raw) {
-    console.error(`[sceneDesigner] scene ${scene.scene_index} (${scene.intent}): EMPTY response. model=${response.model} finish_reason=${choice.finish_reason} usage=${JSON.stringify(response.usage)}`);
-    console.error(`[sceneDesigner] full response: ${JSON.stringify(response).slice(0, 1000)}`);
+  if (!raw || (!raw.includes("<html") && !raw.includes("<!DOCTYPE"))) {
+    if (attempt < 2) {
+      console.warn(`[sceneDesigner] scene ${scene.scene_index} (${scene.intent}) empty/invalid response, retrying (attempt ${attempt + 1}). finish_reason=${choice.finish_reason}`);
+      await new Promise(r => setTimeout(r, 1500));
+      return designScene(scene, projectContext, attempt + 1);
+    }
+    console.error(`[sceneDesigner] scene ${scene.scene_index} (${scene.intent}) failed after ${attempt} attempts. finish_reason=${choice.finish_reason}`);
     return "";
   }
 
-  // Strip markdown code fences if model wraps output despite instructions
   const html = raw
     .replace(/^```html\s*/i, "")
     .replace(/^```\s*/,       "")
     .replace(/\s*```$/,       "")
     .trim();
-
-  if (!html.includes("<html") && !html.includes("<!DOCTYPE")) {
-    console.warn(`[sceneDesigner] scene ${scene.scene_index} (${scene.intent}): response may not be valid HTML. finish_reason=${choice.finish_reason} first 300 chars: ${raw.slice(0, 300)}`);
-  }
 
   return html;
 }

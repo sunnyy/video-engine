@@ -9,7 +9,24 @@
 const CANVAS_W = 1080;
 const CANVAS_H = 1920;
 
-function buildDesignMandate(accentColor, theme = "dark") {
+function hexToRgba(hex, alpha) {
+  const h = (hex ?? "#000000").replace("#", "");
+  if (h.length === 3) {
+    const r = parseInt(h[0] + h[0], 16);
+    const g = parseInt(h[1] + h[1], 16);
+    const b = parseInt(h[2] + h[2], 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  if (h.length >= 6) {
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return `rgba(0,0,0,${alpha})`;
+}
+
+function buildDesignMandate(accentColor, theme = "dark", productMood = "premium") {
   const themeRules =
     theme === "light"
       ? `THEME: LIGHT
@@ -45,16 +62,25 @@ This is the brand color for the entire scene. Use it on:
 - Glow layers behind the product image zone
 - Stat numbers and key labels
 
-Derived values to use:
-- Full:  ${accentColor}
-- 70%:   ${accentColor}B3
-- 40%:   ${accentColor}66
-- 15%:   ${accentColor}26
-- 8%:    ${accentColor}14
+Derived values to use (copy these exactly):
+- Full:       ${accentColor}
+- 70% opacity: ${hexToRgba(accentColor, 0.7)}
+- 40% opacity: ${hexToRgba(accentColor, 0.4)}
+- 15% opacity: ${hexToRgba(accentColor, 0.15)}
+- 8% opacity:  ${hexToRgba(accentColor, 0.08)}
 
 FORBIDDEN: Do not use generic purple (#6366f1) or indigo unless that IS the accent color.
 Background must use accent color in at least one radial gradient:
-CORRECT: radial-gradient(circle at 50% 40%, ${accentColor}30 0%, transparent 55%)
+CORRECT: radial-gradient(circle at 50% 40%, ${hexToRgba(accentColor, 0.19)} 0%, transparent 55%)
+
+### PRODUCT MOOD: ${productMood}
+Let this mood influence the visual feel of every design decision:
+  premium     → refined, minimal, generous breathing room, elegant thin typography
+  playful     → vibrant, expressive, more elements, fun font weights
+  minimalist  → ultra-clean, maximum whitespace, one focal point only
+  bold        → high contrast, heavy type, aggressive composition, strong edges
+  elegant     → sophisticated, thin fonts, soft details, restrained color usage
+  organic     → warm tones, soft gradients, natural materials aesthetic
 
 ### ${themeRules}
 
@@ -130,6 +156,7 @@ Give it a subtle border-radius (12–24px) and a soft glow box-shadow using the 
 export function buildProductScenePrompt(sceneScript, projectContext) {
   const accentColor   = projectContext.accentColor   ?? "#7c5cfc";
   const theme         = projectContext.theme         ?? "dark";
+  const productMood   = projectContext.productMood   ?? "premium";
   const brandName     = projectContext.brandName     ?? "Brand";
   const ctaText       = projectContext.ctaText       ?? "Shop Now";
   const offerText     = projectContext.offerText     ?? "";
@@ -140,7 +167,7 @@ export function buildProductScenePrompt(sceneScript, projectContext) {
 
   const intentDirective  = INTENT_DIRECTIVES[sceneIntent] ?? INTENT_DIRECTIVES.hero;
   const assetDirective   = getAssetDirective(sceneIntent);
-  const designMandate    = buildDesignMandate(accentColor, theme);
+  const designMandate    = buildDesignMandate(accentColor, theme, productMood);
 
   return {
     system: `You are a world-class motion graphics art director designing premium product advertisement scenes.
@@ -164,8 +191,35 @@ SPACING RULE:
 Calculate each element's bottom edge: bottom = top + (font-size × line-count × line-height).
 Next element's top must be ≥ that bottom + 40px. No vertical overlaps on text elements.
 
+OVERFLOW PREVENTION — calculate before finalizing any font-size:
+  Estimated render width = char_count × font-size × 0.60
+  This must be ≤ element width. If not, reduce font-size until it fits.
+  Single words cannot wrap in CSS — for a single-word element this is critical.
+  Example: "GLOWING" = 7 chars → max font-size = floor(900 / (7 × 0.60)) = 214px.
+
 HEIGHT RULE:
 Never set a fixed height on text elements. Only set left, top, width — omit height. Renderer computes height.
+
+BRAND NAME PLACEMENT:
+Brand name appears ONLY in hero and cta scenes. In hook, features, and offer scenes: do NOT include the brand name anywhere.
+
+ARCHETYPE DEFINITIONS — follow the layout structure for the assigned archetype:
+  typography_hero:   Full-canvas text composition. No product image required. Big bold type fills the frame.
+                     2–3 text elements max, massive font sizes (150–300px hero), centered or left-anchored.
+  full_bleed_image:  Product image placeholder fills 65–80% of canvas height. Minimal text overlay (1–2 lines).
+                     Text in a tight strip above or below the image zone.
+  split_composition: Canvas split into two zones. Product image on one side (40–50% canvas width), all text on the other.
+                     Left/right split — image and text never overlap.
+  feature_grid:      Product image at top (30–40% canvas height). Below: 2–3 feature rows, each with icon + bold label + short descriptor.
+                     Items evenly spaced, uniform left alignment, clear visual gap between product and features.
+  single_stat:       One dominant number or stat takes center stage (180–280px font). Supporting text tiny above/below.
+                     Everything else is minimal. Product image small or absent.
+  minimal_cta:       Maximum whitespace. One CTA button, brand name, and product image — nothing else. No decoration.
+                     Every element has generous breathing room (100px+ margins).
+  numbered_list:     Numbered items (1. 2. 3.) stacked vertically with clear spacing. Number large and in accent color.
+                     Item text medium weight. Product image small at top (25–35% canvas height).
+  quote_statement:   Large bold statement fills most of the canvas (3–4 lines, 60–90px font).
+                     Attribution or source sits small below. Product image minimal or absent.
 
 PRODUCT IMAGE PLACEHOLDER FORMAT:
 <div data-role="image-placeholder" data-layer="image" data-asset-type="product" data-asset-hint="[specific shot description]" data-animation="scale-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:5;border-radius:[r]px;background:rgba(255,255,255,0.04);box-shadow:0 0 60px ${accentColor}40;overflow:hidden;"></div>

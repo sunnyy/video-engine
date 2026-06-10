@@ -26,6 +26,7 @@ import { router as productVideoRouter } from "./routes/productVideo.js";
 import { router as productVideoSceneRouter } from "./routes/productVideoScene.js";
 import { router as typographyVideoRouter } from "./routes/typographyVideo.js";
 import { router as promoVideoRouter }      from "./routes/promoVideo.js";
+import { router as socialVideoRouter }     from "./routes/socialVideo.js";
 
 console.log("Server starting...", new Date().toISOString());
 
@@ -117,6 +118,7 @@ app.use("/api/promo-video",       generationLimiter, promoVideoRouter);
 app.use("/api/product-video",    generationLimiter, productVideoRouter);
 app.use("/api/product-video",    generationLimiter, productVideoSceneRouter);
 app.use("/api/typography-video", generationLimiter, typographyVideoRouter);
+app.use("/api/social-video",    generationLimiter, socialVideoRouter);
 app.use("/api/render",       renderRouter);
 app.use("/api/product-ad",   productAdRouter);
 app.use("/api/poster",       posterRouter);

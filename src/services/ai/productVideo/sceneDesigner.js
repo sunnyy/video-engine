@@ -10,7 +10,7 @@ import { buildProductScenePrompt } from "./intentPrompts.js";
 
 const SCENE_DESIGNER_MODEL = "gpt-5.4";
 
-export async function designProductScene(scene, projectContext) {
+export async function designProductScene(scene, projectContext, attempt = 1) {
   const prompt = buildProductScenePrompt(scene.script_segment, {
     ...projectContext,
     sceneIntent:   scene.intent,
@@ -30,8 +30,13 @@ export async function designProductScene(scene, projectContext) {
   const choice = response.choices[0];
   const raw    = (choice.message.content ?? "").trim();
 
-  if (!raw) {
-    console.error(`[productSceneDesigner] scene ${scene.scene_index} (${scene.intent}): EMPTY response. finish_reason=${choice.finish_reason}`);
+  if (!raw || (!raw.includes("<html") && !raw.includes("<!DOCTYPE"))) {
+    if (attempt < 2) {
+      console.warn(`[productSceneDesigner] scene ${scene.scene_index} (${scene.intent}) empty/invalid response, retrying (attempt ${attempt + 1}). finish_reason=${choice.finish_reason}`);
+      await new Promise(r => setTimeout(r, 1500));
+      return designProductScene(scene, projectContext, attempt + 1);
+    }
+    console.error(`[productSceneDesigner] scene ${scene.scene_index} (${scene.intent}) failed after ${attempt} attempts`);
     return "";
   }
 
@@ -40,10 +45,6 @@ export async function designProductScene(scene, projectContext) {
     .replace(/^```\s*/,       "")
     .replace(/\s*```$/,       "")
     .trim();
-
-  if (!html.includes("<html") && !html.includes("<!DOCTYPE")) {
-    console.warn(`[productSceneDesigner] scene ${scene.scene_index} (${scene.intent}): response may not be valid HTML. first 200 chars: ${raw.slice(0, 200)}`);
-  }
 
   console.log(`[productSceneDesigner] scene ${scene.scene_index} (${scene.intent}) — ${html.length} chars`);
   return html;

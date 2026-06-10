@@ -209,7 +209,7 @@ export async function runV2Pipeline(project) {
 
   // ── Steps 2+3: Design scenes in parallel (visual_concept planned upfront, no sequential dependency) ──
   console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes in parallel`);
-  const sceneGraphs = await Promise.all(
+  const sceneResults = await Promise.all(
     scenes.map(async (scene, index) => {
       try {
         const sceneProjectContext = {
@@ -224,13 +224,15 @@ export async function runV2Pipeline(project) {
         console.log(`[v2/pipeline] scene ${scene.scene_index} (${scene.intent}) — ${html?.length ?? 0} chars`);
         const graph = parseSceneHTML(html || "", scene.scene_index, canvas);
         console.log(`[v2/pipeline] scene ${scene.scene_index} graph: ${graph.length} layers${graph.length > 0 ? ` — first: ${JSON.stringify(graph[0]).slice(0, 120)}` : " — EMPTY"}`);
-        return graph;
+        return { graph, html };
       } catch (err) {
         console.error(`[v2/pipeline] scene ${scene.scene_index} design failed:`, err.message);
-        return [];
+        return { graph: [], html: null };
       }
     })
   );
+  const sceneGraphs = sceneResults.map(r => r.graph);
+  const sceneHTMLs  = sceneResults.map(r => r.html);
 
   // ── Step 4: Single TTS for the full continuous voiceover ──────────────────
   // Trim full_script to dev-capped scenes if needed
@@ -301,7 +303,7 @@ export async function runV2Pipeline(project) {
           locked:    false,
           trimStart: 0,
           trimEnd:   totalDur,
-          volume:    1.5,
+          volume:    1.0,
           muted:     false,
           fadeIn:    0.1,
           fadeOut:   0.3,
@@ -443,7 +445,10 @@ export async function runV2Pipeline(project) {
         mode:              "timeline",
         source:            "promo_video_v2",
         editor_version:    "timeline",
-        raw_ai_json:       { scenes: scenes.map(s => ({ sceneIndex: s.scene_index, intent: s.intent, visual_concept: s.visual_concept })) },
+        raw_ai_json:       {
+          scenes:     scenes.map(s => ({ sceneIndex: s.scene_index, intent: s.intent, archetype: s.archetype ?? null, visual_concept: s.visual_concept })),
+          sceneHTMLs: sceneHTMLs,
+        },
       })
       .select("id")
       .single();
@@ -789,6 +794,7 @@ async function runTHPipeline(project) {
   const genNeeded = scenes.filter(s => s.thPattern !== 'th_full').length;
   console.log(`[v2/pipeline-th] ${projectId} — designing ${genNeeded} of ${scenes.length} scenes`);
   const sceneGraphs     = [];
+  const thSceneHTMLs    = new Array(scenes.length).fill(null);
   const generatedScenes = [];
 
   for (let i = 0; i < scenes.length; i++) {
@@ -815,6 +821,7 @@ async function runTHPipeline(project) {
         })),
       };
       const html = await designScene(scene, sceneProjectContext);
+      thSceneHTMLs[i] = html;
       const graph = parseSceneHTML(html || '', i, canvas);
       console.log(`[v2/pipeline-th] scene ${i} (${scene.intent}/${scene.thPattern}) — ${graph.length} layers`);
       sceneGraphs.push(graph);
@@ -954,7 +961,10 @@ async function runTHPipeline(project) {
 
   // Step 9 — Save timeline
   if (full_transcript) finalTimeline.full_script = full_transcript;
-  const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video_th_v2', rawGroups ?? null);
+  const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video_th_v2', {
+    groups:     rawGroups ?? null,
+    sceneHTMLs: thSceneHTMLs,
+  });
 
   return {
     ...project,

@@ -127,6 +127,12 @@ const Icons = {
       <path d="M3 11l19-9-9 19-2-8-8-2z"/>
     </svg>
   ),
+  social: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+    </svg>
+  ),
   textReel: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 6h16M4 10h16M4 14h10"/>
@@ -295,7 +301,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-const inVideos  = path === "/videos" || path === "/video-captions" || path === "/product-video" || path === "/typography-video" || path === "/promo-video";
+const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-video", "/promo-video", "/social-video"].includes(path) || path.startsWith("/video-editor");
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -333,6 +339,7 @@ const inVideos  = path === "/videos" || path === "/video-captions" || path === "
               <NavItem icon={Icons.ad}         label="Product Video"    sub="Turn photos into video ads"   to="/product-video"     active={path === "/product-video"} />
               <NavItem icon={Icons.typography} label="Typography Video" sub="Bold text animations"         to="/typography-video"  active={path === "/typography-video"} />
               <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos"     to="/video-captions"    active={path === "/video-captions"} />
+              <NavItem icon={Icons.social}     label="Social Video"     sub="Turn tweets into viral shorts" to="/social-video"      active={path === "/social-video"} />
             </FlyoutGroup>
 
             <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>
