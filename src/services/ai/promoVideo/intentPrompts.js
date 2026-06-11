@@ -144,6 +144,22 @@ Every div must have position:absolute with explicit left and top values in pixel
 Never use right, bottom, flexbox, or grid for positioning.
 x values must be between 0 and ${canvasW}. y values must be between 0 and ${canvasH}.
 
+FONT SIZE OVERFLOW RULE — MANDATORY, CHECK EVERY ELEMENT:
+- Formula: estimated_render_width = char_count × font_size × 0.65
+- This MUST be ≤ the element's width. Reduce font_size until it fits.
+- Single words: add white-space:nowrap;overflow:hidden — a word CANNOT be cut off at the canvas edge.
+- In split/column layouts each column is ≤ 500px wide. Max font-size for an 11-char word = 500/(11×0.65) ≈ 70px.
+- Words 8+ chars: max font-size 120px. Words 5–7 chars: max 180px. Always set an explicit width on every text element.
+
+BUTTONS / CTA ELEMENTS — CRITICAL RULE, NO EXCEPTIONS:
+❌ WRONG — two elements (causes text overflow and misalignment):
+  <div style="position:absolute;left:80px;top:1700px;width:300px;height:60px;background:#FFD700;border-radius:8px;"></div>
+  <div style="position:absolute;left:80px;top:1710px;">BUY NOW</div>
+✅ CORRECT — one element, background on the text itself:
+  <div data-role="cta" ... style="position:absolute;left:80px;top:1700px;background:#FFD700;color:#000;padding:18px 40px;border-radius:8px;font-size:28px;font-weight:800;white-space:nowrap;width:auto;">BUY NOW</div>
+- ONE element only. Never a background div behind a text div.
+- Always add white-space:nowrap so button text never wraps.
+
 SPACING RULE:
 Every text element must have at least 40px of vertical gap below it before the next element begins.
 Before finalising top values, calculate each element's bottom edge: bottom = top + (font-size × line-count × line-height).

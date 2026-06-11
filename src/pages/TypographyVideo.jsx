@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { generateTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
 import { getTypographyVideoProjects, deleteProject } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
+import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
 
 const T = {
   bg:      "#0a0a10",
@@ -22,10 +23,10 @@ const DURATION_OPTIONS = [
 ];
 
 const STATUS_STEPS = [
-  "Writing script…",
-  "Generating voiceover…",
-  "Designing scenes…",
-  "Parsing & building timeline…",
+  "Crafting your story…",
+  "Adding your voice…",
+  "Building your visuals…",
+  "Putting it all together…",
   "Saving project…",
 ];
 
@@ -50,9 +51,11 @@ function VideoCard({ project, onDelete }) {
     else { setConfirming(true); setTimeout(() => setConfirming(false), 2500); }
   }
 
+  const editorHref = `/video-editor/${project.id}`;
+  const navProps = { href: editorHref, onClick: e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(editorHref, { state: { from: "/typography-video" } }); } }, style: { display: "block", textDecoration: "none", color: "inherit" } };
+
   return (
     <div
-      onClick={() => navigate(`/video-editor/${project.id}`, { state: { from: "/typography-video" } })}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false); }}
       style={{
@@ -60,31 +63,32 @@ function VideoCard({ project, onDelete }) {
         border:       `1px solid ${hovering ? "rgba(124,92,252,0.4)" : T.border}`,
         borderRadius: 14,
         overflow:     "hidden",
-        cursor:       "pointer",
         transition:   "all 0.2s",
         transform:    hovering ? "translateY(-2px)" : "none",
         boxShadow:    hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
       }}
     >
-      <div style={{ paddingTop: "56.25%", position: "relative", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}>
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontSize: 32, opacity: 0.35 }}>✍️</span>
+      <a {...navProps}>
+        <div style={{ paddingTop: "56.25%", position: "relative", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 32, opacity: 0.35 }}>✍️</span>
+          </div>
+          <div style={{ position: "absolute", top: 8, left: 8 }}>
+            <span style={{
+              padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
+              background: "rgba(34,197,94,0.2)", color: "#4ade80",
+              border: "1px solid rgba(34,197,94,0.3)",
+            }}>Complete</span>
+          </div>
         </div>
-        <div style={{ position: "absolute", top: 8, left: 8 }}>
-          <span style={{
-            padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-            background: "rgba(34,197,94,0.2)", color: "#4ade80",
-            border: "1px solid rgba(34,197,94,0.3)",
-          }}>Complete</span>
-        </div>
-      </div>
+      </a>
       <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <a {...navProps} style={{ ...navProps.style, minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {project.name}
           </div>
           <div style={{ fontSize: 11, color: "#77777f", marginTop: 3 }}>{timeLabel(project.updated_at)}</div>
-        </div>
+        </a>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: T.accent }}>Edit →</span>
           <button
@@ -158,6 +162,8 @@ function GeneratorForm() {
   const [inputType,      setInputType]      = useState("topic");
   const [input,          setInput]          = useState("What happens if you stop blinking");
   const [targetDuration, setTargetDuration] = useState(40);
+  const [language,       setLanguage]       = useState("en");
+  const [voiceId,        setVoiceId]        = useState(null);
   const [loading,        setLoading]        = useState(false);
   const [statusIdx, setStatusIdx] = useState(0);
   const [error,     setError]     = useState(null);
@@ -170,7 +176,7 @@ function GeneratorForm() {
 
     try {
       const result = await generateTypographyVideo(
-        { input: input.trim(), inputType, targetDuration },
+        { input: input.trim(), inputType, targetDuration, voiceId, language },
         ({ step }) => setStatusIdx(step),
       );
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/typography-video" } });
@@ -185,6 +191,17 @@ function GeneratorForm() {
   return (
     <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "36px 24px 60px" }}>
+
+        {/* Hero */}
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>✍️</div>
+          <h2 style={{ margin: "0 0 8px", fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif" }}>
+            Turn any idea into a text video
+          </h2>
+          <p style={{ margin: 0, fontSize: 14, color: T.muted, lineHeight: 1.5 }}>
+            Give a topic or paste your own script and get a polished, animated text video ready to post.
+          </p>
+        </div>
 
         {/* Input type toggle */}
         <div style={{ marginBottom: 20 }}>
@@ -279,6 +296,19 @@ function GeneratorForm() {
           </div>
         </div>
 
+        {/* Language + Voice */}
+        <div style={{ marginBottom: 28 }}>
+          <LanguageVoicePicker
+            language={language}
+            onLanguageChange={setLanguage}
+            voiceId={voiceId}
+            onVoiceChange={setVoiceId}
+            disabled={loading}
+            accentColor={T.accent}
+            border={T.border}
+          />
+        </div>
+
         {/* Error */}
         {error && (
           <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
@@ -328,7 +358,7 @@ function GeneratorForm() {
         {!loading && (
           <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             {[
-              { icon: "🎙️", label: "AI Voiceover",  desc: "Nova voice, normalized audio" },
+              { icon: "🎙️", label: "Voiceover",     desc: "Nova voice, normalized audio" },
               { icon: "⏱️", label: "Word Sync",      desc: "Phrases timed to speech" },
               { icon: "⚡", label: "15 Credits",     desc: "Per generation" },
             ].map(({ icon, label, desc }) => (

@@ -200,6 +200,16 @@ OVERFLOW PREVENTION — calculate before finalizing any font-size:
 HEIGHT RULE:
 Never set a fixed height on text elements. Only set left, top, width — omit height. Renderer computes height.
 
+GLOW ELEMENTS — gradient divs only, NEVER text:
+- data-role="glow" elements MUST be <div> with a radial-gradient background and filter:blur(…).
+- NEVER put any text content inside a glow element.
+- Do NOT create duplicate/echo text elements as ghost shadows. Every word appears exactly once.
+
+BUTTONS / CTA ELEMENTS — background on the text itself:
+- NEVER create a separate background div behind a text element to make a button.
+- Apply background, padding, border-radius directly on the text element: style="background:${accentColor}; padding:18px 48px; border-radius:999px; …"
+- This keeps button text on one line and prevents wrapping from two-element button layouts.
+
 BRAND NAME PLACEMENT:
 Brand name appears ONLY in hero and cta scenes. In hook, features, and offer scenes: do NOT include the brand name anywhere.
 
@@ -224,9 +234,11 @@ ARCHETYPE DEFINITIONS — follow the layout structure for the assigned archetype
 PRODUCT IMAGE PLACEHOLDER FORMAT:
 <div data-role="image-placeholder" data-layer="image" data-asset-type="product" data-asset-hint="[specific shot description]" data-animation="scale-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:5;border-radius:[r]px;background:rgba(255,255,255,0.04);box-shadow:0 0 60px ${accentColor}40;overflow:hidden;"></div>
 
-ICONS:
-Use Lucide icons via data-icon="icon-name" on data-role="icon" elements.
-Available: check-circle, star, zap, shield, package, arrow-right, shopping-bag, heart, sparkles, etc.
+ICONS — use Lucide instead of drawn graphics:
+- Add data-icon="[kebab-case-name]" on a data-role="icon" element to render a Lucide icon.
+- Example: <div data-role="icon" data-layer="decoration" data-icon="check-circle" data-animation="fade-in" data-scene-element="decoration" style="position:absolute;left:80px;top:600px;width:56px;height:56px;color:#ffffff;z-index:5;"></div>
+- Available: check-circle, star, zap, shield, package, arrow-right, shopping-bag, heart, sparkles, trending-up, dollar-sign, bar-chart-2, cpu, globe, lock, users
+- Set size via width/height (32–80px). Set color via the color: style property.
 
 ${designMandate}
 

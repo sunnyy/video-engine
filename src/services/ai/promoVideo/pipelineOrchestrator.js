@@ -443,7 +443,7 @@ export async function runV2Pipeline(project) {
         safe_project_json: finalTimeline,
         orientation:       formatRatio,
         mode:              "timeline",
-        source:            "promo_video_v2",
+        source:            "promo_video",
         editor_version:    "timeline",
         raw_ai_json:       {
           scenes:     scenes.map(s => ({ sceneIndex: s.scene_index, intent: s.intent, archetype: s.archetype ?? null, visual_concept: s.visual_concept })),
@@ -568,7 +568,7 @@ async function persistAssetManifest(assetManifest, projectId) {
   }
 }
 
-async function saveTimeline(finalTimeline, project, source = 'promo_video_v2', rawAiJson = null) {
+async function saveTimeline(finalTimeline, project, source = 'promo_video', rawAiJson = null) {
   try {
     const { data: editorRow } = await supabaseAdmin
       .from("projects")
@@ -961,7 +961,7 @@ async function runTHPipeline(project) {
 
   // Step 9 — Save timeline
   if (full_transcript) finalTimeline.full_script = full_transcript;
-  const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video_th_v2', {
+  const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video_th', {
     groups:     rawGroups ?? null,
     sceneHTMLs: thSceneHTMLs,
   });

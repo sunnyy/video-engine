@@ -56,6 +56,15 @@ SPACING:
 HEIGHT:
 - Never set height on text elements — only left, top, width.
 
+FONT SIZE OVERFLOW RULE — MANDATORY, CHECK EVERY ELEMENT BEFORE WRITING IT:
+- Formula: estimated_render_width = char_count × font_size × 0.65
+- This estimate MUST be ≤ the element's own width style. Reduce font_size until it fits.
+- NEVER let text extend beyond the element's left + width boundary. Text that overflows the canvas is a critical failure.
+- Single words: add style="white-space:nowrap;overflow:hidden;" — a word CANNOT wrap mid-character.
+- In any split/column layout (two halves, comparison grids, etc.): each column is at most 500px wide. All text inside a column MUST fit within 500px. Max font-size for a 11-char word in a 500px column = 500/(11×0.65) ≈ 70px.
+- Stat/hero numbers: max font-size 260px. Words 5+ chars: max 180px unless you calculated it fits. Words 8+ chars: max 120px.
+- ALWAYS set an explicit width on every text element. Never omit width.
+
 FONTS:
 - Hero font: "${heroFont}" — use for main display text.
 - Body font: "${bodyFont}" — use for supporting text, captions, attribution.
@@ -74,6 +83,27 @@ DATA ATTRIBUTES (required on every meaningful element):
   data-layer: text | gradient | image | effect | decoration
   data-animation: fade-in | fade-up | scale-in | slide-left | none
   data-scene-element: hero | background | decoration | supporting
+
+GLOW ELEMENTS — gradient divs only, NEVER text:
+- data-role="glow" elements MUST be <div> with a radial-gradient background and filter:blur(…).
+- NEVER put any text content inside a glow element. Glow elements have no innerHTML.
+- Do NOT create duplicate text elements as echoes or ghost shadows. Every word appears exactly once.
+
+LUCIDE ICONS — use instead of drawn graphics:
+- Add data-icon="[kebab-case-icon-name]" to any element to render a Lucide icon.
+- Example: <div data-role="icon" data-layer="decoration" data-icon="trending-up" data-animation="fade-in" data-scene-element="decoration" style="position:absolute;left:80px;top:400px;width:64px;height:64px;color:#00E5FF;z-index:5;"></div>
+- Useful icons: trending-up, trending-down, zap, dollar-sign, arrow-right, star, check, x-circle, alert-triangle, bar-chart-2, cpu, globe, lock, unlock, users, shield
+- Size via width/height (32–120px). Color via color: style property.
+
+BUTTONS / CTA ELEMENTS — CRITICAL RULE, NO EXCEPTIONS:
+❌ WRONG — separate background div + text div (causes text wrap and misalignment):
+  <div style="position:absolute;left:80px;top:1700px;width:300px;height:60px;background:#FFD700;border-radius:8px;"></div>
+  <div style="position:absolute;left:80px;top:1710px;">CHOOSE YOUR PATH</div>
+✅ CORRECT — background applied directly to the text element:
+  <div data-role="cta" ... style="position:absolute;left:80px;top:1700px;background:#FFD700;color:#000;padding:18px 40px;border-radius:8px;font-size:28px;font-weight:800;white-space:nowrap;width:auto;">CHOOSE YOUR PATH</div>
+- ONE element only. Background, padding, border-radius go on the text element itself.
+- Always add white-space:nowrap to button text so it never wraps.
+- Never size the button with a fixed width — let padding determine its size (width:auto).
 
 SOCIAL IMAGE PLACEHOLDER:
 When use_fetched_image is true and the archetype calls for the post's actual image, use:

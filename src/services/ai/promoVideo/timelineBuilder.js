@@ -343,7 +343,7 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
     format:  { width: canvasW, height: canvasH, fps: FPS, duration: totalDuration },
     layers,
     meta: {
-      source:           "promo_video_v2",
+      source:           "promo_video",
       thumbnail:        null,
       editor_version:   "timeline",
       caption_style:    "minimal",

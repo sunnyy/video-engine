@@ -84,11 +84,11 @@ async function saveTimeline(timeline, projectName, userId, rawAiJson = null) {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function runTypographyPipeline(project, onProgress = () => {}) {
-  const { input, inputType = "topic", targetDuration = 40, userId } = project;
+  const { input, inputType = "topic", targetDuration = 40, userId, voiceId = null, language = "en" } = project;
 
   // Step 1: Script generation
   console.log(`[typography] step 1 — generating script (target: ${targetDuration}s)`);
-  const script = await generateTypographyScript(input, inputType, targetDuration);
+  const script = await generateTypographyScript(input, inputType, targetDuration, language);
   const { sentences, voiceoverScript, projectName, palette, visualDirection, fontPair, musicMood } = script;
 
   const bgColor = palette.background;
@@ -104,7 +104,7 @@ export async function runTypographyPipeline(project, onProgress = () => {}) {
 
   if (voiceoverScript) {
     try {
-      const tts      = await generateFullVoiceover(voiceoverScript, `typo-${Date.now()}`);
+      const tts      = await generateFullVoiceover(voiceoverScript, `typo-${Date.now()}`, voiceId);
       audioUrl        = tts.audio_url;
       wordTimestamps  = tts.wordTimestamps ?? [];
       audioDuration   = tts.duration_seconds ?? 0;

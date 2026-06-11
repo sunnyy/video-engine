@@ -8,7 +8,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
-  const { input, inputType = "topic", targetDuration = 40, projectId } = req.body;
+  const { input, inputType = "topic", targetDuration = 40, voiceId, language = "en", projectId } = req.body;
   if (!input?.trim()) return res.status(400).json({ error: "input is required" });
 
   // SSE setup
@@ -28,7 +28,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     creditAmount = 15;
 
     const result = await runTypographyPipeline(
-      { input: input.trim(), inputType, targetDuration, userId },
+      { input: input.trim(), inputType, targetDuration, userId, voiceId: voiceId ?? null, language: language ?? "en" },
       ({ step }) => send({ step }),
     );
 

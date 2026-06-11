@@ -196,6 +196,69 @@ router.get("/promo-video/voice-sample/:voiceId", requireAuth, async (req, res) =
   }
 });
 
+// ── Generic video voices — language-aware, shared by all video generators ──────
+const LANG_TO_EL_CODE = { hinglish: "hi", es: "es" };
+
+router.get("/video/voices", requireAuth, async (req, res) => {
+  const lang   = req.query.lang;
+  const elCode = LANG_TO_EL_CODE[lang];
+
+  if (elCode) {
+    try {
+      const elUrl = `https://api.elevenlabs.io/v1/shared-voices?language=${elCode}&page_size=20`;
+      console.log(`[video/voices] fetching: ${elUrl}`);
+      const elRes = await fetch(elUrl, { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } });
+      console.log(`[video/voices] status: ${elRes.status}`);
+      const raw = await elRes.text();
+      console.log(`[video/voices] raw (first 600): ${raw.slice(0, 600)}`);
+      const data = elRes.ok ? JSON.parse(raw) : { voices: [] };
+      const voices = (data.voices || []).slice(0, 5).map(v => ({
+        id:          v.voice_id,
+        label:       v.name,
+        gender:      v.gender ?? v.labels?.gender ?? "neutral",
+        desc:        (v.description ?? "Natural voice").slice(0, 50),
+        preview_url: v.preview_url ?? null,
+      }));
+      console.log(`[video/voices] returning ${voices.length} voices for lang=${lang}`);
+      return res.json({ voices });
+    } catch (err) {
+      console.error(`[video/voices] error for lang=${lang}:`, err.message);
+      return res.json({ voices: [] });
+    }
+  }
+
+  // English: curated ElevenLabs voices with live preview URLs
+  try {
+    const elRes = await fetch("https://api.elevenlabs.io/v1/voices", {
+      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
+    });
+    const data = elRes.ok ? await elRes.json() : { voices: [] };
+    const byId = Object.fromEntries((data.voices || []).map(v => [v.voice_id, v]));
+    const voices = PROMO_VOICE_META.map(meta => ({
+      ...meta,
+      preview_url: byId[meta.id]?.preview_url ?? null,
+    }));
+    return res.json({ voices });
+  } catch {
+    return res.json({ voices: PROMO_VOICE_META.map(v => ({ ...v, preview_url: null })) });
+  }
+});
+
+router.get("/video/voice-preview", requireAuth, async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).end();
+  try {
+    const upstream = await fetch(url);
+    if (!upstream.ok) return res.status(502).end();
+    res.setHeader("Content-Type", upstream.headers.get("content-type") || "audio/mpeg");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    const buf = await upstream.arrayBuffer();
+    res.end(Buffer.from(buf));
+  } catch {
+    res.status(502).end();
+  }
+});
+
 router.get("/elevenlabs/voices", requireAuth, async (_req, res) => {
   try {
     const elRes = await fetch("https://api.elevenlabs.io/v1/voices", {

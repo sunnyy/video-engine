@@ -106,6 +106,19 @@ Kicker/label:
 
 OVERFLOW: Estimated render width = char_count × font-size × 0.65 ≤ element width.
 Single words cannot wrap in CSS — always verify single-word elements.
+Stat/hero numbers: max 260px. Multi-character words (5+ chars): max 200px unless verified it fits.
+
+GLOW ELEMENTS — gradient only, NEVER text:
+- data-role="glow" elements are radial-gradient divs with filter:blur(…). No text content ever.
+- NEVER duplicate text as an echo/ghost shadow. Every word appears exactly once.
+
+LUCIDE ICONS — use instead of drawn graphics:
+- <div data-role="icon" data-layer="decoration" data-icon="[kebab-case-name]" style="…;width:64px;height:64px;color:#00E5FF;"></div>
+- Useful: trending-up, zap, dollar-sign, arrow-right, star, check, bar-chart-2, cpu, globe, shield
+
+BUTTONS / CTA — background on the text element itself:
+- NEVER create a separate background div behind text to make a button.
+- Apply background, padding, border-radius directly on the text element's inline style.
 
 VERTICAL SPACING: Estimated height = ceil(char_count × font-size × 0.65 / width) × (font-size × line-height).
 Next element top ≥ prev top + estimated height + 20px.

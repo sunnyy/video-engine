@@ -264,7 +264,7 @@ async function saveTimeline(timeline, project) {
         safe_project_json: timeline,
         orientation:       "9:16",
         mode:              "timeline",
-        source:            "product_video_v2",
+        source:            "product_video",
         editor_version:    "timeline",
         raw_ai_json:       {
           script:     project._scriptMeta ?? null,
@@ -306,6 +306,7 @@ export async function runProductVideoPipeline(project) {
     offerText:          project.offerText          ?? "",
     website:            project.website            ?? "",
     sceneCount:         project.sceneCount         ?? 3,
+    goal:               project.goal               ?? "promo",
   });
 
   let scenes        = scriptResult.scenes.map(s => ({ ...s }));

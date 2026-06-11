@@ -335,11 +335,11 @@ const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
-              <NavItem icon={Icons.promo}      label="Promo Video"      sub="AI-planned SaaS promo videos" to="/promo-video"        active={path === "/promo-video"} />
+              <NavItem icon={Icons.social}     label="Social Video"     sub="Turn social posts into shorts" to="/social-video"      active={path === "/social-video"} />
               <NavItem icon={Icons.ad}         label="Product Video"    sub="Turn photos into video ads"   to="/product-video"     active={path === "/product-video"} />
+              <NavItem icon={Icons.promo}      label="SaaS / Promo Video"      sub="AI-planned SaaS promo videos" to="/promo-video"        active={path === "/promo-video"} />
               <NavItem icon={Icons.typography} label="Typography Video" sub="Bold text animations"         to="/typography-video"  active={path === "/typography-video"} />
               <NavItem icon={Icons.captions}   label="Video Captions"   sub="Auto-caption your videos"     to="/video-captions"    active={path === "/video-captions"} />
-              <NavItem icon={Icons.social}     label="Social Video"     sub="Turn tweets into viral shorts" to="/social-video"      active={path === "/social-video"} />
             </FlyoutGroup>
 
             <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>

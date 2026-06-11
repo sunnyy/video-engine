@@ -8,6 +8,13 @@
 
 import { openai } from "../../../server/middleware/shared.js";
 
+const CAMPAIGN_GOAL_DIRECTIVES = {
+  launch:    "CAMPAIGN GOAL: PRODUCT LAUNCH — This is a new product debut. Emphasize newness, excitement, and first-time availability. Create a sense of exclusive access and discovery.",
+  promo:     "CAMPAIGN GOAL: PROMOTIONAL AD — This is a general promotional ad. Focus on desire, lifestyle aspiration, and why this product is worth having.",
+  discount:  "CAMPAIGN GOAL: DISCOUNT / SALE — Price and urgency are the story. Highlight the savings and limited-time nature. Make the deal feel too good to miss.",
+  awareness: "CAMPAIGN GOAL: BRAND AWARENESS — This is a brand story. Focus on values, lifestyle, and emotional connection. Soft sell — plant the brand in the viewer's mind.",
+};
+
 export const PRODUCT_INTENT_PATTERNS = {
   1: [
     { intents: ["standalone"], tone: "One powerful scene — product, desire, and CTA all in one." },
@@ -78,6 +85,18 @@ SCENE INTENT DESCRIPTIONS:
 ARCHETYPES — assign one per scene, NO REPEATS:
 ${ARCHETYPES.join(" | ")}
 
+PUNCTUATION RULES — controls TTS pacing:
+- Periods: use after each complete statement or list item — natural breath between each one.
+- Commas: only to connect fragments within a single continuous thought. Never for list items.
+- Em dash (—): dramatic pause between two contrasting beats. e.g. "Dull skin — gone in days."
+- Question marks: perfect for direct-address hooks.
+LIST ITEMS — always use periods, never commas:
+  WRONG: "Dry skin, dull tone, uneven texture."
+  RIGHT: "Dry skin. Dull tone. Uneven texture."
+CTA — never use em dash. Use a comma for one continuous energetic thought:
+  WRONG: "Try it risk-free — shop now"
+  RIGHT: "Try it risk-free, shop now"
+
 OUTPUT — return only valid JSON:
 {
   "full_script": "complete voiceover from start to finish",
@@ -103,12 +122,17 @@ RULES:
 - Count words before submitting — don't exceed budget per scene
 - No two scenes may share the same archetype`;
 
+  const goalDirective = CAMPAIGN_GOAL_DIRECTIVES[project.goal] ?? CAMPAIGN_GOAL_DIRECTIVES.promo;
+
   const userPrompt = `Brand: ${project.brandName || "Unknown Brand"}
-${project.productDescription ? `Product description: ${project.productDescription}` : ""}
+${project.productDescription
+    ? `Product description: ${project.productDescription}`
+    : "No description provided — study the product image to identify what the product is, what problem it solves, who it's for, and its key benefits. Use that analysis as the foundation for the script."}
 CTA text: ${project.ctaText || "Shop Now"}
 ${project.offerText  ? `Offer/deal: ${project.offerText}`   : ""}
 ${project.website    ? `Website: ${project.website}`        : ""}
 Scene count: ${sceneCount}
+${goalDirective}
 
 Analyze the product image and write the script.`;
 

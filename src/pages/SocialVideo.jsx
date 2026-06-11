@@ -3,12 +3,13 @@ import { useNavigate }        from "react-router-dom";
 import { generateSocialVideo }   from "../services/ai/socialVideo/generateSocialVideo";
 import { getSocialVideoProjects, deleteProject } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
+import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
 
 const T = {
   bg:      "#090b11",
   surface: "#0e1018",
   border:  "rgba(255,255,255,0.07)",
-  accent:  "#1d9bf0",
+  accent:  "#7c5cfc",
   text:    "#e8eaf0",
   muted:   "#8896a8",
   success: "#22c55e",
@@ -16,12 +17,12 @@ const T = {
 };
 
 const STATUS_STEPS = [
-  "Fetching post content…",
-  "Writing script…",
-  "Designing scenes…",
-  "Generating voiceover…",
-  "Building timeline…",
-  "Saving project…",
+  "Analyzing your post…",
+  "Crafting your story…",
+  "Creating your scenes…",
+  "Adding voiceover…",
+  "Putting it together…",
+  "Almost ready…",
 ];
 
 function timeLabel(dateStr) {
@@ -35,7 +36,10 @@ function timeLabel(dateStr) {
 
 function detectPlatformLabel(url) {
   if (!url) return null;
-  if (/twitter\.com|x\.com/i.test(url)) return "Twitter / X";
+  if (/twitter\.com|x\.com/i.test(url))   return "Twitter / X";
+  if (/instagram\.com/i.test(url))         return "Instagram";
+  if (/linkedin\.com/i.test(url))          return "LinkedIn";
+  if (/reddit\.com/i.test(url))            return "Reddit";
   return "Social URL";
 }
 
@@ -52,43 +56,46 @@ function VideoCard({ project, onDelete }) {
     else { setConfirming(true); setTimeout(() => setConfirming(false), 2500); }
   }
 
+  const editorHref = `/video-editor/${project.id}`;
+  const navProps = { href: editorHref, onClick: e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(editorHref, { state: { from: "/social-video" } }); } }, style: { display: "block", textDecoration: "none", color: "inherit" } };
+
   return (
     <div
-      onClick={() => navigate(`/video-editor/${project.id}`, { state: { from: "/social-video" } })}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false); }}
       style={{
         background:   T.surface,
-        border:       `1px solid ${hovering ? "rgba(29,155,240,0.4)" : T.border}`,
+        border:       `1px solid ${hovering ? "rgba(124,92,252,0.4)" : T.border}`,
         borderRadius: 14,
         overflow:     "hidden",
-        cursor:       "pointer",
         transition:   "all 0.2s",
         transform:    hovering ? "translateY(-2px)" : "none",
         boxShadow:    hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
       }}
     >
-      <div style={{ paddingTop: "56.25%", position: "relative", background: "linear-gradient(135deg,#060a14,#0d1a28,#0a1420)" }}>
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontSize: 32, opacity: 0.35 }}>📱</span>
-        </div>
-        <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 5 }}>
-          <span style={{
-            padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-            background: "rgba(34,197,94,0.2)", color: "#4ade80",
-            border: "1px solid rgba(34,197,94,0.3)",
-          }}>Complete</span>
-          {meta.platform && (
+      <a {...navProps}>
+        <div style={{ paddingTop: "56.25%", position: "relative", background: "linear-gradient(135deg,#060a14,#0d1a28,#0a1420)" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 32, opacity: 0.35 }}>📱</span>
+          </div>
+          <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 5 }}>
             <span style={{
               padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-              background: "rgba(29,155,240,0.2)", color: "#60c8ff",
-              border: "1px solid rgba(29,155,240,0.3)",
-            }}>{meta.platform}</span>
-          )}
+              background: "rgba(34,197,94,0.2)", color: "#4ade80",
+              border: "1px solid rgba(34,197,94,0.3)",
+            }}>Complete</span>
+            {meta.platform && (
+              <span style={{
+                padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
+                background: "rgba(124,92,252,0.2)", color: "#a78bfa",
+                border: "1px solid rgba(124,92,252,0.3)",
+              }}>{meta.platform}</span>
+            )}
+          </div>
         </div>
-      </div>
+      </a>
       <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <a {...navProps} style={{ ...navProps.style, minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {project.name}
           </div>
@@ -96,7 +103,7 @@ function VideoCard({ project, onDelete }) {
             <div style={{ fontSize: 11, color: T.accent, marginTop: 1 }}>{meta.author}</div>
           )}
           <div style={{ fontSize: 11, color: "#55667a", marginTop: 2 }}>{timeLabel(project.updated_at)}</div>
-        </div>
+        </a>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: T.accent }}>Edit →</span>
           <button
@@ -149,7 +156,7 @@ function VideoListing() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
         <div style={{ fontSize: 48 }}>📱</div>
         <div style={{ fontSize: 20, fontWeight: 700, color: T.text }}>No social videos yet</div>
-        <div style={{ fontSize: 14, color: T.muted }}>Switch to Create New and paste a tweet URL</div>
+        <div style={{ fontSize: 14, color: T.muted }}>Switch to Create New and paste a social media post URL</div>
       </div>
     );
   }
@@ -167,6 +174,8 @@ function GeneratorForm() {
   const navigate = useNavigate();
   const [url,           setUrl]           = useState("");
   const [includeAuthor, setIncludeAuthor] = useState(false);
+  const [language,      setLanguage]      = useState("en");
+  const [voiceId,       setVoiceId]       = useState(null);
   const [loading,       setLoading]       = useState(false);
   const [statusStep,    setStatusStep]    = useState(0);
   const [error,         setError]         = useState(null);
@@ -182,7 +191,7 @@ function GeneratorForm() {
 
     try {
       const result = await generateSocialVideo(
-        { url: url.trim(), includeAuthor },
+        { url: url.trim(), includeAuthor, voiceId, language },
         ({ step }) => {
           const idx = STATUS_STEPS.indexOf(step);
           if (idx !== -1) setStatusStep(idx);
@@ -207,10 +216,10 @@ function GeneratorForm() {
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>📱</div>
           <h2 style={{ margin: "0 0 8px", fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif" }}>
-            Turn a tweet into a video
+            Turn any post into a video
           </h2>
           <p style={{ margin: 0, fontSize: 14, color: T.muted, lineHeight: 1.5 }}>
-            Paste any Twitter/X post URL. AI fetches the content, writes a viral script, and builds a ready-to-post short.
+            Paste a Twitter/X, Instagram, LinkedIn, or Reddit URL and get a ready-to-post short video in minutes.
           </p>
         </div>
 
@@ -224,12 +233,12 @@ function GeneratorForm() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-              placeholder="https://twitter.com/user/status/..."
+              placeholder="https://twitter.com/… or instagram.com/… or linkedin.com/… or reddit.com/…"
               disabled={loading}
               style={{
                 width: "100%", padding: "12px 14px", paddingRight: platformLabel ? 120 : 14,
                 boxSizing: "border-box",
-                background: "rgba(255,255,255,0.04)", border: `1px solid ${url.trim() ? "rgba(29,155,240,0.35)" : T.border}`,
+                background: "rgba(255,255,255,0.04)", border: `1px solid ${url.trim() ? "rgba(124,92,252,0.35)" : T.border}`,
                 borderRadius: 10, color: T.text, fontSize: 14, fontFamily: "inherit",
                 outline: "none", opacity: loading ? 0.5 : 1, transition: "border-color 0.2s",
               }}
@@ -238,12 +247,25 @@ function GeneratorForm() {
               <span style={{
                 position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
                 padding: "3px 8px", borderRadius: 5, fontSize: 11, fontWeight: 700,
-                background: "rgba(29,155,240,0.15)", color: "#60c8ff",
-                border: "1px solid rgba(29,155,240,0.3)",
+                background: "rgba(124,92,252,0.15)", color: "#a78bfa",
+                border: "1px solid rgba(124,92,252,0.3)",
                 pointerEvents: "none",
               }}>{platformLabel}</span>
             )}
           </div>
+        </div>
+
+        {/* Language + Voice */}
+        <div style={{ marginBottom: 24 }}>
+          <LanguageVoicePicker
+            language={language}
+            onLanguageChange={setLanguage}
+            voiceId={voiceId}
+            onVoiceChange={setVoiceId}
+            disabled={loading}
+            accentColor={T.accent}
+            border={T.border}
+          />
         </div>
 
         {/* Author toggle */}
@@ -252,8 +274,8 @@ function GeneratorForm() {
           style={{
             marginBottom: 24, display: "flex", alignItems: "flex-start", gap: 12,
             padding: "14px 16px", borderRadius: 10,
-            background: includeAuthor ? "rgba(29,155,240,0.08)" : "rgba(255,255,255,0.03)",
-            border: `1px solid ${includeAuthor ? "rgba(29,155,240,0.3)" : T.border}`,
+            background: includeAuthor ? "rgba(124,92,252,0.08)" : "rgba(255,255,255,0.03)",
+            border: `1px solid ${includeAuthor ? "rgba(124,92,252,0.3)" : T.border}`,
             cursor: loading ? "not-allowed" : "pointer", transition: "all 0.2s",
             opacity: loading ? 0.5 : 1,
           }}
@@ -316,7 +338,7 @@ function GeneratorForm() {
           disabled={!canGenerate}
           style={{
             width: "100%", padding: "14px 24px",
-            background: canGenerate ? T.accent : "rgba(29,155,240,0.25)",
+            background: canGenerate ? T.accent : "rgba(124,92,252,0.25)",
             color: "#fff", border: "none", borderRadius: 12,
             fontSize: 15, fontWeight: 700,
             cursor: canGenerate ? "pointer" : "not-allowed",
@@ -326,22 +348,6 @@ function GeneratorForm() {
           {loading ? "Generating…" : "Generate Social Video"}
         </button>
 
-        {/* Info */}
-        {!loading && (
-          <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            {[
-              { icon: "🐦", label: "Twitter / X",  desc: "Paste any public tweet URL" },
-              { icon: "🎙️", label: "AI Voiceover",  desc: "ElevenLabs, word-synced" },
-              { icon: "⚡", label: "15 Credits",    desc: "Per generation" },
-            ].map(({ icon, label, desc }) => (
-              <div key={label} style={{ padding: "14px", borderRadius: 10, background: T.surface, border: `1px solid ${T.border}`, textAlign: "center" }}>
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#c0ccd8" }}>{label}</div>
-                <div style={{ fontSize: 11, color: "#45556a", marginTop: 3 }}>{desc}</div>
-              </div>
-            ))}
-          </div>
-        )}
 
       </div>
     </div>
@@ -372,8 +378,8 @@ export default function SocialVideo() {
                 onClick={() => setTab(t.id)}
                 style={{
                   padding: "16px 28px", border: "none", borderRadius: "8px 8px 0 0",
-                  background: tab === t.id ? "rgba(29,155,240,0.12)" : "transparent",
-                  color:      tab === t.id ? "#60c8ff"               : "#55667a",
+                  background: tab === t.id ? "rgba(124,92,252,0.12)" : "transparent",
+                  color:      tab === t.id ? "#a78bfa"               : "#55667a",
                   fontSize: 16, fontWeight: tab === t.id ? 700 : 500,
                   fontFamily: "'Outfit',sans-serif",
                   cursor: "pointer", transition: "all 0.15s",

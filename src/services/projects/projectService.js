@@ -67,7 +67,7 @@ export async function getProductVideoProjects() {
     .from("projects")
     .select("id, name, updated_at, safe_project_json")
     .eq("user_id", user.id)
-    .eq("source", "product_video")
+    .in("source", ["product_video", "product_video_v2"])
     .order("updated_at", { ascending: false });
 
   if (error) throw error;

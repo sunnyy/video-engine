@@ -18,6 +18,18 @@ Think: shocking facts, real examples, specific numbers, contrast, a strong CTA a
 NEVER write vague filler. Every scene should feel impossible to scroll past.
 Each scene voiceover: 6–12 words, punchy, one standalone idea.
 
+━━━ PUNCTUATION RULES — controls TTS pacing ━━━
+- Periods: use after each complete statement or list item — natural breath between each one.
+- Commas: only to connect fragments within a single continuous thought. Never for list items.
+- Em dash (—): dramatic pause between two contrasting beats. e.g. "Most people quit — the 1% don't."
+- Question marks: perfect for direct-address hooks and rhetorical beats.
+LIST ITEMS — always use periods, never commas:
+  WRONG: "They wake up early, they read every day, they never quit."
+  RIGHT: "They wake up early. They read every day. They never quit."
+CTA — never use em dash. Use a comma for one continuous energetic thought:
+  WRONG: "Save this — share it with someone who needs it"
+  RIGHT: "Save this, share it with someone who needs it"
+
 ━━━ OUTPUT FORMAT ━━━
 {
   "projectName": "",
@@ -213,17 +225,23 @@ Match the topic to the closest category and adapt. Never output the same palette
 
 Return ONLY valid JSON.`;
 
-export async function generateTypographyScript(input, inputType, targetDuration = 40) {
-  const approxScenes = Math.max(1, Math.round(targetDuration / 4));
+const LANG_DIRECTIVES = {
+  hinglish: "\nLANGUAGE: Write ALL voiceover and scene text in Hinglish (natural Hindi + English mix, Roman script). Short, punchy — how young urban Indians actually speak.",
+  es:       "\nLANGUAGE: Write ALL voiceover and scene text in Spanish. Short, punchy sentences suited for viral short-form video.",
+};
+
+export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en") {
+  const approxScenes  = Math.max(1, Math.round(targetDuration / 4));
+  const langDirective = LANG_DIRECTIVES[language] ?? "";
 
   const userMsg = inputType === "script"
-    ? `Convert this script into kinetic typography scenes. Each sentence or natural break becomes one scene.\n\nScript: "${input.trim()}"`
+    ? `Convert this script into kinetic typography scenes. Each sentence or natural break becomes one scene.${langDirective}\n\nScript: "${input.trim()}"`
     : `Target video duration: ~${targetDuration} seconds (roughly ${approxScenes} scenes at ~4s each, but let the topic structure decide the exact count).
 
 Scene 1: hook — use this text VERBATIM as the opening hook.
 Remaining scenes: expand with rich, punchy, fact-driven content. Surprising facts, real numbers, dramatic revelations, a strong CTA as the final scene. NO filler. NO generic summaries. Make every scene impossible to skip.
 
-Each scene voiceover: 6–12 words.
+Each scene voiceover: 6–12 words.${langDirective}
 
 Topic: "${input.trim()}"
 

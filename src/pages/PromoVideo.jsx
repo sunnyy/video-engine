@@ -10,7 +10,7 @@ const T = {
   bg:      "#0a0a10",
   surface: "#111118",
   border:  "rgba(255,255,255,0.07)",
-  accent:  "#f5c518",
+  accent:  "#7c5cfc",
   text:    "#e8e8f0",
   muted:   "#9494a8",
   success: "#22c55e",
@@ -20,7 +20,7 @@ const T = {
 const C = {
   inp:  { padding: "9px 12px", background: "#35354a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#e8e8f0", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" },
   lbl:  { fontSize: 11, fontWeight: 700, color: "#b0b0cc", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5, display: "block" },
-  btnY: { padding: "11px 24px", background: "#f5c518", color: "#000", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 800, cursor: "pointer" },
+  btnY: { padding: "11px 24px", background: "#7c5cfc", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 800, cursor: "pointer" },
   btnG: { padding: "9px 18px", background: "rgba(255,255,255,0.07)", color: "#c0c0d8", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" },
 };
 
@@ -58,7 +58,7 @@ const STATUS_META = {
 
 const RENDER_MESSAGES = [
   "Building your video…",
-  "Writing your script…",
+  "Crafting your story…",
   "Adding visuals…",
   "Putting it all together…",
   "Almost ready…",
@@ -217,8 +217,8 @@ function YesNo({ value, onChange }) {
             style={{
               padding: "8px 20px", borderRadius: 8, cursor: "pointer",
               fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-              background: active ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.04)",
-              border: active ? "1.5px solid rgba(245,197,24,0.35)" : "1.5px solid rgba(255,255,255,0.1)",
+              background: active ? "rgba(124,92,252,0.08)" : "rgba(255,255,255,0.04)",
+              border: active ? "1.5px solid rgba(124,92,252,0.35)" : "1.5px solid rgba(255,255,255,0.1)",
               color: active ? T.accent : T.muted,
             }}>
             {opt === "yes" ? "Yes" : "No"}
@@ -363,19 +363,23 @@ function ProjectCard({ project: p, onDelete }) {
     return new Date(str).toLocaleDateString();
   }
 
+  const cardHref = isComplete && p.editor_project_id ? `/video-editor/${p.editor_project_id}` : `/promo-video/${p.id}`;
+
+  const navClick = e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); handleClick(); } };
+
   return (
     <div
-      onClick={handleClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => { setHov(false); setConf(false); }}
       style={{
-        background: T.surface, borderRadius: 14, overflow: "hidden", cursor: "pointer",
-        border: `1px solid ${hov ? "rgba(245,197,24,0.25)" : T.border}`,
+        background: T.surface, borderRadius: 14, overflow: "hidden",
+        border: `1px solid ${hov ? "rgba(124,92,252,0.25)" : T.border}`,
         transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none",
         boxShadow: hov ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
       }}>
 
       {/* Thumbnail */}
+      <a href={cardHref} onClick={navClick} style={{ display: "block", textDecoration: "none" }}>
       <div style={{ position: "relative", width: "100%", aspectRatio, overflow: "hidden", background: "#0b0b14" }}>
         {thumbIsVideo ? (
           <VideoThumb src={thumbSrc} playing={hov} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -418,9 +422,9 @@ function ProjectCard({ project: p, onDelete }) {
             pointerEvents: "none",
           }}>
             <div style={{
-              width: 38, height: 38, borderRadius: "50%", background: "rgba(245,197,24,0.92)",
+              width: 38, height: 38, borderRadius: "50%", background: "rgba(124,92,252,0.92)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, color: "#000", paddingLeft: 2,
+              fontSize: 13, color: "#fff", paddingLeft: 2,
               opacity: hov ? 0 : 1, transition: "opacity 0.25s",
             }}>▶</div>
           </div>
@@ -449,9 +453,10 @@ function ProjectCard({ project: p, onDelete }) {
           {conf ? "!" : "✕"}
         </button>
       </div>
+      </a>
 
       {/* Info */}
-      <div style={{ padding: "11px 13px" }}>
+      <a href={cardHref} onClick={navClick} style={{ display: "block", textDecoration: "none", color: "inherit", padding: "11px 13px" }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
           {p.product_name}
         </div>
@@ -463,7 +468,7 @@ function ProjectCard({ project: p, onDelete }) {
           {p.total_scenes ? <span style={{ marginLeft: 4 }}>· {p.total_scenes} scenes</span> : null}
           <span style={{ marginLeft: "auto" }}>{p.created_at ? timeLabel(p.created_at) : ""}</span>
         </div>
-      </div>
+      </a>
     </div>
   );
 }
@@ -927,25 +932,42 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   function StepBar() {
     if (step >= 4) return null;
     return (
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 32, gap: 0 }}>
-        {WIZARD_STEPS.map((label, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", flex: i < WIZARD_STEPS.length - 1 ? 1 : 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 40 }}>
+        {WIZARD_STEPS.flatMap((label, i) => {
+          const done   = i < step;
+          const active = i === step;
+          const items  = [];
+          if (i > 0) items.push(
+            <div key={`line-${i}`} style={{
+              flex: 1, height: 2, marginTop: 15, borderRadius: 2,
+              background: done ? T.accent : "rgba(255,255,255,0.08)",
+              transition: "background 0.3s",
+            }} />
+          );
+          items.push(
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, flexShrink: 0 }}>
               <div style={{
-                width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 800, flexShrink: 0,
-                background: i < step ? "rgba(34,197,94,0.2)" : i === step ? T.accent : "rgba(255,255,255,0.06)",
-                color:      i < step ? T.success           : i === step ? "#000"  : "#55556a",
+                width: 32, height: 32, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 13, fontWeight: 700,
+                background: done ? T.accent : active ? "rgba(124,92,252,0.18)" : "rgba(255,255,255,0.05)",
+                color: done ? "#fff" : active ? "#c4b5fd" : T.muted,
+                border: `2px solid ${done || active ? T.accent : "rgba(255,255,255,0.1)"}`,
+                transition: "all 0.3s",
               }}>
-                {i < step ? "✓" : i + 1}
+                {done ? "✓" : i + 1}
               </div>
-              <span style={{ fontSize: 12, fontWeight: i === step ? 700 : 500, color: i === step ? T.accent : i < step ? T.success : "#55556a", whiteSpace: "nowrap" }}>
+              <span style={{
+                fontSize: 11, fontWeight: active ? 700 : 400,
+                color: active ? T.text : T.muted,
+                transition: "all 0.3s",
+              }}>
                 {label}
               </span>
             </div>
-            {i < WIZARD_STEPS.length - 1 && <div style={{ flex: 1, height: 1, background: i < step ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)", margin: "0 10px" }} />}
-          </div>
-        ))}
+          );
+          return items;
+        })}
       </div>
     );
   }
@@ -962,6 +984,18 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   return (
     <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "36px 24px 80px" }}>
+
+        {/* Hero */}
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>🎬</div>
+          <h2 style={{ margin: "0 0 8px", fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif" }}>
+            Create a polished promo video
+          </h2>
+          <p style={{ margin: 0, fontSize: 14, color: T.muted, lineHeight: 1.5 }}>
+            Describe your product or service and get a short, branded video ready for any platform.
+          </p>
+        </div>
+
         <StepBar />
 
         {/* ─── Step 0: Video Type ─── */}
@@ -980,8 +1014,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                 <button key={id} onClick={() => setVideoType(id)}
                   style={{
                     padding: 28, borderRadius: 14, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                    background: videoType === id ? "rgba(245,197,24,0.06)" : "rgba(255,255,255,0.02)",
-                    border: videoType === id ? "2px solid rgba(245,197,24,0.55)" : "2px solid rgba(255,255,255,0.1)",
+                    background: videoType === id ? "rgba(124,92,252,0.06)" : "rgba(255,255,255,0.02)",
+                    border: videoType === id ? "2px solid rgba(124,92,252,0.55)" : "2px solid rgba(255,255,255,0.1)",
                   }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>{icon}</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: videoType === id ? T.accent : T.text, marginBottom: 6 }}>{title}</div>
@@ -1039,7 +1073,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             </div>
             <div>
               <label style={C.lbl}>Product Description <span style={{ color: T.danger }}>*</span></label>
-              <textarea style={{ ...C.inp, resize: "vertical", minHeight: 90, lineHeight: 1.5 }}
+              <textarea style={{ ...C.inp, resize: "vertical", minHeight: 180, lineHeight: 1.5 }}
                 value={productDesc} onChange={e => setProductDesc(e.target.value)}
                 placeholder="What does your product do? What problem does it solve?" maxLength={500} />
               <div style={{ fontSize: 11, color: "#55556a", marginTop: 3, textAlign: "right" }}>{productDesc.length}/500</div>
@@ -1067,8 +1101,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                     <button key={f.value} onClick={() => setFormatRatio(f.value)}
                       style={{ flex: 1, padding: "10px 8px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-                        background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.03)",
-                        border: sel ? "1.5px solid rgba(245,197,24,0.45)" : "1.5px solid rgba(255,255,255,0.1)" }}>
+                        background: sel ? "rgba(124,92,252,0.08)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(124,92,252,0.45)" : "1.5px solid rgba(255,255,255,0.1)" }}>
                       <div style={{ width: f.shape.w, height: f.shape.h, border: `1.5px solid ${col}`, borderRadius: 2, background: sel ? `${T.accent}18` : "transparent" }} />
                       <span style={{ fontSize: 12, fontWeight: 700, color: col }}>{f.label}</span>
                       <span style={{ fontSize: 10, color: "#55556a", textAlign: "center" }}>{f.hint}</span>
@@ -1108,8 +1142,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                         style={{
                           flex: 1, padding: "8px 6px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
                           display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-                          background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.04)",
-                          border: sel ? "1.5px solid rgba(245,197,24,0.45)" : "1.5px solid rgba(255,255,255,0.1)",
+                          background: sel ? "rgba(124,92,252,0.08)" : "rgba(255,255,255,0.04)",
+                          border: sel ? "1.5px solid rgba(124,92,252,0.45)" : "1.5px solid rgba(255,255,255,0.1)",
                         }}>
                         <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
                           {Array.from({ length: opt.dots }).map((_, i) => (
@@ -1136,8 +1170,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                         style={{
                           flex: 1, padding: "8px 6px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
                           display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-                          background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.04)",
-                          border: sel ? "1.5px solid rgba(245,197,24,0.45)" : "1.5px solid rgba(255,255,255,0.1)",
+                          background: sel ? "rgba(124,92,252,0.08)" : "rgba(255,255,255,0.04)",
+                          border: sel ? "1.5px solid rgba(124,92,252,0.45)" : "1.5px solid rgba(255,255,255,0.1)",
                         }}>
                         <div style={{
                           width: f.shape.w, height: f.shape.h,
@@ -1314,8 +1348,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                       style={{
                         flex: 1, padding: "10px 12px", borderRadius: 10, cursor: "pointer",
                         fontFamily: "inherit", textAlign: "center", display: "flex", flexDirection: "column", gap: 3,
-                        background: sel ? "rgba(245,197,24,0.08)" : "rgba(255,255,255,0.03)",
-                        border: sel ? "1.5px solid rgba(245,197,24,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
+                        background: sel ? "rgba(124,92,252,0.08)" : "rgba(255,255,255,0.03)",
+                        border: sel ? "1.5px solid rgba(124,92,252,0.5)" : "1.5px solid rgba(255,255,255,0.1)",
                       }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: sel ? T.accent : T.text }}>{t.label}</span>
                       <span style={{ fontSize: 11, color: T.muted }}>{t.description}</span>
@@ -1427,9 +1461,9 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
             {!renderError ? (
               <>
                 <div style={{ position: "relative", width: 80, height: 80 }}>
-                  <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid rgba(245,197,24,0.15)" }} />
+                  <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid rgba(124,92,252,0.15)" }} />
                   <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid transparent", borderTopColor: T.accent, animation: "pv-spin 1s linear infinite" }} />
-                  <div style={{ position: "absolute", inset: 12, borderRadius: "50%", background: "rgba(245,197,24,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
+                  <div style={{ position: "absolute", inset: 12, borderRadius: "50%", background: "rgba(124,92,252,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
                     🎬
                   </div>
                 </div>
@@ -1583,7 +1617,7 @@ You'll land straight in the editor when it's ready.
                               disabled={upSt === "uploading"}
                               onClick={() => ref.current?.click()}
                               style={{
-                                background: "#f5c518", color: "#000", border: "none", borderRadius: 8,
+                                background: "#7c5cfc", color: "#fff", border: "none", borderRadius: 8,
                                 padding: "8px 18px", fontSize: 13, fontWeight: 600,
                                 cursor: upSt === "uploading" ? "not-allowed" : "pointer",
                                 display: "flex", alignItems: "center", gap: 6,
@@ -1614,8 +1648,8 @@ You'll land straight in the editor when it's ready.
                 style={{
                   width: "100%", padding: "15px 24px", fontSize: 16, fontWeight: 700,
                   borderRadius: 12, border: "none", cursor: canOpen ? "pointer" : "not-allowed",
-                  background: canOpen ? "#f5c518" : "rgba(255,255,255,0.06)",
-                  color: canOpen ? "#000000" : "rgba(255,255,255,0.25)",
+                  background: canOpen ? "#7c5cfc" : "rgba(255,255,255,0.06)",
+                  color: canOpen ? "#ffffff" : "rgba(255,255,255,0.25)",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                 }}>
                 {anyUploading ? <><Spinner size={16} color="#fff" /> Uploading…</> :
@@ -1687,7 +1721,7 @@ export default function PromoVideo() {
               <button key={t.id} onClick={() => t.id === "create" ? handleCreateNew() : setTab(t.id)}
                 style={{
                   padding: "16px 28px", border: "none", borderRadius: "8px 8px 0 0",
-                  background: tab === t.id ? "rgba(245,197,24,0.1)" : "transparent",
+                  background: tab === t.id ? "rgba(124,92,252,0.1)" : "transparent",
                   color:      tab === t.id ? T.accent : "#55556a",
                   fontSize: 16, fontWeight: tab === t.id ? 700 : 500,
                   fontFamily: "'Outfit',sans-serif", cursor: "pointer", transition: "all 0.15s",

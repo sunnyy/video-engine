@@ -52,23 +52,27 @@ function assignWordTimestamps(scenes, wordTimestamps) {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function runSocialPipeline(params, onStep) {
-  const { url, userId, voiceId = null, targetDuration = 25, includeAuthor = false } = params;
+  const { url, userId, voiceId = null, language = "en", targetDuration = 25, includeAuthor = false } = params;
 
   const step = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
 
   // ── Step 1: Fetch social content ─────────────────────────────────────────
-  step("Fetching post content…");
+  step("Analyzing your post…");
   const content = await fetchSocialContent(url);
-  console.log(`[social] platform=${content.platform} author="${content.author}" imageUrl=${!!content.imageUrl}`);
+  console.log(`[social] platform=${content.platform} author="${content.author}" images=${content.imageUrls?.length ?? (content.imageUrl ? 1 : 0)}`);
 
   // ── Step 2: Generate script ───────────────────────────────────────────────
-  step("Writing script…");
-  // Give threads more time — they have more content to cover
+  step("Crafting your story…");
+  // Scale duration by content volume
+  const wordCount = (content.text || "").split(/\s+/).filter(Boolean).length;
   const effectiveDuration = content.isThread
-    ? Math.min(targetDuration + content.threadLength * 3, 45)
-    : targetDuration;
+    ? Math.min(targetDuration + content.threadLength * 3, 60)
+    : wordCount > 300
+      ? Math.min(targetDuration + Math.floor(wordCount / 100) * 5, 60)
+      : targetDuration;
+  if (wordCount > 300) console.log(`[social] long post detected: ${wordCount} words → duration ${effectiveDuration}s`);
   const { full_script, scenes: rawScenes, palette, fontPair, musicMood } =
-    await generateSocialScript({ content, targetDuration: effectiveDuration });
+    await generateSocialScript({ content, targetDuration: effectiveDuration, language });
 
   const scenes = rawScenes.map(s => ({ ...s }));
   console.log(`[social] ${scenes.length} scenes, musicMood=${musicMood}`);
@@ -88,7 +92,7 @@ export async function runSocialPipeline(params, onStep) {
   };
 
   // ── Steps 3+4: Design scenes in parallel ─────────────────────────────────
-  step("Designing scenes…");
+  step("Creating your scenes…");
   const sceneResults = await Promise.all(
     scenes.map(async (scene) => {
       try {
@@ -106,7 +110,7 @@ export async function runSocialPipeline(params, onStep) {
   const sceneHTMLs  = sceneResults.map(r => r.html);
 
   // ── Step 5: TTS ───────────────────────────────────────────────────────────
-  step("Generating voiceover…");
+  step("Adding voiceover…");
   let voiceoverUrl      = null;
   let voiceoverDuration = 0;
 
@@ -134,7 +138,7 @@ export async function runSocialPipeline(params, onStep) {
   }
 
   // ── Step 6: Build timeline ─────────────────────────────────────────────────
-  step("Building timeline…");
+  step("Putting it together…");
   const { timeline } = buildTimeline(sceneGraphs, scenes, projectContext);
 
   // ── Step 7: Inject voiceover layer ────────────────────────────────────────
@@ -173,15 +177,21 @@ export async function runSocialPipeline(params, onStep) {
   }
 
   // ── Step 8: Inject fetched social image into social-image placeholders ─────
-  if (content.imageUrl) {
+  const imageUrls = content.imageUrls?.length
+    ? content.imageUrls
+    : (content.imageUrl ? [content.imageUrl] : []);
+
+  if (imageUrls.length > 0) {
     let injected = 0;
     for (const layer of finalTimeline.layers) {
       if (layer.type === "image" && layer.assetType === "social-image" && !layer.src) {
-        layer.src = content.imageUrl;
+        const sceneIdx = parseInt(layer.trackId?.match(/^s(\d+)_/)?.[1] ?? "0");
+        const imgIdx   = scenes[sceneIdx]?.image_index ?? 0;
+        layer.src      = imageUrls[Math.min(imgIdx, imageUrls.length - 1)];
         injected++;
       }
     }
-    if (injected > 0) console.log(`[social] injected fetched image into ${injected} placeholder(s)`);
+    if (injected > 0) console.log(`[social] injected ${injected} image placeholder(s) from ${imageUrls.length} available`);
   }
 
   // ── Step 9: Background music ──────────────────────────────────────────────
@@ -214,7 +224,7 @@ export async function runSocialPipeline(params, onStep) {
   if (full_script) finalTimeline.full_script = full_script;
 
   // ── Step 10: Save to projects table ──────────────────────────────────────
-  step("Saving project…");
+  step("Almost ready…");
   const projectName = content.author
     ? `${content.author} — Social Video`
     : `Social Video — ${new Date().toLocaleDateString()}`;

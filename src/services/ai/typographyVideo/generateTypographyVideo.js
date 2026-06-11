@@ -1,9 +1,9 @@
 import { serverFetch } from "../../serverApi";
 
-export async function generateTypographyVideo({ input, inputType = "topic", targetDuration = 40, projectId = null }, onProgress) {
+export async function generateTypographyVideo({ input, inputType = "topic", targetDuration = 40, projectId = null, voiceId = null, language = "en" }, onProgress) {
   const res = await serverFetch("/api/typography-video/generate", {
     method: "POST",
-    body: JSON.stringify({ input, inputType, targetDuration, projectId }),
+    body: JSON.stringify({ input, inputType, targetDuration, projectId, voiceId, language }),
   });
 
   if (!res.ok && res.status !== 200) {

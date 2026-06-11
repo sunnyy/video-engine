@@ -8,7 +8,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
-  const { url, targetDuration = 25, includeAuthor = false, projectId } = req.body;
+  const { url, targetDuration = 25, includeAuthor = false, voiceId, language = "en", projectId } = req.body;
   if (!url?.trim()) return res.status(400).json({ error: "url is required" });
 
   // SSE setup
@@ -28,7 +28,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     creditAmount = 15;
 
     const result = await runSocialPipeline(
-      { url: url.trim(), userId, targetDuration, includeAuthor: !!includeAuthor },
+      { url: url.trim(), userId, targetDuration, includeAuthor: !!includeAuthor, voiceId: voiceId ?? null, language: language ?? "en" },
       ({ step }) => send({ step }),
     );
 
