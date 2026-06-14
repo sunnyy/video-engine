@@ -99,7 +99,7 @@ function VideoCard({ asset, onClick }) {
   );
 }
 
-export default function MediaModal({ onClose, onReplace }) {
+export default function MediaModal({ onClose, onReplace, initialFilter }) {
   const project     = useTimelineStore((s) => s.project);
   const currentTime = useTimelineStore((s) => s.currentTime);
   const projectId   = useTimelineStore((s) => s.projectId);
@@ -109,7 +109,7 @@ export default function MediaModal({ onClose, onReplace }) {
 
   const { myAssets, loadMyAssets } = useAssetsStore();
 
-  const [filter, setFilter]       = useState("image");
+  const [filter, setFilter]       = useState(initialFilter ?? "image");
   const [search, setSearch]       = useState("");
   const [page, setPage]           = useState(1);
   const [uploading, setUploading] = useState(false);

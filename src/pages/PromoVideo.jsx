@@ -118,15 +118,15 @@ const GENDER_COLORS = {
   male:   { bg: "rgba(96,165,250,0.12)",  border: "rgba(96,165,250,0.3)",  color: "#60a5fa" },
 };
 
-const SCENE_COUNT_OPTIONS = [
-  { value: 1, label: "1 Scene",  description: "Quick test",                dots: 1 },
-  { value: 3, label: "3 Scenes", description: "Quick and punchy",          dots: 3 },
-  { value: 5, label: "5 Scenes", description: "Standard promo",            dots: 5 },
+const DURATION_OPTIONS = [
+  { value: 12, label: "10–15 sec", description: "Short",    dots: 1 },
+  { value: 22, label: "15–30 sec", description: "Standard", dots: 2 },
+  { value: 45, label: "30–60 sec", description: "Long",     dots: 3 },
 ];
 
-const PROMO_CREDITS  = { 1: 50, 3: 120, 5: 200 };
+const PROMO_CREDITS  = { 12: 50, 22: 120, 45: 200 };
 const TH_CREDITS     = 180;
-const PROMO_GEN_TIME = { 1: "~30 sec", 3: "~1 min", 5: "~2 min" };
+const PROMO_GEN_TIME = { 12: "~30 sec", 22: "~1 min", 45: "~2 min" };
 
 const THEME_OPTIONS = [
   { value: "dark",   label: "Dark",   description: "Deep dark backgrounds" },
@@ -511,7 +511,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [customAccent,    setCustomAccent]    = useState("");
   const [typographyStyle, setTypographyStyle] = useState("modern");
   const [voiceId,         setVoiceId]         = useState("21m00Tcm4TlvDq8ikWAM");
-  const [sceneCount,      setSceneCount]      = useState(3);
+  const [targetDuration,  setTargetDuration]  = useState(22);
   const [promoVoices,     setPromoVoices]     = useState(PROMO_VOICES);
   const [langVoices,      setLangVoices]      = useState({});
   const [playingVoiceId,  setPlayingVoiceId]  = useState(null);
@@ -822,7 +822,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         accent_color:            customAccent || accentColor,
         typography_style:        typographyStyle,
         voice_id:                voiceId,
-        scene_count:             sceneCount,
+        target_duration:         targetDuration,
       };
 
       const res  = await serverFetch("/api/promo-video/create", {
@@ -1134,11 +1134,11 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
               <div>
                 <label style={C.lbl}>Video Length</label>
                 <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                  {SCENE_COUNT_OPTIONS.map(opt => {
-                    const sel = sceneCount === opt.value;
+                  {DURATION_OPTIONS.map(opt => {
+                    const sel = targetDuration === opt.value;
                     const col = sel ? T.accent : T.muted;
                     return (
-                      <button key={opt.value} onClick={() => setSceneCount(opt.value)}
+                      <button key={opt.value} onClick={() => setTargetDuration(opt.value)}
                         style={{
                           flex: 1, padding: "8px 6px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
                           display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
@@ -1245,7 +1245,7 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
             {/* Voiceover / Script */}
             <div>
-              <label style={C.lbl}>Do you have a recording?</label>
+              <label style={C.lbl}>Do you have a voiceover?</label>
               <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
                 <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />
                 {hasVoiceover === "yes" && (
@@ -1441,14 +1441,14 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {creating
                   ? <><Spinner size={14} color="#000" /> Creating…</>
-                  : `✦ Create My Video · ${videoType === "talking_head" ? TH_CREDITS : (PROMO_CREDITS[sceneCount] ?? 120)} ✦`}
+                  : `✦ Create My Video · ${videoType === "talking_head" ? TH_CREDITS : (PROMO_CREDITS[targetDuration] ?? 120)} ✦`}
               </button>
             </div>
             {!creating && (
               <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", textAlign: "center", margin: "8px 0 0" }}>
                 {videoType === "talking_head"
                   ? `${TH_CREDITS} credits · ~1 min to generate`
-                  : `${PROMO_CREDITS[sceneCount] ?? 120} credits · ${PROMO_GEN_TIME[sceneCount] ?? "~1 min"} to generate`
+                  : `${PROMO_CREDITS[targetDuration] ?? 120} credits · ${PROMO_GEN_TIME[targetDuration] ?? "~1 min"} to generate`
                 }
               </p>
             )}

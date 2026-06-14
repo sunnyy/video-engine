@@ -48,7 +48,6 @@ export function detectPlatform(url) {
   if (/twitter\.com|x\.com/i.test(url))   return "twitter";
   if (/instagram\.com/i.test(url))         return "instagram";
   if (/linkedin\.com/i.test(url))          return "linkedin";
-  if (/reddit\.com/i.test(url))            return "reddit";
   return "generic";
 }
 
@@ -357,7 +356,6 @@ export async function fetchSocialContent(url) {
 
   try {
     if (platform === "twitter")   return await fetchTwitterContent(url.trim());
-    if (platform === "reddit")    return await fetchRedditContent(url.trim());
     if (platform === "instagram") return await fetchInstagramContent(url.trim());
     if (platform === "linkedin")  return await fetchLinkedInContent(url.trim());
     return await fetchOGContent(url.trim());

@@ -22,7 +22,12 @@ const SCENE_DESIGNER_MODEL = "gpt-5.4";
  * @returns {string}              — raw HTML string for this scene
  */
 export async function designScene(scene, projectContext, attempt = 1) {
-  const prompt = buildSceneDesignerPrompt(scene.script_segment, { ...projectContext, sceneIntent: scene.intent });
+  const prompt = buildSceneDesignerPrompt(scene.script_segment, {
+    ...projectContext,
+    sceneIntent:        scene.intent,
+    creativeBrief:      scene.creative_brief ?? projectContext.visualConcept ?? null,
+    wantsProductVisual: scene.wants_product_visual,
+  });
 
   const thGuidance = projectContext.videoType === 'talking_head' ? `
 THIS IS A TALKING HEAD VIDEO. The speaker's video plays continuously as a base layer beneath your design.

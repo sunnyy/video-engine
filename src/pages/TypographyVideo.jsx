@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { generateTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
-import { getTypographyVideoProjects, deleteProject } from "../services/projects/projectService";
+import { getTypographyVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
 
@@ -39,11 +39,35 @@ function timeLabel(dateStr) {
   return d.toLocaleDateString();
 }
 
+function VideoThumb({ src, style, playing }) {
+  const ref = useRef();
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (playing) { v.play().catch(() => {}); }
+    else { v.pause(); v.currentTime = 0.1; }
+  }, [playing]);
+  return (
+    <video ref={ref} src={src} muted playsInline loop preload="auto"
+      onLoadedData={() => { if (ref.current && !playing) ref.current.currentTime = 0.1; }}
+      style={style} />
+  );
+}
+
 /* ── Project card ── */
 function VideoCard({ project, onDelete }) {
   const [hovering,   setHovering]   = useState(false);
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
+
+  const thumbSrc    = project.safe_project_json?.meta?.thumbnail ?? null;
+  const thumbIsVid  = !!thumbSrc && /\.(mp4|webm|mov)(\?|$)/i.test(thumbSrc);
+  const previewText = project.safe_project_json?.meta?.script?.voiceoverScript
+    ?? project.safe_project_json?.meta?.script?.scenes?.[0]?.voiceover
+    ?? null;
+  const palette     = project.safe_project_json?.meta?.script?.palette;
+  const bgColor     = palette?.background ?? "#0f0820";
+  const accentColor = palette?.accent     ?? "#7c5cfc";
 
   function handleDelete(e) {
     e.stopPropagation();
@@ -52,58 +76,82 @@ function VideoCard({ project, onDelete }) {
   }
 
   const editorHref = `/video-editor/${project.id}`;
-  const navProps = { href: editorHref, onClick: e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(editorHref, { state: { from: "/typography-video" } }); } }, style: { display: "block", textDecoration: "none", color: "inherit" } };
+  const navClick = e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(editorHref, { state: { from: "/typography-video" } }); } };
 
   return (
     <div
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false); }}
       style={{
-        background:   T.surface,
-        border:       `1px solid ${hovering ? "rgba(124,92,252,0.4)" : T.border}`,
-        borderRadius: 14,
-        overflow:     "hidden",
-        transition:   "all 0.2s",
-        transform:    hovering ? "translateY(-2px)" : "none",
-        boxShadow:    hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
+        background: T.surface, borderRadius: 14, overflow: "hidden",
+        border: `1px solid ${hovering ? "rgba(124,92,252,0.25)" : T.border}`,
+        transition: "all 0.2s", transform: hovering ? "translateY(-2px)" : "none",
+        boxShadow: hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
       }}
     >
-      <a {...navProps}>
-        <div style={{ paddingTop: "56.25%", position: "relative", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}>
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 32, opacity: 0.35 }}>✍️</span>
-          </div>
-          <div style={{ position: "absolute", top: 8, left: 8 }}>
-            <span style={{
-              padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-              background: "rgba(34,197,94,0.2)", color: "#4ade80",
-              border: "1px solid rgba(34,197,94,0.3)",
-            }}>Complete</span>
-          </div>
-        </div>
-      </a>
-      <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <a {...navProps} style={{ ...navProps.style, minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {project.name}
-          </div>
-          <div style={{ fontSize: 11, color: "#77777f", marginTop: 3 }}>{timeLabel(project.updated_at)}</div>
-        </a>
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: T.accent }}>Edit →</span>
-          <button
-            onClick={handleDelete}
+      <a href={editorHref} onClick={navClick} style={{ display: "block", textDecoration: "none" }}>
+        <div style={{ position: "relative", width: "100%", aspectRatio: "9/16", overflow: "hidden", background: bgColor }}>
+          {thumbIsVid ? (
+            <VideoThumb src={thumbSrc} playing={hovering} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : thumbSrc ? (
+            <img src={thumbSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <div style={{
+              width: "100%", height: "100%", display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 10, padding: "16px 12px",
+              background: `linear-gradient(135deg, ${bgColor} 0%, #1a0a2e 60%, #2d1060 100%)`,
+            }}>
+              {previewText ? (
+                <div style={{
+                  fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.8)",
+                  textAlign: "center", lineHeight: 1.5, padding: "0 4px",
+                  overflow: "hidden", display: "-webkit-box",
+                  WebkitLineClamp: 10, WebkitBoxOrient: "vertical",
+                }}>
+                  {previewText}
+                </div>
+              ) : (
+                <span style={{ fontSize: 28, opacity: 0.3 }}>✍️</span>
+              )}
+            </div>
+          )}
+
+          {thumbIsVid && (
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              background: hovering ? "rgba(0,0,0,0)" : "rgba(0,0,0,0.22)", transition: "background 0.3s",
+              pointerEvents: "none",
+            }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: "50%", background: "rgba(124,92,252,0.92)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 13, color: "#fff", paddingLeft: 2,
+                opacity: hovering ? 0 : 1, transition: "opacity 0.25s",
+              }}>▶</div>
+            </div>
+          )}
+
+          <button onClick={handleDelete} title={confirming ? "Click again to confirm" : "Delete"}
             style={{
-              width: 26, height: 26, borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11,
-              background: confirming ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.06)",
-              color:      confirming ? "#f87171"               : "#55556a",
+              position: "absolute", top: 8, left: 8,
+              width: 26, height: 26, borderRadius: 6, border: "none", cursor: "pointer",
+              background: confirming ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.55)",
+              color: confirming ? "#fff" : "#999", fontSize: 13, fontWeight: 700,
               opacity: hovering ? 1 : 0, transition: "opacity 0.15s",
               display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-            title={confirming ? "Click again to confirm" : "Delete"}
-          >{confirming ? "!" : "✕"}</button>
+              backdropFilter: "blur(4px)",
+            }}>
+            {confirming ? "!" : "✕"}
+          </button>
         </div>
-      </div>
+      </a>
+
+      <a href={editorHref} onClick={navClick} style={{ display: "block", textDecoration: "none", color: "inherit", padding: "11px 13px" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+          {project.name}
+        </div>
+        <div style={{ fontSize: 11, color: "#77777f" }}>{timeLabel(project.updated_at)}</div>
+      </a>
     </div>
   );
 }
@@ -149,7 +197,7 @@ function VideoListing() {
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
         {projects.map(p => <VideoCard key={p.id} project={p} onDelete={handleDelete} />)}
       </div>
     </div>
@@ -179,6 +227,7 @@ function GeneratorForm() {
         { input: input.trim(), inputType, targetDuration, voiceId, language },
         ({ step }) => setStatusIdx(step),
       );
+      invalidateProjectCaches("typography_video", "all");
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/typography-video" } });
     } catch (err) {
       setError(err.message || "Generation failed. Please try again.");
@@ -319,20 +368,12 @@ function GeneratorForm() {
         {/* Progress */}
         {loading && (
           <div style={{ marginBottom: 24, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
-              {STATUS_STEPS[statusIdx]}
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14, color: T.text }}>
+              Generating your video…
             </div>
-            <div style={{ display: "flex", gap: 5, marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 5 }}>
               {STATUS_STEPS.slice(0, -1).map((_, i) => (
                 <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusIdx ? T.accent : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
-              ))}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {STATUS_STEPS.slice(0, -1).map((label, i) => (
-                <div key={i} style={{ fontSize: 12, color: i === statusIdx ? T.text : i < statusIdx ? T.success : T.muted, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, width: 10 }}>{i < statusIdx ? "✓" : i === statusIdx ? "▶" : "○"}</span>
-                  {label}
-                </div>
               ))}
             </div>
           </div>
@@ -354,22 +395,6 @@ function GeneratorForm() {
           {loading ? "Generating…" : "Generate Video"}
         </button>
 
-        {/* Info cards */}
-        {!loading && (
-          <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            {[
-              { icon: "🎙️", label: "Voiceover",     desc: "Nova voice, normalized audio" },
-              { icon: "⏱️", label: "Word Sync",      desc: "Phrases timed to speech" },
-              { icon: "⚡", label: "15 Credits",     desc: "Per generation" },
-            ].map(({ icon, label, desc }) => (
-              <div key={label} style={{ padding: "14px", borderRadius: 10, background: T.surface, border: `1px solid ${T.border}`, textAlign: "center" }}>
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#c0c0d8" }}>{label}</div>
-                <div style={{ fontSize: 11, color: "#55556a", marginTop: 3 }}>{desc}</div>
-              </div>
-            ))}
-          </div>
-        )}
 
       </div>
     </div>

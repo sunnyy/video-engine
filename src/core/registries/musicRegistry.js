@@ -18,6 +18,25 @@ export async function loadMusicLibrary() {
   }
 }
 
+const NICHE_MOOD = {
+  health:        "calm",
+  nature:        "calm",
+  education:     "calm",
+  psychology:    "dramatic",
+  mystery:       "dramatic",
+  finance:       "dramatic",
+  entertainment: "playful",
+  lifestyle:     "playful",
+  tech:          "energetic",
+  fitness:       "energetic",
+  motivation:    "energetic",
+  viral:         "energetic",
+};
+
+export function pickMoodForNiche(niche) {
+  return NICHE_MOOD[niche?.toLowerCase()] ?? "energetic";
+}
+
 export function pickAutoMood(videoType = "viral", tone = "bold", energy = "medium") {
   if (tone === "funny" || videoType === "entertainment") return "playful";
   if (tone === "emotional" && energy === "high") return "dramatic";

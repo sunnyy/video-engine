@@ -1,5 +1,23 @@
 import { supabase } from "../../lib/supabase";
 
+// ── In-memory TTL cache (avoids redundant Supabase calls during a session) ────
+const TTL_MS = 5 * 60 * 1000; // 5 minutes
+const _cache = {};
+
+function getCached(key) {
+  const entry = _cache[key];
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { delete _cache[key]; return null; }
+  return entry.data;
+}
+function setCached(key, data) {
+  _cache[key] = { data, expiresAt: Date.now() + TTL_MS };
+}
+export function invalidateProjectCaches(...keys) {
+  if (keys.length === 0) { Object.keys(_cache).forEach(k => delete _cache[k]); }
+  else { keys.forEach(k => delete _cache[k]); }
+}
+
 export async function createProject({ name, rawAI, safeProject = null, source = "ai_generated", stepsCompleted = null }) {
   const {
     data: { user },
@@ -43,10 +61,10 @@ export async function getProjectById(id) {
 }
 
 export async function getUserProjects() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const hit = getCached("all");
+  if (hit) return hit;
 
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
   const { data, error } = await supabase
@@ -56,10 +74,15 @@ export async function getUserProjects() {
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return data;
+  const result = data ?? [];
+  setCached("all", result);
+  return result;
 }
 
 export async function getProductVideoProjects() {
+  const hit = getCached("product_video");
+  if (hit) return hit;
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -71,10 +94,15 @@ export async function getProductVideoProjects() {
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCached("product_video", result);
+  return result;
 }
 
 export async function getTypographyVideoProjects() {
+  const hit = getCached("typography_video");
+  if (hit) return hit;
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -86,10 +114,15 @@ export async function getTypographyVideoProjects() {
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCached("typography_video", result);
+  return result;
 }
 
 export async function getSocialVideoProjects() {
+  const hit = getCached("social_video");
+  if (hit) return hit;
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -101,10 +134,55 @@ export async function getSocialVideoProjects() {
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCached("social_video", result);
+  return result;
+}
+
+export async function getSaasVideoProjects() {
+  const hit = getCached("saas_video");
+  if (hit) return hit;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, updated_at, safe_project_json")
+    .eq("user_id", user.id)
+    .eq("source", "saas_video")
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  const result = data || [];
+  setCached("saas_video", result);
+  return result;
+}
+
+export async function getPromptVideoProjects() {
+  const hit = getCached("prompt_video");
+  if (hit) return hit;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, updated_at, safe_project_json")
+    .eq("user_id", user.id)
+    .eq("source", "prompt_video")
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  const result = data || [];
+  setCached("prompt_video", result);
+  return result;
 }
 
 export async function getProductAdProjects() {
+  const hit = getCached("product_ad");
+  if (hit) return hit;
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -116,7 +194,9 @@ export async function getProductAdProjects() {
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCached("product_ad", result);
+  return result;
 }
 
 export async function updateProject(id, safeProject, extra = {}) {
@@ -162,6 +242,7 @@ export async function deleteProject(id) {
     .eq("id", id);
 
   if (error) throw error;
+  invalidateProjectCaches(); // clear all so listings refresh on next visit
 }
 /* ─────────────────────────────────────────────────────────────
    Renders history — per-project list from `renders` table

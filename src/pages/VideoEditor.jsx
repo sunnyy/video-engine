@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useTimelineStore } from "../store/useTimelineStore";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
@@ -25,6 +25,7 @@ function createEmptyProject(name = "Untitled Video") {
 export default function VideoEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -63,7 +64,7 @@ export default function VideoEditor() {
           if (insertError) throw insertError;
           setProjectId(data.id);
           setProject(emptyProject);
-          navigate(`/video-editor/${data.id}`, { replace: true });
+          navigate(`/video-editor/${data.id}`, { replace: true, state: location.state });
         } else {
           const { data, error: fetchError } = await supabase
             .from("projects")

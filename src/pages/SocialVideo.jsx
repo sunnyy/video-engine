@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate }        from "react-router-dom";
 import { generateSocialVideo }   from "../services/ai/socialVideo/generateSocialVideo";
-import { getSocialVideoProjects, deleteProject } from "../services/projects/projectService";
+import { getSocialVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
 
@@ -39,8 +39,22 @@ function detectPlatformLabel(url) {
   if (/twitter\.com|x\.com/i.test(url))   return "Twitter / X";
   if (/instagram\.com/i.test(url))         return "Instagram";
   if (/linkedin\.com/i.test(url))          return "LinkedIn";
-  if (/reddit\.com/i.test(url))            return "Reddit";
   return "Social URL";
+}
+
+function VideoThumb({ src, style, playing }) {
+  const ref = useRef();
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (playing) { v.play().catch(() => {}); }
+    else { v.pause(); v.currentTime = 0.1; }
+  }, [playing]);
+  return (
+    <video ref={ref} src={src} muted playsInline loop preload="auto"
+      onLoadedData={() => { if (ref.current && !playing) ref.current.currentTime = 0.1; }}
+      style={style} />
+  );
 }
 
 function VideoCard({ project, onDelete }) {
@@ -48,7 +62,12 @@ function VideoCard({ project, onDelete }) {
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
 
-  const meta = project.safe_project_json?.raw_ai_json ?? {};
+  const meta       = project.safe_project_json?.raw_ai_json ?? {};
+  const thumbSrc   = project.safe_project_json?.meta?.thumbnail ?? null;
+  const thumbIsVid = !!thumbSrc && /\.(mp4|webm|mov)(\?|$)/i.test(thumbSrc);
+  const previewText = project.safe_project_json?.meta?.script?.voiceoverScript
+    ?? project.safe_project_json?.layers?.[0]?.text
+    ?? null;
 
   function handleDelete(e) {
     e.stopPropagation();
@@ -57,68 +76,93 @@ function VideoCard({ project, onDelete }) {
   }
 
   const editorHref = `/video-editor/${project.id}`;
-  const navProps = { href: editorHref, onClick: e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(editorHref, { state: { from: "/social-video" } }); } }, style: { display: "block", textDecoration: "none", color: "inherit" } };
+  const navClick = e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(editorHref, { state: { from: "/social-video" } }); } };
 
   return (
     <div
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false); }}
       style={{
-        background:   T.surface,
-        border:       `1px solid ${hovering ? "rgba(124,92,252,0.4)" : T.border}`,
-        borderRadius: 14,
-        overflow:     "hidden",
-        transition:   "all 0.2s",
-        transform:    hovering ? "translateY(-2px)" : "none",
-        boxShadow:    hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
+        background: T.surface, borderRadius: 14, overflow: "hidden",
+        border: `1px solid ${hovering ? "rgba(124,92,252,0.25)" : T.border}`,
+        transition: "all 0.2s", transform: hovering ? "translateY(-2px)" : "none",
+        boxShadow: hovering ? "0 8px 32px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.2)",
       }}
     >
-      <a {...navProps}>
-        <div style={{ paddingTop: "56.25%", position: "relative", background: "linear-gradient(135deg,#060a14,#0d1a28,#0a1420)" }}>
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 32, opacity: 0.35 }}>📱</span>
-          </div>
-          <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 5 }}>
-            <span style={{
-              padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-              background: "rgba(34,197,94,0.2)", color: "#4ade80",
-              border: "1px solid rgba(34,197,94,0.3)",
-            }}>Complete</span>
-            {meta.platform && (
-              <span style={{
-                padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-                background: "rgba(124,92,252,0.2)", color: "#a78bfa",
-                border: "1px solid rgba(124,92,252,0.3)",
-              }}>{meta.platform}</span>
-            )}
-          </div>
-        </div>
-      </a>
-      <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <a {...navProps} style={{ ...navProps.style, minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {project.name}
-          </div>
-          {meta.author && (
-            <div style={{ fontSize: 11, color: T.accent, marginTop: 1 }}>{meta.author}</div>
+      <a href={editorHref} onClick={navClick} style={{ display: "block", textDecoration: "none" }}>
+        <div style={{ position: "relative", width: "100%", aspectRatio: "9/16", overflow: "hidden", background: "#060a14" }}>
+          {thumbIsVid ? (
+            <VideoThumb src={thumbSrc} playing={hovering} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : thumbSrc ? (
+            <img src={thumbSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <div style={{
+              width: "100%", height: "100%", display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 10, padding: "16px 12px",
+              background: "linear-gradient(135deg, #060a14 0%, #0d1a28 60%, #0a1420 100%)",
+            }}>
+              {previewText ? (
+                <div style={{
+                  fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.75)",
+                  textAlign: "center", lineHeight: 1.45, padding: "0 4px",
+                  overflow: "hidden", display: "-webkit-box",
+                  WebkitLineClamp: 8, WebkitBoxOrient: "vertical",
+                }}>
+                  {previewText}
+                </div>
+              ) : (
+                <span style={{ fontSize: 32, opacity: 0.3 }}>📱</span>
+              )}
+            </div>
           )}
-          <div style={{ fontSize: 11, color: "#55667a", marginTop: 2 }}>{timeLabel(project.updated_at)}</div>
-        </a>
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: T.accent }}>Edit →</span>
-          <button
-            onClick={handleDelete}
+
+          {thumbIsVid && (
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              background: hovering ? "rgba(0,0,0,0)" : "rgba(0,0,0,0.22)", transition: "background 0.3s",
+              pointerEvents: "none",
+            }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: "50%", background: "rgba(124,92,252,0.92)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 13, color: "#fff", paddingLeft: 2,
+                opacity: hovering ? 0 : 1, transition: "opacity 0.25s",
+              }}>▶</div>
+            </div>
+          )}
+
+          {meta.platform && (
+            <div style={{
+              position: "absolute", top: 8, right: 8,
+              fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 5,
+              background: "rgba(124,92,252,0.85)", color: "#fff", backdropFilter: "blur(4px)",
+            }}>{meta.platform}</div>
+          )}
+
+          <button onClick={handleDelete} title={confirming ? "Click again to confirm" : "Delete"}
             style={{
-              width: 26, height: 26, borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11,
-              background: confirming ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.06)",
-              color:      confirming ? "#f87171"               : "#55667a",
+              position: "absolute", top: 8, left: 8,
+              width: 26, height: 26, borderRadius: 6, border: "none", cursor: "pointer",
+              background: confirming ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.55)",
+              color: confirming ? "#fff" : "#999", fontSize: 13, fontWeight: 700,
               opacity: hovering ? 1 : 0, transition: "opacity 0.15s",
               display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-            title={confirming ? "Click again to confirm" : "Delete"}
-          >{confirming ? "!" : "✕"}</button>
+              backdropFilter: "blur(4px)",
+            }}>
+            {confirming ? "!" : "✕"}
+          </button>
         </div>
-      </div>
+      </a>
+
+      <a href={editorHref} onClick={navClick} style={{ display: "block", textDecoration: "none", color: "inherit", padding: "11px 13px" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+          {project.name}
+        </div>
+        {meta.author && (
+          <div style={{ fontSize: 11, color: T.accent, marginBottom: 2 }}>{meta.author}</div>
+        )}
+        <div style={{ fontSize: 11, color: "#55667a" }}>{timeLabel(project.updated_at)}</div>
+      </a>
     </div>
   );
 }
@@ -163,7 +207,7 @@ function VideoListing() {
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
         {projects.map(p => <VideoCard key={p.id} project={p} onDelete={handleDelete} />)}
       </div>
     </div>
@@ -197,6 +241,7 @@ function GeneratorForm() {
           if (idx !== -1) setStatusStep(idx);
         },
       );
+      invalidateProjectCaches("social_video", "all");
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/social-video" } });
     } catch (err) {
       if (err.code === "NO_CREDITS") {
@@ -210,7 +255,7 @@ function GeneratorForm() {
 
   return (
     <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-      <div style={{ maxWidth: 580, margin: "0 auto", padding: "40px 24px 60px" }}>
+      <div style={{ maxWidth: 650, margin: "0 auto", padding: "40px 24px 60px" }}>
 
         {/* Hero */}
         <div style={{ textAlign: "center", marginBottom: 36 }}>
@@ -219,7 +264,7 @@ function GeneratorForm() {
             Turn any post into a video
           </h2>
           <p style={{ margin: 0, fontSize: 14, color: T.muted, lineHeight: 1.5 }}>
-            Paste a Twitter/X, Instagram, LinkedIn, or Reddit URL and get a ready-to-post short video in minutes.
+            Paste a Twitter/X, Instagram, or LinkedIn URL and get a ready-to-post short video in minutes.
           </p>
         </div>
 
@@ -233,7 +278,7 @@ function GeneratorForm() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-              placeholder="https://twitter.com/… or instagram.com/… or linkedin.com/… or reddit.com/…"
+              placeholder="https://twitter.com/… or instagram.com/… or linkedin.com/…"
               disabled={loading}
               style={{
                 width: "100%", padding: "12px 14px", paddingRight: platformLabel ? 120 : 14,

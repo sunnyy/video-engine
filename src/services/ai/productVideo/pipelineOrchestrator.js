@@ -1,37 +1,34 @@
 /**
  * pipelineOrchestrator.js
- * src/services/ai/productVideo/v2/pipelineOrchestrator.js
- *
- * Product Video v2 pipeline — HTML/CSS first, product shots injected after.
+ * Product Video pipeline v3 — image-first, direct layer construction.
  *
  * Flow:
- *  1.  Generate script + product analysis (GPT-4.1 vision)
- *  2.  Design scenes as HTML (GPT-5.4, parallel)
- *  3.  Parse HTML → scene graphs
- *  4.  Generate TTS for full script
- *  5.  Whisper transcription → word-level timestamps
- *  6.  Generate product shots (FAL nano-banana, one per scene, parallel)
- *  7.  Build timeline from scene graphs
- *  8.  Inject product shots into image-placeholder layers
- *  9.  For hybrid/video mode: generate video clips for selected shots
- * 10.  Inject voiceover audio layer
- * 11.  Background music
- * 12.  Logo injection
- * 13.  Save timeline to projects table
+ *  1.  analyzeProduct (GPT-4.1 vision) + buildVerticalReference — run in parallel
+ *  2.  generateProductScript (GPT-4.1 text, uses brief) — script + display_text + shot_directives
+ *  3.  TTS (ElevenLabs with-timestamps)
+ *  4.  Assign scene durations from word timestamps
+ *  5.  Generate product shots (FAL flux-kontext) + design HTML scenes (GPT-5.4) — in parallel
+ *  6.  parseSceneHTML → inject shot URLs into product-shot placeholders → buildTimeline
+ *  7.  Inject voiceover audio layer
+ *  8.  Background music
+ *  9.  Logo injection
+ * 10.  Save to projects table
  */
 
-import { supabaseAdmin }                                    from "../../../server/middleware/shared.js";
-import { generateFullVoiceover }  from "../promoVideo/ttsGenerator.js";
-import { pickAutoMood }                                     from "../../../core/registries/musicRegistry.js";
-import { generateProductScript, SCENE_BUDGETS }             from "./scriptGenerator.js";
-import { designProductScene }                               from "./sceneDesigner.js";
-import { parseSceneHTML }                                   from "./htmlParser.js";
-import { buildTimeline }                                    from "./timelineBuilder.js";
+import { supabaseAdmin }            from "../../../server/middleware/shared.js";
+import { generateFullVoiceover }    from "../promoVideo/ttsGenerator.js";
+import { pickAutoMood }             from "../../../core/registries/musicRegistry.js";
+import { analyzeProduct }           from "./productAnalyzer.js";
+import { generateProductScript, SCENE_BUDGETS } from "./scriptGenerator.js";
+import { designProductScene }       from "./sceneDesigner.js";
+import { parseSceneHTML }           from "../promoVideo/htmlParser.js";
+import { buildTimeline }            from "../promoVideo/timelineBuilder.js";
 
 const CANVAS = { width: 1080, height: 1920 };
+const FPS    = 30;
 const FAL_KEY = () => process.env.FAL_API_KEY || process.env.FAL_KEY;
 
-// ── Whisper timestamp assignment ──────────────────────────────────────────────
+// ── Timestamp assignment ───────────────────────────────────────────────────────
 
 function assignWhisperTimestamps(scenes, whisperWords) {
   if (!whisperWords?.length) return;
@@ -41,77 +38,25 @@ function assignWhisperTimestamps(scenes, whisperWords) {
     if (!segWords || wordIdx >= whisperWords.length) continue;
     const startWord = whisperWords[wordIdx];
     const endWord   = whisperWords[Math.min(wordIdx + segWords - 1, whisperWords.length - 1)];
-    scene.vo_start        = parseFloat((startWord?.start ?? 0).toFixed(3));
-    scene.vo_end          = parseFloat((endWord?.end ?? scene.vo_start + (scene.duration ?? 3)).toFixed(3));
+    scene.vo_start         = parseFloat((startWord?.start ?? 0).toFixed(3));
+    scene.vo_end           = parseFloat((endWord?.end ?? scene.vo_start + (scene.duration ?? 3)).toFixed(3));
     scene.duration_seconds = parseFloat(Math.max(1.0, scene.vo_end - scene.vo_start).toFixed(3));
     wordIdx = Math.min(wordIdx + segWords, whisperWords.length);
   }
 }
 
-// ── Product shot generation (FAL nano-banana) ─────────────────────────────────
+// ── Vertical reference composite ───────────────────────────────────────────────
+// Composites the product image onto a 9:16 dark canvas so FAL receives a
+// vertical-format reference image regardless of the original product photo shape.
 
-const ANCHOR = "Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, textures, branding, proportions, shape, and design details — completely unchanged. Only change the scene, environment, surface, lighting, and advertisement composition as described: ";
-const NO_TEXT = "STRICT RULE: This image must contain ZERO text, ZERO words, ZERO letters, ZERO numbers, ZERO UI elements, ZERO buttons, ZERO labels. Absolutely no typography of any kind. Pure photography only.\n";
-
-const INTENT_SHOT_PROMPTS = {
-  hook: NO_TEXT + "Create a dramatic, scroll-stopping product advertisement photograph. The product is the hero — cinematic lighting, bold atmosphere, premium commercial photography. Dark moody background with dramatic shadows. Leave generous negative space in the lower third for text overlay. Vertical 9:16 format.",
-  hero: NO_TEXT + "Create a clean, premium product hero photograph for a luxury advertisement. The product is centered and beautifully lit — studio quality, elegant and aspirational. Leave clear negative space on one side for headline text. Soft cinematic lighting, realistic reflections, luxury commercial photography quality. Vertical 9:16 format.",
-  features: NO_TEXT + "Create a detailed macro product photograph showcasing craftsmanship and material quality. Focus on textures, details, and premium construction. Background is neutral and complementary to the product colors, making product details pop. Leave clear space on the left third for feature text overlay. Vertical 9:16 format.",
-  offer: NO_TEXT + "Create a clean, bold product advertisement photograph optimized for promotional text overlay. The product is prominently placed with maximum visual impact. Leave very generous negative space in the upper half for large offer text overlay. Clean background derived from product colors. Vertical 9:16 format.",
-  cta: NO_TEXT + "Create a clean, elegant product advertisement photograph for a call-to-action. The product is centered and aspirational. Leave clear negative space in the lower third for CTA button and text overlay. Background is clean, minimal, and brand-appropriate. Vertical 9:16 format.",
-};
-
-async function generateSingleShot(referenceUrl, intent, userId, projectId, attempt = 1) {
-  const shotPrompt = INTENT_SHOT_PROMPTS[intent] ?? INTENT_SHOT_PROMPTS.hero;
-  try {
-    const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
-      method:  "POST",
-      headers: { "Authorization": `Key ${FAL_KEY()}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_urls: [referenceUrl], prompt: ANCHOR + shotPrompt }),
-    });
-    const raw = await falRes.text();
-    if (!falRes.ok) {
-      if (falRes.status === 429 && attempt < 3) {
-        await new Promise(r => setTimeout(r, 1500 * attempt));
-        return generateSingleShot(referenceUrl, intent, userId, projectId, attempt + 1);
-      }
-      throw new Error(`fal failed: ${raw.slice(0, 200)}`);
-    }
-    const data   = JSON.parse(raw);
-    const falUrl = data.images?.[0]?.url;
-    if (!falUrl) throw new Error("No image URL from fal");
-
-    const imgRes = await fetch(falUrl);
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
-    const key    = `product-videos/${userId}/${projectId}/v2-shot-${intent}-${Date.now()}.jpg`;
-    const { error: upErr } = await supabaseAdmin.storage
-      .from("user-assets").upload(key, buffer, { contentType: "image/jpeg", upsert: false });
-    if (upErr) return falUrl;
-    const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
-    return pub?.publicUrl ?? falUrl;
-  } catch (err) {
-    console.error(`[productShots] shot for intent=${intent} failed:`, err.message);
-    return null;
-  }
-}
-
-async function generateAllShots(scenes, vertRefUrl, userId, projectId) {
-  return Promise.all(
-    scenes.map(scene => generateSingleShot(vertRefUrl, scene.intent, userId, projectId))
-  );
-}
-
-// ── Vertical reference composite ──────────────────────────────────────────────
-// nano-banana mirrors input aspect ratio; compositing onto a vertical canvas fixes this.
-
-async function buildVerticalReference(productImageUrl, userId, projectId) {
+async function buildVerticalReference(productImageUrl, userId, runId) {
   try {
     const { default: sharp } = await import("sharp");
     const imgBuf = Buffer.from(await (await fetch(productImageUrl)).arrayBuffer());
     const meta   = await sharp(imgBuf).metadata();
     const TW = CANVAS.width, TH = CANVAS.height;
     const scale = Math.min((TW * 0.82) / (meta.width || TW), (TH * 0.60) / (meta.height || TH));
-    const fitW  = Math.round((meta.width || TW)  * scale);
+    const fitW  = Math.round((meta.width  || TW) * scale);
     const fitH  = Math.round((meta.height || TH) * scale);
     const left  = Math.round((TW - fitW) / 2);
     const top   = Math.round((TH - fitH) / 2);
@@ -119,7 +64,7 @@ async function buildVerticalReference(productImageUrl, userId, projectId) {
       .composite([{ input: await sharp(imgBuf).resize(fitW, fitH).toBuffer(), left, top }])
       .jpeg({ quality: 90 })
       .toBuffer();
-    const vKey = `product-videos/${userId}/${projectId}/v2-vref-${Date.now()}.jpg`;
+    const vKey = `product-videos/${userId}/${runId}/vref-${Date.now()}.jpg`;
     await supabaseAdmin.storage.from("user-assets").upload(vKey, vertBuf, { contentType: "image/jpeg", upsert: false });
     const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(vKey);
     console.log("[productPipeline] vertical reference created");
@@ -130,95 +75,116 @@ async function buildVerticalReference(productImageUrl, userId, projectId) {
   }
 }
 
-// ── Shot injection ────────────────────────────────────────────────────────────
+// ── FAL shot generation ────────────────────────────────────────────────────────
 
-function injectProductShots(timeline, shotUrls, scenes) {
-  for (const layer of timeline.layers) {
-    if (layer.type !== "image" || layer.assetType !== "product") continue;
-    // id format: s{sceneIndex}_...
-    const match      = layer.id?.match(/^s(\d+)_/);
-    const sceneIndex = match ? parseInt(match[1], 10) : 0;
-    const shotUrl    = shotUrls[sceneIndex];
-    if (shotUrl) {
-      layer.src       = shotUrl;
-      layer.objectFit = "cover";
-      console.log(`[productPipeline] injected shot for scene ${sceneIndex} → ${layer.id}`);
-    }
+// Every shot must leave the bottom 40% of the frame open for text overlay,
+// and contain zero typography so the timeline text layers read clearly.
+const NO_TEXT_SUFFIX = " Leave the bottom 40% of the frame as an open, uncluttered background surface — no product, no props — so text can overlay cleanly. No text, no words, no letters, no numbers, no UI elements in the image.";
+
+// Fallback per-intent prompts for the nano-banana fallback path.
+const FALLBACK_PROMPTS = {
+  hook:     "Create a dramatic editorial product hero photograph — cinematic, scroll-stopping. Product is the star, lit beautifully. Warm aspirational background (marble, linen, natural wood). Product fills 50–70% of the vertical frame. Ultra premium commercial photography. Vertical 9:16.",
+  hero:     "Create a premium lifestyle product photograph. Product centered on a beautiful warm surface (marble, fine fabric). Soft directional natural light. Optional tasteful lifestyle props around — not obscuring the product. Luxury editorial photography. Vertical 9:16.",
+  features: "Create an editorial flat-lay with natural lifestyle context — ingredients, materials, or complementary objects artfully arranged around the product. Warm tones. Product is the clear focal point. Natural light, editorial quality. Vertical 9:16.",
+  offer:    "Create a bold, high-energy product photograph. Product is front and center — large, impactful. Clean, bright, punchy. Editorial commercial photography. Vertical 9:16.",
+  cta:      "Create a clean, inviting lifestyle product photograph — aspirational and warm. Product sits elegantly on a premium surface with soft natural light. Minimal styling, maximum elegance. Vertical 9:16.",
+  standalone: "Create a dramatic aspirational product photograph — cinematic hero shot. Product fills 50–70% of the vertical frame. Warm, premium background. Commercial photography. Vertical 9:16.",
+};
+
+async function uploadShot(falUrl, userId, runId, intent) {
+  try {
+    const imgRes = await fetch(falUrl);
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const key    = `product-videos/${userId}/${runId}/shot-${intent}-${Date.now()}.jpg`;
+    const { error } = await supabaseAdmin.storage
+      .from("user-assets").upload(key, buffer, { contentType: "image/jpeg", upsert: false });
+    if (error) return falUrl;
+    const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    return pub?.publicUrl ?? falUrl;
+  } catch {
+    return falUrl;
   }
 }
 
-// ── Video clip generation (hybrid/video mode) ─────────────────────────────────
+async function generateShotKontext(vertRefUrl, shotDirective) {
+  const prompt = shotDirective + NO_TEXT_SUFFIX;
+  const falRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
+    method:  "POST",
+    headers: { "Authorization": `Key ${FAL_KEY()}`, "Content-Type": "application/json" },
+    body:    JSON.stringify({
+      image_url:   vertRefUrl,
+      prompt,
+      num_images:  1,
+      guidance_scale: 3.5,
+    }),
+  });
+  if (!falRes.ok) throw new Error(`flux-kontext ${falRes.status}: ${(await falRes.text()).slice(0, 200)}`);
+  const data = await falRes.json();
+  const url  = data.images?.[0]?.url ?? null;
+  if (!url) throw new Error("flux-kontext: no image URL in response");
+  return url;
+}
 
-async function generateVideoClips(timeline, shotUrls, scenes, visualMode) {
-  const targetIntents = visualMode === "video"
-    ? ["hook", "hero", "features", "offer", "cta"]
-    : ["hook", "hero"];
+async function generateShotNanoBanana(vertRefUrl, intent, shotDirective) {
+  const prompt = (shotDirective || FALLBACK_PROMPTS[intent] || FALLBACK_PROMPTS.hero) + NO_TEXT_SUFFIX;
+  const ANCHOR = "Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, textures, branding, proportions — completely unchanged. Only change the scene, environment, surface, lighting, and advertisement composition as described: ";
+  const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
+    method:  "POST",
+    headers: { "Authorization": `Key ${FAL_KEY()}`, "Content-Type": "application/json" },
+    body:    JSON.stringify({ image_urls: [vertRefUrl], prompt: ANCHOR + prompt }),
+  });
+  if (!falRes.ok) throw new Error(`nano-banana ${falRes.status}: ${(await falRes.text()).slice(0, 200)}`);
+  const data = await falRes.json();
+  const url  = data.images?.[0]?.url ?? null;
+  if (!url) throw new Error("nano-banana: no image URL in response");
+  return url;
+}
 
-  for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i];
-    if (!targetIntents.includes(scene.intent)) continue;
-    const sourceUrl = shotUrls[i];
-    if (!sourceUrl) continue;
-
-    const motionPrompt = `Slow cinematic zoom-in on the product. Subtle ambient motion. Premium advertisement quality. No text or graphics.`;
+async function generateSingleShot(vertRefUrl, scene, userId, runId, attempt = 1) {
+  const { intent, shot_directive } = scene;
+  try {
+    // Primary: flux-kontext (better product fidelity via image conditioning)
+    const url = await generateShotKontext(vertRefUrl, shot_directive || FALLBACK_PROMPTS[intent] || FALLBACK_PROMPTS.hero);
+    return await uploadShot(url, userId, runId, intent);
+  } catch (kontextErr) {
+    console.warn(`[productShots] scene ${scene.scene_index} kontext failed (${kontextErr.message}), falling back to nano-banana`);
     try {
-      const clipRes = await fetch("https://fal.run/fal-ai/kling-video/v1.6/pro/image-to-video", {
-        method:  "POST",
-        headers: { "Authorization": `Key ${FAL_KEY()}`, "Content-Type": "application/json" },
-        body:    JSON.stringify({ image_url: sourceUrl, prompt: motionPrompt, duration: "5", aspect_ratio: "9:16" }),
-      });
-      if (!clipRes.ok) { console.warn(`[productPipeline] clip gen scene ${i} failed: ${clipRes.status}`); continue; }
-      const clipData = await clipRes.json();
-      const videoUrl = clipData?.video?.url ?? null;
-      if (!videoUrl) continue;
-
-      // Replace the image layer for this scene with a video layer
-      for (const layer of timeline.layers) {
-        const match = layer.id?.match(/^s(\d+)_/);
-        if (!match || parseInt(match[1], 10) !== i) continue;
-        if (layer.type === "image" && layer.assetType === "product") {
-          layer.type = "video";
-          layer.src  = videoUrl;
-          console.log(`[productPipeline] video clip injected for scene ${i}`);
-          break;
-        }
+      // Fallback: nano-banana (proven but weaker product preservation)
+      if (attempt <= 2 && kontextErr.message?.includes("429")) {
+        await new Promise(r => setTimeout(r, 1500 * attempt));
       }
-    } catch (err) {
-      console.error(`[productPipeline] clip gen scene ${i} error:`, err.message);
+      const url = await generateShotNanoBanana(vertRefUrl, intent, shot_directive);
+      return await uploadShot(url, userId, runId, intent);
+    } catch (fallbackErr) {
+      console.error(`[productShots] scene ${scene.scene_index} all shot generation failed:`, fallbackErr.message);
+      return null;
     }
   }
 }
 
-// ── Logo injection ────────────────────────────────────────────────────────────
+async function generateAllShots(scenes, vertRefUrl, userId, runId) {
+  return Promise.all(scenes.map(scene => generateSingleShot(vertRefUrl, scene, userId, runId)));
+}
+
+// ── Logo injection ─────────────────────────────────────────────────────────────
 
 function injectLogo(timeline, logoUrl, scenes) {
   if (!logoUrl) return;
-  const logoSceneIndices = scenes
-    .map((s, i) => ({ intent: s.intent, i }))
-    .filter(({ intent }) => intent === "hook" || intent === "cta")
-    .map(({ i }) => i);
-
-  // Add logo layers for hook and cta scenes
   let cursor = 0;
   for (let i = 0; i < scenes.length; i++) {
     const dur   = scenes[i].duration_seconds ?? 4;
     const start = parseFloat(cursor.toFixed(4));
     const end   = parseFloat((cursor + dur).toFixed(4));
     cursor = end;
-    if (!logoSceneIndices.includes(i)) continue;
+    const isHookOrCTA = scenes[i].intent === "hook" || scenes[i].intent === "cta" || scenes[i].intent === "standalone";
+    if (!isHookOrCTA) continue;
     timeline.layers.push({
-      id:       `s${i}_logo`,
-      trackId:  `s${i}_logo`,
-      name:     "Logo",
-      type:     "image",
-      src:      logoUrl,
+      id: `s${i}_logo`, trackId: `s${i}_logo`,
+      name: "Logo", type: "image", src: logoUrl,
       objectFit: "contain",
-      start, end,
-      zIndex:   20,
-      visible:  true,
-      locked:   false,
-      sfx:      null,
-      filter:   null, boxShadow: null, mixBlendMode: null, backdropFilter: null,
+      start, end, zIndex: 20,
+      visible: true, locked: false,
+      sfx: null, filter: null, boxShadow: null, mixBlendMode: null, backdropFilter: null,
       keyframes: { x: [], y: [], scale: [], rotation: [], opacity: [{ time: 0, value: 0 }, { time: 0.4, value: 1 }], blur: [] },
       transition: { in: { type: "fade", duration: 0.4 }, out: { type: "none", duration: 0 } },
       transform: { x: 60, y: 100, width: 200, height: 80, opacity: 0.92, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
@@ -228,9 +194,9 @@ function injectLogo(timeline, logoUrl, scenes) {
 
 // ── Music injection ────────────────────────────────────────────────────────────
 
-async function injectMusic(timeline, project) {
+async function injectMusic(timeline, productMood) {
   try {
-    const mood = pickAutoMood(null, project.productMood ?? "premium");
+    const mood = pickAutoMood(null, productMood ?? "premium");
     const { data: allTracks } = await supabaseAdmin
       .from("music_tracks").select("public_url, title, mood").eq("is_active", true);
     if (!allTracks?.length) return;
@@ -246,38 +212,47 @@ async function injectMusic(timeline, project) {
       volume: 0.25, muted: false, fadeIn: 1, fadeOut: 1,
       sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
     });
-    console.log(`[productPipeline] music injected: "${track.title}" (${mood})`);
+    console.log(`[productPipeline] music: "${track.title}" (${mood})`);
   } catch (e) {
     console.warn("[productPipeline] music injection skipped:", e.message);
   }
 }
 
-// ── Save timeline ──────────────────────────────────────────────────────────────
+// Minimum scene durations — ensures animations have room to complete
+const MIN_DUR = { hook: 2.8, hero: 3.2, features: 3.5, offer: 2.8, cta: 3.5, standalone: 6.0 };
 
-async function saveTimeline(timeline, project) {
+// ── Save ───────────────────────────────────────────────────────────────────────
+
+async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
   try {
     const { data: row } = await supabaseAdmin
       .from("projects")
       .insert({
         user_id:           project.userId,
-        name:              `${project.brandName ?? "Product"} — Product Ad`,
+        name:              timeline.name,
         safe_project_json: timeline,
         orientation:       "9:16",
         mode:              "timeline",
         source:            "product_video",
         editor_version:    "timeline",
-        raw_ai_json:       {
-          script:     project._scriptMeta ?? null,
-          scenes:     project._scenes?.map(s => ({ intent: s.intent, archetype: s.archetype ?? null, visual_concept: s.visual_concept, script_segment: s.script_segment })) ?? null,
-          sceneHTMLs: project._sceneHTMLs ?? null,
+        raw_ai_json: {
+          brief:      project._brief ?? null,
+          sceneHTMLs,
+          scenes: scenes.map(s => ({
+            intent:         s.intent,
+            script_segment: s.script_segment,
+            display_text:   s.display_text,
+            visual_concept: s.visual_concept,
+            shot_directive: s.shot_directive,
+          })),
         },
       })
       .select("id")
       .single();
-    console.log(`[productPipeline] timeline saved → editor project ${row?.id}`);
+    console.log(`[productPipeline] saved → project ${row?.id}`);
     return row?.id ?? null;
   } catch (e) {
-    console.warn("[productPipeline] timeline save failed (non-fatal):", e.message);
+    console.warn("[productPipeline] save failed (non-fatal):", e.message);
     return null;
   }
 }
@@ -290,17 +265,30 @@ async function saveTimeline(timeline, project) {
  * @param {object} project
  *   userId, productImageUrl, brandName, productDescription, ctaText,
  *   offerText, website, logoUrl, accentColor, visualMode, sceneCount,
- *   tone, voiceId
+ *   goal, voiceId
  * @returns {{ editor_project_id, total_duration, shots }}
  */
 export async function runProductVideoPipeline(project) {
   const { userId, productImageUrl, visualMode = "image" } = project;
+  const runId = `pv3-${Date.now()}`;
 
-  // ── Step 1: Script + product analysis ────────────────────────────────────
-  console.log("[productPipeline] step 1 — generating script");
+  // ── Step 1: Analyze product image + build vertical reference (parallel) ────
+  console.log("[productPipeline] step 1 — analyzing product + building reference");
+  const [brief, vertRefUrl] = await Promise.all([
+    analyzeProduct(productImageUrl),
+    buildVerticalReference(productImageUrl, userId, runId),
+  ]);
+
+  // User-supplied accent overrides the analyzer
+  const accentColor  = project.accentColor ?? brief.accent_color;
+  const productMood  = brief.product_mood;
+  const productTheme = brief.product_theme;
+
+  // ── Step 2: Generate script (text-only — brief has the visual analysis) ───
+  console.log("[productPipeline] step 2 — generating script");
   const scriptResult = await generateProductScript({
-    productImageUrl,
-    brandName:          project.brandName          ?? "",
+    productBrief:       brief,
+    brandName:          project.brandName          ?? brief.product_name ?? "",
     productDescription: project.productDescription ?? "",
     ctaText:            project.ctaText            ?? "Shop Now",
     offerText:          project.offerText          ?? "",
@@ -311,62 +299,24 @@ export async function runProductVideoPipeline(project) {
 
   let scenes        = scriptResult.scenes.map(s => ({ ...s }));
   const full_script = scriptResult.full_script;
-  const accentColor  = project.accentColor ?? scriptResult.accent_color ?? "#7c5cfc";
-  const productMood  = scriptResult.product_mood  ?? "premium";
-  const productTheme = scriptResult.product_theme ?? "dark";
-
-  // ── Build project context for scene designer ──────────────────────────────
-  const projectContext = {
-    brandName:    project.brandName    ?? "Brand",
-    ctaText:      project.ctaText      ?? "Shop Now",
-    offerText:    project.offerText    ?? "",
-    website:      project.website      ?? "",
-    accentColor,
-    theme:        productTheme,
-    canvasWidth:  CANVAS.width,
-    canvasHeight: CANVAS.height,
-    formatRatio:  "9:16",
-    productMood,
-  };
-
-  // ── Step 2: Design all scenes in parallel (HTML/CSS) ─────────────────────
-  console.log(`[productPipeline] step 2 — designing ${scenes.length} scenes`);
-  const sceneResults = await Promise.all(
-    scenes.map(async (scene) => {
-      try {
-        const html  = await designProductScene(scene, projectContext);
-        const graph = parseSceneHTML(html || "", scene.scene_index, CANVAS);
-        console.log(`[productPipeline] scene ${scene.scene_index} (${scene.intent}) → ${graph.length} layers`);
-        return { graph, html };
-      } catch (err) {
-        console.error(`[productPipeline] scene ${scene.scene_index} design failed:`, err.message);
-        return { graph: [], html: null };
-      }
-    })
-  );
-  const sceneGraphs = sceneResults.map(r => r.graph);
-  const sceneHTMLs  = sceneResults.map(r => r.html);
 
   // ── Step 3: TTS ───────────────────────────────────────────────────────────
-  console.log("[productPipeline] step 3 — generating voiceover");
-  let voiceoverAudioUrl = null, voiceoverDuration = 0, voiceoverBuffer = null;
+  console.log("[productPipeline] step 3 — voiceover");
+  let voiceoverUrl = null, voiceoverDuration = 0;
   try {
     const voiceId = (project.voiceId && project.voiceId.length > 8) ? project.voiceId : null;
-    const tts = await generateFullVoiceover(full_script, `pv2-${Date.now()}`, voiceId);
-    voiceoverAudioUrl = tts.audio_url;
+    const tts = await generateFullVoiceover(full_script, runId, voiceId);
+    voiceoverUrl      = tts.audio_url;
     voiceoverDuration = tts.duration_seconds;
-    voiceoverBuffer   = tts.buffer;
     if (tts.wordTimestamps?.length) {
       assignWhisperTimestamps(scenes, tts.wordTimestamps);
-      console.log(`[productPipeline] step 4 — ${tts.wordTimestamps.length} word timestamps from ElevenLabs`);
-    } else {
-      console.warn("[productPipeline] step 4 — no timestamps, using intent budgets");
+      console.log(`[productPipeline] step 4 — ${tts.wordTimestamps.length} word timestamps`);
     }
   } catch (err) {
     console.error("[productPipeline] TTS failed (non-fatal):", err.message);
   }
 
-  // Extend last scene to cover full voiceover audio
+  // Extend last scene to cover full voiceover
   if (voiceoverDuration > 0 && scenes.length > 0) {
     const sumDur = scenes.reduce((a, s) => a + (s.duration_seconds ?? 0), 0);
     const last   = scenes[scenes.length - 1];
@@ -376,85 +326,97 @@ export async function runProductVideoPipeline(project) {
     last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + 0.4).toFixed(3));
   }
 
-  // ── Step 5: Build vertical reference for FAL ──────────────────────────────
-  console.log("[productPipeline] step 5 — building vertical reference");
-  const vertRefUrl = await buildVerticalReference(productImageUrl, userId, `pv2-${Date.now()}`);
-
-  // ── Step 6: Generate product shots (parallel) ─────────────────────────────
-  console.log(`[productPipeline] step 6 — generating ${scenes.length} product shots`);
-  const shotUrls = await generateAllShots(scenes, vertRefUrl, userId, `pv2-${Date.now()}`);
-  const validShots = shotUrls.map((url, i) => url ?? productImageUrl);
-
-  // ── Step 7: Build timeline ────────────────────────────────────────────────
-  console.log("[productPipeline] step 7 — building timeline");
-  const { timeline } = buildTimeline(sceneGraphs, scenes, {
-    ...projectContext,
-    projectId:  null,
-    musicMood:  productMood,
-  });
-
-  // ── Step 8: Inject product shots ──────────────────────────────────────────
-  injectProductShots(timeline, validShots, scenes);
-
-  // ── Step 9: Video clips for hybrid/video mode ─────────────────────────────
-  if (visualMode === "hybrid" || visualMode === "video") {
-    console.log(`[productPipeline] step 9 — generating video clips (${visualMode})`);
-    await generateVideoClips(timeline, validShots, scenes, visualMode);
+  // Apply minimum durations before scene design / timeline build
+  for (const scene of scenes) {
+    const raw = scene.duration_seconds ?? (SCENE_BUDGETS[scene.intent]?.duration ?? 3.5);
+    scene.duration_seconds = Math.max(raw, MIN_DUR[scene.intent] ?? 2.8);
   }
 
-  // ── Step 10: Inject voiceover ─────────────────────────────────────────────
-  if (voiceoverAudioUrl) {
+  const projectContext = {
+    brandName:       project.brandName ?? brief.product_name ?? "Brand",
+    ctaText:         project.ctaText   ?? "Shop Now",
+    offerText:       project.offerText ?? "",
+    website:         project.website   ?? "",
+    accentColor,
+    theme:           productTheme,
+    productMood,
+    productTheme,
+    productCategory: scriptResult.product_category || brief.product_category || brief.product_name || "Product",
+    canvasWidth:     CANVAS.width,
+    canvasHeight:    CANVAS.height,
+    fps:             FPS,
+    musicMood:       productMood ?? "premium",
+    productName:     project.brandName ?? brief.product_name ?? "Product",
+  };
+
+  // ── Steps 5+6: Generate product shots AND design HTML scenes — in parallel ─
+  console.log(`[productPipeline] steps 5+6 — generating ${scenes.length} shots + scene HTML in parallel`);
+  const sceneResults = await Promise.all(
+    scenes.map(async (scene) => {
+      try {
+        const [shotUrl, html] = await Promise.all([
+          generateSingleShot(vertRefUrl, scene, userId, runId),
+          designProductScene(scene, brief, projectContext),
+        ]);
+
+        const resolvedUrl = shotUrl ?? productImageUrl;
+        const graph = parseSceneHTML(html || "", scene.scene_index, CANVAS);
+
+        // Inject the product shot URL into the product-shot placeholder
+        for (const entry of graph) {
+          if (entry.assetType === "product-shot") {
+            entry.src = resolvedUrl;
+          }
+        }
+
+        console.log(`[productPipeline] scene ${scene.scene_index} (${scene.intent}) — ${graph.length} layers, shot=${resolvedUrl ? "ok" : "fallback"}`);
+        return { graph, html, shotUrl: resolvedUrl };
+      } catch (err) {
+        console.error(`[productPipeline] scene ${scene.scene_index} failed:`, err.message);
+        return { graph: [], html: null, shotUrl: productImageUrl };
+      }
+    })
+  );
+
+  const sceneGraphs = sceneResults.map(r => r.graph);
+  const sceneHTMLs  = sceneResults.map(r => r.html);
+  const validShots  = sceneResults.map(r => r.shotUrl);
+
+  // ── Step 7a: Build timeline via shared builder ─────────────────────────────
+  console.log("[productPipeline] building timeline");
+  const { timeline: rawTimeline } = buildTimeline(sceneGraphs, scenes, projectContext);
+  const timeline = {
+    ...rawTimeline,
+    name: `${project.brandName || brief.product_name || "Product"} — Product Ad`,
+    meta: { ...rawTimeline.meta, source: "product_video", scene_format: "v4" },
+  };
+
+  // ── Step 7b: Inject voiceover ─────────────────────────────────────────────
+  if (voiceoverUrl) {
     const totalDur = timeline.format.duration;
     timeline.layers.push({
-      id:        "voiceover_full",
-      trackId:   "track_voiceover",
-      type:      "audio",
-      audioType: "voiceover",
-      src:       voiceoverAudioUrl,
-      start:     0,
-      end:       totalDur,
-      zIndex:    0,
-      visible:   true,
-      locked:    false,
-      trimStart: 0,
-      trimEnd:   totalDur,
-      volume:    1.0,
-      muted:     false,
-      fadeIn:    0.1,
-      fadeOut:   0.3,
-      sfx:       null,
-      keyframes: {},
-      animation: null,
-      transition: null,
-      transform:  null,
+      id: "voiceover_full", trackId: "track_voiceover",
+      type: "audio", audioType: "voiceover", src: voiceoverUrl,
+      start: 0, end: totalDur, zIndex: 0,
+      visible: true, locked: false, trimStart: 0, trimEnd: totalDur,
+      volume: 1.0, muted: false, fadeIn: 0.1, fadeOut: 0.3,
+      sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
     });
   }
 
-  // ── Step 11: Music ────────────────────────────────────────────────────────
-  await injectMusic(timeline, { productMood });
+  // ── Step 8: Music ─────────────────────────────────────────────────────────
+  await injectMusic(timeline, productMood);
 
-  // ── Step 12: Logo ─────────────────────────────────────────────────────────
+  // ── Step 9: Logo ──────────────────────────────────────────────────────────
   if (project.logoUrl) {
     injectLogo(timeline, project.logoUrl, scenes);
   }
 
-  // ── Step 13: Save ─────────────────────────────────────────────────────────
-  const projectWithMeta = {
-    ...project,
-    productMood,
-    _scenes:     scenes,
-    _sceneHTMLs: sceneHTMLs,
-    _scriptMeta: {
-      accent_color:     accentColor,
-      product_mood:     productMood,
-      product_theme:    productTheme,
-      product_category: scriptResult.product_category ?? null,
-    },
-  };
-  const editorProjectId = await saveTimeline(timeline, projectWithMeta);
+  // ── Step 10: Save ─────────────────────────────────────────────────────────
+  const editorProjectId = await saveTimeline(timeline, { ...project, _brief: brief }, scenes, sceneHTMLs);
 
   const totalDuration = parseFloat(timeline.format.duration.toFixed(2));
-  console.log(`[productPipeline] done — ${scenes.length} scenes, ${totalDuration}s, editor=${editorProjectId}`);
+  console.log(`[productPipeline] done — ${scenes.length} scenes, ${totalDuration}s, project=${editorProjectId}`);
 
   return {
     editor_project_id: editorProjectId,

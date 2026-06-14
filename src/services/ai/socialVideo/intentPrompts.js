@@ -1,20 +1,17 @@
 /**
  * intentPrompts.js
- * Scene designer prompts for the Social Video pipeline.
+ * Art-director prompt for the Social Video pipeline.
  *
- * Archetypes:
- *   typography_hero   — hook: massive text dominates canvas
- *   quote_statement   — quote: premium quote card
- *   single_stat       — stat: one number dominates
- *   full_bleed_image  — image: fetched social image fills canvas
- *   split_composition — image: image left, text right
- *   minimal_cta       — cta: clean attribution + action
+ * The scriptGenerator (creative director) hands each scene a free-form
+ * creative_brief. This prompt does NOT impose a fixed archetype menu — it gives
+ * the model the rendering primitives (data-attribute schema, animation enum,
+ * layout rules) and asks it to compose whatever frame best realizes the brief.
  */
 
 export function buildSocialScenePrompt(visualText, sceneContext) {
   const {
-    sceneIntent      = "quote",
-    archetype        = null,
+    sceneIntent      = "scene",
+    creativeBrief    = "",
     visualConcept    = "",
     hasFetchedImage  = false,
     palette          = {},
@@ -23,6 +20,8 @@ export function buildSocialScenePrompt(visualText, sceneContext) {
     author           = "",
     authorHandle     = "",
   } = sceneContext;
+
+  const brief = creativeBrief || visualConcept || "";
 
   const bg   = palette.background          ?? "#0A0A0A";
   const bg2  = palette.backgroundSecondary ?? "#111111";
@@ -38,7 +37,8 @@ export function buildSocialScenePrompt(visualText, sceneContext) {
   const CANVAS_H = 1920;
 
   const system = `You are a world-class motion graphics art director for short-form viral social media videos.
-Design a single 9:16 video frame (${CANVAS_W}x${CANVAS_H}px).
+You are handed a CREATIVE BRIEF for ONE scene. Design the single 9:16 video frame (${CANVAS_W}x${CANVAS_H}px) that best realizes that brief — its narrative purpose, focal point, and feeling.
+There is no fixed layout menu. Compose freely using the primitives below to serve the brief.
 Output ONLY a self-contained HTML file with inline CSS. Nothing before <!DOCTYPE html>.
 
 RULES:
@@ -106,26 +106,28 @@ BUTTONS / CTA ELEMENTS — CRITICAL RULE, NO EXCEPTIONS:
 - Never size the button with a fixed width — let padding determine its size (width:auto).
 
 SOCIAL IMAGE PLACEHOLDER:
-When use_fetched_image is true and the archetype calls for the post's actual image, use:
+When use_fetched_image is true and the brief calls for the post's actual image, use:
 <div data-role="image-placeholder" data-layer="image" data-asset-type="social-image" data-animation="fade-in" data-scene-element="hero" style="position:absolute;left:[x]px;top:[y]px;width:[w]px;height:[h]px;z-index:[z];background:rgba(255,255,255,0.04);border-radius:[r]px;"></div>
 Only use data-asset-type="social-image" — never "stock", "ai", or "asset".
 
-ARCHETYPE EXECUTION:
-  typography_hero  → massive headline text owns the canvas. Accent color for key words. Minimal decoration. Nothing competes with text.
-  quote_statement  → the quote owns the canvas. Large quotation marks in accent color. Attribution below in muted color. Premium card or no card at all.
-  single_stat      → one massive number in accent color, plus a short label above or below. Radial glow behind the number. Nothing else competes.
-  list_reveal      → STRICT RULES: Parse DISPLAY TEXT by newlines — each line is one list item. Render each line as a separate positioned text element in a tight vertical stack. Layout: title label at top (~y:200), items start at ~y:340, each item ~90px taller than the previous (y += 90). Item style: font-size 46–52px, body font, primaryText color, left ~80px, width ~900px. Prefix each item with "→ " or a bullet "• ". Add a short header above the list (what this list is about). Animate: each item data-animation="fade-up", staggered. Do NOT scatter items — they must form a clean readable column.
-  full_bleed_image → social-image placeholder fills 70%+ of canvas (top portion). Short caption or title text at bottom, overlaid on dark gradient.
-  split_composition→ social-image on top half (~55%), bold text block on bottom half. Clear horizontal separation.
-  minimal_cta      → bold CTA text dominates (e.g. "SAVE THIS", "FOLLOW FOR MORE"). No author name, no platform name.
+COMPOSITION GUIDANCE (a toolkit, NOT templates):
+Choose and combine whatever serves the brief. Proven moves you can draw on:
+  - One massive headline owning the canvas — for a bold claim or scroll-stopping hook.
+  - A premium quote treatment with oversized quotation marks in accent color — for a key statement.
+  - One giant number with a radial glow behind it and a short label — for a striking stat.
+  - A clean vertical stack, one item per line, staggered fade-up — for a list (parse DISPLAY TEXT by newlines; one positioned element per line; tight readable column, never scattered).
+  - A full-bleed social image with a short caption over a dark gradient — when the image is the hero.
+  - A split frame, image on one side / bold text on the other — to pair a visual with a message, or to stage a two-sided comparison.
+  - A bold standalone action line — for a call to action.
+Mix, break, or go beyond these as the brief demands. The brief's feeling and focal point ALWAYS win over any convention. Match the motion (animation choices) to the feeling the brief asks for.
 
-ANIMATION:
+ANIMATION (pick per the feeling the brief wants — stay within this set):
   Background/glow:  data-animation="none" or "fade-in"
-  Headline:         data-animation="fade-up"
-  Subhead/quote:    data-animation="fade-up"
-  Stat number:      data-animation="scale-in"
+  Headlines/quotes: data-animation="fade-up"
+  Stat numbers:     data-animation="scale-in"
   Attribution:      data-animation="fade-in"
   CTA:              data-animation="scale-in"
+  Lateral motion:   data-animation="slide-left"
 
 ABSOLUTE PROHIBITIONS — violating any of these invalidates the entire scene:
 - NEVER display any author name, username, or @handle UNLESS the AUTHOR ATTRIBUTION directive explicitly instructs it
@@ -150,16 +152,16 @@ Place the author credit in the bottom-left corner of the canvas, small and taste
   - One line only: handle preferred, or "name · handle" if both present`
     : "";
 
-  const user = `ARCHETYPE: ${archetype ?? sceneIntent}
-INTENT: ${sceneIntent}
-VISUAL CONCEPT: ${visualConcept || "(choose best approach)"}
+  const user = `CREATIVE BRIEF (design the frame that realizes this):
+"${brief || "(no brief — use your best judgment for this scene)"}"
+SCENE INTENT: ${sceneIntent}
 ${useFetchedImageNote}
 ${attributionDirective}
 DISPLAY TEXT (show in scene):
 "${visualText}"
 
-Design a stunning, viral-quality social video scene for this content.
-Make it look premium, bold, and shareable.
+Design the single most striking, premium, scroll-stopping 9:16 frame that delivers this brief.
+The composition, focal point, and motion must match the brief's feeling — not a generic layout.
 ${showAttribution ? "Author credit is allowed on this scene only — small, bottom-left, as described above." : "Remember: NO author names, NO handles, NO platform names — anywhere."}`;
 
   return { system, user };

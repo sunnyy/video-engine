@@ -2,8 +2,10 @@
  * scriptGenerator.js
  * src/services/ai/promoVideo/v2/scriptGenerator.js
  *
- * Generates one continuous full_script + scene array for a v2 promo video.
- * Scene durations are intent-driven budgets; actual timing comes from Whisper
+ * GPT-4.1 acts as creative director + copywriter: it reads a product and decides
+ * the narrative angle and beat structure that best sell THAT product (no fixed
+ * funnel template), then writes one continuous full_script + scene array.
+ * Scene durations are soft budgets; actual timing comes from Whisper
  * transcription of the single voiceover in pipelineOrchestrator.
  */
 
@@ -21,6 +23,7 @@ const INTENT_DURATIONS = {
   standalone:  8.0,
 };
 
+// Kept for parseCustomScript (user-provided scripts) and any legacy callers.
 export const INTENT_PATTERNS = {
   1: [
     { name: 'standalone', intents: ['standalone'], tone: 'Complete story in one scene — pain, product, CTA.' },
@@ -62,15 +65,15 @@ export const SCENE_WORD_BUDGETS = {
 };
 
 export const INTENT_DESCRIPTIONS = {
-  hook:       'Open with a specific recognizable question or statement that signals the product category instantly. Viewer must know within 2 seconds what kind of product this is for. Never abstract or poetic.',
-  problem:    'Deepen the pain with specific tasks or scenarios the target customer lives through daily. Make it feel personal and real. Do not introduce the product here.',
-  solution:   'Introduce the product by name. One clear line on what it does. Show the relief — what changes after using it. This is the first time the product name appears unless the pattern is product_first.',
-  benefit:    'One clear customer outcome. Focus on what the customer gets, not what the product does. Time saved, results achieved, simplicity gained. Make it feel attainable.',
-  feature:    'One specific capability shown in action. Concrete, visual, demonstrable. Not a feature list — one feature done well.',
-  process:    'Show how it works step by step. Simple, fast, logical sequence. Make the workflow feel effortless.',
-  proof:      'Social proof, numbers, or results. Real and specific. e.g. a concrete stat or "Creators are already posting today."',
-  cta:        'One direct energetic action — product name + call to action as a single flowing thought. No em dashes. No full stops mid-sentence. Comma only.',
-  standalone: 'Complete self-contained video. Must include: pain, product introduction by name, CTA. All three beats in one flowing script. Never leave viewer without knowing what product is and what to do next.',
+  hook:       'Open with a specific recognizable question or statement that signals the product category instantly.',
+  problem:    'Deepen the pain with specific tasks or scenarios the target customer lives through daily.',
+  solution:   'Introduce the product by name. One clear line on what it does. Show the relief.',
+  benefit:    'One clear customer outcome — what the customer gets, not what the product does.',
+  feature:    'One specific capability shown in action. Concrete, visual, demonstrable.',
+  process:    'Show how it works step by step. Simple, fast, logical.',
+  proof:      'Social proof, numbers, or results. Real and specific.',
+  cta:        'One direct energetic action — product name + call to action as a single flowing thought.',
+  standalone: 'Complete self-contained video: pain, product by name, and CTA in one flowing script.',
 };
 
 const TONE_INSTRUCTIONS = {
@@ -94,16 +97,29 @@ Energy: quiet confidence. Pace: deliberate. Fewer words is always better.`,
 
 function buildSystemPrompt(sceneCountInstruction, languageInstruction, tone = "professional") {
   const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.professional;
-  return `You are an elite SaaS promo video copywriter who writes scripts that make people stop scrolling.
+  return `You are an elite creative director and SaaS promo video copywriter who writes scripts that make people stop scrolling.
 
-Your job is to read a product description and write a short-form promo video script that feels human, specific, and emotionally persuasive.
+You read a product and decide — like a creative director — the single best way to tell ITS story. You are NOT filling a fixed funnel template.
 
-Before writing anything, think through:
+STEP 1 — THINK LIKE A DIRECTOR (before writing):
 1. Who specifically uses this product? What does their day look like? What frustrates them?
-2. What specific painful thing does this product eliminate or replace?
-3. What does success feel like for this customer after using the product?
+2. What painful thing does this product eliminate or replace?
+3. What does success feel like for this customer after using it?
+4. What is the most compelling ANGLE for THIS product? Pain-led story, confident product-first reveal, a bold provocative claim, a transformation, a "you're doing it wrong" hook, a fast demo… Choose the angle that fits this product — not a default.
 
-Then write the script from inside that frustration — not from a feature list.
+STEP 2 — DESIGN THE SCRIPT AROUND THAT ANGLE:
+- YOU decide the beats, their order, and how many scenes (within the requested count).
+- There is NO mandatory opening or closing beat. A CTA close is common for promos but optional if another ending lands harder.
+- Give each scene a short intent keyword in your own words (e.g. "hook", "pain", "reveal", "outcome", "proof", "demo", "cta" — invent what fits the story).
+- Write from inside the customer's frustration, never from a feature list.
+
+HOOK OPENING RULE — the first scene is special:
+- The opening line must be a relatable, second-person question or statement about the ACTIVITY / job-to-be-done at a HIGH level — the thing the viewer is tired of doing.
+  RIGHT: "Still editing every video by hand?" / "Tired of making videos manually?" / "Spending hours producing one short video?"
+  WRONG (do NOT open with a list of micro-tasks): "Writing scripts. Finding assets. Tweaking timelines. Fixing captions."
+- Name the broad pain the viewer instantly recognizes — not the granular sub-tasks. Within 2 seconds the viewer must know what kind of product this is for.
+- Never abstract or poetic. Never a feature. Never a task checklist.
+- The rapid-fire list of granular pain points belongs in a LATER problem/pain scene — never in the hook.
 
 ${languageInstruction}
 ${toneInstruction}
@@ -112,23 +128,20 @@ SCRIPT RULES:
 - Sound like a founder talking to a friend. Casual, direct, confident.
 - Write in short fragments, not complete sentences. One idea per line. Like a human talking fast.
 - Vary sentence length dramatically — mix very short punchy lines with slightly longer ones for rhythm.
-- For problem/frustration scenes: use a rapid-fire list of specific pain points the customer recognizes from their own life. Not a paragraph — each item 2–4 words. "Writing scripts. Finding assets. Tweaking layouts. Fixing captions."
+- In a problem/pain scene (AFTER the hook — never the opening line): use a rapid-fire list of specific pain points the customer recognizes. Each item 2–4 words. "Writing scripts. Finding assets. Tweaking layouts. Fixing captions."
 - Never list features. Never use buzzwords.
 - Never say: revolutionize, unlock, game-changing, next-generation, cutting-edge, leverage, utilize.
 - The product should feel like the solution, not the subject.
-- Every word must earn its place. Cut anything that doesn't move the story forward.
-- Read the script out loud. If it sounds like a press release, rewrite it. If it sounds like a founder venting to a friend, it's right.
+- Every word must earn its place. Read it out loud — if it sounds like a press release, rewrite it.
 
 PRODUCT NAME RULE:
 Never mention "AI" in the script. Refer to the product by name instead.
 Wrong: "AI builds your video in seconds"
 Right: "[Product name] turns your topic into a finished video in seconds"
-The product name must appear at least twice: once in the solution scene, once in the CTA.
+The product name must appear at least twice across the script — once when you reveal the product, once in the closing action.
 
-SOLUTION SCENE RULE:
-The solution scene introduces the product for the first time. Name it directly.
-Tell the viewer what it does in one clear line, then show the relief — what changes for the customer.
-Structure: "[Product] is your [what it does]. [What the customer gets]."
+PRODUCT REVEAL:
+Whenever you first introduce the product, name it directly and say what it does in one clear line, then show the relief — what changes for the customer.
 
 PUNCTUATION RULE:
 - Periods: use after each complete pain point or statement. Each item in a list of frustrations gets its own period — natural breath between each one.
@@ -136,7 +149,7 @@ PUNCTUATION RULE:
 - Em dash (—): dramatic pause between two contrasting beats. "Stuck for hours — done in seconds."
 - Question marks: perfect for opening hooks that address the viewer directly.
 
-PAIN POINT LISTS — always use periods, never commas:
+PAIN POINT LISTS (problem scene only, never the hook) — always use periods, never commas:
 WRONG: "Writing scripts, finding stock, endless cuts, audio won't sync."
 RIGHT: "Writing scripts. Finding stock. Endless cuts. Audio won't sync."
 
@@ -147,18 +160,25 @@ CTA PUNCTUATION — never use em dash in CTA. Use a comma instead.
 The CTA must read as one continuous energetic thought, not two separate statements.
 WRONG: "Stop wasting hours — try Vidquence free today"
 RIGHT: "Stop wasting hours, try Vidquence free today"
-RIGHT: "Skip the grind, launch Vidquence now"
+
+PER-SCENE CREATIVE BRIEF:
+For each scene, brief the art director who will design the frame:
+- intent: your keyword for this scene's job.
+- creative_brief: 1–2 sentences — what this scene DOES narratively AND how it should LOOK and FEEL (focal point, energy, motion feeling). This is the most important field; be vivid and specific.
+- script_segment: the spoken words for this scene (consecutive substring of full_script, no gaps).
+- wants_product_visual: true if this scene should SHOW the actual product (a screenshot / UI), false otherwise. You decide per beat — typically true when revealing the product, showing a feature, or demoing; false for pure pain, hook, or CTA moments.
 
 OUTPUT FORMAT — return only valid JSON:
 {
+  "creative_direction": "one sentence: the angle you chose and why it fits this product",
   "full_script": "complete voiceover from start to finish as natural flowing speech",
   "scenes": [
     {
       "scene_index": 0,
       "intent": "hook",
-      "archetype": "typography_hero",
+      "creative_brief": "what this scene does narratively + how it looks and feels",
       "script_segment": "exact words from full_script for this scene",
-      "visual_concept": "one short phrase describing what to show visually — should match the archetype",
+      "wants_product_visual": false,
       "duration_seconds": 4
     }
   ]
@@ -166,24 +186,13 @@ OUTPUT FORMAT — return only valid JSON:
 
 ${sceneCountInstruction}
 
-SCENE RULES:
+PACING:
 - One beat per scene. Never combine two beats into one scene.
 - script_segment values must be consecutive substrings of full_script with no gaps.
-- scene intents: hook | problem | solution | benefit | process | feature | proof | cta | standalone
+- Keep each spoken segment tight — roughly 10–20 words. Do not pad to reach a duration.
 
-SCENE ARCHETYPE:
-Assign one archetype per scene from this list. No two scenes in the same video may use the same archetype. Pick based on the scene content and what would look most visually interesting and varied.
-
-Available archetypes:
-typography_hero | single_stat | split_composition | numbered_list | feature_grid | full_bleed_image | minimal_cta | proof_social | process_steps | quote_statement
-
-VARIETY RULE:
-Every scene must have a different archetype AND a different visual_concept. Never repeat the same compositional approach twice.
-Plan the full video's visual arc before assigning — ensure the sequence feels dynamic and varied.
-
-WORD COUNT IS MANDATORY:
-Each scene's script_segment must not exceed the word limit shown. Count the words before submitting. If over limit, cut until within budget. This is not a suggestion.
-Do not pad. Do not add filler sentences to reach a duration.`;
+VISUAL VARIETY:
+Plan the video's visual arc so consecutive scenes don't look identical. Vary composition where it serves the story — never force variety that hurts clarity.`;
 }
 
 /**
@@ -191,38 +200,22 @@ Do not pad. Do not add filler sentences to reach a duration.`;
  * Returns { ...project, scenes, full_script, scene_format: 'v2' }
  */
 export async function generateScriptV2(project) {
-  const sceneCount = INTENT_PATTERNS[project.scene_count] ? project.scene_count : 3;
-  const patterns        = INTENT_PATTERNS[sceneCount] ?? INTENT_PATTERNS[3];
-  const selectedPattern = patterns[Math.floor(Math.random() * patterns.length)];
-  const sequence        = selectedPattern.intents;
-  const patternName     = selectedPattern.name;
-  const patternTone     = selectedPattern.tone;
+  const requested   = project.scene_count;
+  const isAuto      = requested === "auto" || requested == null;
+  const targetCount = isAuto ? null : (parseInt(requested, 10) || 3);
 
-  const totalDuration  = sequence.reduce((s, intent) => s + (SCENE_WORD_BUDGETS[intent]?.duration ?? 3), 0);
-  const structureLines = sequence.map((intent, i) => {
-    const budget = SCENE_WORD_BUDGETS[intent] ?? { duration: 3, words: 8 };
-    return `  Scene ${i + 1} — ${intent} (~${budget.duration}s, maximum ${budget.words} words): ${INTENT_DESCRIPTIONS[intent] ?? intent}`;
-  }).join("\n");
-
-  const sceneCountInstruction = sceneCount === 1
+  const sceneCountInstruction = targetCount === 1
     ? `SCENE COUNT — MANDATORY:
-Generate EXACTLY 1 scene with intent: standalone.
-This is a complete self-contained video — problem, product introduction, and CTA all in one scene.
-Maximum ${SCENE_WORD_BUDGETS.standalone.words} words. Target duration: ~${SCENE_WORD_BUDGETS.standalone.duration}s.
-The product name must appear at least once. End with a clear call to action.
-Count the words before submitting.`
-    : `SCENE COUNT — MANDATORY:
-Generate EXACTLY ${sequence.length} scenes. No more, no fewer.
-
-STRUCTURE AND WORD LIMITS FOR THIS VIDEO:
-${structureLines}
-Total estimated duration: ~${totalDuration}s
-
-Each scene's script_segment must stay within its word limit. Count the words.
-
-NARRATIVE PATTERN: ${patternName}
-PATTERN TONE: ${patternTone}
-Follow this narrative structure strictly. The pattern tone describes the overall feel and pacing of the script.`;
+Generate EXACTLY 1 self-contained scene with intent "standalone".
+Pain, product introduction by name, and a clear call to action — all in one flowing script.
+Maximum ${SCENE_WORD_BUDGETS.standalone.words} words. Target duration: ~${SCENE_WORD_BUDGETS.standalone.duration}s.`
+    : targetCount
+      ? `SCENE COUNT — MANDATORY:
+Generate EXACTLY ${targetCount} scenes. No more, no fewer.
+YOU decide the beats and their order — design the structure that best sells THIS product.`
+      : `SCENE COUNT:
+Choose the number of scenes that best fits this product — between 3 and 7.
+YOU decide the beats and their order — design the structure that best sells THIS product.`;
 
   const languageInstruction =
     project.language === "hinglish" ? `LANGUAGE — HINGLISH:
@@ -235,8 +228,8 @@ Rules:
 - Never write pure formal Hindi — it must sound like how someone actually talks in a reel
 - Use FOMO triggers naturally: "sab kar rahe hain", "peeche mat raho", "abhi try karo"
 
-Example Hinglish style:
-"Kya, abhi bhi hours waste kar rahe ho videos banane mein? Scripts likhna, assets dhundhna, captions fix karna — sab manually? [Product] try karo — topic daalo, video ready. Baki sab [Product] handle karega. Abhi start karo, free mein."
+Example Hinglish style (note the hook opens with a relatable high-level question, NOT a task list — the task list comes later as the problem beat):
+"Abhi bhi har video manually edit kar rahe ho? Ghanton ka kaam. Scripts likhna. Assets dhundhna. Captions fix karna. [Product] try karo — topic daalo, video ready. Baki sab [Product] handle karega. Abhi start karo, free mein."
 
 The full_script must be speakable naturally by an ElevenLabs multilingual voice at 1.1x speed.
 `
@@ -250,8 +243,8 @@ Rules:
 - Always use "tú" — never formal "usted"
 - Use FOMO triggers naturally: "todos lo están usando", "no te quedes atrás", "pruébalo ahora"
 
-Example Spanish style:
-"¿Todavía pasas horas editando videos cortos? Escribiendo scripts, buscando assets, ajustando captions — todo a mano. [Product] lo hace por ti. Pon tu tema, el video está listo. Pruébalo gratis ahora."
+Example Spanish style (note the hook opens with a relatable high-level question, NOT a task list — the task list comes later as the problem beat):
+"¿Todavía editas cada video a mano? Horas de trabajo. Escribir scripts. Buscar assets. Ajustar captions. [Product] lo hace por ti. Pon tu tema, el video está listo. Pruébalo gratis ahora."
 
 The full_script must be speakable naturally by an ElevenLabs multilingual voice at 1.1x speed.
 `
@@ -265,8 +258,7 @@ Write the full_script in English.
   const userPrompt = `Product Name: ${project.product_name ?? "Unknown"}
 Product Description: ${project.product_description ?? "Not provided"}
 Tone: ${tone}
-Scene Count: ${sceneCount === "auto" ? "Auto (5-7 scenes, you decide)" : sceneCount}
-${sequence ? `Intent sequence to follow exactly: ${sequence.join(" → ")}` : ""}`;
+Scene Count: ${isAuto ? "Auto — you decide (3–7 scenes)" : targetCount}`;
 
   const response = await openai.chat.completions.create({
     model:       "gpt-4.1",
@@ -299,43 +291,155 @@ ${sequence ? `Intent sequence to follow exactly: ${sequence.join(" → ")}` : ""
     throw new Error(`scriptGenerator: no scenes found in response`);
   }
 
-  const scenes = rawScenes.map((s, i) => ({
-    scene_index:       i,
-    scene_id:          i + 1,
-    // spoken = script_segment so sceneDesigner still gets per-scene text for the HTML prompt
-    spoken:            s.script_segment ?? s.spoken ?? "",
-    script_segment:    s.script_segment ?? s.spoken ?? "",
-    intent:            s.intent         ?? "statement",
-    section_role:      s.section_role   ?? "body",
-    mood:              s.mood           ?? null,
-    headline:          s.headline       ?? null,
-    subhead:           s.subhead        ?? null,
-    body:              s.body           ?? null,
-    stat:              s.stat           ?? null,
-    label:             s.label          ?? null,
-    emphasis:          s.emphasis       ?? null,
-    steps:             Array.isArray(s.steps) ? s.steps : [],
-    items:             Array.isArray(s.items) ? s.items : [],
-    icon:              s.icon           ?? null,
-    asset_requirement: s.asset_requirement ?? "none",
-    asset_hint:        s.asset_hint     ?? null,
-    archetype:         s.archetype       ?? null,
-    visual_concept:    s.visual_concept  ?? null,
-    // duration = intent budget; overwritten by Whisper timestamps in the orchestrator
-    duration:          s.duration       ?? INTENT_DURATIONS[s.intent ?? "statement"] ?? 3.0,
-    duration_seconds:  s.duration       ?? INTENT_DURATIONS[s.intent ?? "statement"] ?? 3.0,
-  }));
+  const scenes = rawScenes.map((s, i) => {
+    const brief = s.creative_brief ?? s.visual_concept ?? null;
+    return {
+      scene_index:       i,
+      scene_id:          i + 1,
+      // spoken = script_segment so sceneDesigner still gets per-scene text for the HTML prompt
+      spoken:            s.script_segment ?? s.spoken ?? "",
+      script_segment:    s.script_segment ?? s.spoken ?? "",
+      intent:            s.intent         ?? "scene",
+      creative_brief:    brief,
+      wants_product_visual: s.wants_product_visual === true,
+      section_role:      s.section_role   ?? "body",
+      mood:              s.mood           ?? null,
+      headline:          s.headline       ?? null,
+      subhead:           s.subhead        ?? null,
+      body:              s.body           ?? null,
+      stat:              s.stat           ?? null,
+      label:             s.label          ?? null,
+      emphasis:          s.emphasis       ?? null,
+      steps:             Array.isArray(s.steps) ? s.steps : [],
+      items:             Array.isArray(s.items) ? s.items : [],
+      icon:              s.icon           ?? null,
+      asset_requirement: s.asset_requirement ?? "none",
+      asset_hint:        s.asset_hint     ?? null,
+      archetype:         s.archetype       ?? null,
+      visual_concept:    brief,
+      // duration = soft budget; overwritten by Whisper timestamps in the orchestrator
+      duration:          s.duration       ?? INTENT_DURATIONS[s.intent] ?? 4.0,
+      duration_seconds:  s.duration       ?? INTENT_DURATIONS[s.intent] ?? 4.0,
+    };
+  });
+
+  const creativeDirection = typeof parsed.creative_direction === "string" && parsed.creative_direction.trim()
+    ? parsed.creative_direction.trim()
+    : null;
 
   console.log(`[scriptGenerator] ${scenes.length} scenes for ${project.id}`);
+  if (creativeDirection) console.log(`[scriptGenerator] direction: ${creativeDirection}`);
 
   return {
     ...project,
     scenes,
     full_script: full_script ?? scenes.map(s => s.script_segment).join(" "),
-    scene_format:  "v2",
-    pattern_name:  patternName,
-    pattern_tone:  patternTone,
-    status:        "script_generated",
-    updated_at:    new Date().toISOString(),
+    scene_format:      "v2",
+    pattern_name:      "director",
+    pattern_tone:      creativeDirection,
+    creative_direction: creativeDirection,
+    status:            "script_generated",
+    updated_at:        new Date().toISOString(),
   };
+}
+
+// ── Narration-only generation (beat pipeline) ──────────────────────────────────
+// Writes ONE continuous voiceover, with no scene split. The visual director
+// segments it into timed beats AFTER the voiceover is generated.
+
+function buildLanguageInstruction(language) {
+  if (language === "hinglish") return `LANGUAGE — HINGLISH:
+Write the entire script in Hinglish (natural Hindi+English in Roman script). Casual, energetic, FOMO-driven.
+Product name and technical terms (video, script, caption, timeline, upload, content) stay in English. Emotion and flow in Hindi.
+Never pure formal Hindi — sound like how someone actually talks in a reel.`;
+  if (language === "es") return `LANGUAGE — SPANISH:
+Write the entire script in conversational Latin American Spanish. Casual, energetic, direct. Always "tú", never "usted".
+Product name and technical terms (video, script, caption, timeline, upload) stay in English.`;
+  return `LANGUAGE — ENGLISH:\nWrite the entire script in English.`;
+}
+
+/**
+ * generateNarration(project)
+ * Returns { full_script, creative_direction, projectName }.
+ * The script is a single continuous voiceover — NOT split into scenes.
+ */
+export async function generateNarration(project) {
+  const tone            = project.tone ?? "professional";
+  const languageInstruction = buildLanguageInstruction(project.language);
+
+  // Soft length target — scale words to a ~25–40s read unless the project hints otherwise.
+  const targetSeconds = Number(project.target_duration) || 32;
+  const targetWords   = Math.round((targetSeconds / 60) * 150); // ~150 wpm
+
+  const systemPrompt = `You are an elite creative director and SaaS promo video copywriter who writes scripts that make people stop scrolling.
+
+You read a product and decide — like a creative director — the single best ANGLE to tell ITS story (pain-led, confident product-first reveal, a bold provocative claim, a transformation, a fast demo…). Choose the angle that fits THIS product, not a default.
+
+Then write ONE continuous voiceover script — natural flowing speech from first word to last. Do NOT split it into scenes or label sections. Just the spoken narration.
+
+${languageInstruction}
+Write in a ${tone} tone — interpret naturally what that means for THIS product and audience. Own the voice; don't follow a formula.
+
+HOOK OPENING — the first line is special:
+- Open at a HIGH level on the activity / job the viewer is tired of, in a way they instantly recognize (a relatable question or statement). Do NOT open with a granular list of micro-tasks — save any rapid-fire pain list for later in the script.
+
+SCRIPT PRINCIPLES:
+- Sound like a real person talking, not marketing copy. Short fragments, one idea per breath, varied sentence length for rhythm.
+- Lead with feeling and outcome, not a feature list. Avoid generic marketing buzzwords and clichés.
+- The product should feel like the solution, not the subject.
+
+PRODUCT NAME RULE:
+Never mention "AI". Refer to the product by name. The product name must appear at least twice — once when you reveal the product, once in the closing action.
+
+PUNCTUATION (controls TTS pacing):
+- Periods after each complete pain point or statement. In a pain list, each item gets its own period.
+- Commas only to connect fragments within one continuous thought — never to separate list items.
+- Em dash for a dramatic pause between two contrasting beats. Question marks for direct-address hooks.
+- In the CTA never use an em dash — use a comma for one continuous energetic thought.
+
+LENGTH: aim for roughly ${targetWords} words (~${targetSeconds}s spoken). Tight, no padding.
+
+OUTPUT — valid JSON only:
+{
+  "creative_direction": "one sentence: the angle you chose and why it fits this product",
+  "projectName": "short 3–6 word title capturing the core idea",
+  "full_script": "the complete continuous voiceover"
+}`;
+
+  const userPrompt = `Product Name: ${project.product_name ?? "Unknown"}
+Product Description: ${project.product_description ?? "Not provided"}
+Tone: ${tone}`;
+
+  const response = await openai.chat.completions.create({
+    model:       "gpt-4.1",
+    temperature: 0.7,
+    max_tokens:  1500,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user",   content: userPrompt   },
+    ],
+  });
+
+  const raw = (response.choices[0].message.content ?? "").trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) parsed = JSON.parse(match[0]);
+    else throw new Error(`generateNarration: JSON parse failed\n${raw.slice(0, 300)}`);
+  }
+
+  const full_script = typeof parsed.full_script === "string" ? parsed.full_script.trim() : "";
+  if (!full_script) throw new Error("generateNarration: empty full_script");
+
+  const creative_direction = typeof parsed.creative_direction === "string" && parsed.creative_direction.trim()
+    ? parsed.creative_direction.trim() : null;
+  const projectName = typeof parsed.projectName === "string" && parsed.projectName.trim()
+    ? parsed.projectName.trim() : null;
+
+  console.log(`[generateNarration] ${full_script.split(/\s+/).length} words for ${project.id}`);
+  if (creative_direction) console.log(`[generateNarration] direction: ${creative_direction}`);
+
+  return { full_script, creative_direction, projectName };
 }

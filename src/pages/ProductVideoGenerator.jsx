@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 import { serverFetch } from "../services/serverApi";
-import { getProductVideoProjects, deleteProject } from "../services/projects/projectService";
+import { getProductVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
 
@@ -394,6 +394,7 @@ function GeneratorForm() {
       const { editor_project_id } = await res.json();
       if (!editor_project_id) throw new Error("No editor project returned from pipeline");
 
+      invalidateProjectCaches("product_video", "all");
       navigate(`/video-editor/${editor_project_id}`, { state: { from: "/product-video" } });
     } catch (err) {
       console.error("[ProductVideoGenerator]", err);

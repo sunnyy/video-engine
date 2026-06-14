@@ -71,11 +71,12 @@ export async function runSocialPipeline(params, onStep) {
       ? Math.min(targetDuration + Math.floor(wordCount / 100) * 5, 60)
       : targetDuration;
   if (wordCount > 300) console.log(`[social] long post detected: ${wordCount} words → duration ${effectiveDuration}s`);
-  const { full_script, scenes: rawScenes, palette, fontPair, musicMood } =
+  const { full_script, scenes: rawScenes, palette, fontPair, musicMood, projectName: gptName, creativeDirection } =
     await generateSocialScript({ content, targetDuration: effectiveDuration, language });
 
   const scenes = rawScenes.map(s => ({ ...s }));
   console.log(`[social] ${scenes.length} scenes, musicMood=${musicMood}`);
+  if (creativeDirection) console.log(`[social] creative direction: ${creativeDirection}`);
 
   const projectContext = {
     palette,
@@ -139,7 +140,9 @@ export async function runSocialPipeline(params, onStep) {
 
   // ── Step 6: Build timeline ─────────────────────────────────────────────────
   step("Putting it together…");
-  const { timeline } = buildTimeline(sceneGraphs, scenes, projectContext);
+  const rawProjectName = gptName
+    ?? (content.author ? `${content.author} — Social Video` : `Social Video — ${new Date().toLocaleDateString()}`);
+  const { timeline } = buildTimeline(sceneGraphs, scenes, { ...projectContext, productName: rawProjectName });
 
   // ── Step 7: Inject voiceover layer ────────────────────────────────────────
   let finalTimeline = timeline;
@@ -225,9 +228,7 @@ export async function runSocialPipeline(params, onStep) {
 
   // ── Step 10: Save to projects table ──────────────────────────────────────
   step("Almost ready…");
-  const projectName = content.author
-    ? `${content.author} — Social Video`
-    : `Social Video — ${new Date().toLocaleDateString()}`;
+  const projectName = rawProjectName;
 
   let editorProjectId = null;
   try {
@@ -245,11 +246,11 @@ export async function runSocialPipeline(params, onStep) {
           platform:  content.platform,
           author:    content.author,
           sourceUrl: url,
+          creative_direction: creativeDirection ?? null,
           scenes:    scenes.map(s => ({
             sceneIndex:    s.scene_index,
             intent:        s.intent,
-            archetype:     s.archetype ?? null,
-            visual_concept: s.visual_concept,
+            creative_brief: s.creative_brief ?? s.visual_concept ?? null,
           })),
           sceneHTMLs,
         },

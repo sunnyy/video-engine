@@ -8,6 +8,7 @@ import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeR
 import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import * as LucideIcons from "lucide-react";
+import { ASSET_PLACEHOLDER_SRC } from "../../core/utils/placeholders";
 
 const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape", "icon", "html_block"]);
 const SNAP_T = 12; // canvas-space pixels
@@ -863,22 +864,33 @@ function LayerElement({
   } else if (layer.type === "video") {
     content = <VideoLayerEl layer={layer} currentTime={currentTime} isPlaying={isPlaying} />;
   } else if (layer.type === "image" || layer.type === "sticker") {
-    content = layer.src ? (
-      <img
-        src={layer.src}
-        style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), display: "block", pointerEvents: "none" }}
-        draggable={false}
-      />
-    ) : (
-      <div style={{
-        width: "100%", height: "100%",
-        background: "rgba(255,255,255,0.05)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#55556a", fontSize: 12,
-      }}>
-        No source
-      </div>
-    );
+    if (layer.isPlaceholder) {
+      content = (
+        <div style={{ width: "100%", height: "100%", position: "relative" }}>
+          <img src={ASSET_PLACEHOLDER_SRC} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} draggable={false} />
+          <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", background: "rgba(245,158,11,0.92)", color: "#0d0d18", fontSize: 9, fontWeight: 800, padding: "3px 9px", borderRadius: 4, whiteSpace: "nowrap", pointerEvents: "none", letterSpacing: "0.08em" }}>
+            MISSING ASSET
+          </div>
+        </div>
+      );
+    } else {
+      content = layer.src ? (
+        <img
+          src={layer.src}
+          style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), objectPosition: layer.objectPosition || undefined, display: "block", pointerEvents: "none" }}
+          draggable={false}
+        />
+      ) : (
+        <div style={{
+          width: "100%", height: "100%",
+          background: "rgba(255,255,255,0.05)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#55556a", fontSize: 12,
+        }}>
+          No source
+        </div>
+      );
+    }
   } else if (layer.type === "html_block") {
     content = (
       <div
@@ -888,23 +900,35 @@ function LayerElement({
     );
   } else if (layer.type === "text") {
     const s = layer.style ?? {};
-    const autoSize = !isEditing && !!s.autoWidth;
+    // autoWidth → both dims shrink to content; autoHeight → only height shrinks
+    // (width stays fixed so wrapping is unchanged). Height must be auto for the
+    // fit-content wrapper to measure the real rendered text height.
+    const autoW = !isEditing && !!s.autoWidth;
+    const autoH = !isEditing && (!!s.autoWidth || !!s.autoHeight);
+    const isGradientColor = typeof s.color === "string" &&
+      (s.color.startsWith("linear-gradient") || s.color.startsWith("radial-gradient"));
     const baseTextStyle = {
-      width: autoSize ? undefined : "100%",
-      height: autoSize ? undefined : "100%",
+      width: autoW ? undefined : "100%",
+      height: autoH ? undefined : "100%",
       fontFamily: s.fontFamily ?? "Outfit, sans-serif",
       fontSize: s.fontSize ?? 72,
       fontWeight: s.fontWeight ?? 800,
       fontStyle: s.fontStyle ?? "normal",
-      color: s.color ?? "#ffffff",
+      color: isGradientColor ? "transparent" : (s.color ?? "#ffffff"),
       textAlign: s.textAlign ?? "center",
       lineHeight: s.lineHeight ?? 1.2,
       letterSpacing: s.letterSpacing ?? 0,
       textTransform: s.textTransform ?? "none",
-      textShadow: s.textShadow ?? undefined,
+      textShadow: isGradientColor ? undefined : (s.textShadow ?? undefined),
       wordBreak: "normal",
       whiteSpace: "pre-wrap",
       boxSizing: "border-box",
+      ...(isGradientColor && {
+        background: s.color,
+        WebkitBackgroundClip: "text",
+        backgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+      }),
     };
 
     if (isEditing) {
@@ -1010,7 +1034,7 @@ function LayerElement({
         <div
           style={{
             ...baseTextStyle,
-            background:   s.background   ?? undefined,
+            background:   isGradientColor ? s.color : (s.background ?? undefined),
             borderRadius: s.borderRadius ? `${s.borderRadius}px` : undefined,
             padding:      s.padding      ?? undefined,
             display: "flex",
@@ -1214,15 +1238,17 @@ function LayerElement({
             ? isDragging
               ? "2px solid rgba(124,92,252,0.9)"
               : "2px dashed rgba(124,92,252,0.55)"
-            : isHovered ? "1px solid rgba(255,255,255,0.5)" : "none",
+            : layer.isPlaceholder
+              ? "2px dashed rgba(245,158,11,0.7)"
+              : isHovered ? "1px solid rgba(255,255,255,0.5)" : "none",
           outlineOffset: 1,
         }}
       >
         {/* Inner content — overflow clipped here, drag events here */}
         <div
           style={{
-            position: (layer.style?.autoWidth || layer.type === "html_block") ? "relative" : "absolute",
-            inset: (layer.style?.autoWidth || layer.type === "html_block") ? undefined : 0,
+            position: (layer.style?.autoWidth || layer.type === "html_block" || (layer.type === "text" && layer.style?.autoHeight)) ? "relative" : "absolute",
+            inset: (layer.style?.autoWidth || layer.type === "html_block" || (layer.type === "text" && layer.style?.autoHeight)) ? undefined : 0,
             overflow: "visible",
             cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",

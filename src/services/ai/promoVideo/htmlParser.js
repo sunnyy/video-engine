@@ -397,14 +397,19 @@ export function parseSceneHTML(htmlString, sceneIndex, canvas = { width: CANVAS_
       if (entry.width > maxWidth) entry.width = maxWidth;
     }
 
-    // Recalculate text height from content metrics — never trust GPT's hardcoded height
+    // Recalculate text height from content metrics — never trust GPT's hardcoded height.
+    // This is only a fallback (build-time reflow + final render); in the editor the text
+    // box renders fit-content and measures its true rendered height (autoHeight below),
+    // so the selection/resize box hugs the actual glyphs instead of an over-counted estimate.
     if (entry.type === "text" && entry.text) {
-      const fontSize     = entry.style.fontSize || 16;
+      const fontSize = entry.style.fontSize || 16;
+
       const lh           = entry.style.lineHeight || 1.2;
       const lineHeightPx = lh > 4 ? lh : lh * fontSize;
       const charsPerLine = Math.floor(entry.width / (fontSize * 0.55));
       const lines        = Math.ceil(entry.text.length / Math.max(1, charsPerLine));
       entry.height       = Math.ceil(lines * lineHeightPx) + 20;
+      entry.style.autoHeight = true;
     }
 
     // Fix 4 — skip elements whose text content is a GPT design note

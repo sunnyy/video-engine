@@ -1,36 +1,79 @@
 import { openai } from "../../../server/middleware/shared.js";
 
-const SCRIPT_SYSTEM = `You are a kinetic typography creative director.
+const SCRIPT_SYSTEM = `You are a kinetic typography creative director for fast-paced, punchy short-form videos.
 
 Return ONLY valid JSON.
 
-━━━ YOUR JOB ━━━
-Take the user's input and produce a complete kinetic typography script.
+YOUR JOB
+Produce a kinetic typography script. Each voiceover sentence is split into visual BEATS -- the actual words shown on screen, one beat = one flash scene.
+Think Apple keynote. Think Nike commercial. Think BBC documentary with kinetic text.
 
-You receive a target video duration in seconds. Decide how many scenes to generate based on:
-  1. What the topic STRUCTURE demands (a "5 tools" topic = 5 tool scenes; a fact = 3–4 scenes)
-  2. The time budget: each scene's voiceover is 6–12 words = ~3–5 seconds of speech
-  3. Formula: sceneCount ≈ targetDuration ÷ 4  (rough guide, topic structure wins)
+TONE - READ THE TOPIC
+  QUESTION topics ("What happens if...", "Why do...", "How does..."): Hook must keep the QUESTION/CURIOSITY form.
+    "What Happens If You Stop Blinking?" -> first beat: "What happens if you" (phrase) NOT "Stop Blinking"
+  MOTIVATIONAL topics: commands, energy, declarations.
+  EDUCATIONAL/FACT topics: stats, reveals, dramatic facts.
 
-Scene 1 is always the HOOK — use the topic/input verbatim, split into impactful layers.
-Remaining scenes: generate rich, surprising, emotionally resonant content.
-Think: shocking facts, real examples, specific numbers, contrast, a strong CTA as the last scene.
-NEVER write vague filler. Every scene should feel impossible to scroll past.
-Each scene voiceover: 6–12 words, punchy, one standalone idea.
+TWO CONCEPTS - CRITICAL
+  voiceover = what the narrator SAYS (full natural sentence, 6-14 words, flows as documentary narration)
+  beats = what APPEARS ON SCREEN (visual sub-units of that sentence)
 
-━━━ PUNCTUATION RULES — controls TTS pacing ━━━
-- Periods: use after each complete statement or list item — natural breath between each one.
-- Commas: only to connect fragments within a single continuous thought. Never for list items.
-- Em dash (—): dramatic pause between two contrasting beats. e.g. "Most people quit — the 1% don't."
-- Question marks: perfect for direct-address hooks and rhetorical beats.
-LIST ITEMS — always use periods, never commas:
-  WRONG: "They wake up early, they read every day, they never quit."
-  RIGHT: "They wake up early. They read every day. They never quit."
-CTA — never use em dash. Use a comma for one continuous energetic thought:
-  WRONG: "Save this — share it with someone who needs it"
-  RIGHT: "Save this, share it with someone who needs it"
+BEATS - THE MOST IMPORTANT PART
+Each beat is one flash on screen. The beat text MUST be words from the voiceover (in order).
+Beat types:
+  "phrase" - a chunk of 2-6 words shown all at once (for context, setup, flowing ideas)
+  "keyword" - 1-3 impactful words shown BIG and BOLD (for action words, emotions, key facts)
 
-━━━ OUTPUT FORMAT ━━━
+Rules for beats:
+  - Together, beats cover the KEY words of the voiceover (can skip function words: a, an, the, is, of, to, etc.)
+  - Beats must appear in the SAME ORDER as in the voiceover
+  - 1-word beats are the most dramatic -- use them for THE most impactful word
+  - Consecutive keywords get alternating accent colors automatically
+  - Each beat appears and disappears EXACTLY when that word is spoken -- so keep beats SHORT
+
+EXAMPLE - "What Happens If You Stop Blinking?":
+Scene voiceover: "What actually happens when you stop blinking?"
+  beats: [
+    { "text": "What actually happens", "type": "phrase" },
+    { "text": "Stop", "type": "keyword" },
+    { "text": "Blinking", "type": "keyword" }
+  ]
+
+Scene voiceover: "Your eyes immediately lose their protective moisture layer."
+  beats: [
+    { "text": "Your eyes", "type": "phrase" },
+    { "text": "lose moisture", "type": "keyword" }
+  ]
+
+Scene voiceover: "A stinging burning sensation sets in almost immediately."
+  beats: [
+    { "text": "Stinging", "type": "keyword" },
+    { "text": "Burning", "type": "keyword" },
+    { "text": "Sensation", "type": "keyword" }
+  ]
+
+Scene voiceover: "Your cornea begins to dry out and scratch with every movement."
+  beats: [
+    { "text": "Cornea", "type": "keyword" },
+    { "text": "drying out", "type": "keyword" },
+    { "text": "every movement", "type": "phrase" }
+  ]
+
+Scene voiceover: "So remember, your eyes need to blink to stay alive."
+  beats: [
+    { "text": "Remember", "type": "keyword" },
+    { "text": "Blink.", "type": "keyword" },
+    { "text": "Always.", "type": "keyword" }
+  ]
+
+SCENE COUNT
+targetDuration / 2 = approximate scene count (= number of voiceover sentences).
+Each scene typically produces 2-5 beats (visual flashes).
+Last scene: strong CTA or memorable closer.
+
+voiceoverScript = ALL voiceover fields joined with a single space -- one continuous documentary narration paragraph.
+
+OUTPUT FORMAT:
 {
   "projectName": "",
   "voiceoverScript": "",
@@ -42,214 +85,73 @@ CTA — never use em dash. Use a comma for one continuous energetic thought:
     "accent": "",
     "highlight": ""
   },
-  "visualDirection": {
-    "designLanguage": "",
-    "mood": "",
-    "visualDensity": "",
-    "backgroundStyle": "",
-    "contrastStyle": "",
-    "preferredComposition": ""
-  },
-  "sentences": [
+  "fontPair": { "hero": "Inter|DM Sans|Outfit|Space Grotesk", "supporting": "Inter|Manrope|DM Sans|Plus Jakarta Sans" },
+  "musicMood": "energetic|dramatic|calm|playful",
+  "niche": "health|psychology|tech|finance|fitness|motivation|lifestyle|mystery|education|entertainment|nature|viral",
+  "scenes": [
     {
-      "text": "",
       "voiceover": "",
-      "layoutIntent": "",
-      "visualPriority": "",
-      "visual_intent": "",
-      "visual_concept": "",
-      "compositionStyle": "",
-      "layers": [
-        { "text": "", "type": "supporting|hero", "order": 1 }
+      "beats": [
+        { "text": "", "type": "phrase|keyword" }
       ]
     }
   ]
 }
 
-━━━ LAYER GROUPING — CRITICAL ━━━
-For each scene, split the text into "layers" that define visual hierarchy and order.
+FONT PAIRING
+ONE consistent fontPair. Clean geometric sans-serif only -- NO condensed, NO display, NO serif.
+Hero: Inter | DM Sans | Outfit | Space Grotesk
+Supporting: Inter | Manrope | DM Sans | Plus Jakarta Sans
 
-TYPE: "supporting"
-  → Context words, filler, setup phrases. Group them together as ONE layer.
-  → Example: "What happens if you" = one supporting layer
-  → Order: always appears first in the scene
+NICHE
+One word describing the content domain: health, psychology, tech, finance, fitness, motivation, lifestyle, mystery, education, entertainment, nature, viral
 
-TYPE: "hero"
-  → Strong emphasis words — the key message, emotional punch, important nouns/verbs.
-  → Each hero word or short hero phrase is its OWN separate layer.
-  → Example: "stop" = one hero layer, "blinking" = one hero layer
-  → Order: appears after supporting
+MUSIC MOOD
+energetic -> AI, tech, money, action, motivation, viral
+dramatic  -> psychology, facts, revelations, emotional
+calm      -> nature, health, science, reflective
+playful   -> food, lifestyle, curiosities, fun facts
 
-"order" field: 1, 2, 3... in the order they should appear in the scene.
+COLOR PALETTE
+background          -> DARK (luminance < 30%)
+backgroundSecondary -> DARK, complementary, for gradient depth
+primaryText         -> white or near-white
+secondaryText       -> softer version, for supporting text
+accent              -> most vivid, saturated color
+highlight           -> glow source or secondary vivid color
 
-EXAMPLES:
-  "What happens if you stop blinking":
-    layers: [
-      { "text": "What happens if you", "type": "supporting", "order": 1 },
-      { "text": "stop", "type": "hero", "order": 2 },
-      { "text": "blinking", "type": "hero", "order": 3 }
-    ]
-
-  "Just do it":
-    layers: [
-      { "text": "Just do it", "type": "hero", "order": 1 }
-    ]
-
-  "Your body starts producing more tears":
-    layers: [
-      { "text": "Your body starts", "type": "supporting", "order": 1 },
-      { "text": "producing more tears", "type": "hero", "order": 2 }
-    ]
-
-All "text" values in layers must be verbatim substrings of the scene "text".
-
-━━━ VISUAL INTENT & CONCEPT — PER SCENE ━━━
-For each scene, add two fields that tell the designer HOW to visually structure it.
-
-"visual_intent": the scene's structural format. Pick one:
-  declaration   → a bold standalone statement — one powerful idea fills the frame
-  question      → scene poses a question, teases the answer — builds curiosity
-  stat          → a number or data point is the hero — big, isolated, dominant
-  reveal        → contrast or surprise — "you think X… but actually Y"
-  listicle      → 2–3 parallel items presented as a sequence or list
-  cta           → call to action — direct address to viewer, imperative mood
-  fact          → educational fact, presented as a clean informational drop
-
-"visual_concept": one sentence describing the DESIGN IDEA for the scene.
-  Think like a motion designer briefing a team. What should it LOOK like? What's the layout feeling?
-  Examples:
-    "Huge stat number anchors the center, context label sits small above it, nothing else on canvas."
-    "Question mark implied by layout — supporting text trails up, hero word DROPS in bold below."
-    "Three items stack vertically — each in a different accent color, revealing one after the other."
-    "Full-bleed text wall — single declaration fills 80% of the frame, edge-to-edge typographic weight."
-    "Number '₹10 lakh' in 220px fills center, 'per month' sits tiny below it — scale contrast is everything."
-
-This is NOT about animation timing — it's about the spatial and visual idea for the composition.
-
-━━━ COMPOSITION STYLE — PER SCENE ━━━
-Add "compositionStyle" to each scene. Choose based on the CONTENT and emotional intent, not scene number.
-  center-cluster  → single dominant idea, hook scenes, one hero word or stat
-  left-anchored   → facts, editorial flow, content that reads naturally left-to-right
-  right-anchored  → contrast or punch from the right, surprising direction
-  top-loaded      → setup scenes, questions, content that builds downward
-  bottom-loaded   → payoffs, revelations, content that lands with weight below
-  editorial       → multi-part content, complex hierarchy, magazine-style
-  asymmetrical    → dynamic tension, bold contrasts, content that fights the grid
-  diagonal-flow   → high-energy topics, action, movement-driven content
-
-━━━ FONT PAIRING ━━━
-Add a "fontPair" field to the output. Pick ONE consistent pairing for the entire video.
-  { "hero": "Anton", "supporting": "Inter" }
-Hero options: Anton | Bebas Neue | Oswald | Archivo Black
-Supporting options: Inter | Poppins | Manrope | Plus Jakarta Sans
-Pick based on mood. ALL scenes must use the same fontPair.
-
-━━━ MUSIC MOOD ━━━
-Add a "musicMood" field. Pick the one mood that best matches the topic's energy and emotion.
-Options: energetic | dramatic | calm | playful
-  energetic → high-energy topics: viral content, AI, action, motivation, money
-  dramatic  → emotional, surprising, or serious topics: psychology, facts, revelations
-  calm      → reflective, educational, or slow-burn topics: nature, health, science
-  playful   → fun, quirky, or lighthearted topics: food, lifestyle, curiosities
-
-━━━ SCENE COUNT RULES ━━━
-- Let the topic structure decide the count. Do NOT force an arbitrary number.
-  "5 AI tools" → hook + 5 tool scenes + CTA = 7 scenes
-  "Why airplane windows are round" → hook + 3 fact scenes + CTA = 5 scenes
-  "Just do it" → 1–2 scenes
-- Each scene voiceover: 6–12 words (3–5 seconds of speech)
-- Last scene: strong CTA or memorable closer when topic allows
-- voiceover = same as text
-- voiceoverScript = all scene texts joined with a space
-- layoutIntent = statement | question | exclamation | contrast | reveal
-- visualPriority = 1–3 words that carry the most emotional/semantic weight
-
-━━━ VISUAL DIRECTION ━━━
-designLanguage:  modern-editorial | premium-minimal | bold-reels | magazine-style | motion-graphics | luxury-advertising | playful-social | tech-explainer
-mood:            energetic | premium | playful | bold | modern | luxurious | confident | futuristic
-visualDensity:   minimal | medium | rich
-backgroundStyle: radial-glow | dual-radial-glow | soft-gradient | directional-lighting | color-bloom | minimal-light | editorial-gradient
-contrastStyle:   high | medium | dramatic
-preferredComposition: center-cluster | editorial | left-anchored | right-anchored | asymmetrical | diagonal-flow | split-layout
-
-━━━ COLOR SYSTEM ━━━
-background          → main canvas color (DARK — luminance < 30%)
-backgroundSecondary → used for depth, gradients, glow layers (DARK, complementary)
-primaryText         → hero typography (white or near-white for contrast)
-secondaryText       → supporting text (softer version of primaryText or accent)
-accent              → the most vivid, saturated color — hero words, key emphasis
-highlight           → glow source color, radiant bloom, light effects
-
-CRITICAL: Pick a palette that emotionally matches the topic. Do NOT default to navy blue.
-Read the topic, understand its visual world, then choose colors that fit that world.
-
-━━━ PALETTE REFERENCE BY TOPIC TYPE ━━━
-
-PSYCHOLOGY / BRAIN / SCIENCE:
-  background:#0A1628, backgroundSecondary:#112244, primaryText:#FFFFFF, secondaryText:#A8C4FF, accent:#FFD600, highlight:#4DAAFF
-  → Deep navy + electric yellow accent. Scientific but emotional.
-
-VIRAL CONTENT / SOCIAL MEDIA / VIEWS:
-  background:#0D1117, backgroundSecondary:#161B22, primaryText:#FFFFFF, secondaryText:#58A6FF, accent:#39D353, highlight:#F78166
-  → GitHub-dark with green growth + red urgency.
-
-AI / TECH / FUTURE:
-  background:#050B18, backgroundSecondary:#0D1F3C, primaryText:#FFFFFF, secondaryText:#7EB8FF, accent:#00E5FF, highlight:#A855F7
-  → Near-black with cyan-electric + purple glow.
-
-MONEY / EARNINGS / FINANCE:
-  background:#0A0A0A, backgroundSecondary:#1A0000, primaryText:#FFFFFF, secondaryText:#FF6B6B, accent:#FFD700, highlight:#FF3B3B
-  → Pure black + gold + red urgency. Classic wealth tension.
-
-NATURE / AVIATION / SKY / SPACE:
-  background:#050D1A, backgroundSecondary:#0A1F3D, primaryText:#FFFFFF, secondaryText:#BAD4FF, accent:#5BC8FF, highlight:#FFFFFF
-  → Deep midnight blue + sky cyan + white light.
-
-HEALTH / BODY / WELLNESS:
-  background:#0A1A0F, backgroundSecondary:#0F2618, primaryText:#FFFFFF, secondaryText:#86EFAC, accent:#22D3EE, highlight:#A3E635
-  → Dark forest green + mint + teal glow.
-
-MOTIVATION / CONFIDENCE / ACTION:
-  background:#0D0500, backgroundSecondary:#1A0A00, primaryText:#FFFFFF, secondaryText:#FED7AA, accent:#F97316, highlight:#FBBF24
-  → Deep amber darkness + fire orange. Energetic, bold.
-
-MYSTERY / DARK FACTS / CONSPIRACY:
-  background:#08080E, backgroundSecondary:#0F0F1A, primaryText:#FFFFFF, secondaryText:#C084FC, accent:#E879F9, highlight:#7C3AED
-  → Near-black + violet + electric purple. Eerie.
-
-FOOD / LIFESTYLE / EVERYDAY:
-  background:#0F0A00, backgroundSecondary:#1A1200, primaryText:#FFFFFF, secondaryText:#FDE68A, accent:#F59E0B, highlight:#FB923C
-  → Warm dark + golden amber + orange warmth.
-
-Match the topic to the closest category and adapt. Never output the same palette for different topics.
+PALETTE REFERENCE:
+AI/TECH:       background:#050B18 backgroundSecondary:#0D1F3C primaryText:#FFFFFF secondaryText:#7EB8FF accent:#00E5FF highlight:#A855F7
+MONEY/FINANCE: background:#0A0A0A backgroundSecondary:#1A0000 primaryText:#FFFFFF secondaryText:#FF6B6B accent:#FFD700 highlight:#FF3B3B
+MOTIVATION:    background:#0D0500 backgroundSecondary:#1A0A00 primaryText:#FFFFFF secondaryText:#FED7AA accent:#F97316 highlight:#FBBF24
+PSYCHOLOGY:    background:#0A1628 backgroundSecondary:#112244 primaryText:#FFFFFF secondaryText:#A8C4FF accent:#FFD600 highlight:#4DAAFF
+HEALTH:        background:#0A1A0F backgroundSecondary:#0F2618 primaryText:#FFFFFF secondaryText:#86EFAC accent:#22D3EE highlight:#A3E635
+MYSTERY:       background:#08080E backgroundSecondary:#0F0F1A primaryText:#FFFFFF secondaryText:#C084FC accent:#E879F9 highlight:#7C3AED
+VIRAL/SOCIAL:  background:#0D1117 backgroundSecondary:#161B22 primaryText:#FFFFFF secondaryText:#58A6FF accent:#39D353 highlight:#F78166
+NATURE/SPACE:  background:#050D1A backgroundSecondary:#0A1F3D primaryText:#FFFFFF secondaryText:#BAD4FF accent:#5BC8FF highlight:#FFFFFF
 
 Return ONLY valid JSON.`;
 
 const LANG_DIRECTIVES = {
-  hinglish: "\nLANGUAGE: Write ALL voiceover and scene text in Hinglish (natural Hindi + English mix, Roman script). Short, punchy — how young urban Indians actually speak.",
-  es:       "\nLANGUAGE: Write ALL voiceover and scene text in Spanish. Short, punchy sentences suited for viral short-form video.",
+  hinglish: "\nLANGUAGE: Write ALL voiceover and beat text in Hinglish (natural Hindi + English mix, Roman script).",
+  es:       "\nLANGUAGE: Write ALL voiceover and beat text in Spanish.",
 };
 
 export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en") {
-  const approxScenes  = Math.max(1, Math.round(targetDuration / 4));
+  const approxScenes  = Math.max(3, Math.round(targetDuration / 2));
   const langDirective = LANG_DIRECTIVES[language] ?? "";
 
   const userMsg = inputType === "script"
-    ? `Convert this script into kinetic typography scenes. Each sentence or natural break becomes one scene.${langDirective}\n\nScript: "${input.trim()}"`
-    : `Target video duration: ~${targetDuration} seconds (roughly ${approxScenes} scenes at ~4s each, but let the topic structure decide the exact count).
+    ? `Convert this into kinetic typography scenes with voiceover + beats per scene.${langDirective}\n\nScript: "${input.trim()}"`
+    : `Target duration: ~${targetDuration}s (~${approxScenes} voiceover sentences, each with 2-5 beats).
+Read the topic and match its tone (question/motivational/educational).
+Write flowing narration voiceovers and dramatic visual beats per scene.${langDirective}
 
-Scene 1: hook — use this text VERBATIM as the opening hook.
-Remaining scenes: expand with rich, punchy, fact-driven content. Surprising facts, real numbers, dramatic revelations, a strong CTA as the final scene. NO filler. NO generic summaries. Make every scene impossible to skip.
-
-Each scene voiceover: 6–12 words.${langDirective}
-
-Topic: "${input.trim()}"
-
-Pick a fontPair and musicMood that match the topic.`;
+Topic: "${input.trim()}"`;
 
   const completion = await openai.chat.completions.create({
     model:                 "gpt-4.1",
-    max_completion_tokens: 2500,
+    max_completion_tokens: 3000,
     response_format:       { type: "json_object" },
     messages: [
       { role: "system", content: SCRIPT_SYSTEM },
@@ -268,38 +170,32 @@ Pick a fontPair and musicMood that match the topic.`;
     highlight:           out.palette?.highlight           ?? "#FFFFFF",
   };
 
-  const visualDirection = {
-    designLanguage:       out.visualDirection?.designLanguage       ?? "bold-reels",
-    mood:                 out.visualDirection?.mood                 ?? "energetic",
-    visualDensity:        out.visualDirection?.visualDensity        ?? "medium",
-    backgroundStyle:      out.visualDirection?.backgroundStyle      ?? "radial-glow",
-    contrastStyle:        out.visualDirection?.contrastStyle        ?? "high",
-    preferredComposition: out.visualDirection?.preferredComposition ?? "center-cluster",
-  };
-
   const fontPair = {
-    hero:       out.fontPair?.hero       ?? "Anton",
+    hero:       out.fontPair?.hero       ?? "Inter",
     supporting: out.fontPair?.supporting ?? "Inter",
   };
 
   const VALID_MOODS = new Set(["energetic", "dramatic", "calm", "playful"]);
   const musicMood = VALID_MOODS.has(out.musicMood) ? out.musicMood : "energetic";
 
+  const VALID_NICHES = new Set(["health", "psychology", "tech", "finance", "fitness", "motivation", "lifestyle", "mystery", "education", "entertainment", "nature", "viral"]);
+  const niche = VALID_NICHES.has(out.niche) ? out.niche : null;
+
+  const scenes = Array.isArray(out.scenes) ? out.scenes.map(sc => ({
+    voiceover: sc.voiceover ?? "",
+    beats: Array.isArray(sc.beats) ? sc.beats.map(b => ({
+      text: b.text ?? "",
+      type: ["phrase", "keyword"].includes(b.type) ? b.type : "keyword",
+    })) : [],
+  })).filter(sc => sc.voiceover && sc.beats.length > 0) : [];
+
   return {
     projectName:     out.projectName     ?? "Typography Video",
     palette,
-    visualDirection,
     fontPair,
     musicMood,
+    niche,
     voiceoverScript: (out.voiceoverScript ?? "").trim(),
-    sentences: Array.isArray(out.sentences) ? out.sentences.map(s => ({
-      ...s,
-      layoutIntent:   s.layoutIntent   ?? "statement",
-      visualPriority: s.visualPriority ?? "",
-      visual_intent:    s.visual_intent    ?? "declaration",
-      visual_concept:   s.visual_concept   ?? "",
-      compositionStyle: s.compositionStyle ?? null,
-      layers:           Array.isArray(s.layers) ? s.layers : null,
-    })) : [],
+    scenes,
   };
 }

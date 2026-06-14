@@ -127,7 +127,7 @@ router.post("/create", requireAuth, async (req, res) => {
       target_platform, language, tone, target_audience, duration_seconds,
       has_script, has_talking_head, has_screenshots, has_recordings, has_logo, has_voiceover,
       caption_style, transition_style, motion_style, color_palette, music_mood,
-      visual_style, accent_color, typography_style, voice_id, scene_count,
+      visual_style, accent_color, typography_style, voice_id, scene_count, target_duration,
     } = req.body;
 
     // Use existing draft ID (from /init) if provided, otherwise generate new one
@@ -165,7 +165,9 @@ router.post("/create", requireAuth, async (req, res) => {
       accent_color:     accent_color     || "#6366f1",
       typography_style: typography_style || "modern",
       voice_id:         voice_id         || "21m00Tcm4TlvDq8ikWAM",
-      scene_count:      scene_count      ?? "auto",
+      // target_duration drives the beat pipeline; scene_count kept only for render-time pricing tiers
+      target_duration:  Number(target_duration) || 30,
+      scene_count:      scene_count ?? (Number(target_duration) <= 15 ? 1 : Number(target_duration) <= 30 ? 3 : 5),
       format_ratio:     req.body.format_ratio || '9:16',
     };
 
@@ -362,9 +364,9 @@ router.post("/:projectId/upload-asset", requireAuth, async (req, res) => {
           const timeline = editorRow.safe_project_json;
           let injected = false;
           const updatedLayers = timeline.layers.map(layer => {
-            if (layer.type === "image" && layer.id?.startsWith(prefix) && !layer.src) {
+            if (layer.type === "image" && layer.id?.startsWith(prefix) && (!layer.src || layer.isPlaceholder)) {
               injected = true;
-              return { ...layer, src: asset_url };
+              return { ...layer, src: asset_url, isPlaceholder: false, assetQueued: false };
             }
             return layer;
           });

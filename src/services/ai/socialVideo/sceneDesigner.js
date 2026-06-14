@@ -9,7 +9,7 @@ export async function designSocialScene(scene, projectContext, attempt = 1) {
 
   const { system, user } = buildSocialScenePrompt(scene.visual_text || scene.script_segment, {
     sceneIntent:     scene.intent,
-    archetype:       scene.archetype       ?? null,
+    creativeBrief:   scene.creative_brief  ?? scene.visual_concept ?? "",
     visualConcept:   scene.visual_concept  ?? "",
     hasFetchedImage: scene.use_fetched_image === true,
     palette:         projectContext.palette      ?? {},

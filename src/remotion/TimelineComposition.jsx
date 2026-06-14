@@ -170,7 +170,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
       <Sequence from={startFrame} durationInFrames={durationFrames}>
         <Img
           src={layer.src}
-          style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover" }}
+          style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover", objectPosition: layer.objectPosition || undefined }}
         />
       </Sequence>
     );

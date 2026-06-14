@@ -108,9 +108,12 @@ export default function TopBar() {
         onClick={(e) => {
           const src  = project?.meta?.source;
           const dest = location.state?.from
-                     ?? (src === "product_video"                  ? "/product-video"
-                       : src === "typography_video"               ? "/typography-video"
-                       : src === "promo_video" || src === "promo_video_v2" ? "/promo-video"
+                     ?? (src === "product_video" || src === "product_video_v2" ? "/product-video"
+                       : src === "typography_video"                            ? "/typography-video"
+                       : src === "promo_video"  || src === "promo_video_v2"   ? "/promo-video"
+                       : src === "social_video"                               ? "/social-video"
+                       : src === "video_captions"                             ? "/video-captions"
+                       : src === "scratch"                                    ? "/videos"
                        : "/dashboard");
           if (e.ctrlKey || e.metaKey) {
             window.open(dest, "_blank");

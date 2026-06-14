@@ -263,10 +263,52 @@ function SrcField({ layer, update }) {
   );
 }
 
+// Replace any image/video layer's media in place via the Media modal — works for
+// skipped-asset placeholders AND for existing uploaded / stock / AI media.
+function ReplaceMediaButton({ layer, update }) {
+  const [showMedia, setShowMedia] = useState(false);
+  const isPlaceholder = !!layer.isPlaceholder;
+
+  const onReplace = (src, type) => {
+    const layerType = type === "video" ? "video" : "image";
+    const patch = { src, type: layerType, isPlaceholder: false, assetQueued: false };
+    // Switching an image layer to a video needs sane audio defaults.
+    if (layerType === "video" && layer.type !== "video") { patch.muted = false; patch.volume = 1; }
+    update(patch);
+    setShowMedia(false);
+  };
+
+  const baseStyle = {
+    width: "100%", padding: "10px 0", borderRadius: 8, fontFamily: "inherit",
+    fontSize: 13, fontWeight: 700, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+  };
+  const style = isPlaceholder
+    ? { ...baseStyle, border: "2px dashed rgba(245,158,11,0.6)", background: "rgba(245,158,11,0.08)", color: "#f59e0b" }
+    : { ...baseStyle, border: "1px solid rgba(124,92,252,0.4)", background: "rgba(124,92,252,0.12)", color: "#c8aaff", fontWeight: 600 };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <button onClick={() => setShowMedia(true)} style={style}>
+        <span style={{ fontSize: 15 }}>{isPlaceholder ? "📎" : "🔁"}</span>
+        {isPlaceholder ? "Add Asset" : "Replace Media"}
+      </button>
+      {showMedia && (
+        <MediaModal
+          onClose={() => setShowMedia(false)}
+          onReplace={onReplace}
+          initialFilter={layer.type === "video" ? "video" : "image"}
+        />
+      )}
+    </div>
+  );
+}
+
 function VideoProps({ layer, update, updateSilent, commit, resolvedObjectFitVal, updateObjectFit }) {
   const preVol = useRef(null);
   return (
     <Section title="Video">
+      <ReplaceMediaButton layer={layer} update={update} />
       <SrcField layer={layer} update={update} />
       <Field label="Volume">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -561,6 +603,7 @@ function TextProps({ layer, update, updateSilent, commit }) {
 function ImageProps({ layer, update, resolvedObjectFitVal, updateObjectFit }) {
   return (
     <Section title="Image">
+      <ReplaceMediaButton layer={layer} update={update} />
       <SrcField layer={layer} update={update} />
       <Field label="Object Fit">
         <select style={selectStyle} value={resolvedObjectFitVal} onChange={(e) => updateObjectFit(e.target.value)}>
@@ -1707,8 +1750,11 @@ export default function PropertiesPanel() {
               </button>
             </div>
           )}
-          {/* Scene source switcher — hidden for text layers */}
-          {layer.type !== "text" && (
+          {/* Scene source switcher — talking-head projects only. Showing it for
+              faceless beats targets the scene background (bgLayer) and wrongly
+              adds a new layer instead of replacing the selected placeholder. */}
+          {layer.type !== "text"
+            && project?.layers?.some(l => TH_TRACKS.has(l.trackId) && l.type === "video") && (
             <SceneSourceSection
               layer={layer}
               project={project}

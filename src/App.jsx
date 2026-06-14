@@ -36,6 +36,8 @@ import ProductVideoGenerator from "./pages/ProductVideoGenerator";
 import TypographyVideo       from "./pages/TypographyVideo";
 import SocialVideo           from "./pages/SocialVideo";
 import PromoVideo            from "./pages/PromoVideo";
+import SaasVideo             from "./pages/SaasVideo";
+import PromptVideo           from "./pages/PromptVideo";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
@@ -153,6 +155,8 @@ export default function App() {
             <Route path="/promo-video"             element={<PromoVideo />} />
             <Route path="/promo-video/:projectId"  element={<PromoVideo />} />
             <Route path="/product-video"      element={<ProductVideoGenerator />} />
+            <Route path="/saas-video"         element={<SaasVideo />} />
+            <Route path="/prompt-video"       element={<PromptVideo />} />
             <Route path="/typography-video"   element={<TypographyVideo />} />
             <Route path="/social-video"       element={<SocialVideo />} />
             <Route path="/product-poster"    element={<PosterStudio />} />

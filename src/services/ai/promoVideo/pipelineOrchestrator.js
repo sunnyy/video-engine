@@ -22,11 +22,13 @@
 import { supabaseAdmin, openai }                      from "../../../server/middleware/shared.js";
 import { generateFullVoiceover } from "./ttsGenerator.js";
 import { pickAutoMood }                               from "../../../core/registries/musicRegistry.js";
-import { generateScriptV2, INTENT_PATTERNS, SCENE_WORD_BUDGETS } from "./scriptGenerator.js";
+import { generateScriptV2, generateNarration, INTENT_PATTERNS, SCENE_WORD_BUDGETS } from "./scriptGenerator.js";
+import { planVisualBeats }                           from "./visualDirector.js";
 import { designScene }                               from "./sceneDesigner.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
-import { buildTimeline }                              from "./timelineBuilder.js";
+import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
+import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -79,6 +81,29 @@ async function generateFalImage(hint, projectId) {
     return pub?.publicUrl ?? falUrl;
   } catch (e) {
     console.error("[v2/pipeline] Fal.ai error:", e.message);
+    return null;
+  }
+}
+
+// Stock video b-roll from Pixabay. Prefers portrait clips for the 9:16 canvas.
+async function fetchPixabayVideo(hint) {
+  const key = process.env.VITE_PIXABAY_API_KEY;
+  if (!key || !hint) return null;
+  try {
+    const url = `https://pixabay.com/api/videos/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(hint)}&per_page=12&safesearch=true`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    const hits = data.hits ?? [];
+    if (!hits.length) return null;
+    const isPortrait = (h) => {
+      const v = h.videos?.large ?? h.videos?.medium ?? {};
+      return (v.height ?? h.height ?? 0) > (v.width ?? h.width ?? 1);
+    };
+    const pick = hits.find(isPortrait) ?? hits[0];
+    const v = pick.videos ?? {};
+    return v.large?.url ?? v.medium?.url ?? v.small?.url ?? v.tiny?.url ?? null;
+  } catch (e) {
+    console.error("[v2/beats] Pixabay video error:", e.message);
     return null;
   }
 }
@@ -158,9 +183,15 @@ function parseCustomScript(script, project) {
   console.log(`[v2/pipeline] custom script: ${scenes.length} scenes parsed from user-provided text`);
   return { full_script: script, scenes, pattern_name: 'custom', pattern_tone: 'User-provided script — follow the text exactly as written.' };
 }
+// Phase 1 beat pipeline toggle — set false to fall back to the legacy scene pipeline.
+const BEAT_PIPELINE = true;
+
 export async function runV2Pipeline(project) {
   if (project.video_type === 'talking_head') {
     return await runTHPipeline(project);
+  }
+  if (BEAT_PIPELINE) {
+    return await runV2BeatPipeline(project);
   }
 
   const projectId = project.id;
@@ -206,6 +237,8 @@ export async function runV2Pipeline(project) {
 
   // Expose pattern name so scene designer knows if script is user-provided
   projectContext.patternName = scriptResult.pattern_name ?? null;
+  const creativeDirection = scriptResult.creative_direction ?? null;
+  if (creativeDirection) console.log(`[v2/pipeline] ${projectId} — creative direction: ${creativeDirection}`);
 
   // ── Steps 2+3: Design scenes in parallel (visual_concept planned upfront, no sequential dependency) ──
   console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes in parallel`);
@@ -356,6 +389,8 @@ export async function runV2Pipeline(project) {
         layer.src = await generateFalImage(layer.assetHint, projectId);
       } else if (layer.assetType === "asset") {
         layer.assetQueued = true;
+        layer.src = ASSET_PLACEHOLDER_SRC;
+        layer.isPlaceholder = true;
       }
       if (layer.src) console.log(`[v2/pipeline] resolved ${layer.assetType} placeholder: ${layer.id}`);
     }));
@@ -446,7 +481,8 @@ export async function runV2Pipeline(project) {
         source:            "promo_video",
         editor_version:    "timeline",
         raw_ai_json:       {
-          scenes:     scenes.map(s => ({ sceneIndex: s.scene_index, intent: s.intent, archetype: s.archetype ?? null, visual_concept: s.visual_concept })),
+          creative_direction: creativeDirection,
+          scenes:     scenes.map(s => ({ sceneIndex: s.scene_index, intent: s.intent, creative_brief: s.creative_brief ?? s.visual_concept ?? null, wants_product_visual: s.wants_product_visual ?? null })),
           sceneHTMLs: sceneHTMLs,
         },
       })
@@ -473,6 +509,186 @@ export async function runV2Pipeline(project) {
     _asset_queue:       asset_queue,
     _assetManifest:     assetManifest,
     updated_at:         new Date().toISOString(),
+  };
+}
+
+// ── V2 Beat pipeline (voiceover-first, timed visual beats) ─────────────────────
+
+async function runV2BeatPipeline(project) {
+  const projectId   = project.id;
+  const formatRatio = project.format_ratio ?? '9:16';
+  const canvas      = CANVAS_SIZES[formatRatio] ?? CANVAS_SIZES['9:16'];
+
+  const projectContext = {
+    projectId,
+    productName:     project.product_name    ?? "Product",
+    niche:           project.style?.niche    ?? "saas",
+    accentColor:     project.accent_color    ?? project.style?.color_palette ?? "#6366f1",
+    visualStyle:     project.visual_style    ?? "radiant",
+    typographyStyle: project.typography_style ?? "modern",
+    logoUrl:         project.logo_url        ?? null,
+    logoWidth:       project.logo_width      ?? null,
+    logoHeight:      project.logo_height     ?? null,
+    fps:             30,
+    musicMood:       project.style?.music_mood ?? "upbeat",
+    voiceId:         project.voice_id        ?? null,
+    language:        project.language        ?? "en",
+    canvasWidth:     canvas.width,
+    canvasHeight:    canvas.height,
+    formatRatio,
+    theme:           project.theme ?? 'dark',
+    tone:            project.tone  ?? 'professional',
+  };
+
+  // ── Step 1: Narration (single continuous voiceover script) ────────────────
+  let full_script, creativeDirection = null;
+  if (project.script?.trim()) {
+    console.log(`[v2/beats] ${projectId} — using user-provided script`);
+    full_script = project.script.trim();
+  } else {
+    console.log(`[v2/beats] ${projectId} — generating narration`);
+    const narration = await generateNarration(project);
+    full_script       = narration.full_script;
+    creativeDirection = narration.creative_direction;
+  }
+  if (creativeDirection) console.log(`[v2/beats] direction: ${creativeDirection}`);
+
+  // ── Step 2: Voiceover FIRST (so visuals can be timed to real speech) ──────
+  let voiceoverAudioUrl = null, voiceoverDuration = 0, wordTimestamps = [];
+  try {
+    const tts = await generateFullVoiceover(full_script, projectId, projectContext.voiceId);
+    voiceoverAudioUrl = tts.audio_url;
+    voiceoverDuration = tts.duration_seconds;
+    wordTimestamps    = tts.wordTimestamps ?? [];
+  } catch (err) {
+    console.error("[v2/beats] TTS failed (non-fatal):", err.message);
+  }
+
+  // ── Step 3: Visual director → timed beats ─────────────────────────────────
+  const beats = await planVisualBeats({ full_script, wordTimestamps, audioDuration: voiceoverDuration, projectContext });
+
+  // ── Step 4: Design each beat in parallel ──────────────────────────────────
+  const splitTop = Math.round(canvas.height * 0.55); // media top 55%, text bottom 45%
+  const beatResults = await Promise.all(beats.map(async (beat) => {
+    try {
+      const isMedia    = beat.presentation !== "html";
+      const hasOverlay = beat.presentation === "media_full" || beat.presentation === "media_split";
+      let media   = null;
+      let sceneCtx = { ...projectContext, visualConcept: beat.creative_brief, creativeBrief: beat.creative_brief, wantsProductVisual: beat.wants_product_visual, beatDuration: beat.duration };
+
+      if (isMedia) {
+        // map director media_source → asset type + layer kind
+        const assetType = beat.media_source === "stock_video" ? "stock_video"
+                        : beat.media_source === "ai_image"    ? "ai" : "stock";
+        const kind = beat.media_source === "stock_video" ? "video" : "image";
+        if (beat.presentation === "media_split") {
+          media   = { kind, assetType, assetHint: beat.asset_hint, region: { y: 0, height: splitTop } };
+          sceneCtx = { ...sceneCtx, overlayMode: true, regionTop: splitTop, regionHeight: canvas.height - splitTop };
+        } else {
+          media   = { kind, assetType, assetHint: beat.asset_hint, region: { y: 0, height: canvas.height } };
+          sceneCtx = { ...sceneCtx, overlayMode: true };
+        }
+      }
+
+      // media_only beats carry no text — skip the designer entirely (faster + cheaper).
+      if (isMedia && !hasOverlay) {
+        console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.media_source}/${beat.motion}) — media only, no overlay`);
+        return { graph: [], media };
+      }
+
+      const pseudoScene = {
+        scene_index:          beat.beat_index,
+        intent:               beat.presentation,
+        script_segment:       beat.spoken,
+        creative_brief:       beat.creative_brief,
+        wants_product_visual: beat.wants_product_visual,
+      };
+      const html  = await designScene(pseudoScene, sceneCtx);
+      const graph = parseSceneHTML(html || "", beat.beat_index, canvas);
+      console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.motion}) — ${graph.length} layers${media ? ` + ${media.kind}` : ""}`);
+      return { graph, media };
+    } catch (err) {
+      console.error(`[v2/beats] beat ${beat.beat_index} design failed:`, err.message);
+      return { graph: [], media: null };
+    }
+  }));
+
+  // ── Step 5: Build timeline from beats ─────────────────────────────────────
+  const { timeline } = buildTimelineFromBeats(beats, beatResults, projectContext);
+
+  // ── Step 6: Inject the single global voiceover layer ──────────────────────
+  let finalTimeline = timeline;
+  if (voiceoverAudioUrl) {
+    const totalDur = finalTimeline.format.duration;
+    finalTimeline = {
+      ...finalTimeline,
+      layers: [
+        ...finalTimeline.layers,
+        {
+          id: "voiceover_full", trackId: "track_voiceover",
+          type: "audio", audioType: "voiceover", src: voiceoverAudioUrl,
+          start: 0, end: totalDur, zIndex: 0,
+          visible: true, locked: false, trimStart: 0, trimEnd: totalDur,
+          volume: 1.0, muted: false, fadeIn: 0.1, fadeOut: 0.3,
+          sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+        },
+      ],
+    };
+  }
+
+  // ── Step 7: Background music ──────────────────────────────────────────────
+  await injectBackgroundMusic(finalTimeline, project);
+
+  // ── Step 8: Resolve media + product-asset placeholders (image AND video) ──
+  const placeholderLayers = finalTimeline.layers.filter(l => (l.type === "image" || l.type === "video") && !l.src && l.assetHint);
+  await Promise.all(placeholderLayers.map(async (layer) => {
+    if (layer.assetType === "stock") {
+      const query = extractSearchQuery(layer.assetHint);
+      layer.src = await fetchPixabayImage(query);
+    } else if (layer.assetType === "stock_video") {
+      layer.src = await fetchPixabayVideo(extractSearchQuery(layer.assetHint));
+      // Fallback: no matching stock clip → degrade to a stock image so the beat isn't empty.
+      if (!layer.src) {
+        layer.type = "image";
+        layer.src  = await fetchPixabayImage(extractSearchQuery(layer.assetHint));
+        console.warn(`[v2/beats] stock_video had no match for ${layer.id} — fell back to image`);
+      }
+    } else if (layer.assetType === "ai") {
+      layer.src = await generateFalImage(layer.assetHint, projectId);
+    } else if (layer.assetType === "asset") {
+      layer.assetQueued  = true;
+      layer.src          = ASSET_PLACEHOLDER_SRC;
+      layer.isPlaceholder = true;
+    }
+    if (layer.src) console.log(`[v2/beats] resolved ${layer.assetType} placeholder: ${layer.id}`);
+  }));
+
+  // ── Step 9: Asset manifest (product screenshots only) ─────────────────────
+  const assetManifest = buildAssetManifest(finalTimeline);
+  await persistAssetManifest(assetManifest, projectId);
+
+  // ── Step 10: Save timeline ────────────────────────────────────────────────
+  if (full_script) finalTimeline.full_script = full_script;
+  const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video', {
+    creative_direction: creativeDirection,
+    beats: beats.map(b => ({
+      index: b.beat_index, presentation: b.presentation, motion: b.motion,
+      media_source: b.media_source, spoken: b.spoken, creative_brief: b.creative_brief,
+    })),
+  });
+
+  const totalDuration = parseFloat(finalTimeline.format.duration.toFixed(2));
+  return {
+    ...project,
+    full_script,
+    scene_format:      "v2",        // render gate expects "v2"; beat marker is pipeline_version
+    pipeline_version:  "v2_beats",
+    status:            "script_generated",
+    duration_seconds:  totalDuration,
+    editor_project_id: editorProjectId,
+    _timeline:         finalTimeline,
+    _assetManifest:    assetManifest,
+    updated_at:        new Date().toISOString(),
   };
 }
 
