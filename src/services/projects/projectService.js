@@ -179,6 +179,26 @@ export async function getPromptVideoProjects() {
   return result;
 }
 
+export async function getAiVideoProjects() {
+  const hit = getCached("ai_video");
+  if (hit) return hit;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, updated_at, safe_project_json")
+    .eq("user_id", user.id)
+    .eq("source", "ai_video")
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  const result = data || [];
+  setCached("ai_video", result);
+  return result;
+}
+
 export async function getProductAdProjects() {
   const hit = getCached("product_ad");
   if (hit) return hit;

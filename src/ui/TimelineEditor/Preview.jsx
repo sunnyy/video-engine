@@ -217,7 +217,7 @@ function VideoLayerEl({ layer, currentTime, isPlaying }) {
     <video
       ref={ref}
       src={layer.src}
-      style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), pointerEvents: "none" }}
+      style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), borderRadius: "inherit", pointerEvents: "none" }}
       muted={layer.muted ?? false}
       loop={false}
       preload="auto"
@@ -603,7 +603,7 @@ function PersistentVideoTrack({
           <video
             ref={videoRef}
             src={activeClip?.src ?? clips[0]?.src}
-            style={{ width: "100%", height: "100%", objectFit: activeClip ? resolvedObjectFit(activeClip, currentTime) : "cover", pointerEvents: "none" }}
+            style={{ width: "100%", height: "100%", objectFit: activeClip ? resolvedObjectFit(activeClip, currentTime) : "cover", borderRadius: "inherit", pointerEvents: "none" }}
             muted={activeClip?.muted ?? clips[0]?.muted ?? false}
             loop={false}
             preload="auto"
@@ -877,7 +877,7 @@ function LayerElement({
       content = layer.src ? (
         <img
           src={layer.src}
-          style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), objectPosition: layer.objectPosition || undefined, display: "block", pointerEvents: "none" }}
+          style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), objectPosition: layer.objectPosition || undefined, display: "block", borderRadius: "inherit", pointerEvents: "none" }}
           draggable={false}
         />
       ) : (
@@ -1039,7 +1039,10 @@ function LayerElement({
             padding:      s.padding      ?? undefined,
             display: "flex",
             alignItems: "center",
-            justifyContent: s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
+            // "start"/"end" (what getComputedStyle returns for default text) must map
+            // to flex-start/flex-end too — otherwise left-aligned text renders centered.
+            justifyContent: (s.textAlign === "left" || s.textAlign === "start") ? "flex-start"
+                          : (s.textAlign === "right" || s.textAlign === "end") ? "flex-end" : "center",
             cursor: "default",
           }}
           onDoubleClick={(e) => { e.stopPropagation(); onStartEdit?.(); }}
@@ -1076,6 +1079,10 @@ function LayerElement({
           width: "100%",
           height: "100%",
           background: layer.gradient ?? "linear-gradient(135deg, #000000, #ffffff)",
+          // Match the wrapper's rounded corners — the wrapper has overflow:visible
+          // (so glows/shadows can bleed), so the fill must round itself or it shows
+          // square corners poking through a rounded border.
+          borderRadius: "inherit",
           pointerEvents: "none",
         }}
       />

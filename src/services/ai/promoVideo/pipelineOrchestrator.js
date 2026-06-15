@@ -25,7 +25,9 @@ import { pickAutoMood }                               from "../../../core/regist
 import { generateScriptV2, generateNarration, INTENT_PATTERNS, SCENE_WORD_BUDGETS } from "./scriptGenerator.js";
 import { planVisualBeats }                           from "./visualDirector.js";
 import { designScene }                               from "./sceneDesigner.js";
+import { designFreeScene }                           from "./sceneDesignerFree.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
+import { measureSceneHTML, closeMeasureBrowser }      from "./htmlMeasure.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
@@ -185,6 +187,9 @@ function parseCustomScript(script, project) {
 }
 // Phase 1 beat pipeline toggle — set false to fall back to the legacy scene pipeline.
 const BEAT_PIPELINE = true;
+// EXPERIMENTAL: let GPT write natural nested HTML/CSS and flatten it via a headless
+// browser (htmlMeasure) instead of the absolute-only parser. Toggle to A/B.
+const USE_HEADLESS_MEASURE = true;
 
 export async function runV2Pipeline(project) {
   if (project.video_type === 'talking_head') {
@@ -574,7 +579,7 @@ async function runV2BeatPipeline(project) {
       const isMedia    = beat.presentation !== "html";
       const hasOverlay = beat.presentation === "media_full" || beat.presentation === "media_split";
       let media   = null;
-      let sceneCtx = { ...projectContext, visualConcept: beat.creative_brief, creativeBrief: beat.creative_brief, wantsProductVisual: beat.wants_product_visual, beatDuration: beat.duration };
+      let sceneCtx = { ...projectContext, visualConcept: beat.creative_brief, creativeBrief: beat.creative_brief, wantsProductVisual: beat.wants_product_visual, beatDuration: beat.duration, layout: beat.layout };
 
       if (isMedia) {
         // map director media_source → asset type + layer kind
@@ -593,7 +598,7 @@ async function runV2BeatPipeline(project) {
       // media_only beats carry no text — skip the designer entirely (faster + cheaper).
       if (isMedia && !hasOverlay) {
         console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.media_source}/${beat.motion}) — media only, no overlay`);
-        return { graph: [], media };
+        return { graph: [], media, html: null };
       }
 
       const pseudoScene = {
@@ -603,15 +608,37 @@ async function runV2BeatPipeline(project) {
         creative_brief:       beat.creative_brief,
         wants_product_visual: beat.wants_product_visual,
       };
+
+      // Headless path: GPT writes natural nested CSS → browser measures → layers.
+      // Falls back to the absolute-only designer+parser on any failure.
+      if (USE_HEADLESS_MEASURE) {
+        try {
+          const html  = await designFreeScene(pseudoScene, sceneCtx);
+          const graph = await measureSceneHTML(html || "", beat.beat_index, canvas);
+          console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.motion}) — measured ${graph.length} layers${media ? ` + ${media.kind}` : ""}`);
+          return { graph, media, html };
+        } catch (mErr) {
+          console.warn(`[v2/beats] beat ${beat.beat_index} headless measure failed, falling back to parser:`, mErr.message);
+          const html  = await designScene(pseudoScene, sceneCtx);
+          const graph = parseSceneHTML(html || "", beat.beat_index, canvas);
+          return { graph, media, html };
+        }
+      }
+
       const html  = await designScene(pseudoScene, sceneCtx);
       const graph = parseSceneHTML(html || "", beat.beat_index, canvas);
       console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.motion}) — ${graph.length} layers${media ? ` + ${media.kind}` : ""}`);
-      return { graph, media };
+      return { graph, media, html };
     } catch (err) {
       console.error(`[v2/beats] beat ${beat.beat_index} design failed:`, err.message);
-      return { graph: [], media: null };
+      return { graph: [], media: null, html: null };
     }
   }));
+
+  // GPT-5.4 scene HTML per beat — saved to raw_ai_json so the design output is inspectable.
+  const sceneHTMLs = beatResults.map(r => r.html ?? null);
+
+  if (USE_HEADLESS_MEASURE) { try { await closeMeasureBrowser(); } catch {} }
 
   // ── Step 5: Build timeline from beats ─────────────────────────────────────
   const { timeline } = buildTimelineFromBeats(beats, beatResults, projectContext);
@@ -663,6 +690,15 @@ async function runV2BeatPipeline(project) {
     if (layer.src) console.log(`[v2/beats] resolved ${layer.assetType} placeholder: ${layer.id}`);
   }));
 
+  // Drop stock/ai media that failed to resolve — an empty image/video box should
+  // never render. (asset placeholders keep ASSET_PLACEHOLDER_SRC for user upload.)
+  const beforeDrop = finalTimeline.layers.length;
+  finalTimeline.layers = finalTimeline.layers.filter(l =>
+    !((l.type === "image" || l.type === "video") && !l.src && l.assetType && l.assetType !== "asset"));
+  if (finalTimeline.layers.length !== beforeDrop) {
+    console.log(`[v2/beats] dropped ${beforeDrop - finalTimeline.layers.length} unresolved media layer(s)`);
+  }
+
   // ── Step 9: Asset manifest (product screenshots only) ─────────────────────
   const assetManifest = buildAssetManifest(finalTimeline);
   await persistAssetManifest(assetManifest, projectId);
@@ -671,9 +707,10 @@ async function runV2BeatPipeline(project) {
   if (full_script) finalTimeline.full_script = full_script;
   const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video', {
     creative_direction: creativeDirection,
-    beats: beats.map(b => ({
+    beats: beats.map((b, i) => ({
       index: b.beat_index, presentation: b.presentation, motion: b.motion,
       media_source: b.media_source, spoken: b.spoken, creative_brief: b.creative_brief,
+      html: sceneHTMLs[i] ?? null, // GPT-5.4 scene HTML/CSS for this beat
     })),
   });
 

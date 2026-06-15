@@ -17,8 +17,8 @@
 
 import { openai } from "../../../server/middleware/shared.js";
 
-const MIN_BEAT_SEC = 2.0;
-const MAX_BEAT_SEC = 6.0;
+const MIN_BEAT_SEC = 1.5;
+const MAX_BEAT_SEC = 4.0;
 // Safety net: any beat shorter than this is folded into a neighbor (catches the
 // model over-splitting a lone word like "Preview." into its own scene).
 const MERGE_FLOOR_SEC = 1.2;
@@ -29,17 +29,22 @@ const PRESENTATIONS  = new Set(["html", "media_only", "media_full", "media_split
 // ONLY when the idea can't be shown with stock. AI video is deferred for later.
 const MEDIA_SOURCES  = new Set(["stock_image", "stock_video", "ai_image"]);
 const MOTIONS        = new Set(["push_in", "pull_out", "pan_left", "pan_right", "drift_up", "drift_down"]);
+// LAYOUT is a FREE-TEXT structural description the director invents per beat (no
+// fixed taxonomy). It's what stops every parallel GPT-5.4 call from defaulting to
+// the same kicker+headline+subhead stack — and it lives here, in the one call that
+// sees the whole script, so structures can be kept distinct across beats.
 
 const SYSTEM = `You are a visual director for short-form promo videos. You are given a finished voiceover narration. Your job is to break it into a sequence of VISUAL BEATS — what the viewer SEES, moment to moment, synced to what is being said.
 
 CORE PRINCIPLES:
-- A BEAT IS ONE COMPLETE VISUAL IDEA — never one stray word, never one line pulled out of a group. Decide beats by IDEA, not by sentence or punctuation.
-- GROUP related consecutive lines into ONE beat. A rapid-fire run — a list of pains, a list of features, "No X. No Y. No Z." negations, or a trio like "Preview. Rollback. Ship again." — is a SINGLE beat that reveals its items one-by-one (kinetic), NOT one beat per item.
-- NEVER give a lone short word or phrase its own beat (e.g. "No servers.", "Preview.", "Rollback."). Fold it into the idea it belongs to. The ONLY exception is one deliberate, dramatic full-screen word, used very sparingly.
-- Do NOT split a single continuous thought across beats.
-- Target ${MIN_BEAT_SEC}–${MAX_BEAT_SEC}s per beat. If a coherent list or idea runs longer than ${MAX_BEAT_SEC}s, KEEP IT AS ONE BEAT and reveal it progressively — never chop a list to satisfy a limit.
+- THE UNIT IS ONE DISTINCT VISUAL IDEA — the single thing the viewer SEES at that moment. It can be SMALLER than a sentence. Decide beats by idea, not by sentences or punctuation.
+- SPLIT a sentence whenever it moves to a DIFFERENT thing to show. If a line walks through an action, then a product/output, then a list of named things, that is 2–3 SEPARATE beats — one per idea, each with its own visual and its own cut. e.g. "Drop your topic" → one beat (the input action); "Vidquence turns it into a polished video" → one beat (the product output); "ready for TikTok, Reels, and Shorts" → one beat (the platform list).
+- GROUP only when consecutive fragments express the SAME idea. A list of similar items — negations ("No X. No Y."), features, or named things ("TikTok, Reels, Shorts") — is ONE beat shown as a kinetic listicle (icon + label per item), NOT one beat per item.
+- RULE OF THUMB: a LIST of similar items = ONE beat; a SEQUENCE of different ideas = SEPARATE beats.
+- PACING / NO LONG STATIC HOLDS: aim ${MIN_BEAT_SEC}–${MAX_BEAT_SEC}s per beat. No beat should hold a near-static frame longer than ~4s — nobody watches a dense screen for 7–8 seconds. If an idea's speech runs longer than ~${MAX_BEAT_SEC}s it almost always contains multiple ideas → SPLIT it. A genuine single list may run a bit longer ONLY if it reveals progressively (kinetic), never static.
+- NEVER give a lone connective/emphatic word its own beat ("and", "Preview.") unless it's a deliberate dramatic full-screen hit, used very sparingly.
 - The beats together cover the ENTIRE script in order. Each beat's "spoken" is an EXACT, CONSECUTIVE substring of the narration, verbatim — no gaps, no overlaps, no paraphrasing.
-- SANITY CHECK: a ~30s script should be roughly 5–8 beats. If you have more than ~10, you are over-segmenting — merge related lines into shared beats.
+- SANITY CHECK: a content-rich ~25–30s script is typically 7–10 beats. Too few long, dense, static beats is as bad as too many tiny ones — if any beat is long AND dense, split it.
 - THE HOOK (the FIRST beat) is special: it MUST show the opening line on screen — as kinetic "html" (preferred), or "media_full" / "media_split" with the hook text overlaid. NEVER use "media_only" for the hook; a bare image with no words is a weak, confusing open. The viewer must be able to read the hook.
 - MATCH COMPLEXITY TO TIME. A beat's spoken length is roughly its screen time (about N words ÷ 2.5 ≈ seconds). A genuinely short beat must stay SIMPLE (one bold line or a media shot), but the answer to "this is too short for a built UI" is usually to GROUP it with its neighbors into a richer beat — not to leave it as a lone scene.
 
@@ -52,7 +57,7 @@ PRESENTATION TYPES (pick one per beat — VARY them, see "TREATMENT MIX" below):
 MEDIA SOURCE (for media_only / media_full / media_split) — PREFER STOCK:
 - "stock_image" → a real photograph from a stock library (a person, a place, a real situation). Your default for real-world moments.
 - "stock_video" → a short real stock VIDEO clip / b-roll with real motion. Great for dynamic, lively, or atmospheric moments. Prefer this over a static image when motion suits the beat.
-- "ai_image"    → an AI-generated illustration / concept image. Use ONLY when the idea genuinely CANNOT be shown with a stock photo or video (an abstract concept, an impossible or highly specific scene). Do not default to it.
+- "ai_image"    → an AI-generated concept image. Use for hero / atmosphere / abstract or impossible-to-photograph moments — and whenever real stock would look generic or cliché for THIS product (common for software). Don't make it the default for everything, but don't treat it as a rare last resort either.
 
 CHOOSING THE TREATMENT MIX — FIT IT TO THE PRODUCT (no fixed ratio):
 First judge what KIND of product/idea this is, then pick the mix that genuinely suits it:
@@ -64,6 +69,11 @@ AVOID THE SLIDESHOW FEEL — but the fix is MOTION, not a media quota:
 - Heavy use of "html" is great (and usually right for software) AS LONG AS every html beat is kinetic — staggered, animated reveals — and you VARY the treatment so two beats never look like the same template recolored.
 - Let some beats breathe (a clean single statement, or an atmosphere shot) for rhythm.
 - media_only / media_full / media_split beats must NOT carry a specific stat, feature list, or precise claim that must be READ — those belong in kinetic html. Use media beats for feeling, scene, and atmosphere the voiceover explains.
+
+LAYOUT (required for every beat) — INVENT the structural shape of this specific frame and describe it in one short phrase. Describe ONLY the skeleton/composition: how the elements are arranged in the frame — NOT colors, fonts, pixel sizes, or animation (the designer owns those). You are the art director; GPT designs exactly the structure you describe. There is NO fixed list of layouts — make one up that fits THIS idea.
+This is the single most important field for VARIETY: each scene is designed by a separate call that can't see the others, so without a distinct structure they ALL collapse into the same "kicker + headline + subhead" stack. Because you see the whole script at once, make every beat's structure genuinely different from its neighbours, and don't reuse a structure you already used. Avoid the default headline-over-subhead stack unless it's truly the best shape for that one beat.
+Write the KIND of thing below — but INVENT your own per beat, never copy these: "one giant word filling the frame with a faint oversized echo of it behind", "a vertical list, each row an icon then a few words, revealed top to bottom", "a single huge metric centered with a thin caption beneath", "two stacked panels — before on top, after below — split by a hairline rule", "one clean device/window frame, nothing floating around it".
+For media beats the image carries the frame — describe at most where a single overlaid line sits.
 
 ASSET HINT (required for every media beat — media_only / media_full / media_split): one line describing what the image or video shows — subject + context + lighting (and the motion for stock_video). Max 15 words. Describe what the camera sees, never emotions. No people's faces required.
 
@@ -80,6 +90,7 @@ OUTPUT — valid JSON only:
       "beat_index": 0,
       "spoken": "exact consecutive words from the narration for this beat",
       "presentation": "html | media_only | media_full | media_split",
+      "layout": "one short phrase describing THIS frame's invented structure — make it different from every other beat",
       "media_source": "stock_image | stock_video | ai_image | null",
       "asset_hint": "image/video description or null",
       "wants_product_visual": false,
@@ -158,17 +169,82 @@ function mergeShortBeats(beats) {
   return out.map((b, i) => ({ ...b, beat_index: i }));
 }
 
+// Split a too-long text beat into clause-sized sub-beats so html scenes don't sit
+// static for 5–8s. Runs BEFORE timing alignment, using a word-count estimate.
+// Only html beats are split — media beats have continuous Ken Burns motion.
+const WORDS_PER_SEC  = 2.5;
+const SPLIT_OVER_SEC = 3.8;
+const ALT_MOTION = { push_in: "pull_out", pull_out: "push_in", pan_left: "pan_right", pan_right: "pan_left", drift_up: "drift_down", drift_down: "drift_up" };
+
+function clauseSplit(text) {
+  const words = text.trim().split(/\s+/);
+  const mid = Math.floor(words.length / 2);
+  let best = -1, bestDist = 1e9;
+  for (let i = 2; i < words.length - 2; i++) {
+    const w = words[i], next = words[i + 1] || "";
+    if (/[,—:;.]$/.test(w) || /^(and|or|but|so|then|because|when|while)$/i.test(next)) {
+      const d = Math.abs(i - mid);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+  }
+  const cut = best >= 0 ? best + 1 : mid;
+  return [words.slice(0, cut).join(" "), words.slice(cut).join(" ")];
+}
+
+function splitLongBeats(beats) {
+  let cur = beats, changed = true;
+  for (let pass = 0; pass < 3 && changed; pass++) {
+    changed = false;
+    const out = [];
+    for (const b of cur) {
+      const words = b.spoken.trim().split(/\s+/).filter(Boolean).length;
+      if (b.presentation === "html" && words >= 8 && words / WORDS_PER_SEC > SPLIT_OVER_SEC) {
+        const [a, c] = clauseSplit(b.spoken);
+        if (a && c) {
+          // A split is a PROGRESSION, not a clone. The first half keeps the beat's
+          // brief/layout (the setup); the second half is the PAYOFF and must look
+          // different — so we clear its layout (the designer invents a fresh shape)
+          // and rewrite its brief to ask for a distinct, simpler resolving frame.
+          // Without this, both halves got the identical brief → twin scenes.
+          out.push({ ...b, spoken: a });
+          out.push({
+            ...b,
+            spoken: c,
+            motion: ALT_MOTION[b.motion] || b.motion,
+            layout: "",
+            creative_brief: `The PAYOFF frame that resolves the previous beat — design a DIFFERENT, simpler structure (e.g. the finished result, or a punchy closing line), NOT a repeat of the previous frame's layout. Show only: "${c.trim()}".`,
+          });
+          changed = true;
+          continue;
+        }
+      }
+      out.push(b);
+    }
+    cur = out;
+  }
+  return cur;
+}
+
+// User-asset upload slots are deferred (user_assets ships later). Until then,
+// product-asset placeholders only HURT — GPT tags designed preview/UI panels as
+// data-asset-type="asset", and the pipeline replaces those whole designed areas
+// with the "MISSING ASSET" box. Disabled for now; flip to true when uploads land.
+const ASSET_PLACEHOLDERS_ENABLED = false;
+
 function sanitizeBeat(b, i) {
   const presentation = PRESENTATIONS.has(b.presentation) ? b.presentation : "html";
   const isMedia = presentation !== "html";
   const motion  = MOTIONS.has(b.motion) ? b.motion : "push_in";
+  // Free-text structural description invented by the director — no validation, just trim.
+  const layout  = typeof b.layout === "string" ? b.layout.trim() : "";
   return {
     beat_index:          i,
     spoken:              typeof b.spoken === "string" ? b.spoken.trim() : "",
     presentation,
+    layout,
     media_source:        isMedia ? (MEDIA_SOURCES.has(b.media_source) ? b.media_source : "stock_image") : null,
     asset_hint:          isMedia ? (typeof b.asset_hint === "string" ? b.asset_hint.trim() : null) : null,
-    wants_product_visual: !isMedia && b.wants_product_visual === true,
+    wants_product_visual: ASSET_PLACEHOLDERS_ENABLED && !isMedia && b.wants_product_visual === true,
     motion,
     creative_brief:      typeof b.creative_brief === "string" ? b.creative_brief.trim() : "",
   };
@@ -211,6 +287,7 @@ NARRATION (segment this exactly, verbatim, in order):
   if (!rawBeats.length) throw new Error("planVisualBeats: no beats returned");
 
   let beats = rawBeats.map(sanitizeBeat).filter(b => b.spoken);
+  beats = splitLongBeats(beats).map((b, i) => ({ ...b, beat_index: i }));
   alignBeatsToWords(beats, wordTimestamps, audioDuration);
   const before = beats.length;
   beats = mergeShortBeats(beats);
@@ -223,6 +300,6 @@ NARRATION (segment this exactly, verbatim, in order):
   }
 
   const counts = beats.reduce((acc, b) => { acc[b.presentation] = (acc[b.presentation] ?? 0) + 1; return acc; }, {});
-  console.log(`[visualDirector] ${beats.length} beats — ${JSON.stringify(counts)}`);
+  console.log(`[visualDirector] ${beats.length} beats — ${JSON.stringify(counts)} — layouts: ${beats.map(b => b.layout).join(", ")}`);
   return beats;
 }

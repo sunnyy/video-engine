@@ -301,7 +301,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-video", "/promo-video", "/social-video", "/saas-video", "/prompt-video"].includes(path) || path.startsWith("/video-editor");
+const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-video", "/promo-video", "/social-video", "/saas-video", "/prompt-video", "/ai-video"].includes(path) || path.startsWith("/video-editor");
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -336,8 +336,9 @@ const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-
 
             <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
               <NavItem icon={Icons.promo}      label="Promo Video" sub="Promo videos for SaaS products"  to="/promo-video"       active={path === "/promo-video"} />
-              <NavItem icon={Icons.promo}      label="SaaS Video"         sub="Paste your URL — new pipeline" to="/saas-video"       active={path === "/saas-video"} />
+              <NavItem icon={Icons.promo}      label="SaaS Video"         sub="Paste your URL — get a video ready" to="/saas-video"       active={path === "/saas-video"} />
               <NavItem icon={Icons.aiVideo}    label="Prompt to Video"    sub="Describe any video — beat engine" to="/prompt-video"  active={path === "/prompt-video"} />
+              <NavItem icon={Icons.aiVideo}    label="AI Video"           sub="Transformation engine (prototype)" to="/ai-video"    active={path === "/ai-video"} />
               <NavItem icon={Icons.ad}         label="Product Video"      sub="Turn photos into video ads"    to="/product-video"    active={path === "/product-video"} />
               <NavItem icon={Icons.social}     label="Social to Video"     sub="Turn posts into video reels"  to="/social-video"     active={path === "/social-video"} />
               <NavItem icon={Icons.typography} label="Typography Video"   sub="Bold kinetic text animations"  to="/typography-video" active={path === "/typography-video"} />

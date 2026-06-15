@@ -200,7 +200,8 @@ function TimelineLayer({ layer, currentTime, fps }) {
             display: "flex",
             alignItems: "center",
             justifyContent:
-              s.textAlign === "left" ? "flex-start" : s.textAlign === "right" ? "flex-end" : "center",
+              (s.textAlign === "left" || s.textAlign === "start") ? "flex-start"
+              : (s.textAlign === "right" || s.textAlign === "end") ? "flex-end" : "center",
             whiteSpace: s.whiteSpace ?? "pre-wrap",
             wordBreak: s.wordBreak ?? "normal",
             overflow: "visible",

@@ -138,6 +138,34 @@ function animationToKeyframes(animation, bx = 0, by = 0) {
   }
 }
 
+// ── Ambient pulse ───────────────────────────────────────────────────────────────
+// GPT-5.4 puts continuous CSS @keyframes (flicker/pulse/glow) on decorative elements.
+// We can't replay arbitrary keyframes, so for any flagged element we synthesize a
+// gentle looping opacity oscillation across the whole beat — generalized "life", not
+// the exact curve. Staggered per element (phase from id) so they don't pulse in sync.
+const PULSE_MIN    = 0.5;  // dimmest opacity multiplier (× the layer's base opacity)
+const PULSE_PERIOD = 1.8;  // seconds per cycle
+const PULSE_STEP   = 0.3;  // sampling interval (linearly interpolated between)
+
+function phaseFromId(id) {
+  let h = 0;
+  for (let i = 0; i < (id || "").length; i++) h = (h * 31 + id.charCodeAt(i)) % 997;
+  return (h % 100) / 100;
+}
+
+function ambientPulseKeyframes(baseKf, duration, phase) {
+  const op = Array.isArray(baseKf.opacity) ? [...baseKf.opacity] : [];
+  const entranceEnd = op.length ? op[op.length - 1].time : 0;
+  const startAt = Math.max(entranceEnd + PULSE_STEP, PULSE_STEP);
+  const out = op.filter(k => k.time < startAt); // keep the entrance fade
+  for (let t = startAt; t <= duration + 1e-6; t += PULSE_STEP) {
+    const ph = ((t / PULSE_PERIOD) + phase) * 2 * Math.PI;
+    const v  = PULSE_MIN + (1 - PULSE_MIN) * (0.5 + 0.5 * Math.sin(ph));
+    out.push({ time: parseFloat(t.toFixed(3)), value: parseFloat(v.toFixed(3)) });
+  }
+  return { ...baseKf, opacity: out };
+}
+
 // ── Transition ────────────────────────────────────────────────────────────────
 
 function defaultTransition(animation) {
@@ -151,9 +179,13 @@ function graphEntryToLayer(entry, start, end, delay = 0) {
   const shouldAnimate =
     entry.animation !== "none" &&
     entry.sceneElement !== "background";
-  const rawKf = shouldAnimate
+  let rawKf = shouldAnimate
     ? animationToKeyframes(entry.animation, entry.x, entry.y)
     : { ...NO_KF };
+  // Ambient life for decorative elements that had a CSS animation in the source.
+  if (entry.ambientPulse) {
+    rawKf = ambientPulseKeyframes(rawKf, Math.max(0.1, end - start), phaseFromId(entry.id));
+  }
   const base = {
     id:        entry.id,
     trackId:   entry.id,
