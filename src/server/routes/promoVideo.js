@@ -145,7 +145,7 @@ router.post("/create", requireAuth, async (req, res) => {
       caption_style, transition_style, motion_style, color_palette, music_mood,
     });
 
-    const { voiceover_url, talking_head_url, logo_url, script: scriptInput } = req.body;
+    const { talking_head_url, logo_url } = req.body;
     const resolvedVideoType = video_type || (has_talking_head ? "talking_head" : "faceless");
 
     project = {
@@ -159,6 +159,9 @@ router.post("/create", requireAuth, async (req, res) => {
       has_logo:         !!has_logo,
       has_voiceover:    !!has_voiceover,
       logo_url:         logo_url || null,
+      product_notes:    (req.body.notes ?? "").trim() || null,
+      // "url" → scraped copy is source of truth; "manual" → typed copy leads, URL is visuals-only
+      text_source:      req.body.text_source || (product_url ? "url" : "manual"),
       language:         language         || "en",
       visual_style:     visual_style     || "radiant",
       theme:            req.body.theme   || "dark",
@@ -204,29 +207,7 @@ router.post("/create", requireAuth, async (req, res) => {
       project = await runV2Pipeline(project);
 
     } else {
-      // ── Faceless path: optional voiceover transcription → GPT scene plan ───
-      if (has_voiceover && voiceover_url && !scriptInput?.trim()) {
-        const tmpPath = path.join(TEMP_DIR, `vo-${uuidv4()}.audio`);
-        try {
-          const audioRes = await fetch(voiceover_url);
-          if (!audioRes.ok) throw new Error(`Failed to download voiceover: ${audioRes.status}`);
-          fs.writeFileSync(tmpPath, Buffer.from(await audioRes.arrayBuffer()));
-          const transcription = await openai.audio.transcriptions.create({
-            model: "whisper-1",
-            file:  fs.createReadStream(tmpPath),
-          });
-          project.script     = transcription.text?.trim() || null;
-          project.has_script = !!project.script;
-          console.log(`[promo-video/create] whisper: "${project.script?.slice(0, 80)}…"`);
-        } catch (e) {
-          console.warn("[promo-video/create] whisper transcription failed (non-fatal):", e.message);
-        } finally {
-          try { fs.unlinkSync(tmpPath); } catch {}
-        }
-      } else if (scriptInput?.trim()) {
-        project.script = scriptInput.trim();
-      }
-
+      // ── Faceless path: always generate the script + voiceover (TTS) ourselves ──
       project = await runV2Pipeline(project);
     }
 

@@ -406,9 +406,20 @@ OUTPUT — valid JSON only:
   "full_script": "the complete continuous voiceover"
 }`;
 
+  // When the product was scraped from a URL, ground the script in the real page copy
+  // so the voiceover speaks the actual product's language, claims, and features.
+  const h = project._harvest;
+  const grounding = h ? `
+
+REAL PRODUCT PAGE — ground the script in this; use the product's actual language, claims, and features, don't invent:
+${h.title ? `Page title: ${h.title}\n` : ""}${h.description ? `Tagline: ${h.description}\n` : ""}${h.headlines?.length ? `Headlines: ${h.headlines.slice(0, 8).join(" | ")}\n` : ""}${h.bullets?.length ? `Features: ${h.bullets.slice(0, 10).join(" | ")}\n` : ""}${h.bodyText ? `Page text (excerpt): ${h.bodyText.slice(0, 1200)}` : ""}` : "";
+
+  // Optional user-provided angle/notes — steer the script toward this direction.
+  const noteLine = project.product_notes ? `\nUSER'S ANGLE / NOTES (prioritize this direction): ${project.product_notes}` : "";
+
   const userPrompt = `Product Name: ${project.product_name ?? "Unknown"}
 Product Description: ${project.product_description ?? "Not provided"}
-Tone: ${tone}`;
+Tone: ${tone}${noteLine}${grounding}`;
 
   const response = await openai.chat.completions.create({
     model:       "gpt-4.1",

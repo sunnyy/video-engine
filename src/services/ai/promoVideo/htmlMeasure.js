@@ -330,8 +330,12 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
       }
     }
 
+    // A real Lucide icon is a LEAF glyph. If a data-icon element actually contains
+    // its own tagged child shapes, it's an illustration built from divs (e.g. a clock
+    // = ring + hands + ticks), not an icon — rendering a glyph would stack a generic
+    // icon on top of the hand-built shapes. Only convert leaf elements to icons.
     const iconName = normalizeIconName(n.dataIcon);
-    if (iconName) {
+    if (iconName && !n.hasRoleChildren) {
       entry.type = "icon";
       entry.iconName = iconName;
       entry.style = entry.style ?? {};

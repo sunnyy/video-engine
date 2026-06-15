@@ -6,6 +6,8 @@
  * Output is compatible with the timeline editor and Remotion renderer.
  */
 
+import { expandEnter, expandExit, expandEmphasis } from "../aiVideo/motion.js";
+
 const FPS      = 30;
 const W_DEFAULT = 1080;
 const H_DEFAULT = 1920;
@@ -171,6 +173,118 @@ function ambientPulseKeyframes(baseKf, duration, phase) {
 function defaultTransition(animation) {
   if (animation === "none") return { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } };
   return { in: { type: "fade", duration: 0.3 }, out: { type: "none", duration: 0 } };
+}
+
+// ── Beat motion (ported from the AI Video transformation engine) ────────────────
+// The beat pipeline drives ALL element motion through the eased intent→keyframe
+// expander in aiVideo/motion.js — the same flying/popping/zooming vocabulary, with
+// real easing curves baked into keyframes (the renderer interpolates linearly).
+// Intent precedence per element: GPT-authored data-enter/-exit/-emphasis → the
+// legacy data-animation word mapped into the new palette → a hierarchy default
+// (hero expressive, supporting calm, decoration fades, background static).
+// Whole-scene pushes (one scene slides out as the next slides in) are layered on
+// top at beat boundaries — they override per-element enter/exit for that scene.
+
+const BEAT_MW = 0.6;   // per-element enter/exit window (s)
+const PUSH_MW = 0.55;  // whole-scene slide window (s)
+
+// Legacy data-animation → enter palette, so existing GPT output still gets eased.
+const LEGACY_ENTER = {
+  "fade-in":     { type: "fade-in" },
+  "fade-up":     { type: "rise-in" },
+  "scale-in":    { type: "pop-in" },
+  "slide-left":  { type: "fly-in", direction: "right" }, // enters from the right
+  "slide-right": { type: "fly-in", direction: "left" },
+};
+
+// Hierarchy default when GPT authored no motion at all.
+function defaultEnterFor(group) {
+  switch (group) {
+    case "hero":       return { type: "pop-in" };
+    case "supporting": return { type: "rise-in" };
+    case "workflow":   return { type: "rise-in" };
+    case "decoration": return { type: "fade-in" };
+    case "background": return { type: "none" };
+    default:           return { type: "fade-in" };
+  }
+}
+
+function mergeKf(...partials) {
+  const out = { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] };
+  for (const p of partials) {
+    if (!p) continue;
+    for (const key of Object.keys(out)) if (Array.isArray(p[key]) && p[key].length) out[key].push(...p[key]);
+  }
+  for (const key of Object.keys(out)) {
+    const byTime = new Map();
+    for (const kf of out[key]) byTime.set(kf.time, kf);
+    out[key] = [...byTime.values()].sort((a, b) => a.time - b.time);
+  }
+  return out;
+}
+
+function clampKf(kf, dur) {
+  const out = {};
+  for (const key of Object.keys(kf)) {
+    const byTime = new Map();
+    for (const k of kf[key]) {
+      const time = Math.max(0, Math.min(dur, parseFloat(k.time.toFixed(3))));
+      byTime.set(time, { ...k, time });
+    }
+    out[key] = [...byTime.values()].sort((a, b) => a.time - b.time);
+  }
+  return out;
+}
+
+/**
+ * beatMotionKeyframes(entry, layer, duration, canvas, delay, push)
+ * Builds the full eased keyframe set for one beat layer.
+ * @param push { enter: dir|null, exit: dir|null } — whole-scene slide directions.
+ */
+function beatMotionKeyframes(entry, layer, duration, canvas, delay, push) {
+  const t = layer.transform;
+  const box = { x: t.x, y: t.y, width: t.width, height: t.height };
+  const ctx = { box, canvas, dur: duration, mw: BEAT_MW };
+  const group = entry.sceneElement ?? "supporting";
+
+  // ENTER: scene push wins; else GPT intent; else legacy animation; else hierarchy default.
+  let enterIntent;
+  if (push.enter) {
+    enterIntent = { type: "fly-in", direction: push.enter, win: PUSH_MW };
+  } else {
+    enterIntent = entry.enter
+      || (entry.animation && entry.animation !== "none" ? LEGACY_ENTER[entry.animation] : null)
+      || defaultEnterFor(group);
+  }
+
+  // EXIT: scene push wins; else GPT intent; else hold (no exit).
+  let exitIntent = push.exit
+    ? { type: "fly-out", direction: push.exit, win: PUSH_MW }
+    : (entry.exit || { type: "none" });
+
+  let en = expandEnter(enterIntent, ctx);
+  const ex = expandExit(exitIntent, ctx);
+
+  // Stagger only the entrance (so a scene reads in waves); a scene push moves as one block.
+  if (delay && !push.enter) en = applyDelay(en, delay);
+
+  // EMPHASIS runs in the hold window between the entrance and the exit.
+  const enterMw = Object.keys(en).length ? ((enterIntent.win ?? BEAT_MW) + (push.enter ? 0 : (delay || 0))) : 0;
+  const exitMw  = Object.keys(ex).length ? (exitIntent.win ?? BEAT_MW) : 0;
+  const emphasisIntent = entry.emphasis || (entry.ambientPulse ? { type: "breathe" } : null);
+  const emphasis = (emphasisIntent && duration - enterMw - exitMw > 0.3)
+    ? expandEmphasis(emphasisIntent, { ...ctx, holdStart: enterMw, holdEnd: duration - exitMw })
+    : null;
+
+  return clampKf(mergeKf(en, ex, emphasis), duration);
+}
+
+// Push schedule: a whole-scene slide on every other beat boundary, alternating side.
+// boundary k sits between beat k and beat k+1.
+function pushForBoundary(k) {
+  if (k < 0 || k % 2 === 0) return null;
+  const idx = (k - 1) / 2;
+  return idx % 2 === 0 ? { exit: "left", enter: "right" } : { exit: "right", enter: "left" };
 }
 
 // ── Scene graph entry → timeline layer ───────────────────────────────────────
@@ -434,8 +548,10 @@ function mediaKenBurns(motion, dur, w, h, bx = 0, by = 0) {
 }
 
 // Lay out one parsed HTML graph (a beat's overlay/full design) into timeline
-// layers between start and end, with staggered entrance delays.
-function layoutGraph(graph, start, end, duration) {
+// layers between start and end, with staggered entrance delays + eased motion.
+// canvas = { width, height }; push = { enter: dir|null, exit: dir|null } for the
+// whole-scene slide at this beat's boundaries.
+function layoutGraph(graph, start, end, duration, canvas, push = { enter: null, exit: null }) {
   const out = [];
   const sorted = [...graph].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
@@ -470,10 +586,17 @@ function layoutGraph(graph, start, end, duration) {
     const idx   = groupIndex[group] ?? 0;
     groupIndex[group] = idx + 1;
     const isBackground = group === "background";
-    const delay = (entry.animation === "none" || isBackground)
+    const delay = isBackground
       ? 0
       : calculateElementDelay(entry, idx, groupSizes[group], duration);
-    out.push(graphEntryToLayer(entry, start, end, delay));
+
+    const layer = graphEntryToLayer(entry, start, end, 0);
+    // The eased intent→keyframe expander owns ALL beat motion; replace the simple
+    // entrance keyframes and clear the renderer transition (background is the only
+    // layer that may carry a scene transition, set by the caller).
+    layer.keyframes  = beatMotionKeyframes(entry, layer, duration, canvas, delay, push);
+    layer.transition = { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } };
+    out.push(layer);
   }
   return out;
 }
@@ -491,8 +614,8 @@ export function buildTimelineFromBeats(beats, beatResults, projectContext) {
   const canvasH = projectContext.canvasHeight ?? H_DEFAULT;
   console.log(`[timelineBuilder] beat pipeline — ${beats.length} beats`);
 
+  const canvas = { width: canvasW, height: canvasH };
   const layers = [];
-  let prevTransition = null;
 
   for (let i = 0; i < beats.length; i++) {
     const beat   = beats[i];
@@ -501,11 +624,24 @@ export function buildTimelineFromBeats(beats, beatResults, projectContext) {
     const end    = parseFloat((beat.end ?? (beat.start ?? 0)).toFixed(4));
     const duration = Math.max(0.1, parseFloat((end - start).toFixed(4)));
 
-    const transitionType = pickTransition(prevTransition);
-    prevTransition = transitionType;
-    const transitionIn = transitionType === "none"
-      ? { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } }
-      : { in: { type: transitionType, duration: 0.4 }, out: { type: "none", duration: 0 } };
+    // Whole-scene push: this beat enters via the previous boundary, exits via its own.
+    const push = {
+      enter: pushForBoundary(i - 1)?.enter ?? null,
+      exit:  pushForBoundary(i)?.exit       ?? null,
+    };
+
+    // Media (full-bleed) slides as one block via the renderer transition field —
+    // a slide of 100% of a full-canvas layer is exactly a whole-scene push. Content
+    // layers slide via baked keyframes (handled in layoutGraph). Non-push media gets
+    // a soft fade so the cut isn't abrupt.
+    const mediaTransition = {
+      in: push.enter
+        ? { type: push.enter === "right" ? "slide-left" : "slide-right", duration: PUSH_MW }
+        : { type: "fade", duration: 0.3 },
+      out: push.exit
+        ? { type: push.exit === "left" ? "slide-left" : "slide-right", duration: PUSH_MW }
+        : { type: "none", duration: 0 },
+    };
 
     // Media background layer. Images get Ken Burns motion; video clips carry their
     // own motion so they get a static transform (and play muted).
@@ -526,7 +662,7 @@ export function buildTimelineFromBeats(beats, beatResults, projectContext) {
         sfx:       null,
         filter:    null, boxShadow: null, mixBlendMode: null, backdropFilter: null,
         keyframes: isVideo ? { ...NO_KF } : mediaKenBurns(beat.motion, duration, canvasW, mediaH, 0, mediaY),
-        transition: transitionIn,
+        transition: mediaTransition,
         transform: {
           x: 0, y: mediaY, width: canvasW, height: mediaH,
           opacity: 1, rotation: 0, scale: 1,
@@ -540,15 +676,9 @@ export function buildTimelineFromBeats(beats, beatResults, projectContext) {
       });
     }
 
-    // Designed HTML layers (full frame, or overlay/region text).
-    const graphLayers = layoutGraph(result.graph ?? [], start, end, duration);
-
-    // Apply the beat's cut to the lowest-z layer so the whole beat reads as one
-    // varied transition (media already carries it; otherwise the background does).
-    if (!result.media && graphLayers.length) {
-      graphLayers[0].transition = transitionIn;
-    }
-
+    // Designed HTML layers (full frame, or overlay/region text) — eased per-element
+    // motion + whole-scene push baked into keyframes.
+    const graphLayers = layoutGraph(result.graph ?? [], start, end, duration, canvas, push);
     layers.push(...graphLayers);
   }
 

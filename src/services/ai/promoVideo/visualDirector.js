@@ -27,7 +27,7 @@ const MERGE_FLOOR_SEC = 1.2;
 const PRESENTATIONS  = new Set(["html", "media_only", "media_full", "media_split"]);
 // Media sources: Pixabay stock (image / video b-roll), or an AI-generated image
 // ONLY when the idea can't be shown with stock. AI video is deferred for later.
-const MEDIA_SOURCES  = new Set(["stock_image", "stock_video", "ai_image"]);
+const MEDIA_SOURCES  = new Set(["stock_image", "stock_video", "ai_image", "product_shot"]);
 const MOTIONS        = new Set(["push_in", "pull_out", "pan_left", "pan_right", "drift_up", "drift_down"]);
 // LAYOUT is a FREE-TEXT structural description the director invents per beat (no
 // fixed taxonomy). It's what stops every parallel GPT-5.4 call from defaulting to
@@ -257,8 +257,12 @@ function sanitizeBeat(b, i) {
 export async function planVisualBeats({ full_script, wordTimestamps = [], audioDuration = 0, projectContext = {} }) {
   if (!full_script?.trim()) return [];
 
+  const hasShots = (projectContext.screenshotCount ?? 0) > 0;
+  const shotNote = hasShots
+    ? `\n\nREAL PRODUCT SCREENSHOTS AVAILABLE (${projectContext.screenshotCount}): for beats that SHOW the actual product, its UI, a feature, or a demo, set media_source "product_shot" (presentation media_full or media_split) — these render the real captured product screenshots. Prefer "product_shot" over stock/ai for any genuine product/demo moment; use stock/ai/html for everything else.`
+    : "";
   const userPrompt = `PRODUCT: ${projectContext.productName ?? "Product"}
-TOTAL VOICEOVER DURATION: ~${(audioDuration || 0).toFixed(1)}s
+TOTAL VOICEOVER DURATION: ~${(audioDuration || 0).toFixed(1)}s${shotNote}
 NARRATION (segment this exactly, verbatim, in order):
 "${full_script.trim()}"`;
 

@@ -31,6 +31,7 @@ import { measureSceneHTML, closeMeasureBrowser }      from "./htmlMeasure.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
+import { harvestAssets }                               from "./assetHarvester.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -524,14 +525,47 @@ async function runV2BeatPipeline(project) {
   const formatRatio = project.format_ratio ?? '9:16';
   const canvas      = CANVAS_SIZES[formatRatio] ?? CANVAS_SIZES['9:16'];
 
+  // ── Step 0: Product-URL harvest (optional) — scrape real copy, brand, screenshots ──
+  let harvest = null;
+  const productUrl = (project.product_url ?? "").trim();
+  // "url"  → the scraped page is the source of truth (name/description/script grounding).
+  // "manual" → the user typed their own name/description; the URL only supplies visuals
+  //            (screenshots/logo/brand), so we never let scraped copy override the typed
+  //            copy and we don't ground the narration in the page text.
+  const textSource = project.text_source ?? (productUrl ? "url" : "manual");
+  if (productUrl) {
+    console.log(`[v2/beats] ${projectId} — harvesting ${productUrl} (text_source=${textSource})`);
+    harvest = await harvestAssets(productUrl, `promo-${projectId}-${Date.now()}`);
+    if (textSource === "url") {
+      // Scraped copy wins; typed/default values are only a fallback if the page is empty.
+      project = {
+        ...project,
+        product_name:        harvest.title       || project.product_name        || "Product",
+        product_description: harvest.description || project.product_description || "",
+        _harvest:            harvest,
+      };
+    } else {
+      // Manual mode: keep the user's typed copy; only fall back to scraped if a field is
+      // blank. No _harvest grounding — the script speaks to the user's own description.
+      project = {
+        ...project,
+        product_name:        project.product_name        || harvest.title       || "Product",
+        product_description: project.product_description || harvest.description || "",
+      };
+    }
+  }
+  const screenshots = harvest?.screenshotUrls ?? [];
+
   const projectContext = {
     projectId,
     productName:     project.product_name    ?? "Product",
     niche:           project.style?.niche    ?? "saas",
-    accentColor:     project.accent_color    ?? project.style?.color_palette ?? "#6366f1",
+    // URL mode auto-brands: scraped brand color / logo win. Manual mode respects the
+    // user's own Style-step accent and uploaded logo, falling back to scraped only.
+    accentColor:     (textSource === "url" ? harvest?.brandColor : null) ?? project.accent_color ?? project.style?.color_palette ?? harvest?.brandColor ?? "#6366f1",
     visualStyle:     project.visual_style    ?? "radiant",
     typographyStyle: project.typography_style ?? "modern",
-    logoUrl:         project.logo_url        ?? null,
+    logoUrl:         (textSource === "url" ? harvest?.logoUrl : null) ?? project.logo_url ?? harvest?.logoUrl ?? null,
     logoWidth:       project.logo_width      ?? null,
     logoHeight:      project.logo_height     ?? null,
     fps:             30,
@@ -543,19 +577,15 @@ async function runV2BeatPipeline(project) {
     formatRatio,
     theme:           project.theme ?? 'dark',
     tone:            project.tone  ?? 'professional',
+    // Director uses this to offer "product_shot" media when real screenshots exist.
+    screenshotCount: screenshots.length,
   };
 
-  // ── Step 1: Narration (single continuous voiceover script) ────────────────
-  let full_script, creativeDirection = null;
-  if (project.script?.trim()) {
-    console.log(`[v2/beats] ${projectId} — using user-provided script`);
-    full_script = project.script.trim();
-  } else {
-    console.log(`[v2/beats] ${projectId} — generating narration`);
-    const narration = await generateNarration(project);
-    full_script       = narration.full_script;
-    creativeDirection = narration.creative_direction;
-  }
+  // ── Step 1: Narration (single continuous voiceover script — always generated) ──
+  console.log(`[v2/beats] ${projectId} — generating narration`);
+  const narration = await generateNarration(project);
+  const full_script = narration.full_script;
+  const creativeDirection = narration.creative_direction;
   if (creativeDirection) console.log(`[v2/beats] direction: ${creativeDirection}`);
 
   // ── Step 2: Voiceover FIRST (so visuals can be timed to real speech) ──────
@@ -583,8 +613,9 @@ async function runV2BeatPipeline(project) {
 
       if (isMedia) {
         // map director media_source → asset type + layer kind
-        const assetType = beat.media_source === "stock_video" ? "stock_video"
-                        : beat.media_source === "ai_image"    ? "ai" : "stock";
+        const assetType = beat.media_source === "stock_video"  ? "stock_video"
+                        : beat.media_source === "ai_image"     ? "ai"
+                        : beat.media_source === "product_shot" ? "product" : "stock";
         const kind = beat.media_source === "stock_video" ? "video" : "image";
         if (beat.presentation === "media_split") {
           media   = { kind, assetType, assetHint: beat.asset_hint, region: { y: 0, height: splitTop } };
@@ -666,10 +697,19 @@ async function runV2BeatPipeline(project) {
   // ── Step 7: Background music ──────────────────────────────────────────────
   await injectBackgroundMusic(finalTimeline, project);
 
+  // ── Step 7.5: Whoosh SFX on each beat cut ─────────────────────────────────
+  await attachBeatTransitionSfx(finalTimeline, beats.length);
+
   // ── Step 8: Resolve media + product-asset placeholders (image AND video) ──
+  // Real product screenshots from the URL harvest fill "product" beats in order;
+  // if we run out (or none were captured) the beat degrades to a stock image.
+  let shotIdx = 0;
   const placeholderLayers = finalTimeline.layers.filter(l => (l.type === "image" || l.type === "video") && !l.src && l.assetHint);
   await Promise.all(placeholderLayers.map(async (layer) => {
-    if (layer.assetType === "stock") {
+    if (layer.assetType === "product") {
+      layer.src = screenshots.length ? screenshots[shotIdx++ % screenshots.length] : null;
+      if (!layer.src) { layer.assetType = "stock"; layer.src = await fetchPixabayImage(extractSearchQuery(layer.assetHint)); }
+    } else if (layer.assetType === "stock") {
       const query = extractSearchQuery(layer.assetHint);
       layer.src = await fetchPixabayImage(query);
     } else if (layer.assetType === "stock_video") {
@@ -745,6 +785,27 @@ async function resolveImagePlaceholders(finalTimeline, project) {
     }
     if (layer.src) console.log(`[v2/pipeline] resolved ${layer.assetType} placeholder: ${layer.id}`);
   }));
+}
+
+// Whoosh SFX on each beat cut (beat 1 onward). Attaches to the lowest-z layer of
+// the incoming beat via its `sfx` field, which the renderer fires at the layer start.
+async function attachBeatTransitionSfx(finalTimeline, beatCount) {
+  try {
+    const { data: tracks } = await supabaseAdmin.from("sfx_tracks").select("key, public_url").eq("is_active", true);
+    const whoosh = (tracks ?? []).find(t => /whoosh|swoosh|woosh|swish|transition/i.test(t.key));
+    if (!whoosh) return;
+    let attached = 0;
+    for (let i = 1; i < beatCount; i++) {
+      const layers = finalTimeline.layers.filter(l => l.id?.startsWith(`s${i}_`) && l.type !== "audio");
+      if (!layers.length) continue;
+      const target = layers.reduce((a, b) => ((a.zIndex ?? 0) <= (b.zIndex ?? 0) ? a : b));
+      target.sfx = { key: whoosh.key, src: whoosh.public_url, volume: 0.4, delay: -0.08 };
+      attached++;
+    }
+    if (attached) console.log(`[v2/beats] transition sfx: ${attached}x "${whoosh.key}"`);
+  } catch (e) {
+    console.warn("[v2/beats] transition sfx skipped:", e.message);
+  }
 }
 
 async function injectBackgroundMusic(finalTimeline, project, volume = 0.25) {

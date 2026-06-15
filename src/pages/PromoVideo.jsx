@@ -207,28 +207,6 @@ function Spinner({ size = 16, color = T.accent }) {
   );
 }
 
-function YesNo({ value, onChange }) {
-  return (
-    <div style={{ display: "flex", gap: 8 }}>
-      {["yes", "no"].map(opt => {
-        const active = value === opt;
-        return (
-          <button key={opt} onClick={() => onChange(opt)}
-            style={{
-              padding: "8px 20px", borderRadius: 8, cursor: "pointer",
-              fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-              background: active ? "rgba(124,92,252,0.08)" : "rgba(255,255,255,0.04)",
-              border: active ? "1.5px solid rgba(124,92,252,0.35)" : "1.5px solid rgba(255,255,255,0.1)",
-              color: active ? T.accent : T.muted,
-            }}>
-            {opt === "yes" ? "Yes" : "No"}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function FileUploadRow({ label, accept, url, uploading, onFile, onClear, inputRef, loadingLabel = "Uploading…", doneLabel = "File ready" }) {
   return (
     <div>
@@ -478,9 +456,11 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
 
-  // Step 1 — Product Info
+  // Step 1 — Product Info. URL is the default; "info" is a fallback for no-site cases.
+  const [inputMode,   setInputMode]   = useState(prefill?.product_description && !prefill?.product_url ? "info" : "url");
   const [productName, setProductName] = useState(prefill?.product_name ?? "Vidquence");
   const [productUrl,  setProductUrl]  = useState(prefill?.product_url ?? "https://vidquence.com/");
+  const [notes,       setNotes]       = useState("");
   const [productDesc, setProductDesc] = useState(prefill?.product_description ?? "Vidquence is a full-stack AI-powered short-form video creation platform built for content creators, marketers, and agencies. At its core is an automated video generation engine that takes a topic or script, runs it through a multi-stage AI pipeline — script generation, beat classification, layout selection, asset sourcing, DNA-based styling — and produces a complete 9:16 video ready for TikTok, Instagram Reels, and YouTube Shorts.");
   const [formatRatio, setFormatRatio] = useState("9:16");
   const [language,    setLanguage]    = useState(prefill?.language ?? "en");
@@ -495,14 +475,8 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
   const [hasTHVideo,   setHasTHVideo]   = useState(null); // null | "yes" | "no"
   const [thUrl,        setThUrl]        = useState(null);
   const [thLoading,    setThLoading]    = useState(false);
-  const [hasScript,       setHasScript]       = useState(null);
-  const [scriptText,      setScriptText]      = useState("");
-  const [hasVoiceover,    setHasVoiceover]    = useState(null);
-  const [voUrl,           setVoUrl]           = useState(null);
-  const [voLoading,       setVoLoading]       = useState(false);
   const [thTranscriptData, setThTranscriptData] = useState(null);
   const thRef = useRef();
-  const voRef = useRef();
 
   // Step 2 — Style Preferences
   const [visualStyle,     setVisualStyle]     = useState("radiant");
@@ -719,14 +693,13 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
   // Derived validation
   const step1ValidTH       = !!thUrl;
-  const step1ValidFaceless = productName.trim().length > 0 && productDesc.trim().length > 0;
+  const isValidUrl         = /^https?:\/\/[^\s.]+\.[^\s]{2,}/.test(productUrl.trim());
+  const step1ValidFaceless = inputMode === "url"
+    ? isValidUrl
+    : (productName.trim().length > 0 && productDesc.trim().length > 0);
   const step1Valid         = videoType === "talking_head" ? step1ValidTH : step1ValidFaceless;
 
-  const step2ValidFaceless =
-    hasVoiceover === "yes" && !!voUrl ||
-    hasVoiceover === "no" && hasScript === "yes" && scriptText.trim().length > 0 ||
-    hasVoiceover === "no" && hasScript === "no";
-  const step2Valid = videoType === "talking_head" ? true : step2ValidFaceless;
+  // Step 2 (Settings) has no required fields — length/format/language/voice all default.
 
   // ── File upload helpers ──
   async function handleLogoFile(file) {
@@ -771,13 +744,6 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
     setThLoading(false);
   }
 
-  async function handleVoFile(file) {
-    setVoLoading(true);
-    try { setVoUrl(await uploadPromoFile(file, "voiceovers")); }
-    catch { /* ignore */ }
-    setVoLoading(false);
-  }
-
   // ── Create project (Step 3) ──
   async function createProject() {
     setCreating(true);
@@ -797,25 +763,32 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
         video_type:              isTH ? "talking_head" : "faceless",
         video_goal:              isTH ? "onboarding_demo" : "saas_promo",
         product_name:            productName.trim(),
-        product_url:             productUrl.trim() || null,
+        // URL is scraped in BOTH modes (it supplies screenshots/logo/brand). The
+        // difference is text_source: "url" → scraped copy is the source of truth for
+        // name/description/script; "manual" → the typed name/description lead, the
+        // URL only contributes visuals.
+        product_url:             !isTH ? (productUrl.trim() || null) : null,
+        text_source:             inputMode === "url" ? "url" : "manual",
         product_description:     productDesc.trim(),
+        notes:                   (!isTH && inputMode === "url") ? (notes.trim() || null) : null,
         format_ratio:            formatRatio,
         language,
         tone,
 
         has_talking_head:        isTH,
-        has_voiceover:           !isTH && hasVoiceover === "yes",
-        has_script:              !isTH && (hasVoiceover === "yes" || hasScript === "yes"),
+        // Faceless always generates its own script + voiceover — we never ask for them.
+        has_voiceover:           false,
+        has_script:              false,
         has_logo:                !!logoUrl,
         has_screenshots:         false,
         has_recordings:          false,
         talking_head_segments:   thSegments,
         talking_head_url:        null,
-        voiceover_url:           voUrl   || null,
+        voiceover_url:           null,
         logo_url:                logoUrl || null,
         logo_width:              logoDimensions?.width  || null,
         logo_height:             logoDimensions?.height || null,
-        script:                  !isTH && hasVoiceover !== "yes" && hasScript === "yes" ? scriptText : null,
+        script:                  null,
         pipeline_version:        "v2",
         visual_style:            visualStyle,
         theme,
@@ -836,12 +809,11 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
       setProjectId(data.project.id);
       setAssetManifest(data.assetManifest);
 
-      // Auto-upload pre-staged voiceover / logo files to matching scenes
+      // Auto-upload pre-staged logo to matching scenes
       const required = data.assetManifest?.user_required || [];
       const autoUploads = [];
       for (const item of required) {
         let url = null;
-        if (item.asset_type === "user_recording_audio" && voUrl) url = voUrl;
         if (item.scene_type === "logo_outro" && logoUrl) url = logoUrl;
         if (url) autoUploads.push(autoUploadScene(data.project.id, item.scene_id, url));
       }
@@ -1063,21 +1035,51 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
 
         {step === 1 && videoType === "faceless" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-            <div>
-              <label style={C.lbl}>Product Name <span style={{ color: T.danger }}>*</span></label>
-              <input style={C.inp} value={productName} onChange={e => setProductName(e.target.value)} placeholder="e.g. Vidquence" maxLength={80} />
-            </div>
-            <div>
-              <label style={C.lbl}>Product URL <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
-              <input style={C.inp} value={productUrl} onChange={e => setProductUrl(e.target.value)} placeholder="https://yourproduct.com" />
-            </div>
-            <div>
-              <label style={C.lbl}>Product Description <span style={{ color: T.danger }}>*</span></label>
-              <textarea style={{ ...C.inp, resize: "vertical", minHeight: 180, lineHeight: 1.5 }}
-                value={productDesc} onChange={e => setProductDesc(e.target.value)}
-                placeholder="What does your product do? What problem does it solve?" maxLength={500} />
-              <div style={{ fontSize: 11, color: "#55556a", marginTop: 3, textAlign: "right" }}>{productDesc.length}/500</div>
-            </div>
+            {inputMode === "url" ? (
+              <>
+                <div>
+                  <label style={C.lbl}>Your website <span style={{ color: T.danger }}>*</span></label>
+                  <input style={{ ...C.inp, fontSize: 16, padding: "15px 16px" }} value={productUrl} onChange={e => setProductUrl(e.target.value)} placeholder="https://yourproduct.com" />
+                  <div style={{ fontSize: 12, color: T.muted, marginTop: 8, lineHeight: 1.5 }}>
+                    Paste your link — we read your copy, brand color, logo, and real screenshots and build the video from it. Nothing else to fill in.
+                  </div>
+                </div>
+                <div>
+                  <label style={C.lbl}>Angle / notes <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
+                  <input style={C.inp} value={notes} onChange={e => setNotes(e.target.value)} maxLength={200}
+                    placeholder='e.g. "focus on the time saved" or "punchy, for founders"' />
+                </div>
+                <button onClick={() => setInputMode("info")}
+                  style={{ alignSelf: "flex-start", background: "none", border: "none", color: T.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                  No website yet? Describe it instead →
+                </button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label style={C.lbl}>Product Name <span style={{ color: T.danger }}>*</span></label>
+                  <input style={C.inp} value={productName} onChange={e => setProductName(e.target.value)} placeholder="e.g. Vidquence" maxLength={80} />
+                </div>
+                <div>
+                  <label style={C.lbl}>Product Description <span style={{ color: T.danger }}>*</span></label>
+                  <textarea style={{ ...C.inp, resize: "vertical", minHeight: 160, lineHeight: 1.5 }}
+                    value={productDesc} onChange={e => setProductDesc(e.target.value)}
+                    placeholder="What does your product do? What problem does it solve?" maxLength={500} />
+                  <div style={{ fontSize: 11, color: "#55556a", marginTop: 3, textAlign: "right" }}>{productDesc.length}/500</div>
+                </div>
+                <div>
+                  <label style={C.lbl}>Website <span style={{ color: T.muted, fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional — for screenshots &amp; logo)</span></label>
+                  <input style={C.inp} value={productUrl} onChange={e => setProductUrl(e.target.value)} placeholder="https://yourproduct.com" />
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 6, lineHeight: 1.5 }}>
+                    If you have a live site, we'll pull real screenshots, your logo, and brand color from it. Your name and description above stay the source for the script.
+                  </div>
+                </div>
+                <button onClick={() => setInputMode("url")}
+                  style={{ alignSelf: "flex-start", background: "none", border: "none", color: T.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", padding: 0 }}>
+                  ← I have a website URL
+                </button>
+              </>
+            )}
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep(0)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
               <button onClick={() => setStep(2)} disabled={!step1ValidFaceless}
@@ -1243,37 +1245,10 @@ function CreateWizard({ prefill, initialState, onViewProjects }) {
               </div>
             </div>
 
-            {/* Voiceover / Script */}
-            <div>
-              <label style={C.lbl}>Do you have a voiceover?</label>
-              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
-                <YesNo value={hasVoiceover} onChange={v => { setHasVoiceover(v); if (v === "yes") { setHasScript(null); setScriptText(""); } }} />
-                {hasVoiceover === "yes" && (
-                  <FileUploadRow label="Upload recording" accept="audio/*" url={voUrl} uploading={voLoading}
-                    onFile={handleVoFile} onClear={() => setVoUrl(null)} inputRef={voRef} />
-                )}
-                {hasVoiceover === "no" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <label style={{ ...C.lbl, marginBottom: 2 }}>Do you have a written script?</label>
-                    <YesNo value={hasScript} onChange={setHasScript} />
-                    {hasScript === "yes" && (
-                      <textarea style={{ ...C.inp, resize: "vertical", minHeight: 80, lineHeight: 1.5 }}
-                        placeholder="Paste your script here…" value={scriptText} onChange={e => setScriptText(e.target.value)} />
-                    )}
-                    {hasScript === "no" && (
-                      <div style={{ fontSize: 12, color: T.muted, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 8, border: `1px solid ${T.border}` }}>
-                        We'll write the script and narration for you.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep(1)} style={{ ...C.btnG, flexShrink: 0 }}>← Back</button>
-              <button onClick={() => setStep(3)} disabled={!step2ValidFaceless}
-                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15, opacity: step2ValidFaceless ? 1 : 0.4 }}>
+              <button onClick={() => setStep(3)}
+                style={{ ...C.btnY, flex: 1, padding: "13px 24px", fontSize: 15 }}>
                 Next: Style →
               </button>
             </div>
