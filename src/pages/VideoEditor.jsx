@@ -5,7 +5,9 @@ import { useTimelineStore } from "../store/useTimelineStore";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 import TimelineEditor from "../ui/TimelineEditor";
 
-function createEmptyProject(name = "Untitled Video") {
+const DEFAULT_NAME = "Untitled Video";
+
+function createEmptyProject(name = DEFAULT_NAME) {
   return {
     version: "2.0",
     id: crypto.randomUUID(),
@@ -37,43 +39,35 @@ export default function VideoEditor() {
   const saveTimer = useRef(null);
   const initialLoad = useRef(true);
   const isSaving = useRef(false);
+  const creatingRef = useRef(false); // guards the lazy first-save insert from double-firing
 
   useEffect(() => {
     async function load() {
       try {
         if (id === "new") {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          const emptyProject = createEmptyProject();
-          const { data, error: insertError } = await supabase
-            .from("projects")
-            .insert([
-              {
-                user_id: user.id,
-                name: emptyProject.name,
-                safe_project_json: emptyProject,
-                orientation: "9:16",
-                mode: "timeline",
-                source: "scratch",
-                editor_version: "timeline",
-              },
-            ])
-            .select()
-            .single();
-          if (insertError) throw insertError;
-          setProjectId(data.id);
-          setProject(emptyProject);
-          navigate(`/video-editor/${data.id}`, { replace: true, state: location.state });
+          // Lazy creation: hold an in-memory blank project but do NOT create a
+          // DB row yet. The row is created on the first real edit (see autosave).
+          // This way, opening Blank Canvas and clicking back never leaves an
+          // orphaned empty project behind.
+          setProjectId(null);
+          setProject(createEmptyProject());
         } else {
-          const { data, error: fetchError } = await supabase
-            .from("projects")
-            .select("*")
-            .eq("id", id)
-            .single();
-          if (fetchError) throw fetchError;
-          setProjectId(data.id);
-          setProject(data.safe_project_json);
+          // Skip the fetch if this project is already in the store (e.g. we just
+          // lazily created it and navigated here) — refetching would clobber any
+          // edits made between the insert and now.
+          const store = useTimelineStore.getState();
+          if (store.projectId === id && store.project) {
+            // already loaded in memory
+          } else {
+            const { data, error: fetchError } = await supabase
+              .from("projects")
+              .select("*")
+              .eq("id", id)
+              .single();
+            if (fetchError) throw fetchError;
+            setProjectId(data.id);
+            setProject(data.safe_project_json);
+          }
         }
       } catch (err) {
         console.error("[VideoEditor] Load error:", err);
@@ -90,11 +84,20 @@ export default function VideoEditor() {
     };
   }, [id]);
 
-  // Debounced autosave — uploads any pending blob files first, then saves JSON
+  // Debounced autosave — uploads any pending blob files first, then saves JSON.
+  // For a brand-new Blank Canvas (projectId === null) the DB row is created here
+  // on the FIRST real edit, never on open.
   useEffect(() => {
-    if (!project || !projectId || initialLoad.current || isSaving.current) return;
+    if (!project || initialLoad.current || isSaving.current || creatingRef.current) return;
+
+    // An untouched blank canvas isn't worth a row yet — wait for a real edit
+    // (a layer added, or the project renamed).
+    const worthSaving = (project.layers?.length ?? 0) > 0 || (project.name && project.name !== DEFAULT_NAME);
+    if (!projectId && !worthSaving) return;
+
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
+      if (isSaving.current || creatingRef.current) return;
       isSaving.current = true;
       try {
         const store = useTimelineStore.getState();
@@ -108,11 +111,41 @@ export default function VideoEditor() {
             console.error("[VideoEditor] Upload failed for layer", layerId, err);
           }
         }
-        const latest = useTimelineStore.getState().project;
-        await supabase
-          .from("projects")
-          .update({ safe_project_json: latest, name: latest.name })
-          .eq("id", projectId);
+        const latest    = useTimelineStore.getState().project;
+        const currentId = useTimelineStore.getState().projectId;
+
+        if (!currentId) {
+          // First real edit on a blank canvas → create the project row now.
+          creatingRef.current = true;
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data, error: insertError } = await supabase
+              .from("projects")
+              .insert([
+                {
+                  user_id: user.id,
+                  name: latest.name,
+                  safe_project_json: latest,
+                  orientation: "9:16",
+                  mode: "timeline",
+                  source: "scratch",
+                  editor_version: "timeline",
+                },
+              ])
+              .select()
+              .single();
+            if (insertError) throw insertError;
+            setProjectId(data.id);
+            navigate(`/video-editor/${data.id}`, { replace: true, state: location.state });
+          } finally {
+            creatingRef.current = false;
+          }
+        } else {
+          await supabase
+            .from("projects")
+            .update({ safe_project_json: latest, name: latest.name })
+            .eq("id", currentId);
+        }
       } finally {
         isSaving.current = false;
       }
