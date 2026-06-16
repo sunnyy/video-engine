@@ -1,32 +1,34 @@
 /**
  * pipelineOrchestrator.js
- * Product Video pipeline v3 — image-first, direct layer construction.
+ * Product Video pipeline v4 — base-image-first, identity-preserving Nano Banana shots
+ * + headless-measured overlay + eased motion. Merges Product Ad Studio's proven
+ * generation backend (routes/productAd.js) with the modern overlay/motion frontend.
  *
  * Flow:
- *  1.  analyzeProduct (GPT-4.1 vision) + buildVerticalReference — run in parallel
- *  2.  generateProductScript (GPT-4.1 text, uses brief) — script + display_text + shot_directives
- *  3.  TTS (ElevenLabs with-timestamps)
- *  4.  Assign scene durations from word timestamps
- *  5.  Generate product shots (FAL flux-kontext) + design HTML scenes (GPT-5.4) — in parallel
- *  6.  parseSceneHTML → inject shot URLs into product-shot placeholders → buildTimeline
- *  7.  Inject voiceover audio layer
- *  8.  Background music
- *  9.  Logo injection
- * 10.  Save to projects table
+ *  1.  Director (GPT-4.1 vision) — validation + brief + base-image prompt + per-scene
+ *      plan (shot prompt / anchor / display block / script / render / motion).
+ *  2.  Base image — Nano Banana edit cleans the upload into a studio packshot.
+ *  3.  TTS (ElevenLabs w/ timestamps) → per-scene durations (clamped 3–4s; no stretch).
+ *  4.  Scene shots (Nano Banana edit on the base) + overlay design (GPT-5.4) →
+ *      headless measure — shots sequential, overlays in parallel.
+ *  5.  Prepend pipeline shot (z0) + scrim (z1) beneath each overlay → buildTimeline.
+ *  6.  Scene transitions + voiceover + music + logo → save (source: product_video).
+ *
+ * visualMode is passed through; only "image" is implemented. The per-scene `render`
+ * flag + `motion_prompt` are carried for the deferred image-to-video step.
  */
 
 import { supabaseAdmin }            from "../../../server/middleware/shared.js";
 import { generateFullVoiceover }    from "../promoVideo/ttsGenerator.js";
 import { pickAutoMood }             from "../../../core/registries/musicRegistry.js";
-import { analyzeProduct }           from "./productAnalyzer.js";
-import { generateProductScript, SCENE_BUDGETS } from "./scriptGenerator.js";
+import { generateProductPlan }      from "./productDirector.js";
+import { generateBaseImage, generateAllSceneShots } from "./shotGenerator.js";
 import { designProductScene }       from "./sceneDesigner.js";
-import { parseSceneHTML }           from "../promoVideo/htmlParser.js";
-import { buildTimeline }            from "../promoVideo/timelineBuilder.js";
+import { measureSceneHTML, closeMeasureBrowser } from "../promoVideo/htmlMeasure.js";
+import { buildTimeline }            from "./timelineBuilder.js";
 
 const CANVAS = { width: 1080, height: 1920 };
 const FPS    = 30;
-const FAL_KEY = () => process.env.FAL_API_KEY || process.env.FAL_KEY;
 
 // ── Timestamp assignment ───────────────────────────────────────────────────────
 
@@ -39,131 +41,129 @@ function assignWhisperTimestamps(scenes, whisperWords) {
     const startWord = whisperWords[wordIdx];
     const endWord   = whisperWords[Math.min(wordIdx + segWords - 1, whisperWords.length - 1)];
     scene.vo_start         = parseFloat((startWord?.start ?? 0).toFixed(3));
-    scene.vo_end           = parseFloat((endWord?.end ?? scene.vo_start + (scene.duration ?? 3)).toFixed(3));
+    scene.vo_end           = parseFloat((endWord?.end ?? scene.vo_start + 3).toFixed(3));
     scene.duration_seconds = parseFloat(Math.max(1.0, scene.vo_end - scene.vo_start).toFixed(3));
     wordIdx = Math.min(wordIdx + segWords, whisperWords.length);
   }
 }
 
-// ── Vertical reference composite ───────────────────────────────────────────────
-// Composites the product image onto a 9:16 dark canvas so FAL receives a
-// vertical-format reference image regardless of the original product photo shape.
-
-async function buildVerticalReference(productImageUrl, userId, runId) {
-  try {
-    const { default: sharp } = await import("sharp");
-    const imgBuf = Buffer.from(await (await fetch(productImageUrl)).arrayBuffer());
-    const meta   = await sharp(imgBuf).metadata();
-    const TW = CANVAS.width, TH = CANVAS.height;
-    const scale = Math.min((TW * 0.82) / (meta.width || TW), (TH * 0.60) / (meta.height || TH));
-    const fitW  = Math.round((meta.width  || TW) * scale);
-    const fitH  = Math.round((meta.height || TH) * scale);
-    const left  = Math.round((TW - fitW) / 2);
-    const top   = Math.round((TH - fitH) / 2);
-    const vertBuf = await sharp({ create: { width: TW, height: TH, channels: 3, background: { r: 10, g: 10, b: 16 } } })
-      .composite([{ input: await sharp(imgBuf).resize(fitW, fitH).toBuffer(), left, top }])
-      .jpeg({ quality: 90 })
-      .toBuffer();
-    const vKey = `product-videos/${userId}/${runId}/vref-${Date.now()}.jpg`;
-    await supabaseAdmin.storage.from("user-assets").upload(vKey, vertBuf, { contentType: "image/jpeg", upsert: false });
-    const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(vKey);
-    console.log("[productPipeline] vertical reference created");
-    return pub?.publicUrl ?? productImageUrl;
-  } catch (e) {
-    console.error("[productPipeline] vertical ref failed, using original:", e.message);
-    return productImageUrl;
-  }
+// ── Pipeline-built media for each scene (full-bleed product shot + scrim) ─────
+// The designer builds ONLY the transparent text overlay; the product photo and a
+// legibility scrim (darker top + bottom, clear middle so the product reads) are
+// owned here and sit BENEATH the text — no z-index fights. Works for a still shot
+// now or an animated clip later (swap type:"image" → type:"video").
+function mediaScrimEntries(sceneIndex, src) {
+  const base = {
+    role: "background", animation: "none", sceneElement: "background",
+    rotation: 0, opacity: 1, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
+    filter: null, boxShadow: null, mixBlendMode: null, backdropFilter: null, style: {},
+  };
+  return [
+    { ...base, id: `s${sceneIndex}_media`, trackId: `s${sceneIndex}_media`,
+      layer: "image", type: "image", zIndex: 0, x: 0, y: 0, width: CANVAS.width, height: CANVAS.height,
+      src, objectFit: "cover", assetType: "product-shot" },
+    { ...base, id: `s${sceneIndex}_scrim`, trackId: `s${sceneIndex}_scrim`,
+      layer: "gradient", type: "gradient", zIndex: 1, x: 0, y: 0, width: CANVAS.width, height: CANVAS.height,
+      background: "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.18) 30%, rgba(0,0,0,0.02) 50%, rgba(0,0,0,0.30) 78%, rgba(0,0,0,0.82) 100%)" },
+  ];
 }
 
-// ── FAL shot generation ────────────────────────────────────────────────────────
-
-// Every shot must leave the bottom 40% of the frame open for text overlay,
-// and contain zero typography so the timeline text layers read clearly.
-const NO_TEXT_SUFFIX = " Leave the bottom 40% of the frame as an open, uncluttered background surface — no product, no props — so text can overlay cleanly. No text, no words, no letters, no numbers, no UI elements in the image.";
-
-// Fallback per-intent prompts for the nano-banana fallback path.
-const FALLBACK_PROMPTS = {
-  hook:     "Create a dramatic editorial product hero photograph — cinematic, scroll-stopping. Product is the star, lit beautifully. Warm aspirational background (marble, linen, natural wood). Product fills 50–70% of the vertical frame. Ultra premium commercial photography. Vertical 9:16.",
-  hero:     "Create a premium lifestyle product photograph. Product centered on a beautiful warm surface (marble, fine fabric). Soft directional natural light. Optional tasteful lifestyle props around — not obscuring the product. Luxury editorial photography. Vertical 9:16.",
-  features: "Create an editorial flat-lay with natural lifestyle context — ingredients, materials, or complementary objects artfully arranged around the product. Warm tones. Product is the clear focal point. Natural light, editorial quality. Vertical 9:16.",
-  offer:    "Create a bold, high-energy product photograph. Product is front and center — large, impactful. Clean, bright, punchy. Editorial commercial photography. Vertical 9:16.",
-  cta:      "Create a clean, inviting lifestyle product photograph — aspirational and warm. Product sits elegantly on a premium surface with soft natural light. Minimal styling, maximum elegance. Vertical 9:16.",
-  standalone: "Create a dramatic aspirational product photograph — cinematic hero shot. Product fills 50–70% of the vertical frame. Warm, premium background. Commercial photography. Vertical 9:16.",
+// ── Overlay z-order normalizer ───────────────────────────────────────────────
+// The headless measurer takes GPT's CSS z-index literally, and GPT sometimes puts
+// a decorative panel (card/glow) ABOVE the content it should sit behind — e.g. a
+// blurred card landing on top of an icon or label. Re-stack the overlay by ROLE so
+// structure stays at the back and content/icons always read on top, regardless of
+// whatever z-index GPT wrote. Runs on the overlay graph only (sits above media z0 +
+// scrim z1); relative order within a band is preserved.
+const OVERLAY_Z = {
+  glow: 2,
+  card: 3,
+  decoration: 5,
+  divider: 6,
+  badge: 8,
+  icon: 9,
+  label: 10, kicker: 10, subhead: 10, body: 10,
+  "stat-number": 11, headline: 11,
+  cta: 12,
 };
-
-async function uploadShot(falUrl, userId, runId, intent) {
-  try {
-    const imgRes = await fetch(falUrl);
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
-    const key    = `product-videos/${userId}/${runId}/shot-${intent}-${Date.now()}.jpg`;
-    const { error } = await supabaseAdmin.storage
-      .from("user-assets").upload(key, buffer, { contentType: "image/jpeg", upsert: false });
-    if (error) return falUrl;
-    const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
-    return pub?.publicUrl ?? falUrl;
-  } catch {
-    return falUrl;
+function normalizeOverlayZ(overlay) {
+  const W = CANVAS.width, H = CANVAS.height;
+  // Safety net: drop any element that lands (mostly) OUTSIDE the frame — a runaway
+  // overflow stack. The designer is told to fit; this guarantees no off-frame garbage.
+  const kept = overlay.filter((e) => {
+    const cx = e.x + e.width / 2, cy = e.y + e.height / 2;
+    return e.y < H - 8 && cy > -40 && cy < H + 40 && cx > -40 && cx < W + 40;
+  });
+  if (kept.length !== overlay.length) {
+    console.log(`[productPipeline] dropped ${overlay.length - kept.length} off-frame overlay element(s)`);
   }
+  for (const e of kept) e.zIndex = OVERLAY_Z[e.role] ?? 10;
+  return kept;
 }
 
-async function generateShotKontext(vertRefUrl, shotDirective) {
-  const prompt = shotDirective + NO_TEXT_SUFFIX;
-  const falRes = await fetch("https://fal.run/fal-ai/flux-pro/kontext", {
-    method:  "POST",
-    headers: { "Authorization": `Key ${FAL_KEY()}`, "Content-Type": "application/json" },
-    body:    JSON.stringify({
-      image_url:   vertRefUrl,
-      prompt,
-      num_images:  1,
-      guidance_scale: 3.5,
-    }),
-  });
-  if (!falRes.ok) throw new Error(`flux-kontext ${falRes.status}: ${(await falRes.text()).slice(0, 200)}`);
-  const data = await falRes.json();
-  const url  = data.images?.[0]?.url ?? null;
-  if (!url) throw new Error("flux-kontext: no image URL in response");
-  return url;
-}
+// ── Scene transitions (black-flash-safe, mirrors Social/AI Video) ────────────
+const TRANSITION_DURATION = 0.3;
+const TRANSITION_MAP = {
+  zoom:         { out: "none",       in: "zoom-in" },
+  "slide-left": { out: "slide-left", in: "slide-left" },
+  "slide-up":   { out: "slide-up",   in: "slide-up" },
+  fade:         { out: "none",       in: "fade" },
+};
+const TRANSITION_POOL = ["fade", "slide-left", "zoom", "slide-up"];
 
-async function generateShotNanoBanana(vertRefUrl, intent, shotDirective) {
-  const prompt = (shotDirective || FALLBACK_PROMPTS[intent] || FALLBACK_PROMPTS.hero) + NO_TEXT_SUFFIX;
-  const ANCHOR = "Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, textures, branding, proportions — completely unchanged. Only change the scene, environment, surface, lighting, and advertisement composition as described: ";
-  const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
-    method:  "POST",
-    headers: { "Authorization": `Key ${FAL_KEY()}`, "Content-Type": "application/json" },
-    body:    JSON.stringify({ image_urls: [vertRefUrl], prompt: ANCHOR + prompt }),
-  });
-  if (!falRes.ok) throw new Error(`nano-banana ${falRes.status}: ${(await falRes.text()).slice(0, 200)}`);
-  const data = await falRes.json();
-  const url  = data.images?.[0]?.url ?? null;
-  if (!url) throw new Error("nano-banana: no image URL in response");
-  return url;
-}
-
-async function generateSingleShot(vertRefUrl, scene, userId, runId, attempt = 1) {
-  const { intent, shot_directive } = scene;
-  try {
-    // Primary: flux-kontext (better product fidelity via image conditioning)
-    const url = await generateShotKontext(vertRefUrl, shot_directive || FALLBACK_PROMPTS[intent] || FALLBACK_PROMPTS.hero);
-    return await uploadShot(url, userId, runId, intent);
-  } catch (kontextErr) {
-    console.warn(`[productShots] scene ${scene.scene_index} kontext failed (${kontextErr.message}), falling back to nano-banana`);
-    try {
-      // Fallback: nano-banana (proven but weaker product preservation)
-      if (attempt <= 2 && kontextErr.message?.includes("429")) {
-        await new Promise(r => setTimeout(r, 1500 * attempt));
-      }
-      const url = await generateShotNanoBanana(vertRefUrl, intent, shot_directive);
-      return await uploadShot(url, userId, runId, intent);
-    } catch (fallbackErr) {
-      console.error(`[productShots] scene ${scene.scene_index} all shot generation failed:`, fallbackErr.message);
-      return null;
+function applyTransitions(layers, scenes) {
+  for (let i = 0; i < scenes.length - 1; i++) {
+    const t = TRANSITION_MAP[scenes[i].transition_out] ?? TRANSITION_MAP.fade;
+    for (const layer of layers) {
+      if (!layer.id?.startsWith(`s${i}_`) || layer.type === "audio") continue;
+      layer.transition = {
+        in:  layer.transition?.in ?? { type: "none", duration: 0 },
+        out: { type: t.out, duration: TRANSITION_DURATION },
+      };
+    }
+    for (const layer of layers) {
+      if (!(layer.id?.startsWith(`s${i + 1}_`) && /background|_media|_scrim/.test(layer.id))) continue;
+      layer.transition = {
+        in:  { type: t.in, duration: TRANSITION_DURATION },
+        out: layer.transition?.out ?? { type: "none", duration: 0 },
+      };
     }
   }
 }
 
-async function generateAllShots(scenes, vertRefUrl, userId, runId) {
-  return Promise.all(scenes.map(scene => generateSingleShot(vertRefUrl, scene, userId, runId)));
+// ── Ken Burns (subtle motion on still product shots) ─────────────────────────
+// The product shot is a static background layer, so without this it sits frozen
+// under the text. Give each still scene a slow, varied push-in / pan so the hero
+// shot has life. Varied per scene so consecutive shots don't move identically.
+// Video scenes (later) carry real clip motion and skip this. Translate amounts
+// stay within the scale's overscan so the frame edges never reveal.
+function applyKenBurns(layers, scenes) {
+  for (let i = 0; i < scenes.length; i++) {
+    if (scenes[i].render === "video") continue;
+    const media = layers.find(l => l.id === `s${i}_media`);
+    if (!media?.transform) continue;
+    const dur = Math.max(0.1, (media.end ?? 0) - (media.start ?? 0));
+    const kf  = { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] };
+    switch (i % 4) {
+      case 0: // slow push-in
+        kf.scale = [{ time: 0, value: 1.0 }, { time: dur, value: 1.07 }];
+        break;
+      case 1: // slow pull-back
+        kf.scale = [{ time: 0, value: 1.07 }, { time: dur, value: 1.0 }];
+        break;
+      case 2: // held zoom + horizontal drift
+        media.transform.scale = 1.08;
+        kf.scale = [{ time: 0, value: 1.08 }, { time: dur, value: 1.08 }];
+        kf.x     = [{ time: 0, value: 32 }, { time: dur, value: -32 }];
+        break;
+      default: // held zoom + vertical drift
+        media.transform.scale = 1.08;
+        kf.scale = [{ time: 0, value: 1.08 }, { time: dur, value: 1.08 }];
+        kf.y     = [{ time: 0, value: 46 }, { time: dur, value: -46 }];
+        break;
+    }
+    media.keyframes = kf;
+  }
 }
 
 // ── Logo injection ─────────────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ function injectLogo(timeline, logoUrl, scenes) {
     const start = parseFloat(cursor.toFixed(4));
     const end   = parseFloat((cursor + dur).toFixed(4));
     cursor = end;
-    const isHookOrCTA = scenes[i].intent === "hook" || scenes[i].intent === "cta" || scenes[i].intent === "standalone";
+    const isHookOrCTA = ["hook", "cta", "standalone", "showcase"].includes(scenes[i].intent) && (i === 0 || i === scenes.length - 1);
     if (!isHookOrCTA) continue;
     timeline.layers.push({
       id: `s${i}_logo`, trackId: `s${i}_logo`,
@@ -218,8 +218,16 @@ async function injectMusic(timeline, productMood) {
   }
 }
 
-// Minimum scene durations — ensures animations have room to complete
-const MIN_DUR = { hook: 2.8, hero: 3.2, features: 3.5, offer: 2.8, cta: 3.5, standalone: 6.0 };
+// Mood → display/body font pairing (variety without rigidity).
+const FONT_PAIRS = {
+  premium:    { hero: "Playfair Display", supporting: "Inter" },
+  elegant:    { hero: "Cormorant Garamond", supporting: "Inter" },
+  minimalist: { hero: "Outfit", supporting: "Inter" },
+  bold:       { hero: "Anton", supporting: "Inter" },
+  playful:    { hero: "Poppins", supporting: "Inter" },
+  organic:    { hero: "Fraunces", supporting: "Inter" },
+};
+function fontPairFor(mood) { return FONT_PAIRS[mood] ?? FONT_PAIRS.premium; }
 
 // ── Save ───────────────────────────────────────────────────────────────────────
 
@@ -240,10 +248,14 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
           sceneHTMLs,
           scenes: scenes.map(s => ({
             intent:         s.intent,
+            creative_direction: s.creative_direction,
+            shot_type:      s.shot_type,
+            image_generation_prompt: s.image_generation_prompt,
+            anchor:         s.anchor,
+            display:        s.display,
+            render:         s.render,
+            motion_prompt:  s.motion_prompt,
             script_segment: s.script_segment,
-            display_text:   s.display_text,
-            visual_concept: s.visual_concept,
-            shot_directive: s.shot_directive,
           })),
         },
       })
@@ -270,119 +282,101 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
  */
 export async function runProductVideoPipeline(project) {
   const { userId, productImageUrl, visualMode = "image" } = project;
-  const runId = `pv3-${Date.now()}`;
+  const runId = `pv4-${Date.now()}`;
 
-  // ── Step 1: Analyze product image + build vertical reference (parallel) ────
-  console.log("[productPipeline] step 1 — analyzing product + building reference");
-  const [brief, vertRefUrl] = await Promise.all([
-    analyzeProduct(productImageUrl),
-    buildVerticalReference(productImageUrl, userId, runId),
-  ]);
-
-  // User-supplied accent overrides the analyzer
-  const accentColor  = project.accentColor ?? brief.accent_color;
-  const productMood  = brief.product_mood;
-  const productTheme = brief.product_theme;
-
-  // ── Step 2: Generate script (text-only — brief has the visual analysis) ───
-  console.log("[productPipeline] step 2 — generating script");
-  const scriptResult = await generateProductScript({
-    productBrief:       brief,
-    brandName:          project.brandName          ?? brief.product_name ?? "",
-    productDescription: project.productDescription ?? "",
-    ctaText:            project.ctaText            ?? "Shop Now",
-    offerText:          project.offerText          ?? "",
-    website:            project.website            ?? "",
-    sceneCount:         project.sceneCount         ?? 3,
-    goal:               project.goal               ?? "promo",
+  // ── Step 1: Director (vision) — full plan from the product photo ───────────
+  console.log("[productPipeline] step 1 — director (vision plan)");
+  const plan = await generateProductPlan(productImageUrl, {
+    brandName:          project.brandName,
+    productDescription: project.productDescription,
+    ctaText:            project.ctaText ?? "Shop Now",
+    offerText:          project.offerText,
+    website:            project.website,
+    goal:               project.goal ?? "promo",
+    sceneCount:         project.sceneCount ?? 3,
   });
 
-  let scenes        = scriptResult.scenes.map(s => ({ ...s }));
-  const full_script = scriptResult.full_script;
+  const brief       = plan.brief;
+  const scenes      = plan.scenes.map(s => ({ ...s }));
+  const full_script = plan.full_script;
+  const accentColor = project.accentColor ?? brief.accent_color;
+  const productMood = brief.product_mood;
 
-  // ── Step 3: TTS ───────────────────────────────────────────────────────────
+  // ── Step 2: Base image — clean studio packshot (canonical reference) ───────
+  console.log("[productPipeline] step 2 — base image");
+  const baseImageUrl = await generateBaseImage(productImageUrl, {
+    userId, runId,
+    prompt:       plan.base_image_prompt,
+    hasWatermark: brief.has_watermark,
+  });
+
+  // ── Step 3: Voiceover → per-scene durations (clamped 3–4s; no stretch) ─────
   console.log("[productPipeline] step 3 — voiceover");
-  let voiceoverUrl = null, voiceoverDuration = 0;
+  let voiceoverUrl = null;
   try {
     const voiceId = (project.voiceId && project.voiceId.length > 8) ? project.voiceId : null;
     const tts = await generateFullVoiceover(full_script, runId, voiceId);
-    voiceoverUrl      = tts.audio_url;
-    voiceoverDuration = tts.duration_seconds;
-    if (tts.wordTimestamps?.length) {
-      assignWhisperTimestamps(scenes, tts.wordTimestamps);
-      console.log(`[productPipeline] step 4 — ${tts.wordTimestamps.length} word timestamps`);
-    }
+    voiceoverUrl = tts.audio_url;
+    if (tts.wordTimestamps?.length) assignWhisperTimestamps(scenes, tts.wordTimestamps);
   } catch (err) {
     console.error("[productPipeline] TTS failed (non-fatal):", err.message);
   }
 
-  // Extend last scene to cover full voiceover
-  if (voiceoverDuration > 0 && scenes.length > 0) {
-    const sumDur = scenes.reduce((a, s) => a + (s.duration_seconds ?? 0), 0);
-    const last   = scenes[scenes.length - 1];
-    if (voiceoverDuration > sumDur) {
-      last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + (voiceoverDuration - sumDur)).toFixed(3));
-    }
-    last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + 0.4).toFixed(3));
-  }
-
-  // Apply minimum durations before scene design / timeline build
+  // Clamp scene durations so each beat stays short (the 19s bug was the old
+  // "extend last scene to the full voiceover" logic — removed).
+  const single = scenes.length === 1;
+  const MIN = single ? 4.0 : 2.5;
+  const MAX = single ? 7.0 : 4.5;
   for (const scene of scenes) {
-    const raw = scene.duration_seconds ?? (SCENE_BUDGETS[scene.intent]?.duration ?? 3.5);
-    scene.duration_seconds = Math.max(raw, MIN_DUR[scene.intent] ?? 2.8);
+    const raw = scene.duration_seconds ?? 3.5;
+    scene.duration_seconds = parseFloat(Math.min(MAX, Math.max(MIN, raw)).toFixed(3));
   }
 
   const projectContext = {
-    brandName:       project.brandName ?? brief.product_name ?? "Brand",
-    ctaText:         project.ctaText   ?? "Shop Now",
-    offerText:       project.offerText ?? "",
-    website:         project.website   ?? "",
+    brandName:    project.brandName ?? brief.product_name ?? "Brand",
+    ctaText:      project.ctaText   ?? "Shop Now",
+    website:      project.website   ?? "",
     accentColor,
-    theme:           productTheme,
+    secondaryColor: brief.secondary_color ?? null,
+    theme:        brief.product_theme ?? "dark",
     productMood,
-    productTheme,
-    productCategory: scriptResult.product_category || brief.product_category || brief.product_name || "Product",
-    canvasWidth:     CANVAS.width,
-    canvasHeight:    CANVAS.height,
-    fps:             FPS,
-    musicMood:       productMood ?? "premium",
-    productName:     project.brandName ?? brief.product_name ?? "Product",
+    fontPair:     fontPairFor(productMood),
+    canvasWidth:  CANVAS.width,
+    canvasHeight: CANVAS.height,
+    fps:          FPS,
+    musicMood:    productMood ?? "premium",
+    productName:  project.brandName ?? brief.product_name ?? "Product",
   };
 
-  // ── Steps 5+6: Generate product shots AND design HTML scenes — in parallel ─
-  console.log(`[productPipeline] steps 5+6 — generating ${scenes.length} shots + scene HTML in parallel`);
-  const sceneResults = await Promise.all(
-    scenes.map(async (scene) => {
-      try {
-        const [shotUrl, html] = await Promise.all([
-          generateSingleShot(vertRefUrl, scene, userId, runId),
-          designProductScene(scene, brief, projectContext),
-        ]);
+  // ── Step 4a: Scene shots first (the designer needs to SEE them) ────────────
+  console.log(`[productPipeline] step 4a — ${scenes.length} scene shots`);
+  const shotUrls = await generateAllSceneShots(baseImageUrl, scenes, { userId, runId });
 
-        const resolvedUrl = shotUrl ?? productImageUrl;
-        const graph = parseSceneHTML(html || "", scene.scene_index, CANVAS);
+  // ── Step 4b: Overlay design (vision on each shot) + headless measure ───────
+  console.log("[productPipeline] step 4b — overlays (vision)");
+  const overlayResults = await Promise.all(scenes.map(async (scene, idx) => {
+    try {
+      const sceneImageUrl = shotUrls[idx] ?? baseImageUrl ?? productImageUrl;
+      const html    = await designProductScene(scene, brief, { ...projectContext, sceneImageUrl });
+      const overlay = await measureSceneHTML(html || "", scene.scene_index, CANVAS);
+      return { html, overlay };
+    } catch (err) {
+      console.error(`[productPipeline] scene ${scene.scene_index} overlay failed:`, err.message);
+      return { html: null, overlay: [] };
+    }
+  }));
+  try { await closeMeasureBrowser(); } catch {}
 
-        // Inject the product shot URL into the product-shot placeholder
-        for (const entry of graph) {
-          if (entry.assetType === "product-shot") {
-            entry.src = resolvedUrl;
-          }
-        }
+  // ── Step 5: Assemble graphs — pipeline shot (z0) + scrim (z1) + overlay ────
+  const validShots = shotUrls.map(u => u ?? baseImageUrl ?? productImageUrl);
+  const sceneGraphs = scenes.map((scene, i) => {
+    const overlay = normalizeOverlayZ(overlayResults[i]?.overlay ?? []);
+    console.log(`[productPipeline] scene ${i} (${scene.intent}) — ${overlay.length} overlay layers, shot=${shotUrls[i] ? "ok" : "base-fallback"}`);
+    return [...mediaScrimEntries(i, validShots[i]), ...overlay];
+  });
+  const sceneHTMLs = overlayResults.map(r => r?.html ?? null);
 
-        console.log(`[productPipeline] scene ${scene.scene_index} (${scene.intent}) — ${graph.length} layers, shot=${resolvedUrl ? "ok" : "fallback"}`);
-        return { graph, html, shotUrl: resolvedUrl };
-      } catch (err) {
-        console.error(`[productPipeline] scene ${scene.scene_index} failed:`, err.message);
-        return { graph: [], html: null, shotUrl: productImageUrl };
-      }
-    })
-  );
-
-  const sceneGraphs = sceneResults.map(r => r.graph);
-  const sceneHTMLs  = sceneResults.map(r => r.html);
-  const validShots  = sceneResults.map(r => r.shotUrl);
-
-  // ── Step 7a: Build timeline via shared builder ─────────────────────────────
+  // ── Step 6: Build timeline + scene transitions ─────────────────────────────
   console.log("[productPipeline] building timeline");
   const { timeline: rawTimeline } = buildTimeline(sceneGraphs, scenes, projectContext);
   const timeline = {
@@ -391,7 +385,16 @@ export async function runProductVideoPipeline(project) {
     meta: { ...rawTimeline.meta, source: "product_video", scene_format: "v4" },
   };
 
-  // ── Step 7b: Inject voiceover ─────────────────────────────────────────────
+  let prevTransition = null;
+  for (const s of scenes) {
+    const pool = TRANSITION_POOL.filter(t => t !== prevTransition);
+    s.transition_out = pool[Math.floor(Math.random() * pool.length)];
+    prevTransition = s.transition_out;
+  }
+  applyTransitions(timeline.layers, scenes);
+  applyKenBurns(timeline.layers, scenes);
+
+  // Voiceover
   if (voiceoverUrl) {
     const totalDur = timeline.format.duration;
     timeline.layers.push({
@@ -404,19 +407,14 @@ export async function runProductVideoPipeline(project) {
     });
   }
 
-  // ── Step 8: Music ─────────────────────────────────────────────────────────
   await injectMusic(timeline, productMood);
+  if (project.logoUrl) injectLogo(timeline, project.logoUrl, scenes);
 
-  // ── Step 9: Logo ──────────────────────────────────────────────────────────
-  if (project.logoUrl) {
-    injectLogo(timeline, project.logoUrl, scenes);
-  }
-
-  // ── Step 10: Save ─────────────────────────────────────────────────────────
+  // ── Save ───────────────────────────────────────────────────────────────────
   const editorProjectId = await saveTimeline(timeline, { ...project, _brief: brief }, scenes, sceneHTMLs);
 
   const totalDuration = parseFloat(timeline.format.duration.toFixed(2));
-  console.log(`[productPipeline] done — ${scenes.length} scenes, ${totalDuration}s, project=${editorProjectId}`);
+  console.log(`[productPipeline] done — ${scenes.length} scenes, ${totalDuration}s, mode=${visualMode}, project=${editorProjectId}`);
 
   return {
     editor_project_id: editorProjectId,

@@ -46,9 +46,13 @@ Each scene voiceover: 5–12 words. The video AMPLIFIES the content — it does 
 - Scale total voiceover to scene count: ~10 words per scene. 4 scenes ≈ 40 words, 6 scenes ≈ 60 words. Never exceed 80 words total.
 - Tone must match the content: inspiring, surprising, funny, informational, dramatic.
 
-━━━ ASSET STRATEGY ━━━
-  use_fetched_image: true  → only for image-led scenes when a post image is available
-  use_fetched_image: false → for text-led scenes (headline, stat, quote, cta)
+━━━ MEDIA STRATEGY (real imagery beats text-only when the content has a clear subject) ━━━
+Each scene can carry ONE image, resolved cheapest-first by the pipeline. Set the field that fits the scene (or none):
+  use_fetched_image: true → the POST's own attached image (best when that photo IS the visual). Set image_index.
+  subject_entity: "<exact Wikipedia article title>" → a REAL photo of a named person/company/product/place central to this scene (e.g. "Sam Altman", "OpenAI", "Mount Fuji"). ONLY real notable entities that have a Wikipedia page with a photo — never documents, events, or abstract ideas.
+  stock_query: "<concrete searchable phrase>" → real-world footage/photo for a scene with no specific entity (e.g. "city traffic at night", "hands typing on laptop").
+  none of these → a pure TYPE/GRAPHIC scene (headline, stat, quote, comparison, list, cta).
+Prefer real imagery for scenes with a clear visual subject; keep text/graphic scenes for claims, stats, and CTAs. Don't force an image onto a scene that lands harder as bold type. Set at most ONE of the three per scene.
 
 ━━━ PALETTE GUIDE ━━━
 Match the emotional tone:
@@ -105,6 +109,8 @@ For each scene you are briefing the art director who designs the actual frame. G
       "visual_text": "text to DISPLAY in the scene",
       "use_fetched_image": false,
       "image_index": 0,
+      "subject_entity": null,
+      "stock_query": null,
       "duration_seconds": 3.5
     }
   ]
@@ -196,6 +202,8 @@ Target duration: ~${targetDuration} seconds${threadNote}${lengthNote}${platformD
       archetype:         s.archetype        ?? null,
       use_fetched_image: s.use_fetched_image === true && imageUrls.length > 0,
       image_index:       typeof s.image_index === "number" ? Math.min(s.image_index, imageUrls.length - 1) : 0,
+      subject_entity:    typeof s.subject_entity === "string" && s.subject_entity.trim() ? s.subject_entity.trim() : null,
+      stock_query:       typeof s.stock_query === "string" && s.stock_query.trim() ? s.stock_query.trim() : null,
       duration_seconds:  s.duration_seconds ?? 4.0,
       duration:          s.duration_seconds ?? 4.0,
     };

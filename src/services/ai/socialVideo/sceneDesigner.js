@@ -11,7 +11,8 @@ export async function designSocialScene(scene, projectContext, attempt = 1) {
     sceneIntent:     scene.intent,
     creativeBrief:   scene.creative_brief  ?? scene.visual_concept ?? "",
     visualConcept:   scene.visual_concept  ?? "",
-    hasFetchedImage: scene.use_fetched_image === true,
+    hasFetchedImage: !!scene.resolvedImage,
+    assetTreatment:  scene.assetMeta?.treatment ?? null, // "full_bleed" | "framed"
     palette:         projectContext.palette      ?? {},
     fontPair:        projectContext.fontPair     ?? {},
     showAttribution,

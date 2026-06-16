@@ -338,7 +338,7 @@ const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-
               <NavItem icon={Icons.promo}      label="Promo Video" sub="Promo from your product URL or details"  to="/promo-video"       active={path === "/promo-video"} />
               <NavItem icon={Icons.aiVideo}    label="AI Video"             sub="Any topic → a researched short-form video" to="/ai-video" active={path === "/ai-video"} />
               <NavItem icon={Icons.ad}         label="Product Video"      sub="Turn photos into video ads"    to="/product-video"    active={path === "/product-video"} />
-              <NavItem icon={Icons.social}     label="Social to Video"     sub="Turn posts into video reels"  to="/social-video"     active={path === "/social-video"} />
+              <NavItem icon={Icons.social}     label="Social to Video"     sub="Turn social posts into video reels"  to="/social-video"     active={path === "/social-video"} />
               <NavItem icon={Icons.typography} label="Typography Video"   sub="Bold kinetic text animations"  to="/typography-video" active={path === "/typography-video"} />
               <NavItem icon={Icons.captions}   label="Add Captions"       sub="Auto-caption your videos"      to="/video-captions"   active={path === "/video-captions"} />
               <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "4px 2px" }} />

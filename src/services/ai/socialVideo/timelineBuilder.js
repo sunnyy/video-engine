@@ -1,15 +1,11 @@
 /**
  * timelineBuilder.js
- * src/services/ai/productVideo/timelineBuilder.js
+ * src/services/ai/socialVideo/timelineBuilder.js
  *
- * Self-contained Product Video builder (eased per-element entrances via the
+ * Self-contained Social Video builder (eased per-element entrances via the
  * shared motion engine). Converts scene graphs + scene objects into the timeline
  * JSON format used by the editor and Remotion. Scene-level transitions are
  * applied separately in the orchestrator (applyTransitions).
- *
- * Mirrors socialVideo/timelineBuilder.js — Product Video keeps its OWN copy so it
- * never depends on promoVideo's shared scene-path builder (which is used by Promo
- * TH and must not change).
  */
 
 import { expandEnter } from "../shared/motion.js";
@@ -36,7 +32,6 @@ const ROLE_LABEL = {
   step:               "Step",
   icon:               "Icon",
   logo:               "Logo",
-  cta:                "CTA",
   "image-placeholder": "Image",
 };
 
@@ -67,15 +62,14 @@ const ROLE_PRIORITY = {
   "stat-number":   3,
   badge:           4,
   label:           5,
-  cta:             6,
-  "image-placeholder": 7,
-  card:            8,
-  step:            9,
-  icon:            10,
-  divider:         11,
-  glow:            12,
-  decoration:      13,
-  background:      14,
+  "image-placeholder": 6,
+  card:            7,
+  step:            8,
+  icon:            9,
+  divider:         10,
+  glow:            11,
+  decoration:      12,
+  background:      13,
 };
 
 const MAX_SPREAD    = 0.50; // all elements fully visible by 50% of scene duration
@@ -228,17 +222,24 @@ function graphEntryToLayer(entry, start, end, delay = 0, canvas = { width: W_DEF
 /**
  * buildTimeline(sceneGraphs, scenes, projectContext)
  *
- * @param {Array<Array>} sceneGraphs   — one scene graph per scene (from htmlMeasure)
+ * @param {Array<Array>} sceneGraphs   — one scene graph per scene (from htmlParser)
  * @param {Array<object>} scenes       — original scene objects (for spoken/timing)
- * @param {object} projectContext      — { productName, accentColor, fps, musicMood }
+ * @param {object} projectContext      — { productName, niche, accentColor, fps }
  * @returns {object}                   — complete timeline JSON
  */
 export function buildTimeline(sceneGraphs, scenes, projectContext) {
   const canvasW = projectContext.canvasWidth  ?? W_DEFAULT;
   const canvasH = projectContext.canvasHeight ?? H_DEFAULT;
-  console.log(`[productTimelineBuilder] called with ${sceneGraphs.length} graphs, ${scenes.length} scenes`);
+  console.log(`[timelineBuilder] called with ${sceneGraphs.length} graphs, ${scenes.length} scenes`);
+  if (sceneGraphs[0]?.length) {
+    console.log(`[timelineBuilder] sceneGraphs[0] length: ${sceneGraphs[0].length}, first entry: ${(JSON.stringify(sceneGraphs[0][0]) ?? "").slice(0, 200)}`);
+  } else {
+    console.warn(`[timelineBuilder] sceneGraphs[0] is empty or undefined`);
+  }
 
-  const layers = [];
+  const layers      = [];
+  const asset_queue = [];
+
   let cursor = 0;
 
   for (let i = 0; i < sceneGraphs.length; i++) {
@@ -254,10 +255,13 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
     const end   = parseFloat((cursor + duration).toFixed(4));
     cursor = end;
 
-    console.log(`[productTimelineBuilder] scene ${i} (${scene.intent}): ${graph.length} graph entries, start=${start} end=${end}`);
+    console.log(`[timelineBuilder] scene ${i} (${scene.intent}): ${graph.length} graph entries, start=${start} end=${end}`);
 
     // Sort by zIndex so stagger order matches visual depth (background first)
     const sorted = [...graph].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+    const isHook = i === 0;
+    const isCTA  = i === scenes.length - 1;
 
     // Pre-filter to match what will actually be pushed, so group sizes are accurate
     const visible = sorted.filter(entry => {
@@ -266,6 +270,7 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
         const hasBorder = (entry.borderWidth ?? 0) > 0;
         if (!hasBorder && (bg === "transparent" || bg === "none" || bg === "")) return false;
       }
+      if (!isHook && !isCTA && entry.trackId === "track_logo") return false;
       return true;
     });
 
@@ -301,6 +306,21 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
 
       layers.push(graphEntryToLayer(entry, start, end, delay, { width: canvasW, height: canvasH }));
     }
+
+    // Asset queue
+    if (scene.asset_requirement === "screenshot" || scene.asset_requirement === "recording") {
+      asset_queue.push({
+        scene_id:   i + 1,
+        asset_hint: scene.asset_hint ?? "",
+        type:       "user_upload_pending",
+      });
+    } else if (scene.asset_requirement === "image") {
+      asset_queue.push({
+        scene_id:   i + 1,
+        asset_hint: scene.asset_hint ?? "",
+        type:       "stock",
+      });
+    }
   }
 
   const totalDuration = parseFloat(cursor.toFixed(4));
@@ -308,18 +328,18 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
   const timeline = {
     version: "2.0",
     id:      projectContext.projectId ?? null,
-    name:    `${projectContext.brandName ?? projectContext.productName ?? "Product Video"}`,
+    name:    `${projectContext.productName ?? "Social Video"}`,
     format:  { width: canvasW, height: canvasH, fps: FPS, duration: totalDuration },
     layers,
     meta: {
-      source:           "product_video",
+      source:           "social_video",
       thumbnail:        null,
       editor_version:   "timeline",
       caption_style:    "minimal",
       transition_style: "cut",
-      music_mood:       projectContext.musicMood ?? "premium",
-      product_name:     projectContext.productName ?? projectContext.brandName,
-      scene_format:     "v4",
+      music_mood:       projectContext.musicMood ?? "upbeat",
+      product_name:     projectContext.productName,
+      scene_format:     "v3",
       createdAt:        new Date().toISOString(),
       updatedAt:        new Date().toISOString(),
     },
@@ -327,6 +347,7 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
 
   return {
     timeline,
+    asset_queue,
     total_frames: Math.round(totalDuration * FPS),
     fps:          FPS,
   };

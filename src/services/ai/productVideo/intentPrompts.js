@@ -1,263 +1,162 @@
 /**
  * intentPrompts.js
- * src/services/ai/productVideo/v2/intentPrompts.js
+ * src/services/ai/productVideo/intentPrompts.js
  *
- * Builds the system + user prompt for the product video scene designer (GPT-5.4).
- * Product-video-specific: always includes a product image zone, premium ecommerce aesthetic.
+ * Art-director prompt for the Product Video overlay (headless-measure path).
+ *
+ * Every scene is an OVERLAY: the PIPELINE renders the full-bleed product shot +
+ * scrim (low z); the designer builds ONLY the typography (transparent page, high z),
+ * composed into the scene's ANCHOR zone — the clean negative space the shot was
+ * generated to leave. The director hands us the exact display content (kicker /
+ * headline / accent word / body / label / Lucide icon); the designer realizes it as
+ * premium, measured HTML/CSS. No flat-pixel contract, no overflow math.
  */
 
-const CANVAS_W = 1080;
-const CANVAS_H = 1920;
+const W = 1080, H = 1920;
+
+// What each scene is FOR — energy/role, not a layout template. Gives the designer
+// the scene's job so consecutive scenes feel different, not one uniform treatment.
+const INTENT_PURPOSE = {
+  hook:       "the SCROLL-STOPPER — bold, punchy, minimal. One huge line, maximal negative space, almost no supporting UI. High energy.",
+  showcase:   "the hero beauty moment — confident and aspirational; let the product breathe, elegant restrained type.",
+  hero:       "the brand statement — a strong value line with clear, confident hierarchy.",
+  feature:    "an explainer — calm and structured; lead with the benefit, support with 1–2 crisp feature points.",
+  detail:     "a craft close-up — quiet and premium; a short label/spec and lots of stillness.",
+  lifestyle:  "aspirational, in-context — light, human, emotive; a short evocative line, minimal UI.",
+  offer:      "the deal — high contrast and urgent; the number/offer is the hero.",
+  cta:        "the close — decisive; brand + a clear CTA that drives the tap.",
+  standalone: "a complete mini-ad — desire up top, action at the bottom; balanced and clean.",
+};
+
+// Anchor → the band the overlay must compose within (matches the cleared zone in
+// the generated shot). These are guidance regions, not hard pixel boxes.
+const ANCHOR_ZONES = {
+  "text-top":    { desc: `the UPPER region (roughly y=72–${Math.round(H * 0.48)}), full width — stack content top-down`, align: "flex-start", justify: "flex-start" },
+  "text-bottom": { desc: `the LOWER region (roughly y=${Math.round(H * 0.50)}–${H - 64}), full width`,                 align: "flex-start", justify: "flex-end"   },
+  "text-left":   { desc: `the LEFT column (roughly x=56–${Math.round(W * 0.58)}), using its FULL height`,             align: "flex-start", justify: "flex-start" },
+  "text-right":  { desc: `the RIGHT column (roughly x=${Math.round(W * 0.42)}–${W - 56}), using its FULL height`,      align: "flex-end", justify: "flex-start" },
+};
 
 function hexToRgba(hex, alpha) {
   const h = (hex ?? "#000000").replace("#", "");
   if (h.length === 3) {
-    const r = parseInt(h[0] + h[0], 16);
-    const g = parseInt(h[1] + h[1], 16);
-    const b = parseInt(h[2] + h[2], 16);
+    const r = parseInt(h[0] + h[0], 16), g = parseInt(h[1] + h[1], 16), b = parseInt(h[2] + h[2], 16);
     return `rgba(${r},${g},${b},${alpha})`;
   }
   if (h.length >= 6) {
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
     return `rgba(${r},${g},${b},${alpha})`;
   }
   return `rgba(0,0,0,${alpha})`;
 }
 
-function buildDesignMandate(accentColor, theme = "dark", productMood = "premium") {
-  const themeRules =
-    theme === "light"
-      ? `THEME: LIGHT
-- Background must be very light: #ffffff, #f8f9fa, #fdf4f4, or a soft tint of the accent color at 5–8% opacity
-- Text is near-black (#0a0a12, #111827, #1a1d2e)
-- Glow effects use accent color at 10–15% opacity only — subtle, not dramatic
-- No dark overlays. No black gradients. No near-black backgrounds.
-- The product image zone sits on a soft light surface — gentle drop shadow instead of glow`
-      : theme === "medium"
-      ? `THEME: MEDIUM — COLOR-DERIVED
-- Background must be a VISIBLY COLORED dark tone derived from the accent color — not near-black, not navy
-- Target: roughly 15–25% lightness of the accent color so the color is clearly visible
-- Examples: accent pink #FF6B9D → background #6b1535 or #7a1a3d; accent orange → #7a3010; accent green → #1a5c2a
-- Use a radial gradient that goes from a slightly lighter version at center to the base color at edges
-- The background must look like it BELONGS to the product's color family — someone should immediately associate it with the product
-- Text is white or near-white (#ffffff, rgba(255,255,255,0.9))
-- Glow effects use accent color at 40–60% opacity
-- FORBIDDEN: near-black (#000, #0a0a0a, anything below 10% lightness), generic dark navy, pure white`
-      : `THEME: DARK
-- Background must be very dark: #04050a, #060812, #0a0a10, or a near-black tinted with the accent color
-- Text is white or near-white (#ffffff, rgba(255,255,255,0.9))
-- No light backgrounds. No white backgrounds.
-- Glow effects use accent color at 30–50% opacity — rich and luminous`;
-
-  return `
-## DESIGN MANDATE — FOLLOW EXACTLY
-
-### ACCENT COLOR: ${accentColor}
-This is the brand color for the entire scene. Use it on:
-- CTA buttons (solid fill)
-- Badge backgrounds and borders
-- Divider lines and accent elements
-- Glow accent elements (radial-gradient divs, subtle, z-index 1–2)
-- Stat numbers and key labels
-
-Derived values to use (copy these exactly):
-- Full:       ${accentColor}
-- 70% opacity: ${hexToRgba(accentColor, 0.7)}
-- 40% opacity: ${hexToRgba(accentColor, 0.4)}
-- 15% opacity: ${hexToRgba(accentColor, 0.15)}
-- 8% opacity:  ${hexToRgba(accentColor, 0.08)}
-
-FORBIDDEN: Do not use generic purple (#6366f1) or indigo unless that IS the accent color.
-Background must use accent color in at least one radial gradient:
-CORRECT: radial-gradient(circle at 50% 40%, ${hexToRgba(accentColor, 0.19)} 0%, transparent 55%)
-
-### PRODUCT MOOD: ${productMood}
-Let this mood influence the visual feel of every design decision:
-  premium     → refined, minimal, generous breathing room, elegant thin typography
-  playful     → vibrant, expressive, more elements, fun font weights
-  minimalist  → ultra-clean, maximum whitespace, one focal point only
-  bold        → high contrast, heavy type, aggressive composition, strong edges
-  elegant     → sophisticated, thin fonts, soft details, restrained color usage
-  organic     → warm tones, soft gradients, natural materials aesthetic
-
-### ${themeRules}
-
-### VISUAL STYLE: Premium Ecommerce
-Think: the product's brand aesthetic — Apple, Glossier, MVMT, or whatever matches the product.
-- Product is the hero — everything else frames it
-- Clean typography — large, confident, lots of breathing room
-- No clutter — fewer elements, more impact
-`;
-}
-
-const INTENT_DIRECTIVES = {
-  standalone: `STANDALONE SCENE — Complete product ad in one scene overlaid on the product photograph.
-- NO product image element — the background IS the product photograph.
-- Brand name large, centered or left-aligned (80–120px, bold, white with text-shadow).
-- One clear value statement below brand name (40–56px, white).
-- CTA button: pill shape, solid accent fill, centered, bold text.
-- Optional: offer badge or one feature label.
-- Everything — desire and action — as text/UI floating on the photograph.`,
-
-  hook: `HOOK SCENE — Scroll-stopping opener overlaid on the product photograph.
-- NO product image element — the background IS the product photograph.
-- No brand name or logo in this scene.
-- Headline: 2–4 words, massive font (120–160px), bold, all-caps, white, centered in upper-middle area.
-- Optional: one short kicker above the headline (tiny label, 24–32px, letter-spaced, white).
-- Let the photo breathe — minimal text, maximum impact.`,
-
-  hero: `HERO SCENE — Brand introduction + main value statement overlaid on the product photograph.
-- NO product image element — the background IS the product photograph.
-- Brand name large, placed in upper 30% of canvas (100–140px, bold, white with text-shadow).
-- One headline below brand name (48–64px, describing what it does, white).
-- Optional: one or two short feature labels (icon + text) below headline.
-- Text grouped in one vertical stack — do not scatter elements.`,
-
-  features: `FEATURES SCENE — Specific product benefits overlaid on the product photograph.
-- NO product image element — the background IS the product photograph.
-- 2–3 feature rows in the lower 50–60% of the canvas. Each row: icon + bold label (40–56px) + short descriptor (28–36px).
-- Optionally add a semi-transparent pill or card behind the feature rows (rgba(0,0,0,0.35), border-radius 16px) to lift text off the photo.
-- Upper area intentionally minimal — let the product in the photo be visible.
-- No CTA in this scene.`,
-
-  offer: `OFFER SCENE — The deal, prominently stated, overlaid on the product photograph.
-- NO product image element — the background IS the product photograph.
-- Large offer text centered vertically (120–180px for the number/discount, 40–56px for supporting text).
-- Optional: badge or pill with "LIMITED TIME" or similar — use accent color fill.
-- Keep text grouped — upper and lower sections of the photo should remain visible.
-- No CTA button here — just the offer text.`,
-
-  cta: `CTA SCENE — Final conversion push overlaid on the product photograph.
-- NO product image element — the background IS the product photograph.
-- Brand name (80–120px, white, text-shadow) in the upper third of the canvas.
-- CTA button in the lower third: pill shape, solid accent-color fill, bold text (40–56px), centered, 600–700px wide.
-- Website URL below button (24–32px, rgba(255,255,255,0.7), letter-spaced).
-- Keep center area mostly open so the product in the photograph shows through.`,
-};
-
-// The product shot is injected via a data-asset-type="product-shot" placeholder.
-// GPT includes the placeholder as the first element and designs overlay elements on top.
-function getAssetDirective() {
-  return `BACKGROUND — PRODUCT PHOTOGRAPH PLACEHOLDER:
-The canvas background is a full-bleed product photograph. Use this EXACT element as the first child of <body>:
-<div data-role="image-placeholder" data-layer="image" data-asset-type="product-shot" data-animation="none" data-scene-element="background" style="position:absolute;left:0;top:0;width:${CANVAS_W}px;height:${CANVAS_H}px;z-index:0;"></div>
-
-The photograph has the product in the LOWER 50–60% of the frame. The upper 40–50% is open background (sky, surface, wall — clear space for text).
-You MUST add gradient overlay divs over the photo so text remains legible:
-  Top vignette:    background:linear-gradient(180deg,rgba(0,0,0,0.52) 0%,transparent 28%); left:0;top:0;width:${CANVAS_W}px;height:540px;z-index:1;
-  Bottom dark:     background:linear-gradient(0deg,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.62) 42%,transparent 72%); left:0;top:960px;width:${CANVAS_W}px;height:960px;z-index:1;
-Adjust opacity to match product theme — dark products need stronger overlays.
-All text elements must have text-shadow: 0 2px 12px rgba(0,0,0,0.7) for legibility.`;
-}
-
 export function buildProductScenePrompt(sceneScript, projectContext) {
-  const accentColor   = projectContext.accentColor   ?? "#7c5cfc";
-  const theme         = projectContext.theme         ?? "dark";
-  const productMood   = projectContext.productMood   ?? "premium";
-  const brandName     = projectContext.brandName     ?? "Brand";
-  const ctaText       = projectContext.ctaText       ?? "Shop Now";
-  const offerText     = projectContext.offerText     ?? "";
-  const website       = projectContext.website       ?? "";
-  const sceneIntent   = projectContext.sceneIntent   ?? "hero";
-  const archetype     = projectContext.archetype     ?? null;
-  const visualConcept = projectContext.visualConcept ?? "";
-  const displayText   = projectContext.displayText   ?? "";
+  const {
+    sceneIntent  = "showcase",
+    accentColor  = "#C8954F",
+    secondaryColor = null,
+    theme        = "dark",
+    brandName    = "Brand",
+    ctaText      = "Shop Now",
+    website      = "",
+    productMood  = "premium",
+    fontPair     = {},
+    anchor       = "text-top",
+    display      = {},
+    creativeDirection = "",
+    hasVision    = false,
+  } = projectContext;
 
-  const intentDirective  = INTENT_DIRECTIVES[sceneIntent] ?? INTENT_DIRECTIVES.hero;
-  const assetDirective   = getAssetDirective(sceneIntent);
-  const designMandate    = buildDesignMandate(accentColor, theme, productMood);
+  const purpose = INTENT_PURPOSE[sceneIntent] ?? INTENT_PURPOSE.showcase;
 
-  return {
-    system: `You are a world-class motion graphics art director designing premium product advertisement scenes.
-Output a single self-contained HTML file with inline CSS only.
+  const heroFont = fontPair.hero       ?? "Anton";
+  const bodyFont = fontPair.supporting ?? "Inter";
+  const accent   = accentColor;
+  const secondary = secondaryColor || accentColor;
+  const accentSoft = hexToRgba(accentColor, 0.16);
+  const panelTint  = theme === "light" ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.40)";
 
-Rules:
-- No JavaScript. No SVG. No Canvas. No external assets.
-- Google Fonts via @import allowed.
-- Fixed size: ${CANVAS_W}x${CANVAS_H}px. Not responsive.
-- All positioning must be absolute with explicit left and top in pixels.
-- Never nest positioned elements inside other positioned elements.
-- Never use flexbox or grid for positioning.
+  const zone = ANCHOR_ZONES[anchor] ?? ANCHOR_ZONES["text-top"];
+  const isCta = sceneIntent === "cta" || sceneIntent === "standalone";
 
-REQUIRED data attributes on every meaningful element:
-- data-role: headline | subhead | kicker | badge | label | glow | card | background | divider | icon | "image-placeholder"
-- data-layer: text | gradient | image | effect | decoration
-- data-animation: fade-in | fade-up | scale-in | slide-left | none
-- data-scene-element: hero | background | supporting | decoration | workflow
+  // The content the director chose for this scene — the backbone to realize richly.
+  const feats = (display.features ?? []).filter(f => f && f.label);
+  const content = [
+    display.kicker      ? `• KICKER (tiny uppercase eyebrow, with a short rule/bracket beside it): "${display.kicker}"` : null,
+    display.headline    ? `• HEADLINE (huge, THE focal point, keep the line breaks): "${display.headline.replace(/\n/g, " / ")}"${display.accent_word ? ` — color "${display.accent_word}" in the accent, on its own line/element` : ""}` : null,
+    display.body        ? `• SUBHEAD (one supporting line, letter-spaced): "${display.body}"` : null,
+    display.stat        ? `• BIG STAT BLOCK — oversized accent number "${display.stat.value}"${display.stat.label ? ` with label "${display.stat.label}"` : ""}` : null,
+    display.badge       ? `• BADGE/PILL: "${display.badge}" (accent fill or hairline outline)` : null,
+    feats.length        ? `• FEATURE LIST — render each row as [Lucide icon inside a thin circular ring] + bold LABEL + muted sub line:\n      ${feats.map(f => `– ${f.icon || "check-circle"} | ${f.label}${f.sub ? ` | ${f.sub}` : ""}`).join("\n      ")}` : null,
+    (!feats.length && display.icon) ? `• an icon-in-a-ring ("${display.icon}")${display.label ? ` with label "${display.label}"` : ""}` : null,
+    (!feats.length && display.label) ? `• LABEL: "${display.label}"` : null,
+    isCta && ctaText    ? `• CTA: ONE pill — a single TEXT element "${ctaText}" with accent-color background + padding + border-radius:999px + white-space:nowrap (NOT a wide bar, NOT split into icon+text — the text must live IN the pill)${website ? `; website "${website}" small + muted just below` : ""}` : null,
+    (display.strip?.length) ? `• BOTTOM CREDENTIAL STRIP: ${display.strip.map(s => `"${s}"`).join(" · ")} — small, separated by thin vertical dividers, optional tiny star icon at the start` : null,
+  ].filter(Boolean).join("\n  ");
 
-SPACING RULE:
-Calculate each element's bottom edge: bottom = top + (font-size × line-count × line-height).
-Next element's top must be ≥ that bottom + 40px. No vertical overlaps on text elements.
+  const system = `You are a world-class motion-graphics art director for premium product advertising (think Apple, Nike, MVMT, high-end editorial).
+Design like a real designer — flexbox/grid/normal flow/auto-sizing; a browser lays it out and we MEASURE the result, so NEVER hand-position or compute pixel coordinates. Output ONE self-contained HTML doc (CSS inline or in <style>); nothing before <!DOCTYPE html>. No JavaScript; no external assets except Google Fonts via @import (max 2).
 
-OVERFLOW PREVENTION — calculate before finalizing any font-size:
-  Estimated render width = char_count × font-size × 0.60
-  This must be ≤ element width. If not, reduce font-size until it fits.
-  Single words cannot wrap in CSS — for a single-word element this is critical.
-  Example: "GLOWING" = 7 chars → max font-size = floor(900 / (7 × 0.60)) = 214px.
+FONTS (load via @import): hero/display "${heroFont}" · body "${bodyFont}".
+PRODUCT MOOD: ${productMood} — set the type weight, spacing, and restraint accordingly.
 
-HEIGHT RULE:
-Never set a fixed height on text elements. Only set left, top, width — omit height. Renderer computes height.
+SCENE PURPOSE — this scene is "${sceneIntent}": ${purpose}${creativeDirection ? `\nART DIRECTION (realize this exact feeling): ${creativeDirection}` : ""}
+Let this drive the energy, density, type scale, and layout. Each scene must feel DISTINCT — do not give every scene the same treatment.
 
-GLOW ELEMENTS — gradient divs only, NEVER text:
-- data-role="glow" elements MUST be <div> with a radial-gradient background and filter:blur(…).
-- NEVER put any text content inside a glow element.
-- Do NOT create duplicate/echo text elements as ghost shadows. Every word appears exactly once.
+THIS IS A TEXT OVERLAY over a pipeline-rendered product photograph. You build NEITHER the photo NOR any backdrop/scrim — ONLY the overlay UI.
+- html,body background: TRANSPARENT. NO background element, NO image element, NO full-canvas anything.
+${hasVision ? `- LOOK AT THE ATTACHED PRODUCT IMAGE. Place your overlay ONLY in the genuinely EMPTY space of THAT image — NEVER over the product itself. Find where the product sits and compose in the clear areas around it; pull from the product's real colors and match the lighting.
+- Use the WHOLE frame where it's clear — typically a headline in a clear TOP band AND a CTA / credential strip along a clear BOTTOM band. Do NOT cram everything into one top-left corner and leave the rest empty.
+- Suggested primary area: ${zone.desc} — but TRUST THE IMAGE over this hint: if the product occupies it, put the text where the photo is actually clear.` : `- COMPOSE within ${zone.desc} — the clean space the photo left open; never place anything over the product. You may also use a clear bottom band for a CTA / credential strip.`}
+- Use absolutely-positioned wrappers per region and lay elements inside with normal flow.
 
-BUTTONS / CTA ELEMENTS — background on the text itself:
-- NEVER create a separate background div behind a text element to make a button.
-- Apply background, padding, border-radius directly on the text element: style="background:${accentColor}; padding:18px 48px; border-radius:999px; …"
-- This keeps button text on one line and prevents wrapping from two-element button layouts.
+CANVAS SCALE — CRITICAL. This is a 1080×1920 video frame, NOT a web page. Everything is read from a phone at arm's length, so type and icons must be BIG. Anything under ~22px is invisible and will be discarded. Use these MINIMUMS (go bigger for hierarchy):
+- headline: 90–180px · stat number: 120–240px
+- subhead / body: 30–44px · feature label: 34–46px · feature sub-line: 26–34px
+- kicker / badge / credential strip / website: 24–30px (NEVER smaller)
+- Lucide icons: 64–110px; their circular ring ~110–150px
+- dividers/rules: 2–4px thick (not 1px)
+Do NOT use web-scale 11–16px text anywhere — it will be dropped and the scene will look empty.
 
-BRAND NAME PLACEMENT:
-Brand name appears ONLY in hero and cta scenes. In hook, features, and offer scenes: do NOT include the brand name anywhere.
+CORE CONTENT TO REALIZE (the backbone — render ALL of it, spell every word exactly):
+  ${content || `a confident headline drawn from the voiceover`}
 
-ARCHETYPE DEFINITIONS — follow the layout structure for the assigned archetype.
-NOTE: The background IS the product photograph. Do NOT add any product image element. All archetypes are text/UI only.
-  typography_hero:   Big bold type fills the frame. 2–3 text elements max, massive font sizes (150–300px hero), centered or left-anchored.
-  full_bleed_image:  Minimal text overlay (1–2 lines). Text in a tight strip at the top or bottom of the canvas — let the photo breathe.
-  split_composition: Text stack on one side (left or right, 40–50% canvas width), right/left side intentionally empty so the product in the photo shows.
-  feature_grid:      Text headline in upper 25% of canvas. Below: 2–3 feature rows, each with icon + bold label + short descriptor. Semi-transparent card behind feature rows optional.
-  single_stat:       One dominant number or stat takes center stage (180–280px font). Supporting text tiny above/below. Everything else is minimal.
-  minimal_cta:       Maximum whitespace. One CTA button and brand name — nothing else. Every element has generous breathing room (100px+ margins).
-  numbered_list:     Numbered items (1. 2. 3.) stacked vertically with clear spacing. Number large and in accent color. Item text medium weight.
-  quote_statement:   Large bold statement fills most of the canvas (3–4 lines, 60–90px font). Attribution or source sits small below.
+DESIGN A CLEAN, PREMIUM EDITORIAL OVERLAY — fewer, bigger, confident elements (aim for ~6–10 meaningful elements TOTAL). This is a 3-second video scene, not a packed poster: clarity and hierarchy beat quantity. Realize the core content with strong hierarchy, then add ONLY the supporting touches that genuinely elevate it — YOUR call — e.g. a thin accent rule beside the kicker, one tasteful divider, a refined badge, an icon-in-a-ring per feature, a soft accent glow.
+YOU decide the UI treatment — including WHETHER a subtle translucent panel behind the text helps legibility. It is OPTIONAL and usually unnecessary (a scrim already sits beneath you). Do not add a box by default.
+COMPOSITION: ONE dominant focal element (the headline). Group related items, align to a tidy edge, leave generous breathing room.
 
-ICONS — use Lucide instead of drawn graphics:
-- Add data-icon="[kebab-case-name]" on a data-role="icon" element to render a Lucide icon.
-- Example: <div data-role="icon" data-layer="decoration" data-icon="check-circle" data-animation="fade-in" data-scene-element="decoration" style="position:absolute;left:80px;top:600px;width:56px;height:56px;color:#ffffff;z-index:5;"></div>
-- Available: check-circle, star, zap, shield, package, arrow-right, shopping-bag, heart, sparkles, trending-up, dollar-sign, bar-chart-2, cpu, globe, lock, users
-- Set size via width/height (32–80px). Set color via the color: style property.
+MUST FIT — CRITICAL: the WHOLE composition must fit within the 1080×1920 frame. NOTHING may extend below y=1920 or past the frame edges, and elements must NOT overlap. If it feels tight, REMOVE or shrink elements — never overflow or stack on top of each other.
 
-${designMandate}
+CONSTRAINTS:
+- NEVER cover the product. Everything legible via text-shadow (or an optional translucent panel).
+- No fake UI, no scattered dots/ticks, no product/brand text that wasn't given. One uniform style per text element (the accent split goes in its own element/line). Align text groups to a consistent edge.
 
-${intentDirective}
+PALETTE — build from the PRODUCT's own colors so it feels designed for this product:
+- accent ${accent} (soft tint ${accentSoft}) — the key word, icon, CTA, rules.
+- secondary ${secondary} — a second key from the product, for two-tone type / brackets.
+- if you DO add a panel, it MUST be clearly TRANSLUCENT (opacity ≤ 0.45, ~${panelTint}) so the product shows through — NEVER a solid/opaque box over the photo. Most scenes need no panel.
+- text near-white${theme === "light" ? " or near-black on light panels" : ""}; CTA = accent fill, radius:999px, white-space:nowrap.
 
-${assetDirective}
+ELEMENTS:
+- A CTA/button is ONE TEXT element with the background + padding + radius ON THE TEXT itself — NEVER a separate bar with the label inside (the label gets lost) and never full-width.
+- A Lucide icon: <div data-role="icon" data-icon="NAME"> sized 64–110px; ring = a bordered circular data-role="decoration" element (~110–150px) behind it; label beside/beneath at ≥34px.
+TAG every meaningful element (layout wrappers don't need tags):
+- data-role: headline | subhead | kicker | badge | label | stat-number | cta | divider | glow | card | icon | decoration
+- data-layer: text | gradient | decoration
+- data-animation: fade-in | fade-up | scale-in | slide-left | none   (animate at least 2 elements)
+- data-scene-element: hero | supporting | decoration
+Only REAL tagged elements render — no ::before/::after.
 
-BACKGROUND ELEMENT — MANDATORY FIRST CHILD:
-The very first element inside <body> MUST be the product photo placeholder:
-<div data-role="image-placeholder" data-layer="image" data-asset-type="product-shot" data-animation="none" data-scene-element="background" style="position:absolute;left:0;top:0;width:${CANVAS_W}px;height:${CANVAS_H}px;z-index:0;"></div>
-Add gradient overlay divs immediately after (z-index:1) to darken areas where text will sit.
-All other design elements go at z-index 2+.
+OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 
-OUTPUT: Only the HTML. Nothing before DOCTYPE.
-The html and body must use: width:${CANVAS_W}px; height:${CANVAS_H}px; overflow:hidden; margin:0; background:transparent;`,
-
-    user: `${archetype ? `LAYOUT TYPE: ${archetype}\n` : ""}SCENE INTENT: ${sceneIntent}
-VOICEOVER (context only — not shown on screen):
-${sceneScript}
-${displayText ? `\nDISPLAY TEXT (show this on screen — use it for the headline/copy):\n${displayText}` : ""}
-VISUAL CONCEPT: ${visualConcept || "Choose the best visual approach for this scene"}
-
+  const user = `SCENE INTENT: ${sceneIntent}
+PLACEMENT: ${anchor} → compose within ${zone.desc}.
+VOICEOVER (context only — not shown): "${sceneScript}"
+${display.headline ? "" : `Pick a short, premium headline if none was supplied.`}
 BRAND: ${brandName}
-${ctaText  ? `CTA TEXT: ${ctaText}`     : ""}
-${offerText ? `OFFER: ${offerText}`     : ""}
-${website   ? `WEBSITE: ${website}`     : ""}
-ACCENT COLOR: ${accentColor}
+ACCENT: ${accent}
 
-Design a premium product advertisement scene. The product photo is the background — use the placeholder and add gradient overlays + bold text/UI on top.
-All text must be in English.`,
-  };
+Design the single most striking, premium 9:16 overlay for this scene — text only, in the anchor zone, over the product photo. All text in English.`;
+
+  return { system, user };
 }
