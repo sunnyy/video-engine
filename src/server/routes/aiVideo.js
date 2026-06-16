@@ -1,21 +1,79 @@
 import express from "express";
-import { requireAuth } from "../middleware/shared.js";
-import { runAiVideo, runAiVideoDemo } from "../../services/ai/aiVideo/pipelineOrchestrator.js";
+import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
+import { runPromptPipeline, runPromptPlan } from "../../services/ai/aiVideo/pipelineOrchestrator.js";
 
 export const router = express.Router();
 
-// POST /ai-video/generate
-// With a topic → full AI build (director → GPT-5.4 scenes → motion). Without one →
-// the hand-authored motion demo. No credits charged yet — this is the prototype.
-router.post("/generate", requireAuth, async (req, res) => {
+const PROMPT_VIDEO_CREDITS = 75;
+
+// ── POST /ai-video/plan ──────────────────────────────────────────────────
+// The cheap half: research + script + shot plan, returned for user review.
+// Free (two text-model calls); credits are charged only at /generate.
+router.post("/plan", requireAuth, async (req, res) => {
   try {
-    const { topic, productName = "AI Video" } = req.body ?? {};
-    const result = topic?.trim()
-      ? await runAiVideo({ userId: req.user.id, topic: topic.trim() })
-      : await runAiVideoDemo({ userId: req.user.id, productName });
+    const { prompt, styleId = "auto", targetDuration = 45, language = "en", revision = "" } = req.body;
+    if (!prompt?.trim()) return res.status(400).json({ error: "prompt is required" });
+
+    const effectivePrompt = revision?.trim()
+      ? `${prompt.trim()}\n\nREVISION REQUEST (apply this to the plan): ${revision.trim()}`
+      : prompt.trim();
+
+    const result = await runPromptPlan({
+      prompt: effectivePrompt,
+      styleId: styleId ?? "auto",
+      targetDuration: Math.min(75, Math.max(20, parseInt(targetDuration, 10) || 45)),
+      language: language ?? "en",
+    });
     res.json(result);
   } catch (e) {
-    console.error("[ai-video/generate]", e);
+    console.error("[ai-video/plan]", e.message);
     res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/generate", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  let creditAmount = 0;
+
+  const { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, plan = null } = req.body;
+  if (!prompt?.trim()) return res.status(400).json({ error: "prompt is required" });
+
+  // SSE setup
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
+  try {
+    const deduction = await deductCredits(userId, PROMPT_VIDEO_CREDITS, "ai_video", "AI Video generation", null);
+    if (!deduction.success) {
+      send({ error: "Insufficient credits", code: "NO_CREDITS" });
+      return res.end();
+    }
+    creditAmount = PROMPT_VIDEO_CREDITS;
+
+    const result = await runPromptPipeline(
+      {
+        prompt: prompt.trim(), userId,
+        styleId: styleId ?? "auto",
+        targetDuration: Math.min(75, Math.max(20, parseInt(targetDuration, 10) || 45)),
+        language: language ?? "en",
+        voiceId: voiceId ?? null,
+        plan,
+      },
+      ({ step }) => send({ step }),
+    );
+
+    send({ done: true, projectId: result.projectId, projectName: result.projectName, beatCount: result.beatCount });
+    res.end();
+  } catch (err) {
+    if (creditAmount > 0) {
+      addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: AI Video failed").catch(() => {});
+    }
+    console.error("[ai-video/generate]", err);
+    send({ error: err.message });
+    res.end();
   }
 });

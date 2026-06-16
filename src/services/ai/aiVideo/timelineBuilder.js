@@ -1,11 +1,13 @@
 /**
  * timelineBuilder.js
- * src/services/ai/saasVideo/timelineBuilder.js
+ * src/services/ai/aiVideo/timelineBuilder.js
  *
- * Copied from promoVideo/timelineBuilder.js for the SaaS Video (v3) pipeline
+ * Copied from promoVideo/timelineBuilder.js for the Prompt Video pipeline
  * so the new service is fully self-contained. Converts scene graphs + scene
  * objects into the timeline JSON format used by the editor and Remotion.
  */
+
+import { expandEnter } from "../shared/motion.js";
 
 const FPS      = 30;
 const W_DEFAULT = 1080;
@@ -96,65 +98,49 @@ function applyDelay(keyframes, delay) {
   return result;
 }
 
-// ── Animation → keyframes ─────────────────────────────────────────────────────
-// bx/by are the element's base top-left position so keyframes animate FROM an
-// offset and land exactly on the final position (no permanent override of base).
+// ── Eased entrance motion (the AI Video motion engine, shared/motion.js) ───────
+// The designer's data-animation is just an INTENT; the eased expander turns it
+// into smooth, multi-sampled keyframes (fly / pop / zoom / rise / drift) instead
+// of a flat 2-point linear tween. Scaled by hierarchy: the hero moves expressively,
+// supporting/decoration stay calm. "none" stays static — the designer's choice.
+// Per-element EXITS and scene-level slide/zoom in/out are owned by applyTransitions
+// in the orchestrator, so entrances here never fight a scene transition.
 
-function animationToKeyframes(animation, bx = 0, by = 0) {
+const ENTER_MW = 0.55; // entrance window (seconds)
+
+function enterIntentFor(animation, group) {
+  const hero = group === "hero";
   switch (animation) {
-    case "fade-in":
-      return { ...NO_KF, opacity: [{ time: 0, value: 0 }, { time: 0.3, value: 1 }] };
-
-    case "fade-up":
-      return {
-        ...NO_KF,
-        opacity: [{ time: 0, value: 0 }, { time: 0.35, value: 1 }],
-        y:       [{ time: 0, value: by + 40 }, { time: 0.35, value: by }],
-      };
-
-    case "scale-in":
-      return {
-        ...NO_KF,
-        opacity: [{ time: 0, value: 0 }, { time: 0.35, value: 1 }],
-        scale:   [{ time: 0, value: 0.88 }, { time: 0.35, value: 1.0 }],
-      };
-
-    case "slide-left":
-      return {
-        ...NO_KF,
-        opacity: [{ time: 0, value: 0 }, { time: 0.3, value: 1 }],
-        x:       [{ time: 0, value: bx + 60 }, { time: 0.3, value: bx }],
-      };
-
-    case "slide-right":
-      return {
-        ...NO_KF,
-        opacity: [{ time: 0, value: 0 }, { time: 0.3, value: 1 }],
-        x:       [{ time: 0, value: bx - 60 }, { time: 0.3, value: bx }],
-      };
-
-    case "none":
-    default:
-      return { ...NO_KF };
+    case "fade-in":     return { type: "fade-in" };
+    case "fade-up":     return { type: "rise-in" };
+    case "scale-in":    return { type: "pop-in" };
+    case "slide-left":  return { type: hero ? "fly-in" : "drift-in", direction: "right" };
+    case "slide-right": return { type: hero ? "fly-in" : "drift-in", direction: "left" };
+    default:            return null; // "none" → static
   }
 }
 
-// ── Transition ────────────────────────────────────────────────────────────────
+function entranceKeyframes(entry, duration, canvas) {
+  if (entry.sceneElement === "background") return { ...NO_KF };
+  const intent = enterIntentFor(entry.animation, entry.sceneElement ?? "supporting");
+  if (!intent) return { ...NO_KF };
+  const box = { x: entry.x, y: entry.y, width: entry.width, height: entry.height };
+  const mw  = Math.max(0.2, Math.min(ENTER_MW, duration * 0.6));
+  return { ...NO_KF, ...expandEnter(intent, { box, canvas, dur: duration, mw }) };
+}
 
-function defaultTransition(animation) {
-  if (animation === "none") return { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } };
-  return { in: { type: "fade", duration: 0.3 }, out: { type: "none", duration: 0 } };
+// ── Transition ────────────────────────────────────────────────────────────────
+// Per-element entrances are now baked into keyframes; the renderer transition
+// field is reserved for the orchestrator's scene-level in/out (applyTransitions).
+function defaultTransition() {
+  return { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } };
 }
 
 // ── Scene graph entry → timeline layer ───────────────────────────────────────
 
-function graphEntryToLayer(entry, start, end, delay = 0) {
-  const shouldAnimate =
-    entry.animation !== "none" &&
-    entry.sceneElement !== "background";
-  const rawKf = shouldAnimate
-    ? animationToKeyframes(entry.animation, entry.x, entry.y)
-    : { ...NO_KF };
+function graphEntryToLayer(entry, start, end, delay = 0, canvas = { width: W_DEFAULT, height: H_DEFAULT }) {
+  const duration = Math.max(0.1, end - start);
+  const rawKf = entranceKeyframes(entry, duration, canvas);
   const base = {
     id:        entry.id,
     trackId:   entry.id,
@@ -171,7 +157,7 @@ function graphEntryToLayer(entry, start, end, delay = 0) {
     mixBlendMode:   entry.mixBlendMode   || null,
     backdropFilter: entry.backdropFilter || null,
     keyframes: applyDelay(rawKf, delay),
-    transition: defaultTransition(entry.animation),
+    transition: defaultTransition(),
     transform: {
       x:            entry.x,
       y:            entry.y,
@@ -317,7 +303,7 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
         ? 0
         : calculateElementDelay(entry, idx, groupSizes[group], duration);
 
-      layers.push(graphEntryToLayer(entry, start, end, delay));
+      layers.push(graphEntryToLayer(entry, start, end, delay, { width: canvasW, height: canvasH }));
     }
 
     // Asset queue
@@ -341,11 +327,11 @@ export function buildTimeline(sceneGraphs, scenes, projectContext) {
   const timeline = {
     version: "2.0",
     id:      projectContext.projectId ?? null,
-    name:    `${projectContext.productName ?? "SaaS Video"} — SaaS Video`,
+    name:    `${projectContext.productName ?? "Prompt Video"}`,
     format:  { width: canvasW, height: canvasH, fps: FPS, duration: totalDuration },
     layers,
     meta: {
-      source:           "saas_video",
+      source:           "prompt_video",
       thumbnail:        null,
       editor_version:   "timeline",
       caption_style:    "minimal",

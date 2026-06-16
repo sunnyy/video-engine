@@ -139,46 +139,6 @@ export async function getSocialVideoProjects() {
   return result;
 }
 
-export async function getSaasVideoProjects() {
-  const hit = getCached("saas_video");
-  if (hit) return hit;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, name, updated_at, safe_project_json")
-    .eq("user_id", user.id)
-    .eq("source", "saas_video")
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
-  const result = data || [];
-  setCached("saas_video", result);
-  return result;
-}
-
-export async function getPromptVideoProjects() {
-  const hit = getCached("prompt_video");
-  if (hit) return hit;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, name, updated_at, safe_project_json")
-    .eq("user_id", user.id)
-    .eq("source", "prompt_video")
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
-  const result = data || [];
-  setCached("prompt_video", result);
-  return result;
-}
-
 export async function getAiVideoProjects() {
   const hit = getCached("ai_video");
   if (hit) return hit;

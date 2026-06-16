@@ -1,6 +1,6 @@
 /**
  * beatDirector.js
- * src/services/ai/promptVideo/beatDirector.js
+ * src/services/ai/aiVideo/beatDirector.js
  *
  * Stage 1 — plans the ENTIRE film at BEAT level in one call.
  *
@@ -82,11 +82,11 @@ YOU DECIDE THREE THINGS PER BEAT — source, content, and overlay-or-clean. A de
 
 1. SOURCE (asset_type) — what raw material the beat uses:
 - "none": an HTML/CSS INFORMATION FRAME. ONLY for content that IS information: a stat, a quote, a list, a hook headline, a title/date, a comparison, a small chart, a CTA. NEVER for pictorial concepts — an iceberg, a ship, a crowd, a place, an event are IMAGES, not HTML. If the moment needs to be SEEN, it is a shot, not a designed frame.
-- "ai_image": a generated cinematic SHOT (full-bleed).
-- "photo": a realistic photo shot. With subject_entity set, a REAL photo of that person/org/landmark is fetched.
+- "ai_image": a generated cinematic SHOT (full-bleed). EXPENSIVE — reserve for genuinely un-photographable / stylized concepts (a metaphor, a dramatized historical moment, an abstract idea). The pipeline caps AI generations per video, so don't lean on it.
+- "photo": a realistic photo shot. With subject_entity set, a REAL photo of that person/org/landmark is fetched (free + strongest). PREFER this with a subject_entity wherever a real person/org/place/landmark is involved.
 - "cutout": the subject on transparency, composed by the designer inside a designed frame.
-- "stock_video": real footage. Provide shot_query (concrete searchable phrase).
-Balance by TOPIC: cinematic stories want mostly shots; debates/listicles/explainers want mostly information frames. Never more than 2 consecutive beats of the same asset type.
+- "stock_video": real footage of a real-world moment (a city, a crowd, machinery, nature). Provide shot_query (concrete searchable phrase). PREFER this over ai_image for any real-world scene that footage could show.
+Balance by TOPIC: cinematic stories want mostly shots; debates/listicles/explainers want mostly information frames. Never more than 2 consecutive beats of the same asset type. SOURCE PRIORITY for cost + quality: real entity photo > stock footage/photo > ai_image (last resort). Aim for at most ~2-3 ai_image beats in a 30s video.
 
 2. CONTENT — the information of the beat, as a content object. Real strings, real numbers, from the research. You provide WHAT it says, never how it looks:
 "content": {
@@ -199,16 +199,16 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     if (totalWords > Math.ceil(wordBudget * 1.08)) {
       problems.push(`the total script is ${totalWords} words but the budget is ${wordBudget} (${targetDuration}s of speech) — the video would run ~${Math.round(totalWords / WORDS_PER_SECOND)}s. Cut script_lines down, cut filler beats entirely if needed`);
     }
-    if (staccatoRatio > 0.55) {
+    if (staccatoRatio > 0.65) {
       problems.push(`${terminalEnds} of ${nonFinal.length} non-final beats end with . ! or ? — spoken aloud this is bullet-point telegram delivery with dead air at every cut. Rewrite the narration as FLOWING sentences split across beats: within a sentence, only its final beat ends with terminal punctuation, earlier beats end with a comma, em-dash, or nothing`);
     }
 
     if (problems.length === 0 || attempt === 2) {
-      if (problems.length > 0) console.warn(`[prompt/director] accepting after rewrite with remaining issues: ${problems.length}`);
+      if (problems.length > 0) console.warn(`[ai-video/director] accepting after rewrite with remaining issues: ${problems.length}`);
       break;
     }
 
-    console.log(`[prompt/director] rejected (${totalWords}w, staccato ${(staccatoRatio * 100).toFixed(0)}%) — requesting rewrite`);
+    console.log(`[ai-video/director] tightening narration flow (pass 2): ${totalWords}w, staccato ${(staccatoRatio * 100).toFixed(0)}%`);
     messages.push({ role: "assistant", content: response.choices[0].message.content });
     messages.push({
       role: "user",
@@ -257,7 +257,7 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     const words = line.split(/\s+/).filter(Boolean);
     if (words.length > MAX_BEAT_WORDS + 3) {
       line = words.slice(0, MAX_BEAT_WORDS + 1).join(" ").replace(/[,;—-]+$/, "") + ".";
-      console.warn(`[prompt/director] beat ${i} trimmed from ${words.length} words`);
+      console.warn(`[ai-video/director] beat ${i} trimmed from ${words.length} words`);
     }
 
     let transition = TRANSITIONS.includes(b.transition_out) ? b.transition_out : resolvedStyle.motion.transitions[i % resolvedStyle.motion.transitions.length];
@@ -306,6 +306,6 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     beats,
   };
 
-  console.log(`[prompt/director] ${beats.length} beats, style=${resolvedStyle.id} — assets: ${beats.map(b => b.asset_type).join(",")}`);
+  console.log(`[ai-video/director] ${beats.length} beats, style=${resolvedStyle.id} — assets: ${beats.map(b => b.asset_type).join(",")}`);
   return result;
 }

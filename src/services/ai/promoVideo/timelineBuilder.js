@@ -6,7 +6,7 @@
  * Output is compatible with the timeline editor and Remotion renderer.
  */
 
-import { expandEnter, expandExit, expandEmphasis } from "../aiVideo/motion.js";
+import { expandEnter, expandExit, expandEmphasis } from "../shared/motion.js";
 
 const FPS      = 30;
 const W_DEFAULT = 1080;
@@ -177,7 +177,7 @@ function defaultTransition(animation) {
 
 // ── Beat motion (ported from the AI Video transformation engine) ────────────────
 // The beat pipeline drives ALL element motion through the eased intent→keyframe
-// expander in aiVideo/motion.js — the same flying/popping/zooming vocabulary, with
+// expander in shared/motion.js — the same flying/popping/zooming vocabulary, with
 // real easing curves baked into keyframes (the renderer interpolates linearly).
 // Intent precedence per element: GPT-authored data-enter/-exit/-emphasis → the
 // legacy data-animation word mapped into the new palette → a hierarchy default

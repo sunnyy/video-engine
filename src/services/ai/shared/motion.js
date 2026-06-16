@@ -1,6 +1,10 @@
 /**
  * motion.js
- * src/services/ai/aiVideo/motion.js
+ * src/services/ai/shared/motion.js
+ *
+ * Shared motion engine — the eased ENTER/EXIT/EMPHASIS vocabulary + expander.
+ * Lives here (not under any one service) because multiple video services use it
+ * (Promo Video and AI Video). Originally built in the AI Video transformation prototype.
  *
  * The LOCKED motion vocabulary + the expander.
  *

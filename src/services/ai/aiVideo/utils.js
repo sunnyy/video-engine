@@ -1,8 +1,8 @@
 /**
  * utils.js
- * src/services/ai/saasVideo/utils.js
+ * src/services/ai/aiVideo/utils.js
  *
- * Small shared helpers for the SaaS Video pipeline.
+ * Small shared helpers for the Prompt Video pipeline.
  */
 
 import { supabaseAdmin } from "../../../server/middleware/shared.js";

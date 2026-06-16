@@ -1,6 +1,6 @@
 /**
  * easing.js
- * src/services/ai/aiVideo/easing.js
+ * src/services/ai/shared/easing.js
  *
  * The renderer interpolates between keyframes LINEARLY. To get real acceleration,
  * overshoot, and snap, we sample an easing curve into many keyframes — so the

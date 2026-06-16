@@ -1,6 +1,6 @@
 /**
  * beatDesigner.js
- * src/services/ai/promptVideo/beatDesigner.js
+ * src/services/ai/aiVideo/beatDesigner.js
  *
  * Stage 4 — designs all beats fully in parallel (variety was planned by the
  * beat director; there is no sequential dependency).
@@ -39,11 +39,11 @@ export async function designBeat(beat, ctx, attempt = 1) {
 
   if (!isValidHTML(raw, choice.finish_reason)) {
     if (attempt < 2) {
-      console.warn(`[prompt/design] beat ${beat.beat_index} invalid/truncated (finish=${choice.finish_reason}), retrying`);
+      console.warn(`[ai-video/design] beat ${beat.beat_index} invalid/truncated (finish=${choice.finish_reason}), retrying`);
       await new Promise(r => setTimeout(r, 1200));
       return designBeat(beat, ctx, attempt + 1);
     }
-    console.error(`[prompt/design] beat ${beat.beat_index} failed after ${attempt} attempts`);
+    console.error(`[ai-video/design] beat ${beat.beat_index} failed after ${attempt} attempts`);
     return "";
   }
   return raw;
@@ -54,10 +54,10 @@ export async function designAllBeats(beats, ctx) {
     beats.map(async (beat) => {
       try {
         const html = await designBeat(beat, ctx);
-        console.log(`[prompt/design] beat ${beat.beat_index} (${beat.asset_type ?? "none"}) — ${html.length} chars`);
+        console.log(`[ai-video/design] beat ${beat.beat_index} (${beat.asset_type ?? "none"}) — ${html.length} chars`);
         return { beatIndex: beat.beat_index, html, error: html ? null : "empty design" };
       } catch (err) {
-        console.error(`[prompt/design] beat ${beat.beat_index} failed:`, err.message);
+        console.error(`[ai-video/design] beat ${beat.beat_index} failed:`, err.message);
         return { beatIndex: beat.beat_index, html: "", error: err.message };
       }
     })

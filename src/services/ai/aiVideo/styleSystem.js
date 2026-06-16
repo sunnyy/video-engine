@@ -1,6 +1,6 @@
 /**
  * styleSystem.js
- * src/services/ai/promptVideo/styleSystem.js
+ * src/services/ai/aiVideo/styleSystem.js
  *
  * The style preset system — declared ONCE per video, inherited by every beat.
  * Coherence across a generated video comes from locking these choices up
@@ -18,7 +18,7 @@ export const STYLE_PRESETS = {
     description: "Vintage print magazine — bold two-tone illustrations, halftone texture, punchy headlines",
     illustrationStyle: "retro editorial illustration, limited two-tone palette, mid-century print style, halftone texture, bold flat shapes, screen-print grain, textless artwork",
     photoStyle: "editorial magazine photograph, dramatic studio lighting, slight film grain",
-    paletteGuidance: "Two dominant inks (e.g. burnt orange + deep blue) on cream/off-white or near-black paper. High contrast, no gradients on flat poster beats.",
+    paletteGuidance: "Two dominant inks on a paper-like OR near-black field, high contrast, flat poster feel — the topic palette picks the actual inks; do NOT default every frame to orange-on-cream, and alternate the field (some paper, some dark) across beats.",
     typeSystem: "Condensed bold display type (Oswald, Barlow Condensed, Anton) for headlines, clean grotesque for labels. Uppercase headlines welcome.",
     motion: { energy: "punchy", transitions: ["slide-left", "zoom", "slide-up"], cutSeconds: 2.8 },
     treatmentBias: { ai_illustration: 3, artifact: 2, cutout_colorblock: 2, annotated_photo: 2, typography_punch: 1, stock_moment: 1, versus_split: 1 },
@@ -40,7 +40,7 @@ export const STYLE_PRESETS = {
     description: "Loud color blocks, cutouts, huge type — feed-stopping energy",
     illustrationStyle: "bold pop-art illustration, saturated color blocking, thick outlines, comic energy, high contrast",
     photoStyle: "vibrant editorial photograph, punchy saturated colors, hard light",
-    paletteGuidance: "Saturated color-block backgrounds (hot pink, electric blue, acid yellow) alternating per beat. Black or white type at maximum weight.",
+    paletteGuidance: "Saturated colour-block backgrounds that ALTERNATE per beat (hues drawn from the topic palette, not a fixed set). Black or white type at maximum weight.",
     typeSystem: "Ultra-bold display (Archivo Black via Anton/Unbounded, Outfit 900). Huge. Uppercase.",
     motion: { energy: "aggressive", transitions: ["zoom", "slide-left", "slide-down"], cutSeconds: 2.4 },
     treatmentBias: { cutout_colorblock: 3, typography_punch: 2, ai_illustration: 2, versus_split: 2, annotated_photo: 1, artifact: 1, stock_moment: 1 },
@@ -91,11 +91,14 @@ export function styleMenuForDirector() {
   return STYLE_IDS.map(id => `${id}: ${STYLE_PRESETS[id].description}`).join("\n");
 }
 
-/** The style directive block injected into the director and every designer call. */
+/** The style directive block injected into the director and every designer call.
+ * The style is a LOOSE MOOD/LEANING, not a lock — colour comes from the video's
+ * topic-grounded palette and the per-beat field variation, so scenes don't all
+ * end up the same wash. Palette guidance here is a feel, not a fixed set of hues. */
 export function styleDirectiveBlock(style) {
-  return `## VISUAL STYLE (LOCKED FOR THE WHOLE VIDEO): ${style.label}
+  return `## STYLE LEANING (a loose mood for the whole video — vary treatment scene to scene): ${style.label}
 ${style.description}
-- Palette: ${style.paletteGuidance}
+- Palette feel (a direction, NOT fixed hues — the topic palette decides actual colours): ${style.paletteGuidance}
 - Typography: ${style.typeSystem}
 - Motion energy: ${style.motion.energy} — cuts every ~${style.motion.cutSeconds}s, transitions from: ${style.motion.transitions.join(", ")}`;
 }

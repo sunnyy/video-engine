@@ -1,6 +1,6 @@
 /**
  * visualResolver.js
- * src/services/ai/promptVideo/visualResolver.js
+ * src/services/ai/aiVideo/visualResolver.js
  *
  * Stage 3 — the director proposed, code disposes. Resolves every beat's
  * visual asset in parallel, with deterministic downgrades:
@@ -36,7 +36,7 @@ async function persistRemote(url, runId, label, contentType, referer = null) {
     const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(path);
     return pub?.publicUrl ?? null;
   } catch (e) {
-    console.warn(`[prompt/resolve] persist failed (${label}):`, e.message);
+    console.warn(`[ai-video/resolve] persist failed (${label}):`, e.message);
     return null;
   }
 }
@@ -63,7 +63,7 @@ async function falImage(prompt, runId, label) {
     const persisted = await persistRemote(falUrl, runId, label, "image/jpeg");
     return persisted ?? falUrl;
   } catch (e) {
-    console.warn(`[prompt/resolve] fal image error (${label}):`, e.message);
+    console.warn(`[ai-video/resolve] fal image error (${label}):`, e.message);
     return null;
   }
 }
@@ -85,7 +85,7 @@ async function falRemoveBackground(imageUrl, runId, label) {
     const persisted = await persistRemote(outUrl, runId, label, "image/png");
     return persisted ?? outUrl;
   } catch (e) {
-    console.warn(`[prompt/resolve] birefnet error (${label}):`, e.message);
+    console.warn(`[ai-video/resolve] birefnet error (${label}):`, e.message);
     return null;
   }
 }
@@ -110,7 +110,7 @@ async function imageHasText(imageUrl) {
     });
     return /yes/i.test(res.choices[0]?.message?.content ?? "");
   } catch (e) {
-    console.warn("[prompt/resolve] vision text-check failed (accepting image):", e.message);
+    console.warn("[ai-video/resolve] vision text-check failed (accepting image):", e.message);
     return false;
   }
 }
@@ -124,7 +124,7 @@ async function falImageClean(prompt, runId, label) {
     if (!url) return best;
     best = url;
     if (!(await imageHasText(url))) return url;
-    console.warn(`[prompt/resolve] ${label}: text detected in generated image (attempt ${i}${i < 2 ? " — regenerating" : " — accepting best effort"})`);
+    console.warn(`[ai-video/resolve] ${label}: text detected in generated image (attempt ${i}${i < 2 ? " — regenerating" : " — accepting best effort"})`);
   }
   return best;
 }
@@ -162,10 +162,10 @@ async function wikipediaImage(entityName, runId, label) {
     }
     if (!imgUrl) return null;
     const persisted = await persistRemote(imgUrl, runId, label, "image/jpeg");
-    if (persisted) console.log(`[prompt/resolve] real photo for "${entityName}" via Wikipedia`);
+    if (persisted) console.log(`[ai-video/resolve] real photo for "${entityName}" via Wikipedia`);
     return persisted;
   } catch (e) {
-    console.warn(`[prompt/resolve] wikipedia lookup failed (${entityName}):`, e.message);
+    console.warn(`[ai-video/resolve] wikipedia lookup failed (${entityName}):`, e.message);
     return null;
   }
 }
@@ -223,87 +223,129 @@ async function searchPixabayImage(query) {
   } catch { return null; }
 }
 
-// ── Per-beat resolution ──────────────────────────────────────────────────────
+// ── Cost-aware sourcing waterfall ────────────────────────────────────────────
+// AI image generation is the expensive step. So we resolve in cheap-first order:
+//   1. REAL entity photo (Wikipedia) — free, and the strongest frame
+//   2. STOCK (Pexels/Pixabay) — free/cheap, for real-world moments
+//   3. AI generation — last resort, and CAPPED to a small budget per video
+// Anything past the budget downgrades to an HTML/CSS frame (GPT-5.4, which we
+// keep) rather than paying for another generation.
 
-async function resolveBeat(beat, style, runId) {
+const NEEDS_ASSET = new Set(["ai_image", "photo", "cutout", "stock_video"]);
+
+// AI generations allowed per video — ~1 per 12s, clamped to 2–4. (~3 for 30s.)
+function aiBudgetFor(totalDuration) {
+  return Math.max(2, Math.min(4, Math.round((totalDuration || 30) / 12)));
+}
+
+function stockQuery(beat) {
+  return (beat.shot_query
+    || beat.subject_entity
+    || (beat.image_prompt ? beat.image_prompt.split(/[,.]/)[0].split(/\s+/).slice(0, 6).join(" ") : "")
+    || beat.content?.headline
+    || "").trim();
+}
+
+async function stockImage(query, runId, label) {
+  if (!query) return null;
+  const hit = await searchPixabayImage(query);
+  if (!hit) return null;
+  const persisted = await persistRemote(hit.url, runId, label, "image/jpeg", "https://pixabay.com/");
+  return persisted ?? hit.url;
+}
+
+// PHASE 1 — cheap sources only (real entity, then stock). Sets beat.asset when
+// satisfied; otherwise flags beat._needsAI so the budgeted phase 2 can decide.
+async function resolveFreeSources(beat, style, runId) {
   const label  = `b${beat.beat_index}`;
   const minDur = Math.max(2, Math.ceil(beat.duration_seconds ?? 3));
 
-  if (beat.asset_type === "ai_image") {
-    const src = await falImageClean(`${beat.image_prompt}, ${style.illustrationStyle}, vertical 9:16 composition`, runId, `${label}-illo`);
-    if (src) { beat.asset = { kind: "image", src }; return; }
-    beat.asset_type = "none";
-    return;
+  // 1) Real entity photo (people, orgs, places, landmarks) — best + free
+  if (beat.subject_entity) {
+    const real = await wikipediaImage(beat.subject_entity, runId, `${label}-real`);
+    if (real) {
+      if (beat.asset_type === "cutout") {
+        const cut = await falRemoveBackground(real, runId, `${label}-cutout`);
+        beat.asset = cut ? { kind: "cutout", src: cut, real: true } : { kind: "image", src: real, real: true };
+      } else {
+        beat.asset = { kind: "image", src: real, real: true };
+      }
+      return;
+    }
   }
 
-  if (beat.asset_type === "photo") {
-    // Real photo of the named subject first — generated likenesses are the
-    // weakest frames in AI video
-    if (beat.subject_entity) {
-      const real = await wikipediaImage(beat.subject_entity, runId, `${label}-real`);
-      if (real) { beat.asset = { kind: "image", src: real, real: true }; return; }
-    }
-    const src = await falImageClean(`${beat.image_prompt}, ${style.photoStyle}, vertical 9:16 composition`, runId, `${label}-photo`);
-    if (src) { beat.asset = { kind: "image", src }; return; }
-    beat.asset_type = "none";
-    return;
-  }
-
-  if (beat.asset_type === "cutout") {
-    let portrait = null, isReal = false;
-    if (beat.subject_entity) {
-      portrait = await wikipediaImage(beat.subject_entity, runId, `${label}-real`);
-      isReal = !!portrait;
-    }
-    if (!portrait) {
-      portrait = await falImageClean(`${beat.image_prompt}, studio portrait, full subject visible, plain solid light grey background, ${style.photoStyle}`, runId, `${label}-portrait`);
-    }
-    if (!portrait) { beat.asset_type = "none"; return; }
-    const cutout = await falRemoveBackground(portrait, runId, `${label}-cutout`);
-    beat.asset = cutout
-      ? { kind: "cutout", src: cutout, real: isReal }
-      : { kind: "image", src: portrait, real: isReal }; // raw portrait still works framed in a card
-    return;
-  }
-
+  // 2) Stock — real-world moments. Video for stock_video beats, image otherwise.
+  //    ai_image beats are conceptual/stylized (the locked illustration look), so
+  //    stock rarely satisfies them — they skip straight to the AI budget.
   if (beat.asset_type === "stock_video") {
     const video = (await searchPexelsVideo(beat.shot_query, minDur)) ?? (await searchPixabayVideo(beat.shot_query, minDur));
     if (video) {
-      const persisted = await persistRemote(video.url, runId, `${label}-stock`, "video/mp4", "https://pixabay.com/");
-      if (persisted) { beat.asset = { kind: "video", src: persisted }; return; }
+      const p = await persistRemote(video.url, runId, `${label}-stock`, "video/mp4", "https://pixabay.com/");
+      if (p) { beat.asset = { kind: "video", src: p }; return; }
     }
-    const still = await searchPixabayImage(beat.shot_query);
-    if (still) {
-      const persisted = await persistRemote(still.url, runId, `${label}-still`, "image/jpeg", "https://pixabay.com/");
-      beat.asset = { kind: "image", src: persisted ?? still.url };
-      return;
-    }
-    const ai = await falImageClean(`${beat.shot_query}, ${style.photoStyle}, vertical 9:16`, runId, `${label}-aistill`);
-    if (ai) { beat.asset = { kind: "image", src: ai }; return; }
-    beat.asset_type = "none";
-    return;
+  }
+  if (beat.asset_type === "photo" || beat.asset_type === "stock_video") {
+    const stock = await stockImage(stockQuery(beat), runId, `${label}-stock`);
+    if (stock) { beat.asset = { kind: "image", src: stock }; return; }
   }
 
-  // asset_type "none" — the designer builds the entire frame in HTML/CSS
+  // 3) Nothing free satisfied it → candidate for the (capped) AI budget
+  beat._needsAI = true;
+}
+
+// PHASE 2a — generate (only for budget-granted beats)
+async function resolveWithAI(beat, style, runId) {
+  const label = `b${beat.beat_index}`;
+  if (beat.asset_type === "cutout") {
+    const portrait = await falImageClean(`${beat.image_prompt}, studio portrait, full subject visible, plain solid light grey background, ${style.photoStyle}`, runId, `${label}-portrait`);
+    if (portrait) {
+      const cut = await falRemoveBackground(portrait, runId, `${label}-cutout`);
+      beat.asset = cut ? { kind: "cutout", src: cut } : { kind: "image", src: portrait };
+      return;
+    }
+  } else {
+    const styleStr  = beat.asset_type === "ai_image" ? style.illustrationStyle : style.photoStyle;
+    const promptSrc = beat.image_prompt || beat.shot_query || beat.content?.headline || beat.visual_concept || "";
+    const src = await falImageClean(`${promptSrc}, ${styleStr}, vertical 9:16 composition`, runId, `${label}-ai`);
+    if (src) { beat.asset = { kind: "image", src }; return; }
+  }
+  beat.asset = null; beat.asset_type = "none"; // generation failed → HTML frame
 }
 
 /**
- * resolveVisuals(beats, style, runId) — parallel across non-continuation
- * beats; continuation beats then inherit the previous beat's asset so a
- * visual moment can build across multiple cuts on the same backdrop.
+ * resolveVisuals(beats, style, runId) — two-phase, cost-aware:
+ *   PHASE 1 (parallel): real entity → stock for every asset beat.
+ *   PHASE 2: the beats still needing an image share a small AI budget
+ *            (ai_image beats get first claim); the rest downgrade to HTML.
+ * Continuation beats then inherit the asset they extend.
  */
 export async function resolveVisuals(beats, style, runId) {
+  const totalDur = beats.reduce((a, b) => a + (b.duration_seconds ?? 0), 0);
+  const AI_BUDGET = aiBudgetFor(totalDur);
+
+  // PHASE 1 — cheap sources for every asset-bearing beat, in parallel
   await Promise.all(beats.map(async (beat) => {
-    beat.asset = null;
-    if (beat.continues_previous) return; // inherits below
+    beat.asset = null; beat._needsAI = false;
+    if (beat.continues_previous || !NEEDS_ASSET.has(beat.asset_type)) return;
     try {
-      await resolveBeat(beat, style, runId);
+      await resolveFreeSources(beat, style, runId);
     } catch (e) {
-      console.warn(`[prompt/resolve] beat ${beat.beat_index} failed (${e.message}) — HTML-only fallback`);
-      beat.asset = null;
-      beat.asset_type = "none";
+      console.warn(`[ai-video/resolve] beat ${beat.beat_index} free-source failed (${e.message})`);
+      beat._needsAI = true;
     }
   }));
+
+  // PHASE 2 — spend the AI budget. ai_image beats (a generated shot was the
+  // intent) get first claim; everything else falls in beat order.
+  const needAI = beats.filter(b => b._needsAI && !b.continues_previous)
+    .sort((a, b) => (a.asset_type === "ai_image" ? 0 : 1) - (b.asset_type === "ai_image" ? 0 : 1) || a.beat_index - b.beat_index);
+  const grant    = needAI.slice(0, AI_BUDGET);
+  const overflow = needAI.slice(AI_BUDGET);
+  console.log(`[ai-video/resolve] AI budget ${AI_BUDGET} for ${totalDur.toFixed(0)}s — generating ${grant.length}, ${overflow.length} over budget → HTML frame`);
+
+  await Promise.all(grant.map(b =>
+    resolveWithAI(b, style, runId).catch(() => { b.asset = null; b.asset_type = "none"; })));
+  for (const b of overflow) { b.asset = null; b.asset_type = "none"; } // cheapest: GPT-5.4 HTML frame
 
   // Continuation beats inherit the asset from the beat they extend
   for (let i = 1; i < beats.length; i++) {
@@ -311,7 +353,8 @@ export async function resolveVisuals(beats, style, runId) {
     beats[i].asset      = beats[i - 1].asset;
     beats[i].asset_type = beats[i - 1].asset_type;
   }
+  for (const b of beats) delete b._needsAI;
 
-  console.log(`[prompt/resolve] ${beats.map(b => `b${b.beat_index}:${b.continues_previous ? "+" : ""}${b.asset_type}${b.asset ? `(${b.asset.kind}${b.asset.real ? "/real" : ""})` : ""}`).join(" ")}`);
+  console.log(`[ai-video/resolve] ${beats.map(b => `b${b.beat_index}:${b.continues_previous ? "+" : ""}${b.asset_type}${b.asset ? `(${b.asset.kind}${b.asset.real ? "/real" : ""})` : ""}`).join(" ")}`);
   return beats;
 }

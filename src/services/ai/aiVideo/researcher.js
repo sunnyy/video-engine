@@ -1,6 +1,6 @@
 /**
  * researcher.js
- * src/services/ai/promptVideo/researcher.js
+ * src/services/ai/aiVideo/researcher.js
  *
  * Stage 0 — subject research BEFORE anything visual exists.
  *
@@ -53,7 +53,7 @@ export async function researchTopic(prompt) {
   try {
     response = await callResearch(prompt, RESEARCH_MODEL);
   } catch (e) {
-    console.warn(`[prompt/research] ${RESEARCH_MODEL} failed (${e.message}) — falling back to gpt-4.1`);
+    console.warn(`[ai-video/research] ${RESEARCH_MODEL} failed (${e.message}) — falling back to gpt-4.1`);
     response = await callResearch(prompt, "gpt-4.1");
   }
 
@@ -70,6 +70,6 @@ export async function researchTopic(prompt) {
   brief.artifacts = Array.isArray(brief.artifacts) ? brief.artifacts.slice(0, 8)  : [];
   if (!brief.topic) brief.topic = prompt.slice(0, 120);
 
-  console.log(`[prompt/research] "${brief.topic}" — ${brief.entities.length} entities, ${brief.facts.length} facts, ${brief.artifacts.length} artifacts`);
+  console.log(`[ai-video/research] "${brief.topic}" — ${brief.entities.length} entities, ${brief.facts.length} facts, ${brief.artifacts.length} artifacts`);
   return brief;
 }
