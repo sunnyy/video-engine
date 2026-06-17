@@ -51,15 +51,37 @@ function readJob(jobId) {
   }
 }
 
-/* ── Bundle — rebuilt on every render so code changes are always picked up ── */
+/* ── Newest mtime under a directory (for prebundle staleness detection) ── */
+function newestMtimeMs(dir) {
+  let newest = 0;
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      const t = entry.isDirectory() ? newestMtimeMs(full) : fs.statSync(full).mtimeMs;
+      if (t > newest) newest = t;
+    }
+  } catch {}
+  return newest;
+}
+
+/* ── Bundle — prefer the committed prebundle, but rebuild if it's stale ──
+   The composition (src/remotion) is fully self-contained, so if any file there
+   is newer than the prebundle the committed bundle is out of date — exports
+   would render old code (e.g. lost colors after a refactor). On localhost we
+   rebuild at runtime so tests always reflect current code; before deploy run
+   `npm run prebundle` and commit remotion-bundle/. */
 async function getBundle() {
-  // Prefer the pre-built bundle (generated locally via `npm run prebundle`).
-  // This avoids spawning esbuild at runtime, which crashes on restricted hosts.
   const PREBUNDLE_DIR = path.join(PROJECT_ROOT, "remotion-bundle");
-  if (fs.existsSync(path.join(PREBUNDLE_DIR, "index.html"))) {
-    return PREBUNDLE_DIR;
+  const indexHtml     = path.join(PREBUNDLE_DIR, "index.html");
+
+  if (fs.existsSync(indexHtml)) {
+    const bundleTime = fs.statSync(indexHtml).mtimeMs;
+    const srcTime    = newestMtimeMs(path.join(PROJECT_ROOT, "src", "remotion"));
+    if (srcTime <= bundleTime) return PREBUNDLE_DIR;
+    console.warn("[render] prebundle is older than src/remotion — rebuilding at runtime. Run `npm run prebundle` and commit before deploy.");
   }
-  // Fallback: build at runtime (local dev only).
+
+  // Build at runtime (stale or missing prebundle — local dev path).
   const { bundle } = await import("@remotion/bundler");
   const result = await bundle({
     entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx"),

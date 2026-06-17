@@ -96,20 +96,17 @@ function mediaScrimEntries(sceneIndex, src, meta) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export async function runSocialPipeline(params, onStep) {
-  const { url, userId, voiceId = null, language = "en", targetDuration = 25, includeAuthor = false } = params;
+// ── Phase 1: PLAN (fetch + script) — returned for the user to confirm/edit the
+// script BEFORE the voiceover & everything else is generated from it (no re-run).
+export async function planSocial(params, onStep) {
+  const { url, targetDuration = 25, language = "en" } = params;
+  const step = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
 
-  const step  = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
-  const runId = `social-${userId}-${Date.now()}`;
-
-  // ── Step 1: Fetch social content ─────────────────────────────────────────
   step("Tuning in…");
   const content = await fetchSocialContent(url);
   console.log(`[social] platform=${content.platform} author="${content.author}" images=${content.imageUrls?.length ?? (content.imageUrl ? 1 : 0)}`);
 
-  // ── Step 2: Generate script ───────────────────────────────────────────────
   step("Shaping the story…");
-  // Scale duration by content volume
   const wordCount = (content.text || "").split(/\s+/).filter(Boolean).length;
   const effectiveDuration = content.isThread
     ? Math.min(targetDuration + content.threadLength * 3, 60)
@@ -121,8 +118,22 @@ export async function runSocialPipeline(params, onStep) {
     await generateSocialScript({ content, targetDuration: effectiveDuration, language });
 
   const scenes = rawScenes.map(s => ({ ...s }));
-  console.log(`[social] ${scenes.length} scenes, musicMood=${musicMood}`);
   if (creativeDirection) console.log(`[social] creative direction: ${creativeDirection}`);
+  const projectName = gptName ?? (content.author ? `${content.author} — Social Video` : `Social Video — ${new Date().toLocaleDateString()}`);
+
+  return { content, scenes, full_script, palette, fontPair, musicMood, projectName, creativeDirection, sourceUrl: url };
+}
+
+// ── Phase 2: PRODUCE (voiceover → media → design → build → save) from a plan whose
+// scenes may carry the user's edited script_segment text.
+export async function produceSocial(plan, params, onStep) {
+  const { userId, voiceId = null, includeAuthor = false } = params;
+  const { content, full_script, palette, fontPair, musicMood, projectName, creativeDirection, sourceUrl } = plan;
+  const scenes = plan.scenes.map(s => ({ ...s }));
+
+  const step  = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
+  const runId = `social-${userId}-${Date.now()}`;
+  const url   = sourceUrl;
 
   const projectContext = {
     palette,
@@ -203,9 +214,7 @@ export async function runSocialPipeline(params, onStep) {
 
   // ── Step 5: Build timeline ─────────────────────────────────────────────────
   step("Putting it together…");
-  const rawProjectName = gptName
-    ?? (content.author ? `${content.author} — Social Video` : `Social Video — ${new Date().toLocaleDateString()}`);
-  const { timeline } = buildTimeline(sceneGraphs, scenes, { ...projectContext, productName: rawProjectName });
+  const { timeline } = buildTimeline(sceneGraphs, scenes, { ...projectContext, productName: projectName });
 
   // Assign a varied transition per scene cut, then apply (whole-scene in/out).
   assignSceneTransitions(scenes);
@@ -256,7 +265,6 @@ export async function runSocialPipeline(params, onStep) {
 
   // ── Step 10: Save to projects table ──────────────────────────────────────
   step("Almost ready…");
-  const projectName = rawProjectName;
 
   let editorProjectId = null;
   try {
@@ -299,4 +307,10 @@ export async function runSocialPipeline(params, onStep) {
     platform:    content.platform,
     duration_seconds: parseFloat(finalTimeline.format.duration.toFixed(2)),
   };
+}
+
+// Combined plan→produce (no confirmation) — used by /generate and the legacy page.
+export async function runSocialPipeline(params, onStep) {
+  const plan = await planSocial(params, onStep);
+  return produceSocial(plan, params, onStep);
 }

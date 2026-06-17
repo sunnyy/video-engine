@@ -26,6 +26,7 @@ router.post("/plan", requireAuth, async (req, res) => {
     });
     res.json(result);
   } catch (e) {
+    if (e.code === "CONTENT_BLOCKED") return res.status(422).json({ error: e.message, code: e.code });
     console.error("[ai-video/plan]", e.message);
     res.status(500).json({ error: e.message });
   }

@@ -3,6 +3,7 @@ import { generateTypographyScript }     from "./scriptGenerator.js";
 import { buildTypographyTimelineDirect } from "./timelineBuilderDirect.js";
 import { generateFullVoiceover }         from "../promoVideo/ttsGenerator.js";
 import { pickMoodForNiche, pickMusicByMood } from "../../../core/registries/musicRegistry.js";
+import { moderateInput }                     from "../shared/moderation.js";
 
 // ── Beat timing: two-level match (scene → timestamps, beat → scene timestamps) ──
 
@@ -106,17 +107,31 @@ async function saveTimeline(timeline, projectName, userId) {
   return row?.id ?? null;
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// ── Phase 1: PLAN (free) — script only, returned for confirmation/editing ──────
 
-export async function runTypographyPipeline(project, onProgress = () => {}) {
-  const { input, inputType = "topic", targetDuration = 40, userId, voiceId = null, language = "en" } = project;
+export async function planTypography(project) {
+  const { input, inputType = "topic", targetDuration = 40, language = "en" } = project;
 
-  // Step 1: Script generation
-  console.log(`[typography] step 1 — generating script (target: ${targetDuration}s)`);
+  await moderateInput(input, { label: "typography input" });
+
+  console.log(`[typography] plan — generating script (target: ${targetDuration}s)`);
   const script = await generateTypographyScript(input, inputType, targetDuration, language);
   const { scenes, voiceoverScript, projectName, palette, fontPair, musicMood, niche } = script;
   const totalBeats = scenes.reduce((n, sc) => n + sc.beats.length, 0);
-  console.log(`[typography] script: ${scenes.length} scenes, ${totalBeats} beats`);
+  console.log(`[typography] plan: ${scenes.length} scenes, ${totalBeats} beats`);
+
+  return { scenes, voiceoverScript, projectName, palette, fontPair, musicMood, niche };
+}
+
+// ── Phase 2: PRODUCE (charges) — TTS → timing → build → music → save ───────────
+// scenes may carry the user's edited voiceover text; narration is rebuilt from them.
+
+export async function produceTypography(plan, params, onProgress = () => {}) {
+  const { userId, voiceId = null } = params;
+  const scenes = (plan.scenes ?? []).map(s => ({ ...s }));
+  const { projectName, palette, fontPair, musicMood, niche } = plan;
+  const voiceoverScript = scenes.map(sc => (sc.voiceover ?? "").trim()).filter(Boolean).join(" ");
+
   onProgress({ step: 1 });
 
   // Step 2: TTS — join all scene voiceovers into one continuous narration
@@ -161,6 +176,7 @@ export async function runTypographyPipeline(project, onProgress = () => {}) {
 
   // Attach full script to meta for later retrieval
   timeline.meta.script = { voiceoverScript, scenes };
+  timeline.full_script = voiceoverScript;   // for easy access in safe_project_json
 
   // Step 5: Background music
   const resolvedMood = niche ? pickMoodForNiche(niche) : musicMood;
@@ -205,4 +221,15 @@ export async function runTypographyPipeline(project, onProgress = () => {}) {
 
   console.log(`[typography] done — ${timedBeats.length} beats, ${timeline.format.duration.toFixed(2)}s, project=${projectId}`);
   return { projectId, projectName };
+}
+
+// ── Combined (no confirmation) — used by the legacy /generate route ────────────
+
+export async function runTypographyPipeline(project, onProgress = () => {}) {
+  const plan = await planTypography(project);
+  return produceTypography(
+    plan,
+    { userId: project.userId, voiceId: project.voiceId ?? null, language: project.language ?? "en" },
+    onProgress,
+  );
 }

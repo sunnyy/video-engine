@@ -335,6 +335,7 @@ export async function runProductVideoPipeline(project, onStep) {
     name: `${project.brandName || brief.product_name || "Product"} — Product Ad`,
     meta: { ...rawTimeline.meta, source: "product_video", scene_format: "v4" },
   };
+  timeline.full_script = full_script;   // for easy access in safe_project_json
 
   assignSceneTransitions(scenes);
   applyTransitions(timeline.layers, scenes);

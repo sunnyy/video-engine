@@ -26,6 +26,7 @@ import { generateFullVoiceover } from "./ttsGenerator.js";
 import { track, easeOutCubic }   from "../shared/easing.js";
 import { injectMusic }           from "../shared/music.js";
 import { attachTransitionSfx }   from "../shared/sfx.js";
+import { moderateInput }         from "../shared/moderation.js";
 
 const CANVAS = { width: 1080, height: 1920 };
 const FPS    = 30;
@@ -390,6 +391,7 @@ function applyTransitions(layers, beats) {
  * user for review/revision BEFORE any production money is spent.
  */
 export async function runPromptPlan({ prompt, styleId = "auto", targetDuration = 45, language = "en" }) {
+  await moderateInput(prompt, { label: "prompt-to-video input" });
   const research = await researchTopic(prompt);
   const film = await directBeats({ research, styleId, targetDuration, language });
   const words = film.beats.reduce((a, b) => a + b.script_line.trim().split(/\s+/).filter(Boolean).length, 0);
@@ -426,6 +428,7 @@ export async function runPromptPipeline(params, onStep) {
     film     = plan.film;
     console.log(`[ai-video] using approved plan: ${film.beats.length} beats, style=${film.style?.id}`);
   } else {
+    await moderateInput(prompt, { label: "prompt-to-video input" });
     // ── Stage 0: Research ───────────────────────────────────────────────────
     step(PROMPT_STATUS_STEPS[0]);
     research = await researchTopic(prompt);

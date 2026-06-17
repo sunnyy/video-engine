@@ -7,16 +7,17 @@ import { getProfile } from "../services/profile/profileService";
 import { serverFetch } from "../services/serverApi";
 import { invalidateProjectCaches } from "../services/projects/projectService";
 import { generateAiVideo, planAiVideo } from "../services/ai/aiVideo/generateAiVideo";
-import { generateSocialVideo } from "../services/ai/socialVideo/generateSocialVideo";
+import { planSocialVideo, produceSocialVideo } from "../services/ai/socialVideo/generateSocialVideo";
+import ScriptConfirmModal from "../ui/ScriptConfirmModal";
 import { generateSaasVideo } from "../services/ai/promoVideo/generateSaasVideo";
 import { generateProductVideo, scrapeProductUrl } from "../services/ai/productVideo/generateProductVideo";
-import { generateTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
+import { planTypographyVideo, produceTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
 import { generateCaptions } from "../services/captions/generateCaptions";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 import { captionStylePresets, captionStyleLabels } from "../core/registries/captionTimelineRegistry.jsx";
 import { VoiceLanguageField, DurationField, StyleField, OrientationField, SelectField } from "../ui/fields/index.js";
 import { SERVICE_FIELDS } from "../config/serviceFields.js";
-import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, ArrowUp, Megaphone, Contrast, Droplet, Target, Film, Image as ImageIcon, ImagePlus, Video, MoveVertical } from "lucide-react";
+import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, ArrowUp, Megaphone, Contrast, Droplet, Target, Film, Image as ImageIcon, ImagePlus, Video, MoveVertical, Loader2 } from "lucide-react";
 import AppLayout from "../ui/AppLayout";
 import Onboarding from "./Onboarding";
 import FeedbackModal from "../ui/components/FeedbackModal";
@@ -297,18 +298,34 @@ function SocialChatbox() {
   const [voiceId,       setVoiceId]       = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation,   setOrientation]   = useState(cfg.shared.orientation?.default ?? "9:16");
   const [includeAuthor, setIncludeAuthor] = useState(false);
+  const [plan,          setPlan]          = useState(null);
+  const [planning,      setPlanning]      = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [statusStep,    setStatusStep]    = useState(0);
   const [error,         setError]         = useState(null);
 
-  const canGo = !!url.trim() && !loading;
+  const canGo = !!url.trim() && !planning && !loading;
 
-  async function handleGenerate() {
+  // Phase 1: fetch + script → open the confirmation modal.
+  async function handleStart() {
     if (!canGo) return;
-    setLoading(true); setError(null); setStatusStep(0);
+    setPlanning(true); setError(null);
     try {
-      const result = await generateSocialVideo(
-        { url: url.trim(), includeAuthor, voiceId, language, targetDuration: duration },
+      setPlan(await planSocialVideo({ url: url.trim(), targetDuration: duration, language }));
+    } catch (err) {
+      setError(err.message || "Couldn't read that post.");
+    } finally {
+      setPlanning(false);
+    }
+  }
+
+  // Phase 2: build the video from the confirmed/edited script.
+  async function handleProduce(editedScenes) {
+    setPlan(null); setLoading(true); setError(null); setStatusStep(0);
+    try {
+      const result = await produceSocialVideo(
+        { ...plan, scenes: editedScenes },
+        { voiceId, language, includeAuthor },
         ({ step }) => { const i = SOCIAL_STATUS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("social_video", "all");
@@ -326,8 +343,8 @@ function SocialChatbox() {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste a Twitter/X, Instagram, or LinkedIn post URL…"
-          disabled={loading}
-          onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+          disabled={loading || planning}
+          onKeyDown={(e) => { if (e.key === "Enter") handleStart(); }}
           style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", padding: "8px 0", minHeight: 36 }}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
@@ -338,9 +355,9 @@ function SocialChatbox() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <OrientationField value={orientation} onChange={setOrientation} accent={SA} tinted />
-            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+            <button onClick={handleStart} disabled={!canGo} title="Review script"
               style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? SA : "rgba(34,211,238,0.25)", color: "#04222a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ArrowUp size={18} strokeWidth={2.5} />
+              {planning ? <Loader2 size={18} style={{ animation: "pv-spin 0.7s linear infinite" }} /> : <ArrowUp size={18} strokeWidth={2.5} />}
             </button>
           </div>
         </div>
@@ -369,6 +386,15 @@ function SocialChatbox() {
             ))}
           </div>
         </div>
+      )}
+
+      {plan && (
+        <ScriptConfirmModal
+          scenes={plan.scenes}
+          onConfirm={handleProduce}
+          onCancel={() => setPlan(null)}
+          accent={SA}
+        />
       )}
     </div>
   );
@@ -687,18 +713,34 @@ function TypographyChatbox() {
   const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
   const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [plan,        setPlan]        = useState(null);
+  const [planning,    setPlanning]    = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [statusStep,  setStatusStep]  = useState(0);
   const [error,       setError]       = useState(null);
 
-  const canGo = !!input.trim() && !loading;
+  const canGo = !!input.trim() && !planning && !loading;
 
-  async function handleGenerate() {
+  // Phase 1: script → open the confirmation modal.
+  async function handleStart() {
     if (!canGo) return;
-    setLoading(true); setError(null); setStatusStep(0);
+    setPlanning(true); setError(null);
     try {
-      const result = await generateTypographyVideo(
-        { input: input.trim(), inputType, targetDuration: duration, voiceId, language },
+      setPlan(await planTypographyVideo({ input: input.trim(), inputType, targetDuration: duration, language }));
+    } catch (err) {
+      setError(err.message || "Couldn't build that script.");
+    } finally {
+      setPlanning(false);
+    }
+  }
+
+  // Phase 2: build the video from the confirmed/edited script.
+  async function handleProduce(editedScenes) {
+    setPlan(null); setLoading(true); setError(null); setStatusStep(0);
+    try {
+      const result = await produceTypographyVideo(
+        { ...plan, scenes: editedScenes },
+        { voiceId, language },
         ({ step }) => { if (typeof step === "number") setStatusStep(step); },
       );
       invalidateProjectCaches("typography_video", "all");
@@ -728,9 +770,9 @@ function TypographyChatbox() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={inputType === "topic" ? "A topic — e.g. Why most habits fail" : "Paste your full script — each sentence becomes a scene…"}
-          disabled={loading}
+          disabled={loading || planning}
           rows={inputType === "script" ? 4 : 2}
-          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate(); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleStart(); }}
           style={{ width: "100%", boxSizing: "border-box", resize: "none", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", lineHeight: 1.5, minHeight: 44 }}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
@@ -741,9 +783,9 @@ function TypographyChatbox() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <OrientationField value={orientation} onChange={setOrientation} accent={TC} tinted />
-            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+            <button onClick={handleStart} disabled={!canGo} title="Review script"
               style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? TC : "rgba(124,92,252,0.25)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ArrowUp size={18} strokeWidth={2.5} />
+              {planning ? <Loader2 size={18} style={{ animation: "pv-spin 0.7s linear infinite" }} /> : <ArrowUp size={18} strokeWidth={2.5} />}
             </button>
           </div>
         </div>
@@ -764,6 +806,16 @@ function TypographyChatbox() {
             ))}
           </div>
         </div>
+      )}
+
+      {plan && (
+        <ScriptConfirmModal
+          scenes={plan.scenes}
+          scriptKey="voiceover"
+          onConfirm={handleProduce}
+          onCancel={() => setPlan(null)}
+          accent={TC}
+        />
       )}
     </div>
   );
