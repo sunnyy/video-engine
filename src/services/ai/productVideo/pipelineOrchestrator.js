@@ -24,7 +24,9 @@ import { pickAutoMood }             from "../../../core/registries/musicRegistry
 import { generateProductPlan }      from "./productDirector.js";
 import { generateBaseImage, generateAllSceneShots } from "./shotGenerator.js";
 import { designProductScene }       from "./sceneDesigner.js";
-import { measureSceneHTML, closeMeasureBrowser } from "../promoVideo/htmlMeasure.js";
+import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
+import { applyTransitions, assignSceneTransitions } from "../shared/transitions.js";
+import { injectMusic }            from "../shared/music.js";
 import { buildTimeline }            from "./timelineBuilder.js";
 
 const CANVAS = { width: 1080, height: 1920 };
@@ -101,36 +103,6 @@ function normalizeOverlayZ(overlay) {
   return kept;
 }
 
-// ── Scene transitions (black-flash-safe, mirrors Social/AI Video) ────────────
-const TRANSITION_DURATION = 0.3;
-const TRANSITION_MAP = {
-  zoom:         { out: "none",       in: "zoom-in" },
-  "slide-left": { out: "slide-left", in: "slide-left" },
-  "slide-up":   { out: "slide-up",   in: "slide-up" },
-  fade:         { out: "none",       in: "fade" },
-};
-const TRANSITION_POOL = ["fade", "slide-left", "zoom", "slide-up"];
-
-function applyTransitions(layers, scenes) {
-  for (let i = 0; i < scenes.length - 1; i++) {
-    const t = TRANSITION_MAP[scenes[i].transition_out] ?? TRANSITION_MAP.fade;
-    for (const layer of layers) {
-      if (!layer.id?.startsWith(`s${i}_`) || layer.type === "audio") continue;
-      layer.transition = {
-        in:  layer.transition?.in ?? { type: "none", duration: 0 },
-        out: { type: t.out, duration: TRANSITION_DURATION },
-      };
-    }
-    for (const layer of layers) {
-      if (!(layer.id?.startsWith(`s${i + 1}_`) && /background|_media|_scrim/.test(layer.id))) continue;
-      layer.transition = {
-        in:  { type: t.in, duration: TRANSITION_DURATION },
-        out: layer.transition?.out ?? { type: "none", duration: 0 },
-      };
-    }
-  }
-}
-
 // ── Ken Burns (subtle motion on still product shots) ─────────────────────────
 // The product shot is a static background layer, so without this it sits frozen
 // under the text. Give each still scene a slow, varied push-in / pan so the hero
@@ -192,31 +164,6 @@ function injectLogo(timeline, logoUrl, scenes) {
   }
 }
 
-// ── Music injection ────────────────────────────────────────────────────────────
-
-async function injectMusic(timeline, productMood) {
-  try {
-    const mood = pickAutoMood(null, productMood ?? "premium");
-    const { data: allTracks } = await supabaseAdmin
-      .from("music_tracks").select("public_url, title, mood").eq("is_active", true);
-    if (!allTracks?.length) return;
-    const moodTracks = allTracks.filter(t => t.mood === mood);
-    const pool  = moodTracks.length ? moodTracks : allTracks;
-    const track = pool[Math.floor(Math.random() * pool.length)];
-    const dur   = timeline.format.duration;
-    timeline.layers.push({
-      id: "music_global", trackId: "track_music",
-      type: "audio", audioType: "music", src: track.public_url,
-      start: 0, end: dur, zIndex: 0,
-      visible: true, locked: false, trimStart: 0, trimEnd: dur,
-      volume: 0.25, muted: false, fadeIn: 1, fadeOut: 1,
-      sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
-    });
-    console.log(`[productPipeline] music: "${track.title}" (${mood})`);
-  } catch (e) {
-    console.warn("[productPipeline] music injection skipped:", e.message);
-  }
-}
 
 // Mood → display/body font pairing (variety without rigidity).
 const FONT_PAIRS = {
@@ -280,11 +227,12 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
  *   goal, voiceId
  * @returns {{ editor_project_id, total_duration, shots }}
  */
-export async function runProductVideoPipeline(project) {
+export async function runProductVideoPipeline(project, onStep) {
   const { userId, productImageUrl, visualMode = "image" } = project;
   const runId = `pv4-${Date.now()}`;
 
   // ── Step 1: Director (vision) — full plan from the product photo ───────────
+  onStep?.(0);
   console.log("[productPipeline] step 1 — director (vision plan)");
   const plan = await generateProductPlan(productImageUrl, {
     brandName:          project.brandName,
@@ -303,6 +251,7 @@ export async function runProductVideoPipeline(project) {
   const productMood = brief.product_mood;
 
   // ── Step 2: Base image — clean studio packshot (canonical reference) ───────
+  onStep?.(1);
   console.log("[productPipeline] step 2 — base image");
   const baseImageUrl = await generateBaseImage(productImageUrl, {
     userId, runId,
@@ -349,6 +298,7 @@ export async function runProductVideoPipeline(project) {
   };
 
   // ── Step 4a: Scene shots first (the designer needs to SEE them) ────────────
+  onStep?.(2);
   console.log(`[productPipeline] step 4a — ${scenes.length} scene shots`);
   const shotUrls = await generateAllSceneShots(baseImageUrl, scenes, { userId, runId });
 
@@ -377,6 +327,7 @@ export async function runProductVideoPipeline(project) {
   const sceneHTMLs = overlayResults.map(r => r?.html ?? null);
 
   // ── Step 6: Build timeline + scene transitions ─────────────────────────────
+  onStep?.(3);
   console.log("[productPipeline] building timeline");
   const { timeline: rawTimeline } = buildTimeline(sceneGraphs, scenes, projectContext);
   const timeline = {
@@ -385,12 +336,7 @@ export async function runProductVideoPipeline(project) {
     meta: { ...rawTimeline.meta, source: "product_video", scene_format: "v4" },
   };
 
-  let prevTransition = null;
-  for (const s of scenes) {
-    const pool = TRANSITION_POOL.filter(t => t !== prevTransition);
-    s.transition_out = pool[Math.floor(Math.random() * pool.length)];
-    prevTransition = s.transition_out;
-  }
+  assignSceneTransitions(scenes);
   applyTransitions(timeline.layers, scenes);
   applyKenBurns(timeline.layers, scenes);
 
@@ -407,10 +353,11 @@ export async function runProductVideoPipeline(project) {
     });
   }
 
-  await injectMusic(timeline, productMood);
+  await injectMusic(timeline, { mood: pickAutoMood(null, productMood ?? "premium"), volume: 0.25, fadeIn: 1, fadeOut: 1, label: "productPipeline" });
   if (project.logoUrl) injectLogo(timeline, project.logoUrl, scenes);
 
   // ── Save ───────────────────────────────────────────────────────────────────
+  onStep?.(4);
   const editorProjectId = await saveTimeline(timeline, { ...project, _brief: brief }, scenes, sceneHTMLs);
 
   const totalDuration = parseFloat(timeline.format.duration.toFixed(2));

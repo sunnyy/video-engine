@@ -141,7 +141,7 @@ export function LanguageVoicePicker({
   return (
     <div>
       {/* Language */}
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 30 }}>
         <span style={labelStyle}>Language</span>
         <select
           value={language}

@@ -20,6 +20,8 @@ import About           from "./pages/About";
 import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
+import Projects       from "./pages/Projects";
+import Explore        from "./pages/Explore";
 import Videos         from "./pages/Videos";
 import AdminDashboard  from "./pages/admin/AdminDashboard";
 import UserManager     from "./pages/admin/UserManager";
@@ -142,6 +144,8 @@ export default function App() {
         {session ? (
           <>
             <Route path="/dashboard"        element={<Dashboard />} />
+            <Route path="/projects"         element={<Projects />} />
+            <Route path="/explore"          element={<Explore />} />
             <Route path="/videos"           element={<Videos />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
             <Route path="/speech-to-text"   element={<Transcription />} />

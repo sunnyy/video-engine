@@ -21,7 +21,7 @@ router.post("/plan", requireAuth, async (req, res) => {
     const result = await runPromptPlan({
       prompt: effectivePrompt,
       styleId: styleId ?? "auto",
-      targetDuration: Math.min(75, Math.max(20, parseInt(targetDuration, 10) || 45)),
+      targetDuration: Math.min(75, Math.max(15, parseInt(targetDuration, 10) || 45)),
       language: language ?? "en",
     });
     res.json(result);
@@ -58,7 +58,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       {
         prompt: prompt.trim(), userId,
         styleId: styleId ?? "auto",
-        targetDuration: Math.min(75, Math.max(20, parseInt(targetDuration, 10) || 45)),
+        targetDuration: Math.min(75, Math.max(15, parseInt(targetDuration, 10) || 45)),
         language: language ?? "en",
         voiceId: voiceId ?? null,
         plan,

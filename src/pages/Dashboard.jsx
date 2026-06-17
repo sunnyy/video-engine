@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useProjectsStore } from "../store/useProjectsStore";
@@ -7,7 +7,16 @@ import { getProfile } from "../services/profile/profileService";
 import { serverFetch } from "../services/serverApi";
 import { invalidateProjectCaches } from "../services/projects/projectService";
 import { generateAiVideo, planAiVideo } from "../services/ai/aiVideo/generateAiVideo";
-import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
+import { generateSocialVideo } from "../services/ai/socialVideo/generateSocialVideo";
+import { generateSaasVideo } from "../services/ai/promoVideo/generateSaasVideo";
+import { generateProductVideo, scrapeProductUrl } from "../services/ai/productVideo/generateProductVideo";
+import { generateTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
+import { generateCaptions } from "../services/captions/generateCaptions";
+import { uploadUserAsset } from "../services/assets/uploadUserAsset";
+import { captionStylePresets, captionStyleLabels } from "../core/registries/captionTimelineRegistry.jsx";
+import { VoiceLanguageField, DurationField, StyleField, OrientationField, SelectField } from "../ui/fields/index.js";
+import { SERVICE_FIELDS } from "../config/serviceFields.js";
+import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, ArrowUp, Megaphone, Contrast, Droplet, Target, Film, Image as ImageIcon, ImagePlus, Video, MoveVertical } from "lucide-react";
 import AppLayout from "../ui/AppLayout";
 import Onboarding from "./Onboarding";
 import FeedbackModal from "../ui/components/FeedbackModal";
@@ -35,32 +44,21 @@ const T = {
 // Video services as pills. kind:"chat" → morphs the chatbox here; kind:"nav" →
 // routes to the existing Create page (converted later, you'll guide each).
 const SERVICES = [
-  { id: "ai-video",        label: "AI Video",         emoji: "✨", accent: "#f59e0b", kind: "chat", to: "/ai-video" },
-  { id: "promo-video",     label: "Promo Video",      emoji: "🎬", accent: "#f5c518", kind: "nav",  to: "/promo-video" },
-  { id: "product-video",   label: "Product Video",    emoji: "🛍️", accent: "#f97316", kind: "nav",  to: "/product-video" },
-  { id: "social-video",    label: "Social to Video",  emoji: "💬", accent: "#22d3ee", kind: "nav",  to: "/social-video" },
-  { id: "typography-video",label: "Typography Video", emoji: "🔤", accent: "#7c5cfc", kind: "nav",  to: "/typography-video" },
-  { id: "video-captions",  label: "Add Captions",     emoji: "🎯", accent: "#34d399", kind: "nav",  to: "/video-captions" },
+  { id: "ai-video",        label: "Prompt to Video",  Icon: Sparkles,      accent: "#f59e0b", kind: "chat", to: "/ai-video" },
+  { id: "promo-video",     label: "SaaS Video",       Icon: Clapperboard,  accent: "#f5c518", kind: "chat", to: "/promo-video" },
+  { id: "product-video",   label: "Product Video",    Icon: ShoppingBag,   accent: "#f97316", kind: "chat", to: "/product-video" },
+  { id: "social-video",    label: "Social to Video",  Icon: MessageCircle, accent: "#22d3ee", kind: "chat", to: "/social-video" },
+  { id: "typography-video",label: "Typography Video", Icon: Type,          accent: "#7c5cfc", kind: "chat", to: "/typography-video" },
+  { id: "video-captions",  label: "Auto Captions",    Icon: Captions,      accent: "#34d399", kind: "chat", to: "/video-captions" },
 ];
 
 const AI = SERVICES[0].accent; // amber, the AI Video accent
 
-const STYLES = [
-  { id: "auto",            label: "Auto",            desc: "Director picks from your topic", colors: ["#8896a8", "#38bdf8"] },
-  { id: "editorial_retro", label: "Editorial Retro", desc: "Vintage print, bold two-tone",   colors: ["#c2410c", "#1e3a8a"] },
-  { id: "minimal",         label: "Minimal",         desc: "Quiet, spacious, restrained",    colors: ["#f8fafc", "#0f172a"] },
-  { id: "bold_pop",        label: "Bold Pop",        desc: "Loud blocks, huge type",         colors: ["#ec4899", "#facc15"] },
-  { id: "dark_cinematic",  label: "Dark Cinematic",  desc: "Moody, filmic, atmospheric",     colors: ["#0a0a0a", "#f59e0b"] },
-  { id: "corporate_clean", label: "Corporate",       desc: "Polished, structured, trusted",  colors: ["#1e40af", "#f8fafc"] },
-  { id: "meme_chaos",      label: "Meme Energy",     desc: "Internet-native chaos",          colors: ["#ef4444", "#fde047"] },
-];
-
-const DURATIONS = [{ id: 30, label: "30s" }, { id: 45, label: "45s" }, { id: 60, label: "60s" }];
-
+// Stylish, non-revealing labels — must match the server's PROMPT_STATUS_STEPS.
 const STATUS_STEPS = [
-  "Researching your topic…", "Directing the film…", "Recording the voiceover…",
-  "Creating your visuals…", "Designing every beat…", "Quality-checking every frame…",
-  "Composing the timeline…", "Almost ready…",
+  "Warming up the studio…", "Shaping your vision…", "Finding the angle…",
+  "Bringing it to life…", "Adding the spark…", "Polishing every frame…",
+  "Composing the final cut…", "Almost ready…",
 ];
 
 const EXAMPLE_PROMPTS = [
@@ -68,6 +66,49 @@ const EXAMPLE_PROMPTS = [
   "Top 3 most underrated sci-fi movies of the 2010s.",
   "iPhone vs Android in 2026 — settle it.",
 ];
+
+// Stylish, non-revealing — must match the Social pipeline's emitted step() strings.
+const SOCIAL_STATUS = [
+  "Tuning in…",
+  "Shaping the story…",
+  "Adding the spark…",
+  "Setting the mood…",
+  "Bringing it to life…",
+  "Putting it together…",
+  "Almost ready…",
+];
+
+const SAAS_STATUS = [
+  "Studying your brand…",
+  "Crafting the concept…",
+  "Bringing it to life…",
+  "Almost ready…",
+];
+
+const PRODUCT_STATUS = [
+  "Setting up the shoot…",
+  "Crafting the concept…",
+  "Bringing it to life…",
+  "Designing the look…",
+  "Almost ready…",
+];
+
+const TYPO_STATUS = [
+  "Shaping your vision…",
+  "Adding the spark…",
+  "Designing the look…",
+  "Composing the final cut…",
+  "Almost ready…",
+];
+
+const CAPTION_STATUS = [
+  "Reading your video…",
+  "Finding the words…",
+  "Styling your captions…",
+  "Almost ready…",
+];
+
+const CAPTION_STYLE_OPTIONS = Object.keys(captionStylePresets).map(k => ({ id: k, label: captionStyleLabels[k] || k }));
 
 function timeLabel(dateStr) {
   const d = new Date(dateStr);
@@ -78,62 +119,16 @@ function timeLabel(dateStr) {
   return d.toLocaleDateString();
 }
 
-/* ── Modal shell ── */
-function Modal({ title, onClose, children, width = 560 }) {
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", maxHeight: "86vh", overflowY: "auto", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 18, padding: "22px 24px" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif" }}>{title}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: T.faint, cursor: "pointer", fontSize: 18 }}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/* ── Chip (compact field that opens a modal) ── */
-function Chip({ icon, label, value, onClick }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", borderRadius: 12,
-        background: hov ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-        border: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-        transition: "background 0.15s",
-      }}
-    >
-      <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
-      <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{label}</span>
-        <span style={{ fontSize: 10, color: T.faint }}>{value}</span>
-      </span>
-    </button>
-  );
-}
-
 /* ── AI Video chatbox (the morphing create surface) ── */
 function AiVideoChatbox() {
   const navigate = useNavigate();
   const [prompt,   setPrompt]   = useState("");
-  const [styleId,  setStyleId]  = useState("auto");
-  const [duration, setDuration] = useState(30);
-  const [language, setLanguage] = useState("en");
-  const [voiceId,  setVoiceId]  = useState(null);
-
-  const [styleOpen, setStyleOpen] = useState(false);
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  const cfg = SERVICE_FIELDS["ai-video"];
+  const [styleId,  setStyleId]  = useState(cfg.shared.style.default);
+  const [duration, setDuration] = useState(cfg.shared.duration.default);
+  const [language, setLanguage] = useState(cfg.shared.voiceLanguage.default.language);
+  const [voiceId,  setVoiceId]  = useState(cfg.shared.voiceLanguage.default.voiceId);
+  const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
 
   const [planning,   setPlanning]   = useState(false);
   const [planData,   setPlanData]   = useState(null);
@@ -143,13 +138,12 @@ function AiVideoChatbox() {
   const [error,      setError]      = useState(null);
 
   const canPlan = !!prompt.trim() && !planning && !loading;
-  const styleLabel = STYLES.find(s => s.id === styleId)?.label ?? "Auto";
 
   async function handlePlan(reviseText = "") {
     if (!prompt.trim() || planning || loading) return;
     setPlanning(true); setError(null);
     try {
-      const result = await planAiVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, revision: reviseText });
+      const result = await planAiVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation, revision: reviseText });
       setPlanData(result); setRevision("");
     } catch (err) {
       setError(err.message || "Planning failed. Please try again.");
@@ -163,7 +157,7 @@ function AiVideoChatbox() {
     setLoading(true); setError(null); setStatusStep(2);
     try {
       const result = await generateAiVideo(
-        { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, plan: planData.plan },
+        { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, orientation, plan: planData.plan },
         ({ step }) => { const i = STATUS_STEPS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("ai_video", "all");
@@ -192,37 +186,25 @@ function AiVideoChatbox() {
           }}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
-          {/* Left: chips */}
+          {/* Left: shared field chips (from src/ui/fields) */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Chip icon="🎨" label="Style" value={styleLabel} onClick={() => !loading && setStyleOpen(true)} />
-            <Chip icon="🎙️" label="Voice" value={voiceId ? "Custom" : "Default"} onClick={() => !loading && setVoiceOpen(true)} />
+            <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={AI} />
+            <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={AI} />
+            <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={AI} />
           </div>
-          {/* Right: duration + send */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", gap: 3, background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 100, padding: 3 }}>
-              {DURATIONS.map(d => {
-                const active = duration === d.id;
-                return (
-                  <button key={d.id} onClick={() => !loading && setDuration(d.id)}
-                    style={{
-                      padding: "5px 12px", borderRadius: 100, fontSize: 12, fontWeight: active ? 700 : 500,
-                      border: "none", cursor: "pointer", fontFamily: "inherit",
-                      background: active ? "rgba(245,158,11,0.16)" : "transparent",
-                      color: active ? "#fbbf24" : T.muted,
-                    }}>{d.label}</button>
-                );
-              })}
-            </div>
+          {/* Right: orientation (accent) + send */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <OrientationField value={orientation} onChange={setOrientation} accent={AI} tinted />
             <button
               onClick={() => handlePlan()}
               disabled={!canPlan}
               title="Create a free plan"
               style={{
-                width: 40, height: 40, borderRadius: "50%", border: "none",
+                width: 40, height: 40, borderRadius: 10, border: "none",
                 cursor: canPlan ? "pointer" : "not-allowed", fontSize: 18, fontWeight: 800,
                 background: canPlan ? AI : "rgba(245,158,11,0.25)", color: "#1c1408",
                 display: "flex", alignItems: "center", justifyContent: "center",
-              }}>↑</button>
+              }}><ArrowUp size={18} strokeWidth={2.5} /></button>
           </div>
         </div>
       </div>
@@ -232,7 +214,7 @@ function AiVideoChatbox() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12, justifyContent: "center" }}>
           {EXAMPLE_PROMPTS.map((p, i) => (
             <button key={i} onClick={() => setPrompt(p)}
-              style={{ fontSize: 11, color: T.muted, background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 100, padding: "5px 11px", cursor: "pointer", fontFamily: "inherit" }}>
+              style={{ fontSize: 11, color: T.muted, background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 10, padding: "5px 11px", cursor: "pointer", fontFamily: "inherit" }}>
               {p.length > 44 ? p.slice(0, 44) + "…" : p}
             </button>
           ))}
@@ -260,7 +242,7 @@ function AiVideoChatbox() {
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
             {[`~${planData.summary.estSeconds}s`, `${planData.summary.beatCount} beats`, `${planData.summary.shotCount} shots`, planData.summary.styleId?.replace("_", " "), planData.summary.musicMood].filter(Boolean).map((chip, i) => (
-              <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(245,158,11,0.12)", color: "#fbbf24" }}>{chip}</span>
+              <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, background: "rgba(245,158,11,0.12)", color: "#fbbf24" }}>{chip}</span>
             ))}
           </div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.65, marginBottom: 12, maxHeight: 150, overflowY: "auto" }}>
@@ -299,42 +281,569 @@ function AiVideoChatbox() {
         </div>
       )}
 
-      {/* Modals */}
-      {styleOpen && (
-        <Modal title="Visual style" onClose={() => setStyleOpen(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
-            {STYLES.map(s => {
-              const active = styleId === s.id;
-              return (
-                <button key={s.id} onClick={() => { setStyleId(s.id); setStyleOpen(false); }}
-                  style={{ textAlign: "left", padding: "11px 13px", borderRadius: 10, cursor: "pointer", background: active ? "rgba(245,158,11,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${active ? "rgba(245,158,11,0.45)" : T.border}`, fontFamily: "inherit" }}>
-                  <div style={{ display: "flex", gap: 4, marginBottom: 7 }}>
-                    {s.colors.map((c, i) => <div key={i} style={{ width: 16, height: 16, borderRadius: 5, background: c, border: "1px solid rgba(255,255,255,0.15)" }} />)}
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: active ? "#fbbf24" : T.text }}>{s.label}</div>
-                  <div style={{ fontSize: 10, color: T.faint, marginTop: 2, lineHeight: 1.3 }}>{s.desc}</div>
-                </button>
-              );
-            })}
+    </div>
+  );
+}
+
+/* ── Social to Video chatbox (URL primary input) ── */
+function SocialChatbox() {
+  const navigate = useNavigate();
+  const cfg = SERVICE_FIELDS["social-video"];
+  const SA = cfg.accent;
+  const [url,           setUrl]           = useState("");
+  const [styleId,       setStyleId]       = useState(cfg.shared.style.default);
+  const [duration,      setDuration]      = useState(cfg.shared.duration.default);
+  const [language,      setLanguage]      = useState(cfg.shared.voiceLanguage.default.language);
+  const [voiceId,       setVoiceId]       = useState(cfg.shared.voiceLanguage.default.voiceId);
+  const [orientation,   setOrientation]   = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [includeAuthor, setIncludeAuthor] = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [statusStep,    setStatusStep]    = useState(0);
+  const [error,         setError]         = useState(null);
+
+  const canGo = !!url.trim() && !loading;
+
+  async function handleGenerate() {
+    if (!canGo) return;
+    setLoading(true); setError(null); setStatusStep(0);
+    try {
+      const result = await generateSocialVideo(
+        { url: url.trim(), includeAuthor, voiceId, language, targetDuration: duration },
+        ({ step }) => { const i = SOCIAL_STATUS.indexOf(step); if (i !== -1) setStatusStep(i); },
+      );
+      invalidateProjectCaches("social_video", "all");
+      navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
+    } catch (err) {
+      setError(err.code === "NO_CREDITS" ? "Not enough credits — you need 15 to generate a social video." : (err.message || "Generation failed."));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ background: T.surface, border: `1px solid ${url.trim() ? "rgba(34,211,238,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Paste a Twitter/X, Instagram, or LinkedIn post URL…"
+          disabled={loading}
+          onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+          style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", padding: "8px 0", minHeight: 36 }}
+        />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <StyleField value={styleId} onChange={setStyleId} accent={SA} />
+            <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={SA} />
+            <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={SA} />
           </div>
-        </Modal>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <OrientationField value={orientation} onChange={setOrientation} accent={SA} tinted />
+            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+              style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? SA : "rgba(34,211,238,0.25)", color: "#04222a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Service-specific field: include author credit */}
+      <div style={{ marginTop: 12 }}>
+        <button onClick={() => setIncludeAuthor(v => !v)}
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 10, background: includeAuthor ? `${SA}1c` : "rgba(255,255,255,0.03)", border: `1px solid ${includeAuthor ? SA + "66" : T.border}`, color: includeAuthor ? "#fff" : T.muted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          {includeAuthor ? "☑" : "☐"} Include author credit
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 14, padding: "11px 15px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+          {error}
+        </div>
       )}
-      {voiceOpen && (
-        <Modal title="Language & voice" onClose={() => setVoiceOpen(false)}>
-          <LanguageVoicePicker
-            language={language}
-            onLanguageChange={setLanguage}
-            voiceId={voiceId}
-            onVoiceChange={setVoiceId}
-            disabled={false}
-            accentColor={AI}
-            border={T.border}
+
+      {loading && (
+        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{SOCIAL_STATUS[statusStep]}</div>
+          <div style={{ display: "flex", gap: 5 }}>
+            {SOCIAL_STATUS.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? SA : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── SaaS Video chatbox (faceless one-shot: create→render→poll) ── */
+function SaasChatbox() {
+  const navigate = useNavigate();
+  const cfg = SERVICE_FIELDS["promo-video"];
+  const SC = cfg.accent;
+  const [mode,        setMode]        = useState("url"); // "url" | "info"
+  const [url,         setUrl]         = useState("");
+  const [productName, setProductName] = useState("");
+  const [description, setDescription] = useState("");
+  const [styleId,     setStyleId]     = useState(cfg.shared.style.default);
+  const [duration,    setDuration]    = useState(cfg.shared.duration.default);
+  const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
+  const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
+  const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [tone,        setTone]        = useState(cfg.specific.tone.default);
+  const [theme,       setTheme]       = useState(cfg.specific.theme.default);
+  const [accent,      setAccent]      = useState(cfg.specific.accent.default);
+  const [loading,     setLoading]     = useState(false);
+  const [statusStep,  setStatusStep]  = useState(0);
+  const [error,       setError]       = useState(null);
+
+  const canGo = (mode === "url" ? !!url.trim() : (!!productName.trim() && !!description.trim())) && !loading;
+
+  async function handleGenerate() {
+    if (!canGo) return;
+    setLoading(true); setError(null); setStatusStep(0);
+    const payload = {
+      video_type: "faceless", video_goal: "saas_promo",
+      product_name:        mode === "info" ? productName.trim() : "",
+      product_url:         mode === "url"  ? url.trim() : null,
+      text_source:         mode === "url"  ? "url" : "manual",
+      product_description: mode === "info" ? description.trim() : "",
+      notes: null, format_ratio: orientation, language, tone,
+      has_talking_head: false, has_voiceover: false, has_script: false,
+      has_logo: false, has_screenshots: false, has_recordings: false,
+      talking_head_segments: null, talking_head_url: null, voiceover_url: null,
+      logo_url: null, logo_width: null, logo_height: null, script: null,
+      pipeline_version: "v2",
+      visual_style: styleId, theme, accent_color: accent, typography_style: "modern",
+      voice_id: voiceId, target_duration: duration,
+    };
+    try {
+      const result = await generateSaasVideo(payload, ({ step }) => setStatusStep(step));
+      invalidateProjectCaches("promo_video", "all");
+      navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
+    } catch (err) {
+      setError(err.code === "NO_CREDITS" ? "Not enough credits for a SaaS video." : (err.message || "Generation failed."));
+      setLoading(false);
+    }
+  }
+
+  const filled = mode === "url" ? url.trim() : (productName.trim() || description.trim());
+
+  return (
+    <div>
+      <div style={{ background: T.surface, border: `1px solid ${filled ? "rgba(245,197,24,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+        {/* Mode toggle */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {[["url", "Website URL"], ["info", "No website"]].map(([m, l]) => {
+            const sel = mode === m;
+            return (
+              <button key={m} onClick={() => setMode(m)}
+                style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sel ? SC + "66" : T.border}`, background: sel ? `${SC}1c` : "rgba(255,255,255,0.03)", color: sel ? "#fff" : T.muted }}>
+                {l}
+              </button>
+            );
+          })}
+        </div>
+
+        {mode === "url" ? (
+          <input
+            value={url} onChange={(e) => setUrl(e.target.value)}
+            placeholder="Your SaaS website URL — e.g. https://yourapp.com"
+            disabled={loading}
+            onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+            style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", padding: "8px 0", minHeight: 36 }}
           />
-          <button onClick={() => setVoiceOpen(false)}
-            style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 10, border: "none", background: AI, color: "#1c1408", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-            Done
+        ) : (
+          <>
+            <input
+              value={productName} onChange={(e) => setProductName(e.target.value)}
+              placeholder="Product name" disabled={loading}
+              style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", padding: "6px 0" }}
+            />
+            <textarea
+              value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe what your product does…" disabled={loading} rows={2}
+              style={{ width: "100%", boxSizing: "border-box", resize: "none", border: "none", outline: "none", background: "transparent", color: T.muted, fontSize: 14, fontFamily: "inherit", lineHeight: 1.5 }}
+            />
+          </>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={SC} />
+            <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={SC} />
+            <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={SC} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <OrientationField value={orientation} onChange={setOrientation} accent={SC} tinted />
+            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+              style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? SC : "rgba(245,197,24,0.25)", color: "#1c1408", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Service-specific fields below the box */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+        <SelectField icon={<Megaphone size={16} />} label="Tone"  value={tone}  onChange={setTone}  options={cfg.specific.tone.options}  accent={SC} />
+        <SelectField icon={<Contrast size={16} />}  label="Theme" value={theme} onChange={setTheme} options={cfg.specific.theme.options} accent={SC} />
+        <SelectField icon={<Droplet size={16} />}   label="Accent" value={accent} onChange={setAccent} options={cfg.specific.accent.options} accent={SC} />
+        <button onClick={() => navigate("/promo-video")}
+          style={{ marginLeft: "auto", fontSize: 12, color: T.faint, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+          More options (talking-head, assets) →
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 14, padding: "11px 15px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+          {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{SAAS_STATUS[statusStep]}</div>
+          <div style={{ display: "flex", gap: 5 }}>
+            {SAAS_STATUS.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? SC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: T.faint, marginTop: 10 }}>SaaS renders take ~30s–2min — hang tight.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Product Video chatbox (image-upload or product URL → one-shot generate) ── */
+function ProductChatbox() {
+  const navigate = useNavigate();
+  const cfg = SERVICE_FIELDS["product-video"];
+  const PC = cfg.accent;
+  const fileRef = useRef(null);
+  const [mode,        setMode]        = useState("upload"); // "upload" | "url"
+  const [imageFile,   setImageFile]   = useState(null);
+  const [imagePreview,setImagePreview]= useState(null);
+  const [productUrl,  setProductUrl]  = useState("");
+  const [brand,       setBrand]       = useState("");
+  const [goal,        setGoal]        = useState(cfg.specific.goal.default);
+  const [length,      setLength]      = useState(cfg.specific.length.default);
+  const [visuals,     setVisuals]     = useState(cfg.specific.visuals.default);
+  const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
+  const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
+  const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [loading,     setLoading]     = useState(false);
+  const [statusIdx,   setStatusIdx]   = useState(0);
+  const [error,       setError]       = useState(null);
+
+  const hasInput = mode === "upload" ? !!imageFile : !!productUrl.trim();
+  const canGo = hasInput && !loading;
+
+  function pickFile(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setImageFile(f);
+    setImagePreview(URL.createObjectURL(f));
+  }
+
+  async function handleGenerate() {
+    if (!canGo) return;
+    setLoading(true); setError(null); setStatusIdx(0);
+    try {
+      let productImageUrl, scrapedBrand = "", scrapedDesc = "";
+      if (mode === "upload") {
+        const asset = await uploadUserAsset(imageFile, "image", null, "project", null);
+        productImageUrl = asset.url;
+      } else {
+        const data = await scrapeProductUrl(productUrl.trim());
+        productImageUrl = data.productImageUrl;
+        scrapedBrand = data.brandName || "";
+        scrapedDesc  = data.productDescription || "";
+        if (!productImageUrl) throw new Error("No product image found at that URL — try uploading instead.");
+      }
+      const goalCfg    = cfg.specific.goal.options.find(g => g.id === goal);
+      const effVisuals = (visuals === "hybrid" && length === 1) ? "image" : visuals; // hybrid needs multi-scene
+      const result = await generateProductVideo({
+        productImageUrl,
+        logoUrl: null,
+        brandName: brand.trim() || scrapedBrand,
+        productDescription: scrapedDesc,
+        goal,
+        ctaText: goalCfg?.cta || "Shop Now",
+        offerText: "",
+        website: mode === "url" ? productUrl.trim() : "",
+        visualMode: effVisuals,
+        voice_id: voiceId,
+        language,
+        sceneCount: length,
+      }, ({ step }) => { if (typeof step === "number") setStatusIdx(step); });
+      invalidateProjectCaches("product_video", "all");
+      navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
+    } catch (err) {
+      setError(err.code === "NO_CREDITS" ? "Not enough credits for a product video." : (err.message || "Generation failed."));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ background: T.surface, border: `1px solid ${hasInput ? "rgba(249,115,22,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+        {/* Mode toggle */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {[["upload", "Upload image"], ["url", "Product URL"]].map(([m, l]) => {
+            const sel = mode === m;
+            return (
+              <button key={m} onClick={() => setMode(m)}
+                style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sel ? PC + "66" : T.border}`, background: sel ? `${PC}1c` : "rgba(255,255,255,0.03)", color: sel ? "#fff" : T.muted }}>
+                {l}
+              </button>
+            );
+          })}
+        </div>
+
+        {mode === "upload" ? (
+          <div
+            onClick={() => !loading && fileRef.current?.click()}
+            style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 12, border: `1.5px dashed ${imagePreview ? PC + "66" : T.border}`, cursor: loading ? "default" : "pointer", background: "rgba(255,255,255,0.02)" }}>
+            {imagePreview
+              ? <img src={imagePreview} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover" }} />
+              : <span style={{ display: "flex", color: T.muted }}><ImagePlus size={22} /></span>}
+            <span style={{ fontSize: 14, color: imagePreview ? T.text : T.muted, fontWeight: imagePreview ? 700 : 500 }}>
+              {imagePreview ? (imageFile?.name || "Product image ready") : "Upload a product photo"}
+            </span>
+            {imagePreview && (
+              <button onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
+                style={{ marginLeft: "auto", fontSize: 12, color: T.faint, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" onChange={pickFile} style={{ display: "none" }} />
+          </div>
+        ) : (
+          <input
+            value={productUrl} onChange={(e) => setProductUrl(e.target.value)}
+            placeholder="Amazon / Flipkart / store product URL…" disabled={loading}
+            onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+            style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", padding: "8px 0", minHeight: 36 }}
+          />
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={PC} />
+            <SelectField icon={<Target size={16} />} label="Goal"    value={goal}    onChange={setGoal}    options={cfg.specific.goal.options}    accent={PC} />
+            <SelectField icon={<Film size={16} />}   label="Length"  value={length}  onChange={setLength}  options={cfg.specific.length.options}  accent={PC} />
+            <SelectField icon={<ImageIcon size={16} />} label="Visuals" value={visuals} onChange={setVisuals} options={cfg.specific.visuals.options} accent={PC} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <OrientationField value={orientation} onChange={setOrientation} accent={PC} tinted />
+            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+              style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? PC : "rgba(249,115,22,0.25)", color: "#221207", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Service-specific below: brand + more options */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+        <input
+          value={brand} onChange={(e) => setBrand(e.target.value)}
+          placeholder="Brand name (optional)" disabled={loading}
+          style={{ flex: "0 1 240px", padding: "8px 12px", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 10, color: T.text, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+        />
+        <button onClick={() => navigate("/product-video")}
+          style={{ marginLeft: "auto", fontSize: 12, color: T.faint, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+          More options (offer, logo, description) →
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 14, padding: "11px 15px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+          {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{PRODUCT_STATUS[statusIdx]}</div>
+          <div style={{ display: "flex", gap: 5 }}>
+            {PRODUCT_STATUS.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusIdx ? PC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Typography Video chatbox (topic/script → kinetic text video) ── */
+function TypographyChatbox() {
+  const navigate = useNavigate();
+  const cfg = SERVICE_FIELDS["typography-video"];
+  const TC = cfg.accent;
+  const [inputType,   setInputType]   = useState("topic"); // "topic" | "script"
+  const [input,       setInput]       = useState("");
+  const [styleId,     setStyleId]     = useState(cfg.shared.style.default);
+  const [duration,    setDuration]    = useState(cfg.shared.duration.default);
+  const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
+  const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
+  const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [loading,     setLoading]     = useState(false);
+  const [statusStep,  setStatusStep]  = useState(0);
+  const [error,       setError]       = useState(null);
+
+  const canGo = !!input.trim() && !loading;
+
+  async function handleGenerate() {
+    if (!canGo) return;
+    setLoading(true); setError(null); setStatusStep(0);
+    try {
+      const result = await generateTypographyVideo(
+        { input: input.trim(), inputType, targetDuration: duration, voiceId, language },
+        ({ step }) => { if (typeof step === "number") setStatusStep(step); },
+      );
+      invalidateProjectCaches("typography_video", "all");
+      navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
+    } catch (err) {
+      setError(err.code === "NO_CREDITS" ? "Not enough credits for a typography video." : (err.message || "Generation failed."));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ background: T.surface, border: `1px solid ${input.trim() ? "rgba(124,92,252,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+        {/* Topic / Script toggle */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {[["topic", "Topic"], ["script", "Script"]].map(([m, l]) => {
+            const sel = inputType === m;
+            return (
+              <button key={m} onClick={() => setInputType(m)}
+                style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sel ? TC + "66" : T.border}`, background: sel ? `${TC}1c` : "rgba(255,255,255,0.03)", color: sel ? "#fff" : T.muted }}>
+                {l}
+              </button>
+            );
+          })}
+        </div>
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={inputType === "topic" ? "A topic — e.g. Why most habits fail" : "Paste your full script — each sentence becomes a scene…"}
+          disabled={loading}
+          rows={inputType === "script" ? 4 : 2}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate(); }}
+          style={{ width: "100%", boxSizing: "border-box", resize: "none", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", lineHeight: 1.5, minHeight: 44 }}
+        />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <StyleField value={styleId} onChange={setStyleId} accent={TC} />
+            <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={TC} />
+            <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={TC} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <OrientationField value={orientation} onChange={setOrientation} accent={TC} tinted />
+            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+              style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? TC : "rgba(124,92,252,0.25)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 14, padding: "11px 15px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+          {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{TYPO_STATUS[statusStep]}</div>
+          <div style={{ display: "flex", gap: 5 }}>
+            {TYPO_STATUS.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? TC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Add Captions chatbox (video upload → transcribe → styled captions) ── */
+function CaptionsChatbox() {
+  const navigate = useNavigate();
+  const cfg = SERVICE_FIELDS["video-captions"];
+  const CC = cfg.accent;
+  const fileRef = useRef(null);
+  const [file,         setFile]         = useState(null);
+  const [captionStyle, setCaptionStyle] = useState(cfg.specific.captionStyle.default);
+  const [position,     setPosition]     = useState(cfg.specific.position.default);
+  const [loading,      setLoading]      = useState(false);
+  const [statusStep,   setStatusStep]   = useState(0);
+  const [error,        setError]        = useState(null);
+
+  const canGo = !!file && !loading;
+
+  async function handleGenerate() {
+    if (!canGo) return;
+    setLoading(true); setError(null); setStatusStep(0);
+    try {
+      const result = await generateCaptions(
+        { file, captionStyle, captionPos: position },
+        ({ step }) => { if (typeof step === "number") setStatusStep(step); },
+      );
+      invalidateProjectCaches("caption_studio", "all");
+      navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
+    } catch (err) {
+      setError(err.code === "NO_CREDITS" ? "Not enough credits to caption this video." : (err.message || "Captioning failed."));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ background: T.surface, border: `1px solid ${file ? "rgba(52,211,153,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+        <div
+          onClick={() => !loading && fileRef.current?.click()}
+          style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1.5px dashed ${file ? CC + "66" : T.border}`, cursor: loading ? "default" : "pointer", background: "rgba(255,255,255,0.02)" }}>
+          <span style={{ display: "flex", color: file ? CC : T.muted }}><Video size={22} /></span>
+          <span style={{ fontSize: 14, color: file ? T.text : T.muted, fontWeight: file ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {file ? file.name : "Upload a video to caption"}
+          </span>
+          {file && (
+            <button onClick={(e) => { e.stopPropagation(); setFile(null); }}
+              style={{ marginLeft: "auto", fontSize: 12, color: T.faint, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
+          )}
+          <input ref={fileRef} type="file" accept="video/mp4,video/mov,video/webm,video/avi,video/quicktime" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }} style={{ display: "none" }} />
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <SelectField icon={<Captions size={16} />}     label="Caption style" value={captionStyle} onChange={setCaptionStyle} options={CAPTION_STYLE_OPTIONS} accent={CC} />
+            <SelectField icon={<MoveVertical size={16} />} label="Position"      value={position}     onChange={setPosition}     options={cfg.specific.position.options} accent={CC} />
+          </div>
+          <button onClick={handleGenerate} disabled={!canGo} title="Add captions"
+            style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? CC : "rgba(52,211,153,0.25)", color: "#04231a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <ArrowUp size={18} strokeWidth={2.5} />
           </button>
-        </Modal>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 14, padding: "11px 15px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, fontSize: 13, color: T.danger }}>
+          {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{CAPTION_STATUS[statusStep]}</div>
+          <div style={{ display: "flex", gap: 5 }}>
+            {CAPTION_STATUS.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? CC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -428,7 +937,7 @@ export default function Dashboard() {
       {showFeedback && <FeedbackModal context="post_visit" onClose={() => setShowFeedback(false)} />}
 
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "56px 24px 80px" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", padding: "56px 24px 50px" }}>
 
           {/* Hero */}
           <div style={{ textAlign: "center", marginBottom: 26 }}>
@@ -436,34 +945,38 @@ export default function Dashboard() {
               {userName ? `What are we making, ${userName}?` : "What are we making today?"}
             </h1>
             <p style={{ fontSize: 14, marginTop: 8, color: T.muted }}>
-              Describe it — we'll research, script, narrate, and design it for you.
+              Pick a video type, then describe your idea.
             </p>
           </div>
 
-          {/* Chatbox (morphs per selected service) */}
-          <div style={{ marginBottom: 16 }}>
-            {selected === "ai-video"
-              ? <AiVideoChatbox />
-              : <div style={{ padding: 28, textAlign: "center", color: T.muted, border: `1px dashed ${T.border}`, borderRadius: 18 }}>Opening…</div>}
-          </div>
-
-          {/* Service pills */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", justifyContent: "center", marginBottom: 4 }}>
+          {/* Service pills (above the chatbox) */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "nowrap", justifyContent: "center", marginBottom: 30 }}>
             {SERVICES.map(svc => {
               const active = selected === svc.id;
               return (
                 <button key={svc.id} onClick={() => pickService(svc)}
                   style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 100, whiteSpace: "nowrap",
+                    display: "flex", alignItems: "center", gap: 6, padding: "10px 15px", borderRadius: 10, whiteSpace: "nowrap",
                     background: active ? `${svc.accent}1c` : "rgba(255,255,255,0.03)",
                     border: `1px solid ${active ? svc.accent + "66" : T.border}`,
                     color: active ? "#fff" : T.muted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
                     transition: "all 0.15s",
                   }}>
-                  <span style={{ fontSize: 14 }}>{svc.emoji}</span>{svc.label}
+                  <svc.Icon size={15} />{svc.label}
                 </button>
               );
             })}
+          </div>
+
+          {/* Chatbox (morphs per selected service) */}
+          <div>
+            {selected === "ai-video"      ? <AiVideoChatbox />
+              : selected === "social-video" ? <SocialChatbox />
+              : selected === "promo-video"  ? <SaasChatbox />
+              : selected === "product-video"? <ProductChatbox />
+              : selected === "typography-video" ? <TypographyChatbox />
+              : selected === "video-captions"   ? <CaptionsChatbox />
+              : <div style={{ padding: 28, textAlign: "center", color: T.muted, border: `1px dashed ${T.border}`, borderRadius: 14 }}>Opening…</div>}
           </div>
         </div>
 

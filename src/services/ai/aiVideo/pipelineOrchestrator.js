@@ -20,22 +20,26 @@ import { researchTopic }         from "./researcher.js";
 import { directBeats }           from "./beatDirector.js";
 import { resolveVisuals }        from "./visualResolver.js";
 import { designAllBeats }        from "./beatDesigner.js";
-import { measureSceneHTML, closeMeasureBrowser } from "../promoVideo/htmlMeasure.js";
+import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
 import { buildTimeline }         from "./timelineBuilder.js";
 import { generateFullVoiceover } from "./ttsGenerator.js";
 import { track, easeOutCubic }   from "../shared/easing.js";
+import { injectMusic }           from "../shared/music.js";
+import { attachTransitionSfx }   from "../shared/sfx.js";
 
 const CANVAS = { width: 1080, height: 1920 };
 const FPS    = 30;
 
+// Stylish, non-revealing progress labels — deliberately vague so our pipeline
+// (the "formula") is never narrated to the user or leaked over the SSE stream.
 export const PROMPT_STATUS_STEPS = [
-  "Researching your topic…",
-  "Directing the film…",
-  "Recording the voiceover…",
-  "Creating your visuals…",
-  "Designing every beat…",
-  "Quality-checking every frame…",
-  "Composing the timeline…",
+  "Warming up the studio…",
+  "Shaping your vision…",
+  "Finding the angle…",
+  "Bringing it to life…",
+  "Adding the spark…",
+  "Polishing every frame…",
+  "Composing the final cut…",
   "Almost ready…",
 ];
 
@@ -379,31 +383,6 @@ function applyTransitions(layers, beats) {
   }
 }
 
-async function attachSfx(layers, beats) {
-  try {
-    const { data: tracks } = await supabaseAdmin
-      .from("sfx_tracks").select("key, public_url, duration").eq("is_active", true);
-    const whoosh = (tracks ?? []).find(t => /whoosh|swoosh|swish|woosh|transition/i.test(t.key));
-    if (!whoosh) return;
-    let attached = 0;
-    // Whoosh on energetic cuts (zoom/slides), capped at 6 per video —
-    // every single cut whooshing is noise, not energy.
-    for (let i = 0; i < beats.length - 1; i++) {
-      if (attached >= 6) break;
-      if (beats[i].transition_out === "fade" || beats[i].transition_out === "none") continue;
-      if (beats[i + 1]?.continues_previous) continue; // builds stay quiet
-      const target = layers.find(l => l.id === `s${i + 1}_media`)
-        ?? layers.find(l => l.id?.startsWith(`s${i + 1}_`) && /background/.test(l.id));
-      if (!target) continue;
-      target.sfx = { key: whoosh.key, src: whoosh.public_url, volume: 0.4, delay: -0.1 };
-      attached++;
-    }
-    if (attached) console.log(`[ai-video] sfx: ${attached}x "${whoosh.key}"`);
-  } catch (e) {
-    console.warn("[ai-video] sfx skipped:", e.message);
-  }
-}
-
 // ── Main export ──────────────────────────────────────────────────────────────
 
 /**
@@ -578,7 +557,7 @@ export async function runPromptPipeline(params, onStep) {
 
   // A transition on every cut, selective whoosh, voiceover, music
   applyTransitions(finalTimeline.layers, beats);
-  await attachSfx(finalTimeline.layers, beats);
+  await attachTransitionSfx(finalTimeline.layers, beats, { label: "ai-video" });
 
   if (voiceoverUrl) {
     finalTimeline.layers.push({
@@ -590,26 +569,7 @@ export async function runPromptPipeline(params, onStep) {
       sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
     });
   }
-  try {
-    const { data: tracks } = await supabaseAdmin
-      .from("music_tracks").select("public_url, title, mood").eq("is_active", true);
-    if (tracks?.length) {
-      const pool = tracks.filter(t => t.mood === film.music_mood).length
-        ? tracks.filter(t => t.mood === film.music_mood) : tracks;
-      const track = pool[Math.floor(Math.random() * pool.length)];
-      finalTimeline.layers.push({
-        id: "music_global", trackId: "track_music",
-        type: "audio", audioType: "music", src: track.public_url,
-        start: 0, end: totalDur, zIndex: 0,
-        visible: true, locked: false, trimStart: 0, trimEnd: totalDur,
-        volume: 0.2, muted: false, fadeIn: 0.8, fadeOut: 1.5,
-        sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
-      });
-      console.log(`[ai-video] music: "${track.title}" (${film.music_mood})`);
-    }
-  } catch (e) {
-    console.warn("[ai-video] music skipped:", e.message);
-  }
+  await injectMusic(finalTimeline, { mood: film.music_mood, volume: 0.2, fadeIn: 0.8, fadeOut: 1.5, label: "ai-video" });
 
   finalTimeline.full_script = fullScript;
 

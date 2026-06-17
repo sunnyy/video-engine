@@ -25,6 +25,12 @@ router.post("/generate", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "productImageUrl is required" });
   }
 
+  // Stream real progress (SSE) — the pipeline emits a step index at each boundary.
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
   try {
     const result = await runProductVideoPipeline({
       userId:             req.user.id,
@@ -40,16 +46,18 @@ router.post("/generate", requireAuth, async (req, res) => {
       accentColor:        accentColor        ?? null,
       sceneCount:         sceneCount         ?? 3,
       voiceId:            voice_id           ?? null,
-    });
+    }, (step) => send({ step }));
 
-    res.json({
+    send({
+      done: true,
       editor_project_id: result.editor_project_id,
       total_duration:    result.total_duration,
-      shots:             result.shots,
     });
+    res.end();
   } catch (err) {
     console.error("[product-video/generate]", err);
-    res.status(500).json({ error: err.message });
+    send({ error: err.message, code: err.code });
+    res.end();
   }
 });
 

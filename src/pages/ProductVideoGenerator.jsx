@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
+import { generateProductVideo } from "../services/ai/productVideo/generateProductVideo";
 import { serverFetch } from "../services/serverApi";
 import { getProductVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
@@ -19,11 +20,11 @@ const T = {
 };
 
 const STEP_LABELS = [
-  "Getting started…",
-  "Crafting your ad…",
-  "Adding voiceover…",
-  "Creating your visuals…",
-  "Putting it together…",
+  "Setting up the shoot…",
+  "Crafting the concept…",
+  "Bringing it to life…",
+  "Designing the look…",
+  "Almost ready…",
 ];
 
 const GOALS = [
@@ -368,34 +369,25 @@ function GeneratorForm() {
       setStep(2);
       setStepLabel("Crafting your ad…");
 
-      const res = await serverFetch("/api/product-video/generate", {
-        method: "POST",
-        body: JSON.stringify({
-          productImageUrl,
-          logoUrl:            logoUrl            ?? null,
-          brandName:          brandName.trim(),
-          productDescription: productDescription.trim() || "",
-          goal,
-          ctaText:            ctaText.trim()   || "Shop Now",
-          offerText:          offerText.trim() || "",
-          website:            website.trim()   || "",
-          visualMode,
-          voice_id:           selectedVoice ?? null,
-          language,
-          sceneCount,
-        }),
+      const result = await generateProductVideo({
+        productImageUrl,
+        logoUrl:            logoUrl            ?? null,
+        brandName:          brandName.trim(),
+        productDescription: productDescription.trim() || "",
+        goal,
+        ctaText:            ctaText.trim()   || "Shop Now",
+        offerText:          offerText.trim() || "",
+        website:            website.trim()   || "",
+        visualMode,
+        voice_id:           selectedVoice ?? null,
+        language,
+        sceneCount,
+      }, ({ step }) => {
+        if (typeof step === "number") { setStep(step + 1); setStepLabel(STEP_LABELS[step] ?? ""); }
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Pipeline failed (${res.status})`);
-      }
-
-      const { editor_project_id } = await res.json();
-      if (!editor_project_id) throw new Error("No editor project returned from pipeline");
-
       invalidateProjectCaches("product_video", "all");
-      navigate(`/video-editor/${editor_project_id}`, { state: { from: "/product-video" } });
+      navigate(`/video-editor/${result.projectId}`, { state: { from: "/product-video" } });
     } catch (err) {
       console.error("[ProductVideoGenerator]", err);
       setError(err.message || "Something went wrong. Please try again.");

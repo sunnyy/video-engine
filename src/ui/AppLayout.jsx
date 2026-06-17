@@ -301,7 +301,8 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
-const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-video", "/promo-video", "/social-video", "/ai-video"].includes(path) || path.startsWith("/video-editor");
+// Video service nav is hidden — those live in the Dashboard chatbox now. Image/Audio
+  // tools live under Explore; user projects under Projects. (Routes/pages kept intact.)
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
   const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
@@ -334,29 +335,8 @@ const inVideos  = ["/videos", "/video-captions", "/product-video", "/typography-
 
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
-            <FlyoutGroup icon={Icons.folder} label="Videos" active={inVideos}>
-              <NavItem icon={Icons.promo}      label="Promo Video" sub="Promo from your product URL or details"  to="/promo-video"       active={path === "/promo-video"} />
-              <NavItem icon={Icons.aiVideo}    label="AI Video"             sub="Any topic → a researched short-form video" to="/ai-video" active={path === "/ai-video"} />
-              <NavItem icon={Icons.ad}         label="Product Video"      sub="Turn photos into video ads"    to="/product-video"    active={path === "/product-video"} />
-              <NavItem icon={Icons.social}     label="Social to Video"     sub="Turn social posts into video reels"  to="/social-video"     active={path === "/social-video"} />
-              <NavItem icon={Icons.typography} label="Typography Video"   sub="Bold kinetic text animations"  to="/typography-video" active={path === "/typography-video"} />
-              <NavItem icon={Icons.captions}   label="Add Captions"       sub="Auto-caption your videos"      to="/video-captions"   active={path === "/video-captions"} />
-              <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "4px 2px" }} />
-              <NavItem icon={Icons.custom}     label="Blank Canvas"       sub="Start a video from scratch"    to="/video-editor/new" active={path === "/video-editor/new"} />
-            </FlyoutGroup>
-
-            <FlyoutGroup icon={Icons.gallery} label="Images" active={inImages}>
-              <NavItem icon={Icons.gallery}   label="Images"         sub="AI image generation"   to="/image-generation" active={path === "/image-generation"} />
-              <NavItem icon={Icons.poster}    label="Product Poster" sub="Studio-quality posters" to="/product-poster"   active={path === "/product-poster"} />
-              <NavItem icon={Icons.instagram} label="Banner Design"  sub="Social media banners"  to="/banner-design"    active={path === "/banner-design"} />
-              <NavItem icon={Icons.thumbnail} label="Thumbnail"      sub="YouTube thumbnails"    to="/thumbnail"        active={path.startsWith("/thumbnail")} />
-              <NavItem icon={Icons.outfit}    label="Virtual Try-On" sub="Try clothes with AI"   to="/virtual-tryon"    active={path === "/virtual-tryon"} />
-            </FlyoutGroup>
-
-            <FlyoutGroup icon={Icons.mic} label="Audio" active={inAudio}>
-              <NavItem icon={Icons.voice} label="Voiceover / TTS" sub="Text to speech voices"    to="/voiceover"      active={path === "/voiceover"} />
-              <NavItem icon={Icons.mic}   label="Speech to Text"  sub="Transcribe audio to text" to="/speech-to-text" active={path === "/speech-to-text"} />
-            </FlyoutGroup>
+            <IconBtn icon={Icons.folder}  label="Projects" to="/projects" active={path === "/projects"} />
+            <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
           </nav>
 
           {/* Bottom: credits + account + signout */}

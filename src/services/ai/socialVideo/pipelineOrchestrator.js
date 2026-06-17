@@ -19,8 +19,10 @@ import { fetchSocialContent }     from "./contentFetcher.js";
 import { generateSocialScript }   from "./scriptGenerator.js";
 import { designSocialScene }      from "./sceneDesigner.js";
 import { resolveSocialMedia }     from "./mediaResolver.js";
-import { measureSceneHTML, closeMeasureBrowser } from "../promoVideo/htmlMeasure.js";
+import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
+import { applyTransitions, assignSceneTransitions } from "../shared/transitions.js";
 import { buildTimeline }          from "./timelineBuilder.js";
+import { injectMusic }            from "../shared/music.js";
 import { generateFullVoiceover }  from "../promoVideo/ttsGenerator.js";
 
 const CANVAS = { width: 1080, height: 1920 };
@@ -89,41 +91,8 @@ function mediaScrimEntries(sceneIndex, src, meta) {
   ];
 }
 
-// ── Scene transitions (black-flash-safe, mirrors AI Video) ───────────────────
-// Sequential scenes can't overlap, so fading the OUTGOING scene to transparent
-// would dip to black at every cut. Slides may animate the out side (they move,
-// staying opaque); fades/zooms act on the INCOMING side only.
-const TRANSITION_DURATION = 0.3;
-const TRANSITION_MAP = {
-  zoom:         { out: "none",       in: "zoom-in" },
-  "slide-left": { out: "slide-left", in: "slide-left" },
-  "slide-up":   { out: "slide-up",   in: "slide-up" },
-  fade:         { out: "none",       in: "fade" },
-};
-const TRANSITION_POOL = ["fade", "slide-left", "zoom", "slide-up"];
-
-// Per-element entrances are baked into keyframes by the builder; this layers a
-// whole-scene transition on top: the outgoing scene gets the out side, the
-// incoming scene's background layer gets the in side.
-function applyTransitions(layers, scenes) {
-  for (let i = 0; i < scenes.length - 1; i++) {
-    const t = TRANSITION_MAP[scenes[i].transition_out] ?? TRANSITION_MAP.fade;
-    for (const layer of layers) {
-      if (!layer.id?.startsWith(`s${i}_`) || layer.type === "audio") continue;
-      layer.transition = {
-        in:  layer.transition?.in ?? { type: "none", duration: 0 },
-        out: { type: t.out, duration: TRANSITION_DURATION },
-      };
-    }
-    for (const layer of layers) {
-      if (!(layer.id?.startsWith(`s${i + 1}_`) && /background|_media|_scrim/.test(layer.id))) continue;
-      layer.transition = {
-        in:  { type: t.in, duration: TRANSITION_DURATION },
-        out: layer.transition?.out ?? { type: "none", duration: 0 },
-      };
-    }
-  }
-}
+// Scene transitions are shared: ../shared/transitions.js (applyTransitions +
+// assignSceneTransitions). AI Video keeps its own beat-aware variant.
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
@@ -134,12 +103,12 @@ export async function runSocialPipeline(params, onStep) {
   const runId = `social-${userId}-${Date.now()}`;
 
   // ── Step 1: Fetch social content ─────────────────────────────────────────
-  step("Analyzing your post…");
+  step("Tuning in…");
   const content = await fetchSocialContent(url);
   console.log(`[social] platform=${content.platform} author="${content.author}" images=${content.imageUrls?.length ?? (content.imageUrl ? 1 : 0)}`);
 
   // ── Step 2: Generate script ───────────────────────────────────────────────
-  step("Crafting your story…");
+  step("Shaping the story…");
   // Scale duration by content volume
   const wordCount = (content.text || "").split(/\s+/).filter(Boolean).length;
   const effectiveDuration = content.isThread
@@ -171,7 +140,7 @@ export async function runSocialPipeline(params, onStep) {
 
   // ── Step 3: Voiceover FIRST — so scenes are timed to real speech, and the
   // designer runs after the durations are known (voiceover-first pipeline) ──
-  step("Adding voiceover…");
+  step("Adding the spark…");
   let voiceoverUrl      = null;
   let voiceoverDuration = 0;
 
@@ -200,7 +169,7 @@ export async function runSocialPipeline(params, onStep) {
 
   // ── Step 3.5: Resolve media (post image → real entity → stock → capped AI) ──
   // Runs BEFORE design so the designer knows which scenes carry an image.
-  step("Finding visuals…");
+  step("Setting the mood…");
   try {
     await resolveSocialMedia(scenes, content, runId);
   } catch (e) {
@@ -208,7 +177,7 @@ export async function runSocialPipeline(params, onStep) {
   }
 
   // ── Step 4: Design scenes (free HTML/CSS) + headless measure, in parallel ──
-  step("Creating your scenes…");
+  step("Bringing it to life…");
   const sceneResults = await Promise.all(
     scenes.map(async (scene) => {
       try {
@@ -239,12 +208,7 @@ export async function runSocialPipeline(params, onStep) {
   const { timeline } = buildTimeline(sceneGraphs, scenes, { ...projectContext, productName: rawProjectName });
 
   // Assign a varied transition per scene cut, then apply (whole-scene in/out).
-  let prevTransition = null;
-  for (const s of scenes) {
-    const pool = TRANSITION_POOL.filter(t => t !== prevTransition);
-    s.transition_out = pool[Math.floor(Math.random() * pool.length)];
-    prevTransition = s.transition_out;
-  }
+  assignSceneTransitions(scenes);
   applyTransitions(timeline.layers, scenes);
 
   // ── Step 7: Inject voiceover layer ────────────────────────────────────────
@@ -286,31 +250,7 @@ export async function runSocialPipeline(params, onStep) {
   // entries before buildTimeline — no placeholder injection needed.)
 
   // ── Step 8: Background music ──────────────────────────────────────────────
-  try {
-    const { data: allTracks } = await supabaseAdmin
-      .from("music_tracks")
-      .select("public_url, title, mood")
-      .eq("is_active", true);
-
-    if (allTracks?.length) {
-      const pool  = allTracks.filter(t => t.mood === musicMood).length
-        ? allTracks.filter(t => t.mood === musicMood)
-        : allTracks;
-      const track    = pool[Math.floor(Math.random() * pool.length)];
-      const musicDur = finalTimeline.format.duration;
-      finalTimeline.layers.push({
-        id: "music_global", trackId: "track_music",
-        type: "audio", audioType: "music", src: track.public_url,
-        start: 0, end: musicDur, zIndex: 0,
-        visible: true, locked: false, trimStart: 0, trimEnd: musicDur,
-        volume: 0.2, muted: false, fadeIn: 1, fadeOut: 1,
-        sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
-      });
-      console.log(`[social] music injected: "${track.title}" (${musicMood})`);
-    }
-  } catch (e) {
-    console.warn("[social] music injection skipped:", e.message);
-  }
+  await injectMusic(finalTimeline, { mood: musicMood, volume: 0.2, fadeIn: 1, fadeOut: 1, label: "social" });
 
   if (full_script) finalTimeline.full_script = full_script;
 

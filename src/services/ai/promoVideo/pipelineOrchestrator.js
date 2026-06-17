@@ -27,7 +27,7 @@ import { planVisualBeats }                           from "./visualDirector.js";
 import { designScene }                               from "./sceneDesigner.js";
 import { designFreeScene }                           from "./sceneDesignerFree.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
-import { measureSceneHTML, closeMeasureBrowser }      from "./htmlMeasure.js";
+import { measureSceneHTML, closeMeasureBrowser }      from "../shared/converter.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";

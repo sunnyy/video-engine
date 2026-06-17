@@ -1,0 +1,109 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useProjectsStore } from "../store/useProjectsStore";
+import AppLayout from "../ui/AppLayout";
+
+/**
+ * Projects — the home for the user's videos (moved out of the Dashboard hub).
+ * Lists all projects with a by-service filter. Routes/pages for each service stay
+ * intact; this just reads the project store (getUserProjects → has `source`).
+ */
+
+const T = { bg: "#090b11", surface: "#0e1018", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", faint: "#55667a" };
+
+const FILTERS = [
+  { id: "all",              label: "All",             sources: null },
+  { id: "ai_video",         label: "Prompt to Video", sources: ["ai_video"] },
+  { id: "promo_video",      label: "SaaS Video",      sources: ["promo_video"] },
+  { id: "product_video",    label: "Product Video",   sources: ["product_video", "product_video_v2", "product_ad"] },
+  { id: "social_video",     label: "Social",          sources: ["social_video"] },
+  { id: "typography_video", label: "Typography",      sources: ["typography_video"] },
+  { id: "caption_studio",   label: "Captions",        sources: ["caption_studio"] },
+];
+
+function timeLabel(dateStr) {
+  const d = new Date(dateStr);
+  const diff = Math.floor((Date.now() - d) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff < 7) return `${diff}d ago`;
+  return d.toLocaleDateString();
+}
+
+function Card({ project }) {
+  const navigate = useNavigate();
+  const [hov, setHov] = useState(false);
+  const thumb = project.safe_project_json?.meta?.thumbnail
+    || (project.safe_project_json?.layers || []).find(l => l.type === "image" && l.src)?.src
+    || null;
+  const isVid = !!thumb && /\.(mp4|webm|mov)(\?|$)/i.test(thumb);
+  const href = `/video-editor/${project.id}`;
+  return (
+    <a
+      href={href}
+      onClick={(e) => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(href, { state: { from: "/projects" } }); } }}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ display: "block", textDecoration: "none", borderRadius: 14, overflow: "hidden", border: `1px solid ${hov ? "rgba(124,92,252,0.35)" : T.border}`, background: T.surface, transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none" }}
+    >
+      <div style={{ position: "relative", width: "100%", aspectRatio: "9/16", background: "#060a14", overflow: "hidden" }}>
+        {thumb
+          ? (isVid
+              ? <video src={thumb} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />)
+          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}><span style={{ fontSize: 28, opacity: 0.35 }}>🎬</span></div>}
+      </div>
+      <div style={{ padding: "10px 12px" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project.name || "Untitled"}</div>
+        <div style={{ fontSize: 11, color: T.faint, marginTop: 2 }}>{timeLabel(project.updated_at)}</div>
+      </div>
+    </a>
+  );
+}
+
+export default function Projects() {
+  const { projects, loading, fetchProjects } = useProjectsStore();
+  const [filter, setFilter] = useState("all");
+
+  useEffect(() => { fetchProjects(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const active = FILTERS.find(f => f.id === filter) ?? FILTERS[0];
+  const shown = [...projects]
+    .filter(p => !active.sources || active.sources.includes(p.source))
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+  return (
+    <AppLayout>
+      <style>{`@keyframes pv-spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
+        <div style={{ padding: "40px 40px 80px" }}>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: "0 0 18px" }}>Your Projects</h1>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+            {FILTERS.map(f => {
+              const sel = filter === f.id;
+              return (
+                <button key={f.id} onClick={() => setFilter(f.id)}
+                  style={{ padding: "7px 13px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sel ? "rgba(124,92,252,0.55)" : T.border}`, background: sel ? "rgba(124,92,252,0.14)" : "rgba(255,255,255,0.03)", color: sel ? "#fff" : T.muted }}>
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {loading ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 0", color: T.faint }}>
+              <div style={{ width: 16, height: 16, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "pv-spin 0.8s linear infinite" }} />
+              <span style={{ fontSize: 13 }}>Loading…</span>
+            </div>
+          ) : shown.length === 0 ? (
+            <div style={{ padding: "60px 0", textAlign: "center", color: T.faint, fontSize: 14 }}>No projects here yet — make one from the dashboard.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+              {shown.map(p => <Card key={p.id} project={p} />)}
+            </div>
+          )}
+        </div>
+      </div>
+    </AppLayout>
+  );
+}

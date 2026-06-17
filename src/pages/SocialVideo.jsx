@@ -16,11 +16,13 @@ const T = {
   danger:  "#f87171",
 };
 
+// Stylish, non-revealing — must match the Social pipeline's emitted step() strings.
 const STATUS_STEPS = [
-  "Analyzing your post…",
-  "Crafting your story…",
-  "Creating your scenes…",
-  "Adding voiceover…",
+  "Tuning in…",
+  "Shaping the story…",
+  "Adding the spark…",
+  "Setting the mood…",
+  "Bringing it to life…",
   "Putting it together…",
   "Almost ready…",
 ];

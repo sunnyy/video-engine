@@ -17,14 +17,15 @@ const T = {
 };
 
 // Must match PROMPT_STATUS_STEPS in the server pipeline
+// Stylish, non-revealing labels — must match the server's PROMPT_STATUS_STEPS.
 const STATUS_STEPS = [
-  "Researching your topic…",
-  "Directing the film…",
-  "Recording the voiceover…",
-  "Creating your visuals…",
-  "Designing every beat…",
-  "Quality-checking every frame…",
-  "Composing the timeline…",
+  "Warming up the studio…",
+  "Shaping your vision…",
+  "Finding the angle…",
+  "Bringing it to life…",
+  "Adding the spark…",
+  "Polishing every frame…",
+  "Composing the final cut…",
   "Almost ready…",
 ];
 
@@ -505,7 +506,7 @@ export default function AiVideo() {
 
         <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#090b11", flexShrink: 0, display: "flex", alignItems: "center", gap: 24 }}>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: T.accent, fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>
-            AI Video
+            Prompt to Video
           </h1>
           <div style={{ display: "flex", gap: 4 }}>
             {tabs.map(t => (

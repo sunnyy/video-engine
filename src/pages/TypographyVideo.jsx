@@ -23,11 +23,11 @@ const DURATION_OPTIONS = [
 ];
 
 const STATUS_STEPS = [
-  "Crafting your story…",
-  "Adding your voice…",
-  "Building your visuals…",
-  "Putting it all together…",
-  "Saving project…",
+  "Shaping your vision…",
+  "Adding the spark…",
+  "Designing the look…",
+  "Composing the final cut…",
+  "Almost ready…",
 ];
 
 function timeLabel(dateStr) {
