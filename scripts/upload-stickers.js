@@ -14,6 +14,9 @@
  *          category text,
  *          created_at timestamptz default now()
  *        );
+ *        -- Data API grants (required for tables created from Oct 30, 2026 onward):
+ *        GRANT SELECT ON stickers TO anon, authenticated;
+ *        GRANT ALL    ON stickers TO service_role;
  *
  *   2. Set STICKERS_FOLDER below to the folder containing your PNG/JPG files.
  *

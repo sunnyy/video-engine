@@ -30,6 +30,13 @@ CREATE TABLE IF NOT EXISTS promo_videos (
   updated_at          timestamptz   DEFAULT now()
 );
 
+-- Data API grants — REQUIRED for any table created from Oct 30, 2026 onward.
+-- Without these, PostgREST/supabase-js returns 42501 even when RLS policies exist
+-- (RLS only filters rows after the role already has table-level access).
+-- promo_videos is per-user/private, so anon (logged-out) gets nothing.
+GRANT SELECT, INSERT, UPDATE, DELETE ON promo_videos TO authenticated;
+GRANT ALL                          ON promo_videos TO service_role;
+
 -- Enable Row Level Security
 ALTER TABLE promo_videos ENABLE ROW LEVEL SECURITY;
 

@@ -13,7 +13,7 @@
  */
 
 import { supabaseAdmin, openai } from "../../../server/middleware/shared.js";
-import sharp from "sharp";
+import { searchStockImage, searchStockVideo, probeImageDims, treatmentFor } from "../shared/stock.js";
 
 const PHOTO_STYLE = "cinematic editorial photograph, dramatic lighting, premium, slight film grain";
 const NO_TEXT_SUFFIX = ", absolutely no text, no letters, no words, no numbers, no captions, no signage, no watermarks, clean surfaces";
@@ -78,25 +78,21 @@ async function wikipediaImage(entityName, runId, label) {
   }
 }
 
-// ── Stock photo (Pixabay) ───────────────────────────────────────────────────
-async function searchPixabayImage(query) {
-  const key = process.env.VITE_PIXABAY_API_KEY;
-  if (!key) return null;
-  try {
-    const url = `https://pixabay.com/api/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(query)}&image_type=photo&orientation=vertical&per_page=5&safesearch=true`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data.hits?.[0]?.largeImageURL ?? null;
-  } catch { return null; }
+// ── Stock (Pexels→Pixabay, orientation-aware, randomized) — shared/stock.js ───
+async function stockImage(query, runId, label, orientation) {
+  if (!query) return null;
+  const hit = await searchStockImage(query, { orientation });
+  if (!hit) return null;
+  const p = await persistRemote(hit.url, runId, label, "image/jpeg", "https://pixabay.com/");
+  return p ?? hit.url;
 }
 
-async function stockImage(query, runId, label) {
+async function stockVideo(query, runId, label, orientation, minDuration) {
   if (!query) return null;
-  const hit = await searchPixabayImage(query);
+  const hit = await searchStockVideo(query, { orientation, minDuration });
   if (!hit) return null;
-  const p = await persistRemote(hit, runId, label, "image/jpeg", "https://pixabay.com/");
-  return p ?? hit;
+  const p = await persistRemote(hit.url, runId, label, "video/mp4", "https://pixabay.com/");
+  return p ?? hit.url;
 }
 
 // ── AI image (FAL) + vision text-gate ─────────────────────────────────────────
@@ -133,30 +129,7 @@ async function imageHasText(imageUrl) {
   } catch { return false; }
 }
 
-// ── Asset shape analyzer ──────────────────────────────────────────────────────
-// Measure the resolved asset so the designer + pipeline compose AROUND its real
-// shape instead of blindly full-bleed-cropping it (which wrecks landscape photos
-// and screenshots). Portrait/square → full-bleed cover; landscape/wide → framed
-// (contained over a blurred backdrop) with text in the free space.
-async function probeImageDims(url) {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    const m = await sharp(buf).metadata();
-    if (!m.width || !m.height) return null;
-    return { width: m.width, height: m.height };
-  } catch { return null; }
-}
-
-function treatmentFor(dims) {
-  if (!dims) return { treatment: "full_bleed", orientation: "portrait", aspect: null };
-  const aspect = dims.width / dims.height;
-  if (aspect <= 1.15) {
-    return { treatment: "full_bleed", orientation: aspect < 0.85 ? "portrait" : "square", aspect: +aspect.toFixed(2), width: dims.width, height: dims.height };
-  }
-  return { treatment: "framed", orientation: "landscape", aspect: +aspect.toFixed(2), width: dims.width, height: dims.height };
-}
+// (Asset shape analyser — probeImageDims / treatmentFor — now in shared/stock.js)
 
 async function falImageClean(prompt, runId, label) {
   let best = null;
@@ -174,14 +147,14 @@ async function falImageClean(prompt, runId, label) {
  * resolveSocialMedia(scenes, content, runId) — sets scene.resolvedImage for every
  * scene that wants one, cheapest source first, with a small AI budget.
  */
-export async function resolveSocialMedia(scenes, content, runId) {
+export async function resolveSocialMedia(scenes, content, runId, orientation = "9:16") {
   const postImages = content.imageUrls?.length ? content.imageUrls : (content.imageUrl ? [content.imageUrl] : []);
   const totalDur   = scenes.reduce((a, s) => a + (s.duration_seconds ?? 0), 0);
   const AI_BUDGET  = aiBudgetFor(totalDur);
 
   // Phase 1 — cheap sources, in parallel
   await Promise.all(scenes.map(async (scene) => {
-    scene.resolvedImage = null; scene._needsAI = false;
+    scene.resolvedImage = null; scene.resolvedKind = "image"; scene._needsAI = false;
     try {
       if (scene.use_fetched_image && postImages.length) {
         scene.resolvedImage = postImages[Math.min(scene.image_index ?? 0, postImages.length - 1)];
@@ -192,7 +165,13 @@ export async function resolveSocialMedia(scenes, content, runId) {
         if (real) { scene.resolvedImage = real; return; }
       }
       if (scene.stock_query) {
-        const stock = await stockImage(scene.stock_query, runId, `s${scene.scene_index}-stock`);
+        // GPT marked this beat as motion → try a stock VIDEO first, fall back to a still.
+        if (scene.stock_motion) {
+          const minDur = Math.max(2, Math.ceil(scene.duration_seconds ?? 3));
+          const vid = await stockVideo(scene.stock_query, runId, `s${scene.scene_index}-stock`, orientation, minDur);
+          if (vid) { scene.resolvedImage = vid; scene.resolvedKind = "video"; return; }
+        }
+        const stock = await stockImage(scene.stock_query, runId, `s${scene.scene_index}-stock`, orientation);
         if (stock) { scene.resolvedImage = stock; return; }
       }
       // wanted an image but cheap sources missed → AI candidate
@@ -211,8 +190,13 @@ export async function resolveSocialMedia(scenes, content, runId) {
   }));
   for (const s of scenes) delete s._needsAI;
 
-  // Phase 3 — analyze each resolved asset's shape → treatment (full-bleed vs framed)
+  // Phase 3 — analyze each resolved asset's shape → treatment (full-bleed vs framed).
+  // Stock videos are requested in the project orientation, so they're full-bleed.
   await Promise.all(scenes.filter(s => s.resolvedImage).map(async (s) => {
+    if (s.resolvedKind === "video") {
+      s.assetMeta = { treatment: "full_bleed", orientation: "portrait", aspect: null };
+      return;
+    }
     s.assetMeta = treatmentFor(await probeImageDims(s.resolvedImage));
   }));
 

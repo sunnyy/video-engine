@@ -199,6 +199,20 @@ function graphEntryToLayer(entry, start, end, delay = 0, canvas = { width: W_DEF
     };
   }
 
+  if (entry.type === "video") {
+    return {
+      ...base,
+      src:            entry.src            ?? null,
+      objectFit:      entry.objectFit      ?? "cover",
+      objectPosition: entry.objectPosition ?? null,
+      assetType:      entry.assetType      ?? null,
+      muted:          entry.muted          ?? true,
+      volume:         entry.volume         ?? 0,
+      trimStart:      entry.trimStart      ?? 0,
+      playbackRate:   entry.playbackRate   ?? 1,
+    };
+  }
+
   if (entry.type === "icon") {
     return { ...base, iconName: entry.iconName ?? null, style: { color: entry.style?.color ?? "#ffffff" } };
   }

@@ -444,7 +444,7 @@ export default function LandingPage() {
       <nav className="nav">
         <div className="nav-inner">
           <a href="/" className="nav-logo">
-            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 68, width: "auto" }} />
+            <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 38, width: "auto" }} />
           </a>
           <div className="nav-right">
             <a href="/about" className="nav-link">
@@ -1105,7 +1105,7 @@ export default function LandingPage() {
         <div className="container">
           <div className="footer-inner">
             <a href="/" className="nav-logo">
-              <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 68, width: "auto" }} />
+              <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 38, width: "auto" }} />
             </a>
             <div className="footer-links">
               <a href="/about" className="footer-link">

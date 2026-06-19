@@ -28,6 +28,7 @@ import { designScene }                               from "./sceneDesigner.js";
 import { designFreeScene }                           from "./sceneDesignerFree.js";
 import { parseSceneHTML }                             from "./htmlParser.js";
 import { measureSceneHTML, closeMeasureBrowser }      from "../shared/converter.js";
+import { searchStockImage, searchStockVideo }         from "../shared/stock.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
@@ -43,18 +44,11 @@ function extractSearchQuery(hint) {
   return words.slice(0, 4).join(" ") || hint.split(/\s+/).slice(0, 3).join(" ");
 }
 
-async function fetchPixabayImage(hint) {
-  const key = process.env.VITE_PIXABAY_API_KEY;
-  if (!key || !hint) return null;
-  try {
-    const url = `https://pixabay.com/api/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(hint)}&image_type=photo&orientation=vertical&per_page=3&safesearch=true`;
-    const res  = await fetch(url);
-    const data = await res.json();
-    return data.hits?.[0]?.largeImageURL ?? null;
-  } catch (e) {
-    console.error("[v2/pipeline] Pixabay error:", e.message);
-    return null;
-  }
+// Stock image — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
+async function fetchPixabayImage(hint, orientation = "9:16") {
+  if (!hint) return null;
+  const hit = await searchStockImage(hint, { orientation });
+  return hit?.url ?? null;
 }
 
 async function generateFalImage(hint, projectId) {
@@ -88,27 +82,11 @@ async function generateFalImage(hint, projectId) {
   }
 }
 
-// Stock video b-roll from Pixabay. Prefers portrait clips for the 9:16 canvas.
-async function fetchPixabayVideo(hint) {
-  const key = process.env.VITE_PIXABAY_API_KEY;
-  if (!key || !hint) return null;
-  try {
-    const url = `https://pixabay.com/api/videos/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(hint)}&per_page=12&safesearch=true`;
-    const res  = await fetch(url);
-    const data = await res.json();
-    const hits = data.hits ?? [];
-    if (!hits.length) return null;
-    const isPortrait = (h) => {
-      const v = h.videos?.large ?? h.videos?.medium ?? {};
-      return (v.height ?? h.height ?? 0) > (v.width ?? h.width ?? 1);
-    };
-    const pick = hits.find(isPortrait) ?? hits[0];
-    const v = pick.videos ?? {};
-    return v.large?.url ?? v.medium?.url ?? v.small?.url ?? v.tiny?.url ?? null;
-  } catch (e) {
-    console.error("[v2/beats] Pixabay video error:", e.message);
-    return null;
-  }
+// Stock video b-roll — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
+async function fetchPixabayVideo(hint, orientation = "9:16") {
+  if (!hint) return null;
+  const hit = await searchStockVideo(hint, { orientation });
+  return hit?.url ?? null;
 }
 
 /**
@@ -390,7 +368,7 @@ export async function runV2Pipeline(project) {
     await Promise.all(placeholderLayers.map(async (layer) => {
       if (layer.assetType === "stock") {
         const query = extractSearchQuery(layer.assetHint);
-        layer.src = await fetchPixabayImage(query);
+        layer.src = await fetchPixabayImage(query, formatRatio);
       } else if (layer.assetType === "ai") {
         layer.src = await generateFalImage(layer.assetHint, projectId);
       } else if (layer.assetType === "asset") {
@@ -407,7 +385,7 @@ export async function runV2Pipeline(project) {
   if (imageScenes.length > 0) {
     await Promise.all(imageScenes.map(async (scene) => {
       const query    = extractSearchQuery(scene.asset_hint || project.product_name || "");
-      const imageUrl = await fetchPixabayImage(query);
+      const imageUrl = await fetchPixabayImage(query, formatRatio);
       if (imageUrl) {
         scene.asset_url = imageUrl;
         const sceneIdx  = scene.scene_index;
@@ -708,16 +686,16 @@ async function runV2BeatPipeline(project) {
   await Promise.all(placeholderLayers.map(async (layer) => {
     if (layer.assetType === "product") {
       layer.src = screenshots.length ? screenshots[shotIdx++ % screenshots.length] : null;
-      if (!layer.src) { layer.assetType = "stock"; layer.src = await fetchPixabayImage(extractSearchQuery(layer.assetHint)); }
+      if (!layer.src) { layer.assetType = "stock"; layer.src = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio); }
     } else if (layer.assetType === "stock") {
       const query = extractSearchQuery(layer.assetHint);
-      layer.src = await fetchPixabayImage(query);
+      layer.src = await fetchPixabayImage(query, formatRatio);
     } else if (layer.assetType === "stock_video") {
-      layer.src = await fetchPixabayVideo(extractSearchQuery(layer.assetHint));
+      layer.src = await fetchPixabayVideo(extractSearchQuery(layer.assetHint), formatRatio);
       // Fallback: no matching stock clip → degrade to a stock image so the beat isn't empty.
       if (!layer.src) {
         layer.type = "image";
-        layer.src  = await fetchPixabayImage(extractSearchQuery(layer.assetHint));
+        layer.src  = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio);
         console.warn(`[v2/beats] stock_video had no match for ${layer.id} — fell back to image`);
       }
     } else if (layer.assetType === "ai") {
@@ -777,7 +755,7 @@ async function resolveImagePlaceholders(finalTimeline, project) {
   await Promise.all(placeholderLayers.map(async (layer) => {
     if (layer.assetType === "stock") {
       const query = extractSearchQuery(layer.assetHint);
-      layer.src = await fetchPixabayImage(query);
+      layer.src = await fetchPixabayImage(query, project.format_ratio ?? "9:16");
     } else if (layer.assetType === "ai") {
       layer.src = await generateFalImage(layer.assetHint, project.id);
     } else if (layer.assetType === "asset") {

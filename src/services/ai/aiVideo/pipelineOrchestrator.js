@@ -419,6 +419,7 @@ export async function runPromptPipeline(params, onStep) {
   } = params;
 
   const runId = `prompt-${userId}-${Date.now()}`;
+  const orientation = params.orientation ?? "9:16"; // drives stock search + saved project
   const step  = (msg) => { console.log(`[ai-video] ${msg}`); onStep?.({ step: msg }); };
 
   let research, film;
@@ -472,7 +473,7 @@ export async function runPromptPipeline(params, onStep) {
 
   // ── Stage 3: Visual resolution (parallel) ─────────────────────────────────
   step(PROMPT_STATUS_STEPS[3]);
-  await resolveVisuals(beats, style, runId);
+  await resolveVisuals(beats, style, runId, orientation);
 
   // ── Stage 4: Beat design (parallel) ───────────────────────────────────────
   step(PROMPT_STATUS_STEPS[4]);
@@ -586,7 +587,7 @@ export async function runPromptPipeline(params, onStep) {
         user_id:           userId,
         name:              film.project_name,
         safe_project_json: finalTimeline,
-        orientation:       "9:16",
+        orientation:       orientation,
         mode:              "timeline",
         source:            "ai_video",
         editor_version:    "timeline",

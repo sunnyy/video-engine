@@ -23,6 +23,9 @@
  *     created_at timestamptz default now()
  *   );
  *   create index on music_tracks(mood, is_active);
+ *   -- Data API grants (required for tables created from Oct 30, 2026 onward):
+ *   grant select on music_tracks to anon, authenticated;
+ *   grant all    on music_tracks to service_role;
  */
 
 import { createClient } from "@supabase/supabase-js";

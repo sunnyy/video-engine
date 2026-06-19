@@ -19,6 +19,7 @@ import { supabaseAdmin, TEMP_DIR, PROJECT_ROOT, uuidv4 } from "../../../server/m
 import { generatePromoVoiceovers, injectVoiceoversIntoTimeline } from "./ttsGenerator.js";
 import { PROJECT_STATUS, ASSET_SOURCE, ASSET_TYPE } from "./projectSchema.js";
 import { pickAutoMood } from "../../../core/registries/musicRegistry.js";
+import { searchStockImage } from "../shared/stock.js";
 
 // Bump this version string whenever TimelineComposition.jsx positioning logic changes.
 // The bundle cache is invalidated when the version file changes, forcing a rebuild.
@@ -64,19 +65,11 @@ function extractSearchQuery(hint) {
   return words.slice(0, 4).join(" ") || hint.split(/\s+/).slice(0, 3).join(" ");
 }
 
-async function fetchPixabayImage(hint) {
-  const key = process.env.VITE_PIXABAY_API_KEY;
-  if (!key) { console.warn("[renderOrchestrator] VITE_PIXABAY_API_KEY is not set"); return null; }
+// Stock image — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
+async function fetchPixabayImage(hint, orientation = "9:16") {
   if (!hint) return null;
-  try {
-    const url = `https://pixabay.com/api/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(hint)}&image_type=photo&orientation=vertical&per_page=3&safesearch=true`;
-    const res  = await fetch(url);
-    const data = await res.json();
-    return data.hits?.[0]?.largeImageURL ?? null;
-  } catch (e) {
-    console.error("[renderOrchestrator] Pixabay fetch error:", e.message);
-    return null;
-  }
+  const hit = await searchStockImage(hint, { orientation });
+  return hit?.url ?? null;
 }
 
 export async function orchestratePromoRender(projectId) {
@@ -157,7 +150,7 @@ export async function orchestratePromoRender(projectId) {
       console.log(`[renderOrchestrator] fetching ${stockScenes.length} Pixabay images`);
       await Promise.all(stockScenes.map(async scene => {
         const query = extractSearchQuery(scene.asset_hint || scene.scene_type);
-        const imageUrl = await fetchPixabayImage(query);
+        const imageUrl = await fetchPixabayImage(query, row.format_ratio ?? "9:16");
         if (imageUrl) scene.asset_url = imageUrl;
       }));
     }
@@ -265,6 +258,17 @@ export async function orchestratePromoRender(projectId) {
           : l.sfx ? { ...l, sfx: null } : l  // strip sfx if URL not found — don't crash render
         ),
     };
+
+    // ── Watermark for free users (no active subscription) ──────────────────
+    // Set on renderTimeline only (a copy) — the editor project saved above keeps
+    // a clean timeline; when the user later exports from the editor, render.js
+    // re-applies the watermark there. New meta object so finalTimeline is untouched.
+    try {
+      const { data: sub } = await supabaseAdmin
+        .from("subscriptions").select("id")
+        .eq("user_id", row.user_id).eq("status", "active").maybeSingle();
+      if (!sub) renderTimeline.meta = { ...renderTimeline.meta, showWatermark: true };
+    } catch (_) {}
 
     const serveUrl = await getBundle();
     const { getCompositions, renderFrames, stitchFramesToVideo } = await import("@remotion/renderer");

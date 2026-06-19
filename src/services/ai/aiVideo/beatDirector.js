@@ -131,6 +131,7 @@ Return ONLY valid JSON:
   "style_id": "${style ? style.id : `one of: ${STYLE_IDS.join(" | ")}`}",
   "palette": { "bg": "#hex", "accent": "#hex", "accent2": "#hex", "text": "#hex" },
   "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient",
+  "niche": "one-word content domain for asset reuse (e.g. tech, finance, business, fitness, health, history, science, nature, lifestyle, sports, food, travel)",
   "beats": [
     {
       "beat_index": 0,
@@ -143,6 +144,8 @@ Return ONLY valid JSON:
       "image_prompt": null,
       "camera": null,
       "shot_query": null,
+      "visual_type": "for any image/video beat, one of: concept | scene | place | object | person | texture | abstract (used to reuse matching library images)",
+      "keywords": ["2-4 concrete lowercase nouns describing what the visual shows — used to match/reuse library images"],
       "transition_out": "zoom"
     }
   ]
@@ -159,61 +162,25 @@ Direct this film, beat by beat.`,
 export async function directBeats({ research, styleId, targetDuration = 45, language = "en" }) {
   const style = styleId && styleId !== "auto" ? STYLE_PRESETS[styleId] : null;
   const prompt = buildDirectorPrompt({ research, style, targetDuration, language });
-  const wordBudget = Math.round(targetDuration * WORDS_PER_SECOND);
 
-  const messages = [
-    { role: "system", content: prompt.system },
-    { role: "user",   content: prompt.user },
-  ];
+  // Single pass — the word budget and flowing-narration rules live in the prompt
+  // (same lightweight approach as Social/Typography). Duration is approximate by
+  // design; we don't burn a second full-plan rewrite to micro-enforce it.
+  const response = await openai.chat.completions.create({
+    model: DIRECTOR_MODEL,
+    max_tokens: 6000,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user",   content: prompt.user },
+    ],
+  });
 
-  let plan = null;
-
-  // Global duration enforcement: total words ≈ total seconds × 2.3. One
-  // corrective rewrite if the plan blows the budget — an over-budget plan
-  // produces a video longer than the user asked for, which is a spec failure.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await openai.chat.completions.create({
-      model: DIRECTOR_MODEL,
-      max_tokens: 6000,
-      response_format: { type: "json_object" },
-      messages,
-    });
-
-    try {
-      plan = JSON.parse(response.choices[0].message.content);
-    } catch (e) {
-      throw new Error(`beat director returned invalid JSON: ${e.message}`);
-    }
-
-    const candidateBeats = Array.isArray(plan.beats) ? plan.beats : [];
-    const lines = candidateBeats.map(b => (b.script_line ?? "").trim());
-    const totalWords = lines.reduce((a, l) => a + l.split(/\s+/).filter(Boolean).length, 0);
-
-    // Staccato detection: when most non-final beats end with terminal
-    // punctuation, TTS speaks bullet points with dead air at every cut
-    const nonFinal = lines.slice(0, -1);
-    const terminalEnds = nonFinal.filter(l => /[.!?]$/.test(l)).length;
-    const staccatoRatio = nonFinal.length ? terminalEnds / nonFinal.length : 0;
-
-    const problems = [];
-    if (totalWords > Math.ceil(wordBudget * 1.08)) {
-      problems.push(`the total script is ${totalWords} words but the budget is ${wordBudget} (${targetDuration}s of speech) — the video would run ~${Math.round(totalWords / WORDS_PER_SECOND)}s. Cut script_lines down, cut filler beats entirely if needed`);
-    }
-    if (staccatoRatio > 0.65) {
-      problems.push(`${terminalEnds} of ${nonFinal.length} non-final beats end with . ! or ? — spoken aloud this is bullet-point telegram delivery with dead air at every cut. Rewrite the narration as FLOWING sentences split across beats: within a sentence, only its final beat ends with terminal punctuation, earlier beats end with a comma, em-dash, or nothing`);
-    }
-
-    if (problems.length === 0 || attempt === 2) {
-      if (problems.length > 0) console.warn(`[ai-video/director] accepting after rewrite with remaining issues: ${problems.length}`);
-      break;
-    }
-
-    console.log(`[ai-video/director] tightening narration flow (pass 2): ${totalWords}w, staccato ${(staccatoRatio * 100).toFixed(0)}%`);
-    messages.push({ role: "assistant", content: response.choices[0].message.content });
-    messages.push({
-      role: "user",
-      content: `REJECTED:\n${problems.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nRewrite the COMPLETE plan keeping the beat structure and treatments. Same JSON format.`,
-    });
+  let plan;
+  try {
+    plan = JSON.parse(response.choices[0].message.content);
+  } catch (e) {
+    throw new Error(`beat director returned invalid JSON: ${e.message}`);
   }
 
   // ── Validation — structure is code's job, not the model's ────────────────
@@ -226,7 +193,11 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
   palette.text    = normalizeHex(palette.text, "#ffffff");
 
   let beats = Array.isArray(plan.beats) ? plan.beats : [];
-  if (beats.length < MIN_BEATS) throw new Error(`beat director planned only ${beats.length} beats (minimum ${MIN_BEATS})`);
+  // MIN_BEATS is a soft *target* (density is the style); only fail if there are too
+  // few beats to make a video at all. A 7-beat plan is fine — don't abort the run.
+  const HARD_FLOOR = 4;
+  if (beats.length < HARD_FLOOR) throw new Error(`beat director planned only ${beats.length} beats (need at least ${HARD_FLOOR})`);
+  if (beats.length < MIN_BEATS) console.warn(`[ai-video/director] ${beats.length} beats — under soft target ${MIN_BEATS}, accepting`);
   if (beats.length > MAX_BEATS) beats = beats.slice(0, MAX_BEATS);
 
   let sameTypeRun = 0;
@@ -280,6 +251,15 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     }
     if (content.kind !== "none" && !content.headline) content.kind = "none";
 
+    // Library-reuse metadata (visual_type + keywords) — GPT-supplied, with fallbacks.
+    const VTYPES = ["concept", "scene", "place", "object", "person", "texture", "abstract"];
+    const visual_type = VTYPES.includes(b.visual_type) ? b.visual_type
+      : assetType === "ai_image" ? "concept" : assetType === "cutout" ? "person" : "scene";
+    const keywords = (Array.isArray(b.keywords) && b.keywords.length)
+      ? b.keywords.filter(k => typeof k === "string").map(k => k.toLowerCase().trim()).filter(Boolean).slice(0, 4)
+      : `${b.shot_query ?? ""} ${b.image_prompt ?? b.visual_concept ?? ""}`
+          .toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 3).slice(0, 4);
+
     return {
       beat_index:     i,
       script_line:    line,
@@ -293,15 +273,24 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
         ? (CAMERAS.includes(b.camera) ? b.camera : "slow_zoom_in")
         : null,
       shot_query:     assetType === "stock_video" ? (b.shot_query ?? "") : null,
+      visual_type,
+      keywords,
       transition_out: transition,
     };
   });
   beats.forEach(b => delete b._assetType);
 
+  // Niche — one stable domain per video, used for library-image reuse matching.
+  const niche = ((typeof plan.niche === "string" && plan.niche.trim()) ? plan.niche.trim().toLowerCase().split(/\s+/)[0] : "")
+    || (research.topic ? research.topic.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 3)[0] : "")
+    || "general";
+  beats.forEach(b => { b.niche = niche; });
+
   const result = {
     project_name: plan.project_name || research.topic?.slice(0, 60) || "Prompt Video",
     style:        resolvedStyle,
     palette,
+    niche,
     music_mood:   ["upbeat", "inspiring", "chill", "cinematic", "energetic", "ambient"].includes(plan.music_mood) ? plan.music_mood : "upbeat",
     beats,
   };

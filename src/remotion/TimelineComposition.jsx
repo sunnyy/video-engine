@@ -1,11 +1,11 @@
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender } from "remotion";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender, staticFile } from "remotion";
 import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../core/registries/sfxRegistry";
 import { useMemo, useEffect } from "react";
 import * as LucideIcons from "lucide-react";
 
 export default function TimelineComposition({ project }) {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
   const currentTime = frame / fps;
 
   const layers = [...(project?.layers || [])]
@@ -22,19 +22,27 @@ export default function TimelineComposition({ project }) {
     return [...families];
   }, [project]);
 
-  // Load Google Fonts before any frame renders
+  // Load SELF-HOSTED fonts before any frame renders. The render runs in headless
+  // Chrome with no access to fonts.googleapis.com, so we serve fonts locally from
+  // public/fonts (run `npm run fetch-fonts` to populate). Loading the exact
+  // families used, from local files, is deterministic across Remotion's parallel
+  // render tabs → no font-swap flicker.
   const fontHandle = useMemo(() => delayRender("Loading fonts"), []);
   useEffect(() => {
-    const links = fontFamilies.map((family) => {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@100;300;400;500;600;700;800;900&display=swap`;
-      document.head.appendChild(link);
-      return link;
-    });
-    const timeout = new Promise(resolve => setTimeout(resolve, 5000));
-    Promise.all([Promise.race([document.fonts.ready, timeout]), loadSFXLibrary()]).then(() => continueRender(fontHandle));
-    return () => links.forEach((l) => l.remove());
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = staticFile("fonts/fonts.css"); // resolves to /public/fonts/... in the render bundle
+    document.head.appendChild(link);
+
+    // Explicitly resolve each used family/weight (the @font-face are lazy).
+    const loads = fontFamilies.flatMap((family) =>
+      [400, 700, 800].map((w) => document.fonts.load(`${w} 40px "${family}"`).catch(() => {}))
+    );
+    const ready   = Promise.all(loads).then(() => document.fonts.ready);
+    const timeout = new Promise((resolve) => setTimeout(resolve, 8000));
+    Promise.all([Promise.race([ready, timeout]), loadSFXLibrary()]).then(() => continueRender(fontHandle));
+
+    return () => link.remove();
   }, [fontHandle]);
 
 
@@ -54,7 +62,44 @@ export default function TimelineComposition({ project }) {
             </Sequence>
           );
         })}
+
+      {/* Free-plan watermark — added only at export time (render.js sets
+          meta.showWatermark); never shown in the editor preview. */}
+      {project?.meta?.showWatermark && <Watermark width={width} height={height} />}
     </AbsoluteFill>
+  );
+}
+
+function Watermark({ width = 1080, height = 1920 }) {
+  const base     = Math.min(width, height);
+  const fontSize = Math.round(base * 0.026);
+  const padV     = Math.round(fontSize * 0.5);
+  const padH     = Math.round(fontSize * 0.75);
+  const margin   = Math.round(base * 0.03);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: margin,
+        bottom: margin,
+        zIndex: 2147483647,
+        opacity: 0.5,
+        padding: `${padV}px ${padH}px`,
+        background: "rgba(0,0,0,0.42)",
+        borderRadius: Math.round(fontSize * 0.55),
+        fontFamily: "Outfit, sans-serif",
+        fontSize,
+        fontWeight: 700,
+        lineHeight: 1,
+        color: "rgba(255,255,255,0.96)",
+        letterSpacing: 0.2,
+        textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+        whiteSpace: "nowrap",
+        pointerEvents: "none",
+      }}
+    >
+      Created on Vidquence.com
+    </div>
   );
 }
 

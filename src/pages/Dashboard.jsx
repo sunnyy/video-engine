@@ -989,7 +989,7 @@ export default function Dashboard() {
       {showFeedback && <FeedbackModal context="post_visit" onClose={() => setShowFeedback(false)} />}
 
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 800, margin: "0 auto", padding: "56px 24px 50px" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", padding: "56px 24px 20px" }}>
 
           {/* Hero */}
           <div style={{ textAlign: "center", marginBottom: 26 }}>

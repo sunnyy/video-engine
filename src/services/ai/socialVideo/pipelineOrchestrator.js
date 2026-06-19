@@ -54,8 +54,11 @@ function assignWordTimestamps(scenes, wordTimestamps) {
 // ── Pipeline-built media for image scenes (full-bleed image + scrim, low z) ──
 // The designer builds ONLY the overlay text (transparent), so the image and a
 // legibility scrim are owned here and sit BENEATH the text — no z-index fights.
-function mediaScrimEntries(sceneIndex, src, meta) {
+function mediaScrimEntries(sceneIndex, src, meta, kind = "image") {
   const W = CANVAS.width, H = CANVAS.height;
+  const mediaLayer = kind === "video"
+    ? { layer: "video", type: "video", objectFit: "cover", assetType: "social-image", muted: true, volume: 0 }
+    : { layer: "image", type: "image", objectFit: "cover", assetType: "social-image" };
   const base = {
     role: "background", animation: "none", sceneElement: "background",
     rotation: 0, opacity: 1, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
@@ -82,11 +85,10 @@ function mediaScrimEntries(sceneIndex, src, meta) {
     ];
   }
 
-  // Portrait/square → full-bleed cover + scrim
+  // Portrait/square → full-bleed cover + scrim (image OR stock video)
   return [
-    { ...base, id: `s${sceneIndex}_media`, trackId: `s${sceneIndex}_media`,
-      layer: "image", type: "image", zIndex: 0, x: 0, y: 0, width: W, height: H,
-      src, objectFit: "cover", assetType: "social-image" },
+    { ...base, ...mediaLayer, id: `s${sceneIndex}_media`, trackId: `s${sceneIndex}_media`,
+      zIndex: 0, x: 0, y: 0, width: W, height: H, src },
     scrim(1),
   ];
 }
@@ -130,6 +132,7 @@ export async function produceSocial(plan, params, onStep) {
   const { userId, voiceId = null, includeAuthor = false } = params;
   const { content, full_script, palette, fontPair, musicMood, projectName, creativeDirection, sourceUrl } = plan;
   const scenes = plan.scenes.map(s => ({ ...s }));
+  const orientation = params.orientation ?? "9:16"; // drives stock search + saved project
 
   const step  = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
   const runId = `social-${userId}-${Date.now()}`;
@@ -182,7 +185,7 @@ export async function produceSocial(plan, params, onStep) {
   // Runs BEFORE design so the designer knows which scenes carry an image.
   step("Setting the mood…");
   try {
-    await resolveSocialMedia(scenes, content, runId);
+    await resolveSocialMedia(scenes, content, runId, orientation);
   } catch (e) {
     console.warn("[social] media resolution failed (non-fatal):", e.message);
   }
@@ -209,7 +212,7 @@ export async function produceSocial(plan, params, onStep) {
   // For image scenes, the designer built a transparent overlay — inject the
   // pipeline-owned full-bleed image + scrim beneath it (low z).
   scenes.forEach((scene, i) => {
-    if (scene.resolvedImage) sceneGraphs[i] = [...mediaScrimEntries(i, scene.resolvedImage, scene.assetMeta), ...(sceneGraphs[i] ?? [])];
+    if (scene.resolvedImage) sceneGraphs[i] = [...mediaScrimEntries(i, scene.resolvedImage, scene.assetMeta, scene.resolvedKind), ...(sceneGraphs[i] ?? [])];
   });
 
   // ── Step 5: Build timeline ─────────────────────────────────────────────────
@@ -274,7 +277,7 @@ export async function produceSocial(plan, params, onStep) {
         user_id:           userId,
         name:              projectName,
         safe_project_json: finalTimeline,
-        orientation:       "9:16",
+        orientation:       orientation,
         mode:              "timeline",
         source:            "social_video",
         editor_version:    "timeline",

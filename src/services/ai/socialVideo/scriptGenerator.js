@@ -51,6 +51,7 @@ Each scene can carry ONE image, resolved cheapest-first by the pipeline. Set the
   use_fetched_image: true → the POST's own attached image (best when that photo IS the visual). Set image_index.
   subject_entity: "<exact Wikipedia article title>" → a REAL photo of a named person/company/product/place central to this scene (e.g. "Sam Altman", "OpenAI", "Mount Fuji"). ONLY real notable entities that have a Wikipedia page with a photo — never documents, events, or abstract ideas.
   stock_query: "<concrete searchable phrase>" → real-world footage/photo for a scene with no specific entity (e.g. "city traffic at night", "hands typing on laptop").
+  stock_motion: true → pair with stock_query to use a short real VIDEO clip (b-roll with motion) instead of a still. Choose this for dynamic, atmospheric, or kinetic moments (flowing traffic, ocean waves, a busy crowd, typing hands, city timelapse). Leave false when a crisp still lands better.
   none of these → a pure TYPE/GRAPHIC scene (headline, stat, quote, comparison, list, cta).
 Prefer real imagery for scenes with a clear visual subject; keep text/graphic scenes for claims, stats, and CTAs. Don't force an image onto a scene that lands harder as bold type. Set at most ONE of the three per scene.
 
@@ -111,6 +112,7 @@ For each scene you are briefing the art director who designs the actual frame. G
       "image_index": 0,
       "subject_entity": null,
       "stock_query": null,
+      "stock_motion": false,
       "duration_seconds": 3.5
     }
   ]
@@ -204,6 +206,7 @@ Target duration: ~${targetDuration} seconds${threadNote}${lengthNote}${platformD
       image_index:       typeof s.image_index === "number" ? Math.min(s.image_index, imageUrls.length - 1) : 0,
       subject_entity:    typeof s.subject_entity === "string" && s.subject_entity.trim() ? s.subject_entity.trim() : null,
       stock_query:       typeof s.stock_query === "string" && s.stock_query.trim() ? s.stock_query.trim() : null,
+      stock_motion:      s.stock_motion === true,
       duration_seconds:  s.duration_seconds ?? 4.0,
       duration:          s.duration_seconds ?? 4.0,
     };
