@@ -471,6 +471,26 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
   // No element-count cap: it amputated legit dense scenes (cards, the clock pattern).
   // Over-building is handled upstream (asset guard, screen-time budget, beat split).
 
+  // Text-over-container guard: when flattening, a card/panel can end up with a higher
+  // z than the text it visually CONTAINS (e.g. an explicit-z card → 100+ band, while its
+  // label kept the auto/role z), so the card paints OVER its own text and hides it. In
+  // the DOM the text is a child and paints above the card; restore that by lifting each
+  // text above any larger non-text layer that geometrically contains it and sits at/above
+  // its z. Geometric (no DOM needed) so it generalises to all cards/panels/columns.
+  for (const tx of graph) {
+    if (tx.type !== "text") continue;
+    const cx = tx.x + tx.width / 2, cy = tx.y + tx.height / 2;
+    let lift = tx.zIndex;
+    for (const g of graph) {
+      if (g === tx || g.type === "text") continue;
+      const containsText =
+        cx >= g.x && cx <= g.x + g.width && cy >= g.y && cy <= g.y + g.height &&
+        g.width * g.height > tx.width * tx.height; // g is a larger container behind the text
+      if (containsText && g.zIndex >= tx.zIndex) lift = Math.max(lift, g.zIndex + 1);
+    }
+    tx.zIndex = lift;
+  }
+
   graph.sort((a, b) => a.zIndex - b.zIndex);
   return graph;
 }

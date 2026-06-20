@@ -34,7 +34,7 @@ function contentBlock(beat) {
       ? `  (chart data — render as clean bars/blocks with the labels and values shown)`
       : `  (list items — each its own row/element, staggered entrances)`);
   }
-  lines.push(`Genre by kind: hook = arresting headline scale · stat = the number IS the hero · quote = the words + attribution · list = rows that land one by one · chart = clean bars with real values · title = date/name card · cta = the ask, unmissable.`);
+  lines.push(`What each kind is ABOUT (emphasis only — you choose the form): hook = stop the scroll, maximum impact · stat = the number is the point, make it dominate · quote = the words carry it, with their source · list = each item distinct and scannable · chart = the real values, honestly compared · title = the name/date as the moment · cta = the ask, unmissable.`);
   return lines.join("\n");
 }
 
@@ -61,7 +61,7 @@ export function buildBeatPrompt(beat, ctx) {
 - Icons: data-icon="kebab-name" (Lucide) ONLY on a single standalone glyph — NEVER on something built from shapes/divs (it gets replaced by a generic icon and your design is lost; leave hand-built shapes as data-layer="decoration").
 TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Spell every word EXACTLY as given; minimum readable font ~26px.
 NO PSEUDO-ELEMENTS — our renderer DROPS ::before and ::after entirely (and any content:"" decoration). EVERY visible mark must be its OWN real tagged element: build glows, halos, ring highlights, accent arcs/sweeps, underlines, lines, dots, sparkles, and gradient overlays as actual <div>s with data-role/data-layer (e.g. a glow = a <div data-role="glow" data-layer="effect"> radial-gradient). If you draw an accent with ::before/::after it will VANISH in the render — never rely on it.
-NO FILLER CHROME — this is the #1 thing that makes frames look generic and bloated: do NOT add a kicker, badge, label, tag, chip, "01"/number pill, or rounded mini-pill unless it carries ESSENTIAL real content the frame genuinely cannot say otherwise. Default to NONE of them. No scattered dots, corner ticks, stray rules, or decorative pills. A bold frame is the hero + at most one supporting element — nothing else.
+CONTENT-FIRST — NO ORPHAN DECORATION (the #1 thing that makes frames look amateur and cluttered). EVERY element must BELONG to the content: it either IS content, HOLDS content (a card / panel / chart / mockup wrapped around real content), or DIRECTLY structures content (an accent underline beneath a heading, a divider between two related blocks, the connectors/nodes of a diagram that link labels). BANNED as standalone "design" — these are exactly what makes frames look horrific: free-floating lines / bars / rules in the margins, lone outline circles / rings / dots, arrows that don't point from one labelled thing to another, scattered ticks / sparkles / confetti, corner doodads, and decorative kicker / badge / chip / "01" pills used as garnish. If a shape is not part of a content structure, it does not belong — delete it. Negative space is PREMIUM, never something to fill with shapes.
 NEVER print the beat's internal kind/role as visible text — words like "Hook", "Fact", "Stat", "Quote", "List", "CTA", "Title", "Reveal" are internal direction, never on screen. Render only the real CONTENT strings.`;
 
   if (isOverlay) {
@@ -77,9 +77,9 @@ ${contentBlock(beat)}
 
 OVERLAY CONSTRAINTS (keep your design off the image's subject — absolute):
 - html,body background: TRANSPARENT. NO background element, NO scrim, NO images, NO full-canvas anything.
-- 2–5 typographic elements: the content above, plus optionally one kicker tag and one thin accent rule/divider.
-- Keep main content low — between y=${bandTop} and the bottom; a small kicker/tag may sit at the top (y ≤ ${kickerBottom}). Leave the middle to the image.
-- Promo-grade type: strong hierarchy, the style's type system, accent colour on the key word/number, text-shadow for punch.
+- Just the content above as bold typography — only as many elements as it needs; no decorative chrome, no floating shapes.
+- Keep the content low — between y=${bandTop} and the bottom; anything small/secondary may sit at the top (y ≤ ${kickerBottom}). Leave the middle clear for the image.
+- Promo-grade type: strong hierarchy, the style's type system, accent colour on the key word/number, text-shadow for legibility.
 
 ${dataContract}
 
@@ -111,14 +111,10 @@ ${paletteBlock(palette, beat)}
 
 ${contentBlock(beat)}
 
-ONE FOCAL IDEA per frame, set BIG and confident — but it MUST FIT fully inside the ${canvasW}×${canvasH} frame. Size the hero as large as FITS: a short 1–3 word line can be enormous; a longer headline must WRAP across 2–3 lines (let it wrap naturally — NEVER white-space:nowrap a line wider than the frame) or be sized down so every word sits fully on-screen. Big type is great; type CLIPPED at the edge is broken. Maximum contrast, readable in under a second. (Thin, timid, mid-size type is the main reason a frame feels weak and empty.)
-MATCH RICHNESS TO THE IDEA. A pure-type frame stays lean and bold (a commanding hero + maybe one supporting line). But when the idea calls for a BUILT GRAPHIC, build it fully and make it feel premium and designed — these can have many parts, and that is GOOD: a UI / app / browser mockup, a device or phone screen, a dashboard, a composed multi-part card, panels, a progress bar, an abstract diagram, a geometric motif, a chart from real values. Emptiness reads as a plain slideshow; a richly built graphic does not. Total on-screen words ≤ ${maxWords}.
-NO FILLER (this is different from richness): every element must SERVE the idea. Cut decorative noise — scattered dots, corner ticks, texture strips, stray rules, loose "kicker/badge" pills used as garnish, or oversized "ghost" numerals/words stacked behind everything. A purposeful 12-part mockup is great; 12 random decorations are not.
-VARY THE FORM beat to beat — do NOT make every canvas frame a headline-on-a-field. Reach for: a huge headline · a stacked kinetic phrase · a stat slam · a quote card · a two-side split · a chart from real values · a UI/app mockup · a labeled diagram.
-ILLUSTRATE FREELY — WITH LIMITS. You MAY build rich CSS illustrations and they look great: UI/app/browser mockups, device screens, dashboards, cards, panels, progress bars, abstract diagrams, geometric motifs, charts. Build those richly.
-But DO NOT try to depict these in CSS — they ALWAYS come out as crude grey blobs, so they belong in an IMAGE beat (or carry the idea with bold TYPOGRAPHY) instead: a map / country / geography, a building / architecture / landmark, a vehicle, an animal, a person or face, an emblem / crest / flag / logo, or any specific real-world object or scene.
-TECH LIMIT: NO clip-path and NO inline <svg> — our renderer drops both (a CSS "eagle" or "map" becomes plain rectangles).
-Every frame needs a visible light source or accent presence — flat darkness reads as dead air.
+THE DESIRE: a premium, clean, instantly-readable frame with the polish of Linear / Vercel / Stripe — one dominant focal point, hard contrast, confident negative space. The key word/number/idea must land in under a second. Thin, timid, mid-sized type is what makes a frame feel weak — be bold.
+RICHNESS COMES FROM CONTENT, NEVER ORNAMENT. Interest comes from the real content, well-composed — never from shapes added to fill or "balance" space. NEGATIVE SPACE IS PREMIUM: if a frame feels empty, strengthen the content or enrich the background field; never sprinkle decoration. (The CONTENT-FIRST / no-orphan rule below is absolute.)
+CONSTRAINTS: everything fits fully inside the ${canvasW}×${canvasH} frame — nothing clipped or running off the edge (a long line wraps or sizes down; never force one line wider than the frame). Use only as many elements as the content genuinely needs; on-screen words ≤ ${maxWords}. Fewer, bolder, content-bearing elements beat more-and-smaller every time.
+DEPICT REAL THINGS WITH IMAGES, NOT CSS: never build a map, country, building, landmark, vehicle, animal, person/face, emblem/crest/flag/logo, or any specific real-world object/scene out of CSS shapes — it always renders as crude blobs (those moments are IMAGE beats, not this frame). NO clip-path and NO inline <svg> — our renderer drops both.
 
 ${dataContract}
 
