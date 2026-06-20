@@ -30,6 +30,7 @@ import { parseSceneHTML }                             from "./htmlParser.js";
 import { measureSceneHTML, closeMeasureBrowser }      from "../shared/converter.js";
 import { searchStockImage, searchStockVideo }         from "../shared/stock.js";
 import { styleImagePrompt }                            from "../shared/visualStyles.js";
+import { generateAiImage }                             from "../shared/aiImage.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
@@ -52,35 +53,12 @@ async function fetchPixabayImage(hint, orientation = "9:16") {
   return hit?.url ?? null;
 }
 
-async function generateFalImage(hint, projectId, styleId = "auto") {
-  const key = process.env.FAL_API_KEY;
-  if (!key || !hint) return null;
-  try {
-    const prompt = `${hint}, ${styleImagePrompt(styleId, "photo")}, vertical 9:16 portrait composition, sharp focus, 8k quality, no text, no watermark, no people, no faces`;
-    const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
-      method:  "POST",
-      headers: { "Authorization": `Key ${key}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ prompt, image_size: "portrait_16_9", num_images: 1, num_inference_steps: 4, enable_safety_checker: false }),
-    });
-    if (!falRes.ok) return null;
-    const data  = await falRes.json();
-    const falUrl = data?.images?.[0]?.url ?? null;
-    if (!falUrl) return null;
-
-    // Re-upload to Supabase so URL is permanent (fal.media URLs expire)
-    const imgRes = await fetch(falUrl);
-    if (!imgRes.ok) return falUrl;
-    const buffer   = Buffer.from(await imgRes.arrayBuffer());
-    const filePath = `${projectId ?? "promo"}/v2-ai-images/ai-gen-${Date.now()}.jpg`;
-    const { error: upErr } = await supabaseAdmin.storage
-      .from("user-assets").upload(filePath, buffer, { contentType: "image/jpeg", upsert: false });
-    if (upErr) return falUrl;
-    const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(filePath);
-    return pub?.publicUrl ?? falUrl;
-  } catch (e) {
-    console.error("[v2/pipeline] Fal.ai error:", e.message);
-    return null;
-  }
+// Orientation-aware AI image via the shared, universal generator (FLUX + text-gate
+// + permanent persist). image_size is derived from orientation there — no hardcoding.
+async function generateFalImage(hint, projectId, styleId = "auto", orientation = "9:16") {
+  if (!hint) return null;
+  const prompt = `${hint}, ${styleImagePrompt(styleId, "photo")}, sharp focus, 8k quality, no people, no faces`;
+  return await generateAiImage(prompt, { runId: projectId ?? "promo", label: `ai-${Date.now()}`, orientation });
 }
 
 // Stock video b-roll — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
@@ -371,7 +349,7 @@ export async function runV2Pipeline(project) {
         const query = extractSearchQuery(layer.assetHint);
         layer.src = await fetchPixabayImage(query, formatRatio);
       } else if (layer.assetType === "ai") {
-        layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style);
+        layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style, formatRatio);
       } else if (layer.assetType === "asset") {
         layer.assetQueued = true;
         layer.src = ASSET_PLACEHOLDER_SRC;
@@ -700,7 +678,7 @@ async function runV2BeatPipeline(project) {
         console.warn(`[v2/beats] stock_video had no match for ${layer.id} — fell back to image`);
       }
     } else if (layer.assetType === "ai") {
-      layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style);
+      layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style, formatRatio);
     } else if (layer.assetType === "asset") {
       layer.assetQueued  = true;
       layer.src          = ASSET_PLACEHOLDER_SRC;
@@ -758,7 +736,7 @@ async function resolveImagePlaceholders(finalTimeline, project) {
       const query = extractSearchQuery(layer.assetHint);
       layer.src = await fetchPixabayImage(query, project.format_ratio ?? "9:16");
     } else if (layer.assetType === "ai") {
-      layer.src = await generateFalImage(layer.assetHint, project.id, project.visual_style);
+      layer.src = await generateFalImage(layer.assetHint, project.id, project.visual_style, project.format_ratio ?? "9:16");
     } else if (layer.assetType === "asset") {
       layer.assetQueued = true;
     }

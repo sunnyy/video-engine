@@ -4,23 +4,17 @@ import {
   uploadMemory,
 } from "../middleware/shared.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
-import { BLANK_IMAGE } from "../../services/ai/shared/aiImage.js";
+import { blankForKey } from "../../services/ai/shared/aiImage.js";
 
 export const router = express.Router();
-
-const BLANK_URLS = {
-  square:       BLANK_IMAGE["1:1"],
-  portrait_916: BLANK_IMAGE["9:16"],
-  portrait_45:  BLANK_IMAGE["4:5"],
-  landscape:    BLANK_IMAGE["4:5"], // no true landscape blank yet — keeps prior behavior
-};
 
 const NEGATIVE_PROMPT = "blurry, low quality, distorted, deformed, ugly, bad anatomy, watermark, signature, text errors, cropped elements, cut off text, out of frame, overexposed, underexposed";
 
 const ORIENTATION_NOTE = {
-  square:       "This poster must be designed for a square format (1:1 ratio). Compose the layout for a square canvas.",
-  portrait_45:  "This poster must be designed for a tall vertical portrait format (4:5 ratio). Compose the layout for a tall vertical canvas — headline at top, product in center, features below, bottom strip at the very bottom. Do not compose for square format.",
-  portrait_916: "This poster must be designed for a tall vertical portrait format (9:16 ratio). Compose the layout for a tall vertical canvas — headline at top, product in center, features below, bottom strip at the very bottom. Do not compose for square format.",
+  "1:1":  "This poster must be designed for a square format (1:1 ratio). Compose the layout for a square canvas.",
+  "4:5":  "This poster must be designed for a tall vertical portrait format (4:5 ratio). Compose the layout for a tall vertical canvas — headline at top, product in center, features below, bottom strip at the very bottom. Do not compose for square format.",
+  "9:16": "This poster must be designed for a tall vertical portrait format (9:16 ratio). Compose the layout for a tall vertical canvas — headline at top, product in center, features below, bottom strip at the very bottom. Do not compose for square format.",
+  "16:9": "This poster must be designed for a wide landscape format (16:9 ratio). Compose the layout for a wide horizontal canvas.",
 };
 
 
@@ -83,13 +77,13 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
 
     const FAL_KEY    = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    const blankUrl   = BLANK_URLS[platform] || BLANK_URLS.square;
+    const blankUrl   = blankForKey(platform);
     const orientationNote = ORIENTATION_NOTE[platform] || "";
 
     console.log("[poster/generate] platform:", platform, "→ blank:", blankUrl);
 
-    const blankLabel = { square: "1024x1024px (square)", portrait_45: "864x1080px (portrait 4:5)", portrait_916: "680x1080px (portrait 9:16)", landscape: "864x1080px (landscape)" };
-    const dimLabel   = blankLabel[platform] || blankLabel.square;
+    const blankLabel = { "1:1": "1024x1024px (square)", "4:5": "864x1080px (portrait 4:5)", "9:16": "680x1080px (portrait 9:16)", "16:9": "1920x1080px (landscape)" };
+    const dimLabel   = blankLabel[platform] || blankLabel["1:1"];
 
     const userPrompt = `Use the first uploaded image as the product to feature in this poster. The second image is a blank canvas showing the exact required output dimensions (${dimLabel}) — your output must match its size and aspect ratio precisely.
 

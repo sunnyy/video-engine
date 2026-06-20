@@ -6,6 +6,7 @@ import { getCredits } from "../services/credits/creditService";
 import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
+import SizeSelector from "../ui/SizeSelector";
 
 function timeLabel(dateStr) {
   const d    = new Date(dateStr);
@@ -51,16 +52,10 @@ const STYLES = [
   { id: "cinematic",  label: "Cinematic"  },
 ];
 
-const PLATFORMS = [
-  { id: "square_11",   label: "1:1 Square"   },
-  { id: "portrait_45", label: "4:5 Portrait" },
-  { id: "story_916",   label: "9:16 Story"   },
-];
-
 const RESULT_SIZE = {
-  square_11:   { ratio: "1/1",  maxWidth: 480 },
-  portrait_45: { ratio: "4/5",  maxWidth: 400 },
-  story_916:   { ratio: "9/16", maxWidth: 300 },
+  "1:1":  { ratio: "1/1",  maxWidth: 480 },
+  "4:5":  { ratio: "4/5",  maxWidth: 400 },
+  "9:16": { ratio: "9/16", maxWidth: 300 },
 };
 
 const PAGE_SIZE = 12;
@@ -128,7 +123,7 @@ export default function BannerDesign() {
   const [goal,       setGoal]       = useState("brand_awareness");
   const [style,      setStyle]      = useState("auto");
   const [brandColor, setBrandColor] = useState("");
-  const [platform,   setPlatform]   = useState("square_11");
+  const [platform,   setPlatform]   = useState("1:1");
   const [uploading,  setUploading]  = useState(false);
   const [generating, setGenerating] = useState(false);
   const [bannerUrl,  setBannerUrl]  = useState(null);
@@ -219,7 +214,7 @@ export default function BannerDesign() {
   }
 
   const canGenerate = bizDesc.trim() && !generating && !uploading;
-  const { ratio: resultRatio, maxWidth: resultMaxW } = RESULT_SIZE[platform] || RESULT_SIZE.square_11;
+  const { ratio: resultRatio, maxWidth: resultMaxW } = RESULT_SIZE[platform] || RESULT_SIZE["1:1"];
   const totalPages = Math.ceil(history.length / PAGE_SIZE);
   const paginated  = history.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -326,17 +321,9 @@ export default function BannerDesign() {
               </div>
             </div>
 
-            {/* Platform */}
+            {/* Size */}
             <div>
-              <label style={C.lbl}>Platform + Size</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {PLATFORMS.map(({ id, label }) => (
-                  <button key={id} onClick={() => setPlatform(id)}
-                    style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: platform === id ? "1.5px solid #f5c518" : "1.5px solid rgba(255,255,255,0.14)", background: platform === id ? "rgba(245,197,24,0.1)" : "transparent", color: platform === id ? "#f5c518" : "#7878a8" }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <SizeSelector value={platform} onChange={setPlatform} options={["1:1", "4:5", "9:16"]} accent="#f5c518" />
             </div>
 
           </div>

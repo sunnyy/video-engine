@@ -4,15 +4,9 @@ import {
   uploadMemory,
 } from "../middleware/shared.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
-import { BLANK_IMAGE } from "../../services/ai/shared/aiImage.js";
+import { blankForKey } from "../../services/ai/shared/aiImage.js";
 
 export const router = express.Router();
-
-const BLANK_URLS = {
-  square:       BLANK_IMAGE["1:1"],
-  portrait_45:  BLANK_IMAGE["4:5"],
-  portrait_916: BLANK_IMAGE["9:16"],
-};
 
 const NEGATIVE_PROMPT = "ugly, deformed, blurry, low quality, watermark, border, frame, low contrast, small text, unreadable text, cluttered, busy, amateur";
 
@@ -43,7 +37,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (!title) return res.status(400).json({ error: "title required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    const blankUrl = BLANK_URLS[platform] || BLANK_URLS.square;
+    const blankUrl = blankForKey(platform);
 
     const userPrompt = `Use the uploaded images to create this thumbnail. The last image is a blank canvas showing the exact required output dimensions — your output must match its size and aspect ratio precisely.
 

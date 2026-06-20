@@ -100,7 +100,7 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
     }
     const styleStr  = beat.asset_type === "ai_image" ? style.illustrationStyle : style.photoStyle;
     const promptSrc = beat.image_prompt || beat.shot_query || beat.content?.headline || beat.visual_concept || "";
-    const src = await generateAiImage(`${promptSrc}, ${styleStr}, vertical 9:16 composition`, { runId, label: `${label}-ai`, orientation, noTextGate: true });
+    const src = await generateAiImage(`${promptSrc}, ${styleStr}`, { runId, label: `${label}-ai`, orientation, noTextGate: true });
     return src ? { src, kind: "image", libraryEligible: true } : null;
   };
 

@@ -6,6 +6,7 @@ import { getCredits } from "../services/credits/creditService";
 import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
+import SizeSelector from "../ui/SizeSelector";
 
 const PAGE_SIZE = 12;
 
@@ -211,6 +212,7 @@ export default function VirtualTryOn() {
   const [selectedModel,  setSelectedModel]  = useState(null);
   const [genderFilter,   setGenderFilter]   = useState("all");
   const [hasMannequin,   setHasMannequin]   = useState(false);
+  const [aspect,         setAspect]         = useState("9:16");
   const [generating,     setGenerating]     = useState(false);
   const [resultUrl,      setResultUrl]      = useState(null);
   const [history,        setHistory]        = useState([]);
@@ -316,7 +318,7 @@ export default function VirtualTryOn() {
       const res  = await serverFetch("/api/outfit/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ garmentUrl: finalGarmentUrl, modelUrl: finalModelUrl, hasMannequin }),
+        body:    JSON.stringify({ garmentUrl: finalGarmentUrl, modelUrl: finalModelUrl, hasMannequin, aspect }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
@@ -428,6 +430,9 @@ export default function VirtualTryOn() {
 
           {/* Generate button — always pinned to bottom, disabled until ready */}
           <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
+            <div style={{ marginBottom: 12 }}>
+              <SizeSelector value={aspect} onChange={setAspect} options={["9:16", "4:5", "1:1"]} accent="#f5c518" />
+            </div>
             {genErr && (
               <div style={{ fontSize: 12, color: "#f87171", padding: "8px 12px", background: "rgba(248,113,113,0.06)", borderRadius: 8, border: "1px solid rgba(248,113,113,0.15)", marginBottom: 10 }}>
                 ✕ {genErr}

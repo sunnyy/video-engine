@@ -10,8 +10,6 @@ import { persistRemote } from "./persist.js";
 // image — it ignores any size/aspect parameter. So to force an output aspect we
 // append a blank canvas of that aspect as the final image_url. (FLUX paths do NOT
 // need this — they honor image_size directly.) These are the system blank assets.
-// NOTE: there is no true 16:9 landscape blank yet — add one to system-assets/
-// blank-images and wire it below to support landscape Nano Banana generation.
 const blankPub = (file) =>
   supabaseAdmin.storage.from("system-assets").getPublicUrl(`blank-images/${file}`).data?.publicUrl ?? null;
 
@@ -19,13 +17,28 @@ export const BLANK_IMAGE = {
   "1:1":  blankPub("1024x1024.png"),
   "4:5":  blankPub("864x1080.png"),
   "9:16": blankPub("680x1080.png"),
-  // "16:9": blankPub("1920x1080.png"),  // ← upload a landscape blank to enable this
+  "16:9": blankPub("1920x1080.png"),
 };
 
 /** The blank canvas URL to append as the LAST image_url for a Nano Banana edit,
- *  forcing the output orientation. Returns null when no blank exists (e.g. 16:9). */
+ *  forcing the output orientation. Returns null when no blank exists. */
 export function blankRefUrl(orientation = "9:16") {
   return BLANK_IMAGE[orientation] ?? null;
+}
+
+// Platform/aspect aliases used across the image studios → canonical aspect key.
+const BLANK_ALIASES = {
+  "1:1": "1:1", "4:5": "4:5", "9:16": "9:16", "16:9": "16:9",
+  square: "1:1", square_11: "1:1",
+  portrait_45: "4:5",
+  portrait_916: "9:16", story_916: "9:16",
+  landscape: "16:9",
+};
+
+/** Resolve any studio platform/aspect key (square, portrait_916, story_916,
+ *  landscape, "9:16", …) to its blank canvas URL. Falls back to 1:1. */
+export function blankForKey(key) {
+  return BLANK_IMAGE[BLANK_ALIASES[key] ?? key] ?? BLANK_IMAGE["1:1"];
 }
 
 // Diffusion models render garbled text the moment a prompt hints at one — hammer it.

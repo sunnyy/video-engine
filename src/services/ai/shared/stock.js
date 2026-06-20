@@ -135,11 +135,18 @@ export async function probeImageDims(url) {
   } catch { return null; }
 }
 
-export function treatmentFor(dims) {
-  if (!dims) return { treatment: "full_bleed", orientation: "portrait", aspect: null };
-  const aspect = dims.width / dims.height;
-  if (aspect <= 1.15) {
-    return { treatment: "full_bleed", orientation: aspect < 0.85 ? "portrait" : "square", aspect: +aspect.toFixed(2), width: dims.width, height: dims.height };
-  }
-  return { treatment: "framed", orientation: "landscape", aspect: +aspect.toFixed(2), width: dims.width, height: dims.height };
+export function treatmentFor(dims, orientation = "9:16") {
+  const canvasLandscape = orientation === "16:9";
+  if (!dims) return { treatment: "full_bleed", orientation: canvasLandscape ? "landscape" : "portrait", aspect: null };
+  const aspect  = dims.width / dims.height;
+  const imgKind = aspect < 0.85 ? "portrait" : aspect > 1.18 ? "landscape" : "square";
+  // Full-bleed when the image fills the canvas well (square, or matches the canvas
+  // orientation); otherwise frame the mismatched image in a band. Canvas-aware so a
+  // landscape shot is full-bleed on 16:9 and framed on 9:16, and vice-versa.
+  const fills = imgKind === "square" || (canvasLandscape ? imgKind === "landscape" : imgKind === "portrait");
+  return {
+    treatment: fills ? "full_bleed" : "framed",
+    orientation: imgKind,
+    aspect: +aspect.toFixed(2), width: dims.width, height: dims.height,
+  };
 }

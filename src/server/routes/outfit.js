@@ -5,6 +5,7 @@ import {
   uploadMemory,
 } from "../middleware/shared.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
+import { blankForKey } from "../../services/ai/shared/aiImage.js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -63,12 +64,13 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
     creditAmount = 15;
 
-    const { garmentUrl, modelUrl, hasMannequin } = req.body;
+    const { garmentUrl, modelUrl, hasMannequin, aspect = "9:16" } = req.body;
     if (!garmentUrl || !modelUrl) return res.status(400).json({ error: "garmentUrl and modelUrl required" });
+    const blank = blankForKey(aspect); // Nano Banana takes output size from the LAST image
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
 
-    const basePrompt = `Use Image 1 as the PERSON IDENTITY reference.\nUse Image 2 as the STYLE + CLOTHING reference.\n\nGenerate a professional fashion portrait.\n\nPERSON RULES\n- Preserve facial identity, skin tone, body proportions, hairstyle, and recognizable appearance from Image 1.\n- Keep the same person; do not redesign facial features.\n\nOUTFIT EXTRACTION RULES\n- Automatically identify only the wearable clothing items from Image 2.\n- Ignore background, props, bags, shoes, sunglasses, decorations, text, hangers, flat-lay styling, mannequins, and non-wearable objects unless explicitly visible as intended outfit pieces.\n- Reconstruct the outfit as if worn naturally on the person.\n\nCLOTHING TRANSFER\n- Preserve colors, garment categories, cuts, silhouette, neckline, sleeve style, textures, patterns, seams, buttons, folds, and fabric behavior.\n- Adapt fit naturally to the person's body while keeping the original design intent.\n- Maintain realistic draping and proportions.\n\nSTYLING\n- Convert the clothing into a premium editorial fashion look.\n- Add natural styling adjustments only where necessary for realism.\n- Keep the outfit wearable and commercially photographed.\n\nPOSE\n- Natural fashion pose, relaxed confidence.\n- Avoid mannequin pose or passport pose.\n\nENVIRONMENT\n- Premium indoor studio or lifestyle setting that matches the outfit mood.\n\nCAMERA\n- Vertical portrait (9:16).\n- Full body visible (or at least knees visible).\n- Fashion photography composition.\n\nLIGHTING\n- Soft studio lighting.\n- Clean skin rendering.\n- Luxury campaign quality.\n\nQUALITY RULES\n- No body distortion.\n- No clothing deformation.\n- No identity drift.\n- No extra limbs.\n- High-end fashion campaign realism.`;
+    const basePrompt = `Use Image 1 as the PERSON IDENTITY reference.\nUse Image 2 as the STYLE + CLOTHING reference.\n\nGenerate a professional fashion portrait.\n\nPERSON RULES\n- Preserve facial identity, skin tone, body proportions, hairstyle, and recognizable appearance from Image 1.\n- Keep the same person; do not redesign facial features.\n\nOUTFIT EXTRACTION RULES\n- Automatically identify only the wearable clothing items from Image 2.\n- Ignore background, props, bags, shoes, sunglasses, decorations, text, hangers, flat-lay styling, mannequins, and non-wearable objects unless explicitly visible as intended outfit pieces.\n- Reconstruct the outfit as if worn naturally on the person.\n\nCLOTHING TRANSFER\n- Preserve colors, garment categories, cuts, silhouette, neckline, sleeve style, textures, patterns, seams, buttons, folds, and fabric behavior.\n- Adapt fit naturally to the person's body while keeping the original design intent.\n- Maintain realistic draping and proportions.\n\nSTYLING\n- Convert the clothing into a premium editorial fashion look.\n- Add natural styling adjustments only where necessary for realism.\n- Keep the outfit wearable and commercially photographed.\n\nPOSE\n- Natural fashion pose, relaxed confidence.\n- Avoid mannequin pose or passport pose.\n\nENVIRONMENT\n- Premium indoor studio or lifestyle setting that matches the outfit mood.\n\nCAMERA\n- Match the aspect ratio and framing of the blank canvas image provided.\n- Full body visible (or at least knees visible).\n- Fashion photography composition.\n\nLIGHTING\n- Soft studio lighting.\n- Clean skin rendering.\n- Luxury campaign quality.\n\nQUALITY RULES\n- No body distortion.\n- No clothing deformation.\n- No identity drift.\n- No extra limbs.\n- High-end fashion campaign realism.`;
 
     const prompt = hasMannequin
       ? `The outfit in Image 2 is displayed on a mannequin. Extract only the clothing — ignore the mannequin entirely. ${basePrompt}`
@@ -77,7 +79,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     const falRes = await fetch("https://fal.run/fal-ai/nano-banana/edit", {
       method:  "POST",
       headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ image_urls: [modelUrl, garmentUrl], prompt }),
+      body:    JSON.stringify({ image_urls: blank ? [modelUrl, garmentUrl, blank] : [modelUrl, garmentUrl], prompt }),
     });
     if (!falRes.ok) throw new Error(`Fal.ai failed: ${(await falRes.text()).slice(0, 200)}`);
     const data   = await falRes.json();

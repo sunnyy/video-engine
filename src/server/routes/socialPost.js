@@ -65,7 +65,7 @@ FINAL FEEL: The result should look like a professional campaign created by a top
 
 APPLY THIS CREATIVE DIRECTION EXACTLY:\n`;
 
-import { BLANK_IMAGE as BLANK_URLS } from "../../services/ai/shared/aiImage.js";
+import { blankForKey } from "../../services/ai/shared/aiImage.js";
 
 import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
@@ -165,7 +165,7 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     const NANO_SIZE = { "1:1": "square_hd", "4:5": { width: 864, height: 1080 }, "9:16": { width: 680, height: 1080 } };
     const NANO_DIMS = { "1:1": "1024x1024px (square)", "4:5": "864x1080px (portrait 4:5)", "9:16": "680x1080px (story 9:16)" };
-    const blankUrl  = BLANK_URLS[aspectRatio] || BLANK_URLS["1:1"];
+    const blankUrl  = blankForKey(aspectRatio);
     const dimLabel  = NANO_DIMS[aspectRatio] || NANO_DIMS["1:1"];
 
     const imageUrls = [];

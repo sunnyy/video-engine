@@ -4,15 +4,9 @@ import {
   uploadMemory,
 } from "../middleware/shared.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
-import { BLANK_IMAGE } from "../../services/ai/shared/aiImage.js";
+import { blankForKey } from "../../services/ai/shared/aiImage.js";
 
 export const router = express.Router();
-
-const BLANK_URLS = {
-  square_11:   BLANK_IMAGE["1:1"],
-  portrait_45: BLANK_IMAGE["4:5"],
-  story_916:   BLANK_IMAGE["9:16"],
-};
 
 const NEGATIVE_PROMPT = "ugly, deformed, blurry, low quality, pixelated, watermark, random leaves, plants, fruits, vegetables unrelated to product, generic stock photo, flat lighting, clutter, busy background, cartoon, illustration, text errors, spelling mistakes";
 
@@ -42,12 +36,14 @@ router.post("/generate", requireAuth, async (req, res) => {
     if (!goal) return res.status(400).json({ error: "goal required" });
 
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    const blankUrl = BLANK_URLS[platform] || BLANK_URLS.square_11;
+    const blankUrl = blankForKey(platform);
 
-    const orientationNote = platform === "story_916"
+    const orientationNote = platform === "9:16"
       ? "Design for tall vertical 9:16 portrait format."
-      : platform === "portrait_45"
+      : platform === "4:5"
       ? "Design for vertical 4:5 portrait format."
+      : platform === "16:9"
+      ? "Design for wide landscape 16:9 format."
       : "Design for square 1:1 format.";
 
     const userPrompt = `Use the uploaded images to create this banner. The last image is a blank canvas showing the exact required output dimensions — your output must match its size and aspect ratio precisely.

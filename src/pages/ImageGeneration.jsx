@@ -7,6 +7,7 @@ import { getCredits } from "../services/credits/creditService";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 import RefundClaimTrigger from "../ui/components/RefundClaimTrigger";
+import SizeSelector from "../ui/SizeSelector";
 
 const C = {
   lbl:  { fontSize: 11, fontWeight: 700, color: "#8888aa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6, display: "block" },
@@ -15,6 +16,7 @@ const C = {
 
 const ASPECT_RATIOS = [
   { id: "1:1",  label: "1 : 1",  icon: "▪", cssRatio: "1/1"  },
+  { id: "4:5",  label: "4 : 5",  icon: "▮", cssRatio: "4/5"  },
   { id: "16:9", label: "16 : 9", icon: "▬", cssRatio: "16/9" },
   { id: "9:16", label: "9 : 16", icon: "▮", cssRatio: "9/16" },
 ];
@@ -185,19 +187,7 @@ export default function ImageGeneration() {
 
             {/* Aspect ratio */}
             <div>
-              <label style={C.lbl}>Aspect Ratio</label>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {ASPECT_RATIOS.map(r => (
-                  <button key={r.id} onClick={() => setAspectRatio(r.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer", textAlign: "left", transition: "all 0.15s",
-                      background: aspectRatio === r.id ? "rgba(245,197,24,0.1)" : "rgba(255,255,255,0.04)",
-                      color:      aspectRatio === r.id ? "#f5c518" : "#8888aa",
-                      outline:    aspectRatio === r.id ? "1px solid rgba(245,197,24,0.35)" : "1px solid transparent" }}>
-                    <span style={{ fontSize: 15, opacity: 0.7 }}>{r.icon}</span>
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+              <SizeSelector value={aspectRatio} onChange={setAspectRatio} options={["1:1", "4:5", "9:16", "16:9"]} accent="#f5c518" label="Aspect Ratio" />
             </div>
 
             {/* Divider */}

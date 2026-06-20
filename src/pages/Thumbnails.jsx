@@ -6,6 +6,7 @@ import { getCredits } from "../services/credits/creditService";
 import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
+import SizeSelector from "../ui/SizeSelector";
 
 const PAGE_SIZE = 12;
 
@@ -41,12 +42,6 @@ const THUMB_GOALS = [
   { id: "storytime",   label: "Story Time"      },
 ];
 
-const PLATFORMS = [
-  { id: "youtube",  label: "YouTube"  },
-  { id: "reels",    label: "Reels"    },
-  { id: "tiktok",   label: "TikTok"   },
-  { id: "shorts",   label: "Shorts"   },
-];
 
 function timeLabel(dateStr) {
   if (!dateStr) return "";
@@ -122,7 +117,7 @@ export default function Thumbnails() {
   const [imageFile,    setImageFile]    = useState(null);
   const [uploading,    setUploading]    = useState(false);
   const [thumbGoal,    setThumbGoal]    = useState("");
-  const [platform,     setPlatform]     = useState("youtube");
+  const [platform,     setPlatform]     = useState("16:9");
   const [headline,     setHeadline]     = useState("");
   const [style,        setStyle]        = useState("bold");
   const [refFile,      setRefFile]      = useState(null);
@@ -307,17 +302,9 @@ export default function Thumbnails() {
               </div>
             </div>
 
-            {/* Platform */}
+            {/* Size */}
             <div>
-              <label style={C.lbl}>Platform</label>
-              <div style={{ display: "flex", gap: 6 }}>
-                {PLATFORMS.map(p => (
-                  <button key={p.id} onClick={() => setPlatform(p.id)}
-                    style={{ flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: platform === p.id ? "none" : "1px solid rgba(255,255,255,0.18)", background: platform === p.id ? "#7c5cfc" : "rgba(255,255,255,0.04)", color: platform === p.id ? "#fff" : "#a0a0c8" }}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+              <SizeSelector value={platform} onChange={setPlatform} options={["16:9", "9:16"]} accent="#7c5cfc" />
             </div>
 
             {/* Headline */}

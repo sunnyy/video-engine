@@ -12,11 +12,10 @@
  * injects the URL into the scene's social-image placeholder.
  */
 
-import { supabaseAdmin, openai } from "../../../server/middleware/shared.js";
+import { supabaseAdmin } from "../../../server/middleware/shared.js";
 import { searchStockImage, searchStockVideo, probeImageDims, treatmentFor } from "../shared/stock.js";
 import { styleImagePrompt } from "../shared/visualStyles.js";
-
-const NO_TEXT_SUFFIX = ", absolutely no text, no letters, no words, no numbers, no captions, no signage, no watermarks, clean surfaces";
+import { generateAiImage } from "../shared/aiImage.js";
 
 // AI generations allowed per video — social posts usually carry their own image,
 // so AI is a rare fallback. ~1 per 22s, capped at 2.
@@ -95,53 +94,9 @@ async function stockVideo(query, runId, label, orientation, minDuration) {
   return p ?? hit.url;
 }
 
-// ── AI image (FAL) + vision text-gate ─────────────────────────────────────────
-async function falImage(prompt, runId, label) {
-  const key = process.env.FAL_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch("https://fal.run/fal-ai/flux/schnell", {
-      method: "POST",
-      headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt + NO_TEXT_SUFFIX, image_size: "portrait_16_9", num_images: 1, num_inference_steps: 4, enable_safety_checker: false }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const falUrl = data?.images?.[0]?.url ?? null;
-    if (!falUrl) return null;
-    return (await persistRemote(falUrl, runId, label)) ?? falUrl;
-  } catch (e) {
-    console.warn(`[social/media] fal image error (${label}):`, e.message);
-    return null;
-  }
-}
-
-async function imageHasText(imageUrl) {
-  try {
-    const res = await openai.chat.completions.create({
-      model: "gpt-4o", max_tokens: 5,
-      messages: [{ role: "user", content: [
-        { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
-        { type: "text", text: "Does this image contain any visible text, letters, numbers, or writing-like glyphs? Answer only YES or NO." },
-      ] }],
-    });
-    return /yes/i.test(res.choices[0]?.message?.content ?? "");
-  } catch { return false; }
-}
-
-// (Asset shape analyser — probeImageDims / treatmentFor — now in shared/stock.js)
-
-async function falImageClean(prompt, runId, label) {
-  let best = null;
-  for (let i = 1; i <= 2; i++) {
-    const extra = i === 2 ? ", plain surfaces only, absolutely zero writing anywhere" : "";
-    const url = await falImage(prompt + extra, runId, `${label}-v${i}`);
-    if (!url) return best;
-    best = url;
-    if (!(await imageHasText(url))) return url;
-  }
-  return best;
-}
+// AI image generation + vision text-gate is the shared, orientation-aware utility
+// (../shared/aiImage.js → generateAiImage). No local FLUX copy — orientation is
+// honored universally there.
 
 /**
  * resolveSocialMedia(scenes, content, runId) — sets scene.resolvedImage for every
@@ -185,7 +140,7 @@ export async function resolveSocialMedia(scenes, content, runId, orientation = "
   const needAI = scenes.filter(s => s._needsAI && !s.resolvedImage);
   await Promise.all(needAI.slice(0, AI_BUDGET).map(async (scene) => {
     const subject = scene.stock_query || scene.subject_entity || scene.visual_text || scene.creative_brief || "";
-    const src = await falImageClean(`${subject}, ${styleImagePrompt(styleId, "photo")}, vertical 9:16 composition`, runId, `s${scene.scene_index}-ai`);
+    const src = await generateAiImage(`${subject}, ${styleImagePrompt(styleId, "photo")}`, { runId, label: `s${scene.scene_index}-ai`, orientation });
     if (src) scene.resolvedImage = src;
   }));
   for (const s of scenes) delete s._needsAI;
@@ -194,10 +149,10 @@ export async function resolveSocialMedia(scenes, content, runId, orientation = "
   // Stock videos are requested in the project orientation, so they're full-bleed.
   await Promise.all(scenes.filter(s => s.resolvedImage).map(async (s) => {
     if (s.resolvedKind === "video") {
-      s.assetMeta = { treatment: "full_bleed", orientation: "portrait", aspect: null };
+      s.assetMeta = { treatment: "full_bleed", orientation: orientation === "16:9" ? "landscape" : "portrait", aspect: null };
       return;
     }
-    s.assetMeta = treatmentFor(await probeImageDims(s.resolvedImage));
+    s.assetMeta = treatmentFor(await probeImageDims(s.resolvedImage), orientation);
   }));
 
   console.log(`[social/media] AI budget ${AI_BUDGET} for ${totalDur.toFixed(0)}s — ${scenes.map(s => `s${s.scene_index}:${s.resolvedImage ? `${s.use_fetched_image ? "post" : s.subject_entity ? "real" : "img"}/${s.assetMeta?.treatment ?? "?"}` : "none"}`).join(" ")}`);

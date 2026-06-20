@@ -7,6 +7,7 @@ import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 import RefundClaimTrigger from "../ui/components/RefundClaimTrigger";
+import SizeSelector from "../ui/SizeSelector";
 
 async function downloadFile(url, filename) {
   const res  = await fetch(url);
@@ -32,11 +33,6 @@ const GOALS = [
   { id: "showcase",  label: "Showcase"        },
 ];
 
-const SIZES = [
-  { id: "square",       label: "1:1",  w: 14, h: 14 },
-  { id: "portrait_45",  label: "4:5",  w: 12, h: 15 },
-  { id: "portrait_916", label: "9:16", w: 10, h: 17 },
-];
 
 const STYLES = [
   { id: "auto",       label: "Auto"       },
@@ -118,7 +114,7 @@ export default function PosterStudio() {
   const [imageFile,  setImageFile]  = useState(null);
   const [uploading,  setUploading]  = useState(false);
   const [goal,       setGoal]       = useState("awareness");
-  const [platform,   setPlatform]   = useState("");
+  const [platform,   setPlatform]   = useState("9:16");
   const [style,      setStyle]      = useState("auto");
   const [brandColor, setBrandColor] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -285,19 +281,7 @@ export default function PosterStudio() {
 
             {/* Size */}
             <div>
-              <label style={C.lbl}>Size <span style={{ color: "#f87171", fontSize: 10 }}>*</span></label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {SIZES.map(s => {
-                  const active = platform === s.id;
-                  return (
-                    <button key={s.id} onClick={() => setPlatform(s.id)}
-                      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 10, cursor: "pointer", border: active ? "1.5px solid #f5c518" : "1.5px solid rgba(255,255,255,0.14)", background: active ? "rgba(245,197,24,0.1)" : "transparent", color: active ? "#f5c518" : "#7878a8" }}>
-                      <div style={{ width: s.w, height: s.h, border: `1.5px solid ${active ? "#f5c518" : "#7878a8"}`, borderRadius: 2 }} />
-                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em" }}>{s.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <SizeSelector value={platform} onChange={setPlatform} options={["1:1", "4:5", "9:16"]} accent="#f5c518" />
             </div>
 
             {/* Style */}
