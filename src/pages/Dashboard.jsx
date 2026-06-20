@@ -133,19 +133,18 @@ function AiVideoChatbox() {
 
   const [planning,   setPlanning]   = useState(false);
   const [planData,   setPlanData]   = useState(null);
-  const [revision,   setRevision]   = useState("");
   const [loading,    setLoading]    = useState(false);
   const [statusStep, setStatusStep] = useState(0);
   const [error,      setError]      = useState(null);
 
   const canPlan = !!prompt.trim() && !planning && !loading;
 
-  async function handlePlan(reviseText = "") {
+  async function handlePlan() {
     if (!prompt.trim() || planning || loading) return;
     setPlanning(true); setError(null);
     try {
-      const result = await planAiVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation, revision: reviseText });
-      setPlanData(result); setRevision("");
+      const result = await planAiVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation });
+      setPlanData(result);
     } catch (err) {
       setError(err.message || "Planning failed. Please try again.");
     } finally {
@@ -153,12 +152,14 @@ function AiVideoChatbox() {
     }
   }
 
-  async function handleProduce() {
+  async function handleProduce(editedBeats) {
     if (!planData || loading) return;
-    setLoading(true); setError(null); setStatusStep(2);
+    setPlanData(null); setLoading(true); setError(null); setStatusStep(2);
+    // Carry the user's edited script lines into the plan; visuals stay as planned.
+    const plan = { ...planData.plan, film: { ...planData.plan.film, beats: editedBeats } };
     try {
       const result = await generateAiVideo(
-        { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, orientation, plan: planData.plan },
+        { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, orientation, plan },
         ({ step }) => { const i = STATUS_STEPS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("ai_video", "all");
@@ -234,40 +235,17 @@ function AiVideoChatbox() {
         <div style={{ marginTop: 14, fontSize: 13, color: T.muted, textAlign: "center" }}>Planning your video…</div>
       )}
 
-      {/* Plan preview */}
+      {/* Script confirmation — editable lines only; no internal analysis shown */}
       {planData && !loading && (
-        <div style={{ marginTop: 16, padding: "20px 22px", background: T.surface, border: "1px solid rgba(245,158,11,0.3)", borderRadius: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: T.text }}>{planData.summary.projectName}</div>
-            <button onClick={() => setPlanData(null)} style={{ background: "none", border: "none", color: T.faint, cursor: "pointer", fontSize: 16 }}>✕</button>
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-            {[`~${planData.summary.estSeconds}s`, `${planData.summary.beatCount} beats`, `${planData.summary.shotCount} shots`, planData.summary.styleId?.replace("_", " "), planData.summary.musicMood].filter(Boolean).map((chip, i) => (
-              <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, background: "rgba(245,158,11,0.12)", color: "#fbbf24" }}>{chip}</span>
-            ))}
-          </div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.65, marginBottom: 12, maxHeight: 150, overflowY: "auto" }}>
-            {planData.summary.script}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <input
-              value={revision}
-              onChange={(e) => setRevision(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && revision.trim() && handlePlan(revision)}
-              placeholder='Want changes? e.g. "make it funnier"'
-              disabled={planning}
-              style={{ flex: 1, padding: "10px 12px", boxSizing: "border-box", background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 12, fontFamily: "inherit", outline: "none" }}
-            />
-            <button onClick={() => revision.trim() && handlePlan(revision)} disabled={planning || !revision.trim()}
-              style={{ padding: "10px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: "rgba(255,255,255,0.05)", color: T.text, fontSize: 12, fontWeight: 700, cursor: planning ? "wait" : "pointer", fontFamily: "inherit" }}>
-              {planning ? "Revising…" : "Revise"}
-            </button>
-          </div>
-          <button onClick={handleProduce}
-            style={{ width: "100%", padding: "13px 24px", background: AI, color: "#1c1408", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-            Looks good — Produce Video (75 credits)
-          </button>
-        </div>
+        <ScriptConfirmModal
+          scenes={planData.plan.film.beats}
+          scriptKey="script_line"
+          onConfirm={handleProduce}
+          onCancel={() => setPlanData(null)}
+          accent={AI}
+          title="Review your script"
+          confirmLabel="Looks good — Produce Video (75 credits)"
+        />
       )}
 
       {/* Producing progress */}
@@ -554,7 +532,6 @@ function ProductChatbox() {
   const [goal,        setGoal]        = useState(cfg.specific.goal.default);
   const [length,      setLength]      = useState(cfg.specific.length.default);
   const [visuals,     setVisuals]     = useState(cfg.specific.visuals.default);
-  const [styleId,     setStyleId]     = useState(cfg.shared.style.default);
   const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
   const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
@@ -599,7 +576,6 @@ function ProductChatbox() {
         offerText: "",
         website: mode === "url" ? productUrl.trim() : "",
         visualMode: effVisuals,
-        visualStyle: styleId,
         voice_id: voiceId,
         language,
         sceneCount: length,
@@ -655,7 +631,6 @@ function ProductChatbox() {
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={PC} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={PC} />
             <SelectField icon={<Target size={16} />} label="Goal"    value={goal}    onChange={setGoal}    options={cfg.specific.goal.options}    accent={PC} />
             <SelectField icon={<Film size={16} />}   label="Length"  value={length}  onChange={setLength}  options={cfg.specific.length.options}  accent={PC} />

@@ -198,8 +198,25 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
   let collected;
   try {
     await page.setViewport({ width: canvasW, height: canvasH, deviceScaleFactor: 1 });
-    await page.setContent(htmlString, { waitUntil: "networkidle0", timeout: 15000 });
-    try { await page.evaluate(() => document.fonts && document.fonts.ready); } catch {}
+    // Use domcontentloaded, NOT networkidle0. When several scenes are measured in
+    // parallel against one shared browser, the Google-Fonts @import connections keep
+    // the network from ever going idle within the timeout — so scenes failed
+    // navigation and came back as blank gaps. We only need the DOM laid out + fonts
+    // applied: load the DOM, then await document.fonts.ready behind a hard cap that
+    // can never hang (a slow/blocked font CDN must not blank the scene).
+    await page.setContent(htmlString, { waitUntil: "domcontentloaded", timeout: 15000 });
+    // Flex/grid items default to min-width:auto, so a single long word (e.g.
+    // "MEDITERRANEAN") forces its column to min-content width and BLOWS OUT the whole
+    // layout — sibling columns (a side illustration/notepad) get pushed off-canvas and
+    // culled, and headlines refuse to wrap. The standard remedy is min-width:0 on
+    // flex/grid children; inject it so columns respect their fr ratios as intended.
+    try { await page.addStyleTag({ content: "*{min-width:0!important;}" }); } catch {}
+    try {
+      await Promise.race([
+        page.evaluate(() => document.fonts && document.fonts.ready),
+        new Promise((r) => setTimeout(r, 3000)),
+      ]);
+    } catch {}
     collected = await page.evaluate(collectInPage, canvasW, canvasH);
   } finally {
     try { await page.close(); } catch {}
@@ -257,12 +274,19 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
       width = Math.round(n.rect.width); height = Math.round(n.rect.height);
     }
 
-    const zIndex = n.css.zIndex ?? (
+    // Stacking: an explicit POSITIVE z-index is GPT's deliberate foreground — it must
+    // sit ABOVE role-defaulted (auto-z) elements, or a static panel/card (role-default
+    // z=3) paints over text that GPT intentionally positioned on top of it (z-index:2),
+    // hiding the headline. So: explicit z>0 → high band (100+z); explicit z≤0 → keep low
+    // (behind, as authored); auto (no z-index) → role default in the low band.
+    const roleZ =
       n.role === "background"                       ? 0 :
       n.role === "glow"                            ? 1 :
       n.role === "card" || n.role === "decoration" ? 3 :
-      n.role === "badge" || n.role === "kicker"    ? 8 : 10
-    );
+      n.role === "badge" || n.role === "kicker"    ? 8 : 10;
+    const zIndex = n.css.zIndex == null ? roleZ
+      : n.css.zIndex > 0 ? 100 + n.css.zIndex
+      : n.css.zIndex;
 
     const entry = {
       id, role: n.role, layer: n.layer, animation: n.animation, sceneElement: n.sceneElement,
@@ -323,6 +347,26 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
       if (ta === "center") { entry.x -= Math.round(wrapBuffer / 2); entry.width += wrapBuffer; }
       else if (ta === "right" || ta === "end") { entry.x -= wrapBuffer; entry.width += wrapBuffer; }
       else { entry.width += wrapBuffer; }
+
+      // Text-fit guard that PRESERVES the designer's composition. The headless
+      // measure can size a box to its (narrower) measured text, so the longest word
+      // breaks mid-way at the final render font ("OUTSIDE" -> "OUTSI DE"). Fix by
+      // scaling the FONT down to fit the box AS-IS — keep the box's position/width so
+      // left/right panel and column layouts survive (do NOT widen the box to full
+      // canvas, which yanks panel text to the centre). Only when the box itself runs
+      // past the canvas do we clamp its width + re-anchor it inside the frame.
+      const FIT_PAD = Math.round(canvasW * 0.03);
+      const maxTextW = canvasW - FIT_PAD * 2;
+      if (entry.width > maxTextW) entry.width = maxTextW;
+      const fsNow = entry.style.fontSize || 48;
+      const longestWord = (entry.text || "").split(/\s+/).filter(Boolean)
+        .reduce((a, w) => (w.length > a.length ? w : a), "");
+      const wordNeed = Math.ceil(longestWord.length * fsNow * 0.6); // safe upper bound for display glyphs
+      if (wordNeed > entry.width) {
+        entry.style.fontSize = Math.max(20, Math.floor(fsNow * entry.width / wordNeed));
+      }
+      if (entry.x < FIT_PAD) entry.x = FIT_PAD;
+      else if (entry.x + entry.width > canvasW - FIT_PAD) entry.x = Math.max(FIT_PAD, canvasW - FIT_PAD - entry.width);
     } else if (type === "gradient") {
       entry.background = n.css.bgImage || n.css.bgColor || null;
     } else if (type === "image") {
@@ -403,10 +447,20 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
   graph = graph.filter(e => {
     // 1. Drop unreadable micro-text (almost always fake-mockup label noise).
     if (e.type === "text" && (e.style?.fontSize ?? 99) < MIN_READABLE_FONT) return false;
-    // 2. Drop real content whose center is off-canvas (decorations/glow may bleed).
-    if (e.role !== "background" && e.sceneElement !== "decoration") {
-      const cx = e.x + e.width / 2, cy = e.y + e.height / 2;
-      if (cx < -20 || cx > canvasW + 20 || cy < -20 || cy > canvasH + 20) return false;
+    // 2. Drop only elements that are ENTIRELY off the frame. An element that BLEEDS
+    //    off an edge but is still substantially on-screen is an intentional
+    //    composition (e.g. a notepad/card/device anchored at the frame edge) and must
+    //    be KEPT — culling by CENTER (the old rule) deleted these edge-bleed visuals.
+    if (e.role !== "background") {
+      const visX = Math.min(e.x + e.width, canvasW) - Math.max(e.x, 0);
+      const visY = Math.min(e.y + e.height, canvasH) - Math.max(e.y, 0);
+      // Judge "off-frame" by the FRACTION of the element that's on-screen, not an
+      // absolute pixel count — otherwise legitimately THIN elements (connector lines,
+      // rails, dividers, a 12px underline) get culled even when fully visible. Drop
+      // only when there's no overlap, or just a sliver of the element's own size shows
+      // (a large panel 90% off-frame); keep thin lines and intentional edge-bleed art.
+      if (visX <= 0 || visY <= 0) return false;
+      if (visX < e.width * 0.15 || visY < e.height * 0.15) return false;
     }
     return true;
   });

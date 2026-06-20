@@ -590,7 +590,9 @@ function PersistentVideoTrack({
             cursor: isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable ? "auto" : "none",
             borderRadius: (activeClip?.transform?.borderRadius ?? activeClip?.borderRadius) ? `${activeClip?.transform?.borderRadius ?? activeClip?.borderRadius}px` : undefined,
-            border: activeClip?.borderWidth ? `${activeClip.borderWidth}px solid ${activeClip.borderColor ?? "#ffffff"}` : undefined,
+            border: (activeClip?.borderWidth ?? activeClip?.transform?.borderWidth)
+              ? `${activeClip?.borderWidth ?? activeClip?.transform?.borderWidth}px solid ${activeClip?.borderColor ?? activeClip?.transform?.borderColor ?? "#ffffff"}`
+              : undefined,
             backgroundColor: activeClip?.backgroundColor ?? undefined,
             boxShadow: activeClip?.boxShadow ?? undefined,
             padding: activeClip?.padding ? `${activeClip.padding}px` : undefined,
@@ -1078,7 +1080,7 @@ function LayerElement({
         style={{
           width: "100%",
           height: "100%",
-          background: layer.gradient ?? "linear-gradient(135deg, #000000, #ffffff)",
+          background: layer.gradient ?? "transparent",
           // Match the wrapper's rounded corners — the wrapper has overflow:visible
           // (so glows/shadows can bleed), so the fill must round itself or it shows
           // square corners poking through a rounded border.
@@ -1260,7 +1262,12 @@ function LayerElement({
             cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",
             borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
-            border: layer.borderWidth ? `${layer.borderWidth}px solid ${layer.borderColor ?? "#ffffff"}` : undefined,
+            // Border lives under transform.* in the data; the top-level keys are usually
+            // undefined. Read both (like borderRadius above) so outlined shapes — rings,
+            // bordered cards, border-only dividers — actually draw their border.
+            border: (layer.borderWidth ?? layer.transform?.borderWidth)
+              ? `${layer.borderWidth ?? layer.transform?.borderWidth}px solid ${layer.borderColor ?? layer.transform?.borderColor ?? "#ffffff"}`
+              : undefined,
             backgroundColor: layer.backgroundColor ?? undefined,
             boxShadow: layer.boxShadow ?? undefined,
             padding: layer.padding ? `${layer.padding}px` : undefined,

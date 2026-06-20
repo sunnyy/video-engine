@@ -190,7 +190,9 @@ function TimelineLayer({ layer, currentTime, fps }) {
     backdropFilter: layer.backdropFilter || undefined,
     mixBlendMode: layer.mixBlendMode || layer.blendMode || undefined,
     borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
-    border: layer.borderWidth ? `${layer.borderWidth}px solid ${layer.borderColor ?? "#ffffff"}` : undefined,
+    border: (layer.borderWidth ?? layer.transform?.borderWidth)
+      ? `${layer.borderWidth ?? layer.transform?.borderWidth}px solid ${layer.borderColor ?? layer.transform?.borderColor ?? "#ffffff"}`
+      : undefined,
     boxShadow: layer.boxShadow || undefined,
     zIndex: layer.zIndex,
   };
@@ -311,7 +313,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
   if (layer.type === "gradient") {
     return (
       <Sequence from={startFrame} durationInFrames={durationFrames}>
-        <div style={{ ...baseStyle, position: "absolute", background: layer.gradient || "#000000" }} />
+        <div style={{ ...baseStyle, position: "absolute", background: layer.gradient || "transparent" }} />
       </Sequence>
     );
   }

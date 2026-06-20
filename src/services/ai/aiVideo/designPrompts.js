@@ -59,8 +59,10 @@ export function buildBeatPrompt(beat, ctx) {
 - data-animation: fade-in | fade-up | scale-in | slide-left | slide-right | none  (at least 2 elements animated; entrances land with the voice)
 - data-scene-element: hero | background | supporting | decoration
 - Icons: data-icon="kebab-name" (Lucide) ONLY on a single standalone glyph — NEVER on something built from shapes/divs (it gets replaced by a generic icon and your design is lost; leave hand-built shapes as data-layer="decoration").
-TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Only REAL tagged elements render — no ::before/::after pseudo-elements. Spell every word EXACTLY as given; minimum readable font ~26px.
-NEVER print the beat's intent/kind/role as visible text. Words like "Hook", "Fact", "Reveal", "Stat", "Quote", "CTA", "Title", "List" are INTERNAL direction — they must NOT appear on screen. A kicker/label/badge, if used, must be REAL content (a topic tag or short phrase), never the intent/kind keyword. Render only the CONTENT strings given.`;
+TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Spell every word EXACTLY as given; minimum readable font ~26px.
+NO PSEUDO-ELEMENTS — our renderer DROPS ::before and ::after entirely (and any content:"" decoration). EVERY visible mark must be its OWN real tagged element: build glows, halos, ring highlights, accent arcs/sweeps, underlines, lines, dots, sparkles, and gradient overlays as actual <div>s with data-role/data-layer (e.g. a glow = a <div data-role="glow" data-layer="effect"> radial-gradient). If you draw an accent with ::before/::after it will VANISH in the render — never rely on it.
+NO FILLER CHROME — this is the #1 thing that makes frames look generic and bloated: do NOT add a kicker, badge, label, tag, chip, "01"/number pill, or rounded mini-pill unless it carries ESSENTIAL real content the frame genuinely cannot say otherwise. Default to NONE of them. No scattered dots, corner ticks, stray rules, or decorative pills. A bold frame is the hero + at most one supporting element — nothing else.
+NEVER print the beat's internal kind/role as visible text — words like "Hook", "Fact", "Stat", "Quote", "List", "CTA", "Title", "Reveal" are internal direction, never on screen. Render only the real CONTENT strings.`;
 
   if (isOverlay) {
     // ── OVERLAY MODE ────────────────────────────────────────────────────────
@@ -85,7 +87,6 @@ OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;
 
     const user = `BEAT ${beat.beat_index} — overlay on a shot of: ${beat.image_prompt ?? beat.shot_query ?? beat.visual_concept}
 SPOKEN: "${beat.script_line}"
-INTENT (internal direction — never render as on-screen text): ${beat.visual_concept}
 
 Design the overlay.`;
     return { system, user };
@@ -110,25 +111,25 @@ ${paletteBlock(palette, beat)}
 
 ${contentBlock(beat)}
 
-ONE FOCAL IDEA per frame. FEWER, BIGGER elements always beat more-and-smaller. ELEMENT BUDGET: aim for 4–7 meaningful tagged elements; never exceed ~10. A viewer reads a few things in ${duration.toFixed(1)}s. Total on-screen words ≤ ${maxWords}. The hero reads INSTANTLY (max contrast, max size).
-RESIST CLUTTER: no scattered dots, corner ticks, texture strips, stray rules, or oversized "ghost" background numerals/words stacked behind everything. Every element must earn its place — if it doesn't serve the one idea, delete it. A clean frame with 5 confident elements beats a busy one with 30.
-VARY THE FORM beat to beat — do NOT make every canvas frame a headline-on-a-field:
-- TYPE frames: a huge headline, a stacked kinetic phrase, a stat slam (the number IS the hero), a quote card.
-- BUILT-GRAPHIC frames: a clean chart from the data, a comparison split (X vs Y), a labeled card/grid, a simple geometric motif. Build it from SIMPLE shapes (rectangles, rounded-rects, circles, gradients, glows, lines) as ONE composed group in its OWN zone, with text in a SEPARATE zone — minimal, confident parts, never a cluttered fake UI.
-SIMPLE ABSTRACT ONLY — DO NOT DRAW REAL THINGS IN CSS: never try to depict an object, animal, person, place, map, building, product, flag, emblem, crest, or logo out of shapes — it always renders as crude blobs. Two hard rules: (1) NO clip-path and NO inline <svg> — our renderer DROPS both, so they vanish or flatten to plain rectangles (a CSS "eagle" or "map" becomes red boxes); (2) if a beat needs to SHOW a real thing, that is an IMAGE beat, not this frame — here, express the idea with bold TYPOGRAPHY (e.g. "power fractured" as cracked/split type, NOT a CSS crest) or at most ONE Lucide icon. Illustrate only SIMPLE abstract concepts; never attempt a complex representational scene.
+ONE FOCAL IDEA per frame, set BIG and confident — but it MUST FIT fully inside the ${canvasW}×${canvasH} frame. Size the hero as large as FITS: a short 1–3 word line can be enormous; a longer headline must WRAP across 2–3 lines (let it wrap naturally — NEVER white-space:nowrap a line wider than the frame) or be sized down so every word sits fully on-screen. Big type is great; type CLIPPED at the edge is broken. Maximum contrast, readable in under a second. (Thin, timid, mid-size type is the main reason a frame feels weak and empty.)
+MATCH RICHNESS TO THE IDEA. A pure-type frame stays lean and bold (a commanding hero + maybe one supporting line). But when the idea calls for a BUILT GRAPHIC, build it fully and make it feel premium and designed — these can have many parts, and that is GOOD: a UI / app / browser mockup, a device or phone screen, a dashboard, a composed multi-part card, panels, a progress bar, an abstract diagram, a geometric motif, a chart from real values. Emptiness reads as a plain slideshow; a richly built graphic does not. Total on-screen words ≤ ${maxWords}.
+NO FILLER (this is different from richness): every element must SERVE the idea. Cut decorative noise — scattered dots, corner ticks, texture strips, stray rules, loose "kicker/badge" pills used as garnish, or oversized "ghost" numerals/words stacked behind everything. A purposeful 12-part mockup is great; 12 random decorations are not.
+VARY THE FORM beat to beat — do NOT make every canvas frame a headline-on-a-field. Reach for: a huge headline · a stacked kinetic phrase · a stat slam · a quote card · a two-side split · a chart from real values · a UI/app mockup · a labeled diagram.
+ILLUSTRATE FREELY — WITH LIMITS. You MAY build rich CSS illustrations and they look great: UI/app/browser mockups, device screens, dashboards, cards, panels, progress bars, abstract diagrams, geometric motifs, charts. Build those richly.
+But DO NOT try to depict these in CSS — they ALWAYS come out as crude grey blobs, so they belong in an IMAGE beat (or carry the idea with bold TYPOGRAPHY) instead: a map / country / geography, a building / architecture / landmark, a vehicle, an animal, a person or face, an emblem / crest / flag / logo, or any specific real-world object or scene.
+TECH LIMIT: NO clip-path and NO inline <svg> — our renderer drops both (a CSS "eagle" or "map" becomes plain rectangles).
 Every frame needs a visible light source or accent presence — flat darkness reads as dead air.
 
 ${dataContract}
 
 KINETIC TEXT SYNC: when your text mirrors the spoken line, split it into one element per phrase (spoken order, exact words) — the pipeline lands each as its words are spoken.
 
-LAYOUT FOR THIS FRAME: ${beat.visual_concept || "the strongest premium structure for this content"}
+LAYOUT: entirely yours — invent the strongest, boldest composition for THIS line's content and this film's style. Don't reach for a default; let the words decide the form.
 ${cutoutBlock}${continuation}
 OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 
   const user = `BEAT ${beat.beat_index} — ${duration.toFixed(1)}s on screen
 SPOKEN: "${beat.script_line}"
-INTENT (internal direction — never render as on-screen text): ${beat.visual_concept}
 
 Design this frame. Make it look different from a plain headline-on-cream card.`;
 

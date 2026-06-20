@@ -146,11 +146,10 @@ TAG every meaningful element (layout wrappers don't need tags):
 - data-animation: fade-in | fade-up | scale-in | slide-left | none   (animate at least 2 elements)
 - data-scene-element: hero | supporting | decoration
 Only REAL tagged elements render — no ::before/::after.
-NEVER print the scene's intent/purpose/role as visible text. Words like "Hook", "Showcase", "Feature", "Detail", "Lifestyle", "CTA" are INTERNAL direction — they must NOT appear on screen. Render ONLY the display content given below (kicker/headline/etc.); a kicker is real copy, never the intent keyword.
 
 OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 
-  const user = `SCENE INTENT (internal direction — never render this word on screen): ${sceneIntent}
+  const user = `SCENE INTENT: ${sceneIntent}
 PLACEMENT: ${anchor} → compose within ${zone.desc}.
 VOICEOVER (context only — not shown): "${sceneScript}"
 ${display.headline ? "" : `Pick a short, premium headline if none was supplied.`}

@@ -20,23 +20,6 @@
  */
 
 import { openai } from "../../../server/middleware/shared.js";
-import { getStyle, styleMenuForDirector, STYLE_IDS } from "../shared/visualStyles.js";
-
-// Sensible style fallback by product mood (when Auto and the model doesn't return a valid id).
-const MOOD_STYLE = { premium: "dark_cinematic", elegant: "dark_cinematic", minimalist: "minimal", bold: "bold_pop", playful: "bold_pop", organic: "editorial_retro" };
-
-// The visual-style directive for the director: honor a locked pick, else have it choose.
-function styleDirective(visualStyle) {
-  const locked = getStyle(visualStyle);
-  if (locked) {
-    return `## VISUAL STYLE (locked by the user): ${locked.label} — ${locked.description}
-Shoot EVERY scene in this aesthetic: ${locked.photoStyle}. Palette feel (a direction only — pull the actual accent from the product itself): ${locked.paletteGuidance}
-Set product.visual_style to "${locked.id}".`;
-  }
-  return `## VISUAL STYLE — YOU CHOOSE the look that best fits THIS product's positioning. Pick exactly ONE id from:
-${styleMenuForDirector()}
-Match the product to its market: a premium/luxury/tech product must NOT get a casual or meme look; a playful consumer product can. Shoot every scene's environment, lighting, and mood in the chosen style. Set product.visual_style to the chosen id.`;
-}
 
 // Scene-count → intent sequence GUIDANCE (the director may adapt; not a hard enum).
 const COUNT_GUIDANCE = {
@@ -87,14 +70,12 @@ SCRIPT: write a SHORT spoken line per scene (the word caps above are hard limits
 
 PALETTE: derive from the product. Premium goods → editorial dark, moody field with the product's accent on the key word/icon. Bright/playful goods → lighter field. accent_color = a single #hex pulled from the product.
 
-${styleDirective(params.visualStyle)}
-
 PRODUCT CONTEXT (from the user): brand "${params.brandName || "(read it from the photo)"}"${params.productDescription ? `, described as: ${params.productDescription}` : ""}. CTA: "${params.ctaText || "Shop Now"}".${params.offerText ? ` Offer: ${params.offerText}.` : ""}${params.website ? ` Website: ${params.website}.` : ""} Campaign goal: ${params.goal || "promo"}.
 
 Return ONLY valid JSON, no prose:
 {
   "validation": { "is_suitable": true, "rejection_reason": null },
-  "product": { "name": "", "category": "clothing|wearable|non_worn", "mood": "premium|playful|minimalist|bold|elegant|organic", "theme": "dark|light|medium", "accent_color": "#hex", "secondary_color": "#hex — a second key color from the product, for two-tone UI / panels / dividers", "visual_style": "the chosen (or locked) style id", "has_watermark": false },
+  "product": { "name": "", "category": "clothing|wearable|non_worn", "mood": "premium|playful|minimalist|bold|elegant|organic", "theme": "dark|light|medium", "accent_color": "#hex", "secondary_color": "#hex — a second key color from the product, for two-tone UI / panels / dividers", "has_watermark": false },
   "base_image_prompt": "Nano Banana edit instruction to turn the upload into a clean studio packshot — pure seamless backdrop, clean directional studio light, remove props/clutter, no text added. Keep the product 100% unchanged.",
   "full_script": "the complete voiceover",
   "scenes": [
@@ -178,9 +159,6 @@ export async function generateProductPlan(productImageUrl, params = {}) {
     product_theme:  VALID_THEMES.has(product.theme) ? product.theme  : "dark",
     accent_color:   /^#[0-9a-f]{3,8}$/i.test(product.accent_color ?? "") ? product.accent_color : "#C8954F",
     secondary_color: /^#[0-9a-f]{3,8}$/i.test(product.secondary_color ?? "") ? product.secondary_color : null,
-    visual_style:   getStyle(params.visualStyle)?.id                          // locked pick wins
-                    ?? (STYLE_IDS.includes(product.visual_style) ? product.visual_style  // else the director's choice
-                    : (MOOD_STYLE[product.mood] ?? "dark_cinematic")),                    // else by mood
     has_watermark:  product.has_watermark === true,
   };
 
@@ -227,7 +205,7 @@ export async function generateProductPlan(productImageUrl, params = {}) {
     ? parsed.full_script.trim()
     : scenes.map(s => s.script_segment).join(" ");
 
-  console.log(`[productDirector] "${brief.product_name}" | ${brief.product_category} | mood=${brief.product_mood} theme=${brief.product_theme} style=${brief.visual_style} accent=${brief.accent_color} | ${scenes.length} scenes`);
+  console.log(`[productDirector] "${brief.product_name}" | ${brief.product_category} | mood=${brief.product_mood} theme=${brief.product_theme} accent=${brief.accent_color} | ${scenes.length} scenes`);
 
   return {
     validation: parsed.validation ?? { is_suitable: true },
