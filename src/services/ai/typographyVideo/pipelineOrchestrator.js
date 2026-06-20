@@ -87,14 +87,24 @@ function assignBeatTimingsFallback(scenes) {
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 
-async function saveTimeline(timeline, projectName, userId) {
+// Map the chosen orientation to canvas dimensions — drives the typographic timeline + saved format.
+function orientationToCanvas(orientation) {
+  switch (orientation) {
+    case "16:9": return { width: 1920, height: 1080 };
+    case "1:1":  return { width: 1080, height: 1080 };
+    case "4:5":  return { width: 1080, height: 1350 };
+    default:     return { width: 1080, height: 1920 }; // 9:16
+  }
+}
+
+async function saveTimeline(timeline, projectName, userId, orientation = "9:16") {
   const { data: row, error } = await supabaseAdmin
     .from("projects")
     .insert({
       user_id:           userId,
       name:              projectName,
       safe_project_json: timeline,
-      orientation:       "9:16",
+      orientation:       orientation,
       mode:              "timeline",
       source:            "typography_video",
       editor_version:    "timeline",
@@ -127,7 +137,8 @@ export async function planTypography(project) {
 // scenes may carry the user's edited voiceover text; narration is rebuilt from them.
 
 export async function produceTypography(plan, params, onProgress = () => {}) {
-  const { userId, voiceId = null } = params;
+  const { userId, voiceId = null, orientation = "9:16" } = params;
+  const canvas = orientationToCanvas(orientation);
   const scenes = (plan.scenes ?? []).map(s => ({ ...s }));
   const { projectName, palette, fontPair, musicMood, niche } = plan;
   const voiceoverScript = scenes.map(sc => (sc.voiceover ?? "").trim()).filter(Boolean).join(" ");
@@ -171,6 +182,7 @@ export async function produceTypography(plan, params, onProgress = () => {}) {
     audioUrl,
     audioDuration,
     globalWordTimestamps: wordTimestamps,
+    canvas,
   });
   onProgress({ step: 3 });
 
@@ -217,7 +229,7 @@ export async function produceTypography(plan, params, onProgress = () => {}) {
 
   // Step 6: Save
   console.log("[typography] step 6 — saving");
-  const projectId = await saveTimeline(timeline, projectName, userId);
+  const projectId = await saveTimeline(timeline, projectName, userId, orientation);
 
   console.log(`[typography] done — ${timedBeats.length} beats, ${timeline.format.duration.toFixed(2)}s, project=${projectId}`);
   return { projectId, projectName };

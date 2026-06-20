@@ -12,7 +12,7 @@
  * premium, measured HTML/CSS. No flat-pixel contract, no overflow math.
  */
 
-const W = 1080, H = 1920;
+// Canvas W/H are per-call (orientation-driven) — derived inside buildProductScenePrompt.
 
 // What each scene is FOR — energy/role, not a layout template. Gives the designer
 // the scene's job so consecutive scenes feel different, not one uniform treatment.
@@ -30,12 +30,14 @@ const INTENT_PURPOSE = {
 
 // Anchor → the band the overlay must compose within (matches the cleared zone in
 // the generated shot). These are guidance regions, not hard pixel boxes.
-const ANCHOR_ZONES = {
-  "text-top":    { desc: `the UPPER region (roughly y=72–${Math.round(H * 0.48)}), full width — stack content top-down`, align: "flex-start", justify: "flex-start" },
-  "text-bottom": { desc: `the LOWER region (roughly y=${Math.round(H * 0.50)}–${H - 64}), full width`,                 align: "flex-start", justify: "flex-end"   },
-  "text-left":   { desc: `the LEFT column (roughly x=56–${Math.round(W * 0.58)}), using its FULL height`,             align: "flex-start", justify: "flex-start" },
-  "text-right":  { desc: `the RIGHT column (roughly x=${Math.round(W * 0.42)}–${W - 56}), using its FULL height`,      align: "flex-end", justify: "flex-start" },
-};
+function anchorZones(W, H) {
+  return {
+    "text-top":    { desc: `the UPPER region (roughly y=72–${Math.round(H * 0.48)}), full width — stack content top-down`, align: "flex-start", justify: "flex-start" },
+    "text-bottom": { desc: `the LOWER region (roughly y=${Math.round(H * 0.50)}–${H - 64}), full width`,                 align: "flex-start", justify: "flex-end"   },
+    "text-left":   { desc: `the LEFT column (roughly x=56–${Math.round(W * 0.58)}), using its FULL height`,             align: "flex-start", justify: "flex-start" },
+    "text-right":  { desc: `the RIGHT column (roughly x=${Math.round(W * 0.42)}–${W - 56}), using its FULL height`,      align: "flex-end", justify: "flex-start" },
+  };
+}
 
 function hexToRgba(hex, alpha) {
   const h = (hex ?? "#000000").replace("#", "");
@@ -65,7 +67,11 @@ export function buildProductScenePrompt(sceneScript, projectContext) {
     display      = {},
     creativeDirection = "",
     hasVision    = false,
+    canvasWidth  = 1080,
+    canvasHeight = 1920,
   } = projectContext;
+  const W = canvasWidth, H = canvasHeight;
+  const ANCHOR_ZONES = anchorZones(W, H);
 
   const purpose = INTENT_PURPOSE[sceneIntent] ?? INTENT_PURPOSE.showcase;
 
@@ -110,7 +116,7 @@ ${hasVision ? `- LOOK AT THE ATTACHED PRODUCT IMAGE. Place your overlay ONLY in 
 - Suggested primary area: ${zone.desc} — but TRUST THE IMAGE over this hint: if the product occupies it, put the text where the photo is actually clear.` : `- COMPOSE within ${zone.desc} — the clean space the photo left open; never place anything over the product. You may also use a clear bottom band for a CTA / credential strip.`}
 - Use absolutely-positioned wrappers per region and lay elements inside with normal flow.
 
-CANVAS SCALE — CRITICAL. This is a 1080×1920 video frame, NOT a web page. Everything is read from a phone at arm's length, so type and icons must be BIG. Anything under ~22px is invisible and will be discarded. Use these MINIMUMS (go bigger for hierarchy):
+CANVAS SCALE — CRITICAL. This is a ${W}×${H} video frame, NOT a web page. Everything is read from a phone at arm's length, so type and icons must be BIG. Anything under ~22px is invisible and will be discarded. Use these MINIMUMS (go bigger for hierarchy):
 - headline: 90–180px · stat number: 120–240px
 - subhead / body: 30–44px · feature label: 34–46px · feature sub-line: 26–34px
 - kicker / badge / credential strip / website: 24–30px (NEVER smaller)
@@ -125,7 +131,7 @@ DESIGN A CLEAN, PREMIUM EDITORIAL OVERLAY — fewer, bigger, confident elements 
 YOU decide the UI treatment — including WHETHER a subtle translucent panel behind the text helps legibility. It is OPTIONAL and usually unnecessary (a scrim already sits beneath you). Do not add a box by default.
 COMPOSITION: ONE dominant focal element (the headline). Group related items, align to a tidy edge, leave generous breathing room.
 
-MUST FIT — CRITICAL: the WHOLE composition must fit within the 1080×1920 frame. NOTHING may extend below y=1920 or past the frame edges, and elements must NOT overlap. If it feels tight, REMOVE or shrink elements — never overflow or stack on top of each other.
+MUST FIT — CRITICAL: the WHOLE composition must fit within the ${W}×${H} frame. NOTHING may extend below y=${H} or past the frame edges, and elements must NOT overlap. If it feels tight, REMOVE or shrink elements — never overflow or stack on top of each other.
 
 CONSTRAINTS:
 - NEVER cover the product. Everything legible via text-shadow (or an optional translucent panel).
@@ -156,7 +162,7 @@ ${display.headline ? "" : `Pick a short, premium headline if none was supplied.`
 BRAND: ${brandName}
 ACCENT: ${accent}
 
-Design the single most striking, premium 9:16 overlay for this scene — text only, in the anchor zone, over the product photo. All text in English.`;
+Design the single most striking, premium overlay for this ${W}×${H} scene — text only, in the anchor zone, over the product photo. All text in English.`;
 
   return { system, user };
 }

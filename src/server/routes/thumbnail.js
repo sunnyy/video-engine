@@ -4,13 +4,14 @@ import {
   uploadMemory,
 } from "../middleware/shared.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
+import { BLANK_IMAGE } from "../../services/ai/shared/aiImage.js";
 
 export const router = express.Router();
 
 const BLANK_URLS = {
-  square:       "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/1024x1024.png",
-  portrait_45:  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/864x1080.png",
-  portrait_916: "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/680x1080.png",
+  square:       BLANK_IMAGE["1:1"],
+  portrait_45:  BLANK_IMAGE["4:5"],
+  portrait_916: BLANK_IMAGE["9:16"],
 };
 
 const NEGATIVE_PROMPT = "ugly, deformed, blurry, low quality, watermark, border, frame, low contrast, small text, unreadable text, cluttered, busy, amateur";

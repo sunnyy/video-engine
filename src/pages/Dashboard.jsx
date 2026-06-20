@@ -303,7 +303,7 @@ function SocialChatbox() {
     try {
       const result = await produceSocialVideo(
         { ...plan, scenes: editedScenes },
-        { voiceId, language, includeAuthor, styleId },
+        { voiceId, language, includeAuthor, styleId, orientation },
         ({ step }) => { const i = SOCIAL_STATUS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("social_video", "all");
@@ -576,6 +576,7 @@ function ProductChatbox() {
         offerText: "",
         website: mode === "url" ? productUrl.trim() : "",
         visualMode: effVisuals,
+        orientation,
         voice_id: voiceId,
         language,
         sceneCount: length,
@@ -718,7 +719,7 @@ function TypographyChatbox() {
     try {
       const result = await produceTypographyVideo(
         { ...plan, scenes: editedScenes },
-        { voiceId, language },
+        { voiceId, language, orientation },
         ({ step }) => { if (typeof step === "number") setStatusStep(step); },
       );
       invalidateProjectCaches("typography_video", "all");

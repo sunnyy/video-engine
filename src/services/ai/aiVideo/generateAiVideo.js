@@ -14,12 +14,12 @@ export async function planAiVideo({ prompt, styleId = "auto", targetDuration = 4
 }
 
 export async function generateAiVideo(
-  { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, plan = null },
+  { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null },
   onProgress,
 ) {
   const res = await serverFetch("/api/ai-video/generate", {
     method: "POST",
-    body: JSON.stringify({ prompt, styleId, targetDuration, language, voiceId, plan }),
+    body: JSON.stringify({ prompt, styleId, targetDuration, language, voiceId, orientation, plan }),
   });
 
   if (!res.ok && res.status !== 200) {

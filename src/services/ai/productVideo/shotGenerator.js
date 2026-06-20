@@ -14,10 +14,18 @@
  */
 
 import { supabaseAdmin } from "../../../server/middleware/shared.js";
+import { blankRefUrl } from "../shared/aiImage.js";
 
 const FAL_KEY    = () => process.env.FAL_API_KEY || process.env.FAL_KEY;
 const NANO_EDIT  = "https://fal.run/fal-ai/nano-banana/edit";
 const NO_TEXT    = " Absolutely no text, letters, numbers, logos, watermarks, captions, or UI anywhere in the image.";
+
+// Nano Banana takes its output size from the LAST attached image. Append the blank
+// canvas for the chosen orientation so shots match the VIDEO aspect, not the upload's.
+function withBlank(imageUrls, orientation) {
+  const blank = blankRefUrl(orientation);
+  return blank ? [...imageUrls, blank] : imageUrls;
+}
 
 async function nanoEdit(imageUrls, prompt) {
   const res = await fetch(NANO_EDIT, {
@@ -50,21 +58,21 @@ async function persist(falUrl, userId, runId, label) {
 }
 
 const DEFAULT_BASE_PROMPT =
-  "Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, labels, and shape — completely unchanged. Replace the background with a clean seamless studio backdrop, improve to soft directional studio lighting with gentle shadows, and remove any props, clutter, or distractions. No people. Hyper-realistic, photorealistic, 9:16 vertical portrait.";
+  "Use the FIRST uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, labels, and shape — completely unchanged. Replace the background with a clean seamless studio backdrop, improve to soft directional studio lighting with gentle shadows, and remove any props, clutter, or distractions. No people. Hyper-realistic, photorealistic. Match the aspect ratio and framing of the blank canvas image provided.";
 
 /**
  * generateBaseImage(productImageUrl, opts)
  * Clean studio packshot — the canonical reference every scene conditions on.
  * @param {object} opts { userId, runId, prompt, hasWatermark }
  */
-export async function generateBaseImage(productImageUrl, { userId, runId, prompt, hasWatermark } = {}) {
+export async function generateBaseImage(productImageUrl, { userId, runId, prompt, hasWatermark, orientation = "9:16" } = {}) {
   try {
-    let url = await nanoEdit([productImageUrl], (prompt || DEFAULT_BASE_PROMPT) + NO_TEXT);
+    let url = await nanoEdit(withBlank([productImageUrl], orientation), (prompt || DEFAULT_BASE_PROMPT) + NO_TEXT);
 
     if (hasWatermark) {
       try {
-        url = await nanoEdit([url],
-          "Use the uploaded photo as the product reference. Remove any watermarks, stock-photo text overlays, copyright notices, or semi-transparent text. Keep the product itself — branding, labels, colors, shape, design — completely unchanged.");
+        url = await nanoEdit(withBlank([url], orientation),
+          "Use the FIRST uploaded photo as the product reference. Remove any watermarks, stock-photo text overlays, copyright notices, or semi-transparent text. Keep the product itself — branding, labels, colors, shape, design — completely unchanged. Match the aspect ratio of the blank canvas image provided.");
       } catch (e) {
         console.warn("[productShots] watermark pass skipped:", e.message);
       }
@@ -84,15 +92,15 @@ export async function generateBaseImage(productImageUrl, { userId, runId, prompt
  * Edit the base reference into this scene's composition (scene/lighting only).
  * @param {object} opts { userId, runId }
  */
-export async function generateSceneShot(referenceUrl, scene, { userId, runId } = {}) {
+export async function generateSceneShot(referenceUrl, scene, { userId, runId, orientation = "9:16" } = {}) {
   const sceneDesc = (scene.image_generation_prompt || scene.shot_type || "premium editorial product photograph, dramatic lighting").trim();
   const anchored =
-    `Use the uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, and shape — completely unchanged. Only change the scene, environment, surface, lighting, and composition as described: ${sceneDesc}` + NO_TEXT;
+    `Use the FIRST uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, and shape — completely unchanged. Only change the scene, environment, surface, lighting, and composition as described: ${sceneDesc}. Match the aspect ratio and framing of the blank canvas image provided.` + NO_TEXT;
 
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
     try {
-      const url = await nanoEdit([referenceUrl], anchored);
+      const url = await nanoEdit(withBlank([referenceUrl], orientation), anchored);
       return await persist(url, userId, runId, `s${scene.scene_index}-${scene.intent}`);
     } catch (e) {
       console.warn(`[productShots] scene ${scene.scene_index} attempt ${attempt + 1} failed: ${e.message}`);

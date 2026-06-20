@@ -2,8 +2,31 @@
  * shared/aiImage.js — FAL (FLUX schnell) image generation + a vision text-gate +
  * background removal (birefnet). The last-resort tier; everything else is cheaper.
  */
-import { openai } from "../../../server/middleware/shared.js";
+import { openai, supabaseAdmin } from "../../../server/middleware/shared.js";
 import { persistRemote } from "./persist.js";
+
+// ── Blank canvas references for Nano Banana ─────────────────────────────────
+// Nano Banana (fal nano-banana/edit) takes its OUTPUT size from the LAST attached
+// image — it ignores any size/aspect parameter. So to force an output aspect we
+// append a blank canvas of that aspect as the final image_url. (FLUX paths do NOT
+// need this — they honor image_size directly.) These are the system blank assets.
+// NOTE: there is no true 16:9 landscape blank yet — add one to system-assets/
+// blank-images and wire it below to support landscape Nano Banana generation.
+const blankPub = (file) =>
+  supabaseAdmin.storage.from("system-assets").getPublicUrl(`blank-images/${file}`).data?.publicUrl ?? null;
+
+export const BLANK_IMAGE = {
+  "1:1":  blankPub("1024x1024.png"),
+  "4:5":  blankPub("864x1080.png"),
+  "9:16": blankPub("680x1080.png"),
+  // "16:9": blankPub("1920x1080.png"),  // ← upload a landscape blank to enable this
+};
+
+/** The blank canvas URL to append as the LAST image_url for a Nano Banana edit,
+ *  forcing the output orientation. Returns null when no blank exists (e.g. 16:9). */
+export function blankRefUrl(orientation = "9:16") {
+  return BLANK_IMAGE[orientation] ?? null;
+}
 
 // Diffusion models render garbled text the moment a prompt hints at one — hammer it.
 export const NO_TEXT_SUFFIX = ", absolutely no text, no letters, no words, no numbers, no characters, no typography, no captions, no labels, no signage, no stamps, no logos, no watermarks, clean surfaces";

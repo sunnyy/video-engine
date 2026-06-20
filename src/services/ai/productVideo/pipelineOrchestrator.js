@@ -29,8 +29,17 @@ import { applyTransitions, assignSceneTransitions } from "../shared/transitions.
 import { injectMusic }            from "../shared/music.js";
 import { buildTimeline }            from "./timelineBuilder.js";
 
-const CANVAS = { width: 1080, height: 1920 };
+const CANVAS = { width: 1080, height: 1920 }; // default (9:16)
 const FPS    = 30;
+// Map the chosen orientation to canvas dimensions — drives shots, overlay design, measure + saved format.
+function orientationToCanvas(orientation) {
+  switch (orientation) {
+    case "16:9": return { width: 1920, height: 1080 };
+    case "1:1":  return { width: 1080, height: 1080 };
+    case "4:5":  return { width: 1080, height: 1350 };
+    default:     return { width: 1080, height: 1920 }; // 9:16
+  }
+}
 
 // ── Timestamp assignment ───────────────────────────────────────────────────────
 
@@ -54,7 +63,7 @@ function assignWhisperTimestamps(scenes, whisperWords) {
 // legibility scrim (darker top + bottom, clear middle so the product reads) are
 // owned here and sit BENEATH the text — no z-index fights. Works for a still shot
 // now or an animated clip later (swap type:"image" → type:"video").
-function mediaScrimEntries(sceneIndex, src) {
+function mediaScrimEntries(sceneIndex, src, canvas = CANVAS) {
   const base = {
     role: "background", animation: "none", sceneElement: "background",
     rotation: 0, opacity: 1, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
@@ -62,10 +71,10 @@ function mediaScrimEntries(sceneIndex, src) {
   };
   return [
     { ...base, id: `s${sceneIndex}_media`, trackId: `s${sceneIndex}_media`,
-      layer: "image", type: "image", zIndex: 0, x: 0, y: 0, width: CANVAS.width, height: CANVAS.height,
+      layer: "image", type: "image", zIndex: 0, x: 0, y: 0, width: canvas.width, height: canvas.height,
       src, objectFit: "cover", assetType: "product-shot" },
     { ...base, id: `s${sceneIndex}_scrim`, trackId: `s${sceneIndex}_scrim`,
-      layer: "gradient", type: "gradient", zIndex: 1, x: 0, y: 0, width: CANVAS.width, height: CANVAS.height,
+      layer: "gradient", type: "gradient", zIndex: 1, x: 0, y: 0, width: canvas.width, height: canvas.height,
       background: "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.18) 30%, rgba(0,0,0,0.02) 50%, rgba(0,0,0,0.30) 78%, rgba(0,0,0,0.82) 100%)" },
   ];
 }
@@ -88,8 +97,8 @@ const OVERLAY_Z = {
   "stat-number": 11, headline: 11,
   cta: 12,
 };
-function normalizeOverlayZ(overlay) {
-  const W = CANVAS.width, H = CANVAS.height;
+function normalizeOverlayZ(overlay, canvas = CANVAS) {
+  const W = canvas.width, H = canvas.height;
   // Safety net: drop any element that lands (mostly) OUTSIDE the frame — a runaway
   // overflow stack. The designer is told to fit; this guarantees no off-frame garbage.
   const kept = overlay.filter((e) => {
@@ -186,7 +195,7 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
         user_id:           project.userId,
         name:              timeline.name,
         safe_project_json: timeline,
-        orientation:       "9:16",
+        orientation:       project.orientation ?? "9:16",
         mode:              "timeline",
         source:            "product_video",
         editor_version:    "timeline",
@@ -229,6 +238,7 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
  */
 export async function runProductVideoPipeline(project, onStep) {
   const { userId, productImageUrl, visualMode = "image" } = project;
+  const canvas = orientationToCanvas(project.orientation ?? "9:16");
   const runId = `pv4-${Date.now()}`;
 
   // ── Step 1: Director (vision) — full plan from the product photo ───────────
@@ -257,6 +267,7 @@ export async function runProductVideoPipeline(project, onStep) {
     userId, runId,
     prompt:       plan.base_image_prompt,
     hasWatermark: brief.has_watermark,
+    orientation:  project.orientation ?? "9:16",
   });
 
   // ── Step 3: Voiceover → per-scene durations (clamped 3–4s; no stretch) ─────
@@ -290,8 +301,8 @@ export async function runProductVideoPipeline(project, onStep) {
     theme:        brief.product_theme ?? "dark",
     productMood,
     fontPair:     fontPairFor(productMood),
-    canvasWidth:  CANVAS.width,
-    canvasHeight: CANVAS.height,
+    canvasWidth:  canvas.width,
+    canvasHeight: canvas.height,
     fps:          FPS,
     musicMood:    productMood ?? "premium",
     productName:  project.brandName ?? brief.product_name ?? "Product",
@@ -300,7 +311,7 @@ export async function runProductVideoPipeline(project, onStep) {
   // ── Step 4a: Scene shots first (the designer needs to SEE them) ────────────
   onStep?.(2);
   console.log(`[productPipeline] step 4a — ${scenes.length} scene shots`);
-  const shotUrls = await generateAllSceneShots(baseImageUrl, scenes, { userId, runId });
+  const shotUrls = await generateAllSceneShots(baseImageUrl, scenes, { userId, runId, orientation: project.orientation ?? "9:16" });
 
   // ── Step 4b: Overlay design (vision on each shot) + headless measure ───────
   console.log("[productPipeline] step 4b — overlays (vision)");
@@ -308,7 +319,7 @@ export async function runProductVideoPipeline(project, onStep) {
     try {
       const sceneImageUrl = shotUrls[idx] ?? baseImageUrl ?? productImageUrl;
       const html    = await designProductScene(scene, brief, { ...projectContext, sceneImageUrl });
-      const overlay = await measureSceneHTML(html || "", scene.scene_index, CANVAS);
+      const overlay = await measureSceneHTML(html || "", scene.scene_index, canvas);
       return { html, overlay };
     } catch (err) {
       console.error(`[productPipeline] scene ${scene.scene_index} overlay failed:`, err.message);
@@ -320,9 +331,9 @@ export async function runProductVideoPipeline(project, onStep) {
   // ── Step 5: Assemble graphs — pipeline shot (z0) + scrim (z1) + overlay ────
   const validShots = shotUrls.map(u => u ?? baseImageUrl ?? productImageUrl);
   const sceneGraphs = scenes.map((scene, i) => {
-    const overlay = normalizeOverlayZ(overlayResults[i]?.overlay ?? []);
+    const overlay = normalizeOverlayZ(overlayResults[i]?.overlay ?? [], canvas);
     console.log(`[productPipeline] scene ${i} (${scene.intent}) — ${overlay.length} overlay layers, shot=${shotUrls[i] ? "ok" : "base-fallback"}`);
-    return [...mediaScrimEntries(i, validShots[i]), ...overlay];
+    return [...mediaScrimEntries(i, validShots[i], canvas), ...overlay];
   });
   const sceneHTMLs = overlayResults.map(r => r?.html ?? null);
 

@@ -38,7 +38,7 @@ export function buildSocialScenePrompt(visualText, sceneContext) {
   const heroFont = fontPair.hero       ?? "Anton";
   const bodyFont = fontPair.supporting ?? "Inter";
 
-  const W = 1080, H = 1920;
+  const W = sceneContext.canvasW ?? 1080, H = sceneContext.canvasH ?? 1920;
   const bandTop = Math.round(H * 0.54), kickerMax = Math.round(H * 0.16);
 
   const shared = `You are a world-class motion-graphics art director for short-form viral social video.

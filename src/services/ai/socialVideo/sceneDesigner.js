@@ -15,6 +15,8 @@ export async function designSocialScene(scene, projectContext, attempt = 1) {
     assetTreatment:  scene.assetMeta?.treatment ?? null, // "full_bleed" | "framed"
     palette:         projectContext.palette      ?? {},
     fontPair:        projectContext.fontPair     ?? {},
+    canvasW:         projectContext.canvasWidth,
+    canvasH:         projectContext.canvasHeight,
     showAttribution,
     author:          showAttribution ? (projectContext.author       ?? "") : "",
     authorHandle:    showAttribution ? (projectContext.authorHandle ?? "") : "",

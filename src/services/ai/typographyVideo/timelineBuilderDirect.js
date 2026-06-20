@@ -37,7 +37,7 @@ function makeBaseLayer(id, overrides) {
   };
 }
 
-function makeGradientLayer(id, gradient, start, end) {
+function makeGradientLayer(id, gradient, start, end, canvas = { width: W, height: H }) {
   return makeBaseLayer(id, {
     name: "BG",
     type: "gradient",
@@ -45,17 +45,17 @@ function makeGradientLayer(id, gradient, start, end) {
     start, end,
     zIndex: 0,
     transform: {
-      x: 0, y: 0, width: W, height: H,
+      x: 0, y: 0, width: canvas.width, height: canvas.height,
       opacity: 1, scale: 1, blur: 0, rotation: 0,
       borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
     },
   });
 }
 
-function makeTextLayer(id, opts, start, end, keyframes = {}) {
+function makeTextLayer(id, opts, start, end, keyframes = {}, canvas = { width: W, height: H }) {
   const {
     content, fontSize, fontFamily, fontWeight = 700, color,
-    y = 0, height = H, zIndex = 2,
+    y = 0, height = canvas.height, zIndex = 2,
     textAnimation = "none", wordTimestamps = null,
     letterSpacing = 0, name = "Text",
   } = opts;
@@ -70,7 +70,7 @@ function makeTextLayer(id, opts, start, end, keyframes = {}) {
     wordTimestamps,
     keyframes: { ...NO_KF, ...keyframes },
     transform: {
-      x: 0, y, width: W, height,
+      x: 0, y, width: canvas.width, height,
       opacity: 1, scale: 1, blur: 0, rotation: 0,
       borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
     },
@@ -83,13 +83,13 @@ function makeTextLayer(id, opts, start, end, keyframes = {}) {
 
 // ── Per-beat layer builder ──────────────────────────────────────────────────────
 
-function buildBeatLayer(beat, index, total, palette, fontPair, start, textEnd, bgEnd, keywordIdx) {
+function buildBeatLayer(beat, index, total, palette, fontPair, start, textEnd, bgEnd, keywordIdx, canvas = { width: W, height: H }) {
   const result   = [];
   const heroFont = fontPair?.hero ?? "Inter";
 
   // Background stretches to next beat so there's no black flash
   const bgGradient = `linear-gradient(165deg, ${palette.background} 0%, ${palette.backgroundSecondary} 100%)`;
-  result.push(makeGradientLayer(`b${index}_bg`, bgGradient, start, bgEnd));
+  result.push(makeGradientLayer(`b${index}_bg`, bgGradient, start, bgEnd, canvas));
 
   const isFirst   = index === 0;
   const isLast    = index === total - 1;
@@ -171,10 +171,10 @@ function buildBeatLayer(beat, index, total, palette, fontPair, start, textEnd, b
     {
       name: "Text", content: beat.text,
       fontSize: fSize, fontFamily: heroFont, fontWeight,
-      color, y: 0, height: H, zIndex: 2,
+      color, y: 0, height: canvas.height, zIndex: 2,
       textAnimation, wordTimestamps,
     },
-    start, textEnd, kf
+    start, textEnd, kf, canvas
   ));
 
   return result;
@@ -189,6 +189,7 @@ export function buildTypographyTimelineDirect(timedBeats, options = {}) {
     fontPair,
     audioUrl             = null,
     audioDuration        = 0,
+    canvas               = { width: W, height: H },
   } = options;
 
   const layers = [];
@@ -210,7 +211,7 @@ export function buildTypographyTimelineDirect(timedBeats, options = {}) {
     const isKeyword = beat.type === "keyword";
     layers.push(...buildBeatLayer(
       beat, i, total, palette, fontPair, start, textEnd, bgEnd,
-      isKeyword ? keywordIdx : -1
+      isKeyword ? keywordIdx : -1, canvas
     ));
     if (isKeyword) keywordIdx++;
   }
@@ -235,7 +236,7 @@ export function buildTypographyTimelineDirect(timedBeats, options = {}) {
     version: "2.0",
     id: null,
     name: projectName,
-    format: { width: W, height: H, fps: FPS, duration: totalDuration },
+    format: { width: canvas.width, height: canvas.height, fps: FPS, duration: totalDuration },
     layers,
     meta: {
       source:         "typography_video",

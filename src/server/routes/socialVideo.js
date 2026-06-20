@@ -63,7 +63,7 @@ router.post("/produce", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
-  const { plan, voiceId, language = "en", includeAuthor = false, styleId = "auto", projectId } = req.body;
+  const { plan, voiceId, language = "en", includeAuthor = false, styleId = "auto", orientation = "9:16", projectId } = req.body;
   if (!plan?.scenes?.length) return res.status(400).json({ error: "plan is required" });
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -79,7 +79,7 @@ router.post("/produce", requireAuth, async (req, res) => {
 
     const result = await produceSocial(
       plan,
-      { userId, voiceId: voiceId ?? null, language: language ?? "en", includeAuthor: !!includeAuthor, styleId: styleId ?? "auto" },
+      { userId, voiceId: voiceId ?? null, language: language ?? "en", includeAuthor: !!includeAuthor, styleId: styleId ?? "auto", orientation: ["9:16","16:9","1:1","4:5"].includes(orientation) ? orientation : "9:16" },
       ({ step }) => send({ step }),
     );
 

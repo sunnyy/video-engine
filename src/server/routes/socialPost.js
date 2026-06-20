@@ -65,11 +65,7 @@ FINAL FEEL: The result should look like a professional campaign created by a top
 
 APPLY THIS CREATIVE DIRECTION EXACTLY:\n`;
 
-const BLANK_URLS = {
-  "1:1":  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/1024x1024.png",
-  "4:5":  "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/864x1080.png",
-  "9:16": "https://dfwacscjpdesuvwamxfs.supabase.co/storage/v1/object/public/system-assets/blank-images/680x1080.png",
-};
+import { BLANK_IMAGE as BLANK_URLS } from "../../services/ai/shared/aiImage.js";
 
 import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,

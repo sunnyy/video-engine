@@ -21,6 +21,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     accentColor,
     sceneCount,
     voice_id,
+    orientation,
   } = req.body;
 
   if (!productImageUrl) {
@@ -52,6 +53,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       accentColor:        accentColor        ?? null,
       sceneCount:         sceneCount         ?? 3,
       voiceId:            voice_id           ?? null,
+      orientation:        ["9:16","16:9","1:1","4:5"].includes(orientation) ? orientation : "9:16",
     }, (step) => send({ step }));
 
     send({

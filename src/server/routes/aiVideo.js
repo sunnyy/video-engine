@@ -36,7 +36,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
-  const { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, plan = null } = req.body;
+  const { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null } = req.body;
   if (!prompt?.trim()) return res.status(400).json({ error: "prompt is required" });
 
   // SSE setup
@@ -62,6 +62,7 @@ router.post("/generate", requireAuth, async (req, res) => {
         targetDuration: Math.min(75, Math.max(15, parseInt(targetDuration, 10) || 45)),
         language: language ?? "en",
         voiceId: voiceId ?? null,
+        orientation: ["9:16", "16:9", "1:1", "4:5"].includes(orientation) ? orientation : "9:16",
         plan,
       },
       ({ step }) => send({ step }),

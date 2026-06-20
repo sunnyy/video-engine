@@ -28,7 +28,16 @@ import { injectMusic }           from "../shared/music.js";
 import { attachTransitionSfx }   from "../shared/sfx.js";
 import { moderateInput }         from "../shared/moderation.js";
 
-const CANVAS = { width: 1080, height: 1920 };
+const CANVAS = { width: 1080, height: 1920 }; // default (9:16)
+// Map the chosen orientation to canvas dimensions — drives design, measure, timeline + saved format.
+function orientationToCanvas(orientation) {
+  switch (orientation) {
+    case "16:9": return { width: 1920, height: 1080 };
+    case "1:1":  return { width: 1080, height: 1080 };
+    case "4:5":  return { width: 1080, height: 1350 };
+    default:     return { width: 1080, height: 1920 }; // 9:16
+  }
+}
 const FPS    = 30;
 
 // Stylish, non-revealing progress labels — deliberately vague so our pipeline
@@ -263,7 +272,7 @@ function cameraKeyframes(camera, kind, dur) {
   }
 }
 
-function buildAssetLayer(beat, start, end) {
+function buildAssetLayer(beat, start, end, canvas = CANVAS) {
   const dur = parseFloat((end - start).toFixed(3));
   const isVideo = beat.asset.kind === "video";
   return {
@@ -280,7 +289,7 @@ function buildAssetLayer(beat, start, end) {
     keyframes: cameraKeyframes(beat.camera, beat.asset.kind, dur),
     transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
     transform: {
-      x: 0, y: 0, width: CANVAS.width, height: CANVAS.height,
+      x: 0, y: 0, width: canvas.width, height: canvas.height,
       opacity: 1, scale: 1, blur: 0, rotation: 0,
       borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
     },
@@ -291,7 +300,7 @@ function buildAssetLayer(beat, start, end) {
  * Template furniture for shot beats — deterministic, code-built, never
  * GPT-composed over imagery it can't see.
  */
-function buildShotScrim(beat, start, end) {
+function buildShotScrim(beat, start, end, canvas = CANVAS) {
   const strong = !!(beat.content?.kind && beat.content.kind !== "none");
   return {
     id: `s${beat.beat_index}_scrim`, trackId: `s${beat.beat_index}_scrim`,
@@ -302,14 +311,14 @@ function buildShotScrim(beat, start, end) {
       : "linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.10) 60%, rgba(0,0,0,0.28) 100%)",
     keyframes: { ...NO_KF },
     transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
-    transform: { x: 0, y: 0, width: CANVAS.width, height: CANVAS.height, opacity: 1, scale: 1, blur: 0, rotation: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+    transform: { x: 0, y: 0, width: canvas.width, height: canvas.height, opacity: 1, scale: 1, blur: 0, rotation: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
   };
 }
 
-function buildShotOverlay(beat, start, end, style) {
+function buildShotOverlay(beat, start, end, style, canvas = CANVAS) {
   const dur = parseFloat((end - start).toFixed(3));
   const d = Math.min(0.35 * dur, 0.9); // the stark line lands shortly after the cut
-  const y = Math.round(CANVAS.height * 0.74);
+  const y = Math.round(canvas.height * 0.74);
   return {
     id: `s${beat.beat_index}_overlay`, trackId: `s${beat.beat_index}_overlay`,
     name: "Overlay", type: "text", content: beat.content?.headline ?? "",
@@ -321,7 +330,7 @@ function buildShotOverlay(beat, start, end, style) {
       y:       [{ time: d, value: y + 30 }, { time: parseFloat((d + 0.3).toFixed(3)), value: y }],
     },
     transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
-    transform: { x: Math.round(CANVAS.width * 0.08), y, width: Math.round(CANVAS.width * 0.84), height: 120, opacity: 1, scale: 1, blur: 0, rotation: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+    transform: { x: Math.round(canvas.width * 0.08), y, width: Math.round(canvas.width * 0.84), height: 120, opacity: 1, scale: 1, blur: 0, rotation: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
     style: {
       fontSize: 60, fontFamily: "Inter, sans-serif", fontWeight: 800,
       color: "#ffffff", textAlign: "center", lineHeight: 1.15, letterSpacing: 0.5,
@@ -419,7 +428,8 @@ export async function runPromptPipeline(params, onStep) {
   } = params;
 
   const runId = `prompt-${userId}-${Date.now()}`;
-  const orientation = params.orientation ?? "9:16"; // drives stock search + saved project
+  const orientation = params.orientation ?? "9:16"; // drives canvas, stock search + saved project
+  const canvas = orientationToCanvas(orientation);
   const step  = (msg) => { console.log(`[ai-video] ${msg}`); onStep?.({ step: msg }); };
 
   let research, film;
@@ -477,7 +487,7 @@ export async function runPromptPipeline(params, onStep) {
 
   // ── Stage 4: Beat design (parallel) ───────────────────────────────────────
   step(PROMPT_STATUS_STEPS[4]);
-  const designCtx = { style, palette, canvasW: CANVAS.width, canvasH: CANVAS.height };
+  const designCtx = { style, palette, canvasW: canvas.width, canvasH: canvas.height };
   // Canvas-mode design for HTML/cutout beats; overlay-mode design for shot
   // beats carrying content. Clean shots (content.kind "none") get no design.
   const hasOverlayContent = (b) => b.content?.kind && b.content.kind !== "none";
@@ -496,7 +506,7 @@ export async function runPromptPipeline(params, onStep) {
     const html = beatHTMLs[i];
     if (!html) return [];
     try {
-      return await measureSceneHTML(html, beat.beat_index, CANVAS);
+      return await measureSceneHTML(html, beat.beat_index, canvas);
     } catch (err) {
       console.warn(`[ai-video/measure] beat ${beat.beat_index} measure failed: ${err.message}`);
       return [];
@@ -517,7 +527,7 @@ export async function runPromptPipeline(params, onStep) {
     niche:       research.topic,
     accentColor: palette.accent,
     musicMood:   film.music_mood,
-    canvasWidth: CANVAS.width, canvasHeight: CANVAS.height, fps: FPS,
+    canvasWidth: canvas.width, canvasHeight: canvas.height, fps: FPS,
   };
   const { timeline } = buildTimeline(beatGraphs, scenesForBuilder, projectContext);
   const finalTimeline = timeline;
@@ -542,16 +552,16 @@ export async function runPromptPipeline(params, onStep) {
       layer.keyframes = cameraKeyframes(beat.camera ?? "slow_zoom_in", beat.asset.kind, dur);
       lastMedia.beatIndex = beat.beat_index;
     } else {
-      const layer = buildAssetLayer(beat, win.start, win.end);
+      const layer = buildAssetLayer(beat, win.start, win.end, canvas);
       shotLayers.push(layer);
       lastMedia = { layer, src: beat.asset.src, beatIndex: beat.beat_index };
     }
 
-    shotLayers.push(buildShotScrim(beat, win.start, win.end));
+    shotLayers.push(buildShotScrim(beat, win.start, win.end, canvas));
     // Fallback stark line only if overlay content exists but its design failed
     const hasDesignedOverlay = finalTimeline.layers.some(l => l.id?.startsWith(`s${beat.beat_index}_`) && l.type === "text");
     if (beat.content?.kind && beat.content.kind !== "none" && beat.content.headline && !hasDesignedOverlay) {
-      shotLayers.push(buildShotOverlay(beat, win.start, win.end, style));
+      shotLayers.push(buildShotOverlay(beat, win.start, win.end, style, canvas));
     }
   }
   if (shotLayers.length) finalTimeline.layers = [...shotLayers, ...finalTimeline.layers];

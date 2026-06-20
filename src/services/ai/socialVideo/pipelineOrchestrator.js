@@ -26,7 +26,16 @@ import { injectMusic }            from "../shared/music.js";
 import { moderateInput }          from "../shared/moderation.js";
 import { generateFullVoiceover }  from "../promoVideo/ttsGenerator.js";
 
-const CANVAS = { width: 1080, height: 1920 };
+const CANVAS = { width: 1080, height: 1920 }; // default (9:16)
+// Map the chosen orientation to canvas dimensions — drives design, measure, timeline + saved format.
+function orientationToCanvas(orientation) {
+  switch (orientation) {
+    case "16:9": return { width: 1920, height: 1080 };
+    case "1:1":  return { width: 1080, height: 1080 };
+    case "4:5":  return { width: 1080, height: 1350 };
+    default:     return { width: 1080, height: 1920 }; // 9:16
+  }
+}
 const FPS    = 30;
 
 // ── Timestamp assignment (same pattern as promoVideo) ────────────────────────
@@ -55,8 +64,8 @@ function assignWordTimestamps(scenes, wordTimestamps) {
 // ── Pipeline-built media for image scenes (full-bleed image + scrim, low z) ──
 // The designer builds ONLY the overlay text (transparent), so the image and a
 // legibility scrim are owned here and sit BENEATH the text — no z-index fights.
-function mediaScrimEntries(sceneIndex, src, meta, kind = "image") {
-  const W = CANVAS.width, H = CANVAS.height;
+function mediaScrimEntries(sceneIndex, src, meta, kind = "image", canvas = CANVAS) {
+  const W = canvas.width, H = canvas.height;
   const mediaLayer = kind === "video"
     ? { layer: "video", type: "video", objectFit: "cover", assetType: "social-image", muted: true, volume: 0 }
     : { layer: "image", type: "image", objectFit: "cover", assetType: "social-image" };
@@ -136,7 +145,8 @@ export async function produceSocial(plan, params, onStep) {
   const { userId, voiceId = null, includeAuthor = false, styleId = "auto" } = params;
   const { content, full_script, palette, fontPair, musicMood, projectName, creativeDirection, sourceUrl } = plan;
   const scenes = plan.scenes.map(s => ({ ...s }));
-  const orientation = params.orientation ?? "9:16"; // drives stock search + saved project
+  const orientation = params.orientation ?? "9:16"; // drives canvas, stock search + saved project
+  const canvas = orientationToCanvas(orientation);
 
   const step  = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
   const runId = `social-${userId}-${Date.now()}`;
@@ -150,8 +160,8 @@ export async function produceSocial(plan, params, onStep) {
     authorHandle:  content.authorHandle ?? "",
     platform:      content.platform    ?? "twitter",
     includeAuthor: includeAuthor && !!(content.author || content.authorHandle),
-    canvasWidth:   CANVAS.width,
-    canvasHeight:  CANVAS.height,
+    canvasWidth:   canvas.width,
+    canvasHeight:  canvas.height,
     fps:           FPS,
     voiceId,
   };
@@ -200,7 +210,7 @@ export async function produceSocial(plan, params, onStep) {
     scenes.map(async (scene) => {
       try {
         const html  = await designSocialScene(scene, projectContext);
-        const graph = await measureSceneHTML(html || "", scene.scene_index, CANVAS);
+        const graph = await measureSceneHTML(html || "", scene.scene_index, canvas);
         console.log(`[social] scene ${scene.scene_index} (${scene.intent}) — ${graph.length} layers`);
         return { graph, html };
       } catch (err) {
@@ -216,7 +226,7 @@ export async function produceSocial(plan, params, onStep) {
   // For image scenes, the designer built a transparent overlay — inject the
   // pipeline-owned full-bleed image + scrim beneath it (low z).
   scenes.forEach((scene, i) => {
-    if (scene.resolvedImage) sceneGraphs[i] = [...mediaScrimEntries(i, scene.resolvedImage, scene.assetMeta, scene.resolvedKind), ...(sceneGraphs[i] ?? [])];
+    if (scene.resolvedImage) sceneGraphs[i] = [...mediaScrimEntries(i, scene.resolvedImage, scene.assetMeta, scene.resolvedKind, canvas), ...(sceneGraphs[i] ?? [])];
   });
 
   // ── Step 5: Build timeline ─────────────────────────────────────────────────

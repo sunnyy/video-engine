@@ -11,9 +11,9 @@ export async function planTypographyVideo({ input, inputType = "topic", targetDu
 }
 
 /** Phase 2 (charges): build the video from the confirmed/edited plan (SSE). */
-export async function produceTypographyVideo(plan, { voiceId = null, language = "en" } = {}, onProgress) {
+export async function produceTypographyVideo(plan, { voiceId = null, language = "en", orientation = "9:16" } = {}, onProgress) {
   const res = await serverFetch("/api/typography-video/produce", {
-    method: "POST", body: JSON.stringify({ plan, voiceId, language }),
+    method: "POST", body: JSON.stringify({ plan, voiceId, language, orientation }),
   });
   return readSseResult(res, onProgress);
 }
