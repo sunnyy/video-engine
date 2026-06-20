@@ -5,6 +5,7 @@ import {
 } from "../middleware/shared.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { blankForKey } from "../../services/ai/shared/aiImage.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
 
@@ -69,9 +70,9 @@ router.post("/generate", requireAuth, async (req, res) => {
   let creditAmount = 0;
   try {
     const recordId  = uuidv4();
-    const deduction = await deductCredits(userId, 10, "poster_generate", "Poster Studio — poster generation", recordId);
+    const deduction = await deductCredits(userId, CREDIT_COSTS.poster_generate, "poster_generate", "Poster Studio — poster generation", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 10;
+    creditAmount = CREDIT_COSTS.poster_generate;
 
     const { productImageUrl, goal, style, brandColor, platform } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });

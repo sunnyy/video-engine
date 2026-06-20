@@ -1,6 +1,9 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runTypographyPipeline, planTypography, produceTypography } from "../../services/ai/typographyVideo/pipelineOrchestrator.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
+
+const TYPOGRAPHY_VIDEO_CREDITS = CREDIT_COSTS.typography_video;
 
 export const router = express.Router();
 
@@ -20,12 +23,12 @@ router.post("/generate", requireAuth, async (req, res) => {
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
   try {
-    const deduction = await deductCredits(userId, 15, "typography_video", "Typography video generation", projectId || null);
+    const deduction = await deductCredits(userId, TYPOGRAPHY_VIDEO_CREDITS, "typography_video", "Typography video generation", projectId || null);
     if (!deduction.success) {
       send({ error: "Insufficient credits", code: "NO_CREDITS" });
       return res.end();
     }
-    creditAmount = 15;
+    creditAmount = TYPOGRAPHY_VIDEO_CREDITS;
 
     const result = await runTypographyPipeline(
       { input: input.trim(), inputType, targetDuration, userId, voiceId: voiceId ?? null, language: language ?? "en" },
@@ -73,9 +76,9 @@ router.post("/produce", requireAuth, async (req, res) => {
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
   try {
-    const deduction = await deductCredits(userId, 15, "typography_video", "Typography video generation", projectId || null);
+    const deduction = await deductCredits(userId, TYPOGRAPHY_VIDEO_CREDITS, "typography_video", "Typography video generation", projectId || null);
     if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
-    creditAmount = 15;
+    creditAmount = TYPOGRAPHY_VIDEO_CREDITS;
 
     const result = await produceTypography(
       plan,

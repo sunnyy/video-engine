@@ -7,6 +7,7 @@ import {
   supabaseAdmin, openai, requireAuth, deductCredits, addCredits,
   TEMP_DIR,
 } from "../middleware/shared.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
@@ -35,9 +36,9 @@ router.post("/generate-tts", requireAuth, async (req, res) => {
     if (!script?.trim()) return res.status(400).json({ error: "No script provided" });
     const { flagged } = await moderateInput(script);
     if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
-    const deduction = await deductCredits(userId, 5, "tts_generation", "TTS voiceover", projectId);
+    const deduction = await deductCredits(userId, CREDIT_COSTS.tts_generation, "tts_generation", "TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 5;
+    creditAmount = CREDIT_COSTS.tts_generation;
 
     const validVoices = ["nova","shimmer","coral","alloy","sage","ash","onyx","echo","fable","verse","marin","cedar"];
     const resolvedVoice = validVoices.includes(voice) ? voice : "nova";
@@ -299,9 +300,9 @@ router.post("/generate-tts-elevenlabs", requireAuth, async (req, res) => {
     const { flagged } = await moderateInput(script);
     if (flagged) return res.status(400).json({ error: "Your prompt was flagged as inappropriate. Please try a different topic.", code: "CONTENT_FLAGGED" });
 
-    const deduction = await deductCredits(userId, 5, "tts_generation", "ElevenLabs TTS voiceover", projectId);
+    const deduction = await deductCredits(userId, CREDIT_COSTS.tts_generation, "tts_generation", "ElevenLabs TTS voiceover", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 5;
+    creditAmount = CREDIT_COSTS.tts_generation;
 
     const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method:  "POST",

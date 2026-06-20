@@ -27,8 +27,14 @@ export const CREDIT_COSTS = {
   outfit_tryon:          15,  // Virtual Try-On
   social_post:           15,  // Banner Design / Social Post
   caption_studio:         8,  // Caption Studio (render)
+  // NOTE: timeline/editor video export is FREE — the user already paid to generate;
+  // re-exports/edits aren't charged. Free-tier monetization is the watermark.
   promo_video:           { 1: 50, 3: 120, 5: 200 }, // SaaS/Promo Video — per scene count
   promo_video_th:        180,                       // Talking Head video — flat rate
+  // Dashboard video services (plan → produce)
+  ai_video:              75,  // Prompt to Video / AI Video
+  social_video:          15,  // Social Video
+  typography_video:      15,  // Typography Video
 };
 
 // Full cost estimates per service — used by CreditConfirmModal

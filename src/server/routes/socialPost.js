@@ -66,6 +66,7 @@ FINAL FEEL: The result should look like a professional campaign created by a top
 APPLY THIS CREATIVE DIRECTION EXACTLY:\n`;
 
 import { blankForKey } from "../../services/ai/shared/aiImage.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
@@ -122,9 +123,9 @@ router.post("/generate", requireAuth, async (req, res) => {
   let creditAmount = 0;
   try {
     const recordId  = uuidv4();
-    const deduction = await deductCredits(userId, 15, "social_post", "Social Media Post Generator", recordId);
+    const deduction = await deductCredits(userId, CREDIT_COSTS.social_post, "social_post", "Social Media Post Generator", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 15;
+    creditAmount = CREDIT_COSTS.social_post;
 
     const { referenceImageUrl, logoUrl, brandColor, headline, niche, goal, style, aspectRatio = "1:1", textDensity, cta } = req.body;
 

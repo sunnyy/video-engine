@@ -11,6 +11,7 @@ import {
   supabaseAdmin, openai, requireAuth, deductCredits, addCredits,
   upload, uploadMemory, TEMP_DIR, uuidv4,
 } from "../middleware/shared.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 import { moderateInput } from "../middleware/moderateInput.js";
 
 export const router = express.Router();
@@ -195,9 +196,9 @@ router.post("/generate-image", requireAuth, async (req, res) => {
   let creditAmount = 0;
   try {
     const { prompt, orientation, projectId } = req.body;
-    const deduction = await deductCredits(userId, 2, "ai_image", "AI image generation", projectId);
+    const deduction = await deductCredits(userId, CREDIT_COSTS.ai_image, "ai_image", "AI image generation", projectId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 2;
+    creditAmount = CREDIT_COSTS.ai_image;
     if (!process.env.FAL_API_KEY) return res.status(500).json({ error: "FAL_API_KEY not set" });
 
     const imageSize = orientation === "9:16" ? "portrait_16_9" : "landscape_16_9";

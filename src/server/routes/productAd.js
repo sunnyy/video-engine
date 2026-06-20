@@ -4,6 +4,7 @@ import {
   supabaseAdmin, requireAuth, deductCredits, addCredits,
   upload, uuidv4,
 } from "../middleware/shared.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 import { moderateInput } from "../middleware/moderateInput.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 
@@ -37,9 +38,9 @@ router.post("/analyze", requireAuth, async (req, res) => {
   try {
     const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(userId, 5, "product_ad_analyze", "Product Ad — strategy analysis");
+    const deduction = await deductCredits(userId, CREDIT_COSTS.product_ad_analyze, "product_ad_analyze", "Product Ad — strategy analysis");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 5;
+    creditAmount = CREDIT_COSTS.product_ad_analyze;
     const { imageUrl, targetMarket } = req.body;
     if (!imageUrl) return res.status(400).json({ error: "imageUrl required" });
     const { flagged } = await moderateInput(targetMarket);
@@ -97,9 +98,9 @@ router.post("/generate-base-image", requireAuth, async (req, res) => {
   try {
     const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(userId, 8, "product_ad_base_image", "Product Ad — base model image");
+    const deduction = await deductCredits(userId, CREDIT_COSTS.product_ad_base_image, "product_ad_base_image", "Product Ad — base model image");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 8;
+    creditAmount = CREDIT_COSTS.product_ad_base_image;
     const { productImageUrl, modelImageUrl, category, hasMannequin, hasWatermark } = req.body;
     if (!productImageUrl) return res.status(400).json({ error: "productImageUrl required" });
     const FAL_KEY = process.env.FAL_API_KEY || process.env.FAL_KEY;
@@ -184,9 +185,9 @@ router.post("/generate-images", requireAuth, async (req, res) => {
   try {
     const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(userId, 40, "product_ad_scenes", "Product Ad — scene images");
+    const deduction = await deductCredits(userId, CREDIT_COSTS.product_ad_scenes, "product_ad_scenes", "Product Ad — scene images");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 40;
+    creditAmount = CREDIT_COSTS.product_ad_scenes;
     const { shots, referenceImageUrl, category, modelImageUrl } = req.body;
     if (!shots?.length || !referenceImageUrl) return res.status(400).json({ error: "shots and referenceImageUrl required" });
 
@@ -260,9 +261,9 @@ router.post("/generate-clip", requireAuth, async (req, res) => {
   try {
     const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Product Ad Studio requires an active plan.", code: "SUBSCRIPTION_REQUIRED" });
-    const deduction = await deductCredits(userId, 60, "product_ad_clip", "Product Ad — video clip");
+    const deduction = await deductCredits(userId, CREDIT_COSTS.product_ad_clip, "product_ad_clip", "Product Ad — video clip");
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 60;
+    creditAmount = CREDIT_COSTS.product_ad_clip;
     const { imageUrl, motionPrompt, durationSeconds = 3 } = req.body;
     if (!imageUrl || !motionPrompt) return res.status(400).json({ error: "imageUrl and motionPrompt required" });
 

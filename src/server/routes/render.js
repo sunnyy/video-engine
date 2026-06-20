@@ -2,7 +2,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import {
-  supabaseAdmin, requireAuth, deductCredits,
+  supabaseAdmin, requireAuth,
   TEMP_DIR, PUBLIC_DIR, PROJECT_ROOT, uuidv4,
 } from "../middleware/shared.js";
 
@@ -112,9 +112,8 @@ function resolveAssetUrl(url) {
 router.post("/timeline", requireAuth, async (req, res) => {
   const { project, projectId, resolution = "1080p" } = req.body;
 
-  const deduction = await deductCredits(req.user.id, 8, "export_timeline", "Timeline video export", projectId);
-  if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-
+  // Export is FREE — the user already paid to generate the video; re-exports/edits
+  // shouldn't be charged. Free-tier monetization is the watermark, applied at render.
   const jobId = uuidv4();
   writeJob(jobId, { progress: 0, done: false, url: null, error: null, cancelled: false });
   res.json({ success: true, jobId });

@@ -9,13 +9,14 @@ import { orchestratePromoRender } from "../../services/ai/promoVideo/renderOrche
 import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../services/ai/promoVideo/talkingHeadProcessor.js";
 import { runV2Pipeline } from "../../services/ai/promoVideo/pipelineOrchestrator.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
 
-const PROMO_VIDEO_CREDITS = { 1: 50, 3: 120, 5: 200 };
-const TH_VIDEO_CREDITS    = 180;
+const PROMO_VIDEO_CREDITS = CREDIT_COSTS.promo_video;
+const TH_VIDEO_CREDITS    = CREDIT_COSTS.promo_video_th;
 function promoCredits(sceneCount) {
-  return PROMO_VIDEO_CREDITS[sceneCount] ?? 120;
+  return PROMO_VIDEO_CREDITS[sceneCount] ?? PROMO_VIDEO_CREDITS[3];
 }
 
 function rowToProject(row) {

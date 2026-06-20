@@ -6,6 +6,7 @@ import {
 } from "../middleware/shared.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { blankForKey } from "../../services/ai/shared/aiImage.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -60,9 +61,9 @@ router.post("/generate", requireAuth, async (req, res) => {
   let creditAmount = 0;
   try {
     const recordId = uuidv4();
-    const deduction = await deductCredits(userId, 15, "outfit_tryon", "Outfit Studio — virtual try-on", recordId);
+    const deduction = await deductCredits(userId, CREDIT_COSTS.outfit_tryon, "outfit_tryon", "Outfit Studio — virtual try-on", recordId);
     if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = 15;
+    creditAmount = CREDIT_COSTS.outfit_tryon;
 
     const { garmentUrl, modelUrl, hasMannequin, aspect = "9:16" } = req.body;
     if (!garmentUrl || !modelUrl) return res.status(400).json({ error: "garmentUrl and modelUrl required" });

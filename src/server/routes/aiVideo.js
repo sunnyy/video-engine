@@ -1,10 +1,11 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runPromptPipeline, runPromptPlan } from "../../services/ai/aiVideo/pipelineOrchestrator.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
 
-const PROMPT_VIDEO_CREDITS = 75;
+const PROMPT_VIDEO_CREDITS = CREDIT_COSTS.ai_video;
 
 // ── POST /ai-video/plan ──────────────────────────────────────────────────
 // The cheap half: research + script + shot plan, returned for user review.

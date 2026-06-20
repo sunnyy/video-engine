@@ -1,6 +1,9 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runSocialPipeline, planSocial, produceSocial } from "../../services/ai/socialVideo/pipelineOrchestrator.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
+
+const SOCIAL_VIDEO_CREDITS = CREDIT_COSTS.social_video;
 
 export const router = express.Router();
 
@@ -20,12 +23,12 @@ router.post("/generate", requireAuth, async (req, res) => {
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
   try {
-    const deduction = await deductCredits(userId, 15, "social_video", "Social video generation", projectId || null);
+    const deduction = await deductCredits(userId, SOCIAL_VIDEO_CREDITS, "social_video", "Social video generation", projectId || null);
     if (!deduction.success) {
       send({ error: "Insufficient credits", code: "NO_CREDITS" });
       return res.end();
     }
-    creditAmount = 15;
+    creditAmount = SOCIAL_VIDEO_CREDITS;
 
     const result = await runSocialPipeline(
       { url: url.trim(), userId, targetDuration, includeAuthor: !!includeAuthor, voiceId: voiceId ?? null, language: language ?? "en" },
@@ -73,9 +76,9 @@ router.post("/produce", requireAuth, async (req, res) => {
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
   try {
-    const deduction = await deductCredits(userId, 15, "social_video", "Social video generation", projectId || null);
+    const deduction = await deductCredits(userId, SOCIAL_VIDEO_CREDITS, "social_video", "Social video generation", projectId || null);
     if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
-    creditAmount = 15;
+    creditAmount = SOCIAL_VIDEO_CREDITS;
 
     const result = await produceSocial(
       plan,
