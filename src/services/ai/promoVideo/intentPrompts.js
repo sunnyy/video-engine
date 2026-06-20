@@ -6,6 +6,8 @@
  * The designer receives the raw script segment and designs freely.
  */
 
+import { getStyle } from "../shared/visualStyles.js";
+
 const FORMAT_GUIDANCE = {
   '9:16': 'Vertical canvas. Stack elements top-to-bottom. Hero content in upper half. Supporting content below. Wide elements span full width.',
   '16:9': 'Horizontal canvas. Distribute elements left-to-right. Left third for text, right two-thirds for visuals. Or split 50/50. Never stack everything vertically.',
@@ -35,7 +37,8 @@ export function buildSceneDesignerPrompt(sceneScript, projectContext) {
   const canvasH     = projectContext.canvasHeight ?? 1920;
   const formatRatio = projectContext.formatRatio  ?? '9:16';
   const accentColor = projectContext.accentColor  || "#6366f1";
-  const visualStyle = projectContext.visualStyle  || "radiant";
+  const _sv         = getStyle(projectContext.visualStyle);
+  const visualStyle = _sv ? `${_sv.label} (${_sv.description})` : "modern, polished, brand-forward";
   const theme       = projectContext.theme        || "dark";
   const isTH        = projectContext.videoType === 'talking_head';
   const beatDuration = projectContext.beatDuration ?? null;
@@ -163,6 +166,7 @@ ${overlayMode ? `
 VISUAL LANGUAGE:
 All text elements in the scene must be in English regardless of the voiceover language.
 Headlines, subheads, labels, kickers, stats, badges — always English. Never Hindi, never Hinglish.
+NEVER print the scene's intent/role as visible text. Words like "Hook", "Fact", "Reveal", "Feature", "CTA", "Proof", "Problem", "Solution" are INTERNAL direction — they must NOT appear on screen. A kicker/badge/label must be REAL content (product name, benefit, or short phrase), never the intent keyword.
 
 IMPORTANT:
 This is NOT a website. This is NOT a landing page. This is NOT a dashboard.
@@ -197,7 +201,7 @@ Let the brief's focal point and feeling decide. One idea owns each frame — eve
 OUTPUT: Only the HTML. Nothing before DOCTYPE.
 The html and body must use: width:${canvasW}px; height:${canvasH}px; overflow:hidden; margin:0;`,
 
-    user: `${projectContext.archetype ? `LAYOUT TYPE: ${projectContext.archetype}\n\n` : ''}SCENE INTENT: ${projectContext.sceneIntent || "unknown"}
+    user: `${projectContext.archetype ? `LAYOUT TYPE: ${projectContext.archetype}\n\n` : ''}SCENE INTENT (internal direction — never render this word on screen): ${projectContext.sceneIntent || "unknown"}
 CANVAS FORMAT: ${formatRatio} — ${FORMAT_GUIDANCE[formatRatio] ?? FORMAT_GUIDANCE['9:16']}
 SCENE SCRIPT:
 ${sceneScript}

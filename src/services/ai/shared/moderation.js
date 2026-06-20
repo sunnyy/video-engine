@@ -24,33 +24,65 @@ const HARD_BLOCK = [
   "illicit/violent",
 ];
 
+function evaluate(result, label, message) {
+  if (!result) return;
+  const flaggedCats = Object.entries(result.categories ?? {})
+    .filter(([, on]) => on)
+    .map(([cat]) => cat);
+  const hardHit = flaggedCats.some(cat => HARD_BLOCK.includes(cat));
+  if (result.flagged || hardHit) {
+    console.warn(`[moderation] BLOCKED ${label} — categories: ${flaggedCats.join(", ") || "(flagged)"}`);
+    const err = new Error(message);
+    err.code = "CONTENT_BLOCKED";
+    err.categories = flaggedCats;
+    throw err;
+  }
+}
+
+/** Text safety gate — run before any generation. Throws CONTENT_BLOCKED if disallowed. */
 export async function moderateInput(text, { label = "input" } = {}) {
   const input = (text ?? "").trim();
   if (!input) return;
-
   let result;
   try {
     const resp = await openai.moderations.create({ model: "omni-moderation-latest", input });
     result = resp?.results?.[0];
   } catch (err) {
-    // Moderation outage shouldn't take the whole service down — log and allow.
-    console.warn(`[moderation] check failed for ${label}, allowing:`, err.message);
+    console.warn(`[moderation] text check failed for ${label}, allowing:`, err.message);
     return;
   }
+  evaluate(result, label, "This request can't be processed. Please try a different topic.");
+}
 
-  if (!result) return;
+/** Image safety gate — moderate a user-provided image URL (http(s) or data: URI). */
+export async function moderateImage(imageUrl, { label = "image" } = {}) {
+  if (!imageUrl) return;
+  let result;
+  try {
+    const resp = await openai.moderations.create({
+      model: "omni-moderation-latest",
+      input: [{ type: "image_url", image_url: { url: imageUrl } }],
+    });
+    result = resp?.results?.[0];
+  } catch (err) {
+    console.warn(`[moderation] image check failed for ${label}, allowing:`, err.message);
+    return;
+  }
+  evaluate(result, label, "This image can't be processed. Please use a different image.");
+}
 
-  const flaggedCats = Object.entries(result.categories ?? {})
-    .filter(([, on]) => on)
-    .map(([cat]) => cat);
-
-  const hardHit = flaggedCats.some(cat => HARD_BLOCK.includes(cat));
-
-  if (result.flagged || hardHit) {
-    console.warn(`[moderation] BLOCKED ${label} — categories: ${flaggedCats.join(", ") || "(flagged)"}`);
-    const err = new Error("This request can't be processed. Please try a different topic.");
-    err.code = "CONTENT_BLOCKED";
-    err.categories = flaggedCats;
-    throw err;
+/**
+ * Route convenience: moderate the given text + image inputs; on a block, send a
+ * 422 and return false so the handler can `if (!(await guardContent(...))) return;`.
+ * Runs before any credit deduction / streaming. Pass arrays (falsy entries skipped).
+ */
+export async function guardContent(res, { text = [], images = [], label = "input" } = {}) {
+  try {
+    for (const t of [].concat(text))   { if (t) await moderateInput(t, { label }); }
+    for (const u of [].concat(images)) { if (u) await moderateImage(u, { label }); }
+    return true;
+  } catch (e) {
+    if (e.code === "CONTENT_BLOCKED") { res.status(422).json({ error: e.message, code: e.code }); return false; }
+    throw e;
   }
 }

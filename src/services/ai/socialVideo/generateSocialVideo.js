@@ -11,9 +11,9 @@ export async function planSocialVideo({ url, targetDuration = 25, language = "en
 }
 
 /** Phase 2 (charges): build the video from the confirmed/edited plan (SSE). */
-export async function produceSocialVideo(plan, { voiceId = null, language = "en", includeAuthor = false } = {}, onProgress) {
+export async function produceSocialVideo(plan, { voiceId = null, language = "en", includeAuthor = false, styleId = "auto" } = {}, onProgress) {
   const res = await serverFetch("/api/social-video/produce", {
-    method: "POST", body: JSON.stringify({ plan, voiceId, language, includeAuthor }),
+    method: "POST", body: JSON.stringify({ plan, voiceId, language, includeAuthor, styleId }),
   });
   return readSseResult(res, onProgress);
 }

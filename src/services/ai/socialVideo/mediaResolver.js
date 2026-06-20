@@ -14,8 +14,8 @@
 
 import { supabaseAdmin, openai } from "../../../server/middleware/shared.js";
 import { searchStockImage, searchStockVideo, probeImageDims, treatmentFor } from "../shared/stock.js";
+import { styleImagePrompt } from "../shared/visualStyles.js";
 
-const PHOTO_STYLE = "cinematic editorial photograph, dramatic lighting, premium, slight film grain";
 const NO_TEXT_SUFFIX = ", absolutely no text, no letters, no words, no numbers, no captions, no signage, no watermarks, clean surfaces";
 
 // AI generations allowed per video — social posts usually carry their own image,
@@ -147,7 +147,7 @@ async function falImageClean(prompt, runId, label) {
  * resolveSocialMedia(scenes, content, runId) — sets scene.resolvedImage for every
  * scene that wants one, cheapest source first, with a small AI budget.
  */
-export async function resolveSocialMedia(scenes, content, runId, orientation = "9:16") {
+export async function resolveSocialMedia(scenes, content, runId, orientation = "9:16", styleId = "auto") {
   const postImages = content.imageUrls?.length ? content.imageUrls : (content.imageUrl ? [content.imageUrl] : []);
   const totalDur   = scenes.reduce((a, s) => a + (s.duration_seconds ?? 0), 0);
   const AI_BUDGET  = aiBudgetFor(totalDur);
@@ -185,7 +185,7 @@ export async function resolveSocialMedia(scenes, content, runId, orientation = "
   const needAI = scenes.filter(s => s._needsAI && !s.resolvedImage);
   await Promise.all(needAI.slice(0, AI_BUDGET).map(async (scene) => {
     const subject = scene.stock_query || scene.subject_entity || scene.visual_text || scene.creative_brief || "";
-    const src = await falImageClean(`${subject}, ${PHOTO_STYLE}, vertical 9:16 composition`, runId, `s${scene.scene_index}-ai`);
+    const src = await falImageClean(`${subject}, ${styleImagePrompt(styleId, "photo")}, vertical 9:16 composition`, runId, `s${scene.scene_index}-ai`);
     if (src) scene.resolvedImage = src;
   }));
   for (const s of scenes) delete s._needsAI;

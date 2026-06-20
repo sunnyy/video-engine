@@ -3,6 +3,7 @@ import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
+import { guardContent } from "../../services/ai/shared/moderation.js";
 
 export const router = express.Router();
 
@@ -69,6 +70,7 @@ router.post("/upload", requireAuth, uploadMemory.single("image"), async (req, re
 
 router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
+  if (!(await guardContent(res, { images: [req.body.productImageUrl], label: "poster" }))) return;
   let creditAmount = 0;
   try {
     const recordId  = uuidv4();

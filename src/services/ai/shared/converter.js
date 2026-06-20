@@ -304,6 +304,13 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
         padding:       0, // box already measured; padding baked into width/height
       };
 
+      // A text layer that carries a background IS a pill / chip / button. Its label
+      // was centered by the padded box (shrink-to-fit / inline-flex), NOT by
+      // text-align — so computed alignment is "start". Since we bake the padding into
+      // the width and zero it, a left-aligned label slides to the left edge and the
+      // padding piles up on the right. Center it to restore the pill's symmetry.
+      if (entry.style.background) entry.style.textAlign = "center";
+
       // Text-fit safety buffer. The headless measurement and the editor/Remotion
       // render can disagree by a few sub-pixels on text width (font hinting +
       // rounding). When the measured box is tight to a single line, that drift

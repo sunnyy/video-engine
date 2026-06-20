@@ -23,6 +23,7 @@ import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
 import { applyTransitions, assignSceneTransitions } from "../shared/transitions.js";
 import { buildTimeline }          from "./timelineBuilder.js";
 import { injectMusic }            from "../shared/music.js";
+import { moderateInput }          from "../shared/moderation.js";
 import { generateFullVoiceover }  from "../promoVideo/ttsGenerator.js";
 
 const CANVAS = { width: 1080, height: 1920 };
@@ -108,6 +109,9 @@ export async function planSocial(params, onStep) {
   const content = await fetchSocialContent(url);
   console.log(`[social] platform=${content.platform} author="${content.author}" images=${content.imageUrls?.length ?? (content.imageUrl ? 1 : 0)}`);
 
+  // Safety: the real input is the scraped post — moderate its text before scripting.
+  await moderateInput(content.text, { label: "social post content" });
+
   step("Shaping the story…");
   const wordCount = (content.text || "").split(/\s+/).filter(Boolean).length;
   const effectiveDuration = content.isThread
@@ -129,7 +133,7 @@ export async function planSocial(params, onStep) {
 // ── Phase 2: PRODUCE (voiceover → media → design → build → save) from a plan whose
 // scenes may carry the user's edited script_segment text.
 export async function produceSocial(plan, params, onStep) {
-  const { userId, voiceId = null, includeAuthor = false } = params;
+  const { userId, voiceId = null, includeAuthor = false, styleId = "auto" } = params;
   const { content, full_script, palette, fontPair, musicMood, projectName, creativeDirection, sourceUrl } = plan;
   const scenes = plan.scenes.map(s => ({ ...s }));
   const orientation = params.orientation ?? "9:16"; // drives stock search + saved project
@@ -185,7 +189,7 @@ export async function produceSocial(plan, params, onStep) {
   // Runs BEFORE design so the designer knows which scenes carry an image.
   step("Setting the mood…");
   try {
-    await resolveSocialMedia(scenes, content, runId, orientation);
+    await resolveSocialMedia(scenes, content, runId, orientation, styleId);
   } catch (e) {
     console.warn("[social] media resolution failed (non-fatal):", e.message);
   }

@@ -242,6 +242,7 @@ export async function runProductVideoPipeline(project, onStep) {
     website:            project.website,
     goal:               project.goal ?? "promo",
     sceneCount:         project.sceneCount ?? 3,
+    visualStyle:        project.visualStyle ?? "auto",
   });
 
   const brief       = plan.brief;

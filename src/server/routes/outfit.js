@@ -4,6 +4,7 @@ import {
   supabaseAdmin, requireAuth, deductCredits, addCredits, uuidv4,
   uploadMemory,
 } from "../middleware/shared.js";
+import { guardContent } from "../../services/ai/shared/moderation.js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -54,6 +55,7 @@ router.post("/analyze", requireAuth, async (req, res) => {
 
 router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
+  if (!(await guardContent(res, { images: [req.body.garmentUrl], label: "outfit" }))) return;
   let creditAmount = 0;
   try {
     const recordId = uuidv4();

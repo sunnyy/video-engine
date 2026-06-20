@@ -29,6 +29,7 @@ import { designFreeScene }                           from "./sceneDesignerFree.j
 import { parseSceneHTML }                             from "./htmlParser.js";
 import { measureSceneHTML, closeMeasureBrowser }      from "../shared/converter.js";
 import { searchStockImage, searchStockVideo }         from "../shared/stock.js";
+import { styleImagePrompt }                            from "../shared/visualStyles.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
@@ -51,11 +52,11 @@ async function fetchPixabayImage(hint, orientation = "9:16") {
   return hit?.url ?? null;
 }
 
-async function generateFalImage(hint, projectId) {
+async function generateFalImage(hint, projectId, styleId = "auto") {
   const key = process.env.FAL_API_KEY;
   if (!key || !hint) return null;
   try {
-    const prompt = `${hint}, vertical 9:16 portrait composition, photorealistic, sharp focus, 8k quality, no text, no watermark, no people, no faces`;
+    const prompt = `${hint}, ${styleImagePrompt(styleId, "photo")}, vertical 9:16 portrait composition, sharp focus, 8k quality, no text, no watermark, no people, no faces`;
     const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
       method:  "POST",
       headers: { "Authorization": `Key ${key}`, "Content-Type": "application/json" },
@@ -370,7 +371,7 @@ export async function runV2Pipeline(project) {
         const query = extractSearchQuery(layer.assetHint);
         layer.src = await fetchPixabayImage(query, formatRatio);
       } else if (layer.assetType === "ai") {
-        layer.src = await generateFalImage(layer.assetHint, projectId);
+        layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style);
       } else if (layer.assetType === "asset") {
         layer.assetQueued = true;
         layer.src = ASSET_PLACEHOLDER_SRC;
@@ -699,7 +700,7 @@ async function runV2BeatPipeline(project) {
         console.warn(`[v2/beats] stock_video had no match for ${layer.id} — fell back to image`);
       }
     } else if (layer.assetType === "ai") {
-      layer.src = await generateFalImage(layer.assetHint, projectId);
+      layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style);
     } else if (layer.assetType === "asset") {
       layer.assetQueued  = true;
       layer.src          = ASSET_PLACEHOLDER_SRC;
@@ -757,7 +758,7 @@ async function resolveImagePlaceholders(finalTimeline, project) {
       const query = extractSearchQuery(layer.assetHint);
       layer.src = await fetchPixabayImage(query, project.format_ratio ?? "9:16");
     } else if (layer.assetType === "ai") {
-      layer.src = await generateFalImage(layer.assetHint, project.id);
+      layer.src = await generateFalImage(layer.assetHint, project.id, project.visual_style);
     } else if (layer.assetType === "asset") {
       layer.assetQueued = true;
     }

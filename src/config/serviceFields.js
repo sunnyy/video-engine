@@ -9,16 +9,11 @@
  * Scope: dashboard chatbox only — the existing service pages are untouched.
  */
 
-// AI Video (Prompt to Video) visual styles
-export const AI_VIDEO_STYLES = [
-  { id: "auto",            label: "Auto",            desc: "Director picks from your topic", colors: ["#8896a8", "#38bdf8"] },
-  { id: "editorial_retro", label: "Editorial Retro", desc: "Vintage print, bold two-tone",   colors: ["#c2410c", "#1e3a8a"] },
-  { id: "minimal",         label: "Minimal",         desc: "Quiet, spacious, restrained",    colors: ["#f8fafc", "#0f172a"] },
-  { id: "bold_pop",        label: "Bold Pop",        desc: "Loud blocks, huge type",         colors: ["#ec4899", "#facc15"] },
-  { id: "dark_cinematic",  label: "Dark Cinematic",  desc: "Moody, filmic, atmospheric",     colors: ["#0a0a0a", "#f59e0b"] },
-  { id: "corporate_clean", label: "Corporate",       desc: "Polished, structured, trusted",  colors: ["#1e40af", "#f8fafc"] },
-  { id: "meme_chaos",      label: "Meme Energy",     desc: "Internet-native chaos",          colors: ["#ef4444", "#fde047"] },
-];
+// Visual styles — ONE shared registry for all video services (shared/visualStyles.js).
+import { VISUAL_STYLE_OPTIONS } from "../services/ai/shared/visualStyles.js";
+
+// AI Video (Prompt to Video) uses the shared set directly.
+export const AI_VIDEO_STYLES = VISUAL_STYLE_OPTIONS;
 
 export const AI_VIDEO_DURATIONS = [
   { id: 15, label: "15s" },
@@ -42,13 +37,8 @@ export const AI_VIDEO_DURATIONS = [
 // will grow with hand-curated styles).
 
 // ── SaaS (Promo) option lists — mirror src/pages/PromoVideo.jsx so the chatbox
-//    sends backend-valid values (visual_style / target_duration / tone / theme). ──
-export const SAAS_STYLES = [
-  { id: "radiant",       label: "Radiant",       desc: "Glows & depth",    colors: ["#06040e", "#6366f1"] },
-  { id: "minimal",       label: "Minimal",       desc: "Clean & flat",     colors: ["#f2f2f6", "#111111"] },
-  { id: "professional",  label: "Professional",  desc: "Structured, dark", colors: ["#0c1118", "#38bdf8"] },
-  { id: "high-contrast", label: "High Contrast", desc: "Bold & sharp",     colors: ["#000000", "#f5c518"] },
-];
+//    sends backend-valid values (target_duration / tone / theme). Visual style now
+//    uses the shared registry (visual_style is a soft design hint in the pipeline). ──
 export const SAAS_DURATIONS = [
   { id: 12, label: "10–15s" },
   { id: 22, label: "15–30s" },
@@ -109,7 +99,7 @@ export const SERVICE_FIELDS = {
     primary: "url",
     accent:  "#22d3ee",
     shared: {
-      style:         { default: "auto" },   // universal styles (forward-compat for Social)
+      style:         { options: VISUAL_STYLE_OPTIONS, default: "auto" },   // shared visual styles
       voiceLanguage: { default: { language: "en", voiceId: null } },
       duration:      { options: [{ id: 20, label: "20s" }, { id: 30, label: "30s" }, { id: 45, label: "45s" }], default: 30 },
       orientation:   { default: "9:16" },
@@ -121,7 +111,7 @@ export const SERVICE_FIELDS = {
     primary: "url",   // URL or typed info (toggle)
     accent:  "#f5c518",
     shared: {
-      style:         { options: SAAS_STYLES, default: "radiant" },   // backend visual_style
+      style:         { options: VISUAL_STYLE_OPTIONS, default: "auto" },  // backend visual_style (soft hint)
       voiceLanguage: { default: { language: "en", voiceId: null } },
       duration:      { options: SAAS_DURATIONS, default: 22 },        // target_duration
       orientation:   { default: "9:16" },                            // format_ratio
@@ -138,6 +128,7 @@ export const SERVICE_FIELDS = {
     primary: "upload",
     accent:  "#f97316",
     shared: {
+      style:         { options: VISUAL_STYLE_OPTIONS, default: "auto" },  // Auto = director picks from the product
       voiceLanguage: { default: { language: "en", voiceId: null } },
       orientation:   { default: "9:16" },
     },
@@ -153,7 +144,7 @@ export const SERVICE_FIELDS = {
     primary: "prompt",
     accent:  "#7c5cfc",
     shared: {
-      style:         { default: "auto" },
+      style:         { options: VISUAL_STYLE_OPTIONS, default: "auto" },
       voiceLanguage: { default: { language: "en", voiceId: null } },
       duration:      { options: [{ id: 30, label: "30s" }, { id: 40, label: "40s" }, { id: 60, label: "60s" }], default: 40 },
       orientation:   { default: "9:16" },

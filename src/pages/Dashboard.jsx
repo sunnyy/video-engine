@@ -325,7 +325,7 @@ function SocialChatbox() {
     try {
       const result = await produceSocialVideo(
         { ...plan, scenes: editedScenes },
-        { voiceId, language, includeAuthor },
+        { voiceId, language, includeAuthor, styleId },
         ({ step }) => { const i = SOCIAL_STATUS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("social_video", "all");
@@ -349,7 +349,7 @@ function SocialChatbox() {
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <StyleField value={styleId} onChange={setStyleId} accent={SA} />
+            <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={SA} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={SA} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={SA} />
           </div>
@@ -554,6 +554,7 @@ function ProductChatbox() {
   const [goal,        setGoal]        = useState(cfg.specific.goal.default);
   const [length,      setLength]      = useState(cfg.specific.length.default);
   const [visuals,     setVisuals]     = useState(cfg.specific.visuals.default);
+  const [styleId,     setStyleId]     = useState(cfg.shared.style.default);
   const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
   const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
@@ -598,6 +599,7 @@ function ProductChatbox() {
         offerText: "",
         website: mode === "url" ? productUrl.trim() : "",
         visualMode: effVisuals,
+        visualStyle: styleId,
         voice_id: voiceId,
         language,
         sceneCount: length,
@@ -653,6 +655,7 @@ function ProductChatbox() {
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={PC} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={PC} />
             <SelectField icon={<Target size={16} />} label="Goal"    value={goal}    onChange={setGoal}    options={cfg.specific.goal.options}    accent={PC} />
             <SelectField icon={<Film size={16} />}   label="Length"  value={length}  onChange={setLength}  options={cfg.specific.length.options}  accent={PC} />
@@ -726,7 +729,7 @@ function TypographyChatbox() {
     if (!canGo) return;
     setPlanning(true); setError(null);
     try {
-      setPlan(await planTypographyVideo({ input: input.trim(), inputType, targetDuration: duration, language }));
+      setPlan(await planTypographyVideo({ input: input.trim(), inputType, targetDuration: duration, language, styleId }));
     } catch (err) {
       setError(err.message || "Couldn't build that script.");
     } finally {
@@ -777,7 +780,7 @@ function TypographyChatbox() {
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <StyleField value={styleId} onChange={setStyleId} accent={TC} />
+            <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={TC} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={TC} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={TC} />
           </div>

@@ -9,12 +9,13 @@
  */
 import { supabaseAdmin } from "../../../server/middleware/shared.js";
 
-/** Find a reusable image by niche + visual_type + tag overlap + orientation. */
-export async function findLibraryImage({ niche, visual_type, keywords } = {}, orientation = "9:16") {
+/** Find a reusable image by style + niche + visual_type + tag overlap + orientation.
+ *  style_id is matched so a corporate video never reuses a retro image, etc. */
+export async function findLibraryImage({ niche, visual_type, keywords, style_id } = {}, orientation = "9:16") {
   if (!niche || !visual_type || !keywords?.length) return null;
   try {
     const run = async (tagSlice) => {
-      const { data, error } = await supabaseAdmin
+      let q = supabaseAdmin
         .from("ai_image_library")
         .select("id, src, reuse_count")
         .eq("niche", niche)
@@ -22,6 +23,8 @@ export async function findLibraryImage({ niche, visual_type, keywords } = {}, or
         .eq("orientation", orientation)
         .contains("tags", tagSlice)
         .limit(10);
+      if (style_id) q = q.eq("style_id", style_id);
+      const { data, error } = await q;
       return error ? [] : (data ?? []);
     };
 
@@ -54,6 +57,7 @@ export async function saveLibraryImage({ src, prompt, library = {}, orientation 
       context:     library.context ?? null,
       mood:        library.mood ?? null,
       visual_type: library.visual_type,
+      style_id:    library.style_id ?? null,
       niche:       library.niche,
       intent:      library.intent ?? null,
       energy:      library.energy ?? null,

@@ -81,7 +81,7 @@ ${languageBlock(language)}
 YOU DECIDE THREE THINGS PER BEAT — source, content, and overlay-or-clean. A designer decides ALL form.
 
 1. SOURCE (asset_type) — what raw material the beat uses:
-- "none": an HTML/CSS INFORMATION FRAME. ONLY for content that IS information: a stat, a quote, a list, a hook headline, a title/date, a comparison, a small chart, a CTA. NEVER for pictorial concepts — an iceberg, a ship, a crowd, a place, an event are IMAGES, not HTML. If the moment needs to be SEEN, it is a shot, not a designed frame.
+- "none": an HTML/CSS INFORMATION FRAME. ONLY for content that IS information: a stat, a quote, a list, a hook headline, a title/date, a comparison, a small chart, a CTA. NEVER for anything that must DEPICT a real thing — an iceberg, a ship, a crowd, a place, an event, a MAP/geography, a building, an animal, an EMBLEM/crest/flag/logo, or any recognizable object are IMAGES, not HTML (the designer can only build simple abstract shapes + type, so it would come out as crude blobs). If the moment needs to be SEEN as a thing, it is a shot. HTML frames are for words, data, and simple abstract motifs only.
 - "ai_image": a generated cinematic SHOT (full-bleed). EXPENSIVE — reserve for genuinely un-photographable / stylized concepts (a metaphor, a dramatized historical moment, an abstract idea). The pipeline caps AI generations per video, so don't lean on it.
 - "photo": a realistic photo shot. With subject_entity set, a REAL photo of that person/org/landmark is fetched (free + strongest). PREFER this with a subject_entity wherever a real person/org/place/landmark is involved.
 - "cutout": the subject on transparency, composed by the designer inside a designed frame.

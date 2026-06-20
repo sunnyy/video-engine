@@ -1,4 +1,5 @@
 import { openai } from "../../../server/middleware/shared.js";
+import { getStyle } from "../shared/visualStyles.js";
 
 const SCRIPT_SYSTEM = `You are a kinetic typography creative director for fast-paced, punchy short-form videos.
 
@@ -137,9 +138,17 @@ const LANG_DIRECTIVES = {
   es:       "\nLANGUAGE: Write ALL voiceover and beat text in Spanish.",
 };
 
-export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en") {
+export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en", styleId = "auto") {
   const approxScenes  = Math.max(3, Math.round(targetDuration / 2));
   const langDirective = LANG_DIRECTIVES[language] ?? "";
+
+  // Visual style is a soft leaning on the PALETTE + ENERGY (fonts stay clean/kinetic
+  // per the rules above). "auto" → keep the niche-driven choice.
+  const s = getStyle(styleId);
+  const styleBlock = s ? `\n\nVISUAL STYLE — the user chose "${s.label}": ${s.description}
+- Palette feel (a direction — keep on-screen text high-contrast and legible): ${s.paletteGuidance}
+- Pacing / energy: ${s.motion.energy}.
+Lean the palette and energy toward this style, while keeping the clean kinetic-typography font rules above.` : "";
 
   const userMsg = inputType === "script"
     ? `Convert this into kinetic typography scenes with voiceover + beats per scene.${langDirective}\n\nScript: "${input.trim()}"`
@@ -154,7 +163,7 @@ Topic: "${input.trim()}"`;
     max_completion_tokens: 3000,
     response_format:       { type: "json_object" },
     messages: [
-      { role: "system", content: SCRIPT_SYSTEM },
+      { role: "system", content: SCRIPT_SYSTEM + styleBlock },
       { role: "user",   content: userMsg },
     ],
   });

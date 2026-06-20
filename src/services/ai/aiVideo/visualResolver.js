@@ -33,10 +33,11 @@ function stockQuery(beat) {
     || "").trim();
 }
 
-function libMeta(beat) {
+function libMeta(beat, styleId) {
   return {
     niche:        beat.niche,
     visual_type:  beat.visual_type,
+    style_id:     styleId,
     keywords:     beat.keywords,
     intent:       beat.content?.kind ?? null,
     search_query: beat.shot_query ?? null,
@@ -45,8 +46,8 @@ function libMeta(beat) {
 }
 
 // AI Video beat → shared AssetRequest.
-function toRequest(beat) {
-  const lib    = libMeta(beat);
+function toRequest(beat, styleId) {
+  const lib    = libMeta(beat, styleId);
   const minDur = Math.max(2, Math.ceil(beat.duration_seconds ?? 3));
 
   if (beat.subject_entity) {
@@ -85,7 +86,7 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
   beats.forEach(b => { b.asset = null; });
 
   const assetBeats = beats.filter(b => !b.continues_previous && NEEDS_ASSET.has(b.asset_type));
-  const requests   = assetBeats.map(toRequest);
+  const requests   = assetBeats.map(b => toRequest(b, style.id));
 
   // Service-specific generation (cutout / styled illustration / photo).
   const generate = async (req) => {

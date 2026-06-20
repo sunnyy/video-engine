@@ -8,6 +8,7 @@ import { markProjectApproved, transitionProjectStatus, getProjectSummary } from 
 import { orchestratePromoRender } from "../../services/ai/promoVideo/renderOrchestrator.js";
 import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../services/ai/promoVideo/talkingHeadProcessor.js";
 import { runV2Pipeline } from "../../services/ai/promoVideo/pipelineOrchestrator.js";
+import { guardContent } from "../../services/ai/shared/moderation.js";
 
 export const router = express.Router();
 
@@ -129,6 +130,9 @@ router.post("/create", requireAuth, async (req, res) => {
       caption_style, transition_style, motion_style, color_palette, music_mood,
       visual_style, accent_color, typography_style, voice_id, scene_count, target_duration,
     } = req.body;
+
+    // Safety: moderate the user-supplied product text before building the video.
+    if (!(await guardContent(res, { text: [product_name, product_description, target_audience], label: "saas-video" }))) return;
 
     // Use existing draft ID (from /init) if provided, otherwise generate new one
     const id = req.body.project_id || uuidv4();

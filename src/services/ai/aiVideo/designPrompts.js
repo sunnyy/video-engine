@@ -59,7 +59,8 @@ export function buildBeatPrompt(beat, ctx) {
 - data-animation: fade-in | fade-up | scale-in | slide-left | slide-right | none  (at least 2 elements animated; entrances land with the voice)
 - data-scene-element: hero | background | supporting | decoration
 - Icons: data-icon="kebab-name" (Lucide) ONLY on a single standalone glyph — NEVER on something built from shapes/divs (it gets replaced by a generic icon and your design is lost; leave hand-built shapes as data-layer="decoration").
-TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Only REAL tagged elements render — no ::before/::after pseudo-elements. Spell every word EXACTLY as given; minimum readable font ~26px.`;
+TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Only REAL tagged elements render — no ::before/::after pseudo-elements. Spell every word EXACTLY as given; minimum readable font ~26px.
+NEVER print the beat's intent/kind/role as visible text. Words like "Hook", "Fact", "Reveal", "Stat", "Quote", "CTA", "Title", "List" are INTERNAL direction — they must NOT appear on screen. A kicker/label/badge, if used, must be REAL content (a topic tag or short phrase), never the intent/kind keyword. Render only the CONTENT strings given.`;
 
   if (isOverlay) {
     // ── OVERLAY MODE ────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;
 
     const user = `BEAT ${beat.beat_index} — overlay on a shot of: ${beat.image_prompt ?? beat.shot_query ?? beat.visual_concept}
 SPOKEN: "${beat.script_line}"
-INTENT: ${beat.visual_concept}
+INTENT (internal direction — never render as on-screen text): ${beat.visual_concept}
 
 Design the overlay.`;
     return { system, user };
@@ -113,7 +114,8 @@ ONE FOCAL IDEA per frame. FEWER, BIGGER elements always beat more-and-smaller. E
 RESIST CLUTTER: no scattered dots, corner ticks, texture strips, stray rules, or oversized "ghost" background numerals/words stacked behind everything. Every element must earn its place — if it doesn't serve the one idea, delete it. A clean frame with 5 confident elements beats a busy one with 30.
 VARY THE FORM beat to beat — do NOT make every canvas frame a headline-on-a-field:
 - TYPE frames: a huge headline, a stacked kinetic phrase, a stat slam (the number IS the hero), a quote card.
-- BUILT-GRAPHIC frames: a clean chart from the data, a comparison split (X vs Y), a labeled card/grid, a simple diagram or motif. Build it from shapes (divs) as ONE composed group in its OWN zone, with text kept in a SEPARATE zone — minimal, confident parts, never a cluttered fake UI, never crude blobs standing in for real objects.
+- BUILT-GRAPHIC frames: a clean chart from the data, a comparison split (X vs Y), a labeled card/grid, a simple geometric motif. Build it from SIMPLE shapes (rectangles, rounded-rects, circles, gradients, glows, lines) as ONE composed group in its OWN zone, with text in a SEPARATE zone — minimal, confident parts, never a cluttered fake UI.
+SIMPLE ABSTRACT ONLY — DO NOT DRAW REAL THINGS IN CSS: never try to depict an object, animal, person, place, map, building, product, flag, emblem, crest, or logo out of shapes — it always renders as crude blobs. Two hard rules: (1) NO clip-path and NO inline <svg> — our renderer DROPS both, so they vanish or flatten to plain rectangles (a CSS "eagle" or "map" becomes red boxes); (2) if a beat needs to SHOW a real thing, that is an IMAGE beat, not this frame — here, express the idea with bold TYPOGRAPHY (e.g. "power fractured" as cracked/split type, NOT a CSS crest) or at most ONE Lucide icon. Illustrate only SIMPLE abstract concepts; never attempt a complex representational scene.
 Every frame needs a visible light source or accent presence — flat darkness reads as dead air.
 
 ${dataContract}
@@ -126,7 +128,7 @@ OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 
   const user = `BEAT ${beat.beat_index} — ${duration.toFixed(1)}s on screen
 SPOKEN: "${beat.script_line}"
-INTENT: ${beat.visual_concept}
+INTENT (internal direction — never render as on-screen text): ${beat.visual_concept}
 
 Design this frame. Make it look different from a plain headline-on-cream card.`;
 

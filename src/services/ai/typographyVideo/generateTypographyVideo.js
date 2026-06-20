@@ -1,9 +1,9 @@
 import { serverFetch } from "../../serverApi";
 
 /** Phase 1 (free): script → returns the plan for the user to confirm/edit. */
-export async function planTypographyVideo({ input, inputType = "topic", targetDuration = 40, language = "en" }) {
+export async function planTypographyVideo({ input, inputType = "topic", targetDuration = 40, language = "en", styleId = "auto" }) {
   const res  = await serverFetch("/api/typography-video/plan", {
-    method: "POST", body: JSON.stringify({ input, inputType, targetDuration, language }),
+    method: "POST", body: JSON.stringify({ input, inputType, targetDuration, language, styleId }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { const e = new Error(data.error || "Couldn't build that script"); if (data.code) e.code = data.code; throw e; }

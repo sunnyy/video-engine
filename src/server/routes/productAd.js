@@ -5,6 +5,7 @@ import {
   upload, uuidv4,
 } from "../middleware/shared.js";
 import { moderateInput } from "../middleware/moderateInput.js";
+import { guardContent } from "../../services/ai/shared/moderation.js";
 
 export const router = express.Router();
 
@@ -31,6 +32,7 @@ router.post("/upload", requireAuth, upload.single("image"), async (req, res) => 
 // POST /analyze — GPT-4o Vision analyses product image, returns shot strategy
 router.post("/analyze", requireAuth, async (req, res) => {
   const userId = req.user.id;
+  if (!(await guardContent(res, { images: [req.body.imageUrl], label: "product-ad" }))) return;
   let creditAmount = 0;
   try {
     const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();
@@ -90,6 +92,7 @@ router.post("/analyze", requireAuth, async (req, res) => {
 // Wearable + non_worn: nano-banana [product only] → cleaned studio product photo
 router.post("/generate-base-image", requireAuth, async (req, res) => {
   const userId = req.user.id;
+  if (!(await guardContent(res, { images: [req.body.productImageUrl, req.body.modelImageUrl], label: "product-ad" }))) return;
   let creditAmount = 0;
   try {
     const { data: sub } = await supabaseAdmin.from("subscriptions").select("id").eq("user_id", userId).eq("status", "active").maybeSingle();

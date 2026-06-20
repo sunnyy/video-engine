@@ -14,11 +14,14 @@
  * animation / asset-type vocabularies.
  */
 
+import { getStyle } from "../shared/visualStyles.js";
+
 export function buildFreeSceneDesignerPrompt(sceneScript, projectContext) {
   const canvasW     = projectContext.canvasWidth  ?? 1080;
   const canvasH     = projectContext.canvasHeight ?? 1920;
   const accentColor = projectContext.accentColor  || "#6366f1";
-  const visualStyle = projectContext.visualStyle  || "radiant";
+  const _sv         = getStyle(projectContext.visualStyle);
+  const visualStyle = _sv ? `${_sv.label} (${_sv.description})` : "modern, polished, brand-forward";
   const theme       = projectContext.theme        || "dark";
   const beatDuration = projectContext.beatDuration ?? null;
   const overlayMode  = projectContext.overlayMode === true;
@@ -61,6 +64,7 @@ Pick motion by MEANING and HIERARCHY: the hero gets one expressive move (pop/zoo
 Icons: data-icon="kebab-name" (Lucide) ONLY on a single standalone glyph. NEVER put data-icon on something you built yourself from shapes/divs (a clock, chart, device, diagram) — that gets replaced by a generic icon and your design is lost; leave those pieces as data-layer="decoration" so they render as the shapes you drew.
 Only REAL tagged elements render — so anything that must be visible (a cross-out line, a divider, a chip, an icon) must be its own real element with the attributes above. Do NOT use ::before/::after pseudo-elements.
 TEXT IS ONE UNIFORM STYLE PER ELEMENT: a text element renders as a single color (or ONE gradient applied to the WHOLE element). NEVER give individual words or inline <span>s a different color/gradient/highlight inside a text block — that cannot be represented and will break. For emphasis, use a bolder weight, ALL-CAPS, or put the emphasized phrase on its own line/element.
+NEVER print the scene's intent/role as visible text. Words like "Hook", "Fact", "Reveal", "Feature", "CTA", "Proof", "Problem", "Solution" are INTERNAL direction — they must NOT appear on screen. A kicker/badge/label must be REAL content (product name, benefit, or short phrase), never the intent keyword.
 
 ${layout ? `LAYOUT FOR THIS FRAME (from the director — build exactly this structure): ${layout}\nCompose for THIS structure specifically — do NOT fall back to the generic kicker + headline + subhead stack; that sameness across scenes is the #1 thing to avoid.\n` : ""}ART DIRECTION (your call): anchor on brand accent ${accentColor} but build a real palette around it (neutrals, tints, a tasteful secondary) — not monochrome. ${themeDir} Strong contrast. "${visualStyle}" is a loose leaning; vary treatment scene to scene.
 ONE FOCAL IDEA per frame. Keep the element count low — a viewer reads a few things in a few seconds, not a full app screen. Never build a busy product UI crammed with floating chips, callouts, and chrome.
@@ -73,7 +77,7 @@ ${beatDuration != null ? `On screen ~${beatDuration.toFixed(1)}s — ${beatDurat
 
 OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 
-  const user = `SCENE INTENT: ${projectContext.sceneIntent || "scene"}
+  const user = `SCENE INTENT (internal direction — never render this word on screen): ${projectContext.sceneIntent || "scene"}
 CREATIVE BRIEF: ${brief || "Design the strongest premium frame for this line."}
 SPOKEN LINE(S) FOR THIS SCENE:
 ${sceneScript}

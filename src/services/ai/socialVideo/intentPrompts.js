@@ -52,6 +52,7 @@ Tag every MEANINGFUL element (these become animated layers; layout wrappers don'
 - data-animation: fade-in | fade-up | scale-in | slide-left | none   (animate at least 2 elements)
 - data-scene-element: hero | background | supporting | decoration
 TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colors/gradients inside a text block. Only REAL tagged elements render — no ::before/::after. Spell every word EXACTLY as given. A glow is a <div> radial-gradient + blur with NO text inside. A CTA/button is ONE element (bg+padding+radius on the text element, white-space:nowrap).
+NEVER print the scene's intent/role as visible text. Words like "Hook", "Fact", "Reveal", "Setup", "Payoff", "Stat", "CTA", "Turn", "Side A/B" are INTERNAL direction — they must NOT appear on screen. A kicker/badge/label, if used, must be REAL content (a topic tag, source, or short phrase from the brief), never the intent keyword. Only ever render the DISPLAY TEXT given below.
 
 ABSOLUTE PROHIBITIONS (violating any invalidates the scene):
 - NEVER show any author name, username, or @handle unless the ATTRIBUTION directive explicitly instructs it.
@@ -96,7 +97,7 @@ ${attributionDirective}
 OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 
   const user = `CREATIVE BRIEF (realize this): "${brief || "(use your best judgment)"}"
-SCENE INTENT: ${sceneIntent}
+SCENE INTENT (internal direction — NEVER render this word on screen): ${sceneIntent}
 DISPLAY TEXT (show on screen): "${visualText}"
 
 Design the single most striking, premium, scroll-stopping 9:16 ${hasFetchedImage ? "overlay (text only, over the image, in safe bands)" : "frame"} for this. Match the brief's feeling — not a generic layout.
