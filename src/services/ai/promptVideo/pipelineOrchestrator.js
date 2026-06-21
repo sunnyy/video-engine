@@ -1,6 +1,6 @@
 /**
  * pipelineOrchestrator.js
- * src/services/ai/aiVideo/pipelineOrchestrator.js
+ * src/services/ai/promptVideo/pipelineOrchestrator.js
  *
  * Prompt to Video — the beat-level engine. Self-contained service.
  *

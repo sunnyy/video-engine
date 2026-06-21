@@ -1,6 +1,6 @@
 /**
  * freeDesignPrompt.js
- * src/services/ai/promoVideo/freeDesignPrompt.js
+ * src/services/ai/saasVideo/freeDesignPrompt.js
  *
  * Designer prompt for the headless-measure path. Unlike intentPrompts.js (which
  * forces flat, absolutely-positioned elements because the old parser computes

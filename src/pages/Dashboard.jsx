@@ -6,10 +6,10 @@ import { supabase } from "../lib/supabase";
 import { getProfile } from "../services/profile/profileService";
 import { serverFetch } from "../services/serverApi";
 import { invalidateProjectCaches } from "../services/projects/projectService";
-import { generateAiVideo, planAiVideo } from "../services/ai/aiVideo/generateAiVideo";
+import { generatePromptVideo, planPromptVideo } from "../services/ai/promptVideo/generatePromptVideo";
 import { planSocialVideo, produceSocialVideo } from "../services/ai/socialVideo/generateSocialVideo";
 import ScriptConfirmModal from "../ui/ScriptConfirmModal";
-import { generateSaasVideo } from "../services/ai/promoVideo/generateSaasVideo";
+import { generateSaasVideo } from "../services/ai/saasVideo/generateSaasVideo";
 import { generateProductVideo, scrapeProductUrl } from "../services/ai/productVideo/generateProductVideo";
 import { planTypographyVideo, produceTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
 import { generateCaptions } from "../services/captions/generateCaptions";
@@ -121,7 +121,7 @@ function timeLabel(dateStr) {
 }
 
 /* ── AI Video chatbox (the morphing create surface) ── */
-function AiVideoChatbox() {
+function PromptVideoChatbox() {
   const navigate = useNavigate();
   const [prompt,   setPrompt]   = useState("");
   const cfg = SERVICE_FIELDS["ai-video"];
@@ -143,7 +143,7 @@ function AiVideoChatbox() {
     if (!prompt.trim() || planning || loading) return;
     setPlanning(true); setError(null);
     try {
-      const result = await planAiVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation });
+      const result = await planPromptVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation });
       setPlanData(result);
     } catch (err) {
       setError(err.message || "Planning failed. Please try again.");
@@ -158,7 +158,7 @@ function AiVideoChatbox() {
     // Carry the user's edited script lines into the plan; visuals stay as planned.
     const plan = { ...planData.plan, film: { ...planData.plan.film, beats: editedBeats } };
     try {
-      const result = await generateAiVideo(
+      const result = await generatePromptVideo(
         { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, orientation, plan },
         ({ step }) => { const i = STATUS_STEPS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
@@ -1001,7 +1001,7 @@ export default function Dashboard() {
 
           {/* Chatbox (morphs per selected service) */}
           <div>
-            {selected === "ai-video"      ? <AiVideoChatbox />
+            {selected === "ai-video"      ? <PromptVideoChatbox />
               : selected === "social-video" ? <SocialChatbox />
               : selected === "promo-video"  ? <SaasChatbox />
               : selected === "product-video"? <ProductChatbox />

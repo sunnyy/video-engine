@@ -1,6 +1,6 @@
 /**
  * scriptGenerator.js
- * src/services/ai/promoVideo/v2/scriptGenerator.js
+ * src/services/ai/saasVideo/v2/scriptGenerator.js
  *
  * GPT-4.1 acts as creative director + copywriter: it reads a product and decides
  * the narrative angle and beat structure that best sell THAT product (no fixed

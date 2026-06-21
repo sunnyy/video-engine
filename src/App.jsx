@@ -37,8 +37,8 @@ import Settings        from "./pages/Settings";
 import ProductVideoGenerator from "./pages/ProductVideoGenerator";
 import TypographyVideo       from "./pages/TypographyVideo";
 import SocialVideo           from "./pages/SocialVideo";
-import PromoVideo            from "./pages/PromoVideo";
-import AiVideo           from "./pages/AiVideo";
+import SaasVideo            from "./pages/SaasVideo";
+import PromptVideo           from "./pages/PromptVideo";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
@@ -155,10 +155,10 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
-            <Route path="/promo-video"             element={<PromoVideo />} />
-            <Route path="/promo-video/:projectId"  element={<PromoVideo />} />
+            <Route path="/promo-video"             element={<SaasVideo />} />
+            <Route path="/promo-video/:projectId"  element={<SaasVideo />} />
             <Route path="/product-video"      element={<ProductVideoGenerator />} />
-            <Route path="/ai-video"       element={<AiVideo />} />
+            <Route path="/ai-video"       element={<PromptVideo />} />
             <Route path="/typography-video"   element={<TypographyVideo />} />
             <Route path="/social-video"       element={<SocialVideo />} />
             <Route path="/product-poster"    element={<PosterStudio />} />

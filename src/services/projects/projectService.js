@@ -139,7 +139,7 @@ export async function getSocialVideoProjects() {
   return result;
 }
 
-export async function getAiVideoProjects() {
+export async function getPromptVideoProjects() {
   const hit = getCached("ai_video");
   if (hit) return hit;
 

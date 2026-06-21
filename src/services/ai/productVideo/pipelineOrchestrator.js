@@ -19,7 +19,7 @@
  */
 
 import { supabaseAdmin }            from "../../../server/middleware/shared.js";
-import { generateFullVoiceover }    from "../promoVideo/ttsGenerator.js";
+import { generateFullVoiceover }    from "../saasVideo/ttsGenerator.js";
 import { pickAutoMood }             from "../../../core/registries/musicRegistry.js";
 import { generateProductPlan }      from "./productDirector.js";
 import { generateBaseImage, generateAllSceneShots } from "./shotGenerator.js";

@@ -103,7 +103,7 @@ const Icons = {
       <line x1="6" y1="14" x2="14" y2="14"/>
     </svg>
   ),
-  aiVideo: (
+  promptVideo: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
       <path d="M9.5 8.5l5 3.5-5 3.5V8.5z"/>

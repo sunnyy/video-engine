@@ -1,6 +1,6 @@
 /**
  * sceneDesignerFree.js
- * src/services/ai/promoVideo/sceneDesignerFree.js
+ * src/services/ai/saasVideo/sceneDesignerFree.js
  *
  * Designer call for the headless-measure path. Mirrors sceneDesigner.js but uses
  * the free (nested CSS allowed) prompt. Kept separate so the current path is

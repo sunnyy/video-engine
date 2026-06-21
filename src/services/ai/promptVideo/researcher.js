@@ -1,6 +1,6 @@
 /**
  * researcher.js
- * src/services/ai/aiVideo/researcher.js
+ * src/services/ai/promptVideo/researcher.js
  *
  * Stage 0 — subject research BEFORE anything visual exists.
  *

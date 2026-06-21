@@ -24,7 +24,7 @@ import { applyTransitions, assignSceneTransitions } from "../shared/transitions.
 import { buildTimeline }          from "./timelineBuilder.js";
 import { injectMusic }            from "../shared/music.js";
 import { moderateInput }          from "../shared/moderation.js";
-import { generateFullVoiceover }  from "../promoVideo/ttsGenerator.js";
+import { generateFullVoiceover }  from "../saasVideo/ttsGenerator.js";
 
 const CANVAS = { width: 1080, height: 1920 }; // default (9:16)
 // Map the chosen orientation to canvas dimensions — drives design, measure, timeline + saved format.
@@ -38,7 +38,7 @@ function orientationToCanvas(orientation) {
 }
 const FPS    = 30;
 
-// ── Timestamp assignment (same pattern as promoVideo) ────────────────────────
+// ── Timestamp assignment (same pattern as saasVideo) ────────────────────────
 
 function assignWordTimestamps(scenes, wordTimestamps) {
   if (!wordTimestamps?.length) return;

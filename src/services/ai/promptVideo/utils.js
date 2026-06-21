@@ -1,6 +1,6 @@
 /**
  * utils.js
- * src/services/ai/aiVideo/utils.js
+ * src/services/ai/promptVideo/utils.js
  *
  * Small shared helpers for the Prompt Video pipeline.
  */

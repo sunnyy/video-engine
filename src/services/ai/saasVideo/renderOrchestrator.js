@@ -1,6 +1,6 @@
 /**
  * renderOrchestrator.js
- * src/services/ai/promoVideo/renderOrchestrator.js
+ * src/services/ai/saasVideo/renderOrchestrator.js
  *
  * Pipeline order:
  *   1. Generate TTS for all AI-voiceover scenes

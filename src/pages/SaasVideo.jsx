@@ -1644,7 +1644,7 @@ You'll land straight in the editor when it's ready.
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-export default function PromoVideo() {
+export default function SaasVideo() {
   const navigate                          = useNavigate();
   const { projectId: paramProjectId }     = useParams();
   const [tab,          setTab]            = useState("create");

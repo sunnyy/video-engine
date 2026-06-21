@@ -1,6 +1,6 @@
 /**
  * visualDirector.js
- * src/services/ai/promoVideo/visualDirector.js
+ * src/services/ai/saasVideo/visualDirector.js
  *
  * Phase 1 of the beat pipeline. Runs AFTER the voiceover exists.
  * Takes the continuous narration + word-level timestamps and segments it into

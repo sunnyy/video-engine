@@ -1,6 +1,6 @@
 /**
  * timelineBuilder.js
- * src/services/ai/promoVideo/v2/timelineBuilder.js
+ * src/services/ai/saasVideo/v2/timelineBuilder.js
  *
  * Converts v2 scene graphs + scene objects into the existing timeline JSON format.
  * Output is compatible with the timeline editor and Remotion renderer.

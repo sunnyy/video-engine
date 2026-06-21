@@ -1,6 +1,6 @@
 /**
  * assetHarvester.js
- * src/services/ai/promoVideo/assetHarvester.js
+ * src/services/ai/saasVideo/assetHarvester.js
  *
  * Product-URL harvesting for the Promo Video pipeline. Ported (self-contained) from
  * the SaaS Video pipeline so Promo can offer a "paste your URL" mode and the SaaS

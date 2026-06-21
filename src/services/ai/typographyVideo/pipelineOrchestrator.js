@@ -1,7 +1,7 @@
 import { supabaseAdmin }               from "../../../server/middleware/shared.js";
 import { generateTypographyScript }     from "./scriptGenerator.js";
 import { buildTypographyTimelineDirect } from "./timelineBuilderDirect.js";
-import { generateFullVoiceover }         from "../promoVideo/ttsGenerator.js";
+import { generateFullVoiceover }         from "../saasVideo/ttsGenerator.js";
 import { pickMoodForNiche, pickMusicByMood } from "../../../core/registries/musicRegistry.js";
 import { moderateInput }                     from "../shared/moderation.js";
 

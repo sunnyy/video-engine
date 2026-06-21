@@ -1,6 +1,6 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
-import { runPromptPipeline, runPromptPlan } from "../../services/ai/aiVideo/pipelineOrchestrator.js";
+import { runPromptPipeline, runPromptPlan } from "../../services/ai/promptVideo/pipelineOrchestrator.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();

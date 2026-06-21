@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateAiVideo, planAiVideo } from "../services/ai/aiVideo/generateAiVideo";
-import { getAiVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
+import { generatePromptVideo, planPromptVideo } from "../services/ai/promptVideo/generatePromptVideo";
+import { getPromptVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
 
@@ -172,7 +172,7 @@ function VideoListing() {
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    getAiVideoProjects()
+    getPromptVideoProjects()
       .then(setProjects)
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -243,7 +243,7 @@ function GeneratorForm() {
     setPlanning(true);
     setError(null);
     try {
-      const result = await planAiVideo({
+      const result = await planPromptVideo({
         prompt: prompt.trim(), styleId, targetDuration: duration, language, revision: reviseText,
       });
       setPlanData(result);
@@ -262,7 +262,7 @@ function GeneratorForm() {
     setStatusStep(2); // research + direction already done in the plan
 
     try {
-      const result = await generateAiVideo(
+      const result = await generatePromptVideo(
         { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, plan: planData.plan },
         ({ step }) => {
           const idx = STATUS_STEPS.indexOf(step);
@@ -491,7 +491,7 @@ function GeneratorForm() {
   );
 }
 
-export default function AiVideo() {
+export default function PromptVideo() {
   const [tab, setTab] = useState("create");
 
   const tabs = [

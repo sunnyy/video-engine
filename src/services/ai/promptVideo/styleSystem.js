@@ -1,6 +1,6 @@
 /**
  * styleSystem.js
- * src/services/ai/aiVideo/styleSystem.js
+ * src/services/ai/promptVideo/styleSystem.js
  *
  * The style preset system — declared ONCE per video, inherited by every beat.
  * Coherence across a generated video comes from locking these choices up

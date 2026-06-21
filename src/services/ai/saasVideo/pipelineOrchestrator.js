@@ -1,6 +1,6 @@
 /**
  * pipelineOrchestrator.js
- * src/services/ai/promoVideo/v2/pipelineOrchestrator.js
+ * src/services/ai/saasVideo/v2/pipelineOrchestrator.js
  *
  * V2 pipeline — single continuous voiceover model.
  *

@@ -1,6 +1,6 @@
 /**
  * beatDirector.js
- * src/services/ai/aiVideo/beatDirector.js
+ * src/services/ai/promptVideo/beatDirector.js
  *
  * Stage 1 — plans the ENTIRE film at BEAT level in one call.
  *
@@ -214,8 +214,12 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     if (!continues && i > 0 && beats[i - 1]._assetType === assetType) {
       sameTypeRun++;
       if (sameTypeRun >= 2) {
-        assetType = assetType === "none" ? "ai_image" : "none";
-        if (assetType === "ai_image" && !b.image_prompt) b.image_prompt = b.visual_concept ?? "";
+        // Break the run with REAL imagery first, never paid generation: "photo"
+        // resolves stock-first (entity→stock→library→generate), so ai_image stays a
+        // true last resort and only within budget. Flipping to ai_image here would
+        // force a paid conceptual render purely for rhythm — against source priority.
+        assetType = assetType === "none" ? "photo" : "none";
+        if (assetType === "photo" && !b.image_prompt) b.image_prompt = b.visual_concept ?? "";
         sameTypeRun = 0;
       }
     } else if (!continues) {

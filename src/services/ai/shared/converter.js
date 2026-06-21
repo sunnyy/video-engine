@@ -1,6 +1,6 @@
 /**
  * htmlMeasure.js
- * src/services/ai/promoVideo/htmlMeasure.js
+ * src/services/ai/saasVideo/htmlMeasure.js
  *
  * EXPERIMENTAL alternative to htmlParser.js for the beat pipeline.
  *

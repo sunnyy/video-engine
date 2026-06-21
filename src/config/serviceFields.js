@@ -36,7 +36,7 @@ export const AI_VIDEO_DURATIONS = [
 // otherwise the StyleField falls back to the universal VISUAL_STYLES set (which
 // will grow with hand-curated styles).
 
-// ── SaaS (Promo) option lists — mirror src/pages/PromoVideo.jsx so the chatbox
+// ── SaaS (Promo) option lists — mirror src/pages/SaasVideo.jsx so the chatbox
 //    sends backend-valid values (target_duration / tone / theme). Visual style now
 //    uses the shared registry (visual_style is a soft design hint in the pipeline). ──
 export const SAAS_DURATIONS = [

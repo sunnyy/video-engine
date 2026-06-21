@@ -2,12 +2,12 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { supabaseAdmin, openai, requireAuth, deductCredits, addCredits, uuidv4, TEMP_DIR } from "../middleware/shared.js";
-import { createEmptyProject, createEmptyScene, PROJECT_STATUS, ASSET_TYPE, ASSET_SOURCE } from "../../services/ai/promoVideo/projectSchema.js";
-import { generateAssetRequirements, updateAssetStatus } from "../../services/ai/promoVideo/assetRequirements.js";
-import { markProjectApproved, transitionProjectStatus, getProjectSummary } from "../../services/ai/promoVideo/projectStateManager.js";
-import { orchestratePromoRender } from "../../services/ai/promoVideo/renderOrchestrator.js";
-import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../services/ai/promoVideo/talkingHeadProcessor.js";
-import { runV2Pipeline } from "../../services/ai/promoVideo/pipelineOrchestrator.js";
+import { createEmptyProject, createEmptyScene, PROJECT_STATUS, ASSET_TYPE, ASSET_SOURCE } from "../../services/ai/saasVideo/projectSchema.js";
+import { generateAssetRequirements, updateAssetStatus } from "../../services/ai/saasVideo/assetRequirements.js";
+import { markProjectApproved, transitionProjectStatus, getProjectSummary } from "../../services/ai/saasVideo/projectStateManager.js";
+import { orchestratePromoRender } from "../../services/ai/saasVideo/renderOrchestrator.js";
+import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../services/ai/saasVideo/talkingHeadProcessor.js";
+import { runV2Pipeline } from "../../services/ai/saasVideo/pipelineOrchestrator.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 

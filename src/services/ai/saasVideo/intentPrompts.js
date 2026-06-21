@@ -1,6 +1,6 @@
 /**
  * intentPrompts.js
- * src/services/ai/promoVideo/v2/intentPrompts.js
+ * src/services/ai/saasVideo/v2/intentPrompts.js
  *
  * Builds the system + user prompt for the v2 scene designer.
  * The designer receives the raw script segment and designs freely.

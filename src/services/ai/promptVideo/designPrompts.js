@@ -1,6 +1,6 @@
 /**
  * designPrompts.js
- * src/services/ai/aiVideo/designPrompts.js
+ * src/services/ai/promptVideo/designPrompts.js
  *
  * FREE design prompt (headless-measure path) — same approach as Promo Video's
  * freeDesignPrompt. GPT-5.4 designs ONE premium frame as NATURAL HTML/CSS

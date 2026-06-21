@@ -1,6 +1,6 @@
 /**
  * htmlParser.js
- * src/services/ai/promoVideo/v2/htmlParser.js
+ * src/services/ai/saasVideo/v2/htmlParser.js
  *
  * Parses GPT-generated HTML scene frames into a scene graph array.
  * Reads both the <style> block (CSS classes) and inline styles,

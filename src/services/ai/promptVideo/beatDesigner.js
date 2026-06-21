@@ -1,6 +1,6 @@
 /**
  * beatDesigner.js
- * src/services/ai/aiVideo/beatDesigner.js
+ * src/services/ai/promptVideo/beatDesigner.js
  *
  * Stage 4 — designs all beats fully in parallel (variety was planned by the
  * beat director; there is no sequential dependency).

@@ -1,6 +1,6 @@
 /**
  * visualResolver.js
- * src/services/ai/aiVideo/visualResolver.js
+ * src/services/ai/promptVideo/visualResolver.js
  *
  * Stage 3 — resolves every beat's visual via the shared asset waterfall
  * (entity → stock → ai_image_library → generate), capped by an AI budget.

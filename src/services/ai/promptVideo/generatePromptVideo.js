@@ -1,7 +1,7 @@
 import { serverFetch } from "../../serverApi";
 
 /** Phase 1: free plan — research + script + shot list for user review. */
-export async function planAiVideo({ prompt, styleId = "auto", targetDuration = 45, language = "en", revision = "" }) {
+export async function planPromptVideo({ prompt, styleId = "auto", targetDuration = 45, language = "en", revision = "" }) {
   const res = await serverFetch("/api/ai-video/plan", {
     method: "POST",
     body: JSON.stringify({ prompt, styleId, targetDuration, language, revision }),
@@ -13,7 +13,7 @@ export async function planAiVideo({ prompt, styleId = "auto", targetDuration = 4
   return res.json(); // { plan, summary }
 }
 
-export async function generateAiVideo(
+export async function generatePromptVideo(
   { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null },
   onProgress,
 ) {

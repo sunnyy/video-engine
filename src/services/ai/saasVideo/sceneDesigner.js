@@ -1,6 +1,6 @@
 /**
  * sceneDesigner.js
- * src/services/ai/promoVideo/v2/sceneDesigner.js
+ * src/services/ai/saasVideo/v2/sceneDesigner.js
  *
  * Calls the scene designer model to generate a single HTML frame
  * for a given scene + project context.
