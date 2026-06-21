@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { serverFetch } from "../../services/serverApi";
+import { getProjectRenders } from "../../services/projects/projectService";
 
 const btn = {
   background: "none",
@@ -28,6 +29,35 @@ export default function TopBar() {
 
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+
+  // Export history (every render is a row in `renders`, newest first) → download dropdown.
+  const [renders, setRenders] = useState([]);
+  const [showDownloads, setShowDownloads] = useState(false);
+
+  const loadRenders = async () => {
+    if (!projectId) return;
+    try { setRenders((await getProjectRenders(projectId)).filter((r) => r.video_url)); }
+    catch (_) { /* renders history is best-effort */ }
+  };
+  useEffect(() => { loadRenders(); }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fmtRenderDate = (iso) => {
+    try { return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+    catch { return ""; }
+  };
+
+  const downloadVideo = async (url, label) => {
+    if (!url) return;
+    try {
+      const r    = await fetch(url);
+      const blob = await r.blob();
+      const a    = document.createElement("a");
+      a.href     = URL.createObjectURL(blob);
+      a.download = `${name || "video"}-${label || Date.now()}.mp4`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (_) { alert("Download failed — please try again."); }
+  };
 
   // Warn before leaving the tab while an export is running.
   useEffect(() => {
@@ -73,15 +103,8 @@ export default function TopBar() {
             if (status.cancelled) return;
             if (status.error) { alert("Export failed: " + status.error); return; }
             const videoUrl = status.video_url || status.url;
-            if (videoUrl) {
-              const r    = await fetch(videoUrl);
-              const blob = await r.blob();
-              const a    = document.createElement("a");
-              a.href     = URL.createObjectURL(blob);
-              a.download = `${name || "video"}-${Date.now()}.mp4`;
-              a.click();
-              URL.revokeObjectURL(a.href);
-            }
+            if (videoUrl) await downloadVideo(videoUrl);
+            loadRenders(); // refresh the version dropdown with this new export
           }
         } catch (_) {}
       }, 3000);
@@ -212,6 +235,55 @@ export default function TopBar() {
         >
           {isPortrait ? "9:16" : "16:9"}
         </button>
+
+        {/* Download dropdown — previous exports (versions), newest first */}
+        {renders.length > 0 && (
+          <div style={{ position: "relative", marginLeft: 4 }}>
+            <button
+              onClick={() => setShowDownloads((v) => !v)}
+              disabled={exporting}
+              title="Download a previous export"
+              style={{
+                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                color: "#c0c0d8", cursor: exporting ? "default" : "pointer", padding: "7px 14px",
+                borderRadius: 6, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              Download <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+            </button>
+            {showDownloads && (
+              <>
+                <div onClick={() => setShowDownloads(false)} style={{ position: "fixed", inset: 0, zIndex: 9998 }} />
+                <div style={{
+                  position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 9999, width: 250,
+                  background: "#14141e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
+                  boxShadow: "0 12px 40px rgba(0,0,0,0.5)", overflow: "hidden", maxHeight: 320, overflowY: "auto",
+                }}>
+                  <div style={{ padding: "9px 13px", fontSize: 11, fontWeight: 700, color: "#8896a8", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    Exports ({renders.length})
+                  </div>
+                  {renders.map((r, i) => (
+                    <button
+                      key={r.id}
+                      onClick={() => { downloadVideo(r.video_url, fmtRenderDate(r.created_at).replace(/[^\w]+/g, "-")); setShowDownloads(false); }}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%",
+                        textAlign: "left", padding: "10px 13px", background: "none", border: "none",
+                        borderBottom: "1px solid rgba(255,255,255,0.04)", color: "#e8e8f0", cursor: "pointer",
+                        fontSize: 12.5, fontFamily: "inherit",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(124,92,252,0.12)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                    >
+                      <span>{fmtRenderDate(r.created_at)}{i === 0 ? "  · Latest" : ""}</span>
+                      <span style={{ fontSize: 13, color: "#a080ff" }}>↓</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <button
           onClick={handleExport}
