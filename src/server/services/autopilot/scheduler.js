@@ -9,6 +9,7 @@
  */
 import { supabaseAdmin } from "../../middleware/shared.js";
 import { enqueue } from "../../jobs/queue.js";
+import { isKillSwitchOn } from "../../jobs/flags.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -30,6 +31,7 @@ async function hasPendingGenerate(userId) {
 
 /** One scheduler pass: enqueue a generate_video for every enabled user that's due. */
 export async function tick() {
+  if (await isKillSwitchOn().catch(() => false)) return; // global pause: don't enqueue new work
   const { data: rows, error } = await supabaseAdmin.from("autopilot_settings").select("*").eq("enabled", true);
   if (error) { console.warn("[scheduler] load settings failed:", error.message); return; }
 

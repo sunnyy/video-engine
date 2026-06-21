@@ -27,13 +27,38 @@ export async function claimNext() {
   return Array.isArray(data) ? (data[0] ?? null) : (data ?? null);
 }
 
-/** Update a running job's progress (0-100). Best-effort; never throws. */
+/** Update a running job's progress (0-100). Also refreshes the heartbeat. Best-effort. */
 export async function setProgress(id, progress) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
+  const now = new Date().toISOString();
   const { error } = await supabaseAdmin.from("jobs")
-    .update({ progress: pct, updated_at: new Date().toISOString() })
+    .update({ progress: pct, heartbeat_at: now, updated_at: now })
     .eq("id", id);
   if (error) console.warn(`[jobs] setProgress(${id}) failed: ${error.message}`);
+}
+
+/** Refresh a running job's heartbeat so the stale sweeper doesn't reclaim it. */
+export async function heartbeat(id) {
+  const now = new Date().toISOString();
+  await supabaseAdmin.from("jobs").update({ heartbeat_at: now, updated_at: now }).eq("id", id).then(() => {}, () => {});
+}
+
+/**
+ * Recover jobs stuck in 'running' past the heartbeat deadline (crashed/killed worker):
+ * requeue if attempts remain, else mark failed. Returns how many were recovered.
+ */
+export async function sweepStaleJobs(staleMs = 600_000) {
+  const cutoff = new Date(Date.now() - staleMs).toISOString();
+  const { data, error } = await supabaseAdmin.from("jobs")
+    .select("id, attempts, max_attempts").eq("status", "running").lt("heartbeat_at", cutoff);
+  if (error || !data?.length) return 0;
+  for (const j of data) {
+    const patch = j.attempts < j.max_attempts
+      ? { status: "queued", run_at: new Date().toISOString(), error: "recovered: stale heartbeat", updated_at: new Date().toISOString() }
+      : { status: "failed", error: "stale heartbeat, attempts exhausted", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    await supabaseAdmin.from("jobs").update(patch).eq("id", j.id);
+  }
+  return data.length;
 }
 
 /** Mark a job completed with an optional result payload. */

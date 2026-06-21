@@ -10,13 +10,16 @@
  */
 import "./middleware/shared.js";        // initialises env + supabaseAdmin
 import "./jobs/handlers.js";            // side-effect: registers all job handlers
-import { claimNext, complete, fail } from "./jobs/queue.js";
+import { claimNext, complete, fail, sweepStaleJobs } from "./jobs/queue.js";
+import { isKillSwitchOn } from "./jobs/flags.js";
 import { getHandler, registeredTypes } from "./jobs/registry.js";
 import { tick as schedulerTick } from "./services/autopilot/scheduler.js";
 
 const MAX_CONCURRENT = Math.max(1, parseInt(process.env.WORKER_CONCURRENCY || "1", 10));
 const POLL_MS        = Math.max(500, parseInt(process.env.WORKER_POLL_MS || "3000", 10));
 const SCHEDULER_MS   = Math.max(30_000, parseInt(process.env.SCHEDULER_TICK_MS || "60000", 10));
+const STALE_MS       = Math.max(120_000, parseInt(process.env.WORKER_STALE_MS || "600000", 10));
+const SWEEP_MS       = 60_000;
 
 let active  = 0;
 let running = true;
@@ -39,6 +42,8 @@ async function runJob(job) {
 
 // Claim as many jobs as free concurrency allows, then idle until the next poll.
 async function drain() {
+  // Global kill switch: stop claiming new jobs; in-flight jobs finish gracefully.
+  if (await isKillSwitchOn().catch(() => false)) return;
   while (running && active < MAX_CONCURRENT) {
     let job;
     try { job = await claimNext(); }
@@ -61,6 +66,12 @@ const schedulerTimer = setInterval(() => {
   if (running) schedulerTick().catch((e) => console.error("[scheduler] tick error:", e.message));
 }, SCHEDULER_MS);
 schedulerTimer.unref?.();
+
+// Stale-job sweeper — recover jobs left 'running' by a crashed/restarted worker.
+const sweepTimer = setInterval(() => {
+  if (running) sweepStaleJobs(STALE_MS).then((n) => { if (n) console.warn(`[worker] recovered ${n} stale job(s)`); }).catch(() => {});
+}, SWEEP_MS);
+sweepTimer.unref?.();
 
 // Graceful shutdown — Railway sends SIGTERM on redeploy. Stop claiming, let active
 // jobs finish (in-flight rows stay 'running'; a stuck one can be requeued by a sweeper).

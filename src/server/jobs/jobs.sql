@@ -13,6 +13,7 @@ create table if not exists jobs (
   max_attempts int  not null default 3,
   run_at       timestamptz not null default now(),  -- earliest run time (scheduling + backoff)
   claimed_at   timestamptz,
+  heartbeat_at timestamptz,                          -- liveness; stale = crashed worker
   finished_at  timestamptz,
   result       jsonb,
   error        text,
@@ -23,27 +24,47 @@ create table if not exists jobs (
 
 create index if not exists jobs_claimable_idx on jobs (status, priority, run_at);
 
--- Atomically claim the next runnable job. `for update skip locked` makes this safe
--- even if you later run more than one worker instance.
+-- Idempotent add for existing deployments.
+alter table jobs add column if not exists heartbeat_at timestamptz;
+
+-- Atomically claim the next runnable job. `for update skip locked` makes this safe across
+-- workers. Enforces a HARD concurrency guard at claim time: at most one running
+-- generate_video per user (other eligible jobs are still claimed).
 create or replace function claim_job() returns setof jobs
 language plpgsql as $$
 declare j jobs;
 begin
-  select * into j from jobs
-    where status = 'queued' and run_at <= now()
-    order by priority asc, run_at asc
-    for update skip locked
-    limit 1;
-  if not found then return; end if;
+  for j in
+    select * from jobs
+      where status = 'queued' and run_at <= now()
+      order by priority asc, run_at asc
+      for update skip locked
+      limit 20
+  loop
+    if j.type = 'generate_video' and exists (
+      select 1 from jobs r
+       where r.type = 'generate_video' and r.status = 'running'
+         and r.payload->>'userId' = j.payload->>'userId'
+    ) then
+      continue;  -- user already has one generating — leave this queued
+    end if;
 
-  update jobs
-     set status = 'running', attempts = attempts + 1, claimed_at = now(), updated_at = now()
-   where id = j.id
-   returning * into j;
-
-  return next j;
+    update jobs
+       set status = 'running', attempts = attempts + 1, claimed_at = now(), heartbeat_at = now(), updated_at = now()
+     where id = j.id
+     returning * into j;
+    return next j;
+    return;  -- claim exactly one
+  end loop;
 end $$;
 
--- Server-only table: enable RLS with no policies so anon/authenticated clients can't
--- read or write it. The service-role key (supabaseAdmin) bypasses RLS.
+-- Global kill switch + other runtime flags (toggle without redeploy).
+create table if not exists system_flags (
+  key        text primary key,
+  bool_value boolean,
+  updated_at timestamptz not null default now()
+);
+
+-- Server-only tables: RLS on, no public policies (service-role bypasses RLS).
 alter table jobs enable row level security;
+alter table system_flags enable row level security;

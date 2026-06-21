@@ -6,13 +6,14 @@
  * Add handlers as phases land (autopilot_generate, publish_post, …).
  */
 import { registerHandler } from "./registry.js";
-import { setProgress, enqueue } from "./queue.js";
+import { setProgress, enqueue, heartbeat } from "./queue.js";
 import { renderTimeline } from "../services/renderService.js";
 import { publish } from "../services/social/service.js";
 import { runPromptPipeline } from "../../services/ai/promptVideo/pipelineOrchestrator.js";
 import { applyBrandKit } from "../../services/ai/shared/brandKit.js";
 import { getSettings, saveSettings } from "../services/autopilot/settings.js";
 import { getNextTopic, consumeTopic, releaseTopic, getQueuedCount, ensureTopics } from "../services/autopilot/topics.js";
+import { checkGenerationQuota, checkPublishQuota } from "../services/autopilot/quotas.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 import { supabaseAdmin, deductCredits, addCredits, sendUserEmail } from "../middleware/shared.js";
 
@@ -86,6 +87,23 @@ registerHandler("publish_post", async (payload) => {
   const { userId, platform, videoUrl, projectId = null, metadata = {} } = payload || {};
   if (!userId || !platform || !videoUrl) throw new Error("publish_post: userId, platform, videoUrl required");
 
+  // Idempotency: if this row already has a platform_post_id, it was uploaded — never again.
+  if (payload.postId) {
+    const { data: existing } = await supabaseAdmin.from("published_posts").select("platform_post_id, status").eq("id", payload.postId).maybeSingle();
+    if (existing?.platform_post_id) {
+      if (existing.status !== "published") await supabaseAdmin.from("published_posts").update({ status: "published" }).eq("id", payload.postId);
+      return { postId: payload.postId, platform_post_id: existing.platform_post_id, deduped: true };
+    }
+  }
+
+  // Publish-quota cap → pause + notify, don't upload.
+  const pQuota = await checkPublishQuota(userId, await getSettings(userId));
+  if (pQuota.exceeded) {
+    if (payload.postId) await supabaseAdmin.from("published_posts").update({ status: "failed", error: pQuota.reason, updated_at: new Date().toISOString() }).eq("id", payload.postId);
+    await pauseAutopilot(userId, pQuota.reason);
+    const e = new Error(`AutoPilot paused: ${pQuota.reason}`); e.noRetry = true; throw e;
+  }
+
   // Track the attempt in published_posts (reuse the row across retries).
   let postId = payload.postId || null;
   const base = {
@@ -128,12 +146,19 @@ registerHandler("publish_post", async (payload) => {
  * as a post-process, then chains → render_timeline (which chains → publish_post).
  * payload: { userId }
  */
-registerHandler("generate_video", async (payload) => {
+registerHandler("generate_video", async (payload, job) => {
   const { userId } = payload || {};
   if (!userId) throw new Error("generate_video: userId required");
 
   const settings = await getSettings(userId);
   if (!settings.enabled) return { skipped: "autopilot disabled" };
+
+  // 0) Quota cap (runaway-cost guard). Exceeded → pause + notify, nothing reserved.
+  const quota = await checkGenerationQuota(userId, settings);
+  if (quota.exceeded) {
+    await pauseAutopilot(userId, quota.reason);
+    const e = new Error(`AutoPilot paused: ${quota.reason}`); e.noRetry = true; throw e;
+  }
 
   // 1) Credit check BEFORE reserving a topic. Insufficient → pause + notify, topic stays queued.
   const cost = CREDIT_COSTS.ai_video;
@@ -159,6 +184,7 @@ registerHandler("generate_video", async (payload) => {
   if (!ded.success) { await releaseTopic(topic.id); throw new Error("credit deduction failed"); }
 
   try {
+    let lastHb = 0;
     const result = await runPromptPipeline({
       prompt: topic.title, userId,
       styleId: settings.style_id || "auto",
@@ -167,7 +193,7 @@ registerHandler("generate_video", async (payload) => {
       voiceId: settings.voice_id || null,
       orientation: settings.orientation || "9:16",
       plan: null,
-    }, () => {});
+    }, () => { const t = Date.now(); if (t - lastHb > 15000) { lastHb = t; heartbeat(job.id); } });
     const projectId = result.projectId;
 
     // Brand kit as post-process — Prompt-to-Video itself is never touched.
