@@ -31,6 +31,7 @@ import { measureSceneHTML, closeMeasureBrowser }      from "../shared/converter.
 import { searchStockImage, searchStockVideo }         from "../shared/stock.js";
 import { styleImagePrompt }                            from "../shared/visualStyles.js";
 import { generateAiImage }                             from "../shared/aiImage.js";
+import { persistRemote }                               from "../shared/persist.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
@@ -47,10 +48,14 @@ function extractSearchQuery(hint) {
 }
 
 // Stock image — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
-async function fetchPixabayImage(hint, orientation = "9:16") {
+// Re-host to Supabase: raw Pixabay/Pexels CDN URLs are hotlink-protected and fail to
+// load in Remotion's Chrome at export (ERR_BLOCKED_BY_ORB / 400), crashing the render.
+async function fetchPixabayImage(hint, orientation = "9:16", runId = "promo") {
   if (!hint) return null;
   const hit = await searchStockImage(hint, { orientation });
-  return hit?.url ?? null;
+  if (!hit?.url) return null;
+  const persisted = await persistRemote(hit.url, { runId, label: `stock-${Date.now()}`, contentType: "image/jpeg", referer: "https://pixabay.com/" });
+  return persisted ?? hit.url;
 }
 
 // Orientation-aware AI image via the shared, universal generator (FLUX + text-gate
@@ -62,10 +67,13 @@ async function generateFalImage(hint, projectId, styleId = "auto", orientation =
 }
 
 // Stock video b-roll — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
-async function fetchPixabayVideo(hint, orientation = "9:16") {
+// Re-hosted for the same reason as stock images (hotlink-protected CDN fails at export).
+async function fetchPixabayVideo(hint, orientation = "9:16", runId = "promo") {
   if (!hint) return null;
   const hit = await searchStockVideo(hint, { orientation });
-  return hit?.url ?? null;
+  if (!hit?.url) return null;
+  const persisted = await persistRemote(hit.url, { runId, label: `stockvid-${Date.now()}`, contentType: "video/mp4", referer: "https://pixabay.com/" });
+  return persisted ?? hit.url;
 }
 
 /**
@@ -347,7 +355,7 @@ export async function runV2Pipeline(project) {
     await Promise.all(placeholderLayers.map(async (layer) => {
       if (layer.assetType === "stock") {
         const query = extractSearchQuery(layer.assetHint);
-        layer.src = await fetchPixabayImage(query, formatRatio);
+        layer.src = await fetchPixabayImage(query, formatRatio, projectId);
       } else if (layer.assetType === "ai") {
         layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style, formatRatio);
       } else if (layer.assetType === "asset") {
@@ -364,7 +372,7 @@ export async function runV2Pipeline(project) {
   if (imageScenes.length > 0) {
     await Promise.all(imageScenes.map(async (scene) => {
       const query    = extractSearchQuery(scene.asset_hint || project.product_name || "");
-      const imageUrl = await fetchPixabayImage(query, formatRatio);
+      const imageUrl = await fetchPixabayImage(query, formatRatio, projectId);
       if (imageUrl) {
         scene.asset_url = imageUrl;
         const sceneIdx  = scene.scene_index;
@@ -665,16 +673,16 @@ async function runV2BeatPipeline(project) {
   await Promise.all(placeholderLayers.map(async (layer) => {
     if (layer.assetType === "product") {
       layer.src = screenshots.length ? screenshots[shotIdx++ % screenshots.length] : null;
-      if (!layer.src) { layer.assetType = "stock"; layer.src = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio); }
+      if (!layer.src) { layer.assetType = "stock"; layer.src = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio, projectId); }
     } else if (layer.assetType === "stock") {
       const query = extractSearchQuery(layer.assetHint);
-      layer.src = await fetchPixabayImage(query, formatRatio);
+      layer.src = await fetchPixabayImage(query, formatRatio, projectId);
     } else if (layer.assetType === "stock_video") {
-      layer.src = await fetchPixabayVideo(extractSearchQuery(layer.assetHint), formatRatio);
+      layer.src = await fetchPixabayVideo(extractSearchQuery(layer.assetHint), formatRatio, projectId);
       // Fallback: no matching stock clip → degrade to a stock image so the beat isn't empty.
       if (!layer.src) {
         layer.type = "image";
-        layer.src  = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio);
+        layer.src  = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio, projectId);
         console.warn(`[v2/beats] stock_video had no match for ${layer.id} — fell back to image`);
       }
     } else if (layer.assetType === "ai") {
@@ -734,7 +742,7 @@ async function resolveImagePlaceholders(finalTimeline, project) {
   await Promise.all(placeholderLayers.map(async (layer) => {
     if (layer.assetType === "stock") {
       const query = extractSearchQuery(layer.assetHint);
-      layer.src = await fetchPixabayImage(query, project.format_ratio ?? "9:16");
+      layer.src = await fetchPixabayImage(query, project.format_ratio ?? "9:16", project.id);
     } else if (layer.assetType === "ai") {
       layer.src = await generateFalImage(layer.assetHint, project.id, project.visual_style, project.format_ratio ?? "9:16");
     } else if (layer.assetType === "asset") {
