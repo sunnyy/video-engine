@@ -1,10 +1,8 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
-import {
-  supabaseAdmin, requireAuth,
-  TEMP_DIR, PUBLIC_DIR, PROJECT_ROOT, uuidv4,
-} from "../middleware/shared.js";
+import { requireAuth, TEMP_DIR, uuidv4 } from "../middleware/shared.js";
+import { renderTimeline } from "../services/renderService.js";
 
 export const router = express.Router();
 
@@ -51,63 +49,6 @@ function readJob(jobId) {
   }
 }
 
-/* ── Newest mtime under a directory (for prebundle staleness detection) ── */
-function newestMtimeMs(dir) {
-  let newest = 0;
-  try {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      const t = entry.isDirectory() ? newestMtimeMs(full) : fs.statSync(full).mtimeMs;
-      if (t > newest) newest = t;
-    }
-  } catch {}
-  return newest;
-}
-
-/* ── Bundle — prefer the committed prebundle, but rebuild if it's stale ──
-   The composition (src/remotion) is fully self-contained, so if any file there
-   is newer than the prebundle the committed bundle is out of date — exports
-   would render old code (e.g. lost colors after a refactor). On localhost we
-   rebuild at runtime so tests always reflect current code; before deploy run
-   `npm run prebundle` and commit remotion-bundle/. */
-async function getBundle() {
-  const PREBUNDLE_DIR = path.join(PROJECT_ROOT, "remotion-bundle");
-  const indexHtml     = path.join(PREBUNDLE_DIR, "index.html");
-
-  if (fs.existsSync(indexHtml)) {
-    const bundleTime = fs.statSync(indexHtml).mtimeMs;
-    const srcTime    = newestMtimeMs(path.join(PROJECT_ROOT, "src", "remotion"));
-    if (srcTime <= bundleTime) return PREBUNDLE_DIR;
-    console.warn("[render] prebundle is older than src/remotion — rebuilding at runtime. Run `npm run prebundle` and commit before deploy.");
-  }
-
-  // Build at runtime (stale or missing prebundle — local dev path).
-  const { bundle } = await import("@remotion/bundler");
-  const result = await bundle({
-    entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx"),
-    publicDir:  PUBLIC_DIR,
-  });
-  return result;
-}
-
-/* ── Sanitise asset URL for Remotion's Chrome subprocess ──
-   Chrome runs sandboxed and cannot reach the Express server on localhost.
-   Supabase / CDN HTTPS URLs are fetched directly by Chrome — no local caching needed.
-   blob: URLs are unusable; return null so the zone renders without an asset. */
-function resolveAssetUrl(url) {
-  if (!url) return url;
-  if (url.startsWith("blob:")) return null;
-  // Unwrap legacy proxy URLs — Chrome can fetch Pixabay CDN directly over HTTPS
-  if (url.includes("/api/proxy-video?url=")) {
-    try {
-      const inner = new URL(url, "http://localhost").searchParams.get("url");
-      return inner || null;
-    } catch { return null; }
-  }
-  return url;
-}
-
-
 /* ---------------- TIMELINE RENDER ---------------- */
 router.post("/timeline", requireAuth, async (req, res) => {
   const { project, projectId, resolution = "1080p" } = req.body;
@@ -123,120 +64,17 @@ router.post("/timeline", requireAuth, async (req, res) => {
 
 async function timelineRenderJob(jobId, userId, project, projectId, resolution) {
   try {
-    /* ── Sanitise blob: asset URLs and drop image layers with no resolvable src ── */
-    const cleanLayers = (project?.layers || [])
-      .map((layer) => ({ ...layer, src: resolveAssetUrl(layer.src) }))
-      .filter((layer) => {
-        if (layer.type === "image" || layer.type === "sticker") return !!layer.src;
-        return true;
-      });
-    const cleanProject = { ...project, layers: cleanLayers };
-
-    /* ── Cap duration to max visual layer end (prevents long audio tracks from bloating export) ── */
-    const visualLayers = cleanLayers.filter((l) => l.type !== "audio");
-    const maxVisualEnd = visualLayers.length > 0
-      ? Math.max(...visualLayers.map((l) => l.end ?? 0))
-      : (cleanProject.format?.duration || 30);
-    const cappedDuration = Math.min(cleanProject.format?.duration || 30, maxVisualEnd);
-    const cleanProjectWithDuration = {
-      ...cleanProject,
-      format: { ...cleanProject.format, duration: Math.max(1, cappedDuration) },
-    };
-
-    /* ── Watermark for free users (admins and active subscribers are exempt) ── */
-    let finalProject = cleanProjectWithDuration;
-    try {
-      let exempt = false;
-      // Admins never get a watermark — they produce sample/marketing exports.
-      try {
-        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
-        if (user?.app_metadata?.role === "admin") exempt = true;
-      } catch (_) {}
-      if (!exempt) {
-        const { data: sub } = await supabaseAdmin
-          .from("subscriptions")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("status", "active")
-          .maybeSingle();
-        if (sub) exempt = true;
-      }
-      if (!exempt) finalProject = { ...finalProject, meta: { ...finalProject.meta, showWatermark: true } };
-    } catch (_) {}
-
-    const serveUrl = await getBundle();
-    const { getCompositions, renderFrames, stitchFramesToVideo } = await import("@remotion/renderer");
-    const comps = await getCompositions(serveUrl, { inputProps: { project: finalProject } });
-    const comp = comps.find((c) => c.id === "TimelineComposition");
-    if (!comp) throw new Error("TimelineComposition not found in bundle");
-
-    const fmt = finalProject.format || {};
-    const scale = resolution === "4k" ? 2 : 1;
-    const width = (fmt.width || 1080) * scale;
-    const height = (fmt.height || 1920) * scale;
-    const compositionWithRes = { ...comp, width, height };
-
-    const outputPath = path.join(TEMP_DIR, `render-${jobId}.mp4`);
-    const framesDir = path.join(TEMP_DIR, `frames-${jobId}`);
-    if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
-
-    const hasVideoLayers = (finalProject.layers || []).some((l) => l.type === "video");
-    let rendered = 0;
-    const { assetsInfo } = await renderFrames({
-      composition: compositionWithRes,
-      serveUrl,
-      inputProps: { project: finalProject },
-      outputDir: framesDir,
-      imageFormat: "jpeg",
-      concurrency: hasVideoLayers ? 1 : 2,
-      chromiumOptions: { gl: "angle" },
-      onFrameUpdate: () => {
-        if (renderJobs[jobId]?.cancelled) throw new Error("RENDER_CANCELLED");
-        rendered++;
-        const pct = Math.round((rendered / comp.durationInFrames) * 90);
+    // Delegate to the shared, framework-agnostic renderer (same service the worker uses).
+    // renderId = jobId → each manual export is its own version row in `renders`.
+    const { videoUrl } = await renderTimeline(project, {
+      userId, renderId: jobId, projectId: projectId || null, resolution,
+      onProgress: (pct) => {
+        if (!renderJobs[jobId]) return;
         renderJobs[jobId].progress = pct;
-        if (pct % 10 === 0) writeJob(jobId, renderJobs[jobId]);
+        if (pct % 10 === 0 || pct >= 100) writeJob(jobId, renderJobs[jobId]);
       },
+      isCancelled: () => !!renderJobs[jobId]?.cancelled,
     });
-
-    await stitchFramesToVideo({
-      composition: compositionWithRes,
-      serveUrl,
-      inputProps: { project: finalProject },
-      codec: "h264",
-      assetsInfo,
-      outputLocation: outputPath,
-      fps: comp.fps,
-      width,
-      height,
-    });
-
-    fs.rmSync(framesDir, { recursive: true, force: true });
-
-    let videoUrl = null;
-    try {
-      const storageKey = `renders/${userId}/render-${jobId}.mp4`;
-      const videoBuffer = fs.readFileSync(outputPath);
-      const { error: storageErr } = await supabaseAdmin.storage
-        .from("user-assets")
-        .upload(storageKey, videoBuffer, { contentType: "video/mp4", upsert: false });
-      if (!storageErr) {
-        const { data: { publicUrl } } = supabaseAdmin.storage.from("user-assets").getPublicUrl(storageKey);
-        videoUrl = publicUrl;
-        await supabaseAdmin.from("renders").insert([{
-          project_id: projectId || null,
-          user_id: userId,
-          video_url: videoUrl,
-          status: "done",
-          file_path: storageKey,
-          created_at: new Date().toISOString(),
-        }]);
-        // Client will use Supabase URL — local file no longer needed
-        try { fs.unlinkSync(outputPath); } catch {}
-      }
-    } catch (e) {
-      console.warn("[timeline-render] Post-render save failed:", e.message);
-    }
 
     writeJob(jobId, {
       progress: 100,
@@ -246,10 +84,7 @@ async function timelineRenderJob(jobId, userId, project, projectId, resolution) 
       error: null,
     });
   } catch (err) {
-    // Clean up any partial temp files
-    try { fs.rmSync(path.join(TEMP_DIR, `frames-${jobId}`), { recursive: true, force: true }); } catch {}
     try { fs.unlinkSync(path.join(TEMP_DIR, `render-${jobId}.mp4`)); } catch {}
-
     if (err.message === "RENDER_CANCELLED") {
       writeJob(jobId, { progress: 0, done: true, url: null, error: null, cancelled: true });
     } else {
