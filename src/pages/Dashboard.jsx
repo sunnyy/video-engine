@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useProjectsStore } from "../store/useProjectsStore";
@@ -121,7 +122,7 @@ function timeLabel(dateStr) {
 }
 
 /* ── AI Video chatbox (the morphing create surface) ── */
-function PromptVideoChatbox() {
+function PromptVideoChatbox({ onBusy }) {
   const navigate = useNavigate();
   const [prompt,   setPrompt]   = useState("");
   const cfg = SERVICE_FIELDS["ai-video"];
@@ -138,6 +139,10 @@ function PromptVideoChatbox() {
   const [error,      setError]      = useState(null);
 
   const canPlan = !!prompt.trim() && !planning && !loading;
+
+  useEffect(() => {
+    onBusy?.(planning || loading, loading ? STATUS_STEPS[statusStep] : "Planning your video…");
+  }, [planning, loading, statusStep, onBusy]);
 
   async function handlePlan() {
     if (!prompt.trim() || planning || loading) return;
@@ -265,7 +270,7 @@ function PromptVideoChatbox() {
 }
 
 /* ── Social to Video chatbox (URL primary input) ── */
-function SocialChatbox() {
+function SocialChatbox({ onBusy }) {
   const navigate = useNavigate();
   const cfg = SERVICE_FIELDS["social-video"];
   const SA = cfg.accent;
@@ -283,6 +288,10 @@ function SocialChatbox() {
   const [error,         setError]         = useState(null);
 
   const canGo = !!url.trim() && !planning && !loading;
+
+  useEffect(() => {
+    onBusy?.(planning || loading, loading ? SOCIAL_STATUS[statusStep] : "Reading the post…");
+  }, [planning, loading, statusStep, onBusy]);
 
   // Phase 1: fetch + script → open the confirmation modal.
   async function handleStart() {
@@ -379,7 +388,7 @@ function SocialChatbox() {
 }
 
 /* ── SaaS Video chatbox (faceless one-shot: create→render→poll) ── */
-function SaasChatbox() {
+function SaasChatbox({ onBusy }) {
   const navigate = useNavigate();
   const cfg = SERVICE_FIELDS["promo-video"];
   const SC = cfg.accent;
@@ -400,6 +409,10 @@ function SaasChatbox() {
   const [error,       setError]       = useState(null);
 
   const canGo = (mode === "url" ? !!url.trim() : (!!productName.trim() && !!description.trim())) && !loading;
+
+  useEffect(() => {
+    onBusy?.(loading, SAAS_STATUS[statusStep]);
+  }, [loading, statusStep, onBusy]);
 
   async function handleGenerate() {
     if (!canGo) return;
@@ -519,7 +532,7 @@ function SaasChatbox() {
 }
 
 /* ── Product Video chatbox (image-upload or product URL → one-shot generate) ── */
-function ProductChatbox() {
+function ProductChatbox({ onBusy }) {
   const navigate = useNavigate();
   const cfg = SERVICE_FIELDS["product-video"];
   const PC = cfg.accent;
@@ -541,6 +554,10 @@ function ProductChatbox() {
 
   const hasInput = mode === "upload" ? !!imageFile : !!productUrl.trim();
   const canGo = hasInput && !loading;
+
+  useEffect(() => {
+    onBusy?.(loading, PRODUCT_STATUS[statusIdx]);
+  }, [loading, statusIdx, onBusy]);
 
   function pickFile(e) {
     const f = e.target.files?.[0];
@@ -681,7 +698,7 @@ function ProductChatbox() {
 }
 
 /* ── Typography Video chatbox (topic/script → kinetic text video) ── */
-function TypographyChatbox() {
+function TypographyChatbox({ onBusy }) {
   const navigate = useNavigate();
   const cfg = SERVICE_FIELDS["typography-video"];
   const TC = cfg.accent;
@@ -699,6 +716,10 @@ function TypographyChatbox() {
   const [error,       setError]       = useState(null);
 
   const canGo = !!input.trim() && !planning && !loading;
+
+  useEffect(() => {
+    onBusy?.(planning || loading, loading ? TYPO_STATUS[statusStep] : "Building your script…");
+  }, [planning, loading, statusStep, onBusy]);
 
   // Phase 1: script → open the confirmation modal.
   async function handleStart() {
@@ -801,7 +822,7 @@ function TypographyChatbox() {
 }
 
 /* ── Add Captions chatbox (video upload → transcribe → styled captions) ── */
-function CaptionsChatbox() {
+function CaptionsChatbox({ onBusy }) {
   const navigate = useNavigate();
   const cfg = SERVICE_FIELDS["video-captions"];
   const CC = cfg.accent;
@@ -814,6 +835,10 @@ function CaptionsChatbox() {
   const [error,        setError]        = useState(null);
 
   const canGo = !!file && !loading;
+
+  useEffect(() => {
+    onBusy?.(loading, CAPTION_STATUS[statusStep]);
+  }, [loading, statusStep, onBusy]);
 
   async function handleGenerate() {
     if (!canGo) return;
@@ -928,6 +953,20 @@ export default function Dashboard() {
   const [userId,         setUserId]         = useState(null);
   const [userName,       setUserName]       = useState("");
 
+  // Generation lock: while a chatbox is planning/producing, block service switches,
+  // clicks elsewhere, and page unload so the in-flight job isn't orphaned on the front end.
+  const [busy,       setBusy]       = useState(false);
+  const [busyStatus, setBusyStatus] = useState("");
+  const reportBusy = useCallback((b, s) => { setBusy(b); if (b) setBusyStatus(s || "Creating your video…"); }, []);
+
+  // Warn on refresh / tab close / external navigation while a job is running.
+  useEffect(() => {
+    if (!busy) return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; return ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [busy]);
+
   useEffect(() => {
     fetchProjects();
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -953,6 +992,7 @@ export default function Dashboard() {
   }, []);
 
   function pickService(svc) {
+    if (busy) return; // locked while a generation is running
     if (svc.kind === "nav") { navigate(svc.to); return; }
     setSelected(svc.id);
   }
@@ -962,6 +1002,29 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <style>{`@keyframes pv-spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Generation lock overlay — blocks all interaction (incl. the sidebar) until the
+          in-flight plan/produce finishes, so switching services can't orphan the job. */}
+      {busy && createPortal(
+        <div
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: "fixed", inset: 0, zIndex: 100000,
+            background: "rgba(6,7,12,0.82)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18,
+            cursor: "wait",
+          }}>
+          <div style={{ width: 48, height: 48, border: "3px solid rgba(255,255,255,0.14)", borderTopColor: AI, borderRadius: "50%", animation: "pv-spin 0.8s linear infinite" }} />
+          <div style={{ fontSize: 15.5, fontWeight: 700, color: T.text, fontFamily: "'Outfit',sans-serif", textAlign: "center", padding: "0 24px" }}>
+            {busyStatus || "Creating your video…"}
+          </div>
+          <div style={{ fontSize: 12.5, color: T.muted, maxWidth: 340, textAlign: "center", lineHeight: 1.55, padding: "0 24px" }}>
+            Please keep this tab open — don't refresh or leave the page while we build your video.
+          </div>
+        </div>,
+        document.body,
+      )}
+
       {showOnboarding && userId && (
         <Onboarding userId={userId} onComplete={() => { localStorage.setItem(`onboarding_done_${userId}`, "1"); setShowOnboarding(false); }} />
       )}
@@ -985,12 +1048,13 @@ export default function Dashboard() {
             {SERVICES.map(svc => {
               const active = selected === svc.id;
               return (
-                <button key={svc.id} onClick={() => pickService(svc)}
+                <button key={svc.id} onClick={() => pickService(svc)} disabled={busy}
                   style={{
                     display: "flex", alignItems: "center", gap: 6, padding: "10px 15px", borderRadius: 10, whiteSpace: "nowrap",
                     background: active ? `${svc.accent}1c` : "rgba(255,255,255,0.03)",
                     border: `1px solid ${active ? svc.accent + "66" : T.border}`,
-                    color: active ? "#fff" : T.muted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                    color: active ? "#fff" : T.muted, fontSize: 12, fontWeight: 700,
+                    cursor: busy ? "not-allowed" : "pointer", opacity: busy && !active ? 0.5 : 1, fontFamily: "inherit",
                     transition: "all 0.15s",
                   }}>
                   <svc.Icon size={15} />{svc.label}
@@ -1001,12 +1065,12 @@ export default function Dashboard() {
 
           {/* Chatbox (morphs per selected service) */}
           <div>
-            {selected === "ai-video"      ? <PromptVideoChatbox />
-              : selected === "social-video" ? <SocialChatbox />
-              : selected === "promo-video"  ? <SaasChatbox />
-              : selected === "product-video"? <ProductChatbox />
-              : selected === "typography-video" ? <TypographyChatbox />
-              : selected === "video-captions"   ? <CaptionsChatbox />
+            {selected === "ai-video"      ? <PromptVideoChatbox onBusy={reportBusy} />
+              : selected === "social-video" ? <SocialChatbox onBusy={reportBusy} />
+              : selected === "promo-video"  ? <SaasChatbox onBusy={reportBusy} />
+              : selected === "product-video"? <ProductChatbox onBusy={reportBusy} />
+              : selected === "typography-video" ? <TypographyChatbox onBusy={reportBusy} />
+              : selected === "video-captions"   ? <CaptionsChatbox onBusy={reportBusy} />
               : <div style={{ padding: 28, textAlign: "center", color: T.muted, border: `1px dashed ${T.border}`, borderRadius: 14 }}>Opening…</div>}
           </div>
         </div>
