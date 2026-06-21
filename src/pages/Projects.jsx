@@ -30,13 +30,36 @@ function timeLabel(dateStr) {
   return d.toLocaleDateString();
 }
 
+// Resolve a representative preview for any service. Falls through cheapest-first:
+// explicit thumbnail → image layer → video layer (captions, video-backed) →
+// gradient + first headline (typography / pure-text) → generic placeholder.
+function previewFor(project) {
+  const json   = project.safe_project_json || {};
+  const layers = json.layers || [];
+  const t = json.meta?.thumbnail;
+  if (t) return { kind: /\.(mp4|webm|mov)(\?|$)/i.test(t) ? "video" : "image", src: t };
+  const img = layers.find(l => l.type === "image" && l.src);
+  if (img) return { kind: "image", src: img.src };
+  const vid = layers.find(l => l.type === "video" && l.src);
+  if (vid) return { kind: "video", src: vid.src };
+  const grad = layers.find(l => l.type === "gradient" && l.gradient);
+  const txt  = layers.find(l => l.type === "text" && (l.content || "").trim());
+  if (grad || txt) {
+    const c = txt?.style?.color;
+    return {
+      kind:  "text",
+      bg:    grad?.gradient || "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)",
+      text:  (txt?.content || "").trim(),
+      color: typeof c === "string" && c.startsWith("#") ? c : "#ffffff",
+    };
+  }
+  return null;
+}
+
 function Card({ project }) {
   const navigate = useNavigate();
   const [hov, setHov] = useState(false);
-  const thumb = project.safe_project_json?.meta?.thumbnail
-    || (project.safe_project_json?.layers || []).find(l => l.type === "image" && l.src)?.src
-    || null;
-  const isVid = !!thumb && /\.(mp4|webm|mov)(\?|$)/i.test(thumb);
+  const preview = previewFor(project);
   const href = `/video-editor/${project.id}`;
   return (
     <a
@@ -46,11 +69,19 @@ function Card({ project }) {
       style={{ display: "block", textDecoration: "none", borderRadius: 14, overflow: "hidden", border: `1px solid ${hov ? "rgba(124,92,252,0.35)" : T.border}`, background: T.surface, transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none" }}
     >
       <div style={{ position: "relative", width: "100%", aspectRatio: "9/16", background: "#060a14", overflow: "hidden" }}>
-        {thumb
-          ? (isVid
-              ? <video src={thumb} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />)
-          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}><span style={{ fontSize: 28, opacity: 0.35 }}>🎬</span></div>}
+        {preview?.kind === "image" ? (
+          <img src={preview.src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : preview?.kind === "video" ? (
+          <video src={preview.src} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : preview?.kind === "text" ? (
+          <div style={{ width: "100%", height: "100%", background: preview.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <span style={{ color: preview.color, fontSize: 16, fontWeight: 800, textAlign: "center", lineHeight: 1.2, fontFamily: "'Outfit',sans-serif", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {preview.text || project.name}
+            </span>
+          </div>
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}><span style={{ fontSize: 28, opacity: 0.35 }}>🎬</span></div>
+        )}
       </div>
       <div style={{ padding: "10px 12px" }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project.name || "Untitled"}</div>
