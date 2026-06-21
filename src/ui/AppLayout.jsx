@@ -7,6 +7,12 @@ import { supabase } from "../lib/supabase";
 
 /* ── Icons ── */
 const Icons = {
+  admin: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>
+      <path d="M9 12l2 2 4-4"/>
+    </svg>
+  ),
   home: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
@@ -331,6 +337,9 @@ export default function AppLayout({ children }) {
 
           {/* Top nav */}
           <nav style={{ flex: 1, padding: "8px 6px", display: "flex", flexDirection: "column", gap: 2 }}>
+            {isAdmin && (
+              <IconBtn icon={Icons.admin} label="Admin" to="/admin" active={path === "/admin" || path.startsWith("/admin/")} />
+            )}
             <IconBtn icon={Icons.home} label="Home" to="/dashboard" active={path === "/dashboard"} />
 
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
