@@ -143,16 +143,25 @@ async function timelineRenderJob(jobId, userId, project, projectId, resolution) 
       format: { ...cleanProject.format, duration: Math.max(1, cappedDuration) },
     };
 
-    /* ── Watermark for free users ── */
+    /* ── Watermark for free users (admins and active subscribers are exempt) ── */
     let finalProject = cleanProjectWithDuration;
     try {
-      const { data: sub } = await supabaseAdmin
-        .from("subscriptions")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .maybeSingle();
-      if (!sub) finalProject = { ...finalProject, meta: { ...finalProject.meta, showWatermark: true } };
+      let exempt = false;
+      // Admins never get a watermark — they produce sample/marketing exports.
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (user?.app_metadata?.role === "admin") exempt = true;
+      } catch (_) {}
+      if (!exempt) {
+        const { data: sub } = await supabaseAdmin
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("status", "active")
+          .maybeSingle();
+        if (sub) exempt = true;
+      }
+      if (!exempt) finalProject = { ...finalProject, meta: { ...finalProject.meta, showWatermark: true } };
     } catch (_) {}
 
     const serveUrl = await getBundle();
