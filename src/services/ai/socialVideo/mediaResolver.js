@@ -16,6 +16,7 @@ import { supabaseAdmin } from "../../../server/middleware/shared.js";
 import { searchStockImage, searchStockVideo, probeImageDims, treatmentFor } from "../shared/stock.js";
 import { styleImagePrompt } from "../shared/visualStyles.js";
 import { generateAiImage } from "../shared/aiImage.js";
+import { resolveEntityImage } from "../shared/entityImage.js";
 
 // AI generations allowed per video — social posts usually carry their own image,
 // so AI is a rare fallback. ~1 per 22s, capped at 2.
@@ -41,41 +42,9 @@ async function persistRemote(url, runId, label, contentType = "image/jpeg", refe
   }
 }
 
-// ── Real entity photo (Wikipedia) ──────────────────────────────────────────────
-async function wikiSummaryImage(title) {
-  const res = await fetch(
-    `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/\s+/g, "_"))}`,
-    { headers: { Accept: "application/json", "User-Agent": "Vidquence/1.0" } },
-  );
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.originalimage?.source ?? data?.thumbnail?.source ?? null;
-}
-
-async function wikipediaImage(entityName, runId, label) {
-  if (!entityName) return null;
-  try {
-    let imgUrl = await wikiSummaryImage(entityName);
-    if (!imgUrl) {
-      const sRes = await fetch(
-        `https://en.wikipedia.org/w/rest.php/v1/search/title?q=${encodeURIComponent(entityName)}&limit=1`,
-        { headers: { Accept: "application/json", "User-Agent": "Vidquence/1.0" } },
-      );
-      if (sRes.ok) {
-        const sData = await sRes.json();
-        const found = sData?.pages?.[0]?.title;
-        if (found) imgUrl = await wikiSummaryImage(found);
-      }
-    }
-    if (!imgUrl) return null;
-    const persisted = await persistRemote(imgUrl, runId, label);
-    if (persisted) console.log(`[social/media] real photo for "${entityName}" via Wikipedia`);
-    return persisted;
-  } catch (e) {
-    console.warn(`[social/media] wikipedia lookup failed (${entityName}):`, e.message);
-    return null;
-  }
-}
+// Real entity photo (person/org/place/product) → shared/entityImage.js: a free,
+// licensed waterfall (Wikipedia → Wikidata P18 → Wikimedia Commons), universal
+// across all services. It persists internally and returns a permanent URL.
 
 // ── Stock (Pexels→Pixabay, orientation-aware, randomized) — shared/stock.js ───
 async function stockImage(query, runId, label, orientation) {
@@ -116,7 +85,7 @@ export async function resolveSocialMedia(scenes, content, runId, orientation = "
         return;
       }
       if (scene.subject_entity) {
-        const real = await wikipediaImage(scene.subject_entity, runId, `s${scene.scene_index}-real`);
+        const real = await resolveEntityImage(scene.subject_entity, { runId, label: `s${scene.scene_index}-real` });
         if (real) { scene.resolvedImage = real; return; }
       }
       if (scene.stock_query) {
