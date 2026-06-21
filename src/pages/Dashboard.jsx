@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useCreditsStore } from "../store/useCreditsStore";
-import { useProjectsStore } from "../store/useProjectsStore";
 import { supabase } from "../lib/supabase";
 import { getProfile } from "../services/profile/profileService";
 import { serverFetch } from "../services/serverApi";
@@ -111,15 +110,6 @@ const CAPTION_STATUS = [
 ];
 
 const CAPTION_STYLE_OPTIONS = Object.keys(captionStylePresets).map(k => ({ id: k, label: captionStyleLabels[k] || k }));
-
-function timeLabel(dateStr) {
-  const d = new Date(dateStr);
-  const diff = Math.floor((Date.now() - d) / 86400000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Yesterday";
-  if (diff < 7) return `${diff}d ago`;
-  return d.toLocaleDateString();
-}
 
 /* ── AI Video chatbox (the morphing create surface) ── */
 function PromptVideoChatbox({ onBusy }) {
@@ -905,48 +895,111 @@ function CaptionsChatbox({ onBusy }) {
   );
 }
 
-/* ── Project card (grid) ── */
-function ProjectCard({ project }) {
-  const navigate = useNavigate();
+/* ── Samples showcase — admin-curated outcomes per service (Pinterest/masonry) ── */
+// Keep in sync with SERVICES in src/pages/admin/Samples.jsx.
+const SAMPLE_SERVICE_LABELS = {
+  // Video services
+  ai_videos:        "Prompt to Video",
+  saas_video:       "SaaS Video",
+  product_video:    "Product Video",
+  social_video:     "Social to Video",
+  typography_video: "Typography Video",
+  captions:         "Auto Captions",
+  // Image services
+  thumbnails:    "Thumbnail",
+  posters:       "Poster",
+  social_posts:  "Banner / Post",
+  product_ads:   "Product Ad",
+  virtual_tryon: "Virtual Try-On",
+};
+
+function SampleCard({ sample }) {
   const [hov, setHov] = useState(false);
-  const thumb = project.safe_project_json?.meta?.thumbnail
-    || (project.safe_project_json?.layers || []).find(l => l.type === "image" && l.src)?.src
-    || null;
-  const isVid = !!thumb && /\.(mp4|webm|mov)(\?|$)/i.test(thumb);
-  const href = `/video-editor/${project.id}`;
+  const vidRef = useRef(null);
+  const isVid  = sample.type === "video";
+  const label  = SAMPLE_SERVICE_LABELS[sample.service_key] || sample.service_key;
+
+  // Only play videos while they're on screen — keeps a long grid smooth.
+  useEffect(() => {
+    if (!isVid) return;
+    const el = vidRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) el.play().catch(() => {});
+      else el.pause();
+    }, { threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [isVid]);
 
   return (
-    <a
-      href={href}
-      onClick={(e) => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(href, { state: { from: "/dashboard" } }); } }}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{ display: "block", textDecoration: "none", borderRadius: 14, overflow: "hidden", border: `1px solid ${hov ? "rgba(124,92,252,0.35)" : T.border}`, background: T.surface, transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none" }}
-    >
-      <div style={{ position: "relative", width: "100%", aspectRatio: "9/16", background: "#060a14", overflow: "hidden" }}>
-        {thumb ? (
-          isVid
-            ? <video src={thumb} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}>
-            <span style={{ fontSize: 28, opacity: 0.35 }}>🎬</span>
-          </div>
-        )}
+    <div className="sample-card"
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: `1px solid ${hov ? "rgba(124,92,252,0.4)" : T.border}`, background: T.surface, transition: "border-color 0.2s, transform 0.2s", transform: hov ? "translateY(-2px)" : "none" }}>
+      {isVid ? (
+        <video ref={vidRef} src={sample.src} poster={sample.poster || undefined} muted loop playsInline preload="metadata"
+          style={{ width: "100%", display: "block", background: "#060a14" }} />
+      ) : (
+        <img src={sample.src} alt={label} loading="lazy" style={{ width: "100%", display: "block", background: "#060a14" }} />
+      )}
+      <div style={{ position: "absolute", left: 8, bottom: 8, padding: "4px 9px", borderRadius: 7, background: "rgba(8,9,14,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", border: `1px solid ${T.border}`, fontSize: 11, fontWeight: 700, color: T.text, opacity: hov ? 1 : 0.85, transition: "opacity 0.2s" }}>
+        {label}
       </div>
-      <div style={{ padding: "10px 12px" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project.name || "Untitled"}</div>
-        <div style={{ fontSize: 11, color: T.faint, marginTop: 2 }}>{timeLabel(project.updated_at)}</div>
+    </div>
+  );
+}
+
+function SamplesGrid() {
+  const [samples, setSamples] = useState(null); // null = loading
+
+  useEffect(() => {
+    let alive = true;
+    serverFetch("/api/admin/samples/public?limit=60")
+      .then(r => r.json())
+      .then(d => { if (alive) setSamples((d.samples || []).filter(s => s.src)); })
+      .catch(() => { if (alive) setSamples([]); });
+    return () => { alive = false; };
+  }, []);
+
+  if (samples === null) {
+    return (
+      <div style={{ padding: "48px 40px 80px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: T.faint }}>
+          <div style={{ width: 16, height: 16, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "pv-spin 0.8s linear infinite" }} />
+          <span style={{ fontSize: 13 }}>Loading samples…</span>
+        </div>
       </div>
-    </a>
+    );
+  }
+  if (!samples.length) return null; // nothing curated yet — hide the section entirely
+
+  return (
+    <div style={{ padding: "40px 40px 80px" }}>
+      <style>{`
+        .samples-masonry { column-count: 4; column-gap: 16px; }
+        @media (max-width: 1100px) { .samples-masonry { column-count: 3; } }
+        @media (max-width: 760px)  { .samples-masonry { column-count: 2; } }
+        @media (max-width: 460px)  { .samples-masonry { column-count: 2; column-gap: 10px; } }
+        .sample-card { break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; margin-bottom: 16px; }
+      `}</style>
+      <div style={{ marginBottom: 18 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: 0, letterSpacing: "-0.01em" }}>
+          See what you can make
+        </h2>
+        <p style={{ fontSize: 13.5, color: T.muted, marginTop: 6 }}>
+          Real outcomes from every service — pick one above and create your own.
+        </p>
+      </div>
+      <div className="samples-masonry">
+        {samples.map(s => <SampleCard key={s.id} sample={s} />)}
+      </div>
+    </div>
   );
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { balance } = useCreditsStore();
-  const { projects, loading, fetchProjects } = useProjectsStore();
-
   const [selected,       setSelected]       = useState("ai-video");
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showFeedback,   setShowFeedback]   = useState(false);
@@ -968,7 +1021,6 @@ export default function Dashboard() {
   }, [busy]);
 
   useEffect(() => {
-    fetchProjects();
     supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user;
       if (!user) return;
@@ -996,8 +1048,6 @@ export default function Dashboard() {
     if (svc.kind === "nav") { navigate(svc.to); return; }
     setSelected(svc.id);
   }
-
-  const recent = [...projects].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 12);
 
   return (
     <AppLayout>
@@ -1075,31 +1125,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Grid — full width (user projects for now; curated demos later) */}
-        <div style={{ padding: "48px 40px 80px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: T.faint, fontFamily: "'JetBrains Mono',monospace" }}>
-              Your videos
-            </div>
-            <button onClick={() => navigate("/videos")} style={{ fontSize: 13, border: "none", cursor: "pointer", background: "transparent", color: "#7c5cfc", fontFamily: "inherit" }}>
-              View all →
-            </button>
-          </div>
-          {loading ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 0", color: T.faint }}>
-              <div style={{ width: 16, height: 16, border: "2px solid #7c5cfc", borderTopColor: "transparent", borderRadius: "50%", animation: "pv-spin 0.8s linear infinite" }} />
-              <span style={{ fontSize: 13 }}>Loading…</span>
-            </div>
-          ) : recent.length === 0 ? (
-            <div style={{ padding: "40px 0", textAlign: "center", color: T.faint, fontSize: 14 }}>
-              Nothing yet — describe a video above to make your first one.
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
-              {recent.map(p => <ProjectCard key={p.id} project={p} />)}
-            </div>
-          )}
-        </div>
+        {/* Samples — admin-curated showcase of what each service produces */}
+        <SamplesGrid />
       </div>
     </AppLayout>
   );
