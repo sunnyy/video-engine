@@ -28,6 +28,11 @@ import { router as typographyVideoRouter } from "./routes/typographyVideo.js";
 import { router as saasVideoRouter }      from "./routes/saasVideo.js";
 import { router as socialVideoRouter }     from "./routes/socialVideo.js";
 import { router as promptVideoRouter }      from "./routes/promptVideo.js";
+import { installLogGate } from "../core/utils/logger.js";
+
+// Gate all process-narration logs by level (quiet in production, verbose locally or
+// with VERBOSE_LOGS=1). warn/error always print. Must run before any request handling.
+installLogGate();
 
 console.log("Server starting...", new Date().toISOString());
 
