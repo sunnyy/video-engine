@@ -4,10 +4,11 @@
 create table if not exists published_posts (
   id               uuid primary key default gen_random_uuid(),
   user_id          uuid not null,
+  project_id       uuid,                              -- the generated project this came from
   platform         text not null,
   platform_post_id text,                              -- e.g. YouTube video id
   video_url        text not null,                     -- the rendered MP4 it published
-  status           text not null default 'queued',    -- queued | running | published | failed
+  status           text not null default 'queued',    -- awaiting_approval | queued | running | published | failed
   error            text,
   meta             jsonb,                             -- minimal debug (http status, privacy, publishAt)
   published_at     timestamptz,

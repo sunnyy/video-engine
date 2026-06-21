@@ -26,6 +26,13 @@ const Icons = {
       <path d="M12 2a10 10 0 1 0 0 20 2.5 2.5 0 0 0 2.5-2.5c0-1.4-1.1-2-1.1-3 0-.8.7-1.5 1.6-1.5H17a5 5 0 0 0 5-5c0-4.4-4.5-8-10-8z"/>
     </svg>
   ),
+  autopilot: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="2"/>
+      <path d="M3 9h18M8 2.5v4M16 2.5v4"/>
+      <path d="M9.5 14.5l2 2 3.5-3.5"/>
+    </svg>
+  ),
   folder: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
@@ -352,6 +359,7 @@ export default function AppLayout({ children }) {
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <IconBtn icon={Icons.folder}  label="Projects" to="/projects" active={path === "/projects"} />
+            <IconBtn icon={Icons.autopilot} label="AutoPilot" to="/autopilot" active={path === "/autopilot"} />
             <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
           </nav>
 

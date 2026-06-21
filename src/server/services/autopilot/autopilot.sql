@@ -5,6 +5,7 @@
 create table if not exists autopilot_settings (
   user_id            uuid primary key,
   enabled            boolean not null default false,
+  auto_publish       boolean not null default true,   -- false = render then wait for manual approval
   niches             text[] not null default '{}',
   audience           text,
   tone               text,

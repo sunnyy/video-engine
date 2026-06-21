@@ -5,7 +5,7 @@
 import { supabaseAdmin } from "../../middleware/shared.js";
 
 const DEFAULTS = {
-  enabled: false, niches: [], audience: null, tone: null, language: "en",
+  enabled: false, auto_publish: true, niches: [], audience: null, tone: null, language: "en",
   orientation: "9:16", style_id: "auto", voice_id: null, posts_per_day: 1,
   posting_times: [], ai_decide_times: true, platforms: [],
   keywords_emphasize: [], keywords_avoid: [], brand_kit_id: null,

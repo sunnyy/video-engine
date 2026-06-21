@@ -55,11 +55,20 @@ registerHandler("render_timeline", async (payload, job) => {
   if (!videoUrl) throw new Error("render_timeline: render produced no durable URL (upload failed)");
 
   // Chain → publish (autopilot only). Render never re-runs on publish failure: publish is
-  // its own retried job. One publish_post per platform.
-  if (payload?.chain?.publish && Array.isArray(payload.chain.publish.platforms)) {
-    const { platforms, metadata = {} } = payload.chain.publish;
-    for (const platform of platforms) {
-      await enqueue("publish_post", { userId, platform, videoUrl, metadata }, { userId, maxAttempts: 5 });
+  // its own retried job. With auto_publish off, we record an awaiting_approval row per
+  // platform and stop — the user approves later (POST /api/autopilot/approve).
+  if (payload?.chain?.publish && Array.isArray(payload.chain.publish.platforms) && payload.chain.publish.platforms.length) {
+    const { platforms, metadata = {}, autoPublish = true } = payload.chain.publish;
+    if (autoPublish) {
+      for (const platform of platforms) {
+        await enqueue("publish_post", { userId, platform, videoUrl, projectId, metadata }, { userId, maxAttempts: 5 });
+      }
+    } else {
+      const nowIso = new Date().toISOString();
+      await supabaseAdmin.from("published_posts").insert(platforms.map((platform) => ({
+        user_id: userId, project_id: projectId, platform, video_url: videoUrl,
+        status: "awaiting_approval", meta: { metadata }, created_at: nowIso, updated_at: nowIso,
+      })));
     }
   }
   return { videoUrl, filePath };
@@ -74,13 +83,13 @@ registerHandler("render_timeline", async (payload, job) => {
  *   metadata: { title, description, tags[], privacyStatus, scheduledAt, categoryId }
  */
 registerHandler("publish_post", async (payload) => {
-  const { userId, platform, videoUrl, metadata = {} } = payload || {};
+  const { userId, platform, videoUrl, projectId = null, metadata = {} } = payload || {};
   if (!userId || !platform || !videoUrl) throw new Error("publish_post: userId, platform, videoUrl required");
 
   // Track the attempt in published_posts (reuse the row across retries).
   let postId = payload.postId || null;
   const base = {
-    user_id: userId, platform, video_url: videoUrl, status: "running",
+    user_id: userId, project_id: projectId, platform, video_url: videoUrl, status: "running",
     scheduled_at: metadata.scheduledAt ? new Date(metadata.scheduledAt).toISOString() : null,
     updated_at: new Date().toISOString(),
   };
@@ -183,7 +192,7 @@ registerHandler("generate_video", async (payload) => {
     };
     await enqueue("render_timeline", {
       userId, projectId,
-      chain: { publish: { platforms: settings.platforms || [], metadata } },
+      chain: { publish: { platforms: settings.platforms || [], metadata, autoPublish: settings.auto_publish !== false } },
     }, { userId, maxAttempts: 3 });
 
     return { projectId, topicId: topic.id };
