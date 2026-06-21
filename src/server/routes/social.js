@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/shared.js";
 import { connect, completeConnect, disconnect } from "../services/social/service.js";
 import { listAccounts } from "../services/social/accounts.js";
 import { supportedPlatforms } from "../services/social/adapters/index.js";
+import { enqueue } from "../jobs/queue.js";
 
 export const router = express.Router();
 
@@ -44,4 +45,22 @@ router.get("/:platform/callback", async (req, res) => {
 router.post("/:platform/disconnect", requireAuth, async (req, res) => {
   try { await disconnect(req.user.id, req.params.platform); res.json({ ok: true }); }
   catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+/**
+ * Queue a publish of an already-rendered MP4 (separate from rendering — consumes a URL +
+ * metadata only). Returns a jobId; the worker performs the upload.
+ * body: { videoUrl, metadata?: { title, description, tags[], privacyStatus, scheduledAt } }
+ */
+router.post("/:platform/publish", requireAuth, async (req, res) => {
+  try {
+    const { videoUrl, metadata } = req.body;
+    if (!videoUrl) return res.status(400).json({ error: "videoUrl required" });
+    const job = await enqueue(
+      "publish_post",
+      { userId: req.user.id, platform: req.params.platform, videoUrl, metadata: metadata || {} },
+      { userId: req.user.id, maxAttempts: 5 },
+    );
+    res.json({ jobId: job.id });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });

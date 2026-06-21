@@ -7,6 +7,11 @@
  * this API, e.g. https://api.vidquence.com). The registered redirect URI must be exactly
  * `${OAUTH_REDIRECT_BASE}/api/social/youtube/callback`.
  */
+import fs from "fs";
+
+// Errors marked `noRetry` are permanent (auth/permission) — the queue won't retry them.
+function permanent(msg) { const e = new Error(msg); e.noRetry = true; return e; }
+function transient(msg) { return new Error(msg); }
 const AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPES = [
@@ -77,8 +82,67 @@ export const youtube = {
     return { access_token: t.access_token, expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString() };
   },
 
-  // Implemented in the YouTube-publishing phase (resumable upload of the rendered MP4).
-  async publish(/* { accessToken, video, metadata } */) {
-    throw new Error("YouTube publish is not implemented yet (next phase)");
+  /**
+   * Resumable upload of an already-rendered MP4. Consumes a video URL/path + metadata
+   * only — never generates or renders. Returns { platform_post_id, url, meta }.
+   * metadata: { title, description, tags[], privacyStatus, scheduledAt, categoryId }
+   */
+  async publish({ accessToken, video, metadata = {} }) {
+    // Resolve the rendered bytes (durable URL preferred; local path fallback).
+    let bytes;
+    if (video?.url) {
+      const r = await fetch(video.url);
+      if (!r.ok) throw transient(`fetch rendered video failed (${r.status})`);
+      bytes = Buffer.from(await r.arrayBuffer());
+    } else if (video?.path) {
+      bytes = fs.readFileSync(video.path);
+    } else {
+      throw permanent("publish: no video url or path provided");
+    }
+
+    // Build snippet/status. Scheduling on YouTube = private + status.publishAt (RFC3339).
+    const status = {
+      privacyStatus: ["public", "unlisted", "private"].includes(metadata.privacyStatus) ? metadata.privacyStatus : "private",
+      selfDeclaredMadeForKids: false,
+    };
+    if (metadata.scheduledAt) { status.privacyStatus = "private"; status.publishAt = new Date(metadata.scheduledAt).toISOString(); }
+    const body = JSON.stringify({
+      snippet: {
+        title:       (metadata.title || "Untitled").slice(0, 100),
+        description: (metadata.description || "").slice(0, 4900),
+        tags:        Array.isArray(metadata.tags) ? metadata.tags.slice(0, 30) : [],
+        categoryId:  metadata.categoryId || "22",
+      },
+      status,
+    });
+
+    // 1) Initiate resumable session.
+    const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": "video/*",
+        "X-Upload-Content-Length": String(bytes.length),
+      },
+      body,
+    });
+    if (init.status === 401 || init.status === 403) throw permanent(`YouTube auth/permission error: ${(await init.text()).slice(0, 200)}`);
+    if (!init.ok) throw transient(`YouTube init failed (${init.status}): ${(await init.text()).slice(0, 200)}`);
+    const uploadUrl = init.headers.get("location");
+    if (!uploadUrl) throw transient("YouTube did not return an upload URL");
+
+    // 2) Upload the bytes.
+    const up = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "video/*", "Content-Length": String(bytes.length) }, body: bytes });
+    if (up.status === 401 || up.status === 403) throw permanent(`YouTube auth/permission error during upload: ${(await up.text()).slice(0, 200)}`);
+    if (!up.ok) throw transient(`YouTube upload failed (${up.status}): ${(await up.text()).slice(0, 200)}`);
+
+    const data = await up.json().catch(() => ({}));
+    const videoId = data.id || null;
+    return {
+      platform_post_id: videoId,
+      url: videoId ? `https://youtu.be/${videoId}` : null,
+      meta: { httpStatus: up.status, privacyStatus: status.privacyStatus, publishAt: status.publishAt || null },
+    };
   },
 };

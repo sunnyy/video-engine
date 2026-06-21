@@ -45,12 +45,13 @@ export async function complete(id, result = null) {
 }
 
 /**
- * Record a failure. Re-queues with exponential backoff while attempts remain,
- * otherwise marks the job failed. Returns true if it will retry.
+ * Record a failure. Re-queues with exponential backoff while attempts remain, unless the
+ * error is marked `noRetry` (permanent — e.g. auth/permission), in which case it fails
+ * immediately. Returns true if it will retry.
  */
 export async function fail(job, err) {
   const message   = (err?.message || String(err)).slice(0, 1000);
-  const willRetry = job.attempts < job.max_attempts;
+  const willRetry = !err?.noRetry && job.attempts < job.max_attempts;
   const patch = willRetry
     ? { status: "queued", run_at: new Date(Date.now() + BACKOFF_BASE_MS * 2 ** (job.attempts - 1)).toISOString(), error: message, updated_at: new Date().toISOString() }
     : { status: "failed", error: message, finished_at: new Date().toISOString(), updated_at: new Date().toISOString() };
