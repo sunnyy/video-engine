@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "start": "node src/server/index.js",
     "server": "node --env-file=.env src/server/index.js",
+    "worker": "node src/server/worker.js",
+    "worker:dev": "node --env-file=.env src/server/worker.js",
     "prebundle": "node scripts/prebundle.mjs",
     "fetch-fonts": "node scripts/fetch-fonts.mjs",
     "fetch-music": "node --env-file=.env scripts/fetchMusic.js"
