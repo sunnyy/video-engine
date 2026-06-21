@@ -6,10 +6,28 @@
  * Add handlers as phases land (autopilot_generate, publish_post, …).
  */
 import { registerHandler } from "./registry.js";
-import { setProgress } from "./queue.js";
+import { setProgress, enqueue } from "./queue.js";
 import { renderTimeline } from "../services/renderService.js";
 import { publish } from "../services/social/service.js";
-import { supabaseAdmin } from "../middleware/shared.js";
+import { runPromptPipeline } from "../../services/ai/promptVideo/pipelineOrchestrator.js";
+import { applyBrandKit } from "../../services/ai/shared/brandKit.js";
+import { getSettings, saveSettings } from "../services/autopilot/settings.js";
+import { getNextTopic, consumeTopic, releaseTopic, getQueuedCount, ensureTopics } from "../services/autopilot/topics.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
+import { supabaseAdmin, deductCredits, addCredits, sendUserEmail } from "../middleware/shared.js";
+
+const AUTOPILOT_DURATION = 40; // short-form default (seconds)
+
+async function pauseAutopilot(userId, reason) {
+  await saveSettings(userId, { enabled: false }).catch(() => {});
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (user?.email) {
+      await sendUserEmail(user.email, "Your AutoPilot was paused",
+        `<p>AutoPilot has been paused because: <b>${reason}</b>.</p><p>Resolve it and re-enable AutoPilot to resume automatic videos.</p>`);
+    }
+  } catch (_) {}
+}
 
 /**
  * render_timeline — render a project's timeline to a durable MP4.
@@ -35,6 +53,15 @@ registerHandler("render_timeline", async (payload, job) => {
     onProgress: (pct) => setProgress(job.id, pct),
   });
   if (!videoUrl) throw new Error("render_timeline: render produced no durable URL (upload failed)");
+
+  // Chain → publish (autopilot only). Render never re-runs on publish failure: publish is
+  // its own retried job. One publish_post per platform.
+  if (payload?.chain?.publish && Array.isArray(payload.chain.publish.platforms)) {
+    const { platforms, metadata = {} } = payload.chain.publish;
+    for (const platform of platforms) {
+      await enqueue("publish_post", { userId, platform, videoUrl, metadata }, { userId, maxAttempts: 5 });
+    }
+  }
   return { videoUrl, filePath };
 });
 
@@ -84,4 +111,93 @@ registerHandler("publish_post", async (payload) => {
     }
     throw err; // worker's fail() retries transient, skips retry when err.noRetry
   }
+});
+
+/**
+ * generate_video — the head of the AutoPilot chain. Credit-checks, reserves a topic ONLY
+ * now (worker is ready), runs the existing Prompt-to-Video pipeline, applies the brand kit
+ * as a post-process, then chains → render_timeline (which chains → publish_post).
+ * payload: { userId }
+ */
+registerHandler("generate_video", async (payload) => {
+  const { userId } = payload || {};
+  if (!userId) throw new Error("generate_video: userId required");
+
+  const settings = await getSettings(userId);
+  if (!settings.enabled) return { skipped: "autopilot disabled" };
+
+  // 1) Credit check BEFORE reserving a topic. Insufficient → pause + notify, topic stays queued.
+  const cost = CREDIT_COSTS.ai_video;
+  const { data: cred } = await supabaseAdmin.from("user_credits").select("balance").eq("user_id", userId).maybeSingle();
+  if ((cred?.balance ?? 0) < cost) {
+    await pauseAutopilot(userId, "insufficient credits");
+    const e = new Error("AutoPilot paused: insufficient credits"); e.noRetry = true; throw e;
+  }
+
+  // 2) Reserve a topic now (not hours in advance).
+  const topic = await getNextTopic(userId);
+  if (!topic) {
+    if (!settings.niches?.length) {
+      await pauseAutopilot(userId, "no niches configured");
+      const e = new Error("AutoPilot paused: no niches"); e.noRetry = true; throw e;
+    }
+    await enqueue("refill_topics", { userId }, { userId });
+    throw new Error("no topic available yet — refilling"); // transient: retry
+  }
+
+  // 3) Deduct credits for the generation.
+  const ded = await deductCredits(userId, cost, "ai_video", "AutoPilot video", null);
+  if (!ded.success) { await releaseTopic(topic.id); throw new Error("credit deduction failed"); }
+
+  try {
+    const result = await runPromptPipeline({
+      prompt: topic.title, userId,
+      styleId: settings.style_id || "auto",
+      targetDuration: AUTOPILOT_DURATION,
+      language: settings.language || "en",
+      voiceId: settings.voice_id || null,
+      orientation: settings.orientation || "9:16",
+      plan: null,
+    }, () => {});
+    const projectId = result.projectId;
+
+    // Brand kit as post-process — Prompt-to-Video itself is never touched.
+    const { data: kit } = await supabaseAdmin.from("brand_kits").select("*").eq("user_id", userId).maybeSingle();
+    if (kit) {
+      const { data: proj } = await supabaseAdmin.from("projects").select("safe_project_json").eq("id", projectId).single();
+      if (proj?.safe_project_json) {
+        await supabaseAdmin.from("projects")
+          .update({ safe_project_json: applyBrandKit(proj.safe_project_json, kit) }).eq("id", projectId);
+      }
+    }
+
+    await consumeTopic(topic.id, { hook: topic.title });
+    if (await getQueuedCount(userId) < 10) await enqueue("refill_topics", { userId }, { userId }); // async refill
+
+    // 4) Chain → render → publish. project_id travels with the chain.
+    const metadata = {
+      title: topic.title.slice(0, 100),
+      description: settings.website ? `${settings.website}` : "",
+      tags: topic.keywords || [],
+      privacyStatus: "public",
+    };
+    await enqueue("render_timeline", {
+      userId, projectId,
+      chain: { publish: { platforms: settings.platforms || [], metadata } },
+    }, { userId, maxAttempts: 3 });
+
+    return { projectId, topicId: topic.id };
+  } catch (err) {
+    // Generation failed → release topic + refund + retry per job policy.
+    await releaseTopic(topic.id);
+    await addCredits(userId, cost, "refund", "ai_failure_refund", "AutoPilot generation failed").catch(() => {});
+    throw err;
+  }
+});
+
+/** refill_topics — async top-up of the topic queue (never blocks the pipeline). */
+registerHandler("refill_topics", async (payload) => {
+  const { userId } = payload || {};
+  if (!userId) throw new Error("refill_topics: userId required");
+  return await ensureTopics(userId);
 });

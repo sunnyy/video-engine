@@ -12,9 +12,11 @@ import "./middleware/shared.js";        // initialises env + supabaseAdmin
 import "./jobs/handlers.js";            // side-effect: registers all job handlers
 import { claimNext, complete, fail } from "./jobs/queue.js";
 import { getHandler, registeredTypes } from "./jobs/registry.js";
+import { tick as schedulerTick } from "./services/autopilot/scheduler.js";
 
 const MAX_CONCURRENT = Math.max(1, parseInt(process.env.WORKER_CONCURRENCY || "1", 10));
 const POLL_MS        = Math.max(500, parseInt(process.env.WORKER_POLL_MS || "3000", 10));
+const SCHEDULER_MS   = Math.max(30_000, parseInt(process.env.SCHEDULER_TICK_MS || "60000", 10));
 
 let active  = 0;
 let running = true;
@@ -53,6 +55,12 @@ async function loop() {
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
 }
+
+// AutoPilot scheduler — enqueues generate_video for due users (the producer side).
+const schedulerTimer = setInterval(() => {
+  if (running) schedulerTick().catch((e) => console.error("[scheduler] tick error:", e.message));
+}, SCHEDULER_MS);
+schedulerTimer.unref?.();
 
 // Graceful shutdown — Railway sends SIGTERM on redeploy. Stop claiming, let active
 // jobs finish (in-flight rows stay 'running'; a stuck one can be requeued by a sweeper).

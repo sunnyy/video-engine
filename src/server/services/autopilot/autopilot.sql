@@ -19,6 +19,7 @@ create table if not exists autopilot_settings (
   keywords_emphasize text[] default '{}',
   keywords_avoid     text[] default '{}',
   brand_kit_id       uuid,
+  last_generated_at  timestamptz,            -- scheduler uses this to space posts
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
