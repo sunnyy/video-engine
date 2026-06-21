@@ -85,19 +85,20 @@ export function buildProductScenePrompt(sceneScript, projectContext) {
   const zone = ANCHOR_ZONES[anchor] ?? ANCHOR_ZONES["text-top"];
   const isCta = sceneIntent === "cta" || sceneIntent === "standalone";
 
-  // The content the director chose for this scene — the backbone to realize richly.
+  // The content the director chose for this scene — WHAT to show (the exact strings
+  // + each item's role/emphasis). HOW it looks is the designer's call, not a template.
   const feats = (display.features ?? []).filter(f => f && f.label);
   const content = [
-    display.kicker      ? `• KICKER (tiny uppercase eyebrow, with a short rule/bracket beside it): "${display.kicker}"` : null,
-    display.headline    ? `• HEADLINE (huge, THE focal point, keep the line breaks): "${display.headline.replace(/\n/g, " / ")}"${display.accent_word ? ` — color "${display.accent_word}" in the accent, on its own line/element` : ""}` : null,
-    display.body        ? `• SUBHEAD (one supporting line, letter-spaced): "${display.body}"` : null,
-    display.stat        ? `• BIG STAT BLOCK — oversized accent number "${display.stat.value}"${display.stat.label ? ` with label "${display.stat.label}"` : ""}` : null,
-    display.badge       ? `• BADGE/PILL: "${display.badge}" (accent fill or hairline outline)` : null,
-    feats.length        ? `• FEATURE LIST — render each row as [Lucide icon inside a thin circular ring] + bold LABEL + muted sub line:\n      ${feats.map(f => `– ${f.icon || "check-circle"} | ${f.label}${f.sub ? ` | ${f.sub}` : ""}`).join("\n      ")}` : null,
-    (!feats.length && display.icon) ? `• an icon-in-a-ring ("${display.icon}")${display.label ? ` with label "${display.label}"` : ""}` : null,
+    display.kicker      ? `• KICKER (a small eyebrow line): "${display.kicker}"` : null,
+    display.headline    ? `• HEADLINE (THE focal point — the biggest, most dominant element; keep the line breaks): "${display.headline.replace(/\n/g, " / ")}"${display.accent_word ? ` — emphasize "${display.accent_word}" in the accent colour` : ""}` : null,
+    display.body        ? `• SUPPORTING LINE: "${display.body}"` : null,
+    display.stat        ? `• STAT — the number "${display.stat.value}" is a hero element${display.stat.label ? ` with label "${display.stat.label}"` : ""}` : null,
+    display.badge       ? `• BADGE / TAG: "${display.badge}"` : null,
+    feats.length        ? `• FEATURES (present each clearly — a bold label, an optional sub-line, and you MAY use its Lucide icon; the presentation is your design choice):\n      ${feats.map(f => `– ${f.label}${f.sub ? ` — ${f.sub}` : ""}${f.icon ? `  [icon: ${f.icon}]` : ""}`).join("\n      ")}` : null,
+    (!feats.length && display.icon) ? `• an icon ("${display.icon}")${display.label ? ` with label "${display.label}"` : ""}` : null,
     (!feats.length && display.label) ? `• LABEL: "${display.label}"` : null,
-    isCta && ctaText    ? `• CTA: ONE pill — a single TEXT element "${ctaText}" with accent-color background + padding + border-radius:999px + white-space:nowrap (NOT a wide bar, NOT split into icon+text — the text must live IN the pill)${website ? `; website "${website}" small + muted just below` : ""}` : null,
-    (display.strip?.length) ? `• BOTTOM CREDENTIAL STRIP: ${display.strip.map(s => `"${s}"`).join(" · ")} — small, separated by thin vertical dividers, optional tiny star icon at the start` : null,
+    isCta && ctaText    ? `• CTA: "${ctaText}" — a single, unmistakable call-to-action${website ? `; website "${website}" small + muted nearby` : ""}` : null,
+    (display.strip?.length) ? `• CREDENTIAL STRIP: ${display.strip.map(s => `"${s}"`).join(" · ")}` : null,
   ].filter(Boolean).join("\n  ");
 
   const system = `You are a world-class motion-graphics art director for premium product advertising (think Apple, Nike, MVMT, high-end editorial).
@@ -120,16 +121,18 @@ CANVAS SCALE — CRITICAL. This is a ${W}×${H} video frame, NOT a web page. Eve
 - headline: 90–180px · stat number: 120–240px
 - subhead / body: 30–44px · feature label: 34–46px · feature sub-line: 26–34px
 - kicker / badge / credential strip / website: 24–30px (NEVER smaller)
-- Lucide icons: 64–110px; their circular ring ~110–150px
+- Lucide icons: ≥64px (and any frame you choose to put around them sized to match)
 - dividers/rules: 2–4px thick (not 1px)
 Do NOT use web-scale 11–16px text anywhere — it will be dropped and the scene will look empty.
 
 CORE CONTENT TO REALIZE (the backbone — render ALL of it, spell every word exactly):
   ${content || `a confident headline drawn from the voiceover`}
 
-DESIGN A CLEAN, PREMIUM EDITORIAL OVERLAY — fewer, bigger, confident elements (aim for ~6–10 meaningful elements TOTAL). This is a 3-second video scene, not a packed poster: clarity and hierarchy beat quantity. Realize the core content with strong hierarchy, then add ONLY the supporting touches that genuinely elevate it — YOUR call — e.g. a thin accent rule beside the kicker, one tasteful divider, a refined badge, an icon-in-a-ring per feature, a soft accent glow.
-YOU decide the UI treatment — including WHETHER a subtle translucent panel behind the text helps legibility. It is OPTIONAL and usually unnecessary (a scrim already sits beneath you). Do not add a box by default.
-COMPOSITION: ONE dominant focal element (the headline). Group related items, align to a tidy edge, leave generous breathing room.
+DESIGN A CLEAN, PREMIUM EDITORIAL OVERLAY — fewer, bigger, confident elements (aim for ~6–10 TOTAL). This is a 3-second scene, not a packed poster: clarity and hierarchy beat quantity. Realize ALL the content above with strong hierarchy — but the FORM is entirely YOURS: how the kicker, features, badge, CTA and any accents look is your design decision, NOT a fixed template.
+VARY THE TREATMENT SCENE TO SCENE — do NOT reuse the same devices on every scene. An eyebrow-with-a-rule + icons-in-rings + a rounded pill on every scene is exactly what makes a product video look templated and repetitive. Let THIS scene's purpose ("${sceneIntent}") drive a composition that is genuinely different from its neighbours — different focal scale, different arrangement, different supporting touches.
+Add a supporting touch (a rule, a divider, a glow, an icon, a frame) only when it elevates the content — never as default filler.
+PANEL: optional and usually unnecessary (a scrim already sits beneath you) — never add a box by default.
+COMPOSITION: ONE dominant focal element (usually the headline). Group related items, align to a tidy edge, leave generous breathing room.
 
 MUST FIT — CRITICAL: the WHOLE composition must fit within the ${W}×${H} frame. NOTHING may extend below y=${H} or past the frame edges, and elements must NOT overlap. If it feels tight, REMOVE or shrink elements — never overflow or stack on top of each other.
 
@@ -141,11 +144,11 @@ PALETTE — build from the PRODUCT's own colors so it feels designed for this pr
 - accent ${accent} (soft tint ${accentSoft}) — the key word, icon, CTA, rules.
 - secondary ${secondary} — a second key from the product, for two-tone type / brackets.
 - if you DO add a panel, it MUST be clearly TRANSLUCENT (opacity ≤ 0.45, ~${panelTint}) so the product shows through — NEVER a solid/opaque box over the photo. Most scenes need no panel.
-- text near-white${theme === "light" ? " or near-black on light panels" : ""}; CTA = accent fill, radius:999px, white-space:nowrap.
+- text near-white${theme === "light" ? " or near-black on light panels" : ""}; CTA = a legible accent fill with white-space:nowrap (its shape/radius is your choice).
 
-ELEMENTS:
-- A CTA/button is ONE TEXT element with the background + padding + radius ON THE TEXT itself — NEVER a separate bar with the label inside (the label gets lost) and never full-width.
-- A Lucide icon: <div data-role="icon" data-icon="NAME"> sized 64–110px; ring = a bordered circular data-role="decoration" element (~110–150px) behind it; label beside/beneath at ≥34px.
+ELEMENTS (technical — not stylistic):
+- A CTA is ONE text element with its background + padding + radius applied ON THE TEXT itself — NEVER a separate bar/box with the label inside (the label gets lost), and never full-width. Its shape, radius and fill are your design choice.
+- A Lucide icon is <div data-role="icon" data-icon="NAME"> at a legible size (≥64px). Whether you frame it (ring, chip, or bare) is your call; any label near it should be ≥34px.
 TAG every meaningful element (layout wrappers don't need tags):
 - data-role: headline | subhead | kicker | badge | label | stat-number | cta | divider | glow | card | icon | decoration
 - data-layer: text | gradient | decoration
