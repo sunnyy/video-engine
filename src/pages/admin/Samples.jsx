@@ -9,16 +9,22 @@ import { serverFetch } from "../../services/serverApi";
 
 const SAMPLES_PER_PAGE = 20;
 
+// service_key is free text in the DB — `category` only scopes the Add-Sample dropdown
+// to the chosen Type. Keep these keys in sync with SAMPLE_SERVICE_LABELS in Dashboard.jsx.
 const SERVICES = [
-  { key: "ai_videos", label: "AI Videos", icon: "🎬" },
-  { key: "product_ads", label: "Product Ads", icon: "🛍️" },
-  { key: "virtual_tryon", label: "Virtual Try-On", icon: "👗" },
-  { key: "social_posts", label: "Social Posts", icon: "📱" },
-  { key: "thumbnails", label: "Thumbnails", icon: "🖼" },
-  { key: "posters", label: "Posters", icon: "🎨" },
-  { key: "voiceover", label: "Voice Studio", icon: "🎙" },
-  { key: "captions", label: "Caption Studio", icon: "💬" },
-  { key: "transcription", label: "Speech to Text", icon: "📝" },
+  // Video services
+  { key: "ai_videos",        label: "Prompt to Video",  icon: "🎬", category: "video" },
+  { key: "saas_video",       label: "SaaS Video",       icon: "📊", category: "video" },
+  { key: "product_video",    label: "Product Video",    icon: "🛍️", category: "video" },
+  { key: "social_video",     label: "Social to Video",  icon: "📱", category: "video" },
+  { key: "typography_video", label: "Typography Video", icon: "🔤", category: "video" },
+  { key: "captions",         label: "Auto Captions",    icon: "💬", category: "video" },
+  // Image services
+  { key: "thumbnails",   label: "Thumbnail",      icon: "🖼", category: "image" },
+  { key: "posters",      label: "Poster",         icon: "🎨", category: "image" },
+  { key: "social_posts", label: "Banner / Post",  icon: "📐", category: "image" },
+  { key: "product_ads",  label: "Product Ad",     icon: "🏷️", category: "image" },
+  { key: "virtual_tryon",label: "Virtual Try-On", icon: "👗", category: "image" },
 ];
 
 async function safeJson(res) {
@@ -100,20 +106,14 @@ function SampleForm({ sample, onClose, onSaved }) {
           <button type="button" onClick={onClose} className="text-[#555] hover:text-white text-xl cursor-pointer bg-transparent border-0">✕</button>
         </div>
 
-        <div className="flex flex-col">
-          <label className={L}>Service *</label>
-          <select className={F} value={form.service_key} onChange={e => set("service_key", e.target.value)}>
-            <option value="">Select a service</option>
-            {SERVICES.map(s => (
-              <option key={s.key} value={s.key}>{s.icon} {s.label}</option>
-            ))}
-          </select>
-        </div>
-
         <div className="flex gap-3">
           <div className="flex flex-col flex-1">
             <label className={L}>Type *</label>
-            <select className={F} value={form.type} onChange={e => set("type", e.target.value)}>
+            <select className={F} value={form.type} onChange={e => {
+              const t = e.target.value;
+              // Switching type clears a service that doesn't belong to the new category.
+              setForm(f => ({ ...f, type: t, service_key: SERVICES.some(s => s.key === f.service_key && s.category === t) ? f.service_key : "" }));
+            }}>
               <option value="image">Image</option>
               <option value="video">Video</option>
             </select>
@@ -126,6 +126,16 @@ function SampleForm({ sample, onClose, onSaved }) {
               <option value="square">Square</option>
             </select>
           </div>
+        </div>
+
+        <div className="flex flex-col">
+          <label className={L}>Service *</label>
+          <select className={F} value={form.service_key} onChange={e => set("service_key", e.target.value)}>
+            <option value="">Select a {form.type} service</option>
+            {SERVICES.filter(s => s.category === form.type).map(s => (
+              <option key={s.key} value={s.key}>{s.icon} {s.label}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex flex-col">
