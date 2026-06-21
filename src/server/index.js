@@ -30,6 +30,7 @@ import { router as socialVideoRouter }     from "./routes/socialVideo.js";
 import { router as promptVideoRouter }      from "./routes/promptVideo.js";
 import { router as brandKitRouter }         from "./routes/brandKit.js";
 import { router as socialRouter }           from "./routes/social.js";
+import { router as autopilotRouter }        from "./routes/autopilot.js";
 import { installLogGate } from "../core/utils/logger.js";
 
 // Gate all process-narration logs by level (quiet in production, verbose locally or
@@ -131,6 +132,7 @@ app.use("/api/ai-video",    generationLimiter, promptVideoRouter);
 app.use("/api/render",       renderRouter);
 app.use("/api/brand-kit",    brandKitRouter);
 app.use("/api/social",       socialRouter);
+app.use("/api/autopilot",    autopilotRouter);
 app.use("/api/product-ad",   productAdRouter);
 app.use("/api/poster",       posterRouter);
 app.use("/api/thumbnail",    thumbnailRouter);
