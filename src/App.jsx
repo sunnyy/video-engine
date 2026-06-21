@@ -39,6 +39,7 @@ import TypographyVideo       from "./pages/TypographyVideo";
 import SocialVideo           from "./pages/SocialVideo";
 import SaasVideo            from "./pages/SaasVideo";
 import PromptVideo           from "./pages/PromptVideo";
+import BrandKit              from "./pages/BrandKit";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
@@ -154,6 +155,7 @@ export default function App() {
             <Route path="/checkout"         element={<Checkout />} />
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
+            <Route path="/brand-kit"        element={<BrandKit />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
             <Route path="/promo-video"             element={<SaasVideo />} />
             <Route path="/promo-video/:projectId"  element={<SaasVideo />} />

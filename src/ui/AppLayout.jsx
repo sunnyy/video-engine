@@ -19,6 +19,13 @@ const Icons = {
       <path d="M9 21V12h6v9"/>
     </svg>
   ),
+  brand: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="13.5" cy="6.5" r="1.2"/><circle cx="17.5" cy="10.5" r="1.2"/>
+      <circle cx="8.5" cy="7.5" r="1.2"/><circle cx="6.5" cy="12.5" r="1.2"/>
+      <path d="M12 2a10 10 0 1 0 0 20 2.5 2.5 0 0 0 2.5-2.5c0-1.4-1.1-2-1.1-3 0-.8.7-1.5 1.6-1.5H17a5 5 0 0 0 5-5c0-4.4-4.5-8-10-8z"/>
+    </svg>
+  ),
   folder: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
@@ -311,7 +318,7 @@ export default function AppLayout({ children }) {
   // tools live under Explore; user projects under Projects. (Routes/pages kept intact.)
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
-  const inAccount = ["/credits", "/settings", "/feedback"].includes(path);
+  const inAccount = ["/credits", "/settings", "/feedback", "/brand-kit"].includes(path);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -369,6 +376,7 @@ export default function AppLayout({ children }) {
 
             <FlyoutGroup icon={Icons.settings} label="Account" active={inAccount}>
               <NavItem icon={Icons.star}     label="Upgrade"  href="/#pricing" active={false} />
+              <NavItem icon={Icons.brand}    label="Brand Kit" to="/brand-kit" active={path === "/brand-kit"} />
               <NavItem icon={Icons.credits}  label="Credits"  to="/credits"    active={path === "/credits"} />
               <NavItem icon={Icons.settings} label="Settings" to="/settings"   active={path === "/settings"} />
               <NavItem icon={Icons.message}  label="Feedback" to="/feedback"   active={path === "/feedback"} />
