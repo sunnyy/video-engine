@@ -9,6 +9,7 @@ import {
   supabaseAdmin, TEMP_DIR, PROJECT_ROOT,
   sendUserEmail, userPlanExpiredEmail, userPlanExpiringEmail,
 } from "./middleware/shared.js";
+import { notifyUser } from "./services/notificationService.js";
 import { router as renderRouter }     from "./routes/render.js";
 import { router as ttsRouter }        from "./routes/tts.js";
 import { router as authRouter }       from "./routes/auth.js";
@@ -21,6 +22,7 @@ import { router as outfitRouter }     from "./routes/outfit.js";
 import { router as socialPostRouter } from "./routes/socialPost.js";
 import { router as bannerRouter }     from "./routes/banner.js";
 import { router as adminRouter }        from "./routes/admin.js";
+import { router as announcementsRouter } from "./routes/announcements.js";
 import { router as refundClaimsRouter } from "./routes/refundClaims.js";
 import { router as productVideoRouter } from "./routes/productVideo.js";
 import { router as productVideoSceneRouter } from "./routes/productVideoScene.js";
@@ -30,8 +32,9 @@ import { router as socialVideoRouter }     from "./routes/socialVideo.js";
 import { router as promptVideoRouter }      from "./routes/promptVideo.js";
 import { router as brandKitRouter }         from "./routes/brandKit.js";
 import { router as socialRouter }           from "./routes/social.js";
-import { router as autopilotRouter }        from "./routes/autopilot.js";
+import { router as automationRouter }       from "./routes/automation.js";
 import { router as flagsRouter }            from "./routes/flags.js";
+import { router as monitoringRouter }       from "./routes/monitoring.js";
 import { installLogGate } from "../core/utils/logger.js";
 
 // Gate all process-narration logs by level (quiet in production, verbose locally or
@@ -82,8 +85,12 @@ const authLimiter = rateLimit({
 });
 
 app.use("/api", (req, res, next) => {
-  // Exempt render status polling — it's a long-running endpoint and has no security risk
+  // Exempt high-frequency, read-only polling endpoints from the general limiter:
+  // render status, the AutoPilot calendar auto-refresh, and the admin monitoring feed.
+  // All are authenticated GETs with no security risk and would otherwise trip the cap.
   if (req.path.startsWith("/render/status/")) return next();
+  if (req.path.startsWith("/automation/")) return next();  // campaign list/detail polling (user + admin)
+  if (req.path === "/monitoring/metrics") return next();
   return generalLimiter(req, res, next);
 });
 app.use("/api/generate", generationLimiter);
@@ -133,8 +140,9 @@ app.use("/api/ai-video",    generationLimiter, promptVideoRouter);
 app.use("/api/render",       renderRouter);
 app.use("/api/brand-kit",    brandKitRouter);
 app.use("/api/social",       socialRouter);
-app.use("/api/autopilot",    autopilotRouter);
+app.use("/api/automation",   automationRouter);
 app.use("/api/flags",        flagsRouter);
+app.use("/api/monitoring",   monitoringRouter);
 app.use("/api/product-ad",   productAdRouter);
 app.use("/api/poster",       posterRouter);
 app.use("/api/thumbnail",    thumbnailRouter);
@@ -142,6 +150,7 @@ app.use("/api/outfit",       outfitRouter);
 app.use("/api/social-post",  socialPostRouter);
 app.use("/api/banner",       bannerRouter);
 app.use("/api/admin",        adminRouter);
+app.use("/api/admin",        announcementsRouter);
 app.use("/api",              ttsRouter);
 app.use("/api",              authRouter);
 app.use("/api",              assetsRouter);
@@ -175,6 +184,8 @@ async function checkPlanExpiry() {
         const { data: credRow } = await supabaseAdmin.from("user_credits").select("balance").eq("user_id", sub.user_id).maybeSingle();
         const { subject, html } = userPlanExpiredEmail(name, sub.plans?.name || "your", credRow?.balance ?? null);
         sendUserEmail(user.email, subject, html);
+        notifyUser(sub.user_id, { type: "plan_expired", icon: "⏰", severity: "error", link: "/credits",
+          title: `Your ${sub.plans?.name || "plan"} has expired`, body: "Resubscribe to keep premium features — your credits never expire." });
       }
     }
     if (expired?.length) console.log(`[expiry] Marked ${expired.length} subscriptions as expired`);
@@ -195,6 +206,8 @@ async function checkPlanExpiry() {
         const { data: credRow } = await supabaseAdmin.from("user_credits").select("balance").eq("user_id", sub.user_id).maybeSingle();
         const { subject, html } = userPlanExpiringEmail(name, sub.plans?.name || "your", expiryDate, credRow?.balance ?? null);
         sendUserEmail(user.email, subject, html);
+        notifyUser(sub.user_id, { type: "plan_expiring", icon: "⏳", severity: "warning", link: "/credits",
+          title: `Your ${sub.plans?.name || "plan"} expires soon`, body: `Expires ${expiryDate} — renew to keep access.` });
         await supabaseAdmin.from("subscriptions").update({ expiry_warned_at: new Date().toISOString() }).eq("id", sub.id);
       }
     }

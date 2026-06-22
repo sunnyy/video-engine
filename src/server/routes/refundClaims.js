@@ -1,5 +1,6 @@
 import express from "express";
 import { supabaseAdmin, requireAuth, requireAdmin, addCredits } from "../middleware/shared.js";
+import { notifyUser } from "../services/notificationService.js";
 
 export const router = express.Router();
 
@@ -174,6 +175,9 @@ router.post("/admin/refund-claims/:id/approve", requireAuth, requireAdmin, async
 
     await addCredits(claim.user_id, claim.credits_requested, "refund", "claim_approved", "Credit refund approved");
 
+    notifyUser(claim.user_id, { type: "refund_approved", icon: "✅", severity: "success", link: "/credits",
+      title: "Your credit refund was approved", body: `${claim.credits_requested} credits have been added to your account.` });
+
     res.json({ claim: updated });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -204,6 +208,10 @@ router.post("/admin/refund-claims/:id/reject", requireAuth, requireAdmin, async 
       .single();
 
     if (updateErr) throw new Error(updateErr.message);
+
+    notifyUser(updated.user_id, { type: "refund_rejected", icon: "🚫", severity: "warning", link: "/credits",
+      title: "Your refund claim was reviewed", body: rejection_reason });
+
     res.json({ claim: updated });
   } catch (e) {
     res.status(500).json({ error: e.message });

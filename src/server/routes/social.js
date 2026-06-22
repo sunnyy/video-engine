@@ -6,7 +6,7 @@ import express from "express";
 import { requireAuth } from "../middleware/shared.js";
 import { connect, completeConnect, disconnect } from "../services/social/service.js";
 import { listAccounts } from "../services/social/accounts.js";
-import { supportedPlatforms } from "../services/social/adapters/index.js";
+import { supportedPlatforms, allCapabilities } from "../services/social/adapters/index.js";
 import { enqueue } from "../jobs/queue.js";
 
 export const router = express.Router();
@@ -16,7 +16,7 @@ const APP_URL = process.env.APP_PUBLIC_URL || process.env.VITE_APP_URL || "";
 
 /** List the user's connected accounts (no tokens) + which platforms are supported. */
 router.get("/accounts", requireAuth, async (req, res) => {
-  try { res.json({ accounts: await listAccounts(req.user.id), supported: supportedPlatforms() }); }
+  try { res.json({ accounts: await listAccounts(req.user.id), supported: supportedPlatforms(), capabilities: allCapabilities() }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -29,7 +29,7 @@ router.get("/:platform/connect", requireAuth, async (req, res) => {
 /** OAuth redirect target (no auth header — identity travels in the signed `state`). */
 router.get("/:platform/callback", async (req, res) => {
   const { code, state, error } = req.query;
-  const back = (q) => res.redirect(`${APP_URL}/brand-kit?${q}`);
+  const back = (q) => res.redirect(`${APP_URL}/autopilot?${q}`);
   if (error) return back(`social_error=${encodeURIComponent(String(error))}`);
   if (!code || !state) return back("social_error=missing_code");
   try {

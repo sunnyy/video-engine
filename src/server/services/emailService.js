@@ -1,22 +1,33 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "hello@vidquence.com";
 const FROM_EMAIL  = process.env.FROM_EMAIL || "Vidquence <no-reply@vidquence.com>";
+
+// Lazy client — built on first send (after env is loaded), never at import, so a missing
+// RESEND_API_KEY can't crash the process (e.g. the worker). Emails no-op if unconfigured.
+let _resend;
+function client() {
+  if (_resend !== undefined) return _resend;
+  _resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+  if (!_resend) console.warn("[email] RESEND_API_KEY not set — emails are disabled");
+  return _resend;
+}
 
 /* ── Base senders ──────────────────────────────────────────── */
 
 export async function sendAdminAlert(subject, html) {
+  const r = client(); if (!r) return;
   try {
-    await resend.emails.send({ from: FROM_EMAIL, to: ADMIN_EMAIL, subject: `[Vidquence] ${subject}`, html });
+    await r.emails.send({ from: FROM_EMAIL, to: ADMIN_EMAIL, subject: `[Vidquence] ${subject}`, html });
   } catch (err) {
     console.error("[email] Admin alert failed:", err.message);
   }
 }
 
 export async function sendUserEmail(to, subject, html) {
+  const r = client(); if (!r) return;
   try {
-    await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
+    await r.emails.send({ from: FROM_EMAIL, to, subject, html });
   } catch (err) {
     console.error("[email] User email failed:", err.message);
   }

@@ -42,6 +42,19 @@ export const youtube = {
   platform: "youtube",
   scopes: SCOPES,
 
+  // What this platform supports. Callers read this instead of hardcoding YouTube rules,
+  // so adding TikTok/Instagram/etc. is just another adapter with its own capabilities.
+  capabilities: {
+    label: "YouTube",
+    scheduling: true,                                  // status.publishAt
+    privacyOptions: ["public", "unlisted", "private"],
+    tags: true,
+    thumbnails: false,                                 // not wired yet
+    maxTitle: 100,
+    maxDescription: 5000,
+    maxTags: 30,
+  },
+
   getAuthUrl(state) {
     const { id, redirect } = cfg();
     const p = new URLSearchParams({

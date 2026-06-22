@@ -942,7 +942,7 @@ function SampleCard({ sample }) {
       ) : (
         <img src={sample.src} alt={label} loading="lazy" style={{ width: "100%", display: "block", background: "#060a14" }} />
       )}
-      <div style={{ position: "absolute", left: 8, bottom: 8, padding: "4px 9px", borderRadius: 7, background: "rgba(8,9,14,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", border: `1px solid ${T.border}`, fontSize: 11, fontWeight: 700, color: T.text, opacity: hov ? 1 : 0.85, transition: "opacity 0.2s" }}>
+      <div style={{ position: "absolute", left: 20, top: 20, padding: "4px 9px", borderRadius: 7, background: "rgba(255,255,255,0.12)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(6px)", border: `1px solid ${T.border}`, fontSize: 11, fontWeight: 700, color: T.text, opacity: hov ? 1 : 0.85, transition: "opacity 0.2s" }}>
         {label}
       </div>
     </div>
@@ -976,7 +976,7 @@ function SamplesGrid() {
   return (
     <div style={{ padding: "40px 40px 80px" }}>
       <style>{`
-        .samples-masonry { column-count: 4; column-gap: 16px; }
+        .samples-masonry { column-count: 5; column-gap: 16px; }
         @media (max-width: 1100px) { .samples-masonry { column-count: 3; } }
         @media (max-width: 760px)  { .samples-masonry { column-count: 2; } }
         @media (max-width: 460px)  { .samples-masonry { column-count: 2; column-gap: 10px; } }

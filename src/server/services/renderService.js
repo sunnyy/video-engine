@@ -143,6 +143,7 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
       serveUrl,
       inputProps: { project: finalProject },
       codec: "h264",
+      crf: 23, // ~visually-lossless for short-form; ~40-50% smaller than Remotion's default (18)
       assetsInfo,
       outputLocation: outputPath,
       fps: comp.fps,

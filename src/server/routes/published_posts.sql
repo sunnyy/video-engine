@@ -19,4 +19,7 @@ create table if not exists published_posts (
 
 create index if not exists published_posts_user_idx on published_posts (user_id, created_at desc);
 
+-- Idempotent add (create-table-if-not-exists won't alter an existing table).
+alter table published_posts add column if not exists project_id uuid;
+
 alter table published_posts enable row level security;

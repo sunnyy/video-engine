@@ -96,11 +96,15 @@ export async function deductCredits(userId, amount, action, description, project
 
   // Low-credits warning: fire once when balance crosses below 20
   if (newBalance < 20 && newBalance + amount >= 20) {
-    supabaseAdmin.auth.admin.getUserById(userId).then(({ data: { user } }) => {
+    supabaseAdmin.auth.admin.getUserById(userId).then(async ({ data: { user } }) => {
       if (user?.email) {
         const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
         const { subject, html } = userLowCreditsEmail(name, newBalance);
         sendUserEmail(user.email, subject, html);
+        // Lazy import avoids a circular dependency (notificationService imports this file).
+        const { notifyUser } = await import("../services/notificationService.js");
+        notifyUser(userId, { type: "low_credits", icon: "⚠️", severity: "warning", link: "/credits",
+          title: "Your credits are running low", body: `${newBalance} credits remaining — top up to keep creating` });
       }
     }).catch(() => {});
   }

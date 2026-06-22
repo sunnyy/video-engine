@@ -11,15 +11,35 @@
 import "./middleware/shared.js";        // initialises env + supabaseAdmin
 import "./jobs/handlers.js";            // side-effect: registers all job handlers
 import { claimNext, complete, fail, sweepStaleJobs } from "./jobs/queue.js";
-import { isKillSwitchOn } from "./jobs/flags.js";
+import { isKillSwitchOn, touchWorkerHeartbeat } from "./jobs/flags.js";
 import { getHandler, registeredTypes } from "./jobs/registry.js";
-import { tick as schedulerTick } from "./services/autopilot/scheduler.js";
+import { tick as schedulerTick } from "./services/automation/scheduler.js";
+import { checkOAuthHealth } from "./services/social/health.js";
+import { notifyUser } from "./services/notificationService.js";
+
+// User-facing copy for a job that has permanently failed (retries exhausted). Deliberately
+// vague — never narrate pipeline internals or surface raw errors.
+const FAILURE_COPY = {
+  render_timeline: { icon: "⚠️", title: "Your video render didn't finish", body: "Something went wrong — please try again.", link: "/projects" },
+  publish_post:    { icon: "⚠️", title: "Publishing didn't go through", body: "We couldn't publish your video — please try again.", link: "/automation" },
+  generate_video:  { icon: "⚠️", title: "Automation couldn't make your video", body: "Generation didn't complete — we'll try again on the next run.", link: "/automation" },
+};
+
+function notifyJobFailed(job, err) {
+  const userId = job?.payload?.userId;
+  if (!userId) return;
+  // The quota/credit pause path already sent its own "Campaign paused" notification.
+  if ((err?.message || "").startsWith("Campaign paused")) return;
+  const copy = FAILURE_COPY[job.type];
+  if (copy) notifyUser(userId, { type: `${job.type}_failed`, severity: "error", ...copy });
+}
 
 const MAX_CONCURRENT = Math.max(1, parseInt(process.env.WORKER_CONCURRENCY || "1", 10));
 const POLL_MS        = Math.max(500, parseInt(process.env.WORKER_POLL_MS || "3000", 10));
 const SCHEDULER_MS   = Math.max(30_000, parseInt(process.env.SCHEDULER_TICK_MS || "60000", 10));
 const STALE_MS       = Math.max(120_000, parseInt(process.env.WORKER_STALE_MS || "600000", 10));
 const SWEEP_MS       = 60_000;
+const OAUTH_HEALTH_MS = Math.max(600_000, parseInt(process.env.OAUTH_HEALTH_MS || "21600000", 10)); // 6h
 
 let active  = 0;
 let running = true;
@@ -35,6 +55,7 @@ async function runJob(job) {
   } catch (err) {
     const retry = await fail(job, err);
     console.warn(`[worker] ${retry ? "retry" : "FAILED"} ${job.type} (${job.id}): ${err.message}`);
+    if (!retry) notifyJobFailed(job, err);
   } finally {
     active--;
   }
@@ -56,6 +77,7 @@ async function drain() {
 async function loop() {
   console.log(`[worker] started — concurrency=${MAX_CONCURRENT}, poll=${POLL_MS}ms, handlers=[${registeredTypes().join(", ") || "none yet"}]`);
   while (running) {
+    await touchWorkerHeartbeat();  // liveness signal for the monitoring dashboard
     await drain();
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
@@ -72,6 +94,17 @@ const sweepTimer = setInterval(() => {
   if (running) sweepStaleJobs(STALE_MS).then((n) => { if (n) console.warn(`[worker] recovered ${n} stale job(s)`); }).catch(() => {});
 }, SWEEP_MS);
 sweepTimer.unref?.();
+
+// OAuth health monitor — refresh expiring tokens, flag/notify broken accounts.
+const runOAuthHealth = () => {
+  if (!running) return;
+  checkOAuthHealth()
+    .then((s) => { if (s.refreshed || s.broken) console.log(`[oauth-health] checked=${s.checked} refreshed=${s.refreshed} broken=${s.broken}`); })
+    .catch((e) => console.warn("[oauth-health] error:", e.message));
+};
+const oauthTimer = setInterval(runOAuthHealth, OAUTH_HEALTH_MS);
+oauthTimer.unref?.();
+setTimeout(runOAuthHealth, 30_000); // first pass shortly after boot
 
 // Graceful shutdown — Railway sends SIGTERM on redeploy. Stop claiming, let active
 // jobs finish (in-flight rows stay 'running'; a stuck one can be requeued by a sweeper).

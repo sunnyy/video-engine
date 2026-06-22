@@ -61,6 +61,22 @@ export async function sweepStaleJobs(staleMs = 600_000) {
   return data.length;
 }
 
+/** Cancel all QUEUED jobs for a campaign (Stop). Running jobs are left to finish. Returns count. */
+export async function cancelCampaignJobs(campaignId) {
+  const { data } = await supabaseAdmin.from("jobs")
+    .update({ status: "failed", error: "cancelled (campaign stopped)", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("status", "queued").filter("payload->>campaignId", "eq", campaignId).select("id");
+  return (data || []).length;
+}
+
+/** Cancel a single QUEUED job by id (per-video cancel). Returns true if it was cancelled. */
+export async function cancelJob(jobId) {
+  const { data } = await supabaseAdmin.from("jobs")
+    .update({ status: "failed", error: "cancelled by user", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", jobId).eq("status", "queued").select("id");
+  return (data || []).length > 0;
+}
+
 /** Mark a job completed with an optional result payload. */
 export async function complete(id, result = null) {
   const { error } = await supabaseAdmin.from("jobs")

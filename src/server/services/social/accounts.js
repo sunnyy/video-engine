@@ -45,6 +45,38 @@ export async function deleteAccount(userId, platform) {
   if (error) throw new Error(error.message);
 }
 
+/** Raw account row by id (server-internal — includes encrypted tokens). */
+export async function getAccountById(accountId) {
+  const { data, error } = await supabaseAdmin.from("social_accounts").select("*").eq("id", accountId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data || null;
+}
+
+/**
+ * Account-level fresh token: same refresh-if-expiring logic as getFreshAccessToken, but keyed
+ * by a specific connected account id (so a campaign can target a particular channel, and
+ * future multi-account-per-platform works). Returns { accessToken, platform }.
+ */
+export async function getFreshAccessTokenByAccountId(accountId) {
+  const data = await getAccountById(accountId);
+  if (!data) throw new Error("connected account not found");
+
+  const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
+  if (expiresAt - Date.now() > 60_000) return { accessToken: decrypt(data.access_token), platform: data.platform };
+
+  const refreshToken = decrypt(data.refresh_token);
+  if (!refreshToken) {
+    await supabaseAdmin.from("social_accounts").update({ status: "error" }).eq("id", data.id);
+    throw new Error(`${data.platform} token expired and has no refresh token — reconnect required`);
+  }
+  const fresh = await getAdapter(data.platform).refresh(refreshToken);
+  await supabaseAdmin.from("social_accounts").update({
+    access_token: encrypt(fresh.access_token), expires_at: fresh.expires_at,
+    status: "connected", updated_at: new Date().toISOString(),
+  }).eq("id", data.id);
+  return { accessToken: fresh.access_token, platform: data.platform };
+}
+
 /**
  * Return a valid access token for publishing, refreshing it (and persisting the new one)
  * if it's within 60s of expiry. Throws if not connected or no refresh token is available.

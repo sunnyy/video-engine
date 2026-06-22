@@ -8,6 +8,7 @@ import {
   adminCreditsTopupEmail,
   userCreditsPurchasedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
 } from "../middleware/shared.js";
+import { notifyUser } from "../services/notificationService.js";
 
 export const router = express.Router();
 
@@ -220,17 +221,23 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
         sendAdminAlert(adminEmail.subject, adminEmail.html);
         const userEmail = userPlanRenewalEmail(name, plan.name, plan.credits, nextRenewal);
         sendUserEmail(user.email, userEmail.subject, userEmail.html);
+        notifyUser(user.id, { type: "plan_renewed", icon: "🔁", severity: "success", link: "/credits",
+          title: `Your ${plan.name} plan was renewed`, body: `${plan.credits} credits added · next renewal ${nextRenewal}` });
       } else if (isUpgrade) {
         const adminEmail = adminPlanUpgradeEmail({ userEmail: user.email, fromPlan: prevPlanName, toPlan: plan.name, amount: amountINR.toFixed(2) });
         sendAdminAlert(adminEmail.subject, adminEmail.html);
         const userEmail = userPlanUpgradeEmail(name, prevPlanName, plan.name, plan.credits);
         sendUserEmail(user.email, userEmail.subject, userEmail.html);
+        notifyUser(user.id, { type: "plan_upgraded", icon: "⬆️", severity: "success", link: "/credits",
+          title: `Upgraded to ${plan.name}`, body: `From ${prevPlanName} · ${plan.credits} credits added` });
       } else {
         // New subscription
         const adminEmail = adminNewSaleEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2), credits: plan.credits });
         sendAdminAlert(adminEmail.subject, adminEmail.html);
         const userEmail = userCreditsPurchasedEmail(name, plan.credits, newBalance);
         sendUserEmail(user.email, userEmail.subject, userEmail.html);
+        notifyUser(user.id, { type: "plan_purchased", icon: "🎉", severity: "success", link: "/credits",
+          title: `Welcome to ${plan.name}`, body: `${plan.credits} credits added · balance ${newBalance}` });
       }
     }).catch(() => {});
 
@@ -356,6 +363,8 @@ router.post("/credits/topup/verify", requireAuth, async (req, res) => {
       sendAdminAlert(adminEmail.subject, adminEmail.html);
       const userEmail = userCreditsPurchasedEmail(name, pkg.credits, newBalance);
       sendUserEmail(user.email, userEmail.subject, userEmail.html);
+      notifyUser(user.id, { type: "credits_topup", icon: "⚡", severity: "success", link: "/credits",
+        title: `${pkg.credits} credits added`, body: `New balance: ${newBalance} credits` });
     }).catch(() => {});
 
     res.json({ success: true, credits: pkg.credits, balance: newBalance });

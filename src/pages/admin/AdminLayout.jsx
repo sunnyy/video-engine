@@ -10,6 +10,8 @@ const NAV = [
    { to: "/admin/analytics",  label: "Analytics",     icon: "◈" },
    { to: "/admin/users",      label: "Users",         icon: "◎" },
    { to: "/admin/credits",    label: "Credits",        icon: "⊕" },
+   { to: "/admin/monitoring",     label: "Monitoring",     icon: "◍" },
+   { to: "/admin/campaigns",      label: "Campaigns",      icon: "▤" },
    { to: "/admin/plans",      label: "Plans & Pricing", icon: "◇" },
    { to: "/admin/sales",      label: "Sales & Revenue", icon: "◈" },
    { to: "/admin/layouts",    label: "Layout Manager", icon: "⊞" },
@@ -18,9 +20,10 @@ const NAV = [
    { to: "/admin/music",          label: "Music Library",  icon: "♫" },
    { to: "/admin/sfx",            label: "SFX Library",    icon: "◈" },
    { to: "/admin/model-avatars",  label: "Model Avatars",  icon: "◎" },
-   { to: "/admin/samples",        label: "Samples",        icon: "🖼" },
+   { to: "/admin/samples",        label: "Samples",        icon: "▧" },
    { to: "/admin/feedback",       label: "Feedback",       icon: "◎" },
-   { to: "/admin/refund-claims",  label: "Refund Claims",  icon: "↩" },
+   { to: "/admin/announcements",  label: "Announcements",  icon: "📣" },
+   { to: "/admin/refund-claims",  label: "Refund Claims",  icon: "⊖" },
    { to: "/admin/system",         label: "System",         icon: "◉" },
 ];
 

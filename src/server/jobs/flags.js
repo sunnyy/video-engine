@@ -31,3 +31,19 @@ export async function isKillSwitchOn() {
 }
 export function setKillSwitch(on) { return setBool("worker_kill_switch", on); }
 export async function getKillSwitch() { return getBool("worker_kill_switch"); }
+
+// ── Worker liveness heartbeat (reuses system_flags.updated_at). The worker bumps it each
+// poll; the monitoring dashboard reads it to tell whether a worker is actually alive. ──
+let lastBeat = 0;
+export async function touchWorkerHeartbeat() {
+  const now = Date.now();
+  if (now - lastBeat < 25_000) return;            // throttle DB writes to ~once/25s
+  lastBeat = now;
+  try { await supabaseAdmin.from("system_flags").upsert({ key: "worker_heartbeat", bool_value: true, updated_at: new Date().toISOString() }, { onConflict: "key" }); } catch (_) {}
+}
+export async function getWorkerHeartbeat() {
+  try {
+    const { data } = await supabaseAdmin.from("system_flags").select("updated_at").eq("key", "worker_heartbeat").maybeSingle();
+    return data?.updated_at || null;
+  } catch { return null; }
+}

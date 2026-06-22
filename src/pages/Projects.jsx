@@ -91,16 +91,24 @@ function Card({ project }) {
   );
 }
 
+const PAGE_SIZE = 30;
+
 export default function Projects() {
   const { projects, loading, fetchProjects } = useProjectsStore();
   const [filter, setFilter] = useState("all");
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
   useEffect(() => { fetchProjects(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reset the page window whenever the active filter changes.
+  useEffect(() => { setVisible(PAGE_SIZE); }, [filter]);
+
   const active = FILTERS.find(f => f.id === filter) ?? FILTERS[0];
-  const shown = [...projects]
+  const matched = [...projects]
     .filter(p => !active.sources || active.sources.includes(p.source))
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  const shown = matched.slice(0, visible);
+  const hasMore = matched.length > visible;
 
   return (
     <AppLayout>
@@ -129,9 +137,19 @@ export default function Projects() {
           ) : shown.length === 0 ? (
             <div style={{ padding: "60px 0", textAlign: "center", color: T.faint, fontSize: 14 }}>No projects here yet — make one from the dashboard.</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
-              {shown.map(p => <Card key={p.id} project={p} />)}
-            </div>
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16 }}>
+                {shown.map(p => <Card key={p.id} project={p} />)}
+              </div>
+              {hasMore && (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
+                  <button onClick={() => setVisible(v => v + PAGE_SIZE)}
+                    style={{ padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${T.border}`, background: "rgba(124,92,252,0.14)", color: "#fff" }}>
+                    Load more ({matched.length - visible} left)
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -21,6 +21,7 @@ import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
 import Projects       from "./pages/Projects";
+import Notifications  from "./pages/Notifications";
 import Explore        from "./pages/Explore";
 import Videos         from "./pages/Videos";
 import AdminDashboard  from "./pages/admin/AdminDashboard";
@@ -40,7 +41,8 @@ import SocialVideo           from "./pages/SocialVideo";
 import SaasVideo            from "./pages/SaasVideo";
 import PromptVideo           from "./pages/PromptVideo";
 import BrandKit              from "./pages/BrandKit";
-import Autopilot            from "./pages/Autopilot";
+import Automation          from "./pages/Automation";
+import CampaignDetail      from "./pages/CampaignDetail";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
@@ -55,12 +57,15 @@ import Credits         from "./pages/admin/Credits";
 import Plans           from "./pages/admin/Plans";
 import Sales           from "./pages/admin/Sales";
 import System          from "./pages/admin/System";
+import Monitoring       from "./pages/admin/Monitoring";
+import AutomationCampaigns from "./pages/admin/AutomationCampaigns";
 import ModelAvatars    from "./pages/admin/ModelAvatars";
 import AdminFeedback   from "./pages/admin/Feedback";
 import MusicLibrary   from "./pages/admin/MusicLibrary";
 import SFXLibrary     from "./pages/admin/SFXLibrary";
 import Samples        from "./pages/admin/Samples";
 import RefundClaims   from "./pages/admin/RefundClaims";
+import AnnouncementCenter from "./pages/admin/AnnouncementCenter";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -147,6 +152,7 @@ export default function App() {
           <>
             <Route path="/dashboard"        element={<Dashboard />} />
             <Route path="/projects"         element={<Projects />} />
+            <Route path="/notifications"    element={<Notifications />} />
             <Route path="/explore"          element={<Explore />} />
             <Route path="/videos"           element={<Videos />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
@@ -157,7 +163,8 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/brand-kit"        element={<BrandKit />} />
-            <Route path="/autopilot"        element={<Autopilot />} />
+            <Route path="/automation"       element={<Automation />} />
+            <Route path="/automation/campaigns/:id" element={<CampaignDetail />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
             <Route path="/promo-video"             element={<SaasVideo />} />
             <Route path="/promo-video/:projectId"  element={<SaasVideo />} />
@@ -182,6 +189,8 @@ export default function App() {
                 <Route path="/admin/plans"             element={<Plans />} />
                 <Route path="/admin/sales"             element={<Sales />} />
                 <Route path="/admin/system"            element={<System />} />
+                <Route path="/admin/monitoring"        element={<Monitoring />} />
+                <Route path="/admin/campaigns"         element={<AutomationCampaigns />} />
                 <Route path="/admin/layouts"           element={<LayoutManager />} />
                 <Route path="/admin/ai-generator"      element={<LayoutGenerator />} />
                 <Route path="/admin/layouts/:layoutId" element={<LayoutEditor />} />
@@ -192,6 +201,7 @@ export default function App() {
                 <Route path="/admin/sfx"              element={<SFXLibrary />} />
                 <Route path="/admin/samples"          element={<Samples />} />
                 <Route path="/admin/refund-claims"   element={<RefundClaims />} />
+                <Route path="/admin/announcements"   element={<AnnouncementCenter />} />
               </>
             ) : (
               <Route path="/admin/*" element={<Navigate to="/dashboard" />} />

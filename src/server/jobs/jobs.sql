@@ -24,8 +24,9 @@ create table if not exists jobs (
 
 create index if not exists jobs_claimable_idx on jobs (status, priority, run_at);
 
--- Idempotent add for existing deployments.
+-- Idempotent adds for existing deployments.
 alter table jobs add column if not exists heartbeat_at timestamptz;
+alter table jobs add column if not exists progress int not null default 0;
 
 -- Atomically claim the next runnable job. `for update skip locked` makes this safe across
 -- workers. Enforces a HARD concurrency guard at claim time: at most one running

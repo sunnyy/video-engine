@@ -11,6 +11,7 @@ import {
   userCreditsPurchasedEmail, userPlanExpiringEmail, userPlanExpiredEmail,
   openai, TEMP_DIR,
 } from "../middleware/shared.js";
+import { notifyUser } from "../services/notificationService.js";
 
 export const router = express.Router();
 
@@ -59,6 +60,8 @@ router.post("/add-credits", requireAuth, requireAdmin, async (req, res) => {
       const tpl  = userCreditsPurchasedEmail(name, amount, result.balance);
       sendUserEmail(user.email, tpl.subject, tpl.html);
     }).catch(() => {});
+    notifyUser(userId, { type: "credits_granted", icon: "⚡", severity: "success", link: "/credits",
+      title: `${amount} credits added`, body: `New balance: ${result.balance} credits` });
 
     res.json(result);
   } catch (err) {

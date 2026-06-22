@@ -5,6 +5,8 @@ import { signOut } from "../services/auth/authService";
 import { deleteUserAccount } from "../services/auth/deleteAccount";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { serverFetch } from "../services/serverApi";
+import { NOTIFICATION_CATEGORIES } from "../config/notificationCategories";
+import { getNotificationPrefs, saveNotificationPrefs } from "../services/notifications/prefsService";
 import AppLayout from "../ui/AppLayout";
 
 /* ── Constants ── */
@@ -86,9 +88,7 @@ export default function Settings() {
   const [prefSaving,   setPrefSaving]   = useState(false);
   const [prefSaved,    setPrefSaved]    = useState(false);
 
-  const [notifExport,  setNotifExport]  = useState(true);
-  const [notifLow,     setNotifLow]     = useState(true);
-  const [notifUpdates, setNotifUpdates] = useState(true);
+  const [notifPrefs, setNotifPrefs] = useState({});
 
   const [deleteStep,        setDeleteStep]        = useState("idle"); // "idle" | "reason" | "confirm"
   const [deleteReason,      setDeleteReason]      = useState("");
@@ -119,7 +119,17 @@ export default function Settings() {
       if (d.goal)             setPrefGoal(d.goal);
       if (d.default_language) setPrefLanguage(d.default_language);
     }).catch(() => {});
+    getNotificationPrefs().then(setNotifPrefs).catch(() => {});
   }, []);
+
+  // Toggle one channel for one category, persisting the whole prefs object.
+  function setNotifChannel(categoryKey, channel, value) {
+    setNotifPrefs(prev => {
+      const next = { ...prev, [categoryKey]: { ...prev[categoryKey], [channel]: value } };
+      saveNotificationPrefs(next).catch(() => {});
+      return next;
+    });
+  }
 
   async function handleSavePrefs() {
     setPrefSaving(true);
@@ -236,20 +246,38 @@ export default function Settings() {
           <section>
             <SectionLabel>Notifications</SectionLabel>
             <Card>
-              {[
-                { label: "Email me when video export is ready", sub: "Get notified when your render is done",     checked: notifExport,  set: setNotifExport },
-                { label: "Email me when credits are low",       sub: "Alert when balance drops below 10 credits", checked: notifLow,     set: setNotifLow },
-                { label: "Product updates and tips",            sub: "Occasional emails about new features",      checked: notifUpdates, set: setNotifUpdates },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between gap-4 py-1">
-                  <div>
-                    <div className="text-[14px] font-medium" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>{item.label}</div>
-                    <div className="text-[12px] mt-0.5" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>{item.sub}</div>
+              {/* Column headers */}
+              <div className="flex items-center gap-4 pb-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex-1" />
+                <div className="w-[64px] text-center text-[11px] font-bold uppercase tracking-[1px]" style={{ color: "#8888a8", fontFamily: "'JetBrains Mono',monospace" }}>In-app</div>
+                <div className="w-[64px] text-center text-[11px] font-bold uppercase tracking-[1px]" style={{ color: "#8888a8", fontFamily: "'JetBrains Mono',monospace" }}>Email</div>
+              </div>
+
+              {NOTIFICATION_CATEGORIES.map(cat => {
+                const c = notifPrefs[cat.key] || {};
+                const inApp = c.in_app !== false;
+                const email = c.email !== false;
+                return (
+                  <div key={cat.key} className="flex items-center gap-4 py-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] font-medium" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>{cat.label}</div>
+                      <div className="text-[12px] mt-0.5" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>{cat.description}</div>
+                    </div>
+                    {cat.locked ? (
+                      <div className="text-[11px] font-semibold text-center" style={{ width: 144, color: "#55667a", fontFamily: "'Outfit',sans-serif" }}>Always on</div>
+                    ) : (
+                      <>
+                        <div className="w-[64px] flex justify-center">
+                          <Toggle checked={inApp} onChange={v => setNotifChannel(cat.key, "in_app", v)} />
+                        </div>
+                        <div className="w-[64px] flex justify-center">
+                          <Toggle checked={email} onChange={v => setNotifChannel(cat.key, "email", v)} />
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <Toggle checked={item.checked} onChange={item.set} />
-                </div>
-              ))}
-              
+                );
+              })}
             </Card>
           </section>
 

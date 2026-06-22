@@ -5,6 +5,7 @@ import {
   adminNewUserEmail, adminUserDeletedEmail,
   userWelcomeEmail, userAccountDeletedEmail,
 } from "../middleware/shared.js";
+import { notifyUser } from "../services/notificationService.js";
 
 export const router = express.Router();
 
@@ -161,6 +162,8 @@ router.post("/webhooks/user-created", async (req, res) => {
     // Welcome email to user
     const welcome = userWelcomeEmail(name);
     sendUserEmail(email, welcome.subject, welcome.html);
+    notifyUser(id, { type: "welcome", icon: "🎬", severity: "success", link: "/dashboard",
+      title: "Welcome to Vidquence", body: wasDeleted ? "Your account is ready." : "Your account is ready — 50 free credits to get started." });
 
     res.json({ success: true });
   } catch (err) {

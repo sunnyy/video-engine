@@ -9,9 +9,31 @@
  * All platform specifics live in adapters/. Adding TikTok/Instagram/etc. requires no
  * change here — only a new adapter.
  */
-import { getAdapter } from "./adapters/index.js";
+import { getAdapter, capabilitiesOf } from "./adapters/index.js";
 import { signState, verifyState } from "./crypto.js";
-import { saveAccount, deleteAccount, getFreshAccessToken } from "./accounts.js";
+import { saveAccount, deleteAccount, getFreshAccessToken, getFreshAccessTokenByAccountId } from "./accounts.js";
+
+/** Public capability descriptor for a platform (scheduling/tags/privacy/limits). */
+export function capabilities(platform) {
+  return capabilitiesOf(platform);
+}
+
+/**
+ * Trim/normalize metadata to what a platform actually supports, so callers never have to
+ * special-case a platform: drop scheduling if unsupported, coerce privacy to an allowed
+ * value, strip tags if unsupported, and clamp title/description/tag limits.
+ */
+export function normalizeMetadata(platform, metadata = {}) {
+  const cap = capabilitiesOf(platform);
+  const out = { ...metadata };
+  if (!cap.scheduling) delete out.scheduledAt;
+  if (cap.privacyOptions?.length && !cap.privacyOptions.includes(out.privacyStatus)) out.privacyStatus = cap.privacyOptions[0];
+  if (cap.tags === false) delete out.tags;
+  else if (Array.isArray(out.tags) && cap.maxTags) out.tags = out.tags.slice(0, cap.maxTags);
+  if (cap.maxTitle && typeof out.title === "string") out.title = out.title.slice(0, cap.maxTitle);
+  if (cap.maxDescription && typeof out.description === "string") out.description = out.description.slice(0, cap.maxDescription);
+  return out;
+}
 
 /** Build the OAuth consent URL (state carries the userId across the redirect). */
 export function connect(userId, platform) {
@@ -43,5 +65,15 @@ export function refreshToken(userId, platform) {
 export async function publish(userId, platform, video, metadata) {
   const adapter = getAdapter(platform);
   const accessToken = await getFreshAccessToken(userId, platform);
-  return adapter.publish({ accessToken, video, metadata });
+  return adapter.publish({ accessToken, video, metadata: normalizeMetadata(platform, metadata) });
+}
+
+/**
+ * Account-level publish — targets a SPECIFIC connected account (by id), so a campaign can
+ * publish to a particular channel. The platform is derived from the account row.
+ */
+export async function publishToAccount(accountId, video, metadata) {
+  const { accessToken, platform } = await getFreshAccessTokenByAccountId(accountId);
+  const adapter = getAdapter(platform);
+  return adapter.publish({ accessToken, video, metadata: normalizeMetadata(platform, metadata) });
 }

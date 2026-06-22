@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { useNotificationsStore } from "../store/useNotificationsStore";
 import { supabase } from "../lib/supabase";
 
 /* ── Icons ── */
@@ -28,9 +29,9 @@ const Icons = {
   ),
   autopilot: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4.5" width="18" height="16" rx="2"/>
-      <path d="M3 9h18M8 2.5v4M16 2.5v4"/>
-      <path d="M9.5 14.5l2 2 3.5-3.5"/>
+      <path d="M12 8V4H8" />
+      <rect x="4" y="8" width="16" height="12" rx="2" />
+      <path d="M2 14h2M20 14h2M9 13v2M15 13v2" />
     </svg>
   ),
   folder: (
@@ -171,6 +172,12 @@ const Icons = {
       <line x1="21" y1="12" x2="9" y2="12"/>
     </svg>
   ),
+  bell: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 01-3.46 0"/>
+    </svg>
+  ),
 };
 
 /* ── NavItem: used inside flyout panels ── */
@@ -286,6 +293,128 @@ function FlyoutGroup({ icon, label, active, children }) {
   );
 }
 
+/* ── NotificationsBell: sidebar icon + unread badge + click-to-open panel ── */
+function relTime(dateStr) {
+  const s = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if (s < 60)     return "just now";
+  if (s < 3600)   return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400)  return `${Math.floor(s / 3600)}h ago`;
+  if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+const SEV_COLOR = { info: "#7c5cfc", success: "#34d399", warning: "#f59e0b", error: "#ef4444" };
+
+function NotificationsBell() {
+  const navigate = useNavigate();
+  const { items, fetch, subscribe, unsubscribe, markOneRead, markEveryRead } = useNotificationsStore();
+  const [open, setOpen] = useState(false);
+  const [hov, setHov]   = useState(false);
+  const [pos, setPos]   = useState({ top: 0, left: 0 });
+  const triggerRef      = useRef(null);
+  const unread = items.filter(n => !n.read_at).length;
+
+  useEffect(() => { fetch(); subscribe(); return () => unsubscribe(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close on outside click / Escape while open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const toggle = () => {
+    if (!open && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      setPos({ top: Math.max(8, Math.min(r.top, window.innerHeight - 460)), left: r.right + 6 });
+    }
+    setOpen(o => !o);
+  };
+
+  const onRowClick = (n) => {
+    if (!n.read_at) markOneRead(n.id);
+    setOpen(false);
+    if (n.link) navigate(n.link);
+  };
+
+  return (
+    <div ref={triggerRef} style={{ width: "100%", position: "relative" }}>
+      <button
+        onClick={toggle}
+        onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+        style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "9px 4px", borderRadius: 10, cursor: "pointer", gap: 5, width: "100%",
+          background: open ? "rgba(124,92,252,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
+          color: open ? "#a78bfa" : hov ? "#d0d0e8" : "#6e6e88",
+          transition: "all 0.15s", border: "none", fontFamily: "inherit", boxSizing: "border-box", position: "relative",
+        }}
+      >
+        <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+          {Icons.bell}
+          {unread > 0 && (
+            <span style={{ position: "absolute", top: -5, right: -7, minWidth: 15, height: 15, padding: "0 4px", borderRadius: 8, background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily: "'JetBrains Mono',monospace" }}>
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </span>
+        <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "center", width: "100%" }}>Alerts</span>
+      </button>
+
+      {open && createPortal(
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9998 }} />
+          <div style={{
+            position: "fixed", top: pos.top, left: pos.left, zIndex: 9999, width: 340, maxHeight: 460,
+            display: "flex", flexDirection: "column", fontFamily: "'Outfit',sans-serif",
+            background: "#111118", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 14,
+            boxShadow: "0 12px 40px rgba(0,0,0,0.5)", animation: "flyoutIn 0.14s ease", overflow: "hidden",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>Notifications</span>
+              {unread > 0 && (
+                <button onClick={markEveryRead} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#7c5cfc", fontFamily: "inherit" }}>Mark all read</button>
+              )}
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {items.length === 0 ? (
+                <div style={{ padding: "40px 16px", textAlign: "center", color: "#55556a", fontSize: 13 }}>You're all caught up.</div>
+              ) : items.map(n => (
+                <button key={n.id} onClick={() => onRowClick(n)} style={{
+                  display: "flex", gap: 10, width: "100%", textAlign: "left", padding: "11px 14px",
+                  background: n.read_at ? "transparent" : "rgba(124,92,252,0.07)",
+                  border: "none", borderBottom: "1px solid rgba(255,255,255,0.05)", cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  <span style={{ flexShrink: 0, fontSize: 16, lineHeight: 1.3 }}>{n.icon || "🔔"}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3 }}>{n.title}</span>
+                    {n.body && <span style={{ display: "block", fontSize: 11.5, color: "#9494a8", marginTop: 2, lineHeight: 1.35 }}>{n.body}</span>}
+                    <span style={{ display: "block", fontSize: 10.5, color: "#55556a", marginTop: 4 }}>{relTime(n.created_at)}</span>
+                  </span>
+                  {!n.read_at && (
+                    <span role="button" title="Mark as read"
+                      onClick={(e) => { e.stopPropagation(); markOneRead(n.id); }}
+                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, marginTop: 1, cursor: "pointer", borderRadius: "50%" }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: SEV_COLOR[n.severity] || "#7c5cfc" }} />
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => { setOpen(false); navigate("/notifications"); }} style={{ padding: "11px 14px", background: "transparent", border: "none", borderTop: "1px solid rgba(255,255,255,0.07)", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#7c5cfc", fontFamily: "inherit" }}>
+              View all
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 function MobileBanner() {
   const [visible, setVisible] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -342,7 +471,7 @@ export default function AppLayout({ children }) {
         {/* ── Narrow sidebar ── */}
         <aside
           className="flex flex-col shrink-0 border-r"
-          style={{ width: 84, borderColor: "rgba(255,255,255,0.06)", background: "#13131e" }}
+          style={{ width: 96, borderColor: "rgba(255,255,255,0.06)", background: "#13131e" }}
         >
           {/* Logo */}
           <Link to="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 6px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)", textDecoration: "none" }}>
@@ -359,8 +488,14 @@ export default function AppLayout({ children }) {
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <IconBtn icon={Icons.folder}  label="Projects" to="/projects" active={path === "/projects"} />
-            <IconBtn icon={Icons.autopilot} label="AutoPilot" to="/autopilot" active={path === "/autopilot"} />
+            {isAdmin && (
+              <IconBtn icon={Icons.autopilot} label="Automation" to="/automation" active={path === "/automation" || path.startsWith("/automation/")} />
+            )}
             <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
+
+            <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
+
+            <NotificationsBell />
           </nav>
 
           {/* Bottom: credits + account + signout */}
