@@ -182,6 +182,7 @@ registerHandler("generate_video", async (payload, job) => {
 
   const campaign = await getCampaign(campaignId);
   if (!campaign) { const e = new Error("generate_video: campaign not found"); e.noRetry = true; throw e; }
+  console.log(`[generate] campaign "${campaign.name}" → duration=${campaign.target_duration}s style=${campaign.style_id} privacy=${campaign.privacy} accounts=${(campaign.target_accounts||[]).length}`);
 
   // The scheduler-driven path respects the campaign's state; "Run once" (manual) overrides it.
   if (campaign.status !== "active" && !manual) {

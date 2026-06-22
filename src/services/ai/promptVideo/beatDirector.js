@@ -37,35 +37,21 @@ const MAX_BEAT_WORDS = 8;
 const WORDS_PER_SECOND = 2.0; // measured from real ElevenLabs output (words ÷ seconds)
 
 const wordsIn = (s) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
+const scriptWordCount = (beats) => (beats || []).reduce((n, b) => n + wordsIn(b.script_line), 0);
 
-/**
- * Duration enforcement. The director reliably overshoots the word budget, and video length
- * ≈ total spoken words ÷ WORDS_PER_SECOND — so we cap total words to keep the render near
- * targetDuration. Keeps the hook + as many body beats as fit + the closing CTA, and cuts on
- * a sentence boundary so the narration never ends mid-thought. (The model can't be trusted
- * to self-limit, so this is the real guarantee; the prompt budget just reduces how much we cut.)
- */
-function enforceDuration(beats, targetDuration) {
-  if (!Array.isArray(beats) || beats.length <= 2) return beats;
-  const budget = Math.round(targetDuration * WORDS_PER_SECOND * 1.1); // +10% tolerance
-  const total = beats.reduce((n, b) => n + wordsIn(b.script_line), 0);
-  if (total <= budget) return beats;
-
-  const closer = beats[beats.length - 1];          // CTA / closing line — always kept
-  const body = beats.slice(0, -1);
-  const kept = [];
-  let cum = wordsIn(closer.script_line);           // reserve the closer's words first
-  for (const b of body) {
-    const w = wordsIn(b.script_line);
-    if (cum + w > budget) break;
-    cum += w; kept.push(b);
-  }
-  // End the body on a complete sentence (don't cut mid-thought), but keep at least the hook.
-  while (kept.length > 1 && !/[.!?]["')\]]?\s*$/.test((kept[kept.length - 1].script_line || "").trim())) kept.pop();
-  if (!kept.length) kept.push(body[0]);
-  kept.push({ ...closer, continues_previous: false });
-  console.warn(`[ai-video/director] duration cap: ${total} words → ~${cum} (budget ${budget}) — kept ${kept.length}/${beats.length} beats`);
-  return kept;
+// One director completion. `extraUser` appends a follow-up instruction (used for the
+// "too long → rewrite tighter" pass). Returns parsed JSON plan.
+async function runDirectorCompletion(prompt, extraUser = "") {
+  const response = await openai.chat.completions.create({
+    model: DIRECTOR_MODEL,
+    max_tokens: 6000,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user",   content: extraUser ? `${prompt.user}\n\n${extraUser}` : prompt.user },
+    ],
+  });
+  return JSON.parse(response.choices[0].message.content);
 }
 
 function languageBlock(language) {
@@ -77,7 +63,7 @@ function languageBlock(language) {
 }
 
 function buildDirectorPrompt({ research, style, targetDuration, language }) {
-  const beatTarget = Math.round(targetDuration / 1.9);
+  const beatTarget = Math.round(targetDuration / 2.2);
   const targetWords = Math.round(targetDuration * WORDS_PER_SECOND);
 
   return {
@@ -95,7 +81,7 @@ THE BEAT SYSTEM — NON-NEGOTIABLE:
   The phrases must concatenate into natural flowing narration.
 - CONTINUATION BEATS — use them GENEROUSLY: when a sentence spans multiple beats, set "continues_previous": true on the later beat(s) so the WHOLE sentence plays over ONE evolving visual (text landing piece by piece on the same backdrop). Do NOT cut to a brand-new visual for every phrase — hard cuts are for new IDEAS, not for each phrase of the same idea. One idea = one scene.
 - Target ~${beatTarget} beats for ${targetDuration}s. Keep it tight — never pad with extra beats to fill time.
-- LENGTH BUDGET: the ENTIRE script (all script_line words) should total about ${targetWords} words — speech runs ~${WORDS_PER_SECOND} words/sec, so ${targetWords} words ≈ ${targetDuration}s. SCOPE THE CONTENT TO FIT THIS FROM THE START: decide how much you can genuinely cover in ${targetWords} words and commit to that scope. STAY INTERNALLY CONSISTENT — if the hook promises "3 things", a countdown, or a list of N, you MUST deliver all N within the budget (make each one shorter), and the final/last item is the payoff — never drop it. NEVER promise N and show fewer, and NEVER truncate mid-structure. If the full idea can't fit ${targetWords} words, NARROW THE ANGLE (cover less, completely) rather than cutting pieces off the end. Significantly over budget = a video longer than the ${targetDuration}s requested = FAILURE.
+- LENGTH: write a COMPLETE mini-story — a hook, real substance, AND a closing line — totalling about ${targetWords} words across ~${beatTarget} beats (speech ≈ ${WORDS_PER_SECOND} words/sec, so ${targetWords} words ≈ ${targetDuration}s). HIT that length: don't pad past it, and DON'T under-deliver — even a short video needs an actual payoff, never just a hook + "tell me in the comments". STAY INTERNALLY CONSISTENT — if the hook promises N items or a countdown, deliver all N within the budget (each shorter), final item included; if the topic is too big for ${targetWords} words, pick a TIGHTER ANGLE that still has a clear beginning, middle, and end. Going well past ${targetWords} words makes the video longer than the ${targetDuration}s requested = FAILURE.
 - The viewer must never rest: every beat has motion, every cut has a transition.
 - Every beat's visual_concept must be DISTINCT — different subject, different compositional idea, different energy from its neighbors. Two beats that would look alike is a failure.
 
@@ -196,24 +182,33 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
   const style = styleId && styleId !== "auto" ? STYLE_PRESETS[styleId] : null;
   const prompt = buildDirectorPrompt({ research, style, targetDuration, language });
 
-  // Single pass — the word budget + flowing-narration rules live in the prompt; a
-  // code-level word-budget cap (enforceDuration, below) then guarantees the length
-  // without burning a second full-plan rewrite.
-  const response = await openai.chat.completions.create({
-    model: DIRECTOR_MODEL,
-    max_tokens: 6000,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: prompt.system },
-      { role: "user",   content: prompt.user },
-    ],
-  });
-
+  // Length is controlled at GENERATION, never by trimming the finished script/voiceover
+  // (trimming cuts the ending off). The prompt sets the word budget; if the model still
+  // runs well over, we regenerate ONE complete, shorter plan — we never cut beats post-hoc.
+  const targetWords = Math.round(targetDuration * WORDS_PER_SECOND);
+  const beatTarget = Math.round(targetDuration / 2.2);
   let plan;
   try {
-    plan = JSON.parse(response.choices[0].message.content);
+    plan = await runDirectorCompletion(prompt);
   } catch (e) {
     throw new Error(`beat director returned invalid JSON: ${e.message}`);
+  }
+
+  // Length guard — regenerate (never trim) up to twice if the draft runs long, keeping the
+  // shortest COMPLETE result. Structural limits (max beats / words-per-beat) land better with
+  // the model than a raw total-word count, which it routinely ignores.
+  const perBeatMax = 5;
+  const maxBeats = Math.max(4, beatTarget);
+  let bestWords = scriptWordCount(plan.beats);
+  for (let attempt = 1; attempt <= 2 && bestWords > targetWords * 1.2; attempt++) {
+    console.warn(`[ai-video/director] draft ${bestWords}w > target ${targetWords}w — regen ${attempt}/2 (no trim)`);
+    try {
+      const tighter = await runDirectorCompletion(prompt,
+        `LENGTH FAILURE: your script ran ${bestWords} words — far too long for a ${targetDuration}-second video. Rewrite the ENTIRE plan (same JSON schema) under these HARD limits: at most ${maxBeats} beats; EACH script_line at most ${perBeatMax} words; ${targetWords} words TOTAL maximum — count the words in every line. Keep it a COMPLETE short (hook → the point → payoff). If the topic lists multiple items and they won't fit, COVER FEWER / name them in one line rather than running long. Do NOT exceed ${targetWords} words.`);
+      const w = scriptWordCount(tighter?.beats);
+      if (Array.isArray(tighter?.beats) && tighter.beats.length >= 4 && w < bestWords) { plan = tighter; bestWords = w; }
+      else break; // no improvement — don't waste more calls
+    } catch (_) { break; }
   }
 
   // ── Validation — structure is code's job, not the model's ────────────────
@@ -232,8 +227,6 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
   if (beats.length < HARD_FLOOR) throw new Error(`beat director planned only ${beats.length} beats (need at least ${HARD_FLOOR})`);
   if (beats.length < MIN_BEATS) console.warn(`[ai-video/director] ${beats.length} beats — under soft target ${MIN_BEATS}, accepting`);
   if (beats.length > MAX_BEATS) beats = beats.slice(0, MAX_BEATS);
-  // Hard duration guarantee — trim total spoken words to the budget (model overshoots).
-  beats = enforceDuration(beats, targetDuration);
 
   let sameTypeRun = 0;
   beats = beats.map((b, i) => {
