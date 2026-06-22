@@ -113,12 +113,12 @@ alter table published_posts add column if not exists account_id  uuid;
 -- jobs: no schema change — the campaignId travels inside the job payload (jsonb).
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- ⚠️  CLEANUP — run ONLY after confirming the new model works. Drops the old
---     single-config AutoPilot tables (superseded by the automation_* tables above).
---     Destroys old test topics/history/events — fine at 0 users.
+-- CLEANUP — old single-config AutoPilot objects, superseded by the automation_*
+--     tables above. Dropped after confirming the new model works (at 0 real users).
+--     `if exists` makes this a safe no-op on fresh databases.
 -- ─────────────────────────────────────────────────────────────────────────────
--- drop function if exists reserve_topic(uuid);
--- drop table if exists autopilot_topic_history;
--- drop table if exists autopilot_topics;
--- drop table if exists autopilot_events;
--- drop table if exists autopilot_settings;
+drop function if exists reserve_topic(uuid);
+drop table if exists autopilot_topic_history;
+drop table if exists autopilot_topics;
+drop table if exists autopilot_events;
+drop table if exists autopilot_settings;

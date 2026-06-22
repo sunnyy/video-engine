@@ -66,5 +66,12 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.4",
     "vite": "^7.3.1"
+  },
+  "overrides": {
+    "form-data": "^4.0.6",
+    "protobufjs": "^7.6.1",
+    "react-gradient-color-picker": {
+      "lodash": "^4.17.21"
+    }
   }
 }
