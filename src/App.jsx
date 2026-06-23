@@ -124,11 +124,14 @@ export default function App() {
 
   if (recovering) {
     return (
+      <>
+      <ToastContainer />
       <BrowserRouter>
         <Routes>
           <Route path="*" element={<ResetPassword onDone={() => setRecovering(false)} />} />
         </Routes>
       </BrowserRouter>
+      </>
     );
   }
 

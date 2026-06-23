@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { serverFetch } from "../services/serverApi";
 import AppLayout from "../ui/AppLayout";
+import { showToast } from "../ui/Toast";
 
 const FALLBACK_RATE = 92.60;
 
@@ -108,6 +109,7 @@ export default function Credits() {
               const verifyData = await verifyRes.json();
               if (!verifyRes.ok) throw new Error(verifyData.error || "Verification failed");
               setTopupSuccess(`${orderData.credits.toLocaleString()} credits added! New balance: ${verifyData.balance.toLocaleString()}`);
+              showToast(`${orderData.credits.toLocaleString()} credits added ✓`, "success");
               fetchCredits();
               resolve();
             } catch (e) { reject(e); }
@@ -118,7 +120,8 @@ export default function Credits() {
         rzp.open();
       });
     } catch (e) {
-      if (e.message !== "Payment cancelled") setTopupErr(e.message);
+      if (e.message !== "Payment cancelled") { setTopupErr(e.message); showToast(e.message || "Payment failed"); }
+      else showToast("Payment cancelled", "info");
     }
     setTopping(false);
   }

@@ -33,6 +33,8 @@ export default function TopBar() {
 
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [cancelling, setCancelling] = useState(false);
+  const exportPollRef = useRef(null); // active status-poll interval, so Cancel can stop it
 
   // Export history (every render is a row in `renders`, newest first) → download dropdown.
   const [renders, setRenders] = useState([]);
@@ -102,7 +104,7 @@ export default function TopBar() {
     catch { return ""; }
   };
 
-  const downloadVideo = async (url, label) => {
+  const downloadVideo = async (url, label, { silent = false } = {}) => {
     if (!url) return;
     try {
       const r    = await fetch(url);
@@ -112,7 +114,8 @@ export default function TopBar() {
       a.download = `${name || "video"}-${label || Date.now()}.mp4`;
       a.click();
       URL.revokeObjectURL(a.href);
-    } catch (_) { alert("Download failed — please try again."); }
+      if (!silent) showToast("Download started ✓", "success");
+    } catch (_) { showToast("Download failed — please try again."); }
   };
 
   // Warn before leaving the tab while an export is running.
@@ -140,12 +143,15 @@ export default function TopBar() {
   const clearExportJob = () => { try { if (exportKey) localStorage.removeItem(exportKey); } catch {} };
 
   // Poll an export job to completion (used both for a fresh export and a reconnect after reload).
+  const stopExportPoll = () => { if (exportPollRef.current) { clearInterval(exportPollRef.current); exportPollRef.current = null; } };
+
   const pollExportStatus = (jobId, { resumed = false } = {}) => {
+    stopExportPoll();
     const poll = setInterval(async () => {
       try {
         const statusRes = await serverFetch(`/api/render/status/${jobId}`);
         if (statusRes.status === 404) { // job gone (server restart cleared it, or completed+downloaded)
-          clearInterval(poll); clearExportJob(); setExporting(false);
+          stopExportPoll(); clearExportJob(); setExporting(false);
           if (resumed) showToast("Your earlier export is no longer available — please export again.", "info");
           return;
         }
@@ -153,17 +159,35 @@ export default function TopBar() {
         const status = await statusRes.json();
         setExportProgress(status.progress || 0);
         if (status.done) {
-          clearInterval(poll);
+          stopExportPoll();
           clearExportJob();
           setExporting(false);
           if (status.cancelled) return;
-          if (status.error) { alert("Export failed: " + status.error); return; }
+          if (status.error) { showToast("Export failed: " + status.error); return; }
           const videoUrl = status.video_url || status.url;
-          if (videoUrl) await downloadVideo(videoUrl);
+          if (videoUrl) { showToast("Export complete — downloading ✓", "success"); await downloadVideo(videoUrl, undefined, { silent: true }); }
           loadRenders(); // refresh the version dropdown with this new export
         }
       } catch (_) {}
     }, 3000);
+    exportPollRef.current = poll;
+  };
+
+  // Cancel an in-flight (or stuck) export. Best-effort tells the server to stop, then always
+  // clears local state so a dead job (e.g. server was restarted mid-render) can't trap the editor.
+  const cancelExport = async () => {
+    setCancelling(true);
+    let jobId = null;
+    try { jobId = JSON.parse(localStorage.getItem(`vq:export:${projectId}`) || "null")?.jobId || null; } catch {}
+    if (jobId) {
+      try { await serverFetch("/api/render/cancel", { method: "POST", body: JSON.stringify({ jobId }) }); } catch (_) {}
+    }
+    stopExportPoll();
+    clearExportJob();
+    setExporting(false);
+    setExportProgress(0);
+    setCancelling(false);
+    showToast("Export cancelled", "info");
   };
 
   const handleExport = async () => {
@@ -185,7 +209,7 @@ export default function TopBar() {
     } catch (err) {
       setExporting(false);
       clearExportJob();
-      alert(err.message || "Export failed");
+      showToast(err.message || "Export failed");
     }
   };
 
@@ -268,6 +292,11 @@ export default function TopBar() {
               <div style={{ height: "100%", width: `${exportProgress}%`, background: "#7c5cfc", borderRadius: 99, transition: "width 0.3s" }} />
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#a080ff", marginTop: 10, fontFamily: "'JetBrains Mono',monospace" }}>{exportProgress}%</div>
+            <button onClick={cancelExport} disabled={cancelling} style={{
+              marginTop: 18, background: "transparent", border: "1px solid rgba(255,255,255,0.15)",
+              color: "#c0c0d8", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit',sans-serif",
+              padding: "8px 18px", borderRadius: 8, cursor: cancelling ? "default" : "pointer", opacity: cancelling ? 0.6 : 1,
+            }}>{cancelling ? "Cancelling…" : "Cancel export"}</button>
           </div>
           <style>{`@keyframes tb-export-spin { to { transform: rotate(360deg); } }`}</style>
         </div>

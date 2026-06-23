@@ -4,7 +4,8 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithGoogle, getSession } from "../services/auth/authService";
+import { getSession } from "../services/auth/authService";
+import AuthModal from "../ui/AuthModal";
 
 const FAQS = [
   {
@@ -101,12 +102,13 @@ function FAQItem({ q, a }) {
 export default function FAQ() {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
+  const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => { getSession().then(setSession).catch(() => {}); }, []);
 
-  const handleCTA = async () => {
+  const handleCTA = () => {
     if (session) { navigate("/dashboard"); return; }
-    try { await signInWithGoogle(); } catch { navigate("/login"); }
+    setAuthOpen(true);
   };
 
   return (
@@ -123,7 +125,10 @@ export default function FAQ() {
             <a href="/#samples" className="nav-link">Samples</a>
             <a href="/#services" className="nav-link">Services</a>
             <a href="/#pricing" className="nav-link">Pricing</a>
-            <button className="btn-yellow" onClick={handleCTA}>{session ? "Go to Dashboard" : "Start Free"}</button>
+            {!session && (
+              <button className="nav-link" onClick={() => setAuthOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Log in</button>
+            )}
+            <button className="btn-yellow" onClick={handleCTA}>{session ? "Go to Dashboard" : "Get Started"}</button>
           </div>
         </div>
       </nav>
@@ -160,6 +165,8 @@ export default function FAQ() {
           </div>
         </div>
       </footer>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }

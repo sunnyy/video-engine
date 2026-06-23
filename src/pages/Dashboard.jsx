@@ -15,8 +15,10 @@ import { planTypographyVideo, produceTypographyVideo } from "../services/ai/typo
 import { generateCaptions } from "../services/captions/generateCaptions";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 import { captionStylePresets, captionStyleLabels } from "../core/registries/captionTimelineRegistry.jsx";
-import { VoiceLanguageField, DurationField, StyleField, OrientationField, SelectField } from "../ui/fields/index.js";
+import { VoiceLanguageField, DurationField, StyleField, OrientationField, SelectField, ReviewToggleField } from "../ui/fields/index.js";
 import { SERVICE_FIELDS } from "../config/serviceFields.js";
+import { creditsForDuration } from "../core/utils/creditCosts.js";
+import { getReviewScriptFirst, setReviewScriptFirst } from "../core/utils/reviewScriptPref.js";
 import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, ArrowUp, Megaphone, Contrast, Droplet, Target, Film, Image as ImageIcon, ImagePlus, Video, MoveVertical, Loader2 } from "lucide-react";
 import AppLayout from "../ui/AppLayout";
 import Onboarding from "./Onboarding";
@@ -127,6 +129,8 @@ function PromptVideoChatbox({ onBusy }) {
   const [loading,    setLoading]    = useState(false);
   const [statusStep, setStatusStep] = useState(0);
   const [error,      setError]      = useState(null);
+  const [reviewFirst, setReviewFirstState] = useState(getReviewScriptFirst());
+  const reviewFirstSet = (v) => { setReviewFirstState(v); setReviewScriptFirst(v); };
 
   const canPlan = !!prompt.trim() && !planning && !loading;
 
@@ -134,12 +138,14 @@ function PromptVideoChatbox({ onBusy }) {
     onBusy?.(planning || loading, loading ? STATUS_STEPS[statusStep] : "Planning your video…");
   }, [planning, loading, statusStep, onBusy]);
 
+  // Plan the script. With review on, open the modal; with review off, produce directly.
   async function handlePlan() {
     if (!prompt.trim() || planning || loading) return;
     setPlanning(true); setError(null);
     try {
       const result = await planPromptVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation });
-      setPlanData(result);
+      if (reviewFirst) setPlanData(result);
+      else await produce(result, result.plan.film.beats);
     } catch (err) {
       setError(err.message || "Planning failed. Please try again.");
     } finally {
@@ -147,11 +153,11 @@ function PromptVideoChatbox({ onBusy }) {
     }
   }
 
-  async function handleProduce(editedBeats) {
-    if (!planData || loading) return;
+  async function produce(planResult, editedBeats) {
+    if (!planResult || loading) return;
     setPlanData(null); setLoading(true); setError(null); setStatusStep(2);
-    // Carry the user's edited script lines into the plan; visuals stay as planned.
-    const plan = { ...planData.plan, film: { ...planData.plan.film, beats: editedBeats } };
+    // Carry the user's (possibly edited) script lines into the plan; visuals stay as planned.
+    const plan = { ...planResult.plan, film: { ...planResult.plan.film, beats: editedBeats } };
     try {
       const result = await generatePromptVideo(
         { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, orientation, plan },
@@ -160,7 +166,7 @@ function PromptVideoChatbox({ onBusy }) {
       invalidateProjectCaches("ai_video", "all");
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
-      setError(err.code === "NO_CREDITS" ? "Not enough credits — you need 75 to produce this video." : (err.message || "Generation failed."));
+      setError(err.code === "NO_CREDITS" ? `Not enough credits — you need ${creditsForDuration(duration)} to produce this video.` : (err.message || "Generation failed."));
       setLoading(false);
     }
   }
@@ -188,6 +194,7 @@ function PromptVideoChatbox({ onBusy }) {
             <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={AI} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={AI} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={AI} />
+            <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={AI} />
           </div>
           {/* Right: orientation (accent) + send */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -195,7 +202,7 @@ function PromptVideoChatbox({ onBusy }) {
             <button
               onClick={() => handlePlan()}
               disabled={!canPlan}
-              title="Create a free plan"
+              title={reviewFirst ? "Review the script first" : "Generate video"}
               style={{
                 width: 40, height: 40, borderRadius: 10, border: "none",
                 cursor: canPlan ? "pointer" : "not-allowed", fontSize: 18, fontWeight: 800,
@@ -235,11 +242,11 @@ function PromptVideoChatbox({ onBusy }) {
         <ScriptConfirmModal
           scenes={planData.plan.film.beats}
           scriptKey="script_line"
-          onConfirm={handleProduce}
+          onConfirm={(beats) => produce(planData, beats)}
           onCancel={() => setPlanData(null)}
           accent={AI}
           title="Review your script"
-          confirmLabel="Looks good — Produce Video (75 credits)"
+          confirmLabel={`Looks good — Produce Video (${creditsForDuration(duration)} credits)`}
         />
       )}
 
@@ -276,6 +283,8 @@ function SocialChatbox({ onBusy }) {
   const [loading,       setLoading]       = useState(false);
   const [statusStep,    setStatusStep]    = useState(0);
   const [error,         setError]         = useState(null);
+  const [reviewFirst,   setReviewFirstState] = useState(getReviewScriptFirst());
+  const reviewFirstSet = (v) => { setReviewFirstState(v); setReviewScriptFirst(v); };
 
   const canGo = !!url.trim() && !planning && !loading;
 
@@ -283,12 +292,14 @@ function SocialChatbox({ onBusy }) {
     onBusy?.(planning || loading, loading ? SOCIAL_STATUS[statusStep] : "Reading the post…");
   }, [planning, loading, statusStep, onBusy]);
 
-  // Phase 1: fetch + script → open the confirmation modal.
+  // Fetch + script. With review on, open the modal; with review off, produce directly.
   async function handleStart() {
     if (!canGo) return;
     setPlanning(true); setError(null);
     try {
-      setPlan(await planSocialVideo({ url: url.trim(), targetDuration: duration, language }));
+      const p = await planSocialVideo({ url: url.trim(), targetDuration: duration, language });
+      if (reviewFirst) setPlan(p);
+      else await produce(p, p.scenes);
     } catch (err) {
       setError(err.message || "Couldn't read that post.");
     } finally {
@@ -296,12 +307,12 @@ function SocialChatbox({ onBusy }) {
     }
   }
 
-  // Phase 2: build the video from the confirmed/edited script.
-  async function handleProduce(editedScenes) {
+  // Build the video from the confirmed/edited script.
+  async function produce(planObj, editedScenes) {
     setPlan(null); setLoading(true); setError(null); setStatusStep(0);
     try {
       const result = await produceSocialVideo(
-        { ...plan, scenes: editedScenes },
+        { ...planObj, scenes: editedScenes },
         { voiceId, language, includeAuthor, styleId, orientation },
         ({ step }) => { const i = SOCIAL_STATUS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
@@ -329,10 +340,11 @@ function SocialChatbox({ onBusy }) {
             <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={SA} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={SA} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={SA} />
+            <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={SA} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <OrientationField value={orientation} onChange={setOrientation} accent={SA} tinted />
-            <button onClick={handleStart} disabled={!canGo} title="Review script"
+            <button onClick={handleStart} disabled={!canGo} title={reviewFirst ? "Review the script first" : "Generate video"}
               style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? SA : "rgba(34,211,238,0.25)", color: "#04222a", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {planning ? <Loader2 size={18} style={{ animation: "pv-spin 0.7s linear infinite" }} /> : <ArrowUp size={18} strokeWidth={2.5} />}
             </button>
@@ -368,7 +380,7 @@ function SocialChatbox({ onBusy }) {
       {plan && (
         <ScriptConfirmModal
           scenes={plan.scenes}
-          onConfirm={handleProduce}
+          onConfirm={(scenes) => produce(plan, scenes)}
           onCancel={() => setPlan(null)}
           accent={SA}
         />
@@ -704,6 +716,8 @@ function TypographyChatbox({ onBusy }) {
   const [loading,     setLoading]     = useState(false);
   const [statusStep,  setStatusStep]  = useState(0);
   const [error,       setError]       = useState(null);
+  const [reviewFirst, setReviewFirstState] = useState(getReviewScriptFirst());
+  const reviewFirstSet = (v) => { setReviewFirstState(v); setReviewScriptFirst(v); };
 
   const canGo = !!input.trim() && !planning && !loading;
 
@@ -711,12 +725,14 @@ function TypographyChatbox({ onBusy }) {
     onBusy?.(planning || loading, loading ? TYPO_STATUS[statusStep] : "Building your script…");
   }, [planning, loading, statusStep, onBusy]);
 
-  // Phase 1: script → open the confirmation modal.
+  // Build the script. With review on, open the modal; with review off, produce directly.
   async function handleStart() {
     if (!canGo) return;
     setPlanning(true); setError(null);
     try {
-      setPlan(await planTypographyVideo({ input: input.trim(), inputType, targetDuration: duration, language, styleId }));
+      const p = await planTypographyVideo({ input: input.trim(), inputType, targetDuration: duration, language, styleId });
+      if (reviewFirst) setPlan(p);
+      else await produce(p, p.scenes);
     } catch (err) {
       setError(err.message || "Couldn't build that script.");
     } finally {
@@ -724,12 +740,12 @@ function TypographyChatbox({ onBusy }) {
     }
   }
 
-  // Phase 2: build the video from the confirmed/edited script.
-  async function handleProduce(editedScenes) {
+  // Build the video from the confirmed/edited script.
+  async function produce(planObj, editedScenes) {
     setPlan(null); setLoading(true); setError(null); setStatusStep(0);
     try {
       const result = await produceTypographyVideo(
-        { ...plan, scenes: editedScenes },
+        { ...planObj, scenes: editedScenes },
         { voiceId, language, orientation },
         ({ step }) => { if (typeof step === "number") setStatusStep(step); },
       );
@@ -770,10 +786,11 @@ function TypographyChatbox({ onBusy }) {
             <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={TC} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={TC} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={TC} />
+            <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={TC} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <OrientationField value={orientation} onChange={setOrientation} accent={TC} tinted />
-            <button onClick={handleStart} disabled={!canGo} title="Review script"
+            <button onClick={handleStart} disabled={!canGo} title={reviewFirst ? "Review the script first" : "Generate video"}
               style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? TC : "rgba(124,92,252,0.25)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {planning ? <Loader2 size={18} style={{ animation: "pv-spin 0.7s linear infinite" }} /> : <ArrowUp size={18} strokeWidth={2.5} />}
             </button>
@@ -802,7 +819,7 @@ function TypographyChatbox({ onBusy }) {
         <ScriptConfirmModal
           scenes={plan.scenes}
           scriptKey="voiceover"
-          onConfirm={handleProduce}
+          onConfirm={(scenes) => produce(plan, scenes)}
           onCancel={() => setPlan(null)}
           accent={TC}
         />

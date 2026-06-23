@@ -147,6 +147,8 @@ export async function addCredits(userId, amount, type, action, description, paym
 
 export const upload = multer({ dest: TEMP_DIR });
 export const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+// Sample uploads can be short videos, which are legitimately larger than images.
+export const uploadSample = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 export { uuidv4 };
 export {

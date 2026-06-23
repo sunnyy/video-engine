@@ -5,9 +5,11 @@
  */
 
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
-import { signInWithGoogle, getSession } from "../services/auth/authService";
+import { getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
+import AuthModal from "../ui/AuthModal";
 import { videoServices } from "../config/serviceCatalog";
 import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown } from "lucide-react";
 
@@ -73,7 +75,7 @@ const CSS = `
   .hero-h1 { font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(40px, 5.2vw, 74px); line-height: 1.08; letter-spacing: -0.02em; color: var(--text); margin-bottom: 20px; }
   .hero-h1 .yellow { color: var(--yellow); }
   .hero-h1 .outline { -webkit-text-stroke: 1.5px rgba(255,255,255,0.18); color: transparent; }
-  .hero-sub { font-family: var(--font-body); font-size: 18px; color: var(--muted); line-height: 1.65; max-width: 600px; margin: 0 auto 30px; }
+  .hero-sub { font-family: var(--font-body); font-size: 18px; color: var(--muted); line-height: 1.65; max-width: 700px; margin: 0 auto 30px; }
   .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
   .hero-cta { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0F0E1A; background: var(--yellow); border: none; border-radius: 10px; padding: 16px 36px; cursor: pointer; transition: opacity 0.2s; }
   .hero-cta:hover { opacity: 0.85; }
@@ -331,35 +333,20 @@ const CSS = `
   @media (max-width: 760px)  { .samples-masonry { column-count: 2; column-gap: 12px; } }
   .sample-card { break-inside: avoid; -webkit-column-break-inside: avoid; margin-bottom: 16px; position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--card); }
   .sample-card img, .sample-card video { width: 100%; display: block; background: #060a14; }
+  .sample-card:hover { border-color: rgba(245,197,24,0.32); }
+  .sample-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0.9; transition: opacity 0.2s; }
+  .sample-card:hover .sample-play { opacity: 1; }
+  .sample-play span { width: 52px; height: 52px; border-radius: 50%; background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center; padding-left: 3px; }
+
+  /* SAMPLE LIGHTBOX */
+  @keyframes sampleLbIn { from { opacity: 0; } to { opacity: 1; } }
+  .sample-lb { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 32px; background: rgba(5,5,10,0.88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: sampleLbIn 0.18s ease; }
+  .sample-lb-inner { display: flex; }
+  .sample-lb-inner video, .sample-lb-inner img { max-width: 92vw; max-height: 86vh; width: auto; height: auto; border-radius: 14px; box-shadow: 0 30px 90px rgba(0,0,0,0.6); background: #000; display: block; }
+  .sample-lb-close { position: fixed; top: 22px; right: 26px; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; z-index: 1; transition: background 0.2s; }
+  .sample-lb-close:hover { background: rgba(255,255,255,0.2); }
   .sample-badge { position: absolute; left: 12px; top: 12px; padding: 4px 9px; border-radius: 7px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text); letter-spacing: 0.5px; }
 
-  /* FULL SUITE — asymmetric bento */
-  .bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 192px; grid-auto-flow: dense; gap: 14px; margin-top: 44px; }
-  .bento-tile { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #13131e; cursor: pointer; box-shadow: 0 14px 44px rgba(0,0,0,0.34); transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
-  .bento-tile:hover { transform: translateY(-4px); border-color: rgba(245,197,24,0.32); box-shadow: 0 24px 64px rgba(0,0,0,0.5); }
-  .bento-tile.lg   { grid-column: span 2; grid-row: span 2; }
-  .bento-tile.wide { grid-column: span 2; }
-  .bento-tile.tall { grid-row: span 2; }
-  .bento-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
-  .bento-tile:hover .bento-media { transform: scale(1.07); }
-  .bento-scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,8,12,0.92) 0%, rgba(8,8,12,0.25) 52%, rgba(8,8,12,0.04) 100%); }
-  .bento-body { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 18px 16px; z-index: 1; }
-  .bento-name { font-family: var(--font-body); font-size: 18px; font-weight: 800; color: #fff; line-height: 1.2; letter-spacing: -0.01em; }
-  .bento-tile.lg .bento-name { font-size: 27px; }
-  .bento-desc { font-family: var(--font-body); font-size: 13px; color: rgba(255,255,255,0.78); margin-top: 4px; }
-  .bento-open { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #14140a; font-weight: 800; font-size: 15px; opacity: 0; transform: translateY(-4px); transition: opacity 0.2s, transform 0.2s; z-index: 1; }
-  .bento-tile:hover .bento-open { opacity: 1; transform: translateY(0); }
-  @media (max-width: 900px) {
-    .bento { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 160px; }
-    .bento-tile.lg { grid-column: span 2; grid-row: span 2; }
-    .bento-tile.wide { grid-column: span 2; grid-row: span 1; }
-    .bento-tile.tall { grid-column: span 1; grid-row: span 2; }
-  }
-  @media (max-width: 540px) {
-    .bento { grid-auto-rows: 132px; gap: 10px; }
-    .bento-tile.lg .bento-name { font-size: 21px; }
-    .bento-name { font-size: 16px; }
-  }
 `;
 
 /* ── Hero chatbox — a decorative replica of the in-app create surface. Morphs per video
@@ -456,7 +443,7 @@ const SAMPLE_SERVICE_LABELS = {
   product_ads: "Product Ad", virtual_tryon: "Virtual Try-On",
 };
 
-function SampleCard({ sample }) {
+function SampleCard({ sample, onOpen }) {
   const vidRef = useRef(null);
   const isVid  = sample.type === "video";
   const label  = SAMPLE_SERVICE_LABELS[sample.service_key] || sample.service_key;
@@ -468,17 +455,46 @@ function SampleCard({ sample }) {
     return () => io.disconnect();
   }, [isVid]);
   return (
-    <div className="sample-card">
+    <div className="sample-card" onClick={() => onOpen(sample)} style={{ cursor: "pointer" }}>
       {isVid
         ? <video ref={vidRef} src={sample.src} poster={sample.poster || undefined} muted loop playsInline preload="metadata" />
         : <img src={sample.src} alt={label} loading="lazy" />}
       <div className="sample-badge">{label}</div>
+      {isVid && (
+        <div className="sample-play">
+          <span><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg></span>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Click-to-open lightbox — plays the sample full-size WITH sound (controls on).
+function SampleLightbox({ sample, onClose }) {
+  useEffect(() => {
+    if (!sample) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sample, onClose]);
+  if (!sample) return null;
+  const isVid = sample.type === "video";
+  return createPortal(
+    <div className="sample-lb" onClick={onClose}>
+      <button className="sample-lb-close" onClick={onClose} aria-label="Close">×</button>
+      <div className="sample-lb-inner" onClick={(e) => e.stopPropagation()}>
+        {isVid
+          ? <video src={sample.src} poster={sample.poster || undefined} controls autoPlay playsInline />
+          : <img src={sample.src} alt="" />}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
 function SamplesGallery() {
   const [samples, setSamples] = useState(null);
+  const [active, setActive] = useState(null);
   useEffect(() => {
     let alive = true;
     fetch(`${SERVER}/api/admin/samples/public?limit=60`)
@@ -493,74 +509,16 @@ function SamplesGallery() {
       <div className="container">
         <div className="section-label">Made with Vidquence</div>
         <h2 className="section-h">See what people<br /><span className="yellow">are making.</span></h2>
-        <p className="section-sub">Real outputs from every service — generated in minutes, then editable down to the last frame.</p>
+        <p className="section-sub">Real outputs from every service — tap any one to play it with sound.</p>
         <div className="samples-masonry">
-          {samples.map((s) => <SampleCard key={s.id} sample={s} />)}
+          {samples.map((s) => <SampleCard key={s.id} sample={s} onOpen={setActive} />)}
         </div>
       </div>
+      <SampleLightbox sample={active} onClose={() => setActive(null)} />
     </section>
   );
 }
 
-/* ── The Full Suite — asymmetric bento, real sample media, hover-play. ── */
-const SUITE_TILES = [
-  { name: "Prompt to Video",  desc: "Any idea → a finished video",  route: "/dashboard",        key: "ai_videos",        accent: "#f59e0b", size: "lg" },
-  { name: "Product Video",    desc: "A photo → a cinematic ad",     route: "/product-video",    key: "product_video",    accent: "#f97316", size: "wide" },
-  { name: "Virtual Try-On",   desc: "Your product, on a model",     route: "/virtual-tryon",    key: "virtual_tryon",    accent: "#ec4899", size: "tall" },
-  { name: "SaaS Video",       desc: "Your website → a promo",       route: "/promo-video",      key: "saas_video",       accent: "#f5c518", size: "sm" },
-  { name: "Social to Video",  desc: "A post → a short",             route: "/social-video",     key: "social_video",     accent: "#22d3ee", size: "sm" },
-  { name: "Typography Video", desc: "Kinetic text videos",          route: "/typography-video", key: "typography_video", accent: "#7c5cfc", size: "sm" },
-  { name: "Auto Captions",    desc: "Styled animated captions",     route: "/video-captions",   key: "captions",         accent: "#34d399", size: "sm" },
-  { name: "Poster Studio",    desc: "Luxury product posters",       route: "/product-poster",   key: "posters",          accent: "#d946ef", size: "sm" },
-  { name: "Thumbnails",       desc: "Click-worthy thumbnails",      route: "/thumbnail",        key: "thumbnails",       accent: "#ef4444", size: "sm" },
-  { name: "Banner Design",    desc: "On-brand social banners",      route: "/banner-design",    key: "social_posts",     accent: "#3b82f6", size: "sm" },
-];
-
-function SuiteTile({ tile, sample, onClick }) {
-  const vidRef = useRef(null);
-  const isVid = sample?.type === "video";
-  const onEnter = () => { if (isVid) vidRef.current?.play().catch(() => {}); };
-  const onLeave = () => { if (isVid && vidRef.current) { vidRef.current.pause(); vidRef.current.currentTime = 0; } };
-  return (
-    <div className={`bento-tile ${tile.size}`} onClick={onClick} onMouseEnter={onEnter} onMouseLeave={onLeave}>
-      {sample ? (
-        isVid
-          ? <video ref={vidRef} className="bento-media" src={sample.src} poster={sample.poster || undefined} muted loop playsInline preload="metadata" />
-          : <img className="bento-media" src={sample.src} alt={tile.name} loading="lazy" />
-      ) : (
-        <div className="bento-media" style={{ background: `radial-gradient(circle at 72% 18%, ${tile.accent}38, transparent 60%), #13131e` }} />
-      )}
-      <div className="bento-scrim" />
-      <div className="bento-body">
-        <div className="bento-name">{tile.name}</div>
-        <div className="bento-desc">{tile.desc}</div>
-      </div>
-      <div className="bento-open" style={{ background: tile.accent }}>↗</div>
-    </div>
-  );
-}
-
-function FullSuiteBento({ onTileClick }) {
-  const [byKey, setByKey] = useState({});
-  useEffect(() => {
-    let alive = true;
-    fetch(`${SERVER}/api/admin/samples/public?limit=150`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!alive) return;
-        const m = {};
-        for (const s of (d.samples || [])) { if (s.src && !m[s.service_key]) m[s.service_key] = s; }
-        setByKey(m);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  return (
-    <div className="bento">
-      {SUITE_TILES.map((t) => <SuiteTile key={t.name} tile={t} sample={byKey[t.key]} onClick={() => onTileClick(t.route)} />)}
-    </div>
-  );
-}
 
 // Counts up to `to` once scrolled into view (eased). Renders prefix + number + suffix.
 function CountUp({ to, prefix = "", suffix = "", duration = 1400 }) {
@@ -636,6 +594,7 @@ export default function LandingPage() {
   const [plans, setPlans] = useState([]);
   const [rate, setRate] = useState(FALLBACK_RATE);
   const [cycle, setCycle] = useState("annual");
+  const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
     getSession()
@@ -673,16 +632,9 @@ export default function LandingPage() {
     }
   }, [location.hash]);
 
-  const handleCTA = async () => {
-    if (session) {
-      navigate("/dashboard");
-      return;
-    }
-    try {
-      await signInWithGoogle();
-    } catch {
-      navigate("/login");
-    }
+  const handleCTA = () => {
+    if (session) { navigate("/dashboard"); return; }
+    setAuthOpen(true); // open the sign-in modal for logged-out visitors
   };
 
   // Service cards: signed-in users go straight to the tool; logged-out visitors are
@@ -718,8 +670,13 @@ export default function LandingPage() {
             <a href="#pricing" className="nav-link">
               Pricing
             </a>
+            {!session && (
+              <button className="nav-link" onClick={() => setAuthOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                Log in
+              </button>
+            )}
             <button className="btn-yellow" onClick={handleCTA}>
-              {session ? "Go to Dashboard" : "Start Free"}
+              {session ? "Go to Dashboard" : "Get Started"}
             </button>
           </div>
         </div>
@@ -743,7 +700,7 @@ export default function LandingPage() {
               you'll ever <span className="yellow">need.</span>
             </h1>
             <p className="hero-sub">
-              Create more videos, save hours of work, and scale your content with one AI-powered platform built for every workflow.
+              Geneate editable export-ready videos in minutes, save hours of work, and scale your content with one AI-powered platform built for every workflow.
             </p>
             <HeroChatbox onSubmit={handleCTA} />
             <div className="hero-platforms">
@@ -783,15 +740,148 @@ export default function LandingPage() {
       <section className="section" id="services">
         <div className="container">
           <div className="section-label">The Full Suite</div>
-          <h2 className="section-h">
-            Stop switching tabs.
-            <br />
-            <span className="yellow">Start creating.</span>
-          </h2>
-          <p className="section-sub">
-            Every creative tool your brand needs — video, image, and audio — in one place.
-          </p>
-          <FullSuiteBento onTileClick={handleCardClick} />
+
+          {/* ── Desktop bento grid ── */}
+          <div className="services-desktop">
+          {(() => {
+            const CARDS = [
+              { emoji: "🎬", name: "AI Video Generator",    desc: "Script to viral video in minutes",       route: "/dashboard",      accent: "#7c5cfc", col: "span 3", image: "/assets/images/services/AIVideoGenerator.png"    },
+              { emoji: "📦", name: "Product Video Ads",     desc: "One photo → cinematic ad",               route: "/product-video",    accent: "#f97316", col: "span 2", image: "/assets/images/services/ProductVideoAds.png"     },
+              { emoji: "👗", name: "Virtual Try-On",        desc: "AI model wearing your product",          route: "/virtual-tryon",  accent: "#ec4899", col: "span 2", image: "/assets/images/services/VirtualTryOn.png"        },
+              { emoji: "🎨", name: "Banner Design",         desc: "Social media banners in seconds",        route: "/banner-design",  accent: "#f5c518", col: "span 2", image: "/assets/images/services/BannerDesign.png"        },
+              { emoji: "🖼️", name: "Thumbnail Generator",  desc: "Click-worthy thumbnails with AI",        route: "/thumbnail",      accent: "#ef4444", col: "span 2", image: "/assets/images/services/ThumbnailGenerator.png"  },
+              { emoji: "🎨", name: "Poster Studio",         desc: "Luxury product posters in seconds",      route: "/product-poster", accent: "#d946ef", col: "span 2", image: "/assets/images/services/PosterStudio.png"        },
+              { emoji: "💬", name: "Caption Studio",        desc: "Auto-captions with style",               route: "/video-captions", accent: "#22c55e", col: "span 2", image: "/assets/images/services/CaptionStudio.png"       },
+              { emoji: "🎙️", name: "Voice Studio",         desc: "Natural AI voiceovers, multilingual",    route: "/voiceover",      accent: "#3b82f6", col: "span 3", image: "/assets/images/services/VoiceStudio.png"         },
+              { emoji: "🔤", name: "Speech to Text",        desc: "Accurate transcription instantly",       route: "/speech-to-text", accent: "#8b5cf6", col: "span 3", image: "/assets/images/services/SpeechtoText.png"        },
+            ];
+
+            const cardStyle = (accent, col, image) => ({
+              gridColumn: col,
+              position: "relative",
+              background: image ? `url(${image}) center/cover no-repeat` : "#13131e",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: 18,
+              padding: "28px 24px 22px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              minHeight: col === "span 3" ? 240 : 190,
+              overflow: "hidden",
+              transition: "border-color 0.2s, transform 0.2s",
+              cursor: "pointer",
+            });
+
+            return (
+              <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginTop: 40 }}>
+                {/* Row 1 left — heading card */}
+                <div style={{
+                  gridColumn: "span 3",
+                  background: "linear-gradient(135deg, #13131e 60%, rgba(245,197,24,0.07))",
+                  border: "1px solid rgba(245,197,24,0.18)",
+                  borderRadius: 18,
+                  padding: "36px 32px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                  minHeight: 240,
+                }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2, color: "#f5c518", fontFamily: "var(--font-mono)", textTransform: "uppercase", marginBottom: 16 }}>The Full Suite</div>
+                  <h2 style={{ margin: 0, fontSize: "clamp(44px, 5.6vw, 68px)", fontWeight: 800, color: "#e8e8f0", lineHeight: 1.15, letterSpacing: "-0.5px", textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
+                    Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
+                  </h2>
+                  <p style={{ margin: "14px 0 0", fontSize: 18, color: "#e8e8f0", lineHeight: 1.6, maxWidth: 340 }}>
+                    Every creative tool your brand needs — in one place.
+                  </p>
+                </div>
+
+                {/* Service cards */}
+                {CARDS.map((svc) => (
+                  <div
+                    key={svc.name}
+                    data-service={svc.name}
+                    style={cardStyle(svc.accent, svc.col, svc.image)}
+                    onClick={() => handleCardClick(svc.route)}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = svc.accent + "55"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.transform = "translateY(0)"; }}
+                  >
+                    {/* Dark overlay for text readability over background image */}
+                    {svc.image && (
+                      <div style={{ position: "absolute", inset: "-1px", background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.72) 100%)", pointerEvents: "none" }} />
+                    )}
+                    {/* Accent glow */}
+                    {!svc.image && (
+                      <div style={{ position: "absolute", top: -60, right: -60, width: 160, height: 160, borderRadius: "50%", background: svc.accent, opacity: 0.07, pointerEvents: "none" }} />
+                    )}
+
+                    {/* Bottom — name + desc + button */}
+                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, position: "relative", zIndex: 1, marginTop: "auto" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3, fontFamily: "'Outfit', sans-serif", textTransform: "uppercase" }}>{svc.name}</div>
+                          <span style={{ fontSize: 20 }}>{svc.emoji}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#e8e8f0", marginTop: 4, lineHeight: 1.4 }}>{svc.desc}</div>
+                      </div>
+                      <button
+                        style={{
+                          flexShrink: 0,
+                          background: svc.accent + "22",
+                          border: `1px solid ${svc.accent}55`,
+                          color: svc.accent,
+                          borderRadius: 20,
+                          padding: "5px 13px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          transition: "background 0.15s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = svc.accent + "44"}
+                        onMouseLeave={e => e.currentTarget.style.background = svc.accent + "22"}
+                      >
+                        Open →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          </div>{/* end services-desktop */}
+
+          {/* ── Mobile service list ── */}
+          <div className="services-mobile">
+            <div style={{ marginBottom: 28 }}>
+              <h2 style={{ margin: 0, fontSize: 38, fontWeight: 800, color: "#e8e8f0", lineHeight: 1.1, textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
+                Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
+              </h2>
+              <p style={{ margin: "10px 0 0", fontSize: 15, color: "#e8e8f0", lineHeight: 1.5 }}>Every creative tool your brand needs — in one place.</p>
+            </div>
+            <div className="m-svc-grid">
+              {[
+                { emoji: "🎬", name: "AI Video Generator",   desc: "Script to viral video",          route: "/dashboard",      accent: "#7c5cfc", image: "/assets/images/services/AIVideoGenerator.png"   },
+                { emoji: "📦", name: "Product Video Ads",    desc: "One photo → cinematic ad",       route: "/product-video",    accent: "#f97316", image: "/assets/images/services/ProductVideoAds.png"    },
+                { emoji: "👗", name: "Virtual Try-On",       desc: "AI model, your product",         route: "/virtual-tryon",  accent: "#ec4899", image: "/assets/images/services/VirtualTryOn.png"       },
+                { emoji: "🎨", name: "Banner Design",        desc: "Social banners in seconds",      route: "/banner-design",  accent: "#f5c518", image: "/assets/images/services/BannerDesign.png"       },
+                { emoji: "🖼️", name: "Thumbnails",          desc: "Click-worthy AI thumbnails",     route: "/thumbnail",      accent: "#ef4444", image: "/assets/images/services/ThumbnailGenerator.png" },
+                { emoji: "🎨", name: "Poster Studio",        desc: "Luxury product posters",         route: "/product-poster", accent: "#d946ef", image: "/assets/images/services/PosterStudio.png"       },
+                { emoji: "💬", name: "Caption Studio",       desc: "Auto-captions with style",       route: "/video-captions", accent: "#22c55e", image: "/assets/images/services/CaptionStudio.png"      },
+                { emoji: "🎙️", name: "Voice Studio",        desc: "AI voiceovers, multilingual",    route: "/voiceover",      accent: "#3b82f6", image: "/assets/images/services/VoiceStudio.png"        },
+                { emoji: "🔤", name: "Speech to Text",       desc: "Accurate transcription",         route: "/speech-to-text", accent: "#8b5cf6", image: "/assets/images/services/SpeechtoText.png"       },
+              ].map(svc => (
+                <div key={svc.name} className="m-svc-card"
+                  style={{ background: svc.image ? `url(${svc.image}) center/cover no-repeat` : "#13131e", borderColor: svc.accent + "33" }}
+                  onClick={() => handleCardClick(svc.route)}
+                >
+                  {svc.image && <div className="m-svc-card-overlay" />}
+                  <div className="m-svc-card-name" style={{ color: "#e8e8f0" }}>{svc.name}</div>
+                  <div className="m-svc-card-desc">{svc.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -1182,6 +1272,8 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }
