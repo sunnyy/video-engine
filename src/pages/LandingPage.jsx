@@ -675,9 +675,6 @@ export default function LandingPage() {
             <a href="/about" className="nav-link">
               About Us
             </a>
-            <a href="#samples" className="nav-link">
-              Samples
-            </a>
             <a href="#services" className="nav-link">
               Services
             </a>
@@ -687,11 +684,6 @@ export default function LandingPage() {
             <a href="#pricing" className="nav-link">
               Pricing
             </a>
-            {!session && (
-              <button className="nav-link" onClick={() => setAuthOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                Log in
-              </button>
-            )}
             <button className="btn-yellow" onClick={handleCTA}>
               {session ? "Go to Dashboard" : "Get Started"}
             </button>

@@ -15,7 +15,7 @@ import { planTypographyVideo, produceTypographyVideo } from "../services/ai/typo
 import { generateCaptions } from "../services/captions/generateCaptions";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 import { captionStylePresets, captionStyleLabels } from "../core/registries/captionTimelineRegistry.jsx";
-import { VoiceLanguageField, DurationField, StyleField, OrientationField, SelectField, ReviewToggleField } from "../ui/fields/index.js";
+import { VoiceLanguageField, DurationField, StyleField, OrientationField, SelectField, ReviewToggleField, ThemeField, AccentField } from "../ui/fields/index.js";
 import { SERVICE_FIELDS } from "../config/serviceFields.js";
 import { creditsForDuration } from "../core/utils/creditCosts.js";
 import { getReviewScriptFirst, setReviewScriptFirst } from "../core/utils/reviewScriptPref.js";
@@ -711,6 +711,8 @@ function TypographyChatbox({ onBusy }) {
   const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
   const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [theme,       setTheme]       = useState("auto");
+  const [accentColor, setAccentColor] = useState(null);
   const [plan,        setPlan]        = useState(null);
   const [planning,    setPlanning]    = useState(false);
   const [loading,     setLoading]     = useState(false);
@@ -730,7 +732,7 @@ function TypographyChatbox({ onBusy }) {
     if (!canGo) return;
     setPlanning(true); setError(null);
     try {
-      const p = await planTypographyVideo({ input: input.trim(), inputType, targetDuration: duration, language, styleId });
+      const p = await planTypographyVideo({ input: input.trim(), inputType, targetDuration: duration, language, styleId, theme, accentColor });
       if (reviewFirst) setPlan(p);
       else await produce(p, p.scenes);
     } catch (err) {
@@ -784,6 +786,8 @@ function TypographyChatbox({ onBusy }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={TC} />
+            <ThemeField value={theme} onChange={setTheme} accent={TC} />
+            <AccentField value={accentColor} onChange={setAccentColor} accent={TC} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={TC} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={TC} />
             <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={TC} />

@@ -4,7 +4,22 @@ import { useTimelineStore } from "../../store/useTimelineStore";
 import { interpolateKeyframes, resolveTransform, stepKeyframe } from "./keyframeUtils";
 import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../../core/registries/sfxRegistry";
 import { captionTimelineRegistry } from "../../core/registries/captionTimelineRegistry";
-import { shapeRegistry, renderDecorativeSVG } from "../../core/registries/shapeRegistry";
+import { shapeRegistry, renderDecorativeSVG, getClipPathCSS } from "../../core/registries/shapeRegistry";
+import assetShineRegistry from "../../core/registries/assetShineRegistry";
+
+// Piecewise-linear interpolate matching Remotion's interpolate() signature, so the shine
+// overlays render in the editor preview the same way they do in the Remotion export.
+function lerpInterpolate(frame, input, output) {
+  if (frame <= input[0]) return output[0];
+  if (frame >= input[input.length - 1]) return output[output.length - 1];
+  for (let i = 0; i < input.length - 1; i++) {
+    if (frame >= input[i] && frame <= input[i + 1]) {
+      const t = (frame - input[i]) / ((input[i + 1] - input[i]) || 1);
+      return output[i] + t * (output[i + 1] - output[i]);
+    }
+  }
+  return output[output.length - 1];
+}
 import { decorativeById } from "../../core/registries/decorativeRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
 import * as LucideIcons from "lucide-react";
@@ -163,6 +178,8 @@ function VideoLayerEl({ layer, currentTime, isPlaying }) {
   const ref = useRef(null);
   const playing = useRef(false);
   const rate = layer.playbackRate || 1;
+  const previewVolume = useTimelineStore((s) => s.previewVolume);
+  const previewMuted  = useTimelineStore((s) => s.previewMuted);
   const sourceTime = (layer.trimStart ?? 0) + (currentTime - layer.start) * rate;
 
   // Apply playbackRate whenever it changes
@@ -173,13 +190,13 @@ function VideoLayerEl({ layer, currentTime, isPlaying }) {
 
   useEffect(() => {
     const el = ref.current;
-    if (el) el.volume = Math.max(0, Math.min(1, layer.volume ?? 1));
-  }, [layer.volume]);
+    if (el) el.volume = Math.max(0, Math.min(1, (layer.volume ?? 1) * previewVolume));
+  }, [layer.volume, previewVolume]);
 
   useEffect(() => {
     const el = ref.current;
-    if (el) el.muted = layer.muted ?? false;
-  }, [layer.muted]);
+    if (el) el.muted = (layer.muted ?? false) || previewMuted;
+  }, [layer.muted, previewMuted]);
 
   // Play/pause toggle
   useEffect(() => {
@@ -218,7 +235,7 @@ function VideoLayerEl({ layer, currentTime, isPlaying }) {
       ref={ref}
       src={layer.src}
       style={{ width: "100%", height: "100%", objectFit: resolvedObjectFit(layer, currentTime), borderRadius: "inherit", pointerEvents: "none" }}
-      muted={layer.muted ?? false}
+      muted={(layer.muted ?? false) || previewMuted}
       loop={false}
       preload="auto"
       playsInline
@@ -230,14 +247,17 @@ function SfxLayerEl({ layer, currentTime, isPlaying }) {
   const audioRef = useRef(null);
   const timeoutRef = useRef(null);
   const sfx = layer.sfx;
+  const previewVolume = useTimelineStore((s) => s.previewVolume);
+  const previewMuted  = useTimelineStore((s) => s.previewMuted);
   const triggerTime = layer.start + (sfx?.delay ?? 0);
   const sfxDur = sfx?.key ? getSFXDuration(sfx.key) : 0;
 
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !sfx?.key) return;
-    el.volume = Math.max(0, Math.min(1, sfx.volume ?? 1));
-  }, [sfx?.volume, sfx?.key]);
+    el.volume = Math.max(0, Math.min(1, (sfx.volume ?? 1) * previewVolume));
+    el.muted = previewMuted;
+  }, [sfx?.volume, sfx?.key, previewVolume, previewMuted]);
 
   useEffect(() => {
     const el = audioRef.current;
@@ -263,8 +283,12 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
   const playbackSpeed = useTimelineStore((s) => s.playbackSpeed);
   const sourceTime = (layer.trimStart ?? 0) + (currentTime - layer.start);
 
+  const previewVolume = useTimelineStore((s) => s.previewVolume);
+  const previewMuted  = useTimelineStore((s) => s.previewMuted);
+
   function startAudio(el) {
-    el.volume = Math.max(0, Math.min(1, layer.volume ?? 1));
+    el.volume = Math.max(0, Math.min(1, (layer.volume ?? 1) * useTimelineStore.getState().previewVolume));
+    el.muted = useTimelineStore.getState().previewMuted;
     el.play().catch(() => {});
     playing.current = true;
   }
@@ -300,14 +324,14 @@ function AudioLayerEl({ layer, currentTime, isPlaying }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.volume = Math.max(0, Math.min(1, layer.volume ?? 1));
-  }, [layer.volume]);
+    el.volume = Math.max(0, Math.min(1, (layer.volume ?? 1) * previewVolume));
+  }, [layer.volume, previewVolume]);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.muted = layer.muted ?? false;
-  }, [layer.muted]);
+    el.muted = (layer.muted ?? false) || previewMuted;
+  }, [layer.muted, previewMuted]);
 
   useEffect(() => {
     const el = ref.current;
@@ -1225,6 +1249,17 @@ function LayerElement({
     }
   }
 
+  // One-shot shine/flash overlay (plays once at the layer's start). Driven by the
+  // playhead so the preview matches the Remotion export.
+  let shineOverlay = null;
+  if (layer.shineEffect && assetShineRegistry[layer.shineEffect]) {
+    const fps   = useTimelineStore.getState().project?.format?.fps || 30;
+    const entry = assetShineRegistry[layer.shineEffect];
+    const f     = Math.round((currentTime - layer.start) * fps);
+    const dur   = Math.max(1, Math.round(entry.durationFrames * (fps / 25)));
+    if (f >= 0) shineOverlay = entry.render(f, dur, lerpInterpolate);
+  }
+
   return (
     <>
       <div
@@ -1262,6 +1297,7 @@ function LayerElement({
             cursor: isEditing ? "text" : isDraggable ? (isDragging ? "grabbing" : "default") : "default",
             pointerEvents: isDraggable || isEditing ? "auto" : "none",
             borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
+            clipPath: layer.maskShape ? (getClipPathCSS(layer.maskShape) || undefined) : undefined,
             // Border lives under transform.* in the data; the top-level keys are usually
             // undefined. Read both (like borderRadius above) so outlined shapes — rings,
             // bordered cards, border-only dividers — actually draw their border.
@@ -1282,6 +1318,7 @@ function LayerElement({
           onMouseLeave={() => setIsHovered(false)}
         >
           {content}
+          {shineOverlay}
         </div>
       </div>
 

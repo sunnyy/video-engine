@@ -8,6 +8,7 @@ import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 import RefundClaimTrigger from "../ui/components/RefundClaimTrigger";
 import SizeSelector from "../ui/SizeSelector";
+import { useImageDrop } from "../ui/hooks/useImageDrop";
 
 async function downloadFile(url, filename) {
   const res  = await fetch(url);
@@ -155,11 +156,12 @@ export default function PosterStudio() {
     } catch (_) {}
   }
 
-  function handleFilePick(e) {
-    const file = e.target.files?.[0];
+  function selectFile(file) {
     if (!file) return;
     setImageFile(file); setPreviewUrl(URL.createObjectURL(file)); setImageUrl(""); setUploadErr(""); setShowUrl(false);
   }
+  function handleFilePick(e) { selectFile(e.target.files?.[0]); }
+  const { drag, dropProps } = useImageDrop(selectFile);
 
   function handleUrlPaste(e) {
     const url = e.target.value;
@@ -245,8 +247,8 @@ export default function PosterStudio() {
             <div>
               <label style={C.lbl}>Product Image</label>
               <div
-                onClick={() => !previewUrl && fileInputRef.current?.click()}
-                style={{ background: "#333345", border: previewUrl ? "1px solid rgba(255,255,255,0.12)" : "2px dashed rgba(255,255,255,0.15)", borderRadius: 12, overflow: "hidden", cursor: previewUrl ? "default" : "pointer" }}
+                onClick={() => !previewUrl && fileInputRef.current?.click()} {...dropProps}
+                style={{ background: "#333345", border: previewUrl ? "1px solid rgba(255,255,255,0.12)" : `2px dashed ${drag ? "#7c5cfc" : "rgba(255,255,255,0.15)"}`, borderRadius: 12, overflow: "hidden", cursor: previewUrl ? "default" : "pointer", transition: "border-color 0.15s" }}
               >
                 {previewUrl ? (
                   <>
@@ -260,7 +262,7 @@ export default function PosterStudio() {
                 ) : (
                   <div style={{ padding: "36px 16px", textAlign: "center" }}>
                     <div style={{ fontSize: 26, marginBottom: 8 }}>📷</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#b0b0d0", marginBottom: 4 }}>Click to upload product image</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#b0b0d0", marginBottom: 4 }}>Click or drop product image</div>
                     <div style={{ fontSize: 11, color: "#7878a8", marginBottom: 10 }}>JPG, PNG, WEBP</div>
                     <button onClick={e => { e.stopPropagation(); setShowUrl(v => !v); }} style={{ ...C.btnG, fontSize: 11, padding: "5px 14px" }}>🔗 Paste URL</button>
                   </div>
@@ -327,9 +329,8 @@ export default function PosterStudio() {
               </div>
             )}
             <button onClick={handleGenerateClick} disabled={!canGen} style={{ ...C.btnY, opacity: canGen ? 1 : 0.45 }}>
-              {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Generate Poster"}
+              {generating ? "Generating…" : uploading ? "Uploading…" : `✦ Generate · ${SERVICE_COSTS.poster.total} credits`}
             </button>
-            <div style={{ textAlign: "center", fontSize: 11, color: "#7070a0", marginTop: 6 }}>~10 credits</div>
           </div>
         </div>
 

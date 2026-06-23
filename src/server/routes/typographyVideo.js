@@ -49,10 +49,10 @@ router.post("/generate", requireAuth, async (req, res) => {
 
 // ── Phase 1: PLAN (free) — script, returned for confirmation/editing ──
 router.post("/plan", requireAuth, async (req, res) => {
-  const { input, inputType = "topic", targetDuration = 40, language = "en", styleId = "auto" } = req.body;
+  const { input, inputType = "topic", targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null } = req.body;
   if (!input?.trim()) return res.status(400).json({ error: "input is required" });
   try {
-    const plan = await planTypography({ input: input.trim(), inputType, targetDuration, language, styleId });
+    const plan = await planTypography({ input: input.trim(), inputType, targetDuration, language, styleId, theme, accentColor });
     res.json({ plan });
   } catch (err) {
     if (err.code === "CONTENT_BLOCKED") return res.status(422).json({ error: err.message, code: err.code });

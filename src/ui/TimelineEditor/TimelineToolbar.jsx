@@ -33,12 +33,16 @@ export default function TimelineToolbar() {
   const snapEnabled      = useTimelineStore((s) => s.snapEnabled);
   const zoom             = useTimelineStore((s) => s.zoom);
   const playbackSpeed    = useTimelineStore((s) => s.playbackSpeed);
+  const previewVolume    = useTimelineStore((s) => s.previewVolume);
+  const previewMuted     = useTimelineStore((s) => s.previewMuted);
 
   const setIsPlaying         = useTimelineStore((s) => s.setIsPlaying);
   const setCurrentTime       = useTimelineStore((s) => s.setCurrentTime);
   const setZoom              = useTimelineStore((s) => s.setZoom);
   const setSnapEnabled       = useTimelineStore((s) => s.setSnapEnabled);
   const setPlaybackSpeed     = useTimelineStore((s) => s.setPlaybackSpeed);
+  const setPreviewVolume     = useTimelineStore((s) => s.setPreviewVolume);
+  const setPreviewMuted      = useTimelineStore((s) => s.setPreviewMuted);
 
   const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
   const cycleSpeed = () => {
@@ -159,6 +163,42 @@ export default function TimelineToolbar() {
         <span style={{ color: "#44445a", margin: "0 4px" }}>/</span>
         {formatTime(duration)}
       </div>
+
+      <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.09)", margin: "0 4px" }} />
+
+      {/* Preview volume — affects the editor playback only, not the export */}
+      <button
+        style={iconBtn(previewMuted)}
+        onClick={() => setPreviewMuted(!previewMuted)}
+        title={previewMuted ? "Unmute preview" : "Mute preview"}
+      >
+        {previewMuted || previewVolume <= 0 ? (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+          </svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            {previewVolume > 0.5 && <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>}
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>
+        )}
+      </button>
+      <style>{`
+        .vq-vol { -webkit-appearance: none; appearance: none; width: 72px; height: 12px; background: transparent; margin: 0 2px; cursor: pointer; }
+        .vq-vol::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.18); }
+        .vq-vol::-moz-range-track { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.18); }
+        .vq-vol::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 11px; height: 11px; margin-top: -4px; border-radius: 50%; background: #a080ff; cursor: pointer; }
+        .vq-vol::-moz-range-thumb { width: 11px; height: 11px; border: none; border-radius: 50%; background: #a080ff; cursor: pointer; }
+      `}</style>
+      <input
+        type="range" min={0} max={1} step={0.01}
+        value={previewMuted ? 0 : previewVolume}
+        onChange={(e) => setPreviewVolume(parseFloat(e.target.value))}
+        title="Preview volume"
+        className="vq-vol"
+      />
 
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.09)", margin: "0 4px" }} />
 

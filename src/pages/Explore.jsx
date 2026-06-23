@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
 
 /**
@@ -30,18 +30,17 @@ const SECTIONS = [
 ];
 
 function ToolCard({ item }) {
-  const navigate = useNavigate();
   const [hov, setHov] = useState(false);
   const glow = item.accent + "18";
   return (
-    <div
-      onClick={() => navigate(item.to)}
+    <Link
+      to={item.to}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
         background: hov ? `linear-gradient(140deg, ${glow}, ${T.surface} 60%)` : T.surface,
         border: `1px solid ${hov ? item.accent + "55" : T.border}`, borderRadius: 14, padding: "16px 18px",
         cursor: "pointer", transition: "all 0.18s", transform: hov ? "translateY(-2px)" : "none",
-        display: "flex", flexDirection: "column", gap: 10,
+        display: "flex", flexDirection: "column", gap: 10, textDecoration: "none",
       }}
     >
       <span style={{ fontSize: 26, lineHeight: 1 }}>{item.emoji}</span>
@@ -50,7 +49,7 @@ function ToolCard({ item }) {
         <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.5 }}>{item.desc}</div>
       </div>
       <div style={{ fontSize: 12, fontWeight: 600, color: item.accent, opacity: hov ? 1 : 0.5, transition: "opacity 0.18s" }}>Open →</div>
-    </div>
+    </Link>
   );
 }
 

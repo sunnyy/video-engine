@@ -148,10 +148,14 @@ export async function generateSocialScript({ content, targetDuration = 25, langu
   const langDirective     = LANGUAGE_DIRECTIVES[language] ?? "";
   const platformDirective = PLATFORM_TONE_DIRECTIVES[content.platform] ?? "";
 
+  // Final video length = spoken length, so anchor the narration to the target by word count
+  // (~2.3 words/sec) rather than letting it run long. The model decides scene count itself.
+  const wordBudget = Math.round(targetDuration * 2.3);
+
   const userText = `Post text:
 "${postText}"
 ${imageNote}
-Target duration: ~${targetDuration} seconds${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}`;
+Write a ~${targetDuration}-second narration — roughly ${wordBudget} words total across all scenes (the spoken length is the video length, so stay close to that).${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}`;
 
   const messages = [{ role: "system", content: SCRIPT_SYSTEM }];
 

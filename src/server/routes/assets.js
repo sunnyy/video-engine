@@ -781,6 +781,93 @@ router.get("/image-generation/library", requireAuth, async (req, res) => {
   }
 });
 
+/* ── My Generations: aggregate the user's outputs across every service so they can be
+   re-used inside the editor by reference (no download/re-upload). Each source is best-effort:
+   a missing table never breaks the whole response. Returns a flat, newest-first list. ── */
+router.get("/assets/my-generations", requireAuth, async (req, res) => {
+  const uid = req.user.id;
+  const want = req.query.type || null; // "image" | "audio" | null (all)
+  const out = [];
+  const pub = (key) => supabaseAdmin.storage.from("user-assets").getPublicUrl(key).data.publicUrl;
+  const clip = (s, n = 40) => (s ? (s.length > n ? s.slice(0, n) + "…" : s) : "");
+
+  // Table sources: [table, urlCol, type, source, nameCol]
+  const tableSources = [
+    ["generated_images", "url",        "image", "AI Image",  "prompt"],
+    ["social_posts",     "post_url",   "image", "Banner",    "headline"],
+    ["outfit_tryons",    "result_url", "image", "Try-On",    null],
+    ["tts_generations",  "audio_url",  "audio", "Voiceover", "text"],
+  ];
+  await Promise.all(tableSources.map(async ([table, urlCol, type, source, nameCol]) => {
+    if (want && want !== type) return;
+    try {
+      const { data } = await supabaseAdmin.from(table).select("*").eq("user_id", uid)
+        .order("created_at", { ascending: false }).limit(60);
+      for (const r of data || []) {
+        if (!r[urlCol]) continue;
+        out.push({ id: `${table}:${r.id}`, url: r[urlCol], type, source,
+          name: clip(nameCol ? r[nameCol] : "") || `${source}`, created_at: r.created_at });
+      }
+    } catch { /* table may not exist — skip */ }
+  }));
+
+  // Storage-folder sources (posters, thumbnails): listed straight from the bucket.
+  const folderSources = [["posters", "Poster", "poster-"], ["thumbnails", "Thumbnail", ""]];
+  if (!want || want === "image") {
+    await Promise.all(folderSources.map(async ([folder, source, prefix]) => {
+      try {
+        const { data } = await supabaseAdmin.storage.from("user-assets")
+          .list(`${folder}/${uid}`, { limit: 60, sortBy: { column: "created_at", order: "desc" } });
+        for (const f of data || []) {
+          if (!f.name || (prefix && !f.name.startsWith(prefix))) continue;
+          const key = `${folder}/${uid}/${f.name}`;
+          out.push({ id: key, url: pub(key), type: "image", source, name: f.name, created_at: f.created_at });
+        }
+      } catch { /* skip */ }
+    }));
+  }
+
+  out.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  res.json({ generations: out });
+});
+
+/* ── Soft-delete a user_asset from the library WITHOUT removing the storage file, so any
+   project that already embeds its URL keeps rendering. Reports usage first. ── */
+router.get("/assets/:id/usage", requireAuth, async (req, res) => {
+  try {
+    const { data: asset } = await supabaseAdmin.from("user_assets").select("id, url, user_id").eq("id", req.params.id).single();
+    if (!asset || asset.user_id !== req.user.id) return res.status(404).json({ error: "Not found" });
+    // Count projects whose JSON references this asset's URL.
+    const { data: projects } = await supabaseAdmin.from("projects").select("id, safe_project_json").eq("user_id", req.user.id);
+    const used = (projects || []).filter((p) => {
+      try { return JSON.stringify(p.safe_project_json || "").includes(asset.url); } catch { return false; }
+    }).length;
+    res.json({ usage: used, url: asset.url });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete("/assets/:id", requireAuth, async (req, res) => {
+  try {
+    const hard = req.query.hard === "1";
+    const { data: asset } = await supabaseAdmin.from("user_assets").select("*").eq("id", req.params.id).single();
+    if (!asset || asset.user_id !== req.user.id) return res.status(404).json({ error: "Not found" });
+
+    if (hard) {
+      // Only allowed when unused — guard against breaking existing projects.
+      const { data: projects } = await supabaseAdmin.from("projects").select("safe_project_json").eq("user_id", req.user.id);
+      const used = (projects || []).some((p) => { try { return JSON.stringify(p.safe_project_json || "").includes(asset.url); } catch { return false; } });
+      if (used) return res.status(409).json({ error: "Asset is used in one or more projects", code: "IN_USE" });
+      try {
+        const match = asset.file_path || asset.url?.match(/\/user-assets\/(.+)$/)?.[1];
+        if (match) await supabaseAdmin.storage.from("user-assets").remove([decodeURIComponent(match)]);
+      } catch { /* ignore storage errors */ }
+    }
+    // Soft delete (and hard) both remove the library row; hard also removed the file above.
+    await supabaseAdmin.from("user_assets").delete().eq("id", req.params.id);
+    res.json({ ok: true, hard });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 /* ── AI Image Library: save a generated image (service role bypasses RLS) ── */
 router.post("/ai-image-library/save", requireAuth, async (req, res) => {
   try {

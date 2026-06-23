@@ -9,3 +9,4 @@ export { StyleField, VISUAL_STYLES }           from "./style.jsx";
 export { OrientationField, ORIENTATIONS }      from "./orientation.jsx";
 export { SelectField }                         from "./select.jsx";
 export { ReviewToggleField }                   from "./reviewToggle.jsx";
+export { ThemeField, AccentField }             from "./themeField.jsx";

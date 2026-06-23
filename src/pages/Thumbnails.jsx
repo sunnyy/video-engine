@@ -7,6 +7,7 @@ import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 import SizeSelector from "../ui/SizeSelector";
+import { useImageDrop } from "../ui/hooks/useImageDrop";
 
 const PAGE_SIZE = 12;
 
@@ -147,8 +148,7 @@ export default function Thumbnails() {
       .finally(() => setLoading(false));
   }
 
-  function handleFilePick(e) {
-    const file = e.target.files?.[0];
+  function selectFile(file) {
     if (!file) return;
     setImageFile(file);
     setPreviewUrl(URL.createObjectURL(file));
@@ -156,6 +156,8 @@ export default function Thumbnails() {
     setUploadErr("");
     setShowUrl(false);
   }
+  function handleFilePick(e) { selectFile(e.target.files?.[0]); }
+  const { drag, dropProps } = useImageDrop(selectFile);
 
   function handleUrlPaste(e) {
     const url = e.target.value;
@@ -258,8 +260,8 @@ export default function Thumbnails() {
             <div>
               <label style={C.lbl}>Upload Assets <span style={{ color: "#7070a0", fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span></label>
               <div
-                onClick={() => !previewUrl && fileInputRef.current?.click()}
-                style={{ background: "#333345", border: previewUrl ? "1px solid rgba(255,255,255,0.12)" : "2px dashed rgba(255,255,255,0.15)", borderRadius: 12, overflow: "hidden", cursor: previewUrl ? "default" : "pointer" }}
+                onClick={() => !previewUrl && fileInputRef.current?.click()} {...dropProps}
+                style={{ background: "#333345", border: previewUrl ? "1px solid rgba(255,255,255,0.12)" : `2px dashed ${drag ? "#7c5cfc" : "rgba(255,255,255,0.15)"}`, borderRadius: 12, overflow: "hidden", cursor: previewUrl ? "default" : "pointer", transition: "border-color 0.15s" }}
               >
                 {previewUrl ? (
                   <>
@@ -273,7 +275,7 @@ export default function Thumbnails() {
                 ) : (
                   <div style={{ padding: "32px 20px", textAlign: "center" }}>
                     <div style={{ fontSize: 26, marginBottom: 8 }}>📷</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#b0b0d0", marginBottom: 4 }}>Click to upload an image</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#b0b0d0", marginBottom: 4 }}>Click or drop an image</div>
                     <div style={{ fontSize: 11, color: "#7878a8", marginBottom: 8 }}>JPG, PNG, WEBP</div>
                     <div style={{ fontSize: 11, color: "#6868a0", fontStyle: "italic", marginBottom: 10 }}>Leave empty for fully AI-generated</div>
                     <button onClick={e => { e.stopPropagation(); setShowUrl(v => !v); }} style={{ ...C.btnG, fontSize: 11, padding: "5px 14px" }}>🔗 Paste URL instead</button>
@@ -371,9 +373,8 @@ export default function Thumbnails() {
               </div>
             )}
             <button onClick={handleGenerateClick} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.45 }}>
-              {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Generate Thumbnail"}
+              {generating ? "Generating…" : uploading ? "Uploading…" : `✦ Generate · ${SERVICE_COSTS.thumbnail.total} credits`}
             </button>
-            <div style={{ textAlign: "center", fontSize: 11, color: "#7070a0", marginTop: 6 }}>~5 credits</div>
           </div>
         </div>
 

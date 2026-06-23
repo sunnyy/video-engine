@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTimelineStore } from "../../../store/useTimelineStore";
 import { useAssetsStore } from "../../../store/useAssetsStore";
 import { uploadUserAsset } from "../../../services/assets/uploadUserAsset";
+import { serverFetch } from "../../../services/serverApi";
 import { showToast } from "../../Toast";
 import EditorModal from "./EditorModal";
 import { pickFile, getFileDuration, makeLayerAt } from "./helpers";
@@ -16,10 +17,26 @@ export default function AudioModal({ onClose }) {
 
   const { myAssets, loadMyAssets } = useAssetsStore();
   const [uploading, setUploading] = useState(false);
+  const [source, setSource]   = useState("uploads"); // "uploads" | "generations"
+  const [gens, setGens]       = useState(null);
+  const [gensLoading, setGensLoading] = useState(false);
 
   useEffect(() => { if (projectId) loadMyAssets(projectId); }, [projectId]);
 
-  const audioAssets = myAssets.filter((a) => a.type === "audio");
+  // Lazy-load voiceover/TTS generations the first time the tab opens.
+  useEffect(() => {
+    if (source !== "generations" || gens !== null) return;
+    setGensLoading(true);
+    serverFetch("/api/assets/my-generations?type=audio")
+      .then((r) => r.json())
+      .then((d) => setGens(d.generations || []))
+      .catch(() => setGens([]))
+      .finally(() => setGensLoading(false));
+  }, [source, gens]);
+
+  const audioAssets = source === "generations"
+    ? (gens || [])
+    : myAssets.filter((a) => a.type === "audio");
 
   const handleUpload = async () => {
     const file = await pickFile("audio/*");
@@ -62,22 +79,38 @@ export default function AudioModal({ onClose }) {
 
   return (
     <EditorModal title="Audio" onClose={onClose} width={500}>
-      <button
-        onClick={handleUpload}
-        disabled={uploading}
-        style={{
-          width: "100%", marginBottom: 14,
-          background: "rgba(124,92,252,0.18)", border: "1px solid rgba(124,92,252,0.4)",
-          borderRadius: 7, color: "#c8aaff", fontSize: 13, fontWeight: 600,
-          cursor: "pointer", padding: "10px 0", opacity: uploading ? 0.6 : 1,
-        }}
-      >
-        {uploading ? "Uploading…" : "+ Upload Audio"}
-      </button>
+      {/* Source: uploads vs voiceovers generated across services */}
+      <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
+        {[["uploads", "Uploads"], ["generations", "My Generations"]].map(([s, lbl]) => (
+          <button key={s} onClick={() => setSource(s)} style={{
+            padding: "6px 14px", fontSize: 12, cursor: "pointer", borderRadius: 5,
+            background: source === s ? "rgba(124,92,252,0.22)" : "rgba(255,255,255,0.05)",
+            border: source === s ? "1px solid rgba(124,92,252,0.5)" : "1px solid rgba(255,255,255,0.08)",
+            color: source === s ? "#c8aaff" : "#8888a8", fontWeight: source === s ? 600 : 400,
+          }}>{lbl}</button>
+        ))}
+      </div>
 
-      {audioAssets.length === 0 ? (
+      {source === "uploads" && (
+        <button
+          onClick={handleUpload}
+          disabled={uploading}
+          style={{
+            width: "100%", marginBottom: 14,
+            background: "rgba(124,92,252,0.18)", border: "1px solid rgba(124,92,252,0.4)",
+            borderRadius: 7, color: "#c8aaff", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", padding: "10px 0", opacity: uploading ? 0.6 : 1,
+          }}
+        >
+          {uploading ? "Uploading…" : "+ Upload Audio"}
+        </button>
+      )}
+
+      {gensLoading && source === "generations" ? (
+        <div style={{ color: "#44445a", fontSize: 13, textAlign: "center", padding: "30px 0" }}>Loading your voiceovers…</div>
+      ) : audioAssets.length === 0 ? (
         <div style={{ color: "#44445a", fontSize: 13, textAlign: "center", padding: "30px 0" }}>
-          No audio uploaded yet
+          {source === "generations" ? "No voiceovers generated yet" : "No audio uploaded yet"}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

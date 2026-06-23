@@ -1,5 +1,6 @@
 import { openai } from "../../../server/middleware/shared.js";
 import { getStyle } from "../shared/visualStyles.js";
+import { resolveThemePalette, themeDirective } from "../shared/themeRegistry.js";
 
 const SCRIPT_SYSTEM = `You are a kinetic typography creative director for fast-paced, punchy short-form videos.
 
@@ -138,8 +139,10 @@ const LANG_DIRECTIVES = {
   es:       "\nLANGUAGE: Write ALL voiceover and beat text in Spanish.",
 };
 
-export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en", styleId = "auto") {
-  const approxScenes  = Math.max(3, Math.round(targetDuration / 2));
+export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null) {
+  // Final length = spoken length. Measured ≈2.3 words/sec (TTS 1.1x + scene pacing), so the
+  // duration target is expressed as a word budget — the model decides scene/sentence count itself.
+  const wordBudget    = Math.round(targetDuration * 2.3);
   const langDirective = LANG_DIRECTIVES[language] ?? "";
 
   // Visual style is a soft leaning on the PALETTE + ENERGY (fonts stay clean/kinetic
@@ -150,11 +153,13 @@ export async function generateTypographyScript(input, inputType, targetDuration 
 - Pacing / energy: ${s.motion.energy}.
 Lean the palette and energy toward this style, while keeping the clean kinetic-typography font rules above.` : "";
 
+  // Theme is a HARD constraint (light/medium/dark + accent) — reinforced in the prompt and,
+  // crucially, enforced deterministically on the parsed palette below so the LLM can't drift dark.
+  const themeBlock = themeDirective(theme, accentColor);
+
   const userMsg = inputType === "script"
     ? `Convert this into kinetic typography scenes with voiceover + beats per scene.${langDirective}\n\nScript: "${input.trim()}"`
-    : `Target duration: ~${targetDuration}s (~${approxScenes} voiceover sentences, each with 2-5 beats).
-Read the topic and match its tone (question/motivational/educational).
-Write flowing narration voiceovers and dramatic visual beats per scene.${langDirective}
+    : `Write a ~${targetDuration}-second short-form narration for this topic — roughly ${wordBudget} words total (the spoken length is the video length, so stay close to that). Match the topic's tone, then break the narration into short on-screen beats.${langDirective}
 
 Topic: "${input.trim()}"`;
 
@@ -163,14 +168,24 @@ Topic: "${input.trim()}"`;
     max_completion_tokens: 3000,
     response_format:       { type: "json_object" },
     messages: [
-      { role: "system", content: SCRIPT_SYSTEM + styleBlock },
+      { role: "system", content: SCRIPT_SYSTEM + styleBlock + themeBlock },
       { role: "user",   content: userMsg },
     ],
   });
 
   const out = JSON.parse(completion.choices[0].message.content);
 
-  const palette = {
+  // Deterministic theme enforcement: when a theme is chosen, the field + text come from the
+  // theme (the LLM can't drift back to dark); the accent stays flexible unless the user pinned one.
+  const themePalette = resolveThemePalette(theme, accentColor);
+  const palette = themePalette ? {
+    background:          themePalette.background,
+    backgroundSecondary: themePalette.backgroundSecondary,
+    primaryText:         themePalette.primaryText,
+    secondaryText:       themePalette.secondaryText,
+    accent:              accentColor || out.palette?.accent    || themePalette.accent,
+    highlight:           accentColor || out.palette?.highlight || themePalette.highlight,
+  } : {
     background:          out.palette?.background          ?? "#0A0A0A",
     backgroundSecondary: out.palette?.backgroundSecondary ?? "#111111",
     primaryText:         out.palette?.primaryText         ?? "#ffffff",

@@ -9,11 +9,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSession } from "../services/auth/authService";
+import AuthModal from "./AuthModal";
 
 const NAV_H = 60;
 const LINKS = [
   ["About Us", "/about"],
-  ["Samples", "/#samples"],
   ["Services", "/#services"],
   ["How It Works", "/#how"],
   ["Pricing", "/#pricing"],
@@ -22,6 +22,7 @@ const LINKS = [
 export default function MarketingNav({ active }) {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
+  const [authOpen, setAuthOpen] = useState(false);
   useEffect(() => { getSession().then(setSession).catch(() => {}); }, []);
 
   const linkStyle = (href) => ({
@@ -49,7 +50,7 @@ export default function MarketingNav({ active }) {
                 {label}
               </a>
             ))}
-            <button onClick={() => navigate(session ? "/dashboard" : "/login")}
+            <button onClick={() => (session ? navigate("/dashboard") : setAuthOpen(true))}
               style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#0F0E1A", background: "#f5c518", border: "none", borderRadius: 7, padding: "9px 18px", cursor: "pointer", marginLeft: 4 }}>
               {session ? "Go to Dashboard" : "Start Free"}
             </button>
@@ -57,6 +58,7 @@ export default function MarketingNav({ active }) {
         </div>
       </nav>
       <div style={{ height: NAV_H }} aria-hidden="true" />
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </>
   );
 }

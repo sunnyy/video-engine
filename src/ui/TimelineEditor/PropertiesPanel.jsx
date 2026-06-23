@@ -4,6 +4,8 @@ import { interpolateKeyframes, resolveTransform } from "./keyframeUtils";
 import { loadSFXLibrary, getSFXPreviewUrl } from "../../core/registries/sfxRegistry";
 import { captionStylePresets, captionStyleLabels, captionStyleAccents } from "../../core/registries/captionTimelineRegistry";
 import { cinematicById } from "../../core/registries/cinematicRegistry";
+import { MASK_SHAPE_OPTIONS } from "../../core/registries/shapeRegistry";
+import { ASSET_SHINE_OPTIONS } from "../../core/registries/assetShineRegistry";
 import PresetsModal from "./modals/PresetsModal";
 import IconModal from "./modals/IconModal";
 import MediaModal from "./modals/MediaModal";
@@ -29,7 +31,7 @@ const labelStyle = {
   fontWeight: 600,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  marginBottom: 4,
+  marginBottom: 3,
   display: "block",
 };
 
@@ -49,7 +51,7 @@ const selectStyle = { ...inputStyle, cursor: "pointer" };
 
 function Field({ label, children }) {
   return (
-    <div style={{ marginBottom: 11 }}>
+    <div style={{ marginBottom: 9 }}>
       <span style={labelStyle}>{label}</span>
       {children}
     </div>
@@ -78,7 +80,7 @@ function NumberInput({ value, onChange, min, max, step = 1 }) {
 
 function Row2({ children }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
       {children}
     </div>
   );
@@ -86,7 +88,7 @@ function Row2({ children }) {
 
 function Section({ title, children }) {
   return (
-    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", paddingBottom: 14, marginBottom: 14 }}>
+    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", paddingBottom: 12, marginBottom: 12 }}>
       <div
         style={{
           fontSize: 11,
@@ -94,7 +96,7 @@ function Section({ title, children }) {
           color: "#7070a0",
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          marginBottom: 12,
+          marginBottom: 10,
         }}
       >
         {title}
@@ -1077,6 +1079,8 @@ function AppearanceSection({ layer, update, updateSilent, commit,
   showPadding = false,
   showBoxShadow = false,
   showBlendMode = false,
+  showMask = false,
+  showShine = false,
 }) {
   const shadow = layer.boxShadow ?? null;
   const hasBg  = !!layer.backgroundColor;
@@ -1084,6 +1088,34 @@ function AppearanceSection({ layer, update, updateSilent, commit,
   const snap = () => { pre.current = JSON.parse(JSON.stringify(useTimelineStore.getState().project)); };
   return (
     <Section title="Appearance">
+      {showMask && (
+        <Field label="Mask Shape">
+          <select
+            value={layer.maskShape ?? ""}
+            onChange={(e) => update({ maskShape: e.target.value || null })}
+            style={{ width: "100%", background: "#0d0d1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#e8e8f0", fontSize: 12, padding: "6px 8px", cursor: "pointer", outline: "none" }}
+          >
+            <option value="">None</option>
+            {MASK_SHAPE_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>{o.icon ? `${o.icon} ` : ""}{o.label}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {showShine && (
+        <Field label="Shine Effect">
+          <select
+            value={layer.shineEffect ?? ""}
+            onChange={(e) => update({ shineEffect: e.target.value || null })}
+            style={{ width: "100%", background: "#0d0d1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#e8e8f0", fontSize: 12, padding: "6px 8px", cursor: "pointer", outline: "none" }}
+          >
+            <option value="">None</option>
+            {ASSET_SHINE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+      )}
       {showBorderRadius && (
         <Field label="Border Radius">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1783,7 +1815,7 @@ export default function PropertiesPanel() {
           {layer.type !== "audio" && (
             <Section title="Transform">
               {/* Align */}
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 10 }}>
                 <span style={labelStyle}>Align</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {[
@@ -1847,7 +1879,7 @@ export default function PropertiesPanel() {
               </div>
 
               {/* Fill canvas */}
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 10 }}>
                 <button
                   title="Set layer to fill the full canvas (x=0, y=0, width=canvasW, height=canvasH)"
                   onClick={() => updateTransform({ x: 0, y: 0, width: canvasW, height: canvasH })}
@@ -1899,7 +1931,7 @@ export default function PropertiesPanel() {
           )}
           {(layer.type === "image" || layer.type === "video" || layer.type === "sticker") && (
             <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit}
-              showBorderRadius showBorder showBoxShadow showBlendMode />
+              showMask showShine showBorderRadius showBorder showBoxShadow showBlendMode />
           )}
           {layer.type === "gradient" && (
             <AppearanceSection layer={layer} update={update} updateSilent={updateSilent} commit={commit}

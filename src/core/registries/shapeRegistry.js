@@ -393,6 +393,12 @@ export function getClipPathCSS(shapeId) {
   return shapeRegistry[shapeId]?.clipPath || null;
 }
 
+// Mask picker options for the editor: only shapes with a usable CSS clip-path
+// (these apply identically in the browser preview and Remotion's Chromium render).
+export const MASK_SHAPE_OPTIONS = Object.entries(shapeRegistry)
+  .filter(([, entry]) => !!entry.clipPath)
+  .map(([id, entry]) => ({ id, label: entry.label, icon: entry.icon }));
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SVG content for complex masks (objectBoundingBox units, 0–1)
 // ─────────────────────────────────────────────────────────────────────────────

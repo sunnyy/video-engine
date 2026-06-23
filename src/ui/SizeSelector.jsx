@@ -28,7 +28,7 @@ export default function SizeSelector({
   onChange,
   options = ["1:1", "4:5", "9:16", "16:9"],
   accent = "#7c5cfc",
-  label = "Size",
+  label = "Orientation",
 }) {
   return (
     <div>

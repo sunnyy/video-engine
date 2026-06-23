@@ -187,7 +187,7 @@ export default function ImageGeneration() {
 
             {/* Aspect ratio */}
             <div>
-              <SizeSelector value={aspectRatio} onChange={setAspectRatio} options={["1:1", "4:5", "9:16", "16:9"]} accent="#f5c518" label="Aspect Ratio" />
+              <SizeSelector value={aspectRatio} onChange={setAspectRatio} options={["1:1", "4:5", "9:16", "16:9"]} accent="#f5c518" />
             </div>
 
             {/* Divider */}

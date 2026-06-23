@@ -7,6 +7,7 @@ import { SERVICE_COSTS } from "../core/utils/creditCosts";
 import CreditConfirmModal from "../ui/CreditConfirmModal";
 import AppLayout from "../ui/AppLayout";
 import SizeSelector from "../ui/SizeSelector";
+import { useImageDrop } from "../ui/hooks/useImageDrop";
 
 function timeLabel(dateStr) {
   const d    = new Date(dateStr);
@@ -220,11 +221,12 @@ export default function BannerDesign() {
 
   function ImageUploadBox({ label, file, preview, url, onFile, onUrl, onClear, inputRef, optional = true }) {
     const [showUrl, setShowUrl] = useState(false);
+    const { drag, dropProps } = useImageDrop(onFile);
     return (
       <div>
         <label style={C.lbl}>{label} {optional && <span style={{ color: "#7070a0", fontSize: 10, textTransform: "none", fontWeight: 500 }}>(optional)</span>}</label>
-        <div onClick={() => !preview && inputRef.current?.click()}
-          style={{ background: "#333345", border: preview ? "1px solid rgba(255,255,255,0.12)" : "2px dashed rgba(255,255,255,0.15)", borderRadius: 12, overflow: "hidden", cursor: preview ? "default" : "pointer" }}>
+        <div onClick={() => !preview && inputRef.current?.click()} {...dropProps}
+          style={{ background: "#333345", border: preview ? "1px solid rgba(255,255,255,0.12)" : `2px dashed ${drag ? "#7c5cfc" : "rgba(255,255,255,0.15)"}`, borderRadius: 12, overflow: "hidden", cursor: preview ? "default" : "pointer", transition: "border-color 0.15s" }}>
           {preview ? (
             <>
               <img src={preview} alt="" style={{ width: "100%", maxHeight: 140, objectFit: "contain", display: "block", background: "#22222e" }} />
@@ -237,7 +239,7 @@ export default function BannerDesign() {
           ) : (
             <div style={{ padding: "20px 16px", textAlign: "center" }}>
               <div style={{ fontSize: 22, marginBottom: 6 }}>📷</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#b0b0d0", marginBottom: 8 }}>Click to upload</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#b0b0d0", marginBottom: 8 }}>Click or drop image</div>
               <button onClick={e => { e.stopPropagation(); setShowUrl(v => !v); }} style={{ ...C.btnG, fontSize: 11, padding: "4px 12px" }}>🔗 Paste URL</button>
             </div>
           )}
@@ -341,9 +343,8 @@ export default function BannerDesign() {
               </div>
             )}
             <button onClick={handleGenerateClick} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.45 }}>
-              {generating ? "Generating…" : uploading ? "Uploading…" : "✦ Generate Banner"}
+              {generating ? "Generating…" : uploading ? "Uploading…" : `✦ Generate · ${SERVICE_COSTS.social_post.total} credits`}
             </button>
-            <div style={{ textAlign: "center", fontSize: 11, color: "#7070a0", marginTop: 6 }}>~15 credits</div>
           </div>
         </div>
 

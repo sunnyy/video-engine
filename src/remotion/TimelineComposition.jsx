@@ -1,5 +1,7 @@
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender, staticFile } from "remotion";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Sequence, delayRender, continueRender, staticFile, interpolate } from "remotion";
 import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../core/registries/sfxRegistry";
+import { getClipPathCSS } from "../core/registries/shapeRegistry";
+import assetShineRegistry from "../core/registries/assetShineRegistry";
 import { useMemo, useEffect } from "react";
 import * as LucideIcons from "lucide-react";
 
@@ -190,6 +192,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
     backdropFilter: layer.backdropFilter || undefined,
     mixBlendMode: layer.mixBlendMode || layer.blendMode || undefined,
     borderRadius: (layer.transform?.borderRadius ?? layer.borderRadius) ? `${layer.transform?.borderRadius ?? layer.borderRadius}px` : undefined,
+    clipPath: layer.maskShape ? (getClipPathCSS(layer.maskShape) || undefined) : undefined,
     border: (layer.borderWidth ?? layer.transform?.borderWidth)
       ? `${layer.borderWidth ?? layer.transform?.borderWidth}px solid ${layer.borderColor ?? layer.transform?.borderColor ?? "#ffffff"}`
       : undefined,
@@ -197,29 +200,45 @@ function TimelineLayer({ layer, currentTime, fps }) {
     zIndex: layer.zIndex,
   };
 
+  // One-shot shine/flash overlay — a sibling div mirroring the asset's box, so the media
+  // element is untouched. Frame is relative to the layer's start; the layer only renders
+  // within its time window (guard above), so f >= 0 here.
+  const shineEntry = layer.shineEffect ? assetShineRegistry[layer.shineEffect] : null;
+  const shineNode = shineEntry ? (
+    <div style={{ ...baseStyle, position: "absolute", overflow: "hidden" }}>
+      {shineEntry.render(frame - startFrame, Math.max(1, Math.round(shineEntry.durationFrames * (fps / 25))), interpolate)}
+    </div>
+  ) : null;
+
   if (layer.type === "video") {
     return (
-      <Sequence from={startFrame} durationInFrames={durationFrames}>
-        <Video
-          src={layer.src}
-          style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover" }}
-          startFrom={Math.round((layer.trimStart || 0) * fps)}
-          volume={layer.muted ? 0 : (layer.volume ?? 1)}
-          playbackRate={layer.playbackRate || 1}
-        />
-      </Sequence>
+      <>
+        <Sequence from={startFrame} durationInFrames={durationFrames}>
+          <Video
+            src={layer.src}
+            style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover" }}
+            startFrom={Math.round((layer.trimStart || 0) * fps)}
+            volume={layer.muted ? 0 : (layer.volume ?? 1)}
+            playbackRate={layer.playbackRate || 1}
+          />
+        </Sequence>
+        {shineNode}
+      </>
     );
   }
 
   if (layer.type === "image" || layer.type === "sticker") {
     if (!layer.src) return null;
     return (
-      <Sequence from={startFrame} durationInFrames={durationFrames}>
-        <Img
-          src={layer.src}
-          style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover", objectPosition: layer.objectPosition || undefined }}
-        />
-      </Sequence>
+      <>
+        <Sequence from={startFrame} durationInFrames={durationFrames}>
+          <Img
+            src={layer.src}
+            style={{ ...baseStyle, position: "absolute", objectFit: layer.objectFit || "cover", objectPosition: layer.objectPosition || undefined }}
+          />
+        </Sequence>
+        {shineNode}
+      </>
     );
   }
 

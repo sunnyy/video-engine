@@ -218,8 +218,8 @@ export default function App() {
             <Route path="*" element={<Navigate to="/dashboard" />} />
           </>
         ) : (
-          /* Unauthenticated → gate to login */
-          <Route path="*" element={<Navigate to="/login" />} />
+          /* Unauthenticated → homepage (login happens via the Get Started modal there) */
+          <Route path="*" element={<Navigate to="/" />} />
         )}
       </Routes>
     </BrowserRouter>

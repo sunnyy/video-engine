@@ -33,6 +33,8 @@ export const useTimelineStore = create((set, get) => ({
   zoom: 1,
   snapEnabled: true,
   playbackSpeed: 1,
+  previewVolume: 1,      // editor preview master volume (0..1) — does NOT affect the export
+  previewMuted: false,   // editor preview mute toggle
 
   // History
   _history: [],
@@ -343,6 +345,9 @@ export const useTimelineStore = create((set, get) => ({
   setSnapEnabled: (snap) => set({ snapEnabled: snap }),
 
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
+
+  setPreviewVolume: (v) => set({ previewVolume: Math.max(0, Math.min(1, v)), previewMuted: v <= 0 }),
+  setPreviewMuted: (bool) => set({ previewMuted: bool }),
 
   keyframeRecording: false,
   setKeyframeRecording: (val) => set({ keyframeRecording: val }),

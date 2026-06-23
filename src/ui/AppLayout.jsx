@@ -491,6 +491,8 @@ export default function AppLayout({ children }) {
             )}
             <IconBtn icon={Icons.home} label="Home" to="/dashboard" active={path === "/dashboard"} />
 
+            <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
+
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 
             <IconBtn icon={Icons.folder}  label="Projects" to="/projects" active={path === "/projects"} />
@@ -498,7 +500,7 @@ export default function AppLayout({ children }) {
               <IconBtn icon={Icons.autopilot} label="Automation" to="/automation" active={path === "/automation" || path.startsWith("/automation/")} />
             )}
             <IconBtn icon={Icons.connections} label="Social Accounts" to="/connections" active={path === "/connections"} />
-            <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
+            
 
             <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
 

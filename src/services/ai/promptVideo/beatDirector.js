@@ -34,7 +34,7 @@ const CAMERAS = ["slow_zoom_in", "fast_zoom_in", "slow_zoom_out", "pan_left", "p
 
 const MIN_BEATS = 8, MAX_BEATS = 32;
 const MAX_BEAT_WORDS = 8;
-const WORDS_PER_SECOND = 2.0; // measured from real ElevenLabs output (words ÷ seconds)
+const WORDS_PER_SECOND = 2.3; // measured ≈2.3 words/sec at our TTS speed (was 2.0 → under-budgeted, causing 60s→41s undershoot)
 
 const wordsIn = (s) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
 const scriptWordCount = (beats) => (beats || []).reduce((n, b) => n + wordsIn(b.script_line), 0);

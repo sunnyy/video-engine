@@ -439,9 +439,8 @@ export default function VirtualTryOn() {
               </div>
             )}
             <button onClick={handleGenerateClick} disabled={!canGenerate} style={{ ...C.btnY, opacity: canGenerate ? 1 : 0.5 }}>
-              {generating ? "Generating…" : uploading ? "Uploading…" : analyzing ? "Analyzing…" : "✦ Try On"}
+              {generating ? "Generating…" : uploading ? "Uploading…" : analyzing ? "Analyzing…" : `✦ Generate · ${SERVICE_COSTS.outfit_tryon.total} credits`}
             </button>
-            <div style={{ textAlign: "center", fontSize: 11, color: "#444", marginTop: 6 }}>~15 credits</div>
           </div>
         </div>
 

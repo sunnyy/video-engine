@@ -337,28 +337,48 @@ export default function TopBar() {
         ← Back
       </button>
 
-      {/* Center: project name */}
-      <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-        <input
-          value={name}
-          onChange={handleNameChange}
-          onFocus={(e) => e.target.select()}
+      {/* Left: project name, beside Back */}
+      <input
+        value={name}
+        onChange={handleNameChange}
+        onFocus={(e) => e.target.select()}
+        title="Project name"
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "#e8e8f0",
+          fontSize: 14,
+          fontWeight: 600,
+          textAlign: "left",
+          outline: "none",
+          padding: "5px 10px",
+          borderRadius: 6,
+          maxWidth: 220,
+          width: 200,
+          marginLeft: 2,
+          flexShrink: 0,
+        }}
+        onMouseOver={(e) => (e.target.style.background = "rgba(255,255,255,0.06)")}
+        onMouseOut={(e) => (e.target.style.background = "transparent")}
+      />
+
+      {/* Center: editing guidance note */}
+      <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0, padding: "0 8px" }}>
+        <div
+          title="Vidquence's editor is for light touch-ups — replacing images/video/audio, editing text, recoloring, and nudging timing. It isn't a full pro editor: big structural changes (deleting core layers, reworking the layout/scenes) can break how the video was composed. For major changes, regenerate the video instead."
           style={{
-            background: "transparent",
-            border: "none",
-            color: "#e8e8f0",
-            fontSize: 15,
-            fontWeight: 600,
-            textAlign: "center",
-            outline: "none",
-            padding: "5px 12px",
-            borderRadius: 6,
-            maxWidth: 340,
-            width: "100%",
+            display: "inline-flex", alignItems: "center", gap: 8, maxWidth: 620,
+            padding: "5px 12px", borderRadius: 8,
+            background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.2)",
+            color: "#d8c074", fontSize: 12, lineHeight: 1.3, fontFamily: "'Outfit',sans-serif",
+            overflow: "hidden", cursor: "default",
           }}
-          onMouseOver={(e) => (e.target.style.background = "rgba(255,255,255,0.06)")}
-          onMouseOut={(e) => (e.target.style.background = "transparent")}
-        />
+        >
+          <span style={{ fontSize: 13, flexShrink: 0 }}>💡</span>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            Best for light edits — swap media, tweak text, colors &amp; timing. Heavy restructuring may break the video.
+          </span>
+        </div>
       </div>
 
       {/* Right: controls */}
