@@ -7,6 +7,7 @@ import { serverFetch } from "../services/serverApi";
 import { getProductVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
+import { CREDIT_COSTS } from "../core/utils/creditCosts";
 
 const T = {
   bg:      "#0a0a10",
@@ -290,6 +291,7 @@ function GeneratorForm() {
   // Scene count + visuals
   const [sceneCount, setSceneCount] = useState(3);
   const [visualMode, setVisualMode] = useState("image");
+  const productVideoCost = sceneCount * (CREDIT_COSTS.product_video_per_scene[visualMode] ?? CREDIT_COSTS.product_video_per_scene.image);
 
   // Voiceover
   const [language,      setLanguage]      = useState("en");
@@ -390,7 +392,9 @@ function GeneratorForm() {
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/product-video" } });
     } catch (err) {
       console.error("[ProductVideoGenerator]", err);
-      setError(err.message || "Something went wrong. Please try again.");
+      setError(err.code === "NO_CREDITS"
+        ? `Not enough credits. You need ${productVideoCost} credits for this video.`
+        : (err.message || "Something went wrong. Please try again."));
     } finally {
       setGenerating(false);
     }
@@ -779,7 +783,7 @@ function GeneratorForm() {
                         background: active ? "rgba(124,92,252,0.15)" : "rgba(255,255,255,0.05)",
                         border: `1px solid ${active ? "rgba(124,92,252,0.3)" : "rgba(255,255,255,0.08)"}`,
                         borderRadius: 8, padding: "4px 10px", whiteSpace: "nowrap",
-                      }}>{opt.credits}</div>
+                      }}>~{(CREDIT_COSTS.product_video_per_scene[opt.id] || 0) * sceneCount} credits</div>
                     </button>
                   );
                 })}
@@ -859,7 +863,7 @@ function GeneratorForm() {
                 fontFamily: "inherit", transition: "background 0.2s",
               }}
             >
-              {generating ? "Generating..." : "Generate Video"}
+              {generating ? "Generating..." : `Generate Video (${productVideoCost} credits)`}
             </button>
           )}
         </div>

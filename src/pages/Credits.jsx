@@ -232,7 +232,7 @@ export default function Credits() {
               </div>
             )}
 
-            {/* Top-up section — paid users only */}
+            {/* Top-up section — paid subscribers only (free accounts can't farm cheap credits) */}
             {subscription && packages.length > 0 && (
               <div className="rounded-[14px] border p-5 flex flex-col gap-4" style={{ background: "#111118", borderColor: "rgba(124,92,252,0.2)" }}>
                 <div className="flex items-center justify-between">
@@ -312,7 +312,7 @@ export default function Credits() {
                 </button>
 
                 <div style={{ fontSize: 11, color: "#55556a" }}>
-                  Credits never expire · Max single purchase $50 · Secure payment via Razorpay
+                  Credits never expire · Max single purchase $100 · Secure payment via Razorpay
                 </div>
               </div>
             )}
@@ -320,7 +320,7 @@ export default function Credits() {
             {/* Upgrade prompt for free users */}
             {subscription === null && (
               <div style={{ padding: "14px 16px", borderRadius: 10, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", fontSize: 13, color: "#9494a8" }}>
-                ⚡ Credit top-ups are available for paid plan subscribers.{" "}
+                ⚡ Credit top-ups are available on paid plans.{" "}
                 <button onClick={() => navigate("/pricing")} style={{ background: "none", border: "none", color: "#f5c518", cursor: "pointer", fontWeight: 700, fontSize: 13, padding: 0 }}>
                   Upgrade your plan →
                 </button>

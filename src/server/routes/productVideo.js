@@ -1,8 +1,9 @@
 import express from "express";
-import { requireAuth } from "../middleware/shared.js";
+import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runProductVideoPipeline } from "../../services/ai/productVideo/pipelineOrchestrator.js";
 import { scrapeProductUrl } from "../../services/ai/productVideo/productScraper.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
 
@@ -37,7 +38,17 @@ router.post("/generate", requireAuth, async (req, res) => {
   res.setHeader("Connection", "keep-alive");
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
+  const scenes = Math.max(1, Math.min(5, parseInt(sceneCount, 10) || 3));
+  const mode = ["image", "hybrid", "video"].includes(visualMode) ? visualMode : "image";
+  const perScene = CREDIT_COSTS.product_video_per_scene[mode] ?? CREDIT_COSTS.product_video_per_scene.image;
+  const cost = scenes * perScene;
+  let creditAmount = 0;
+
   try {
+    const deduction = await deductCredits(req.user.id, cost, "product_video", `Product Video (${scenes} ${mode} scenes)`, null);
+    if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
+    creditAmount = cost;
+
     const result = await runProductVideoPipeline({
       userId:             req.user.id,
       productImageUrl,
@@ -51,7 +62,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       visualMode:         visualMode         ?? "image",
       visualStyle:        visualStyle        ?? "auto",
       accentColor:        accentColor        ?? null,
-      sceneCount:         sceneCount         ?? 3,
+      sceneCount:         scenes,
       voiceId:            voice_id           ?? null,
       orientation:        ["9:16","16:9","1:1","4:5"].includes(orientation) ? orientation : "9:16",
     }, (step) => send({ step }));
@@ -63,6 +74,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     });
     res.end();
   } catch (err) {
+    if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: Product Video failed").catch(() => {});
     console.error("[product-video/generate]", err);
     send({ error: err.message, code: err.code });
     res.end();

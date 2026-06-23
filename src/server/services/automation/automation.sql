@@ -12,6 +12,7 @@ create table if not exists automation_campaigns (
   user_id            uuid not null,
   name               text not null default 'Untitled campaign',
   status             text not null default 'draft',   -- draft | active | paused | stopped
+  service            text not null default 'ai_video',-- which video pipeline drives this campaign
   -- content
   niches             text[] not null default '{}',
   audience           text,
@@ -41,6 +42,8 @@ create table if not exists automation_campaigns (
 );
 create index if not exists automation_campaigns_user_idx on automation_campaigns (user_id, status);
 alter table automation_campaigns enable row level security;
+-- Idempotent add for existing installs (create-table-if-not-exists won't alter an existing table).
+alter table automation_campaigns add column if not exists service text not null default 'ai_video';
 
 -- ── Topic queue (now scoped to a campaign) ──
 create table if not exists automation_topics (

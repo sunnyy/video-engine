@@ -1,9 +1,7 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runTypographyPipeline, planTypography, produceTypography } from "../../services/ai/typographyVideo/pipelineOrchestrator.js";
-import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
-
-const TYPOGRAPHY_VIDEO_CREDITS = CREDIT_COSTS.typography_video;
+import { creditsForDuration } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
 
@@ -22,13 +20,15 @@ router.post("/generate", requireAuth, async (req, res) => {
 
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
+  const cost = creditsForDuration(targetDuration || 40);
+
   try {
-    const deduction = await deductCredits(userId, TYPOGRAPHY_VIDEO_CREDITS, "typography_video", "Typography video generation", projectId || null);
+    const deduction = await deductCredits(userId, cost, "typography_video", "Typography video generation", projectId || null);
     if (!deduction.success) {
       send({ error: "Insufficient credits", code: "NO_CREDITS" });
       return res.end();
     }
-    creditAmount = TYPOGRAPHY_VIDEO_CREDITS;
+    creditAmount = cost;
 
     const result = await runTypographyPipeline(
       { input: input.trim(), inputType, targetDuration, userId, voiceId: voiceId ?? null, language: language ?? "en" },
@@ -66,7 +66,7 @@ router.post("/produce", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
-  const { plan, voiceId, language = "en", orientation = "9:16", projectId } = req.body;
+  const { plan, voiceId, language = "en", orientation = "9:16", targetDuration, projectId } = req.body;
   if (!plan?.scenes?.length) return res.status(400).json({ error: "plan is required" });
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -75,10 +75,12 @@ router.post("/produce", requireAuth, async (req, res) => {
   res.flushHeaders();
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
+  const cost = creditsForDuration(targetDuration || plan?.targetDuration || 40);
+
   try {
-    const deduction = await deductCredits(userId, TYPOGRAPHY_VIDEO_CREDITS, "typography_video", "Typography video generation", projectId || null);
+    const deduction = await deductCredits(userId, cost, "typography_video", "Typography video generation", projectId || null);
     if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
-    creditAmount = TYPOGRAPHY_VIDEO_CREDITS;
+    creditAmount = cost;
 
     const result = await produceTypography(
       plan,

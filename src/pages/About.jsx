@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import MarketingNav from "../ui/MarketingNav";
 
 /* ── Content sections ── */
 function SectionLabel({ children }) {
@@ -35,38 +35,11 @@ const WHAT_WE_DO = [
 ];
 
 export default function About() {
-  const navigate = useNavigate();
-
   return (
     <div className="min-h-screen text-[#e8e8f0]" style={{ background: "#0F0E1A" }}>
 
-      {/* Top nav */}
-      <nav style={{
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        background: "#0d0d14",
-        padding: "0 40px",
-        height: 56,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}>
-        <a href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
-          <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 62, width: "auto" }} />
-        </a>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <a href="/about" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#f5c518", textDecoration: "none", padding: "7px 14px", borderRadius: 6 }}>About</a>
-          <a href="/#how" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none", padding: "7px 14px", borderRadius: 6 }}>How It Works</a>
-          <a href="/#pricing" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8888a8", textDecoration: "none", padding: "7px 14px", borderRadius: 6 }}>Pricing</a>
-          <button onClick={() => navigate("/dashboard")}
-            style={{
-              fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
-              background: "#f5c518", color: "#0F0E1A", padding: "7px 16px",
-              borderRadius: 7, border: "none", cursor: "pointer", marginLeft: 8,
-            }}>
-            Open App →
-          </button>
-        </div>
-      </nav>
+      {/* Top nav — shared marketing header */}
+      <MarketingNav active="/about" />
 
       {/* Content */}
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "64px 40px 100px" }}>

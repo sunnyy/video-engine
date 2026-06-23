@@ -4,6 +4,7 @@ import { generateSocialVideo }   from "../services/ai/socialVideo/generateSocial
 import { getSocialVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
+import { creditsForDuration } from "../core/utils/creditCosts";
 
 const T = {
   bg:      "#090b11",
@@ -247,7 +248,7 @@ function GeneratorForm() {
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/social-video" } });
     } catch (err) {
       if (err.code === "NO_CREDITS") {
-        setError("Not enough credits. You need 15 credits to generate a social video.");
+        setError(`Not enough credits. You need ${creditsForDuration(15)} credits to generate a social video.`);
       } else {
         setError(err.message || "Generation failed. Please try again.");
       }

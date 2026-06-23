@@ -4,6 +4,7 @@ import { generateTypographyVideo } from "../services/ai/typographyVideo/generate
 import { getTypographyVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
+import { creditsForDuration } from "../core/utils/creditCosts";
 
 const T = {
   bg:      "#0a0a10",
@@ -392,7 +393,7 @@ function GeneratorForm() {
             fontFamily: "inherit", transition: "background 0.2s",
           }}
         >
-          {loading ? "Generating…" : "Generate Video"}
+          {loading ? "Generating…" : `Generate Video (${creditsForDuration(targetDuration)} credits)`}
         </button>
 
 

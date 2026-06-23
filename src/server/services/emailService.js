@@ -189,7 +189,7 @@ export function userWelcomeEmail(name) {
     subject: "Welcome to Vidquence 🎬",
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Welcome, ${name || "Creator"}!</h2>
-      <p style="color:#c8c8d8;margin:0 0 16px">Your account is ready. You've got <strong style="color:#f5c518">50 free credits</strong> to get started — enough to explore the platform and create your first video.</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your account is ready. You've got <strong style="color:#f5c518">150 free credits</strong> to get started — enough to explore the platform and create your first video.</p>
       <p style="color:#c8c8d8;margin:0 0 24px">Head to your dashboard and create your first short.</p>
       <a href="${APP_URL}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Go to Dashboard →</a>
     `),

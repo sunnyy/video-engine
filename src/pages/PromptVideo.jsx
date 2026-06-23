@@ -4,6 +4,7 @@ import { generatePromptVideo, planPromptVideo } from "../services/ai/promptVideo
 import { getPromptVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
+import { creditsForDuration } from "../core/utils/creditCosts";
 
 const T = {
   bg:      "#090b11",
@@ -273,7 +274,7 @@ function GeneratorForm() {
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/ai-video" } });
     } catch (err) {
       if (err.code === "NO_CREDITS") {
-        setError("Not enough credits. You need 75 credits to produce this video.");
+        setError(`Not enough credits. You need ${creditsForDuration(duration)} credits to produce this video.`);
       } else {
         setError(err.message || "Generation failed. Please try again.");
       }
@@ -463,7 +464,7 @@ function GeneratorForm() {
                 border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800,
                 cursor: "pointer", fontFamily: "inherit",
               }}>
-              Looks good — Produce Video (75 credits)
+              Looks good — Produce Video ({creditsForDuration(duration)} credits)
             </button>
           </div>
         )}

@@ -107,14 +107,14 @@ router.post("/campaigns/:id/run-once", requireAuth, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-/* ── Per-video cancel (queued only) ── */
+/* ── Per-video cancel — queued jobs are removed, running jobs abort cooperatively ── */
 router.post("/campaigns/:id/cancel-job", requireAuth, async (req, res) => {
   try {
     const campaign = await getCampaignForUser(req.user.id, req.params.id);
     if (!campaign) return res.status(404).json({ error: "Campaign not found" });
-    const cancelled = await cancelJob(req.body?.jobId);
-    if (cancelled) logEvent({ userId: req.user.id, campaignId: campaign.id, action: "cancel", entity: "job", entityId: req.body?.jobId });
-    res.json({ cancelled });
+    const result = await cancelJob(req.body?.jobId);
+    if (result.ok) logEvent({ userId: req.user.id, campaignId: campaign.id, action: "cancel", entity: "job", entityId: req.body?.jobId, message: result.mode });
+    res.json(result);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 

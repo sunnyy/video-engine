@@ -69,12 +69,37 @@ export async function cancelCampaignJobs(campaignId) {
   return (data || []).length;
 }
 
-/** Cancel a single QUEUED job by id (per-video cancel). Returns true if it was cancelled. */
+/**
+ * Cancel one job by id. QUEUED → mark failed immediately (it never ran). RUNNING → set
+ * cancel_requested so the handler aborts cooperatively (see isCancelRequested). Returns
+ * { ok, mode } where mode is "removed" | "aborting".
+ */
 export async function cancelJob(jobId) {
-  const { data } = await supabaseAdmin.from("jobs")
-    .update({ status: "failed", error: "cancelled by user", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", jobId).eq("status", "queued").select("id");
-  return (data || []).length > 0;
+  const { data: job } = await supabaseAdmin.from("jobs").select("id, status").eq("id", jobId).maybeSingle();
+  if (!job) return { ok: false };
+  const now = new Date().toISOString();
+  if (job.status === "queued") {
+    await supabaseAdmin.from("jobs").update({ status: "failed", error: "canceled by user", finished_at: now, updated_at: now }).eq("id", jobId).eq("status", "queued");
+    return { ok: true, mode: "removed" };
+  }
+  if (job.status === "running") {
+    await supabaseAdmin.from("jobs").update({ cancel_requested: true, updated_at: now }).eq("id", jobId);
+    cancelCache.set(jobId, { v: true, t: Date.now() });
+    return { ok: true, mode: "aborting" };
+  }
+  return { ok: false }; // already terminal
+}
+
+// Cooperative-cancel signal for a RUNNING job. Cached briefly so a tight loop (render's
+// per-frame check) doesn't hammer the DB.
+const cancelCache = new Map(); // jobId -> { v, t }
+export async function isCancelRequested(jobId) {
+  const c = cancelCache.get(jobId);
+  if (c && Date.now() - c.t < 2500) return c.v;
+  let v = false;
+  try { const { data } = await supabaseAdmin.from("jobs").select("cancel_requested").eq("id", jobId).maybeSingle(); v = !!data?.cancel_requested; } catch { /* default false */ }
+  cancelCache.set(jobId, { v, t: Date.now() });
+  return v;
 }
 
 /** Mark a job completed with an optional result payload. */

@@ -35,7 +35,31 @@ export const CREDIT_COSTS = {
   ai_video:              75,  // Prompt to Video / AI Video
   social_video:          15,  // Social Video
   typography_video:      15,  // Typography Video
+  // Product Video — per scene, by visual mode (hybrid/video use LTX clips → cost far more than image scenes)
+  product_video_per_scene: { image: 20, hybrid: 35, video: 50 },
 };
+
+/**
+ * Duration → credit cost bands for free-design video services (AI Video, Social, Typography).
+ * COGS scales ~linearly with duration (more beats = more GPT-5.4 scene calls + TTS + images), so
+ * a 60s video must cost more than a 15s one. Margin-calibrated to ~72–76% at the $49/1,500 plan rate.
+ * NOTE: data only — NOT yet wired into charging (generate routes still deduct the flat per-service
+ * cost above). Wiring duration-aware deduction is the next pricing task. See serviceCatalog.js.
+ */
+export const VIDEO_DURATION_BANDS = { 15: 15, 30: 30, 45: 45, 60: 60 };
+// ^ ~1 credit/second (2026-06-23). MEASURED: a 41s video = ~$0.70 (OpenAI $0.42 + Fal $0.25 +
+// ElevenLabs ~$0.03) → COGS ≈ 15s $0.30 / 30s $0.53 / 60s $0.99. At the Pro rate ($0.0327/cr):
+// 60s = $1.96/video @ ~49% margin (was $3.26) — competitive with faceless-video tools.
+// $49/1,500cr → ~25× 60s or ~100× 15s. COGS hard floor ≈ $0.99 for 60s (can't price below it).
+
+/** Credits for a free-design video of `seconds`: the smallest band ≥ duration; extrapolated beyond the top band. */
+export function creditsForDuration(seconds, bands = VIDEO_DURATION_BANDS) {
+  const keys = Object.keys(bands).map(Number).sort((a, b) => a - b);
+  const sec = Math.max(1, Math.round(Number(seconds)) || keys[0]);
+  for (const k of keys) if (sec <= k) return bands[k];
+  const top = keys[keys.length - 1];
+  return Math.round(bands[top] * (sec / top)); // beyond the largest band → per-second extrapolation
+}
 
 // Full cost estimates per service — used by CreditConfirmModal
 export const SERVICE_COSTS = {
@@ -103,9 +127,9 @@ export function estimateCreditCost(duration, options = {}) {
   return { total, breakdown: { base, tts, images, export: exportCost, beatCount } };
 }
 
+// Reference only — the live source of truth for plans is the `plans` DB table (see plans_single.sql).
 export const PLANS = {
-  starter: { price: 15, credits: 1800, label: "Starter"        },
-  pro:     { price: 29, credits: 3500, label: "Pro"            },
-  agency:  { price: 50, credits: 6000, label: "Agency"         },
-  payg:    { price: 9,  credits: 80,   label: "Pay As You Go"  },
+  free:   { price: 0,  credits: 150,  label: "Free"   },
+  pro:    { price: 49, credits: 1500, label: "Pro"    },
+  agency: { price: 99, credits: 4000, label: "Agency" },
 };

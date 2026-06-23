@@ -4,10 +4,12 @@
  * Redesigned to showcase all services, not just video generation.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { signInWithGoogle, getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
+import { videoServices } from "../config/serviceCatalog";
+import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown } from "lucide-react";
 
 const FALLBACK_RATE = 92.6;
 function toINR(usd, rate) {
@@ -32,44 +34,6 @@ function useReveal() {
   }, []);
 }
 
-function FAQItem({ q, a }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div
-      onClick={() => setOpen(!open)}
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "22px 0", cursor: "pointer" }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-        <span
-          style={{ fontFamily: "var(--font-body)", fontSize: 15, color: "var(--text)", fontWeight: 500, lineHeight: 1.5 }}
-        >
-          {q}
-        </span>
-        <span
-          style={{
-            color: "#f5c518",
-            fontSize: 22,
-            flexShrink: 0,
-            fontWeight: 300,
-            lineHeight: 1,
-            width: 24,
-            textAlign: "center",
-          }}
-        >
-          {open ? "−" : "+"}
-        </span>
-      </div>
-      {open && (
-        <div
-          style={{ marginTop: 14, fontFamily: "var(--font-body)", fontSize: 15, color: "var(--muted)", lineHeight: 1.75 }}
-        >
-          {a}
-        </div>
-      )}
-    </div>
-  );
-}
-
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -78,7 +42,7 @@ const CSS = `
     --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.04);
     --yellow: #f5c518; --yellow-dim: rgba(245,197,24,0.10); --yellow-glow: rgba(245,197,24,0.06);
     --text: #f5f5fb; --muted: #c4c4d4; --dim: #9a9aae;
-    --font-display: 'Bebas Neue', sans-serif;
+    --font-display: 'Inter', sans-serif;
     --font-body: 'Outfit', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
     --radius: 16px; --container: 1380px;
@@ -99,17 +63,17 @@ const CSS = `
   .btn-yellow:hover { opacity: 0.85; }
 
   /* HERO */
-  .hero { padding: 138px 0 64px; position: relative; overflow: hidden; }
+  .hero { padding: 116px 0 28px; position: relative; overflow: hidden; }
   .hero-grid-bg { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(var(--border2) 1px, transparent 1px), linear-gradient(90deg, var(--border2) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%); }
   .hero-glow { position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 900px; height: 900px; pointer-events: none; background: radial-gradient(circle, rgba(245,197,24,0.06) 0%, transparent 65%); }
   .hero-inner { position: relative; z-index: 1; text-align: center; max-width: 860px; margin: 0 auto; }
   .hero-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--yellow-dim); border: 1px solid rgba(245,197,24,0.2); border-radius: 100px; padding: 6px 16px; margin-bottom: 36px; font-family: var(--font-mono); font-size: 12px; color: var(--yellow); letter-spacing: 2px; text-transform: uppercase; }
   .hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .hero-h1 { font-family: var(--font-display); font-size: clamp(52px, 8vw, 110px); line-height: 0.9; letter-spacing: -1px; color: var(--text); margin-bottom: 28px; }
+  .hero-h1 { font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(40px, 5.2vw, 74px); line-height: 1.08; letter-spacing: -0.02em; color: var(--text); margin-bottom: 20px; }
   .hero-h1 .yellow { color: var(--yellow); }
   .hero-h1 .outline { -webkit-text-stroke: 1.5px rgba(255,255,255,0.18); color: transparent; }
-  .hero-sub { font-family: var(--font-body); font-size: 19px; color: var(--muted); line-height: 1.7; max-width: 620px; margin: 0 auto 48px; }
+  .hero-sub { font-family: var(--font-body); font-size: 18px; color: var(--muted); line-height: 1.65; max-width: 600px; margin: 0 auto 30px; }
   .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
   .hero-cta { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0F0E1A; background: var(--yellow); border: none; border-radius: 10px; padding: 16px 36px; cursor: pointer; transition: opacity 0.2s; }
   .hero-cta:hover { opacity: 0.85; }
@@ -150,19 +114,21 @@ const CSS = `
   }
 
   /* STATS */
+  .stats-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent); margin-bottom: 46px; }
   .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; }
   @media (max-width: 700px) { .stats-row { grid-template-columns: 1fr 1fr; } }
-  .stat-cell { background: var(--card); padding: 40px 32px; text-align: center; }
-  .stat-num { font-family: var(--font-display); font-size: 56px; color: var(--yellow); line-height: 1; letter-spacing: -2px; margin-bottom: 8px; }
+  .stat-cell { background: var(--card); padding: 40px 32px; text-align: center; transition: background 0.2s; }
+  .stat-cell:hover { background: var(--card2); }
+  .stat-num { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 54px; color: var(--yellow); line-height: 1; letter-spacing: -2px; margin-bottom: 8px; }
   .stat-label { font-family: var(--font-body); font-size: 15px; color: var(--muted); }
 
   /* SECTION */
   .section { padding: 90px 0; }
-  .section-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--yellow); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
-  .section-label::before { content: ''; width: 24px; height: 1px; background: var(--yellow); }
-  .section-h { font-family: var(--font-display); font-size: clamp(46px, 5vw, 104px); line-height: 0.93; color: var(--text); letter-spacing: -0.5px; margin-bottom: 16px; }
+  .section-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--yellow); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .section-label::before, .section-label::after { content: ''; width: 24px; height: 1px; background: var(--yellow); }
+  .section-h { font-family: 'Inter', sans-serif; font-weight: 800; font-size: clamp(32px, 4vw, 56px); line-height: 1.08; color: var(--text); letter-spacing: -0.02em; margin-bottom: 16px; text-align: center; }
   .section-h .yellow { color: var(--yellow); }
-  .section-sub { font-family: var(--font-body); font-size: 17px; color: var(--muted); line-height: 1.7; max-width: 520px; }
+  .section-sub { font-family: var(--font-body); font-size: 17px; color: var(--muted); line-height: 1.7; max-width: 600px; text-align: center; margin-left: auto; margin-right: auto; text-wrap: balance; }
 
   /* SERVICES */
   .services-grid { display: flex; flex-direction: column; gap: 70px; margin-top: 70px; }
@@ -257,8 +223,8 @@ const CSS = `
 
   /* PRICING */
   .pricing-grid { display: grid; gap: 16px; margin-top: 50px; }
-  .plan { background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(17,17,24,0.98)); border: 1px solid var(--border2); border-radius: var(--radius); padding: 28px; position: relative; overflow: hidden; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s; }
-  .plan::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 78% 12%, rgba(245,197,24,0.09), transparent 34%); opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+  .plan { background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(17,17,24,0.98)); border: 1px solid var(--border2); border-radius: var(--radius); padding: 28px; position: relative; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s; }
+  .plan::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle at 78% 12%, rgba(245,197,24,0.09), transparent 34%); opacity: 0; transition: opacity 0.25s; pointer-events: none; }
   .plan:hover { border-color: rgba(245,197,24,0.28); transform: translateY(-6px); box-shadow: 0 24px 80px rgba(0,0,0,0.38); }
   .plan:hover::before { opacity: 1; }
   .plan-hot { border-color: rgba(245,197,24,0.45) !important; box-shadow: 0 0 0 1px rgba(245,197,24,0.12) inset; }
@@ -267,19 +233,26 @@ const CSS = `
   .plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
   .plan-name { font-family: var(--font-body); font-size: 14px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
   .plan-mini-chip { border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 5px 9px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); white-space: nowrap; background: rgba(255,255,255,0.035); }
-  .plan-price { font-family: var(--font-display); font-size: 64px; color: var(--text); line-height: 1; letter-spacing: -2px; }
+  .plan-price { font-family: var(--font-display); font-weight: 800; font-size: 44px; color: var(--text); line-height: 1; letter-spacing: -2px; }
   .plan-price span { font-size: 28px; color: var(--muted); vertical-align: top; margin-top: 12px; display: inline-block; }
   .plan-cycle { font-family: var(--font-body); font-size: 14px; color: var(--dim); margin-bottom: 4px; }
   .plan-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 18px 0; }
   .plan-stat { border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px; background: rgba(255,255,255,0.035); }
   .plan-stat strong { display: block; font-family: var(--font-body); font-size: 15px; color: var(--text); line-height: 1.1; }
   .plan-stat span { display: block; margin-top: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
-  .plan-meter { height: 9px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 8px 0 24px; }
+  .plan-meter { height: 9px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 4px 0 18px; }
   .plan-meter-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(245,197,24,0.58), var(--yellow)); transition: width 0.25s; }
   .plan-hr { border: none; border-top: 1px solid var(--border2); margin: 22px 0; }
-  .plan-feats { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-  .plan-feats li { font-family: var(--font-body); font-size: 15px; color: var(--muted); display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
-  .plan-feats li::before { content: '✓'; color: var(--yellow); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .plan-price-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+  .plan-credits-badge { text-align: right; flex-shrink: 0; padding-bottom: 6px; }
+  .plan-credits-badge .num { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 22px; line-height: 1; color: var(--yellow); display: flex; align-items: center; gap: 5px; justify-content: flex-end; white-space: nowrap; }
+  .plan-credits-badge .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin-top: 5px; }
+  .plan-feats-note { font-family: var(--font-body); font-size: 12px; color: var(--dim); margin-bottom: 18px; line-height: 1.45; }
+  .plan-feats { display: flex; flex-direction: column; gap: 18px; margin-bottom: 28px; }
+  .plan-feat-cat { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border2); }
+  .plan-feats ul { list-style: none; display: flex; flex-direction: column; gap: 11px; padding: 0; margin: 0; }
+  .plan-feats li { font-family: var(--font-body); font-size: 14px; color: var(--muted); display: flex; align-items: flex-start; gap: 11px; line-height: 1.4; }
+  .plan-feats li .mark { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--yellow); margin-top: 7px; }
   .plan-btn { width: 100%; padding: 15px; border-radius: 10px; border: none; cursor: pointer; font-family: var(--font-body); font-size: 15px; font-weight: 800; transition: transform 0.2s, opacity 0.2s, background 0.2s; position: relative; z-index: 1; }
   .plan:hover .plan-btn { transform: translateY(-1px); }
   .plan-btn-default { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
@@ -315,7 +288,7 @@ const CSS = `
   .cta-banner-section { padding: 40px 0 80px; }
   .cta-banner { background: linear-gradient(135deg, #14140e 0%, #1a1a10 100%); border: 1px solid rgba(245,197,24,0.2); border-radius: 20px; padding: 60px 64px; display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; position: relative; overflow: hidden; }
   .cta-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 70% 50%, rgba(245,197,24,0.06), transparent 60%); pointer-events: none; }
-  .cta-banner-title { font-family: var(--font-display); font-size: clamp(36px, 5vw, 56px); color: var(--text); line-height: 0.95; position: relative; z-index: 1; }
+  .cta-banner-title { font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(32px, 4vw, 50px); color: var(--text); line-height: 1.08; letter-spacing: -0.02em; position: relative; z-index: 1; }
   .cta-banner-sub { font-family: var(--font-body); font-size: 16px; color: var(--muted); margin-top: 12px; position: relative; z-index: 1; }
   .cta-banner-btn { position: relative; z-index: 1; font-family: var(--font-body); font-size: 15px; font-weight: 700; color: var(--yellow); background: #0F0E1A; border: none; border-radius: 12px; padding: 18px 40px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity 0.2s; }
   .cta-banner-btn:hover { opacity: 0.85; }
@@ -329,7 +302,331 @@ const CSS = `
   .footer-copy { font-family: var(--font-mono); font-size: 12px; color: var(--dim); letter-spacing: 1px; }
 
   [data-reveal] { opacity: 0; transform: translateY(20px) scale(0.99); transition: opacity 0.65s ease, transform 0.65s ease; }
+
+  /* HERO rating / trust badge */
+  .hero-rating { display: inline-flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 100px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); margin-bottom: 30px; font-family: var(--font-body); font-size: 13px; color: var(--muted); }
+  .hero-rating strong { color: var(--text); font-weight: 800; }
+  .hero-stars { color: var(--yellow); letter-spacing: 2px; font-size: 13px; }
+  .hero-rating .div { width: 1px; height: 14px; background: rgba(255,255,255,0.14); }
+  @media (max-width: 480px) { .hero-rating { gap: 8px; padding: 7px 12px; font-size: 12px; } }
+
+  /* HERO CHATBOX — Topview-style create surface */
+  .hero-chat { max-width: 900px; margin: 32px auto 0; }
+  .hero-tabs::-webkit-scrollbar { display: none; }
+  .hero-tabs { scrollbar-width: none; }
+  .hero-examples { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
+  .hero-example { font-family: var(--font-body); font-size: 13px; color: var(--muted); background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 7px 13px; cursor: pointer; transition: all 0.15s; }
+  .hero-example:hover { color: var(--text); border-color: rgba(255,255,255,0.22); }
+
+  /* HERO platforms */
+  .hero-platforms { margin-top: 34px; text-align: center; }
+  .hero-platforms-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); margin-bottom: 14px; }
+  .hero-platforms-row { display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; }
+  .hero-platforms-row span { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: var(--muted); opacity: 0.85; transition: opacity 0.2s; }
+  .hero-platforms-row span:hover { opacity: 1; }
+
+  /* SAMPLES GALLERY (live, masonry) */
+  .samples-masonry { column-count: 5; column-gap: 16px; margin-top: 44px; }
+  @media (max-width: 1100px) { .samples-masonry { column-count: 3; } }
+  @media (max-width: 760px)  { .samples-masonry { column-count: 2; column-gap: 12px; } }
+  .sample-card { break-inside: avoid; -webkit-column-break-inside: avoid; margin-bottom: 16px; position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--card); }
+  .sample-card img, .sample-card video { width: 100%; display: block; background: #060a14; }
+  .sample-badge { position: absolute; left: 12px; top: 12px; padding: 4px 9px; border-radius: 7px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text); letter-spacing: 0.5px; }
+
+  /* FULL SUITE — asymmetric bento */
+  .bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 192px; grid-auto-flow: dense; gap: 14px; margin-top: 44px; }
+  .bento-tile { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #13131e; cursor: pointer; box-shadow: 0 14px 44px rgba(0,0,0,0.34); transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+  .bento-tile:hover { transform: translateY(-4px); border-color: rgba(245,197,24,0.32); box-shadow: 0 24px 64px rgba(0,0,0,0.5); }
+  .bento-tile.lg   { grid-column: span 2; grid-row: span 2; }
+  .bento-tile.wide { grid-column: span 2; }
+  .bento-tile.tall { grid-row: span 2; }
+  .bento-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+  .bento-tile:hover .bento-media { transform: scale(1.07); }
+  .bento-scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,8,12,0.92) 0%, rgba(8,8,12,0.25) 52%, rgba(8,8,12,0.04) 100%); }
+  .bento-body { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 18px 16px; z-index: 1; }
+  .bento-name { font-family: var(--font-body); font-size: 18px; font-weight: 800; color: #fff; line-height: 1.2; letter-spacing: -0.01em; }
+  .bento-tile.lg .bento-name { font-size: 27px; }
+  .bento-desc { font-family: var(--font-body); font-size: 13px; color: rgba(255,255,255,0.78); margin-top: 4px; }
+  .bento-open { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #14140a; font-weight: 800; font-size: 15px; opacity: 0; transform: translateY(-4px); transition: opacity 0.2s, transform 0.2s; z-index: 1; }
+  .bento-tile:hover .bento-open { opacity: 1; transform: translateY(0); }
+  @media (max-width: 900px) {
+    .bento { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 160px; }
+    .bento-tile.lg { grid-column: span 2; grid-row: span 2; }
+    .bento-tile.wide { grid-column: span 2; grid-row: span 1; }
+    .bento-tile.tall { grid-column: span 1; grid-row: span 2; }
+  }
+  @media (max-width: 540px) {
+    .bento { grid-auto-rows: 132px; gap: 10px; }
+    .bento-tile.lg .bento-name { font-size: 21px; }
+    .bento-name { font-size: 16px; }
+  }
 `;
+
+/* ── Hero chatbox — a decorative replica of the in-app create surface. Morphs per video
+   service; any submit funnels to signup (no real generation on the public page). ── */
+const HC = { surface: "#0e1018", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8" };
+
+const HERO_SERVICES = [
+  { id: "ai-video",   label: "Prompt to Video",  Icon: Sparkles,      accent: "#f59e0b", placeholder: "Describe your video idea — any topic, any take…" },
+  { id: "saas",       label: "SaaS Video",       Icon: Clapperboard,  accent: "#f5c518", placeholder: "Your SaaS website URL — e.g. https://yourapp.com" },
+  { id: "product",    label: "Product Video",    Icon: ShoppingBag,   accent: "#f97316", placeholder: "Upload a product photo or paste a store URL…" },
+  { id: "social",     label: "Social to Video",  Icon: MessageCircle, accent: "#22d3ee", placeholder: "Paste an X, Instagram, or LinkedIn post URL…" },
+  { id: "typography", label: "Typography Video", Icon: Type,          accent: "#7c5cfc", placeholder: "A topic, or paste your full script…" },
+  { id: "captions",   label: "Auto Captions",    Icon: Captions,      accent: "#34d399", placeholder: "Upload a video to add animated captions…" },
+];
+
+// Ghost control chip with a caret — mirrors the Topview-style chatbox controls.
+function HeroChip({ icon, value }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 11px", borderRadius: 10,
+      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.10)", fontFamily: "var(--font-body)",
+    }}>
+      <span style={{ display: "flex", alignItems: "center", color: HC.muted }}>{icon}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: HC.text }}>{value}</span>
+      <ChevronDown size={13} color={HC.muted} style={{ opacity: 0.6, marginLeft: -1 }} />
+    </span>
+  );
+}
+
+function HeroChatbox({ onSubmit }) {
+  const [sel, setSel]   = useState(0);
+  const [text, setText] = useState("");
+  const svc = HERO_SERVICES[sel];
+  const filled = !!text.trim();
+  return (
+    <div className="hero-chat">
+      <div style={{ background: "#16141f", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 16, padding: "14px 18px 16px", boxShadow: "0 24px 70px rgba(0,0,0,0.45)", textAlign: "left" }}>
+        {/* Service tabs */}
+        <div className="hero-tabs" style={{ display: "flex", gap: 22, alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto", whiteSpace: "nowrap" }}>
+          {HERO_SERVICES.map((s, i) => {
+            const active = i === sel;
+            return (
+              <button key={s.id} onClick={() => setSel(i)} style={{
+                background: "none", border: "none", borderBottom: `2px solid ${active ? s.accent : "transparent"}`,
+                marginBottom: -1, paddingBottom: 12, cursor: "pointer", fontFamily: "var(--font-body)",
+                fontSize: 14, fontWeight: 700, color: active ? "#fff" : "#8a8a99", whiteSpace: "nowrap",
+                display: "inline-flex", alignItems: "center", gap: 7, transition: "color 0.15s", flexShrink: 0,
+              }}>
+                <s.Icon size={15} color={active ? s.accent : "#8a8a99"} />{s.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Input */}
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
+          placeholder={svc.placeholder}
+          rows={3}
+          style={{ width: "100%", boxSizing: "border-box", resize: "none", border: "none", outline: "none", background: "transparent", color: HC.text, fontSize: 16.5, fontFamily: "var(--font-body)", lineHeight: 1.55, minHeight: 80, marginTop: 16 }}
+        />
+
+        {/* Controls */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <HeroChip icon={<Palette size={15} />} value="Auto" />
+            <HeroChip icon={<Mic size={15} />}     value="English" />
+            <HeroChip icon={<Clock size={15} />}   value="30s" />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <HeroChip icon={<Smartphone size={15} />} value="9:16" />
+            <button onClick={onSubmit} title="Start free" aria-label="Start free" style={{
+              width: 38, height: 38, borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.18s",
+              border: `1px solid ${filled ? "transparent" : "rgba(255,255,255,0.12)"}`,
+              background: filled ? svc.accent : "rgba(255,255,255,0.05)",
+              color: filled ? "#14140a" : "#8a8a99",
+            }}>
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Live samples gallery — pulls the same admin-curated outputs the Dashboard shows. ── */
+const SAMPLE_SERVICE_LABELS = {
+  ai_videos: "Prompt to Video", saas_video: "SaaS Video", product_video: "Product Video",
+  social_video: "Social to Video", typography_video: "Typography Video", captions: "Auto Captions",
+  thumbnails: "Thumbnail", posters: "Poster", social_posts: "Banner / Post",
+  product_ads: "Product Ad", virtual_tryon: "Virtual Try-On",
+};
+
+function SampleCard({ sample }) {
+  const vidRef = useRef(null);
+  const isVid  = sample.type === "video";
+  const label  = SAMPLE_SERVICE_LABELS[sample.service_key] || sample.service_key;
+  useEffect(() => {
+    if (!isVid) return;
+    const el = vidRef.current; if (!el) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) el.play().catch(() => {}); else el.pause(); }, { threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [isVid]);
+  return (
+    <div className="sample-card">
+      {isVid
+        ? <video ref={vidRef} src={sample.src} poster={sample.poster || undefined} muted loop playsInline preload="metadata" />
+        : <img src={sample.src} alt={label} loading="lazy" />}
+      <div className="sample-badge">{label}</div>
+    </div>
+  );
+}
+
+function SamplesGallery() {
+  const [samples, setSamples] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`${SERVER}/api/admin/samples/public?limit=60`)
+      .then((r) => r.json())
+      .then((d) => { if (alive) setSamples((d.samples || []).filter((s) => s.src)); })
+      .catch(() => { if (alive) setSamples([]); });
+    return () => { alive = false; };
+  }, []);
+  if (!samples || !samples.length) return null; // nothing curated yet → hide entirely
+  return (
+    <section className="section" id="samples" style={{ paddingTop: 40 }}>
+      <div className="container">
+        <div className="section-label">Made with Vidquence</div>
+        <h2 className="section-h">See what people<br /><span className="yellow">are making.</span></h2>
+        <p className="section-sub">Real outputs from every service — generated in minutes, then editable down to the last frame.</p>
+        <div className="samples-masonry">
+          {samples.map((s) => <SampleCard key={s.id} sample={s} />)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── The Full Suite — asymmetric bento, real sample media, hover-play. ── */
+const SUITE_TILES = [
+  { name: "Prompt to Video",  desc: "Any idea → a finished video",  route: "/dashboard",        key: "ai_videos",        accent: "#f59e0b", size: "lg" },
+  { name: "Product Video",    desc: "A photo → a cinematic ad",     route: "/product-video",    key: "product_video",    accent: "#f97316", size: "wide" },
+  { name: "Virtual Try-On",   desc: "Your product, on a model",     route: "/virtual-tryon",    key: "virtual_tryon",    accent: "#ec4899", size: "tall" },
+  { name: "SaaS Video",       desc: "Your website → a promo",       route: "/promo-video",      key: "saas_video",       accent: "#f5c518", size: "sm" },
+  { name: "Social to Video",  desc: "A post → a short",             route: "/social-video",     key: "social_video",     accent: "#22d3ee", size: "sm" },
+  { name: "Typography Video", desc: "Kinetic text videos",          route: "/typography-video", key: "typography_video", accent: "#7c5cfc", size: "sm" },
+  { name: "Auto Captions",    desc: "Styled animated captions",     route: "/video-captions",   key: "captions",         accent: "#34d399", size: "sm" },
+  { name: "Poster Studio",    desc: "Luxury product posters",       route: "/product-poster",   key: "posters",          accent: "#d946ef", size: "sm" },
+  { name: "Thumbnails",       desc: "Click-worthy thumbnails",      route: "/thumbnail",        key: "thumbnails",       accent: "#ef4444", size: "sm" },
+  { name: "Banner Design",    desc: "On-brand social banners",      route: "/banner-design",    key: "social_posts",     accent: "#3b82f6", size: "sm" },
+];
+
+function SuiteTile({ tile, sample, onClick }) {
+  const vidRef = useRef(null);
+  const isVid = sample?.type === "video";
+  const onEnter = () => { if (isVid) vidRef.current?.play().catch(() => {}); };
+  const onLeave = () => { if (isVid && vidRef.current) { vidRef.current.pause(); vidRef.current.currentTime = 0; } };
+  return (
+    <div className={`bento-tile ${tile.size}`} onClick={onClick} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      {sample ? (
+        isVid
+          ? <video ref={vidRef} className="bento-media" src={sample.src} poster={sample.poster || undefined} muted loop playsInline preload="metadata" />
+          : <img className="bento-media" src={sample.src} alt={tile.name} loading="lazy" />
+      ) : (
+        <div className="bento-media" style={{ background: `radial-gradient(circle at 72% 18%, ${tile.accent}38, transparent 60%), #13131e` }} />
+      )}
+      <div className="bento-scrim" />
+      <div className="bento-body">
+        <div className="bento-name">{tile.name}</div>
+        <div className="bento-desc">{tile.desc}</div>
+      </div>
+      <div className="bento-open" style={{ background: tile.accent }}>↗</div>
+    </div>
+  );
+}
+
+function FullSuiteBento({ onTileClick }) {
+  const [byKey, setByKey] = useState({});
+  useEffect(() => {
+    let alive = true;
+    fetch(`${SERVER}/api/admin/samples/public?limit=150`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        const m = {};
+        for (const s of (d.samples || [])) { if (s.src && !m[s.service_key]) m[s.service_key] = s; }
+        setByKey(m);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  return (
+    <div className="bento">
+      {SUITE_TILES.map((t) => <SuiteTile key={t.name} tile={t} sample={byKey[t.key]} onClick={() => onTileClick(t.route)} />)}
+    </div>
+  );
+}
+
+// Counts up to `to` once scrolled into view (eased). Renders prefix + number + suffix.
+function CountUp({ to, prefix = "", suffix = "", duration = 1400 }) {
+  const [n, setN] = useState(0);
+  const ref = useRef(null);
+  const fired = useRef(false);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !fired.current) {
+        fired.current = true;
+        const start = performance.now();
+        const tick = (t) => {
+          const p = Math.min(1, (t - start) / duration);
+          setN(Math.round(to * (1 - Math.pow(1 - p, 3))));
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    }, { threshold: 0.5 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [to, duration]);
+  return <span ref={ref}>{prefix}{n.toLocaleString()}{suffix}</span>;
+}
+
+const HERO_STATS = [
+  { to: 20,   suffix: "K+", label: "Videos created" },
+  { to: 7500, suffix: "+",  label: "Creators & brands" },
+  { to: 30,   suffix: "+",  label: "Languages supported" },
+  { to: 1, suffix: "m+", label: "Idea to finished video" },
+];
+
+// Checkmark feature row + the "Everything in X, plus:" group label for the pricing cards.
+function Check({ children, accent }) {
+  return (
+    <div style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13.5, color: "var(--muted)", lineHeight: 1.45 }}>
+      <span style={{ color: accent || "var(--yellow)", fontWeight: 800, flexShrink: 0, marginTop: 1, fontSize: 12 }}>✓</span>
+      <span>{children}</span>
+    </div>
+  );
+}
+function PlusLabel({ children }) {
+  return <div style={{ fontSize: 12.5, fontWeight: 700, color: "#e8e8f0", margin: "6px 0 2px" }}>{children}</div>;
+}
+// A "not included" row (crossed out) — e.g. paid-only features shown on the Free card.
+function Cross({ children }) {
+  return (
+    <div style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13.5, color: "var(--dim)", lineHeight: 1.45, opacity: 0.75 }}>
+      <span style={{ color: "#6b6b80", fontWeight: 800, flexShrink: 0, marginTop: 1, fontSize: 12 }}>✕</span>
+      <span style={{ textDecoration: "line-through" }}>{children}</span>
+    </div>
+  );
+}
+// The full service list shown on every pricing card (from the catalog, so it never drifts).
+function VideoServicesList() {
+  return (
+    <>
+      <PlusLabel>All video services</PlusLabel>
+      {videoServices().map((s) => (
+        <Check key={s.key}>{s.beta ? `${s.name} (Beta)` : s.name}</Check>
+      ))}
+      <Check>10+ AI image &amp; audio tools</Check>
+    </>
+  );
+}
 
 export default function LandingPage() {
   useReveal();
@@ -338,7 +635,7 @@ export default function LandingPage() {
   const [session, setSession] = useState(null);
   const [plans, setPlans] = useState([]);
   const [rate, setRate] = useState(FALLBACK_RATE);
-  const [cycle, setCycle] = useState("monthly");
+  const [cycle, setCycle] = useState("annual");
 
   useEffect(() => {
     getSession()
@@ -388,53 +685,12 @@ export default function LandingPage() {
     }
   };
 
-
-
-
-
-  const faqs = [
-    {
-      q: "How is Vidquence different from other AI video tools?",
-      a: "Most tools give you plain text over stock footage. Vidquence is a full AI production studio — every beat of your video gets its own layout, visual design, pacing, and narrative intent. Beyond auto-generated videos, you get a complete creative suite: Product Video Ads, Poster Studio, Thumbnail Generator, Banner Design, Voice Studio, Virtual Try-On, and more — all in one platform.",
-    },
-    {
-      q: "What are credits and how are they used?",
-      a: "Credits power every AI action on the platform — video generation, product ads, posters, thumbnails, voiceovers, and more. Each action has a listed credit cost. Check the Credits page for current costs on each service.",
-    },
-    {
-      q: "What services are included?",
-      a: "Vidquence includes: AI Video Generator (faceless and talking head modes), Product Video Ads (photo → full video ad), Poster Studio, Thumbnail Generator, Virtual Try-On, Banner Design, Voice Studio (TTS voiceovers), Speech to Text, and Caption Studio. All services in one dashboard.",
-    },
-    {
-      q: "What niches and languages are supported?",
-      a: "17 niches including entertainment, gaming, finance, spiritual, food, sports, tech, lifestyle, education, travel, health, skincare, comedy, motivational, news, music, and business. Videos support multilingual scripts and voiceovers including Hindi, English, Arabic, French, Spanish, Portuguese, Urdu, and Turkish.",
-    },
-    {
-      q: "Can I use my own footage and images?",
-      a: "Yes. Upload your own images, videos, or talking head footage directly in the editor. For talking head videos, upload your recorded clip and the AI builds the full video around it with captions, layouts, and music. The AI features are optional — the editor works with whatever assets you bring.",
-    },
-    {
-      q: "Can I edit the video after it's generated?",
-      a: "Fully. Every element of every beat is editable — change text, swap visuals, adjust timing, change transitions, add overlays, update captions, swap background music, and add sound effects. The AI produces a production-ready starting point. You have complete control from there.",
-    },
-    {
-      q: "Does Product Video Ads work for any product?",
-      a: "Yes — clothing, fashion, wearables (watches, earphones, shoes), beauty products, food, gadgets, and more. For clothing, the system uses AI model avatars to show the product being worn. For other products, it generates cinematic product photography shots. Upload one product photo and get a full video ad with multiple scenes, transitions, and background music.",
-    },
-    {
-      q: "Is there a free trial?",
-      a: "New accounts get 50 free credits — enough to try several services without a credit card. Product Video Ads requires an active plan. Paid plans start at ₹999/month with no long-term commitment.",
-    },
-    {
-      q: "What are the plan limits?",
-      a: "Starter includes 1,800 credits per month. Pro includes 3,500 credits. Agency includes 6,000 credits. All plans include every service on the platform. Check the pricing section for current plan rates.",
-    },
-    {
-      q: "Can I cancel anytime?",
-      a: "Yes. Cancel from your account settings at any time. You keep your remaining credits until the end of your billing period. No cancellation fees.",
-    },
-  ];
-
+  // Service cards: signed-in users go straight to the tool; logged-out visitors are
+  // funneled to signup (protected routes would just bounce them to /login anyway).
+  const handleCardClick = (route) => {
+    if (session) navigate(route);
+    else handleCTA();
+  };
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100vh" }}>
@@ -449,6 +705,9 @@ export default function LandingPage() {
           <div className="nav-right">
             <a href="/about" className="nav-link">
               About Us
+            </a>
+            <a href="#samples" className="nav-link">
+              Samples
             </a>
             <a href="#services" className="nav-link">
               Services
@@ -472,206 +731,67 @@ export default function LandingPage() {
         <div className="hero-glow" />
         <div className="container">
           <div className="hero-inner">
-            <div className="hero-badge">
-              <div className="hero-badge-dot" />
-              Creative Production Studio
+            <div className="hero-rating">
+              <span className="hero-stars">★★★★★</span>
+              <strong>4.8</strong>
+              <span className="div" />
+              <span>Trusted by <strong>1,500+</strong> creators</span>
             </div>
             <h1 className="hero-h1">
-              One Platform.
+              The only video tool
               <br />
-              All Your <span className="yellow">Creatives.</span>
+              you'll ever <span className="yellow">need.</span>
             </h1>
             <p className="hero-sub">
-              Generate video ads, social posts, product visuals, voiceovers, thumbnails, and more — without hiring a
-              designer, editor, or content team.
+              Create more videos, save hours of work, and scale your content with one AI-powered platform built for every workflow.
             </p>
-            <div className="hero-actions">
-              <button className="hero-cta" onClick={handleCTA}>
-                Start Creating Free →
-              </button>
-              <button
-                className="hero-cta-ghost"
-                onClick={() => document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })}
-              >
-                See All Services
-              </button>
+            <HeroChatbox onSubmit={handleCTA} />
+            <div className="hero-platforms">
+              <div className="hero-platforms-label">Create &amp; auto-publish to</div>
+              <div className="hero-platforms-row">
+                <span>YouTube</span>
+                <span>Instagram</span>
+                <span>TikTok</span>
+                <span>X</span>
+                <span>LinkedIn</span>
+              </div>
             </div>
-            <div className="hero-proof">✦ 50 free credits on signup · No credit card required</div>
           </div>
         </div>
       </section>
 
 
       {/* STATS */}
-      <section className="section hidden" style={{ paddingBottom: 0 }}>
+      <section style={{ padding: "28px 0 0" }}>
         <div className="container">
+          <div className="stats-divider" />
           <div className="stats-row" data-reveal>
-            <div className="stat-cell">
-              <div className="stat-num">10+</div>
-              <div className="stat-label">AI creative services</div>
-            </div>
-            <div className="stat-cell">
-              <div className="stat-num">17</div>
-              <div className="stat-label">Supported content niches</div>
-            </div>
-            <div className="stat-cell">
-              <div className="stat-num">90+</div>
-              <div className="stat-label">Unique visual layouts</div>
-            </div>
-            <div className="stat-cell">
-              <div className="stat-num">&lt;5m</div>
-              <div className="stat-label">From idea to finished asset</div>
-            </div>
+            {HERO_STATS.map((s, i) => (
+              <div key={i} className="stat-cell">
+                <div className="stat-num"><CountUp to={s.to} prefix={s.prefix} suffix={s.suffix} /></div>
+                <div className="stat-label">{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
+
+      {/* SAMPLES — live, admin-curated outputs */}
+      <SamplesGallery />
 
       {/* SERVICES */}
       <section className="section" id="services">
         <div className="container">
           <div className="section-label">The Full Suite</div>
-
-          {/* ── Desktop bento grid ── */}
-          <div className="services-desktop">
-          {(() => {
-            const CARDS = [
-              { emoji: "🎬", name: "AI Video Generator",    desc: "Script to viral video in minutes",       route: "/new",            accent: "#7c5cfc", col: "span 3", image: "/assets/images/services/AIVideoGenerator.png"    },
-              { emoji: "📦", name: "Product Video Ads",     desc: "One photo → cinematic ad",               route: "/product-video",    accent: "#f97316", col: "span 2", image: "/assets/images/services/ProductVideoAds.png"     },
-              { emoji: "👗", name: "Virtual Try-On",        desc: "AI model wearing your product",          route: "/virtual-tryon",  accent: "#ec4899", col: "span 2", image: "/assets/images/services/VirtualTryOn.png"        },
-              { emoji: "🎨", name: "Banner Design",         desc: "Social media banners in seconds",        route: "/banner-design",  accent: "#f5c518", col: "span 2", image: "/assets/images/services/BannerDesign.png"        },
-              { emoji: "🖼️", name: "Thumbnail Generator",  desc: "Click-worthy thumbnails with AI",        route: "/thumbnail",      accent: "#ef4444", col: "span 2", image: "/assets/images/services/ThumbnailGenerator.png"  },
-              { emoji: "🎨", name: "Poster Studio",         desc: "Luxury product posters in seconds",      route: "/product-poster", accent: "#d946ef", col: "span 2", image: "/assets/images/services/PosterStudio.png"        },
-              { emoji: "💬", name: "Caption Studio",        desc: "Auto-captions with style",               route: "/video-captions", accent: "#22c55e", col: "span 2", image: "/assets/images/services/CaptionStudio.png"       },
-              { emoji: "🎙️", name: "Voice Studio",         desc: "Natural AI voiceovers, multilingual",    route: "/voiceover",      accent: "#3b82f6", col: "span 3", image: "/assets/images/services/VoiceStudio.png"         },
-              { emoji: "🔤", name: "Speech to Text",        desc: "Accurate transcription instantly",       route: "/speech-to-text", accent: "#8b5cf6", col: "span 3", image: "/assets/images/services/SpeechtoText.png"        },
-            ];
-
-            const cardStyle = (accent, col, image) => ({
-              gridColumn: col,
-              position: "relative",
-              background: image ? `url(${image}) center/cover no-repeat` : "#13131e",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 18,
-              padding: "28px 24px 22px",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              minHeight: col === "span 3" ? 240 : 190,
-              overflow: "hidden",
-              transition: "border-color 0.2s, transform 0.2s",
-              cursor: "pointer",
-            });
-
-            return (
-              <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginTop: 40 }}>
-                {/* Row 1 left — heading card */}
-                <div style={{
-                  gridColumn: "span 3",
-                  background: "linear-gradient(135deg, #13131e 60%, rgba(245,197,24,0.07))",
-                  border: "1px solid rgba(245,197,24,0.18)",
-                  borderRadius: 18,
-                  padding: "36px 32px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  minHeight: 240,
-                }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2, color: "#f5c518", fontFamily: "var(--font-mono)", textTransform: "uppercase", marginBottom: 16 }}>The Full Suite</div>
-                  <h2 style={{ margin: 0, fontSize: "clamp(44px, 5.6vw, 68px)", fontWeight: 800, color: "#e8e8f0", lineHeight: 1.15, letterSpacing: "-0.5px", textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
-                    Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
-                  </h2>
-                  <p style={{ margin: "14px 0 0", fontSize: 18, color: "#e8e8f0", lineHeight: 1.6, maxWidth: 340 }}>
-                    Every creative tool your brand needs — in one place.
-                  </p>
-                </div>
-
-                {/* Service cards */}
-                {CARDS.map((svc) => (
-                  <div
-                    key={svc.name}
-                    data-service={svc.name}
-                    style={cardStyle(svc.accent, svc.col, svc.image)}
-                    onClick={() => navigate(svc.route)}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = svc.accent + "55"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.transform = "translateY(0)"; }}
-                  >
-                    {/* Dark overlay for text readability over background image */}
-                    {svc.image && (
-                      <div style={{ position: "absolute", inset: "-1px", background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.72) 100%)", pointerEvents: "none" }} />
-                    )}
-                    {/* Accent glow */}
-                    {!svc.image && (
-                      <div style={{ position: "absolute", top: -60, right: -60, width: 160, height: 160, borderRadius: "50%", background: svc.accent, opacity: 0.07, pointerEvents: "none" }} />
-                    )}
-
-                    {/* Bottom — name + desc + button */}
-                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, position: "relative", zIndex: 1, marginTop: "auto" }}>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3, fontFamily: "'Outfit', sans-serif", textTransform: "uppercase" }}>{svc.name}</div>
-                          <span style={{ fontSize: 20 }}>{svc.emoji}</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: "#e8e8f0", marginTop: 4, lineHeight: 1.4 }}>{svc.desc}</div>
-                      </div>
-                      <button
-                        style={{
-                          flexShrink: 0,
-                          background: svc.accent + "22",
-                          border: `1px solid ${svc.accent}55`,
-                          color: svc.accent,
-                          borderRadius: 20,
-                          padding: "5px 13px",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = svc.accent + "44"}
-                        onMouseLeave={e => e.currentTarget.style.background = svc.accent + "22"}
-                      >
-                        Open →
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          </div>{/* end services-desktop */}
-
-          {/* ── Mobile service list ── */}
-          <div className="services-mobile">
-            <div style={{ marginBottom: 28 }}>
-              <h2 style={{ margin: 0, fontSize: 38, fontWeight: 800, color: "#e8e8f0", lineHeight: 1.1, textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
-                Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
-              </h2>
-              <p style={{ margin: "10px 0 0", fontSize: 15, color: "#e8e8f0", lineHeight: 1.5 }}>Every creative tool your brand needs — in one place.</p>
-            </div>
-            <div className="m-svc-grid">
-              {[
-                { emoji: "🎬", name: "AI Video Generator",   desc: "Script to viral video",          route: "/new",            accent: "#7c5cfc", image: "/assets/images/services/AIVideoGenerator.png"   },
-                { emoji: "📦", name: "Product Video Ads",    desc: "One photo → cinematic ad",       route: "/product-video",    accent: "#f97316", image: "/assets/images/services/ProductVideoAds.png"    },
-                { emoji: "👗", name: "Virtual Try-On",       desc: "AI model, your product",         route: "/virtual-tryon",  accent: "#ec4899", image: "/assets/images/services/VirtualTryOn.png"       },
-                { emoji: "🎨", name: "Banner Design",        desc: "Social banners in seconds",      route: "/banner-design",  accent: "#f5c518", image: "/assets/images/services/BannerDesign.png"       },
-                { emoji: "🖼️", name: "Thumbnails",          desc: "Click-worthy AI thumbnails",     route: "/thumbnail",      accent: "#ef4444", image: "/assets/images/services/ThumbnailGenerator.png" },
-                { emoji: "🎨", name: "Poster Studio",        desc: "Luxury product posters",         route: "/product-poster", accent: "#d946ef", image: "/assets/images/services/PosterStudio.png"       },
-                { emoji: "💬", name: "Caption Studio",       desc: "Auto-captions with style",       route: "/video-captions", accent: "#22c55e", image: "/assets/images/services/CaptionStudio.png"      },
-                { emoji: "🎙️", name: "Voice Studio",        desc: "AI voiceovers, multilingual",    route: "/voiceover",      accent: "#3b82f6", image: "/assets/images/services/VoiceStudio.png"        },
-                { emoji: "🔤", name: "Speech to Text",       desc: "Accurate transcription",         route: "/speech-to-text", accent: "#8b5cf6", image: "/assets/images/services/SpeechtoText.png"       },
-              ].map(svc => (
-                <div key={svc.name} className="m-svc-card"
-                  style={{ background: svc.image ? `url(${svc.image}) center/cover no-repeat` : "#13131e", borderColor: svc.accent + "33" }}
-                  onClick={() => navigate(svc.route)}
-                >
-                  {svc.image && <div className="m-svc-card-overlay" />}
-                  <div className="m-svc-card-name" style={{ color: "#e8e8f0" }}>{svc.name}</div>
-                  <div className="m-svc-card-desc">{svc.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
+          <h2 className="section-h">
+            Stop switching tabs.
+            <br />
+            <span className="yellow">Start creating.</span>
+          </h2>
+          <p className="section-sub">
+            Every creative tool your brand needs — video, image, and audio — in one place.
+          </p>
+          <FullSuiteBento onTileClick={handleCardClick} />
         </div>
       </section>
 
@@ -781,7 +901,7 @@ export default function LandingPage() {
       </section>
 
       {/* VS COMPETITORS */}
-      <section className="section">
+      <section className="section" style={{ display: "none" }}>
         <div className="container">
           <div className="compare-layout">
             <div className="compare-intro">
@@ -806,16 +926,22 @@ export default function LandingPage() {
                 </div>
               </div>
               {[
-              ["AI Video Generation", false, true],
-              ["Product Video Ads", false, true],
+              ["AI Video (prompt → video)", false, true],
+              ["Promo Video (incl. URL mode)", false, true],
+              ["Social-to-Video", false, true],
+              ["Typography Video", false, true],
+              ["Talking Head Video", false, true],
+              ["Product Video & Ads", false, true],
+              ["AI Image Generation", false, true],
               ["Virtual Try-On for Clothing", false, true],
-              ["Social Media Post Generator", false, true],
+              ["Social / Banner Design", false, true],
               ["Thumbnail Generator", false, true],
-              ["Poster & Banner Studio", false, true],
+              ["Poster Studio", false, true],
               ["Voice Studio & TTS", "separate tool", true],
-              ["Caption Studio", "separate tool", true],
+              ["Auto Captions", "separate tool", true],
               ["Speech to Text / Transcription", "separate tool", true],
-              ["Full Video Editor", false, true],
+              ["Full Timeline Editor", false, true],
+              ["Automation & Auto-publish", false, true],
               ["All in one dashboard", false, true],
             ].map(([feat, others, ours], i) => (
               <div key={i} className="compare-row">
@@ -852,16 +978,17 @@ export default function LandingPage() {
             <br />
             <span className="yellow">No surprises.</span>
           </h2>
-          <p className="section-sub">One plan unlocks every service. Cancel anytime.</p>
+          <p className="section-sub">Start free. Every plan unlocks every service. Upgrade or cancel anytime.</p>
+          
 
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 32, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 34 }}>
             <div
               style={{
                 display: "inline-flex",
                 background: "var(--card)",
                 border: "1px solid var(--border2)",
-                borderRadius: 10,
-                padding: 4,
+                borderRadius: 12,
+                padding: 5,
                 gap: 4,
               }}
             >
@@ -870,11 +997,11 @@ export default function LandingPage() {
                   key={c}
                   onClick={() => setCycle(c)}
                   style={{
-                    padding: "7px 20px",
-                    borderRadius: 7,
+                    padding: "10px 30px",
+                    borderRadius: 9,
                     border: "none",
                     cursor: "pointer",
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: 700,
                     fontFamily: "var(--font-body)",
                     background: cycle === c ? "var(--yellow)" : "transparent",
@@ -893,189 +1020,113 @@ export default function LandingPage() {
                 </button>
               ))}
             </div>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--dim)" }}>
-              Live rate: 1 USD = ₹{rate.toFixed(2)}
-            </div>
           </div>
+
+          
 
           <div
             className="pricing-grid"
             data-reveal
             style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}
           >
-            {plans.length === 0
-              ? [0, 1, 2].map((i) => <div key={i} className="plan" style={{ opacity: 0.3, minHeight: 320 }} />)
-              : plans.map((plan, planIndex) => {
-                  const monthly = plan.price_monthly;
-                  const discount = plan.discount_percent || 0;
-                  const annualTotal = Math.round(monthly * 12 * (1 - discount / 100));
-                  const annualPerMo = Math.round(annualTotal / 12);
-                  const usd = cycle === "annual" ? annualPerMo : monthly;
-                  const hasDiscount = cycle === "annual" && discount > 0;
-                  const inr = toINR(usd, rate);
-                  const meterWidth = `${Math.min(100, 42 + planIndex * 24)}%`;
-                  const PLAN_FEATURES = {
-                    starter: [
-                      "1,800 Credits/month",
-                      "Product Ad Studio",
-                      "TTS Voiceover",
-                      "AI Image Generator",
-                      "Product Poster",
-                      "Video Captions",
-                      "AI Video Generator",
-                      "Typography Videos",
-                    ],
-                    pro: [
-                      "3,500 Credits/month",
-                      "Product Ad Studio",
-                      "TTS Voiceover",
-                      "AI Image Generator",
-                      "Product Poster",
-                      "Video Captions",
-                      "AI Video Generator",
-                      "Typography Videos",
-                      "Explainer Videos",
-                      "Banner & Thumbnail Generator",
-                      "Virtual Try-On",
-                      "Speech to Text",
-                    ],
-                    agency: [
-                      "6,000 Credits/month",
-                      "Product Ad Studio",
-                      "TTS Voiceover",
-                      "AI Image Generator",
-                      "Product Poster",
-                      "Video Captions",
-                      "AI Video Generator",
-                      "Typography Videos",
-                      "Explainer Videos",
-                      "Banner & Thumbnail Generator",
-                      "Virtual Try-On",
-                      "Speech to Text",
-                      "Product Video Ads",
-                      "Social Media Post Generator",
-                      "Best credit value per dollar",
-                    ],
-                  };
-                  const feats = PLAN_FEATURES[plan.slug] || [];
-                  return (
-                    <div key={plan.id} className={`plan${plan.is_popular ? " plan-hot" : ""}`}>
-                      {plan.is_popular && <div className="plan-hot-badge">Most Popular</div>}
-                      <div className="plan-head">
-                        <div className="plan-name">{plan.name}</div>
-                        <div className="plan-mini-chip">{cycle === "annual" ? "Annual" : "Monthly"}</div>
-                      </div>
-                      {cycle === "annual" ? (
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                            <div className="plan-price">
-                              <span>$</span>
-                              {annualTotal}
-                            </div>
-                            {hasDiscount && (
-                              <div
-                                style={{
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 18,
-                                  color: "var(--dim)",
-                                  textDecoration: "line-through",
-                                }}
-                              >
-                                ${monthly * 12}
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                            <div className="plan-cycle" style={{ marginBottom: 0 }}>
-                              per year
-                            </div>
-                            {hasDiscount && (
-                              <div
-                                style={{
-                                  display: "inline-block",
-                                  background: "rgba(245,197,24,0.15)",
-                                  color: "var(--yellow)",
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  letterSpacing: "0.05em",
-                                  padding: "2px 8px",
-                                  borderRadius: 4,
-                                }}
-                              >
-                                {discount}% OFF
-                              </div>
-                            )}
-                          </div>
-                          <div
-                            style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--dim)", marginTop: 4 }}
-                          >
-                            ≈ ₹{toINR(annualTotal, rate)}/yr · ${annualPerMo}/mo
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ marginBottom: 16 }}>
-                          <div className="plan-price">
-                            <span>$</span>
-                            {monthly}
-                          </div>
-                          <div className="plan-cycle" style={{ marginBottom: 2 }}>
-                            per month
-                          </div>
-                          <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--dim)" }}>
-                            ≈ ₹{inr}/mo
-                          </div>
-                        </div>
-                      )}
-                      <div className="plan-meter" aria-hidden="true">
-                        <div className="plan-meter-fill" style={{ width: meterWidth }} />
-                      </div>
-                      <div className="plan-hr" />
-                      <ul className="plan-feats">
-                        {feats.map((f, i) => (
-                          <li key={i}>{f}</li>
-                        ))}
-                      </ul>
-                      <button
-                        className={`plan-btn ${plan.is_popular ? "plan-btn-hot" : "plan-btn-default"}`}
-                        onClick={() => navigate(`/checkout?plan=${plan.slug}&cycle=${cycle}`)}
-                      >
-                        Get Started
-                      </button>
+            {/* Free */}
+            <div className="plan">
+              <div className="plan-head">
+                <div className="plan-name">Free</div>
+              </div>
+              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For getting started.</p>
+              <div className="plan-price-row">
+                <div>
+                  <div className="plan-price"><span>$</span>0</div>
+                  <div className="plan-cycle" style={{ marginBottom: 2 }}>free forever</div>
+                </div>
+              </div>
+              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={handleCTA}>
+                Start free
+              </button>
+              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>No credit card required</div>
+              <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <Check>⚡ 150 credits to start</Check>
+                <Check>Watermarked exports</Check>
+                <VideoServicesList />
+                <Cross>Automation &amp; auto-publish to social</Cross>
+                <Cross>Credit top-ups anytime</Cross>
+              </div>
+            </div>
+
+            {/* Pro — the single paid plan */}
+            <div className="plan plan-hot">
+              <div className="plan-hot-badge">Most Popular</div>
+              <div className="plan-head">
+                <div className="plan-name">Pro</div>
+              </div>
+              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For creators, marketers &amp; teams.</p>
+              <div className="plan-price-row">
+                {cycle === "annual" ? (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: "var(--dim)", textDecoration: "line-through" }}>$49</div>
+                      <div className="plan-price" ><span>$</span>41</div>
+                      <span style={{ fontSize: 14, color: "var(--dim)" }}>/mo</span>
                     </div>
-                  );
-                })}
-          </div>
+                    <div className="plan-cycle" style={{ marginBottom: 2, marginTop: 4 }}>$490 billed annually · 17% off</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="plan-price"><span>$</span>49<span style={{ fontSize: 14, color: "var(--dim)" }}> /mo</span></div>
+                    <div className="plan-cycle" style={{ marginBottom: 2 }}>billed monthly</div>
+                  </div>
+                )}
+              </div>
+              <button className="plan-btn plan-btn-hot" style={{ marginTop: 16 }} onClick={() => navigate(`/checkout?plan=pro&cycle=${cycle}`)}>
+                Get Started
+              </button>
+              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>150 free credits first · cancel anytime</div>
+              <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <Check>⚡ 1,500 credits / month</Check>
+                <Check>≈ 100 short or 25 long videos / month</Check>
+                <VideoServicesList />
+                <PlusLabel>Everything in Free, plus:</PlusLabel>
+                <Check>Automation &amp; auto-publish to social</Check>
+                <Check>Credit top-ups anytime</Check>
+              </div>
+            </div>
 
-          <div
-            style={{
-              marginTop: 24,
-              textAlign: "center",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--dim)",
-              letterSpacing: 1,
-            }}
-          >
-            50 free credits on signup · No credit card required · Cancel anytime
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="faq-section">
-        <div className="container">
-          <div className="faq-inner">
-            <div className="section-label">Questions</div>
-            <h2 className="section-h" style={{ marginBottom: 48 }}>
-              Things people
-              <br />
-              <span className="yellow">actually ask.</span>
-            </h2>
-            <div data-reveal>
-              {faqs.map((faq, i) => (
-                <FAQItem key={i} q={faq.q} a={faq.a} />
-              ))}
+            {/* Agency — high-volume teams */}
+            <div className="plan">
+              <div className="plan-head">
+                <div className="plan-name">Agency</div>
+              </div>
+              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For agencies &amp; high-volume teams.</p>
+              <div className="plan-price-row">
+                {cycle === "annual" ? (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: "var(--dim)", textDecoration: "line-through" }}>$99</div>
+                      <div className="plan-price" ><span>$</span>83</div>
+                      <span style={{ fontSize: 14, color: "var(--dim)" }}>/mo</span>
+                    </div>
+                    <div className="plan-cycle" style={{ marginBottom: 2, marginTop: 4 }}>$990 billed annually · 17% off</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="plan-price"><span>$</span>99<span style={{ fontSize: 14, color: "var(--dim)" }}> /mo</span></div>
+                    <div className="plan-cycle" style={{ marginBottom: 2 }}>billed monthly</div>
+                  </div>
+                )}
+              </div>
+              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={() => navigate(`/checkout?plan=agency&cycle=${cycle}`)}>
+                Get Started
+              </button>
+              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
+              <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <Check>⚡ 4,000 credits / month</Check>
+                <Check>≈ 260 short or 65 long videos / month</Check>
+                <VideoServicesList />
+                <PlusLabel>Everything in Pro, plus:</PlusLabel>
+                <Check>More credits for high-volume output</Check>
+                <Check>Best value — lower cost per credit</Check>
+              </div>
             </div>
           </div>
         </div>
@@ -1091,7 +1142,7 @@ export default function LandingPage() {
                 <br />
                 Start creating.
               </div>
-              <div className="cta-banner-sub">50 free credits. No card required. Every service unlocked.</div>
+              <div className="cta-banner-sub">150 free credits. No card required. Every service unlocked.</div>
             </div>
             <button className="cta-banner-btn" onClick={handleCTA}>
               Get Started Free →
@@ -1110,6 +1161,9 @@ export default function LandingPage() {
             <div className="footer-links">
               <a href="/about" className="footer-link">
                 About
+              </a>
+              <a href="/faq" className="footer-link">
+                FAQ
               </a>
               <a href="/terms" className="footer-link">
                 Terms

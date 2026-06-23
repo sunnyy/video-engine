@@ -1,11 +1,9 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runPromptPipeline, runPromptPlan } from "../../services/ai/promptVideo/pipelineOrchestrator.js";
-import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
+import { creditsForDuration } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
-
-const PROMPT_VIDEO_CREDITS = CREDIT_COSTS.ai_video;
 
 // ── POST /ai-video/plan ──────────────────────────────────────────────────
 // The cheap half: research + script + shot plan, returned for user review.
@@ -48,19 +46,22 @@ router.post("/generate", requireAuth, async (req, res) => {
 
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
+  const effDuration = Math.min(75, Math.max(15, parseInt(targetDuration, 10) || 45));
+  const cost = creditsForDuration(effDuration);
+
   try {
-    const deduction = await deductCredits(userId, PROMPT_VIDEO_CREDITS, "ai_video", "AI Video generation", null);
+    const deduction = await deductCredits(userId, cost, "ai_video", `AI Video generation (${effDuration}s)`, null);
     if (!deduction.success) {
       send({ error: "Insufficient credits", code: "NO_CREDITS" });
       return res.end();
     }
-    creditAmount = PROMPT_VIDEO_CREDITS;
+    creditAmount = cost;
 
     const result = await runPromptPipeline(
       {
         prompt: prompt.trim(), userId,
         styleId: styleId ?? "auto",
-        targetDuration: Math.min(75, Math.max(15, parseInt(targetDuration, 10) || 45)),
+        targetDuration: effDuration,
         language: language ?? "en",
         voiceId: voiceId ?? null,
         orientation: ["9:16", "16:9", "1:1", "4:5"].includes(orientation) ? orientation : "9:16",

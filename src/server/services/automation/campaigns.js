@@ -15,7 +15,7 @@ export const STATUSES = ["draft", "active", "paused", "stopped"];
 // Fields a user may set when creating/updating a campaign. `status` is NOT here — it only
 // changes through the lifecycle helpers so transitions stay explicit and auditable.
 const EDITABLE = [
-  "name", "niches", "audience", "tone", "language", "orientation", "style_id", "voice_id",
+  "name", "service", "niches", "audience", "tone", "language", "orientation", "style_id", "voice_id",
   "target_duration", "keywords_emphasize", "keywords_avoid", "posts_per_day", "posting_times",
   "ai_decide_times", "target_accounts", "privacy", "auto_publish", "brand_kit_id",
   "daily_cap", "monthly_cap",

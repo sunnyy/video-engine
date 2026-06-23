@@ -586,6 +586,9 @@ export async function runPromptPipeline(params, onStep) {
   await injectMusic(finalTimeline, { mood: film.music_mood, volume: 0.2, fadeIn: 0.8, fadeOut: 1.5, label: "ai-video" });
 
   finalTimeline.full_script = fullScript;
+  // Persist source + generated publish copy in the project meta so the editor's Publish
+  // button can detect Prompt-to-Video and pre-fill the title/caption/hashtags.
+  finalTimeline.meta = { ...(finalTimeline.meta || {}), source: "ai_video", publish: film.publish || null };
 
   // ── Stage 7: Save with regen context ──────────────────────────────────────
   step(PROMPT_STATUS_STEPS[7]);
@@ -629,5 +632,6 @@ export async function runPromptPipeline(params, onStep) {
     projectName:      film.project_name,
     beatCount:        beats.length,
     duration_seconds: parseFloat(totalDur.toFixed(2)),
+    publish:          film.publish || null, // social post copy: { title, description, hashtags }
   };
 }

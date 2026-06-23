@@ -66,7 +66,11 @@ export default function VideoEditor() {
               .single();
             if (fetchError) throw fetchError;
             setProjectId(data.id);
-            setProject(data.safe_project_json);
+            // Backfill meta.source from the DB column so service detection (Publish button,
+            // Back target) works even for projects saved before meta.source existed.
+            const sp = data.safe_project_json || {};
+            sp.meta = { ...(sp.meta || {}), source: sp.meta?.source || data.source };
+            setProject(sp);
           }
         }
       } catch (err) {

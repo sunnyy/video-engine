@@ -168,6 +168,8 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
     const now = new Date();
     const periodDays = billingCycle === "annual" ? 365 : 30;
     const periodEnd  = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
+    // Annual = 12 months of credits granted up front (credits never expire). Monthly = one month.
+    const creditsToGrant = billingCycle === "annual" ? creditsToGrant * 12 : creditsToGrant;
 
     // Detect upgrade vs renewal: check for existing active subscription
     const { data: existingSub } = await supabaseAdmin
@@ -197,7 +199,7 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
       status:                 "active",
       billing_cycle:          billingCycle,
       price_paid:             amountINR,
-      credits_granted:        plan.credits,
+      credits_granted:        creditsToGrant,
       current_period_start:   now.toISOString(),
       current_period_end:     periodEnd.toISOString(),
       razorpay_payment_id,
@@ -206,7 +208,7 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
 
     // Add credits
     const { balance: newBalance } = await addCredits(
-      req.user.id, plan.credits, "purchase", "plan_subscription",
+      req.user.id, creditsToGrant, "purchase", "plan_subscription",
       `${plan.name} plan – ${billingCycle}`, razorpay_payment_id,
     );
 
@@ -219,29 +221,29 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
       if (isRenewal) {
         const adminEmail = adminPlanRenewalEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2) });
         sendAdminAlert(adminEmail.subject, adminEmail.html);
-        const userEmail = userPlanRenewalEmail(name, plan.name, plan.credits, nextRenewal);
+        const userEmail = userPlanRenewalEmail(name, plan.name, creditsToGrant, nextRenewal);
         sendUserEmail(user.email, userEmail.subject, userEmail.html);
         notifyUser(user.id, { type: "plan_renewed", icon: "🔁", severity: "success", link: "/credits",
-          title: `Your ${plan.name} plan was renewed`, body: `${plan.credits} credits added · next renewal ${nextRenewal}` });
+          title: `Your ${plan.name} plan was renewed`, body: `${creditsToGrant} credits added · next renewal ${nextRenewal}` });
       } else if (isUpgrade) {
         const adminEmail = adminPlanUpgradeEmail({ userEmail: user.email, fromPlan: prevPlanName, toPlan: plan.name, amount: amountINR.toFixed(2) });
         sendAdminAlert(adminEmail.subject, adminEmail.html);
-        const userEmail = userPlanUpgradeEmail(name, prevPlanName, plan.name, plan.credits);
+        const userEmail = userPlanUpgradeEmail(name, prevPlanName, plan.name, creditsToGrant);
         sendUserEmail(user.email, userEmail.subject, userEmail.html);
         notifyUser(user.id, { type: "plan_upgraded", icon: "⬆️", severity: "success", link: "/credits",
-          title: `Upgraded to ${plan.name}`, body: `From ${prevPlanName} · ${plan.credits} credits added` });
+          title: `Upgraded to ${plan.name}`, body: `From ${prevPlanName} · ${creditsToGrant} credits added` });
       } else {
         // New subscription
-        const adminEmail = adminNewSaleEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2), credits: plan.credits });
+        const adminEmail = adminNewSaleEmail({ userEmail: user.email, plan: plan.name, amount: amountINR.toFixed(2), credits: creditsToGrant });
         sendAdminAlert(adminEmail.subject, adminEmail.html);
-        const userEmail = userCreditsPurchasedEmail(name, plan.credits, newBalance);
+        const userEmail = userCreditsPurchasedEmail(name, creditsToGrant, newBalance);
         sendUserEmail(user.email, userEmail.subject, userEmail.html);
         notifyUser(user.id, { type: "plan_purchased", icon: "🎉", severity: "success", link: "/credits",
-          title: `Welcome to ${plan.name}`, body: `${plan.credits} credits added · balance ${newBalance}` });
+          title: `Welcome to ${plan.name}`, body: `${creditsToGrant} credits added · balance ${newBalance}` });
       }
     }).catch(() => {});
 
-    res.json({ success: true, credits: plan.credits, balance: newBalance });
+    res.json({ success: true, credits: creditsToGrant, balance: newBalance });
   } catch (err) {
     console.error("[payments/verify]", err.message);
     res.status(500).json({ error: err.message });
@@ -268,12 +270,12 @@ router.get("/payments/subscription", requireAuth, async (req, res) => {
 });
 
 /* ── Credit top-up packages ── */
+// Credit packs — priced ≥ the $49/1,500 plan's per-credit rate so packs never undercut subscribing.
+// Available to everyone (no subscription required) — if someone wants to buy credits, take the sale.
 const CREDIT_PACKAGES = [
-  { id: "topup_500",   credits: 500,   priceUSD: 5,  label: "500 Credits"    },
-  { id: "topup_1200",  credits: 1200,  priceUSD: 10, label: "1,200 Credits"  },
-  { id: "topup_2500",  credits: 2500,  priceUSD: 20, label: "2,500 Credits"  },
-  { id: "topup_5000",  credits: 5000,  priceUSD: 35, label: "5,000 Credits"  },
-  { id: "topup_10000", credits: 10000, priceUSD: 50, label: "10,000 Credits" },
+  { id: "topup_500",  credits: 500,  priceUSD: 19, label: "500 Credits"   },
+  { id: "topup_1500", credits: 1500, priceUSD: 49, label: "1,500 Credits" },
+  { id: "topup_3000", credits: 3000, priceUSD: 99, label: "3,000 Credits" },
 ];
 
 router.get("/credits/packages", async (_req, res) => {
@@ -288,15 +290,12 @@ router.post("/credits/topup/create-order", requireAuth, async (req, res) => {
     const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);
     if (!pkg) return res.status(404).json({ error: "Package not found" });
 
+    // Credit packs are for paid subscribers only — otherwise free accounts could farm cheap credits.
     const { data: sub } = await supabaseAdmin
-      .from("subscriptions")
-      .select("id")
-      .eq("user_id", req.user.id)
-      .eq("status", "active")
-      .maybeSingle();
+      .from("subscriptions").select("id").eq("user_id", req.user.id).eq("status", "active").maybeSingle();
     if (!sub) return res.status(403).json({ error: "Active plan required to purchase credits", code: "SUBSCRIPTION_REQUIRED" });
 
-    if (pkg.priceUSD > 50) return res.status(400).json({ error: "Maximum top-up is $50" });
+    if (pkg.priceUSD > 100) return res.status(400).json({ error: "Maximum top-up is $100" });
 
     const rate = (typeof clientRate === "number" && clientRate >= 50 && clientRate <= 150)
       ? clientRate : await getUSDtoINR();

@@ -88,6 +88,7 @@ export default function CampaignDetail() {
 
   const c = data.campaign;
   const st = STATUS[c.status] || STATUS.draft;
+  const generating = (data.active || []).some(j => j.type === "generate_video"); // a video is already being made
   const fieldStyle = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13, padding: "8px 10px", outline: "none", fontFamily: "inherit" };
   const lbl = { fontSize: 11, fontWeight: 700, color: T.muted, marginBottom: 4, display: "block" };
   const opt = { background: T.surface, color: T.text };
@@ -108,7 +109,7 @@ export default function CampaignDetail() {
               <span style={{ fontSize: 11, fontWeight: 700, color: st.color, background: `${st.color}1c`, padding: "3px 10px", borderRadius: 20 }}>{st.label}</span>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <button onClick={() => act("run-once")} disabled={busy} style={btn(T.accent)}>Run once</button>
+              <button onClick={() => act("run-once")} disabled={busy || generating} style={btn(generating ? "#3a3a52" : T.accent)}>{generating ? "Generating…" : "Run once"}</button>
               {(c.status === "draft" || c.status === "stopped") && <button onClick={() => act("start")} disabled={busy} style={btn("#22c55e")}>Start</button>}
               {c.status === "active" && <button onClick={() => act("pause")} disabled={busy} style={btn("#3a3a52")}>Pause</button>}
               {c.status === "paused" && <button onClick={() => act("resume")} disabled={busy} style={btn("#22c55e")}>Resume</button>}
@@ -208,7 +209,7 @@ export default function CampaignDetail() {
                       {j.type === "render_timeline" && j.progress ? ` ${j.progress}%` : ""}
                       <span style={{ color: T.faint, marginLeft: 6 }}>{j.status}</span>
                     </span>
-                    {j.status === "queued" && <button onClick={() => act("cancel-job", { body: { jobId: j.id } })} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5 }}>Cancel</button>}
+                    {(j.status === "queued" || j.status === "running") && <button onClick={() => act("cancel-job", { body: { jobId: j.id } })} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5 }}>{j.status === "running" ? "Abort" : "Cancel"}</button>}
                   </div>
                 ))}
 

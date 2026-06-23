@@ -17,6 +17,7 @@ import TermsOfService  from "./pages/legal/TermsOfService";
 import PrivacyPolicy   from "./pages/legal/PrivacyPolicy";
 import RefundPolicy    from "./pages/legal/RefundPolicy";
 import About           from "./pages/About";
+import FAQ             from "./pages/FAQ";
 import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
@@ -42,6 +43,7 @@ import SaasVideo            from "./pages/SaasVideo";
 import PromptVideo           from "./pages/PromptVideo";
 import BrandKit              from "./pages/BrandKit";
 import Automation          from "./pages/Automation";
+import SocialAccounts      from "./pages/SocialAccounts";
 import CampaignDetail      from "./pages/CampaignDetail";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
@@ -138,6 +140,7 @@ export default function App() {
         {/* ── Public routes — always accessible ── */}
         <Route path="/"              element={<LandingPage />} />
         <Route path="/about"         element={<About />} />
+        <Route path="/faq"           element={<FAQ />} />
         <Route path="/terms"         element={<TermsOfService />} />
         <Route path="/privacy"       element={<PrivacyPolicy />} />
         <Route path="/refunds"       element={<RefundPolicy />} />
@@ -164,6 +167,7 @@ export default function App() {
             <Route path="/settings"         element={<Settings />} />
             <Route path="/brand-kit"        element={<BrandKit />} />
             <Route path="/automation"       element={<Automation />} />
+            <Route path="/connections"      element={<SocialAccounts />} />
             <Route path="/automation/campaigns/:id" element={<CampaignDetail />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
             <Route path="/promo-video"             element={<SaasVideo />} />

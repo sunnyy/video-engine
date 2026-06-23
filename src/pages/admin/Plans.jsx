@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "./AdminLayout";
 import { serverFetch } from "../../services/serverApi";
-import { CREDIT_COSTS } from "../../core/utils/creditCosts";
+import { CREDIT_COSTS, VIDEO_DURATION_BANDS, creditsForDuration } from "../../core/utils/creditCosts";
 
 /* ── helpers ── */
 async function safeJson(res) {
@@ -162,19 +162,24 @@ function PlanModal({ plan, onClose, onSaved }) {
   );
 }
 
+/* ── Credit-cost reference row ── */
+function Ref({ label, cost }) {
+  return (
+    <div className="flex items-center justify-between bg-white/[0.03] rounded-lg px-3 py-2">
+      <span className="text-sm text-[#888]">{label}</span>
+      <span className="text-sm font-semibold text-[#7c5cfc]">⚡ {cost ?? "—"}</span>
+    </div>
+  );
+}
+
 /* ── Plan card ── */
 function PlanCard({ plan, onEdit, onToggle, onDelete }) {
   const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const color = plan.is_active ? "#7c5cfc" : "#555";
 
-  const videosPerMonth = plan.credits
-    ? Math.floor(plan.credits / Math.ceil(
-        (CREDIT_COSTS.base_generation || 10) +
-        (CREDIT_COSTS.tts_generation  || 5)  +
-        (CREDIT_COSTS.export_local    || 5)
-      ))
-    : "—";
+  // A 15s video is the cheapest full video (75 cr) — use it as the "~videos/mo" yardstick.
+  const videosPerMonth = plan.credits ? Math.floor(plan.credits / creditsForDuration(15)) : "—";
 
   const handleToggle = async () => {
     setToggling(true);
@@ -221,7 +226,7 @@ function PlanCard({ plan, onEdit, onToggle, onDelete }) {
           <span className="text-white font-semibold">⚡ {plan.credits}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-[#666]">~Videos/mo</span>
+          <span className="text-[#666]">~15s videos/mo</span>
           <span className="text-[#aaa]">~{videosPerMonth}</span>
         </div>
         {plan.credits && plan.price_monthly && (
@@ -340,16 +345,42 @@ export default function Plans() {
         </div>
       )}
 
-      {/* Credit cost reference */}
+      {/* Credit cost reference — reflects the live pricing model */}
       <div className="bg-[#111118] border border-white/[0.08] rounded-2xl p-6">
         <div className="text-base font-semibold text-[#ccc] mb-4">Credit Cost Reference</div>
-        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-          {Object.entries(CREDIT_COSTS).map(([action, cost]) => (
-            <div key={action} className="flex items-center justify-between bg-white/[0.03] rounded-lg px-3 py-2">
-              <span className="text-sm text-[#888]">{action.replace(/_/g, " ")}</span>
-              <span className="text-sm font-semibold text-[#7c5cfc]">⚡ {cost}</span>
-            </div>
+
+        <div className="text-xs text-[#888] font-semibold mb-2 uppercase tracking-wide">Video — by duration (AI / Social / Typography)</div>
+        <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+          {Object.entries(VIDEO_DURATION_BANDS).map(([sec, cost]) => (
+            <Ref key={sec} label={`${sec}s video`} cost={cost} />
           ))}
+        </div>
+
+        <div className="text-xs text-[#888] font-semibold mb-2 uppercase tracking-wide">Other video</div>
+        <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }}>
+          <Ref label="Product Video · image /scene"  cost={CREDIT_COSTS.product_video_per_scene?.image} />
+          <Ref label="Product Video · hybrid /scene" cost={CREDIT_COSTS.product_video_per_scene?.hybrid} />
+          <Ref label="Product Video · video /scene"  cost={CREDIT_COSTS.product_video_per_scene?.video} />
+          <Ref label="Promo · 1 scene"  cost={CREDIT_COSTS.promo_video?.[1]} />
+          <Ref label="Promo · 3 scenes" cost={CREDIT_COSTS.promo_video?.[3]} />
+          <Ref label="Promo · 5 scenes" cost={CREDIT_COSTS.promo_video?.[5]} />
+          <Ref label="Talking Head"     cost={CREDIT_COSTS.promo_video_th} />
+        </div>
+
+        <div className="text-xs text-[#888] font-semibold mb-2 uppercase tracking-wide">Tools (flat)</div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }}>
+          <Ref label="AI Image"            cost={CREDIT_COSTS.ai_image} />
+          <Ref label="AI Voiceover (TTS)"  cost={CREDIT_COSTS.tts_generation} />
+          <Ref label="Speech to Text"      cost={CREDIT_COSTS.transcription} />
+          <Ref label="Product Poster"      cost={CREDIT_COSTS.poster_generate} />
+          <Ref label="Thumbnail"           cost={CREDIT_COSTS.thumbnail_generate} />
+          <Ref label="Banner / Social Post" cost={CREDIT_COSTS.social_post} />
+          <Ref label="Virtual Try-On"      cost={CREDIT_COSTS.outfit_tryon} />
+        </div>
+
+        <div className="text-xs text-[#555] mt-5 leading-relaxed">
+          Credit packs (paid plans only): 500 = $19 · 1,500 = $49 · 3,000 = $99.<br />
+          Annual plans grant 12× the monthly credits up front. Credits never expire.
         </div>
       </div>
 

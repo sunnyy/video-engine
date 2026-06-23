@@ -148,7 +148,7 @@ router.post("/webhooks/user-created", async (req, res) => {
 
     try {
       if (!wasDeleted) {
-        await addCredits(id, 50, "bonus", "signup_bonus", "Welcome bonus — free credits");
+        await addCredits(id, 150, "bonus", "signup_bonus", "Welcome bonus — free credits");
       }
     } catch (creditsErr) {
       console.error("[webhook/user-created] Failed to grant credits:", creditsErr.message);
@@ -163,7 +163,7 @@ router.post("/webhooks/user-created", async (req, res) => {
     const welcome = userWelcomeEmail(name);
     sendUserEmail(email, welcome.subject, welcome.html);
     notifyUser(id, { type: "welcome", icon: "🎬", severity: "success", link: "/dashboard",
-      title: "Welcome to Vidquence", body: wasDeleted ? "Your account is ready." : "Your account is ready — 50 free credits to get started." });
+      title: "Welcome to Vidquence", body: wasDeleted ? "Your account is ready." : "Your account is ready — 150 free credits to get started." });
 
     res.json({ success: true });
   } catch (err) {

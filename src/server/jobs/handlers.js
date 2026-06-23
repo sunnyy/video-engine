@@ -6,21 +6,45 @@
  * Automation chain (all keyed by campaignId): generate_video → render_timeline → publish_post.
  */
 import { registerHandler } from "./registry.js";
-import { setProgress, enqueue, heartbeat } from "./queue.js";
+import { setProgress, enqueue, heartbeat, isCancelRequested } from "./queue.js";
 import { renderTimeline } from "../services/renderService.js";
 import { publishToAccount } from "../services/social/service.js";
-import { runPromptPipeline } from "../../services/ai/promptVideo/pipelineOrchestrator.js";
+import { getPipeline } from "../services/pipelines/index.js";
 import { applyBrandKit } from "../../services/ai/shared/brandKit.js";
 import { getCampaign, setCampaignStatus } from "../services/automation/campaigns.js";
 import { getNextTopic, consumeTopic, releaseTopic, getQueuedCount, ensureTopics } from "../services/automation/topics.js";
 import { checkGenerationQuota, checkPublishQuota } from "../services/automation/quotas.js";
 import { logEvent } from "../services/automation/events.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
-import { supabaseAdmin, deductCredits, addCredits, sendUserEmail, userRenderCompleteEmail } from "../middleware/shared.js";
+import { supabaseAdmin, deductCredits, sendUserEmail, userRenderCompleteEmail } from "../middleware/shared.js";
 import { notifyUser, notifyUserById } from "../services/notificationService.js";
 import { resolveAudienceIds } from "../services/announcements/audience.js";
 
-const AUTOPILOT_DURATION = 40; // short-form default (seconds)
+// A cancellation "error" the worker treats as terminal (never retried).
+function cancelledError() { const e = new Error("canceled by user"); e.noRetry = true; return e; }
+
+// Watch the DB cancel flag for a running job and expose a SYNC `cancelled` boolean — render's
+// isCancelled callback is sync (per-frame), and generation checks it between stages. The poll
+// is cheap (cached in isCancelRequested); always stop() it in a finally.
+function watchCancel(jobId) {
+  const state = { cancelled: false };
+  const timer = setInterval(() => { isCancelRequested(jobId).then((c) => { if (c) state.cancelled = true; }).catch(() => {}); }, 3000);
+  timer.unref?.();
+  return { state, stop: () => clearInterval(timer) };
+}
+
+/**
+ * Charge for one generation EXACTLY ONCE per job. Idempotent: the transaction is tagged with
+ * the job id, and we skip if a charge for that job already exists — so a retried or
+ * hard-killed-then-resumed job can never double-charge. Returns { deduped } when already paid.
+ */
+async function chargeForGeneration(userId, cost, jobId) {
+  const tag = `[job:${jobId}]`;
+  const { data: prior } = await supabaseAdmin.from("credit_transactions")
+    .select("id").eq("user_id", userId).eq("action", "ai_video").ilike("description", `%${tag}%`).limit(1).maybeSingle();
+  if (prior) return { success: true, deduped: true };
+  return deductCredits(userId, cost, "ai_video", `Automation video ${tag}`, null);
+}
 
 /** Pause a campaign (cost/credit/config guard tripped) + notify its owner. */
 async function pauseCampaign(campaign, reason) {
@@ -55,10 +79,23 @@ registerHandler("render_timeline", async (payload, job) => {
   }
   if (!project) throw new Error("render_timeline: no project or projectId in payload");
 
-  const { videoUrl, filePath } = await renderTimeline(project, {
-    userId, renderId: job.id, projectId, resolution,
-    onProgress: (pct) => setProgress(job.id, pct),
-  });
+  const watch = watchCancel(job.id);
+  let videoUrl, filePath;
+  try {
+    ({ videoUrl, filePath } = await renderTimeline(project, {
+      userId, renderId: job.id, projectId, resolution,
+      onProgress: (pct) => setProgress(job.id, pct),
+      isCancelled: () => watch.state.cancelled,
+    }));
+  } catch (err) {
+    if (watch.state.cancelled || /RENDER_CANCELLED/.test(err.message || "")) {
+      logEvent({ userId, campaignId, action: "render", entity: "project", entityId: projectId, status: "fail", message: "canceled by user" });
+      throw cancelledError();
+    }
+    throw err;
+  } finally {
+    watch.stop();
+  }
   if (!videoUrl) throw new Error("render_timeline: render produced no durable URL (upload failed)");
 
   // Chain → publish (automation only). Render never re-runs on publish failure: publish is
@@ -150,7 +187,7 @@ registerHandler("publish_post", async (payload) => {
     const result = await publishToAccount(accountId, { url: videoUrl }, metadata);
     await supabaseAdmin.from("published_posts").update({
       status: "published", platform_post_id: result.platform_post_id ?? null,
-      published_at: new Date().toISOString(), meta: result.meta ?? null, error: null,
+      published_at: new Date().toISOString(), meta: { ...(result.meta || {}), url: result.url || null }, error: null,
       updated_at: new Date().toISOString(),
     }).eq("id", postId);
     logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "ok", message: result.url || null, meta: { platform, platform_post_id: result.platform_post_id ?? null } });
@@ -182,7 +219,12 @@ registerHandler("generate_video", async (payload, job) => {
 
   const campaign = await getCampaign(campaignId);
   if (!campaign) { const e = new Error("generate_video: campaign not found"); e.noRetry = true; throw e; }
-  console.log(`[generate] campaign "${campaign.name}" → duration=${campaign.target_duration}s style=${campaign.style_id} privacy=${campaign.privacy} accounts=${(campaign.target_accounts||[]).length}`);
+
+  // Dispatch by the campaign's service (multi-service): the registry owns the generate step,
+  // this handler owns the generic tail (quota/credits/topic/brand-kit/render/publish chain).
+  const pipeline = getPipeline(campaign.service || "ai_video");
+  if (!pipeline) { const e = new Error(`generate_video: unknown service "${campaign.service}"`); e.noRetry = true; throw e; }
+  console.log(`[generate] campaign "${campaign.name}" [${pipeline.key}] → duration=${campaign.target_duration}s style=${campaign.style_id} privacy=${campaign.privacy} accounts=${(campaign.target_accounts||[]).length}`);
 
   // The scheduler-driven path respects the campaign's state; "Run once" (manual) overrides it.
   if (campaign.status !== "active" && !manual) {
@@ -197,8 +239,9 @@ registerHandler("generate_video", async (payload, job) => {
     const e = new Error(`Campaign paused: ${quota.reason}`); e.noRetry = true; throw e;
   }
 
-  // 1) Credit check BEFORE reserving a topic (wallet is per-user).
-  const cost = CREDIT_COSTS.ai_video;
+  // 1) Affordability check up front (wallet is per-user). We do NOT charge here — the
+  //    deduction happens once on success (below), so failures/hard-kills never cost credits.
+  const cost = (typeof pipeline.cost === "function" ? pipeline.cost(campaign) : null) ?? CREDIT_COSTS[pipeline.creditKey] ?? CREDIT_COSTS.ai_video;
   const { data: cred } = await supabaseAdmin.from("user_credits").select("balance").eq("user_id", userId).maybeSingle();
   if ((cred?.balance ?? 0) < cost) {
     await pauseCampaign(campaign, "insufficient credits");
@@ -216,21 +259,11 @@ registerHandler("generate_video", async (payload, job) => {
     throw new Error("no topic available yet — refilling"); // transient: retry
   }
 
-  // 3) Deduct credits for the generation.
-  const ded = await deductCredits(userId, cost, "ai_video", "Automation video", null);
-  if (!ded.success) { await releaseTopic(topic.id); throw new Error("credit deduction failed"); }
-
+  const watch = watchCancel(job.id);
   try {
     let lastHb = 0;
-    const result = await runPromptPipeline({
-      prompt: topic.title, userId,
-      styleId: campaign.style_id || "auto",
-      targetDuration: campaign.target_duration || AUTOPILOT_DURATION,
-      language: campaign.language || "en",
-      voiceId: campaign.voice_id || null,
-      orientation: campaign.orientation || "9:16",
-      plan: null,
-    }, () => { const t = Date.now(); if (t - lastHb > 15000) { lastHb = t; heartbeat(job.id); } });
+    const onStep = () => { if (watch.state.cancelled) throw cancelledError(); const t = Date.now(); if (t - lastHb > 15000) { lastHb = t; heartbeat(job.id); } };
+    const result = await pipeline.run({ campaign, topic, userId, onStep });
     const projectId = result.projectId;
 
     // Brand kit as post-process — Prompt-to-Video itself is never touched. Per-campaign kit if
@@ -249,6 +282,10 @@ registerHandler("generate_video", async (payload, job) => {
     await consumeTopic(topic.id, { hook: topic.title });
     if (await getQueuedCount(campaignId) < 10) await enqueue("refill_topics", { userId, campaignId }, { userId }); // async refill
 
+    // 3) Charge now that the video actually exists — idempotent by job id, so a retried or
+    //    hard-killed-then-resumed run never double-charges.
+    await chargeForGeneration(userId, cost, job.id);
+
     // 4) Resolve target accounts (connected only) → publish chain.
     let accounts = [];
     if (Array.isArray(campaign.target_accounts) && campaign.target_accounts.length) {
@@ -256,10 +293,14 @@ registerHandler("generate_video", async (payload, job) => {
         .select("id, platform, status").in("id", campaign.target_accounts).eq("user_id", userId);
       accounts = (accts || []).filter((a) => a.status === "connected").map((a) => ({ id: a.id, platform: a.platform }));
     }
+    // Publish copy from the director (AI-written title/caption/hashtags), with topic fallbacks.
+    const pub = result.publish || {};
+    const hashtags = Array.isArray(pub.hashtags) ? pub.hashtags.filter(Boolean) : [];
+    const tags = hashtags.map((h) => String(h).replace(/^#/, "")).filter(Boolean);
     const metadata = {
-      title: topic.title.slice(0, 100),
-      description: "",
-      tags: topic.keywords || [],
+      title: (pub.title || topic.title || "").slice(0, 100),
+      description: [pub.description, hashtags.join(" ")].filter(Boolean).join("\n\n"),
+      tags: tags.length ? tags : (topic.keywords || []),
       privacyStatus: campaign.privacy || "public",
     };
     await enqueue("render_timeline", {
@@ -270,11 +311,14 @@ registerHandler("generate_video", async (payload, job) => {
     logEvent({ userId, campaignId, action: "generate", entity: "project", entityId: projectId, status: "ok", message: topic.title, meta: { topicId: topic.id, attempt: job.attempts } });
     return { projectId, topicId: topic.id };
   } catch (err) {
-    // Generation failed → release topic + refund + retry per job policy.
+    // Generation failed or was canceled → release the topic so it's freed/retried. No refund
+    // needed: we charge only on success, so a failed/canceled run was never charged.
     await releaseTopic(topic.id);
-    await addCredits(userId, cost, "refund", "ai_failure_refund", "Automation generation failed").catch(() => {});
-    logEvent({ userId, campaignId, action: "generate", entity: "topic", entityId: topic.id, status: job.attempts < job.max_attempts ? "retry" : "fail", message: err.message, meta: { attempt: job.attempts } });
+    const status = err.noRetry ? "fail" : (job.attempts < job.max_attempts ? "retry" : "fail");
+    logEvent({ userId, campaignId, action: "generate", entity: "topic", entityId: topic.id, status, message: err.message, meta: { attempt: job.attempts } });
     throw err;
+  } finally {
+    watch.stop();
   }
 });
 

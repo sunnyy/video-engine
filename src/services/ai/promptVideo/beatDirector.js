@@ -144,6 +144,11 @@ SCRIPT RULES:
 - script lines must concatenate into ONE natural flowing narration (this becomes the voiceover).
 - Forbidden: "delve", "dive into", "game-changing", "revolutionary", "in today's video".
 
+PUBLISH METADATA — this video gets posted to social platforms, so also write its post copy:
+- "title": a scroll-stopping, search-friendly title for the post, ≤ 95 characters, no quotes/emojis. Specific and curiosity-driven, not clickbait fluff.
+- "description": a 1-3 sentence caption that summarizes the value and invites the watch/engagement (a real caption, not the script).
+- "hashtags": 5-10 relevant, specific lowercase hashtags (each starts with #, no spaces), mixing broad + niche terms for this topic.
+
 Return ONLY valid JSON:
 {
   "project_name": "short title",
@@ -151,6 +156,7 @@ Return ONLY valid JSON:
   "palette": { "bg": "#hex", "accent": "#hex", "accent2": "#hex", "text": "#hex" },
   "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient",
   "niche": "one-word content domain for asset reuse (e.g. tech, finance, business, fitness, health, history, science, nature, lifestyle, sports, food, travel)",
+  "publish": { "title": "≤95-char post title", "description": "1-3 sentence caption", "hashtags": ["#tag1", "#tag2"] },
   "beats": [
     {
       "beat_index": 0,
@@ -325,6 +331,16 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     niche,
     music_mood:   ["upbeat", "inspiring", "chill", "cinematic", "energetic", "ambient"].includes(plan.music_mood) ? plan.music_mood : "upbeat",
     beats,
+  };
+
+  // Publish copy for social posting — title / caption / hashtags (normalized, with fallbacks).
+  const pub = plan.publish || {};
+  result.publish = {
+    title: String(pub.title || result.project_name || "").trim().slice(0, 95),
+    description: String(pub.description || "").trim().slice(0, 4500),
+    hashtags: Array.isArray(pub.hashtags)
+      ? [...new Set(pub.hashtags.map((h) => "#" + String(h).replace(/^#+/, "").replace(/\s+/g, "").toLowerCase()).filter((h) => h.length > 1))].slice(0, 10)
+      : [],
   };
 
   console.log(`[ai-video/director] ${beats.length} beats, style=${resolvedStyle.id} — assets: ${beats.map(b => b.asset_type).join(",")}`);

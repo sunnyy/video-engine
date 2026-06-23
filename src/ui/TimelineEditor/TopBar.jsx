@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { serverFetch } from "../../services/serverApi";
 import { getProjectRenders } from "../../services/projects/projectService";
+import { supabase } from "../../lib/supabase";
+import { showToast } from "../Toast";
+import PublishModal from "./modals/PublishModal";
+import { isPublishableSource } from "../../config/publishableSources";
 
 const btn = {
   background: "none",
@@ -33,6 +37,58 @@ export default function TopBar() {
   // Export history (every render is a row in `renders`, newest first) → download dropdown.
   const [renders, setRenders] = useState([]);
   const [showDownloads, setShowDownloads] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
+  const [showPubHistory, setShowPubHistory] = useState(false);
+  // Durable publish status — the source of truth lives in the jobs table (server-side), so a
+  // reloaded / reopened editor recomputes it instead of showing a fresh Publish button.
+  const [pubStatus, setPubStatus] = useState(null); // { active, phase, progress, published, failed, total, last }
+  const seededPub = useRef(false);  // first poll seeds; don't toast a pre-existing completion on open
+  const lastPubJob = useRef(null);  // last terminal batch we toasted, so we toast each batch once
+
+  // Authoritative service source from the DB (store's project.meta may be stale/missing it).
+  const [source, setSource] = useState(null);
+  useEffect(() => {
+    if (!projectId) { setSource(null); return; }
+    supabase.from("projects").select("source").eq("id", projectId).single()
+      .then(({ data }) => setSource(data?.source || null)).catch(() => {});
+  }, [projectId]);
+
+  // Publish is offered for automation-pipeline videos (Prompt-to-Video). One click renders the
+  // current timeline then publishes — no prior export required.
+  const canPublish = isPublishableSource(source) || isPublishableSource(project?.meta?.source);
+
+  // Poll the durable publish status (on mount + while a publish is in flight). This is what makes
+  // the flow survive reloads: reopening the editor mid-publish shows "Rendering…/Publishing…"
+  // instead of a fresh button, because state is recomputed server-side from the jobs table.
+  useEffect(() => {
+    if (!projectId || !canPublish) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await serverFetch(`/api/social/publish-status?projectId=${projectId}`);
+        if (!r.ok || !alive) return;
+        const s = await r.json();
+        if (!alive) return;
+        const firstTick = !seededPub.current;
+        seededPub.current = true;
+        setPubStatus(s);
+        // Toast once per batch when it reaches a terminal state — but not for a batch that was
+        // already finished when we opened the editor (firstTick seeds without toasting).
+        const terminal = !s.active && (s.phase === "published" || s.phase === "failed");
+        if (terminal && s.jobId && lastPubJob.current !== s.jobId) {
+          lastPubJob.current = s.jobId;
+          if (!firstTick) {
+            if (s.phase === "published") showToast(s.total > 1 ? `Published to ${s.published}/${s.total} accounts ✓` : "Published ✓", "success");
+            else if (s.published) showToast(`Published ${s.published}/${s.total} — ${s.failed} failed.`, "info");
+            else showToast(s.error || "Publish failed.");
+          }
+        }
+      } catch (_) {}
+    };
+    tick();
+    const timer = setInterval(tick, 3000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [projectId, canPublish]);
 
   const loadRenders = async () => {
     if (!projectId) return;
@@ -76,6 +132,40 @@ export default function TopBar() {
     updateProject({ name: e.target.value });
   };
 
+  // Export persistence: the server already persists each render job to disk and serves it by id
+  // (/api/render/status/:jobId), so we stash the active export's jobId per project and reconnect
+  // on mount. A real refresh / accidental "Leave" no longer loses an in-flight export.
+  const exportKey = projectId ? `vq:export:${projectId}` : null;
+  const saveExportJob = (jobId) => { try { if (exportKey) localStorage.setItem(exportKey, JSON.stringify({ jobId, ts: Date.now() })); } catch {} };
+  const clearExportJob = () => { try { if (exportKey) localStorage.removeItem(exportKey); } catch {} };
+
+  // Poll an export job to completion (used both for a fresh export and a reconnect after reload).
+  const pollExportStatus = (jobId, { resumed = false } = {}) => {
+    const poll = setInterval(async () => {
+      try {
+        const statusRes = await serverFetch(`/api/render/status/${jobId}`);
+        if (statusRes.status === 404) { // job gone (server restart cleared it, or completed+downloaded)
+          clearInterval(poll); clearExportJob(); setExporting(false);
+          if (resumed) showToast("Your earlier export is no longer available — please export again.", "info");
+          return;
+        }
+        if (!statusRes.ok) return;
+        const status = await statusRes.json();
+        setExportProgress(status.progress || 0);
+        if (status.done) {
+          clearInterval(poll);
+          clearExportJob();
+          setExporting(false);
+          if (status.cancelled) return;
+          if (status.error) { alert("Export failed: " + status.error); return; }
+          const videoUrl = status.video_url || status.url;
+          if (videoUrl) await downloadVideo(videoUrl);
+          loadRenders(); // refresh the version dropdown with this new export
+        }
+      } catch (_) {}
+    }, 3000);
+  };
+
   const handleExport = async () => {
     if (!project || exporting) return;
     setExporting(true);
@@ -90,28 +180,63 @@ export default function TopBar() {
         throw new Error(err.error || "Export failed");
       }
       const { jobId } = await res.json();
-
-      const poll = setInterval(async () => {
-        try {
-          const statusRes = await serverFetch(`/api/render/status/${jobId}`);
-          if (!statusRes.ok) return;
-          const status = await statusRes.json();
-          setExportProgress(status.progress || 0);
-          if (status.done) {
-            clearInterval(poll);
-            setExporting(false);
-            if (status.cancelled) return;
-            if (status.error) { alert("Export failed: " + status.error); return; }
-            const videoUrl = status.video_url || status.url;
-            if (videoUrl) await downloadVideo(videoUrl);
-            loadRenders(); // refresh the version dropdown with this new export
-          }
-        } catch (_) {}
-      }, 3000);
+      saveExportJob(jobId);
+      pollExportStatus(jobId);
     } catch (err) {
       setExporting(false);
+      clearExportJob();
       alert(err.message || "Export failed");
     }
+  };
+
+  // Reconnect to an in-flight export after a reload / reopen (resume-after-refresh).
+  useEffect(() => {
+    if (!projectId) return;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(`vq:export:${projectId}`) || "null"); } catch {}
+    if (!saved?.jobId) return;
+    // Drop very old keys (exports finish in minutes; a >30min-old key is abandoned).
+    if (saved.ts && Date.now() - saved.ts > 30 * 60 * 1000) { try { localStorage.removeItem(`vq:export:${projectId}`); } catch {}; return; }
+    setExporting(true);
+    setExportProgress(0);
+    pollExportStatus(saved.jobId, { resumed: true });
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Render-then-publish, durably: enqueue ONE server job (render → publish) and let it run in the
+  // background. Progress/outcome are tracked in the jobs table and surfaced by the status poll
+  // above, so the flow survives reload / navigation / closing the tab. We send the live timeline
+  // JSON so the render is exactly what's on screen.
+  const startPublish = async ({ accountIds, metadata }) => {
+    if (!project || !projectId || pubStatus?.active) return;
+    try {
+      const res = await serverFetch("/api/social/render-and-publish", {
+        method: "POST",
+        body: JSON.stringify({ projectId, project, accountIds, metadata }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Publish failed");
+      seededPub.current = true; // we're driving the transition; don't suppress the terminal toast
+      setPubStatus({ active: true, phase: "rendering", progress: 0, total: d.accounts || accountIds.length });
+      showToast("Publishing started — we'll render then post it. You can keep editing or close this tab.", "info");
+    } catch (err) { showToast(err.message || "Publish failed"); }
+  };
+
+  const pubActive = !!pubStatus?.active;
+  const lastPub = pubStatus?.last || null; // persistent "already published" history for this project
+  const publishedAccounts = {};            // accountId -> published_at, for the re-publish guard
+  (lastPub?.posts || []).forEach((p) => { if (p.status === "published" && p.accountId) publishedAccounts[p.accountId] = p.at; });
+  const publishLabel = !pubActive ? (lastPub ? "↗ Publish again" : "↗ Publish")
+    : pubStatus.phase === "rendering" ? `Rendering… ${pubStatus.progress || 0}%`
+    : "Publishing…";
+
+  const relTime = (iso) => {
+    if (!iso) return "";
+    const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+    if (s < 60) return "just now";
+    const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24); if (d < 30) return `${d}d ago`;
+    try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }); } catch { return ""; }
   };
 
   const handleFormatToggle = () => {
@@ -122,7 +247,17 @@ export default function TopBar() {
 
   return (
     <>
-      {/* Blocking export overlay — prevents editing while a render is in progress */}
+      {showPublish && (
+        <PublishModal
+          name={name}
+          initialPublish={project?.meta?.publish}
+          publishedAccounts={publishedAccounts}
+          onSubmit={startPublish}
+          onClose={() => setShowPublish(false)}
+        />
+      )}
+      {/* Blocking overlay — prevents editing/concurrent renders while exporting. Publishing is a
+          background job (server-side), so it does NOT block the editor. */}
       {exporting && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(8,8,14,0.82)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ width: 360, maxWidth: "90%", background: "#14141e", border: "1px solid rgba(124,92,252,0.3)", borderRadius: 16, padding: "28px 30px", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
@@ -292,7 +427,7 @@ export default function TopBar() {
             background: exporting ? "#4a3a9a" : "#7c5cfc",
             border: "none",
             color: "#fff",
-            cursor: !project || exporting ? "default" : "pointer",
+            cursor: (!project || exporting) ? "default" : "pointer",
             padding: "7px 20px",
             borderRadius: 6,
             fontSize: 14,
@@ -304,6 +439,69 @@ export default function TopBar() {
         >
           {exporting ? `Exporting… ${exportProgress}%` : "Export"}
         </button>
+
+        {/* Persistent "already published" chip + history — survives reload (server-derived), so a
+            user who missed the toast still sees this video was posted, with links to the live posts. */}
+        {canPublish && !pubActive && lastPub && (
+          <div style={{ position: "relative", marginLeft: 4 }}>
+            <button
+              onClick={() => setShowPubHistory((v) => !v)}
+              title="Where this video was published"
+              style={{
+                display: "flex", alignItems: "center", gap: 6, background: "rgba(34,197,94,0.12)",
+                border: "1px solid rgba(34,197,94,0.4)", color: "#34d399", cursor: "pointer",
+                padding: "7px 12px", borderRadius: 6, fontSize: 12.5, fontWeight: 700,
+              }}
+            >
+              <span style={{ fontSize: 12 }}>✓</span> Published{lastPub.at ? ` · ${relTime(lastPub.at)}` : ""} <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+            </button>
+            {showPubHistory && (
+              <>
+                <div onClick={() => setShowPubHistory(false)} style={{ position: "fixed", inset: 0, zIndex: 9998 }} />
+                <div style={{
+                  position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 9999, width: 280,
+                  background: "#14141e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
+                  boxShadow: "0 12px 40px rgba(0,0,0,0.5)", overflow: "hidden", maxHeight: 320, overflowY: "auto",
+                }}>
+                  <div style={{ padding: "9px 13px", fontSize: 11, fontWeight: 700, color: "#8896a8", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    Published to
+                  </div>
+                  {lastPub.posts.map((p, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 13px", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: 12.5, color: "#e8e8f0" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                        <span style={{ fontWeight: 600, textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {p.platform}{p.account && p.account !== p.platform ? ` · ${p.account}` : ""}
+                        </span>
+                        <span style={{ fontSize: 11, color: p.status === "published" ? "#8896a8" : "#f87171" }}>
+                          {p.status === "published" ? relTime(p.at) : "failed"}
+                        </span>
+                      </div>
+                      {p.status === "published" && p.url
+                        ? <a href={p.url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 12, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>View ↗</a>
+                        : p.status !== "published" ? <span style={{ color: "#f87171", fontSize: 14 }}>✕</span> : null}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {canPublish && (
+          <button
+            onClick={() => !pubActive && setShowPublish(true)}
+            disabled={exporting || pubActive}
+            title={pubActive ? "Publishing in progress — you can keep editing" : "Render & publish to your connected social accounts"}
+            style={{
+              background: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.45)",
+              color: "#34d399", cursor: (exporting || pubActive) ? "default" : "pointer", padding: "7px 16px",
+              borderRadius: 6, fontSize: 13, fontWeight: 700, marginLeft: 4,
+              opacity: exporting ? 0.5 : 1,
+            }}
+          >
+            {publishLabel}
+          </button>
+        )}
       </div>
     </div>
     </>
