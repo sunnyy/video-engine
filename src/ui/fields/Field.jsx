@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 /**
  * Field primitives — shared chrome for every dashboard chatbox field.
@@ -33,6 +34,7 @@ export function FieldChip({ icon, label, value, onClick, accent = THEME.accent, 
     >
       <span style={{ display: "flex", alignItems: "center", color: tinted ? accent : THEME.muted }}>{icon}</span>
       <span style={{ fontSize: 13, fontWeight: 700, color: tinted ? accent : THEME.text }}>{value}</span>
+      <ChevronDown size={13} style={{ opacity: 0.6, marginLeft: -1, color: tinted ? accent : THEME.muted }} />
     </button>
   );
 }

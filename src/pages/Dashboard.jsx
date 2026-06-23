@@ -174,7 +174,7 @@ function PromptVideoChatbox({ onBusy }) {
   return (
     <div>
       {/* The box */}
-      <div style={{ background: T.surface, border: `1px solid ${prompt.trim() ? "rgba(245,158,11,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+      <div style={{ background: T.surface, border: `1px solid ${prompt.trim() ? "rgba(245,158,11,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }} className="vq-chatbox">
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -326,7 +326,7 @@ function SocialChatbox({ onBusy }) {
 
   return (
     <div>
-      <div style={{ background: T.surface, border: `1px solid ${url.trim() ? "rgba(34,211,238,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+      <div style={{ background: T.surface, border: `1px solid ${url.trim() ? "rgba(34,211,238,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }} className="vq-chatbox">
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -448,7 +448,7 @@ function SaasChatbox({ onBusy }) {
 
   return (
     <div>
-      <div style={{ background: T.surface, border: `1px solid ${filled ? "rgba(245,197,24,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+      <div style={{ background: T.surface, border: `1px solid ${filled ? "rgba(245,197,24,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }} className="vq-chatbox">
         {/* Mode toggle */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {[["url", "Website URL"], ["info", "No website"]].map(([m, l]) => {
@@ -610,7 +610,7 @@ function ProductChatbox({ onBusy }) {
 
   return (
     <div>
-      <div style={{ background: T.surface, border: `1px solid ${hasInput ? "rgba(249,115,22,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+      <div style={{ background: T.surface, border: `1px solid ${hasInput ? "rgba(249,115,22,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }} className="vq-chatbox">
         {/* Mode toggle */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {[["upload", "Upload image"], ["url", "Product URL"]].map(([m, l]) => {
@@ -759,7 +759,7 @@ function TypographyChatbox({ onBusy }) {
 
   return (
     <div>
-      <div style={{ background: T.surface, border: `1px solid ${input.trim() ? "rgba(124,92,252,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+      <div style={{ background: T.surface, border: `1px solid ${input.trim() ? "rgba(124,92,252,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }} className="vq-chatbox">
         {/* Topic / Script toggle */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {[["topic", "Topic"], ["script", "Script"]].map(([m, l]) => {
@@ -865,7 +865,7 @@ function CaptionsChatbox({ onBusy }) {
 
   return (
     <div>
-      <div style={{ background: T.surface, border: `1px solid ${file ? "rgba(52,211,153,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }}>
+      <div style={{ background: T.surface, border: `1px solid ${file ? "rgba(52,211,153,0.35)" : T.border}`, borderRadius: 18, padding: 16, transition: "border-color 0.2s" }} className="vq-chatbox">
         <div
           onClick={() => !loading && fileRef.current?.click()}
           style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1.5px dashed ${file ? CC + "66" : T.border}`, cursor: loading ? "default" : "pointer", background: "rgba(255,255,255,0.02)" }}>
@@ -1068,7 +1068,11 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <style>{`@keyframes pv-spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes pv-spin { to { transform: rotate(360deg); } }
+        /* Tab header sits flush on top of the chatbox: flatten the box's top edge so the two read as one card. */
+        .vq-chatbox { border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; border-top: none !important; }
+      `}</style>
 
       {/* Generation lock overlay — blocks all interaction (incl. the sidebar) until the
           in-flight plan/produce finishes, so switching services can't orphan the job. */}
@@ -1098,7 +1102,7 @@ export default function Dashboard() {
       {showFeedback && <FeedbackModal context="post_visit" onClose={() => setShowFeedback(false)} />}
 
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 800, margin: "0 auto", padding: "56px 24px 20px" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", padding: "56px 24px 20px" }}>
 
           {/* Hero */}
           <div style={{ textAlign: "center", marginBottom: 26 }}>
@@ -1110,27 +1114,30 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Service pills (above the chatbox) */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "nowrap", justifyContent: "center", marginBottom: 30 }}>
+          {/* Service tabs — sit inside the create surface as the chatbox header (connected to the box below). */}
+          <div style={{
+            display: "flex", gap: 14, alignItems: "center",
+            background: T.surface, border: `1px solid ${T.border}`, borderRadius: "18px 18px 0 0",
+            padding: "0 16px", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap",
+          }}>
             {SERVICES.map(svc => {
               const active = selected === svc.id;
               return (
                 <button key={svc.id} onClick={() => pickService(svc)} disabled={busy}
                   style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "10px 15px", borderRadius: 10, whiteSpace: "nowrap",
-                    background: active ? `${svc.accent}1c` : "rgba(255,255,255,0.03)",
-                    border: `1px solid ${active ? svc.accent + "66" : T.border}`,
-                    color: active ? "#fff" : T.muted, fontSize: 12, fontWeight: 700,
-                    cursor: busy ? "not-allowed" : "pointer", opacity: busy && !active ? 0.5 : 1, fontFamily: "inherit",
-                    transition: "all 0.15s",
+                    background: "none", border: "none", borderBottom: `2px solid ${active ? svc.accent : "transparent"}`,
+                    marginBottom: -1, paddingTop: 14, paddingBottom: 13, cursor: busy ? "not-allowed" : "pointer",
+                    fontFamily: "inherit", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                    color: active ? "#fff" : T.muted, display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0,
+                    opacity: busy && !active ? 0.5 : 1, transition: "color 0.15s",
                   }}>
-                  <svc.Icon size={15} />{svc.label}
+                  <svc.Icon size={15} color={active ? svc.accent : T.muted} />{svc.label}
                 </button>
               );
             })}
           </div>
 
-          {/* Chatbox (morphs per selected service) */}
+          {/* Chatbox (morphs per selected service) — its box top is flattened to merge with the tabs above. */}
           <div>
             {selected === "ai-video"      ? <PromptVideoChatbox onBusy={reportBusy} />
               : selected === "social-video" ? <SocialChatbox onBusy={reportBusy} />
