@@ -105,7 +105,7 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
   const finalProject = await prepareProject(project, userId);
 
   const serveUrl = await getBundle();
-  const { getCompositions, renderFrames, stitchFramesToVideo } = await import("@remotion/renderer");
+  const { getCompositions, renderFrames, stitchFramesToVideo, makeCancelSignal } = await import("@remotion/renderer");
   const comps = await getCompositions(serveUrl, { inputProps: { project: finalProject } });
   const comp  = comps.find((c) => c.id === "TimelineComposition");
   if (!comp) throw new Error("TimelineComposition not found in bundle");
@@ -120,9 +120,22 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
   const framesDir  = path.join(TEMP_DIR, `frames-${renderId}`);
   if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
 
+  // Clean cancellation: poll isCancelled() and trip Remotion's cancel signal. (Throwing inside
+  // onFrameUpdate instead crashes the Chromium tab — "browser crashed, retrying" + the static
+  // server tearing down → ERR_CONNECTION_REFUSED noise.) A cancelSignal is single-use, so we
+  // make a fresh one per stage and point the poller at whichever stage is currently active.
+  let wasCancelled = false;
+  let currentCancel = null;
+  const cancelPoll = isCancelled
+    ? setInterval(() => { try { if (isCancelled()) { wasCancelled = true; currentCancel?.(); } } catch {} }, 500)
+    : null;
+
   try {
     const hasVideoLayers = (finalProject.layers || []).some((l) => l.type === "video");
     let rendered = 0;
+
+    const rf = makeCancelSignal();
+    currentCancel = rf.cancel;
     const { assetsInfo } = await renderFrames({
       composition: compositionWithRes,
       serveUrl,
@@ -131,13 +144,16 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
       imageFormat: "jpeg",
       concurrency: hasVideoLayers ? 1 : 2,
       chromiumOptions: { gl: "angle" },
+      cancelSignal: rf.cancelSignal,
       onFrameUpdate: () => {
-        if (isCancelled?.()) throw new Error("RENDER_CANCELLED");
         rendered++;
         onProgress?.(Math.round((rendered / comp.durationInFrames) * 90));
       },
     });
 
+    const sf = makeCancelSignal();
+    currentCancel = sf.cancel;
+    if (wasCancelled) throw new Error("RENDER_CANCELLED"); // cancelled between stages
     await stitchFramesToVideo({
       composition: compositionWithRes,
       serveUrl,
@@ -149,8 +165,13 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
       fps: comp.fps,
       width,
       height,
+      cancelSignal: sf.cancelSignal,
     });
+  } catch (e) {
+    if (wasCancelled || /cancel/i.test(e?.message || "")) throw new Error("RENDER_CANCELLED");
+    throw e;
   } finally {
+    if (cancelPoll) clearInterval(cancelPoll);
     try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
   }
 

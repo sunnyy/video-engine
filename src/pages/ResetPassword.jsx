@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { updatePassword } from "../services/auth/authService";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../ui/Toast";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export default function ResetPassword() {
     setLoading(true);
     try {
       await updatePassword(password);
+      showToast("Password updated ✓", "success");
       navigate("/");
     } catch (err) {
       const msg = err.message || "";

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import {
   supabaseAdmin, requireAuth, requireAdmin, deductCredits, addCredits,
-  upload, uploadMemory, uuidv4,
+  upload, uploadMemory, uploadSample, uuidv4,
   sendAdminAlert, sendUserEmail,
   adminUserDeletedEmail, adminCreditsTopupEmail,
   adminNewSaleEmail, adminPlanRenewalEmail, adminPlanUpgradeEmail,
@@ -1452,8 +1452,13 @@ router.get("/samples/public", async (req, res) => {
   }
 });
 
-// Upload sample file to storage
-router.post("/samples/upload", requireAuth, requireAdmin, uploadMemory.single("file"), async (req, res) => {
+// Upload sample file to storage. Samples can be short videos → use the larger limit and
+// translate multer's size error into clean JSON instead of an unhandled stack trace.
+const uploadSampleFile = (req, res, next) => uploadSample.single("file")(req, res, (err) => {
+  if (err) return res.status(400).json({ error: err.code === "LIMIT_FILE_SIZE" ? "File too large — samples must be under 200 MB." : err.message });
+  next();
+});
+router.post("/samples/upload", requireAuth, requireAdmin, uploadSampleFile, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const { service_key, type } = req.body;

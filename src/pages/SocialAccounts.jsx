@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AppLayout from "../ui/AppLayout";
 import { serverFetch } from "../services/serverApi";
+import { showToast } from "../ui/Toast";
 
 /**
  * SocialAccounts — connect/disconnect the social channels you publish to. Standalone page
@@ -41,8 +42,8 @@ export default function SocialAccounts() {
   useEffect(() => {
     load();
     const q = new URLSearchParams(window.location.search);
-    if (q.get("connected")) setConnMsg({ ok: true, text: `Connected ${q.get("connected")} ✓` });
-    else if (q.get("social_error")) setConnMsg({ ok: false, text: decodeURIComponent(q.get("social_error")) });
+    if (q.get("connected")) { setConnMsg({ ok: true, text: `Connected ${q.get("connected")} ✓` }); showToast(`${q.get("connected")} connected ✓`, "success"); }
+    else if (q.get("social_error")) { const t = decodeURIComponent(q.get("social_error")); setConnMsg({ ok: false, text: t }); showToast(`Couldn't connect: ${t}`); }
     if (q.get("connected") || q.get("social_error")) window.history.replaceState({}, "", "/connections");
   }, []);
 
@@ -54,12 +55,12 @@ export default function SocialAccounts() {
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.url) throw new Error(d.error || "Could not start connection");
       window.location.href = d.url;
-    } catch (e) { setConnMsg({ ok: false, text: e.message }); setBusy(""); }
+    } catch (e) { setConnMsg({ ok: false, text: e.message }); showToast(e.message || "Could not start connection"); setBusy(""); }
   };
   const disconnectPlatform = async (platform) => {
     setBusy(`connect-${platform}`);
-    try { await serverFetch(`/api/social/${platform}/disconnect`, { method: "POST" }); await load(); }
-    catch (_) {} finally { setBusy(""); }
+    try { await serverFetch(`/api/social/${platform}/disconnect`, { method: "POST" }); await load(); showToast(`${platform} disconnected`, "info"); }
+    catch (_) { showToast(`Couldn't disconnect ${platform}`); } finally { setBusy(""); }
   };
 
   const btn = (bg) => ({ background: bg, border: "none", color: "#fff", fontWeight: 700, fontSize: 12.5, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" });

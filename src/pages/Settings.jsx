@@ -8,6 +8,7 @@ import { serverFetch } from "../services/serverApi";
 import { NOTIFICATION_CATEGORIES } from "../config/notificationCategories";
 import { getNotificationPrefs, saveNotificationPrefs } from "../services/notifications/prefsService";
 import AppLayout from "../ui/AppLayout";
+import { showToast } from "../ui/Toast";
 
 /* ── Constants ── */
 const NICHES = [
@@ -126,7 +127,7 @@ export default function Settings() {
   function setNotifChannel(categoryKey, channel, value) {
     setNotifPrefs(prev => {
       const next = { ...prev, [categoryKey]: { ...prev[categoryKey], [channel]: value } };
-      saveNotificationPrefs(next).catch(() => {});
+      saveNotificationPrefs(next).catch(() => showToast("Couldn't save notification preference."));
       return next;
     });
   }
@@ -140,8 +141,9 @@ export default function Settings() {
         body: JSON.stringify({ niche: prefNiche || null, goal: prefGoal || null, default_language: prefLanguage }),
       });
       setPrefSaved(true);
+      showToast("Preferences saved ✓", "success");
       setTimeout(() => setPrefSaved(false), 2500);
-    } catch {} finally {
+    } catch { showToast("Couldn't save preferences."); } finally {
       setPrefSaving(false);
     }
   }
@@ -162,6 +164,7 @@ export default function Settings() {
       navigate("/");
     } catch (err) {
       setDeleteError(err.message || "Failed to delete account. Please try again.");
+      showToast(err.message || "Failed to delete account. Please try again.");
       setDeleting(false);
     }
   }
