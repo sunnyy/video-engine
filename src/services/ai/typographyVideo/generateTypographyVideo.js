@@ -19,10 +19,10 @@ export async function produceTypographyVideo(plan, { voiceId = null, language = 
 }
 
 /** Combined (no confirmation) — legacy. */
-export async function generateTypographyVideo({ input, inputType = "topic", targetDuration = 40, projectId = null, voiceId = null, language = "en" }, onProgress) {
+export async function generateTypographyVideo({ input, inputType = "topic", targetDuration = 40, projectId = null, voiceId = null, language = "en", theme = "auto", accentColor = null }, onProgress) {
   const res = await serverFetch("/api/typography-video/generate", {
     method: "POST",
-    body: JSON.stringify({ input, inputType, targetDuration, projectId, voiceId, language }),
+    body: JSON.stringify({ input, inputType, targetDuration, projectId, voiceId, language, theme, accentColor }),
   });
   return readSseResult(res, onProgress);
 }

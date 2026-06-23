@@ -123,6 +123,8 @@ function PromptVideoChatbox({ onBusy }) {
   const [language, setLanguage] = useState(cfg.shared.voiceLanguage.default.language);
   const [voiceId,  setVoiceId]  = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [theme,       setTheme]       = useState("auto");
+  const [accentColor, setAccentColor] = useState(null);
 
   const [planning,   setPlanning]   = useState(false);
   const [planData,   setPlanData]   = useState(null);
@@ -143,7 +145,7 @@ function PromptVideoChatbox({ onBusy }) {
     if (!prompt.trim() || planning || loading) return;
     setPlanning(true); setError(null);
     try {
-      const result = await planPromptVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation });
+      const result = await planPromptVideo({ prompt: prompt.trim(), styleId, targetDuration: duration, language, orientation, theme, accentColor });
       if (reviewFirst) setPlanData(result);
       else await produce(result, result.plan.film.beats);
     } catch (err) {
@@ -160,7 +162,7 @@ function PromptVideoChatbox({ onBusy }) {
     const plan = { ...planResult.plan, film: { ...planResult.plan.film, beats: editedBeats } };
     try {
       const result = await generatePromptVideo(
-        { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, orientation, plan },
+        { prompt: prompt.trim(), styleId, targetDuration: duration, language, voiceId, orientation, plan, theme, accentColor },
         ({ step }) => { const i = STATUS_STEPS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("ai_video", "all");
@@ -192,6 +194,8 @@ function PromptVideoChatbox({ onBusy }) {
           {/* Left: shared field chips (from src/ui/fields) */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={AI} />
+            <ThemeField value={theme} onChange={setTheme} accent={AI} />
+            <AccentField value={accentColor} onChange={setAccentColor} accent={AI} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={AI} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={AI} />
             <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={AI} />
@@ -277,6 +281,8 @@ function SocialChatbox({ onBusy }) {
   const [language,      setLanguage]      = useState(cfg.shared.voiceLanguage.default.language);
   const [voiceId,       setVoiceId]       = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation,   setOrientation]   = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [theme,         setTheme]         = useState("auto");
+  const [accentColor,   setAccentColor]   = useState(null);
   const [includeAuthor, setIncludeAuthor] = useState(false);
   const [plan,          setPlan]          = useState(null);
   const [planning,      setPlanning]      = useState(false);
@@ -297,7 +303,7 @@ function SocialChatbox({ onBusy }) {
     if (!canGo) return;
     setPlanning(true); setError(null);
     try {
-      const p = await planSocialVideo({ url: url.trim(), targetDuration: duration, language });
+      const p = await planSocialVideo({ url: url.trim(), targetDuration: duration, language, theme, accentColor });
       if (reviewFirst) setPlan(p);
       else await produce(p, p.scenes);
     } catch (err) {
@@ -338,6 +344,8 @@ function SocialChatbox({ onBusy }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <StyleField value={styleId} onChange={setStyleId} options={cfg.shared.style.options} accent={SA} />
+            <ThemeField value={theme} onChange={setTheme} accent={SA} />
+            <AccentField value={accentColor} onChange={setAccentColor} accent={SA} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={SA} />
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={SA} />
             <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={SA} />

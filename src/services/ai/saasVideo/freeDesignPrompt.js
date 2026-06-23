@@ -15,6 +15,7 @@
  */
 
 import { getStyle } from "../shared/visualStyles.js";
+import { resolveThemePalette } from "../shared/themeRegistry.js";
 
 export function buildFreeSceneDesignerPrompt(sceneScript, projectContext) {
   const canvasW     = projectContext.canvasWidth  ?? 1080;
@@ -32,11 +33,11 @@ export function buildFreeSceneDesignerPrompt(sceneScript, projectContext) {
   const isPortrait   = canvasH > canvasW;
   const isSquare     = canvasH === canvasW;
 
-  const themeDir = theme === "light"
-    ? "LIGHT theme — light backgrounds, dark high-contrast text."
-    : theme === "medium"
-    ? "MEDIUM theme — mid-tone backgrounds, light high-contrast text."
-    : "DARK theme — dark backgrounds, light high-contrast text.";
+  // Concrete theme colours from the shared registry give the designer exact targets (far stronger
+  // than "light backgrounds"). Default to dark when unset/"auto" — Promo always renders a theme.
+  const tp = resolveThemePalette(theme, accentColor) || resolveThemePalette("dark", accentColor);
+  const themeLabel = theme === "light" ? "LIGHT" : theme === "medium" ? "MEDIUM" : "DARK";
+  const themeDir = `${themeLabel} THEME — use these EXACT colours: background field ≈ ${tp.background} (with ${tp.backgroundSecondary} for depth), primary text ${tp.primaryText}, secondary text ${tp.secondaryText}. ${tp.glow ? "Subtle glows/tints are allowed." : "NO dark fields or luminous glows — keep it bright and clean; use soft shadows or pale tints instead."} Text MUST contrast hard with the field. Accent ${tp.accent} for emphasis/highlights only.`;
 
   const orientation = isPortrait
     ? `Tall PORTRAIT (9:16): stack blocks vertically, each near full-width. Do NOT split the hero into left/right columns and don't leave half the frame empty. (A short row of small cards is fine.)`

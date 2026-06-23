@@ -49,10 +49,10 @@ router.post("/generate", requireAuth, async (req, res) => {
 
 // ── Phase 1: PLAN (free) — fetch + script, returned for confirmation/editing ──
 router.post("/plan", requireAuth, async (req, res) => {
-  const { url, targetDuration = 25, language = "en" } = req.body;
+  const { url, targetDuration = 25, language = "en", theme = "auto", accentColor = null } = req.body;
   if (!url?.trim()) return res.status(400).json({ error: "url is required" });
   try {
-    const plan = await planSocial({ url: url.trim(), targetDuration, language });
+    const plan = await planSocial({ url: url.trim(), targetDuration, language, theme, accentColor });
     res.json({ plan });
   } catch (err) {
     if (err.code === "CONTENT_BLOCKED") return res.status(422).json({ error: err.message, code: err.code });

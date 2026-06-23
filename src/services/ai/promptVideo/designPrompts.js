@@ -42,6 +42,17 @@ function contentBlock(beat) {
 // topic palette is the family; each frame picks its OWN field so consecutive scenes
 // don't all look identical.
 function paletteBlock(palette, beat) {
+  const theme = palette.theme || "auto";
+  if (theme === "light") {
+    return `PALETTE (this video's family — anchor on it, but THIS frame owns its own field):
+- accent ${palette.accent} · accent2 ${palette.accent2} · a LIGHT field ${palette.bg} · dark text ${palette.text}
+LIGHT THEME — every frame is BRIGHT; NO dark fields and NO luminous glows. VARY THE BACKGROUND scene to scene between: a clean near-white field, a pale tint of the accent, a soft accent wash, a light card on off-white, or a subtle light gradient. Text is dark and high-contrast. Build a real palette around the accent (neutrals, a tint, a tasteful secondary) — never monochrome, never the same wash every frame.`;
+  }
+  if (theme === "medium") {
+    return `PALETTE (this video's family — anchor on it, but THIS frame owns its own field):
+- accent ${palette.accent} · accent2 ${palette.accent2} · a MID-TONE field ${palette.bg} · light text ${palette.text}
+MEDIUM THEME — mid-tone fields with light high-contrast text (no pure black, no pure white). VARY THE BACKGROUND scene to scene between: a mid-tone field, a slightly deeper tonal block, a saturated accent block, a tint of the accent, or a soft gradient. Build a real palette around the accent — never monochrome, never the same wash every frame.`;
+  }
   return `PALETTE (this video's family — anchor on it, but THIS frame owns its own field):
 - accent ${palette.accent} · accent2 ${palette.accent2} · a deep/near-black ${palette.bg} · a light/near-white ${palette.text === "#ffffff" ? "#f4f1ea" : palette.text}
 VARY THE BACKGROUND scene to scene — do NOT default every frame to the same colour. Rotate intentionally between: a deep dark field, a near-white field, a saturated accent block, a tonal tint of the accent, or (for stat/quote) a moody gradient. Pick the field that suits THIS line; the next beat should look different from this one. Build a real palette around the accent (neutrals, a tint, a tasteful secondary) — never monochrome, never the same wash every frame.`;

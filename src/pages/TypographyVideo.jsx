@@ -4,6 +4,7 @@ import { generateTypographyVideo } from "../services/ai/typographyVideo/generate
 import { getTypographyVideoProjects, deleteProject, invalidateProjectCaches } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
 import { LanguageVoicePicker } from "../ui/LanguageVoicePicker";
+import { ThemeField, AccentField } from "../ui/fields/index.js";
 import { creditsForDuration } from "../core/utils/creditCosts";
 
 const T = {
@@ -213,6 +214,8 @@ function GeneratorForm() {
   const [targetDuration, setTargetDuration] = useState(40);
   const [language,       setLanguage]       = useState("en");
   const [voiceId,        setVoiceId]        = useState(null);
+  const [theme,          setTheme]          = useState("auto");
+  const [accentColor,    setAccentColor]    = useState(null);
   const [loading,        setLoading]        = useState(false);
   const [statusIdx, setStatusIdx] = useState(0);
   const [error,     setError]     = useState(null);
@@ -225,7 +228,7 @@ function GeneratorForm() {
 
     try {
       const result = await generateTypographyVideo(
-        { input: input.trim(), inputType, targetDuration, voiceId, language },
+        { input: input.trim(), inputType, targetDuration, voiceId, language, theme, accentColor },
         ({ step }) => setStatusIdx(step),
       );
       invalidateProjectCaches("typography_video", "all");
@@ -343,6 +346,17 @@ function GeneratorForm() {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Theme + Accent */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.muted, marginBottom: 7, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+            Theme
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <ThemeField value={theme} onChange={setTheme} accent={T.accent} />
+            <AccentField value={accentColor} onChange={setAccentColor} accent={T.accent} />
           </div>
         </div>
 

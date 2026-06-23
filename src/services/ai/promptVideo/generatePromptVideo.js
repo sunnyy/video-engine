@@ -1,10 +1,10 @@
 import { serverFetch } from "../../serverApi";
 
 /** Phase 1: free plan — research + script + shot list for user review. */
-export async function planPromptVideo({ prompt, styleId = "auto", targetDuration = 45, language = "en", revision = "" }) {
+export async function planPromptVideo({ prompt, styleId = "auto", targetDuration = 45, language = "en", revision = "", theme = "auto", accentColor = null }) {
   const res = await serverFetch("/api/ai-video/plan", {
     method: "POST",
-    body: JSON.stringify({ prompt, styleId, targetDuration, language, revision }),
+    body: JSON.stringify({ prompt, styleId, targetDuration, language, revision, theme, accentColor }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Planning failed" }));
@@ -14,12 +14,12 @@ export async function planPromptVideo({ prompt, styleId = "auto", targetDuration
 }
 
 export async function generatePromptVideo(
-  { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null },
+  { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null, theme = "auto", accentColor = null },
   onProgress,
 ) {
   const res = await serverFetch("/api/ai-video/generate", {
     method: "POST",
-    body: JSON.stringify({ prompt, styleId, targetDuration, language, voiceId, orientation, plan }),
+    body: JSON.stringify({ prompt, styleId, targetDuration, language, voiceId, orientation, plan, theme, accentColor }),
   });
 
   if (!res.ok && res.status !== 200) {

@@ -25,6 +25,7 @@
 import { openai } from "../../../server/middleware/shared.js";
 import { STYLE_PRESETS, STYLE_IDS, styleMenuForDirector, styleDirectiveBlock } from "./styleSystem.js";
 import { normalizeHex, ensureVividAccent } from "./utils.js";
+import { resolveThemePalette, themeDirective } from "../shared/themeRegistry.js";
 
 const DIRECTOR_MODEL = "gpt-4.1";
 
@@ -62,15 +63,17 @@ function languageBlock(language) {
   return `LANGUAGE — STRICT: Every script_line must be written in ${language}. content strings may use short Latin-script keywords.`;
 }
 
-function buildDirectorPrompt({ research, style, targetDuration, language }) {
+function buildDirectorPrompt({ research, style, targetDuration, language, theme = "auto", accentColor = null }) {
   const beatTarget = Math.round(targetDuration / 2.2);
   const targetWords = Math.round(targetDuration * WORDS_PER_SECOND);
+  const themeBlock = themeDirective(theme, accentColor);
 
   return {
     system: `You are the director of a short-form video studio that makes dense, fast-cut, subject-specific videos.
 You plan the WHOLE film in one pass: the narration AND one visual per spoken beat. Script and shot list are the same artifact.
 
 ${style ? styleDirectiveBlock(style) : `## VISUAL STYLE: choose one for this video from:\n${styleMenuForDirector()}\nPick what fits the topic's tone. Lock it — every beat inherits it.`}
+${themeBlock}
 
 THE BEAT SYSTEM — NON-NEGOTIABLE:
 - One beat = one spoken PHRASE = one visual moment. 3-6 words per beat, ${MAX_BEAT_WORDS} ABSOLUTE MAX. Beats are 1-2 seconds.
@@ -184,9 +187,9 @@ Direct this film, beat by beat.`,
   };
 }
 
-export async function directBeats({ research, styleId, targetDuration = 45, language = "en" }) {
+export async function directBeats({ research, styleId, targetDuration = 45, language = "en", theme = "auto", accentColor = null }) {
   const style = styleId && styleId !== "auto" ? STYLE_PRESETS[styleId] : null;
-  const prompt = buildDirectorPrompt({ research, style, targetDuration, language });
+  const prompt = buildDirectorPrompt({ research, style, targetDuration, language, theme, accentColor });
 
   // Length is controlled at GENERATION, never by trimming the finished script/voiceover
   // (trimming cuts the ending off). The prompt sets the word budget; if the model still
@@ -225,6 +228,16 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
   palette.accent  = ensureVividAccent(normalizeHex(palette.accent, "#f59e0b"), "#f59e0b");
   palette.accent2 = ensureVividAccent(normalizeHex(palette.accent2, "#38bdf8"), "#38bdf8");
   palette.text    = normalizeHex(palette.text, "#ffffff");
+
+  // Deterministic theme: lock the family field + text to the chosen theme (each beat still
+  // varies WITHIN the family). Accent stays GPT's unless the user pinned one.
+  const themePalette = resolveThemePalette(theme, accentColor);
+  if (themePalette) {
+    palette.bg     = themePalette.background;
+    palette.text   = themePalette.primaryText;
+    if (accentColor) palette.accent = accentColor;
+  }
+  palette.theme = themePalette ? theme : "auto"; // carried into the per-beat design prompts
 
   let beats = Array.isArray(plan.beats) ? plan.beats : [];
   // MIN_BEATS is a soft *target* (density is the style); only fail if there are too

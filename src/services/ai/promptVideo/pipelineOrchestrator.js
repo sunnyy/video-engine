@@ -399,10 +399,10 @@ function applyTransitions(layers, beats) {
  * runPromptPlan — the cheap half: research + direction only. Shown to the
  * user for review/revision BEFORE any production money is spent.
  */
-export async function runPromptPlan({ prompt, styleId = "auto", targetDuration = 45, language = "en" }) {
+export async function runPromptPlan({ prompt, styleId = "auto", targetDuration = 45, language = "en", theme = "auto", accentColor = null }) {
   await moderateInput(prompt, { label: "prompt-to-video input" });
   const research = await researchTopic(prompt);
-  const film = await directBeats({ research, styleId, targetDuration, language });
+  const film = await directBeats({ research, styleId, targetDuration, language, theme, accentColor });
   const words = film.beats.reduce((a, b) => a + b.script_line.trim().split(/\s+/).filter(Boolean).length, 0);
   return {
     plan: { research, film },
@@ -424,6 +424,7 @@ export async function runPromptPipeline(params, onStep) {
   const {
     prompt, userId,
     styleId = "auto", targetDuration = 45, language = "en", voiceId = null,
+    theme = "auto", accentColor = null,
     plan = null,
   } = params;
 
@@ -446,7 +447,7 @@ export async function runPromptPipeline(params, onStep) {
 
     // ── Stage 1: Beat direction (script + shot list, one call) ─────────────
     step(PROMPT_STATUS_STEPS[1]);
-    film = await directBeats({ research, styleId, targetDuration, language });
+    film = await directBeats({ research, styleId, targetDuration, language, theme, accentColor });
   }
   const { style, palette } = film;
   let beats = film.beats;

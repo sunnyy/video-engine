@@ -6,6 +6,7 @@
  */
 
 import { openai } from "../../../server/middleware/shared.js";
+import { resolveThemePalette, themeDirective } from "../shared/themeRegistry.js";
 
 
 const SCRIPT_SYSTEM = `You are a creative director and short-form video scriptwriter.
@@ -128,7 +129,7 @@ const PLATFORM_TONE_DIRECTIVES = {
   linkedin:  "PLATFORM: LinkedIn. Professional audience. Tone: authoritative, insightful, credible. Lead with the key business insight or professional takeaway.",
 };
 
-export async function generateSocialScript({ content, targetDuration = 25, language = "en" }) {
+export async function generateSocialScript({ content, targetDuration = 25, language = "en", theme = "auto", accentColor = null }) {
   const postText   = (content.text || content.title || "").slice(0, 2000);
   const imageUrls  = content.imageUrls?.length ? content.imageUrls : (content.imageUrl ? [content.imageUrl] : []);
   const threadNote = content.isThread
@@ -155,7 +156,7 @@ export async function generateSocialScript({ content, targetDuration = 25, langu
   const userText = `Post text:
 "${postText}"
 ${imageNote}
-Write a ~${targetDuration}-second narration — roughly ${wordBudget} words total across all scenes (the spoken length is the video length, so stay close to that).${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}`;
+Write a ~${targetDuration}-second narration — roughly ${wordBudget} words total across all scenes (the spoken length is the video length, so stay close to that).${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}${themeDirective(theme, accentColor)}`;
 
   const messages = [{ role: "system", content: SCRIPT_SYSTEM }];
 
@@ -216,7 +217,17 @@ Write a ~${targetDuration}-second narration — roughly ${wordBudget} words tota
     };
   });
 
-  const palette = {
+  // Deterministic theme enforcement: when a theme is chosen, field + text come from the theme
+  // (the model can't drift back to dark); the accent stays flexible unless the user pinned one.
+  const themePalette = resolveThemePalette(theme, accentColor);
+  const palette = themePalette ? {
+    background:          themePalette.background,
+    backgroundSecondary: themePalette.backgroundSecondary,
+    primaryText:         themePalette.primaryText,
+    secondaryText:       themePalette.secondaryText,
+    accent:              accentColor || parsed.palette?.accent    || themePalette.accent,
+    highlight:           accentColor || parsed.palette?.highlight || themePalette.highlight,
+  } : {
     background:          parsed.palette?.background          ?? "#0A0A0A",
     backgroundSecondary: parsed.palette?.backgroundSecondary ?? "#111111",
     primaryText:         parsed.palette?.primaryText         ?? "#ffffff",
