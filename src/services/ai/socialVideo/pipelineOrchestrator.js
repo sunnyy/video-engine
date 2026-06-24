@@ -111,7 +111,7 @@ function mediaScrimEntries(sceneIndex, src, meta, kind = "image", canvas = CANVA
 // ── Phase 1: PLAN (fetch + script) — returned for the user to confirm/edit the
 // script BEFORE the voiceover & everything else is generated from it (no re-run).
 export async function planSocial(params, onStep) {
-  const { url, targetDuration = 25, language = "en", theme = "auto", accentColor = null } = params;
+  const { url, targetDuration = 25, language = "en", theme = "auto", accentColor = null, accentColor2 = null } = params;
   const step = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
 
   step("Tuning in…");
@@ -130,7 +130,7 @@ export async function planSocial(params, onStep) {
       : targetDuration;
   if (wordCount > 300) console.log(`[social] long post detected: ${wordCount} words → duration ${effectiveDuration}s`);
   const { full_script, scenes: rawScenes, palette, fontPair, musicMood, projectName: gptName, creativeDirection } =
-    await generateSocialScript({ content, targetDuration: effectiveDuration, language, theme, accentColor });
+    await generateSocialScript({ content, targetDuration: effectiveDuration, language, theme, accentColor, accentColor2 });
 
   const scenes = rawScenes.map(s => ({ ...s }));
   if (creativeDirection) console.log(`[social] creative direction: ${creativeDirection}`);

@@ -1,9 +1,9 @@
 import { serverFetch } from "../../serverApi";
 
 /** Phase 1 (free): fetch + script → returns the plan for the user to confirm/edit. */
-export async function planSocialVideo({ url, targetDuration = 25, language = "en", theme = "auto", accentColor = null }) {
+export async function planSocialVideo({ url, targetDuration = 25, language = "en", theme = "auto", accentColor = null, accentColor2 = null }) {
   const res  = await serverFetch("/api/social-video/plan", {
-    method: "POST", body: JSON.stringify({ url, targetDuration, language, theme, accentColor }),
+    method: "POST", body: JSON.stringify({ url, targetDuration, language, theme, accentColor, accentColor2 }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { const e = new Error(data.error || "Could not read that post"); if (data.code) e.code = data.code; throw e; }

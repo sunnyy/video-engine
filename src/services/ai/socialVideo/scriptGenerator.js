@@ -129,7 +129,7 @@ const PLATFORM_TONE_DIRECTIVES = {
   linkedin:  "PLATFORM: LinkedIn. Professional audience. Tone: authoritative, insightful, credible. Lead with the key business insight or professional takeaway.",
 };
 
-export async function generateSocialScript({ content, targetDuration = 25, language = "en", theme = "auto", accentColor = null }) {
+export async function generateSocialScript({ content, targetDuration = 25, language = "en", theme = "auto", accentColor = null, accentColor2 = null }) {
   const postText   = (content.text || content.title || "").slice(0, 2000);
   const imageUrls  = content.imageUrls?.length ? content.imageUrls : (content.imageUrl ? [content.imageUrl] : []);
   const threadNote = content.isThread
@@ -156,7 +156,7 @@ export async function generateSocialScript({ content, targetDuration = 25, langu
   const userText = `Post text:
 "${postText}"
 ${imageNote}
-Write a ~${targetDuration}-second narration — roughly ${wordBudget} words total across all scenes (the spoken length is the video length, so stay close to that).${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}${themeDirective(theme, accentColor)}`;
+Write a ~${targetDuration}-second narration — roughly ${wordBudget} words total across all scenes (the spoken length is the video length, so stay close to that).${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}${themeDirective(theme, accentColor, accentColor2)}`;
 
   const messages = [{ role: "system", content: SCRIPT_SYSTEM }];
 
@@ -226,13 +226,15 @@ Write a ~${targetDuration}-second narration — roughly ${wordBudget} words tota
     primaryText:         themePalette.primaryText,
     secondaryText:       themePalette.secondaryText,
     accent:              accentColor || parsed.palette?.accent    || themePalette.accent,
+    accent2:             accentColor2 || parsed.palette?.accent2  || null,
     highlight:           accentColor || parsed.palette?.highlight || themePalette.highlight,
   } : {
     background:          parsed.palette?.background          ?? "#0A0A0A",
     backgroundSecondary: parsed.palette?.backgroundSecondary ?? "#111111",
     primaryText:         parsed.palette?.primaryText         ?? "#ffffff",
     secondaryText:       parsed.palette?.secondaryText       ?? "#AAAAAA",
-    accent:              parsed.palette?.accent              ?? "#FFD600",
+    accent:              accentColor  || parsed.palette?.accent   || "#FFD600",
+    accent2:             accentColor2 || parsed.palette?.accent2  || null,
     highlight:           parsed.palette?.highlight           ?? "#FFFFFF",
   };
 

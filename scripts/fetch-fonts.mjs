@@ -50,6 +50,8 @@ const FONTS = {
   "Anton":              [400],
   "Archivo Black":      [400],
   "Fredoka One":        [400],
+  "Caveat":             [400, 500, 600, 700],
+  "Patrick Hand":       [400],
 };
 
 // Desktop UA so Google returns woff2 (latin) URLs.

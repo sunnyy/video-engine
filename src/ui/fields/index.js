@@ -10,3 +10,5 @@ export { OrientationField, ORIENTATIONS }      from "./orientation.jsx";
 export { SelectField }                         from "./select.jsx";
 export { ReviewToggleField }                   from "./reviewToggle.jsx";
 export { ThemeField, AccentField }             from "./themeField.jsx";
+export { LookField }                           from "./look.jsx";
+export { CaptionStyleField }                   from "./captionStyle.jsx";

@@ -10,7 +10,7 @@ export const router = express.Router();
 // Free (two text-model calls); credits are charged only at /generate.
 router.post("/plan", requireAuth, async (req, res) => {
   try {
-    const { prompt, styleId = "auto", targetDuration = 45, language = "en", revision = "", theme = "auto", accentColor = null } = req.body;
+    const { prompt, styleId = "auto", targetDuration = 45, language = "en", revision = "", theme = "auto", accentColor = null, accentColor2 = null } = req.body;
     if (!prompt?.trim()) return res.status(400).json({ error: "prompt is required" });
 
     const effectivePrompt = revision?.trim()
@@ -22,7 +22,7 @@ router.post("/plan", requireAuth, async (req, res) => {
       styleId: styleId ?? "auto",
       targetDuration: Math.min(75, Math.max(15, parseInt(targetDuration, 10) || 45)),
       language: language ?? "en",
-      theme, accentColor,
+      theme, accentColor, accentColor2,
     });
     res.json(result);
   } catch (e) {
@@ -36,7 +36,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
-  const { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null, theme = "auto", accentColor = null } = req.body;
+  const { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null, theme = "auto", accentColor = null, accentColor2 = null } = req.body;
   if (!prompt?.trim()) return res.status(400).json({ error: "prompt is required" });
 
   // SSE setup
@@ -66,7 +66,7 @@ router.post("/generate", requireAuth, async (req, res) => {
         language: language ?? "en",
         voiceId: voiceId ?? null,
         orientation: ["9:16", "16:9", "1:1", "4:5"].includes(orientation) ? orientation : "9:16",
-        theme, accentColor,
+        theme, accentColor, accentColor2,
         plan,
       },
       ({ step }) => send({ step }),

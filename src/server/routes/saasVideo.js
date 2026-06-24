@@ -129,7 +129,7 @@ router.post("/create", requireAuth, async (req, res) => {
       target_platform, language, tone, target_audience, duration_seconds,
       has_script, has_talking_head, has_screenshots, has_recordings, has_logo, has_voiceover,
       caption_style, transition_style, motion_style, color_palette, music_mood,
-      visual_style, accent_color, typography_style, voice_id, scene_count, target_duration,
+      visual_style, accent_color, accent_color_2, typography_style, voice_id, scene_count, target_duration,
     } = req.body;
 
     // Safety: moderate the user-supplied product text before building the video.
@@ -171,6 +171,8 @@ router.post("/create", requireAuth, async (req, res) => {
       visual_style:     visual_style     || "radiant",
       theme:            req.body.theme   || "dark",
       accent_color:     accent_color     || "#6366f1",
+      // Optional secondary accent — carried in-flight to the v2 pipeline only (NOT a DB column).
+      accent_color_2:   accent_color_2   || null,
       typography_style: typography_style || "modern",
       voice_id:         voice_id         || "21m00Tcm4TlvDq8ikWAM",
       // target_duration drives the beat pipeline; scene_count kept only for render-time pricing tiers

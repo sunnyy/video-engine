@@ -528,6 +528,7 @@ async function runV2BeatPipeline(project) {
     // URL mode auto-brands: scraped brand color / logo win. Manual mode respects the
     // user's own Style-step accent and uploaded logo, falling back to scraped only.
     accentColor:     (textSource === "url" ? harvest?.brandColor : null) ?? project.accent_color ?? project.style?.color_palette ?? harvest?.brandColor ?? "#6366f1",
+    accentColor2:    project.accent_color_2 ?? null,   // optional pinned secondary (carried through in-flight; not persisted)
     visualStyle:     project.visual_style    ?? "radiant",
     typographyStyle: project.typography_style ?? "modern",
     logoUrl:         (textSource === "url" ? harvest?.logoUrl : null) ?? project.logo_url ?? harvest?.logoUrl ?? null,

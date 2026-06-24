@@ -20,7 +20,8 @@ import { resolveThemePalette } from "../shared/themeRegistry.js";
 export function buildFreeSceneDesignerPrompt(sceneScript, projectContext) {
   const canvasW     = projectContext.canvasWidth  ?? 1080;
   const canvasH     = projectContext.canvasHeight ?? 1920;
-  const accentColor = projectContext.accentColor  || "#6366f1";
+  const accentColor  = projectContext.accentColor  || "#6366f1";
+  const accentColor2 = projectContext.accentColor2 || null;
   const _sv         = getStyle(projectContext.visualStyle);
   const visualStyle = _sv ? `${_sv.label} (${_sv.description})` : "modern, polished, brand-forward";
   const theme       = projectContext.theme        || "dark";
@@ -37,7 +38,7 @@ export function buildFreeSceneDesignerPrompt(sceneScript, projectContext) {
   // than "light backgrounds"). Default to dark when unset/"auto" — Promo always renders a theme.
   const tp = resolveThemePalette(theme, accentColor) || resolveThemePalette("dark", accentColor);
   const themeLabel = theme === "light" ? "LIGHT" : theme === "medium" ? "MEDIUM" : "DARK";
-  const themeDir = `${themeLabel} THEME — use these EXACT colours: background field ≈ ${tp.background} (with ${tp.backgroundSecondary} for depth), primary text ${tp.primaryText}, secondary text ${tp.secondaryText}. ${tp.glow ? "Subtle glows/tints are allowed." : "NO dark fields or luminous glows — keep it bright and clean; use soft shadows or pale tints instead."} Text MUST contrast hard with the field. Accent ${tp.accent} for emphasis/highlights only.`;
+  const themeDir = `${themeLabel} THEME — use these EXACT colours: background field ≈ ${tp.background} (with ${tp.backgroundSecondary} for depth), primary text ${tp.primaryText}, secondary text ${tp.secondaryText}. ${tp.glow ? "Subtle glows/tints are allowed." : "NO dark fields or luminous glows — keep it bright and clean; use soft shadows or pale tints instead."} Text MUST contrast hard with the field. Accent ${tp.accent} for emphasis/highlights only.${accentColor2 ? ` Secondary accent ${accentColor2} — a brand companion to the primary accent; use BOTH across scenes (gradients, a second highlight, alternating emphasis), varying which dominates.` : ""}`;
 
   const orientation = isPortrait
     ? `Tall PORTRAIT (9:16): stack blocks vertically, each near full-width. Do NOT split the hero into left/right columns and don't leave half the frame empty. (A short row of small cards is fine.)`

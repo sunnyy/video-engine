@@ -9,7 +9,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
-  const { input, inputType = "topic", targetDuration = 40, voiceId, language = "en", projectId, theme = "auto", accentColor = null } = req.body;
+  const { input, inputType = "topic", targetDuration = 40, voiceId, language = "en", projectId, theme = "auto", accentColor = null, accentColor2 = null } = req.body;
   if (!input?.trim()) return res.status(400).json({ error: "input is required" });
 
   // SSE setup
@@ -31,7 +31,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     creditAmount = cost;
 
     const result = await runTypographyPipeline(
-      { input: input.trim(), inputType, targetDuration, userId, voiceId: voiceId ?? null, language: language ?? "en", theme, accentColor },
+      { input: input.trim(), inputType, targetDuration, userId, voiceId: voiceId ?? null, language: language ?? "en", theme, accentColor, accentColor2 },
       ({ step }) => send({ step }),
     );
 
@@ -49,10 +49,10 @@ router.post("/generate", requireAuth, async (req, res) => {
 
 // ── Phase 1: PLAN (free) — script, returned for confirmation/editing ──
 router.post("/plan", requireAuth, async (req, res) => {
-  const { input, inputType = "topic", targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null } = req.body;
+  const { input, inputType = "topic", targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null } = req.body;
   if (!input?.trim()) return res.status(400).json({ error: "input is required" });
   try {
-    const plan = await planTypography({ input: input.trim(), inputType, targetDuration, language, styleId, theme, accentColor });
+    const plan = await planTypography({ input: input.trim(), inputType, targetDuration, language, styleId, theme, accentColor, accentColor2 });
     res.json({ plan });
   } catch (err) {
     if (err.code === "CONTENT_BLOCKED") return res.status(422).json({ error: err.message, code: err.code });

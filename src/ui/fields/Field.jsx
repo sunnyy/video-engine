@@ -33,7 +33,10 @@ export function FieldChip({ icon, label, value, onClick, accent = THEME.accent, 
       }}
     >
       <span style={{ display: "flex", alignItems: "center", color: tinted ? accent : THEME.muted }}>{icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: tinted ? accent : THEME.text }}>{value}</span>
+      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, lineHeight: 1 }}>
+        {label && <span style={{ fontSize: 9, fontWeight: 700, color: tinted ? accent : THEME.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>}
+        <span style={{ fontSize: 13, fontWeight: 700, color: tinted ? accent : THEME.text, lineHeight: 1.1 }}>{value}</span>
+      </span>
       <ChevronDown size={13} style={{ opacity: 0.6, marginLeft: -1, color: tinted ? accent : THEME.muted }} />
     </button>
   );
@@ -47,7 +50,7 @@ export function FieldModal({ title, onClose, children, width = 520 }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", maxHeight: "86vh", overflowY: "auto", background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: "22px 24px" }}
+        style={{ width, maxWidth: "100%", maxHeight: "86vh", overflowY: "auto", background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: "22px 24px", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.22) transparent" }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, fontFamily: "'Outfit',sans-serif" }}>{title}</div>

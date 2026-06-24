@@ -14,18 +14,22 @@ const FORMAT_GUIDANCE = {
   '1:1':  'Square canvas. Center-focused composition. Balance elements around the center. Text can be centered or left-aligned. Visuals fill remaining space.',
 };
 
-function buildDesignMandate(accentColor, visualStyle, theme) {
+function buildDesignMandate(accentColor, visualStyle, theme, accentColor2 = null) {
   const themeDir = theme === 'light'
     ? 'LIGHT theme — light backgrounds, dark high-contrast text.'
     : theme === 'medium'
     ? 'MEDIUM theme — mid-tone backgrounds, light high-contrast text.'
     : 'DARK theme — dark backgrounds, light high-contrast text.';
 
+  const accentLine = accentColor2
+    ? `- BRAND ACCENTS: primary ${accentColor} and secondary ${accentColor2} (the user pinned both). Build the palette from BOTH — use them across the video (gradients, a second highlight, alternating emphasis), varying which dominates scene to scene. Add neutrals/tints around them; never monochrome.`
+    : `- BRAND ACCENT: ${accentColor}. Use it as the primary brand anchor — but you are NOT limited to one color. Build a real, cohesive palette around it: neutrals, tints and shades, and a tasteful complementary or secondary color when it strengthens the design. Do NOT paint every element the same hue, and do NOT make the scene monochrome.`;
+
   return `
 ## ART DIRECTION (you are the designer — make this scene look premium and distinct)
 You have full creative control of the palette and visual treatment. The only fixed point is the brand accent and the theme direction below; everything else is your call.
 
-- BRAND ACCENT: ${accentColor}. Use it as the primary brand anchor — but you are NOT limited to one color. Build a real, cohesive palette around it: neutrals, tints and shades, and a tasteful complementary or secondary color when it strengthens the design. Do NOT paint every element the same hue, and do NOT make the scene monochrome.
+${accentLine}
 - THEME: ${themeDir} Keep strong text contrast. Choose the exact background colors and gradients yourself, and VARY them from scene to scene so the video never feels monotone.
 - STYLE LEANING: "${visualStyle}" is a loose direction, not a rulebook. Interpret it freely. Above all, design what looks best for THIS specific scene and its mood — and deliberately VARY your treatment across scenes (glow vs flat, gradient vs solid, dense vs airy, bold vs restrained). Never apply one formula to every scene.
 - Aim for the polish and variety of a modern launch video (Apple / Stripe / Linear / Arc). Two scenes in the same video should not look like the same template recolored.
@@ -36,7 +40,8 @@ export function buildSceneDesignerPrompt(sceneScript, projectContext) {
   const canvasW     = projectContext.canvasWidth  ?? 1080;
   const canvasH     = projectContext.canvasHeight ?? 1920;
   const formatRatio = projectContext.formatRatio  ?? '9:16';
-  const accentColor = projectContext.accentColor  || "#6366f1";
+  const accentColor  = projectContext.accentColor  || "#6366f1";
+  const accentColor2 = projectContext.accentColor2 || null;
   const _sv         = getStyle(projectContext.visualStyle);
   const visualStyle = _sv ? `${_sv.label} (${_sv.description})` : "modern, polished, brand-forward";
   const theme       = projectContext.theme        || "dark";
@@ -148,7 +153,7 @@ If an atmospheric or conceptual visual genuinely strengthens the scene, you may 
 Maximum ONE image-placeholder per scene. Valid data-asset-type values are exactly: asset | stock | ai.
 
 IMAGE-PLACEHOLDER = RESERVED ZONE (CRITICAL): The rectangle of ANY image-placeholder is exclusive. NO other element (headline, card, label, icon, divider, glow, text) may overlap its area — not even partially, not even a transparent one. A real image or screenshot will fill it; anything on top is covered and wasted. Lay every other element entirely OUTSIDE the placeholder rectangle (above, below, or beside it). Verify each element's box does not intersect the placeholder's left/top/width/height before writing it.`}
-${buildDesignMandate(accentColor, visualStyle, theme)}
+${buildDesignMandate(accentColor, visualStyle, theme, accentColor2)}
 ${beatDuration != null ? `
 ## SCREEN-TIME BUDGET — THIS FRAME IS ON SCREEN FOR ~${beatDuration.toFixed(1)} SECONDS (match complexity to time)
 The viewer must absorb the whole frame in ${beatDuration.toFixed(1)}s. Build only what can be read in that time.

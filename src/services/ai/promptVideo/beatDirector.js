@@ -63,10 +63,10 @@ function languageBlock(language) {
   return `LANGUAGE — STRICT: Every script_line must be written in ${language}. content strings may use short Latin-script keywords.`;
 }
 
-function buildDirectorPrompt({ research, style, targetDuration, language, theme = "auto", accentColor = null }) {
+function buildDirectorPrompt({ research, style, targetDuration, language, theme = "auto", accentColor = null, accentColor2 = null }) {
   const beatTarget = Math.round(targetDuration / 2.2);
   const targetWords = Math.round(targetDuration * WORDS_PER_SECOND);
-  const themeBlock = themeDirective(theme, accentColor);
+  const themeBlock = themeDirective(theme, accentColor, accentColor2);
 
   return {
     system: `You are the director of a short-form video studio that makes dense, fast-cut, subject-specific videos.
@@ -187,9 +187,9 @@ Direct this film, beat by beat.`,
   };
 }
 
-export async function directBeats({ research, styleId, targetDuration = 45, language = "en", theme = "auto", accentColor = null }) {
+export async function directBeats({ research, styleId, targetDuration = 45, language = "en", theme = "auto", accentColor = null, accentColor2 = null }) {
   const style = styleId && styleId !== "auto" ? STYLE_PRESETS[styleId] : null;
-  const prompt = buildDirectorPrompt({ research, style, targetDuration, language, theme, accentColor });
+  const prompt = buildDirectorPrompt({ research, style, targetDuration, language, theme, accentColor, accentColor2 });
 
   // Length is controlled at GENERATION, never by trimming the finished script/voiceover
   // (trimming cuts the ending off). The prompt sets the word budget; if the model still
@@ -237,6 +237,8 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     palette.text   = themePalette.primaryText;
     if (accentColor) palette.accent = accentColor;
   }
+  // A user-pinned secondary accent wins over the GPT/topic-derived accent2 (kept otherwise).
+  if (accentColor2) palette.accent2 = accentColor2;
   palette.theme = themePalette ? theme : "auto"; // carried into the per-beat design prompts
 
   let beats = Array.isArray(plan.beats) ? plan.beats : [];

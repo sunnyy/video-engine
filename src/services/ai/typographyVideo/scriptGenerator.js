@@ -139,7 +139,7 @@ const LANG_DIRECTIVES = {
   es:       "\nLANGUAGE: Write ALL voiceover and beat text in Spanish.",
 };
 
-export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null) {
+export async function generateTypographyScript(input, inputType, targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null) {
   // Final length = spoken length. Measured ≈2.3 words/sec (TTS 1.1x + scene pacing), so the
   // duration target is expressed as a word budget — the model decides scene/sentence count itself.
   const wordBudget    = Math.round(targetDuration * 2.3);
@@ -155,7 +155,7 @@ Lean the palette and energy toward this style, while keeping the clean kinetic-t
 
   // Theme is a HARD constraint (light/medium/dark + accent) — reinforced in the prompt and,
   // crucially, enforced deterministically on the parsed palette below so the LLM can't drift dark.
-  const themeBlock = themeDirective(theme, accentColor);
+  const themeBlock = themeDirective(theme, accentColor, accentColor2);
 
   const userMsg = inputType === "script"
     ? `Convert this into kinetic typography scenes with voiceover + beats per scene.${langDirective}\n\nScript: "${input.trim()}"`
@@ -184,13 +184,15 @@ Topic: "${input.trim()}"`;
     primaryText:         themePalette.primaryText,
     secondaryText:       themePalette.secondaryText,
     accent:              accentColor || out.palette?.accent    || themePalette.accent,
+    accent2:             accentColor2 || out.palette?.accent2  || null,
     highlight:           accentColor || out.palette?.highlight || themePalette.highlight,
   } : {
     background:          out.palette?.background          ?? "#0A0A0A",
     backgroundSecondary: out.palette?.backgroundSecondary ?? "#111111",
     primaryText:         out.palette?.primaryText         ?? "#ffffff",
     secondaryText:       out.palette?.secondaryText       ?? "#AAAAAA",
-    accent:              out.palette?.accent              ?? "#FFD600",
+    accent:              accentColor  || out.palette?.accent   || "#FFD600",
+    accent2:             accentColor2 || out.palette?.accent2  || null,
     highlight:           out.palette?.highlight           ?? "#FFFFFF",
   };
 

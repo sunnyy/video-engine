@@ -120,12 +120,12 @@ async function saveTimeline(timeline, projectName, userId, orientation = "9:16")
 // ── Phase 1: PLAN (free) — script only, returned for confirmation/editing ──────
 
 export async function planTypography(project) {
-  const { input, inputType = "topic", targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null } = project;
+  const { input, inputType = "topic", targetDuration = 40, language = "en", styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null } = project;
 
   await moderateInput(input, { label: "typography input" });
 
   console.log(`[typography] plan — generating script (target: ${targetDuration}s, theme: ${theme})`);
-  const script = await generateTypographyScript(input, inputType, targetDuration, language, styleId, theme, accentColor);
+  const script = await generateTypographyScript(input, inputType, targetDuration, language, styleId, theme, accentColor, accentColor2);
   const { scenes, voiceoverScript, projectName, palette, fontPair, musicMood, niche } = script;
   const totalBeats = scenes.reduce((n, sc) => n + sc.beats.length, 0);
   console.log(`[typography] plan: ${scenes.length} scenes, ${totalBeats} beats`);
