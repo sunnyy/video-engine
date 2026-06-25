@@ -189,7 +189,7 @@ ${sceneCountInstruction}
 PACING:
 - One beat per scene. Never combine two beats into one scene.
 - script_segment values must be consecutive substrings of full_script with no gaps.
-- Keep each spoken segment tight — roughly 10–20 words. Do not pad to reach a duration.
+- Each script_segment is a natural, CONNECTED slice of the flowing full_script — vary its length to the beat, no fixed per-scene word count; it should read like continuous speech, not clipped fragments. Don't pad to reach a duration.
 
 VISUAL VARIETY:
 Plan the video's visual arc so consecutive scenes don't look identical. Vary composition where it serves the story — never force variety that hurts clarity.`;
@@ -218,18 +218,16 @@ Choose the number of scenes that best fits this product — between 3 and 7.
 YOU decide the beats and their order — design the structure that best sells THIS product.`;
 
   const languageInstruction =
-    project.language === "hinglish" ? `LANGUAGE — HINGLISH:
-Write the full_script entirely in Hinglish — the natural mix of Hindi and English with respect.
-Tone: casual, energetic, relatable, FOMO-driven. Like a friend talking, not a formal voiceover.
+    project.language === "hinglish" ? `LANGUAGE — HINDI (DEVANAGARI), casual Hinglish flow:
+Write the SPOKEN full_script in Hindi using DEVANAGARI script — the natural casual mix people speak in reels (FOMO-driven, like a friend talking, not formal). Romanized Hindi ("abhi try karo") is a FAILURE — it makes the voice mispronounce; write it in Devanagari ("अभी ट्राय करो").
 Rules:
-- Product name always in English
-- Technical terms in English (video, script, caption, timeline, upload, AI, content)
-- Emotion, flow, and conversational hooks in Hindi
-- Never write pure formal Hindi — it must sound like how someone actually talks in a reel
-- Use FOMO triggers naturally: "sab kar rahe hain", "peeche mat raho", "abhi try karo"
+- Product name always in English (Latin); common tech terms may stay English (video, script, caption, timeline, upload, AI, content)
+- Emotion, flow, and conversational hooks in Devanagari Hindi — never pure formal Hindi
+- FOMO triggers in Devanagari: "सब कर रहे हैं", "पीछे मत रहो", "अभी try करो"
+- ON-SCREEN text (visual_text / overlays) stays LATIN — short romanized-Hinglish or English keywords (the on-screen design fonts are Latin)
 
-Example Hinglish style (note the hook opens with a relatable high-level question, NOT a task list — the task list comes later as the problem beat):
-"Abhi bhi har video manually edit kar rahe ho? Ghanton ka kaam. Scripts likhna. Assets dhundhna. Captions fix karna. [Product] try karo — topic daalo, video ready. Baki sab [Product] handle karega. Abhi start karo, free mein."
+Example (the hook opens with a relatable question and FLOWS — not a clipped task list; keep it conversational):
+"अभी भी हर video खुद manually edit कर रहे हो, घंटों लगाकर? [Product] try करो — बस topic डालो और video ready। बाकी सब [Product] संभाल लेगा। अभी start करो, वो भी free में।"
 
 The full_script must be speakable naturally by an ElevenLabs multilingual voice at 1.1x speed.
 `
@@ -348,10 +346,9 @@ Scene Count: ${isAuto ? "Auto — you decide (3–7 scenes)" : targetCount}`;
 // segments it into timed beats AFTER the voiceover is generated.
 
 function buildLanguageInstruction(language) {
-  if (language === "hinglish") return `LANGUAGE — HINGLISH:
-Write the entire script in Hinglish (natural Hindi+English in Roman script). Casual, energetic, FOMO-driven.
-Product name and technical terms (video, script, caption, timeline, upload, content) stay in English. Emotion and flow in Hindi.
-Never pure formal Hindi — sound like how someone actually talks in a reel.`;
+  if (language === "hinglish") return `LANGUAGE — HINDI (DEVANAGARI), casual Hinglish flow:
+Write the entire SPOKEN script in Hindi using DEVANAGARI script — casual, energetic, FOMO-driven, the way people actually talk in a reel. Romanized Hindi ("abhi try karo") is a FAILURE — it makes the voice mispronounce; write Devanagari ("अभी ट्राय करो").
+Product name and common tech terms (video, script, caption, timeline, upload, content, AI) stay in English (Latin); emotion and flow in Devanagari Hindi. Never pure formal Hindi.`;
   if (language === "es") return `LANGUAGE — SPANISH:
 Write the entire script in conversational Latin American Spanish. Casual, energetic, direct. Always "tú", never "usted".
 Product name and technical terms (video, script, caption, timeline, upload) stay in English.`;

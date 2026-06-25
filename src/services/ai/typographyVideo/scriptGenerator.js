@@ -17,7 +17,7 @@ TONE - READ THE TOPIC
   EDUCATIONAL/FACT topics: stats, reveals, dramatic facts.
 
 TWO CONCEPTS - CRITICAL
-  voiceover = what the narrator SAYS (full natural sentence, 6-14 words, flows as documentary narration)
+  voiceover = what the narrator SAYS (a full, natural sentence that flows as documentary narration — length varies with the idea, NOT a fixed word count; size the whole script to the duration budget below)
   beats = what APPEARS ON SCREEN (visual sub-units of that sentence)
 
 BEATS - THE MOST IMPORTANT PART
@@ -135,7 +135,7 @@ NATURE/SPACE:  background:#050D1A backgroundSecondary:#0A1F3D primaryText:#FFFFF
 Return ONLY valid JSON.`;
 
 const LANG_DIRECTIVES = {
-  hinglish: "\nLANGUAGE: Write ALL voiceover and beat text in Hinglish (natural Hindi + English mix, Roman script).",
+  hinglish: "\nLANGUAGE: Write ALL voiceover AND beat text in Hindi using DEVANAGARI script (natural Hinglish flow — English/brand terms or acronyms may stay Latin where a speaker actually says them in English). Romanized Hindi ('Ek haddi pure sheher') is a FAILURE — it makes the voice mispronounce words. Beats mirror the voiceover words, so they are Devanagari too.",
   es:       "\nLANGUAGE: Write ALL voiceover and beat text in Spanish.",
 };
 

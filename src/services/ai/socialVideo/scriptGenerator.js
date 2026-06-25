@@ -37,14 +37,14 @@ Duration 15–60s. Scale scene count to content volume:
   - Medium post (100–300 words): 4–5 scenes
   - Long post (>300 words): 5–7 scenes
   - Thread: up to 7 scenes — cover the full thread's key ideas
-Each scene voiceover: 5–12 words. The video AMPLIFIES the content — it does not invent new facts.
+Each scene's voiceover is a NATURAL, CONNECTED slice of ONE flowing narration — vary its length to the idea, never a fixed per-scene word count. The video AMPLIFIES the content — it does not invent new facts.
 
 ━━━ VOICEOVER RULES ━━━
-- Write for speech. Short punchy sentences. One idea per breath.
+- Write ONE flowing piece of spoken narration that reads like a person actually talking — connected sentences with natural connective tissue, NOT a list of clipped fragments read out. Then split it across scenes; each scene's segment continues naturally into the next. (A deliberate rapid-fire list is fine as ONE moment, never the whole script.)
 - NEVER mention the author's name, username, or handle — not even a first name. The video is about the idea, not who said it.
 - Product names, tools, companies, and AI models from the post ARE allowed and should be used. When the post leads with a named product (e.g. "Claude = 550 videos/day"), USE that name in the opening — it is the hook.
 - NEVER mention the platform name (Twitter, X, Instagram, etc.) in any scene.
-- Scale total voiceover to scene count: ~10 words per scene. 4 scenes ≈ 40 words, 6 scenes ≈ 60 words. Never exceed 80 words total.
+- Size the WHOLE narration to the target duration given below (≈2.3 words/sec) — NOT by a per-scene word count. Let each scene's length follow its idea.
 - Tone must match the content: inspiring, surprising, funny, informational, dramatic.
 
 ━━━ MEDIA STRATEGY (real imagery beats text-only when the content has a clear subject) ━━━
@@ -65,17 +65,10 @@ Match the emotional tone:
   Funny/viral       → dark (#0D1117), bright accent (pink/green/yellow)
   Drama/controversy → near-black (#08080E), violet accent (#E879F9)
 
-━━━ PUNCTUATION RULES — controls TTS pacing ━━━
-- Periods: use after each complete statement. Each item in a list gets its own period — natural breath between each one.
-- Commas: only to connect fragments within a single continuous thought. Never to separate list items.
-- Em dash (—): dramatic pause between two contrasting beats. e.g. "Stuck for hours — done in seconds."
-- Question marks: perfect for direct-address hooks.
-LIST ITEMS — always use periods, never commas:
-  WRONG: "Too slow, too expensive, too complicated."
-  RIGHT: "Too slow. Too expensive. Too complicated."
-CTA — never use em dash. Use a comma for one continuous energetic thought:
-  WRONG: "Follow for more — save this now"
-  RIGHT: "Follow for more, save this now"
+━━━ PUNCTUATION & RHYTHM — controls TTS pacing ━━━
+- DEFAULT TO FLOWING connected sentences (commas, connectors like "and / but / so / which is why") so the voice sounds like a person talking, NOT bullet points being read out. A clipped period-separated rhythm ("Too slow. Too expensive. Too complicated.") is a tool for ONE deliberate punchy moment — never the whole script.
+- Periods end a complete statement; commas connect within a thought; em dash (—) is a dramatic pause between two contrasting beats ("Stuck for hours — done in seconds."); question marks for direct-address hooks.
+- CTA — use a comma for one continuous energetic thought, never an em dash: "Follow for more, save this now."
 
 ━━━ PER-SCENE CREATIVE BRIEF ━━━
 For each scene you are briefing the art director who designs the actual frame. Give them:
@@ -88,7 +81,7 @@ For each scene you are briefing the art director who designs the actual frame. G
 {
   "projectName": "Short title for this video — 3–6 words, captures the core idea.",
   "creative_direction": "one sentence: the narrative strategy you chose and why it fits this post",
-  "full_script": "complete speakable voiceover — 30–40 words max",
+  "full_script": "the complete flowing voiceover (all scenes' segments joined) — sized to the target duration, not a fixed word cap",
   "palette": {
     "background": "#hex",
     "backgroundSecondary": "#hex",
@@ -120,7 +113,7 @@ For each scene you are briefing the art director who designs the actual frame. G
 }`;
 
 const LANGUAGE_DIRECTIVES = {
-  hinglish: "LANGUAGE: Write ALL voiceover text in Hinglish (natural mix of Hindi and English, written in Roman/Latin script). Keep it conversational and punchy — how young urban Indians actually speak.",
+  hinglish: "LANGUAGE — TWO SCRIPTS BY FIELD: the SPOKEN voiceover (script_segment + full_script) must be conversational Hindi WRITTEN IN DEVANAGARI (natural Hinglish flow — English/brand terms may stay Latin where a speaker actually says them in English). Romanized Hindi ('Ek haddi, pure sheher') is a FAILURE — it makes the voice mispronounce words. But the ON-SCREEN text (visual_text) must stay LATIN — short punchy romanized-Hinglish/English keywords. So the viewer HEARS Devanagari Hindi and SEES Latin text.",
   es:       "LANGUAGE: Write ALL voiceover text in Spanish. Keep it punchy and natural — short sentences, informal tone suitable for viral short-form video.",
 };
 
