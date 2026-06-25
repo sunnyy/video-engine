@@ -284,7 +284,7 @@ export default function TopBar() {
           background job (server-side), so it does NOT block the editor. */}
       {exporting && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(8,8,14,0.82)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ width: 360, maxWidth: "90%", background: "#14141e", border: "1px solid rgba(124,92,252,0.3)", borderRadius: 16, padding: "28px 30px", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+          <div style={{ width: 400, maxWidth: "90%", background: "#14141e", border: "1px solid rgba(124,92,252,0.3)", borderRadius: 16, padding: "28px 30px", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ width: 40, height: 40, margin: "0 auto 16px", border: "3px solid rgba(124,92,252,0.25)", borderTopColor: "#7c5cfc", borderRadius: "50%", animation: "tb-export-spin 0.8s linear infinite" }} />
             <div style={{ fontSize: 16, fontWeight: 800, color: "#e8e8f0", fontFamily: "'Outfit',sans-serif", marginBottom: 6 }}>Exporting your video…</div>
             <div style={{ fontSize: 13, color: "#8896a8", marginBottom: 18, lineHeight: 1.5 }}>Keep this tab open — editing is paused until the export finishes.</div>
