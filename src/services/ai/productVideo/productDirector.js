@@ -48,6 +48,15 @@ const ANCHORS = `Placement anchors (pick the one that suits the shot; the image 
 - "text-left"   → product anchored to the RIGHT ~55%; keep the LEFT ~45% clean for text.
 - "text-right"  → product anchored to the LEFT ~55%; keep the RIGHT ~45% clean for text.`;
 
+// Spoken script in the target language for correct TTS; on-screen design text stays Latin (fonts).
+function productLangBlock(language) {
+  if (language === "hinglish" || language === "hi")
+    return `LANGUAGE — HINDI: write the SPOKEN lines (script_segment + full_script) in Hindi using DEVANAGARI script — punchy, ad-style, how people actually speak (brand/product name and common tech terms stay English). Romanized Hindi ("abhi kharido") is a FAILURE — it makes the voice mispronounce; write Devanagari ("अभी खरीदो"). Keep ON-SCREEN text (display.headline / eyebrow / badge) in LATIN — short romanized-Hinglish or English keywords (the on-screen fonts are Latin).`;
+  if (language === "es")
+    return `LANGUAGE — SPANISH: write the SPOKEN lines (script_segment + full_script) in conversational Latin American Spanish (brand/product name stays English). On-screen display text may stay short English/Spanish.`;
+  return "";
+}
+
 function buildSystem(count, params) {
   return `You are the creative director AND product photographer for a premium short-form product video (9:16). You are looking at the user's actual product photo. Design a sequence of distinct, magazine-grade scenes — like the panels of a high-end product ad, each shown full-screen for ~3–4 seconds.
 
@@ -88,6 +97,7 @@ Fields:
 - Spell every word exactly. Never put the product's own brand text in the overlay unless it's the brand name on hero/CTA. Prefer roomy anchors (text-top / text-left / text-right) when a scene has more content.
 
 SCRIPT: write a SHORT spoken line per scene (the word caps above are hard limits — long scripts make scenes too long). full_script = all script_segments joined naturally.
+${productLangBlock(params.language)}
 
 PALETTE: derive from the product. Premium goods → editorial dark, moody field with the product's accent on the key word/icon. Bright/playful goods → lighter field. accent_color = a single #hex pulled from the product.
 

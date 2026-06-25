@@ -306,6 +306,7 @@ export async function planProductVideo(project) {
     goal:               project.goal ?? "promo",
     sceneCount:         project.sceneCount ?? 3,
     visualMode:         project.visualMode ?? "image",
+    language:           project.language ?? "en",
   });
 }
 
@@ -333,6 +334,7 @@ export async function runProductVideoPipeline(project, onStep) {
       goal:               project.goal ?? "promo",
       sceneCount:         project.sceneCount ?? 3,
       visualMode:         project.visualMode ?? "image",
+      language:           project.language ?? "en",
     });
   }
 

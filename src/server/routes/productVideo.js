@@ -22,6 +22,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     accentColor,
     sceneCount,
     voice_id,
+    language,
     orientation,
     plan,
     script,
@@ -66,6 +67,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       accentColor:        accentColor        ?? null,
       sceneCount:         scenes,
       voiceId:            voice_id           ?? null,
+      language:           language           ?? "en",
       orientation:        ["9:16","16:9","1:1","4:5"].includes(orientation) ? orientation : "9:16",
       plan:               plan               ?? null,   // approved plan from review (skips director)
       script:             (script ?? "").trim() || null, // edited spoken script
@@ -87,7 +89,7 @@ router.post("/generate", requireAuth, async (req, res) => {
 
 // ── Phase 1: PLAN (free) — vision director → script for review/editing ──
 router.post("/plan", requireAuth, async (req, res) => {
-  const { productImageUrl, brandName, productDescription, goal, ctaText, offerText, website, sceneCount, visualMode } = req.body;
+  const { productImageUrl, brandName, productDescription, goal, ctaText, offerText, website, sceneCount, visualMode, language } = req.body;
   if (!productImageUrl) return res.status(400).json({ error: "productImageUrl is required" });
   if (!(await guardContent(res, { text: [brandName, productDescription], images: [productImageUrl], label: "product-video" }))) return;
   try {
@@ -102,6 +104,7 @@ router.post("/plan", requireAuth, async (req, res) => {
       website:            website            ?? "",
       sceneCount:         scenes,
       visualMode:         ["image","hybrid","video"].includes(visualMode) ? visualMode : "image",
+      language:           language           ?? "en",
     });
     res.json({ plan, full_script: plan.full_script || "" });
   } catch (err) {
