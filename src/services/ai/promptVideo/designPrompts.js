@@ -60,9 +60,15 @@ VARY THE BACKGROUND scene to scene — do NOT default every frame to the same co
 
 // ── Main prompt builder ──────────────────────────────────────────────────────
 export function buildBeatPrompt(beat, ctx) {
-  const { style, palette, canvasW, canvasH } = ctx;
+  const { style, palette, canvasW, canvasH, language } = ctx;
   const duration = beat.duration_seconds ?? 3;
   const isOverlay = !!beat.asset?.src && (beat.asset.kind === "image" || beat.asset.kind === "video");
+  // Hindi VO is Devanagari (spoken) but on-screen text must be Latin — our fonts can't render
+  // Devanagari. The CONTENT strings are already Latin; the SPOKEN line below is Devanagari and is
+  // for context only. This guard stops the designer from putting that Devanagari on screen.
+  const latinOnScreenRule = (language === "hi" || language === "hinglish")
+    ? `\nON-SCREEN SCRIPT — render ONLY the Latin CONTENT strings exactly as given. The SPOKEN line is Devanagari Hindi and is CONTEXT ONLY — NEVER put any Devanagari (Hindi script) on screen; the fonts render it as empty boxes. Every visible character must be Latin.\n`
+    : "";
 
   const dataContract = `Tag every MEANINGFUL element (these become animated layers; layout wrappers don't need tags):
 - data-role: headline | subhead | kicker | label | badge | stat-number | card | divider | glow | background | icon | decoration
@@ -85,7 +91,7 @@ ${styleDirectiveBlock(style)}
 PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white over the scrim; the ONE key word/number in the accent colour.
 
 ${contentBlock(beat)}
-
+${latinOnScreenRule}
 MAKE IT A DESIGNED, LAYERED TREATMENT — never a single subtitle line (that flat caption is the slideshow look). Build a small typographic composition of a few elements working as one block, and VARY the composition every scene so consecutive overlays never share the same skeleton — let THIS line's content and the shot behind it choose the form. There is NO fixed recipe; draw from this toolbox as the moment needs (use SOME, not all, and a different mix each scene):
 - the HEADLINE as hero — when it's more than ~3 words you MAY split it into stacked phrase-lines (exact words, spoken order, each its own element) so phrases land on the voice;
 - the ONE key word/number lifted in the accent colour and a bolder/larger weight;
@@ -127,7 +133,7 @@ ${styleDirectiveBlock(style)}
 ${paletteBlock(palette, beat)}
 
 ${contentBlock(beat)}
-
+${latinOnScreenRule}
 THE DESIRE: a premium, clean, instantly-readable frame with the polish of Linear / Vercel / Stripe — one dominant focal point, hard contrast, confident negative space. The key word/number/idea must land in under a second. Thin, timid, mid-sized type is what makes a frame feel weak — be bold.
 RICHNESS COMES FROM CONTENT, NEVER ORNAMENT. Interest comes from the real content, well-composed — never from shapes added to fill or "balance" space. NEGATIVE SPACE IS PREMIUM: if a frame feels empty, strengthen the content or enrich the background field; never sprinkle decoration. (The CONTENT-FIRST / no-orphan rule below is absolute.)
 CONSTRAINTS: everything fits fully inside the ${canvasW}×${canvasH} frame — nothing clipped or running off the edge (a long line wraps or sizes down; never force one line wider than the frame). Use only as many elements as the content genuinely needs; on-screen words ≤ ${maxWords}. Fewer, bolder, content-bearing elements beat more-and-smaller every time.

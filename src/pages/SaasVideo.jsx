@@ -33,7 +33,7 @@ const FORMAT_OPTIONS = [
 
 const LANGUAGES = [
   { id: "en",       label: "English"              },
-  { id: "hinglish", label: "Hinglish (Hindi + EN)" },
+  { id: "hinglish", label: "Hindi" },
   { id: "es",       label: "Spanish"              },
 ];
 

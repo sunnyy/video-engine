@@ -11,7 +11,7 @@ import { LanguageVoicePicker } from "../LanguageVoicePicker.jsx";
  * Value contract: { language, voiceId } via onLanguageChange / onVoiceChange.
  */
 
-export const LANGUAGE_LABELS = { en: "English", hinglish: "Hinglish", es: "Spanish" };
+export const LANGUAGE_LABELS = { en: "English", hinglish: "Hindi", es: "Spanish" };
 
 export const meta = {
   id: "voiceLanguage",

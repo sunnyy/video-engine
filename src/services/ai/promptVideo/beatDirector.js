@@ -38,6 +38,9 @@ const CAMERAS = ["slow_zoom_in", "fast_zoom_in", "slow_zoom_out", "pan_left", "p
 const MIN_BEATS = 6, MAX_BEATS = 48;
 
 const wordsIn = (s) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
+// True if the string carries a non-Latin script (Devanagari, Arabic, CJK, …). Our on-screen
+// fonts are Latin-only, so such text must never become an overlay (it would render as boxes).
+const hasNonLatinScript = (s) => /[ऀ-ॿ؀-ۿ֐-׿฀-๿぀-ヿ一-鿿가-힯]/.test(String(s || ""));
 
 // The voiceover the viewer hears is the beats' script_lines concatenated. To guarantee it
 // sounds like one flowing narration (not a list of headline fragments), we let the director
@@ -104,10 +107,21 @@ async function runDirectorCompletion(prompt, extraUser = "") {
   return JSON.parse(response.choices[0].message.content);
 }
 
+// Human-readable language name for the dominant output-language banner.
+function languageName(language) {
+  if (language === "hi" || language === "hinglish") return "HINDI (Devanagari script)";
+  if (language === "es") return "SPANISH";
+  if (language === "en") return "ENGLISH";
+  return String(language || "ENGLISH").toUpperCase();
+}
+
 function languageBlock(language) {
   if (language === "en") return "LANGUAGE: English.";
   if (language === "hinglish" || language === "hi") {
-    return `LANGUAGE — STRICT: Every script_line must be in HINGLISH — conversational Hindi written in Latin script, mixing in English nouns naturally ("Yogi ji ka bulldozer", "2017 mein sab badal gaya", "Tum decide karo"). A mostly-English script is a FAILURE. content strings may stay punchy English/Latin keywords.`;
+    return `LANGUAGE — STRICT, TWO SCRIPTS BY FIELD (this matters for both pronunciation AND on-screen rendering):
+- SPOKEN — the "narration" and every "script_line": conversational Hindi WRITTEN IN DEVANAGARI. Keep the natural, casual Hinglish FLOW (the way people actually talk), and you MAY leave genuine English / brand / tech terms or acronyms in Latin where a speaker truly says them in English (e.g. "AI", "iPhone", "reels") — but ALL Hindi words MUST be in Devanagari, never romanized. Romanized Hindi ("Ek haddi, pure sheher ko badal de") is a FAILURE: the voice mispronounces it. Write it as Devanagari, e.g. "एक हड्डी पूरे शहर को बदल देती है, और लोग उसे सम्मान देते हैं।"
+- ON-SCREEN — the "content" fields (headline / subtext / items / attribution) and anything shown on screen: keep these in LATIN script (short, punchy romanized-Hinglish or English keywords, e.g. "EK HADDI", "ONE BONE", "150+ CITIES"). NEVER put Devanagari in content/on-screen strings — the on-screen fonts cannot render it and it shows as empty boxes.
+So the viewer HEARS Devanagari Hindi (correct pronunciation) and SEES Latin text. Different scripts, on purpose.`;
   }
   return `LANGUAGE — STRICT: Every script_line must be written in ${language}. content strings may use short Latin-script keywords.`;
 }
@@ -117,7 +131,9 @@ function buildDirectorPrompt({ research, style, targetDuration, language, theme 
   const targetWords = budgetWords(targetDuration);
 
   return {
-    system: `You are the director of a short-form video studio that makes dense, fast-cut, subject-specific videos.
+    system: `⚠️ OUTPUT LANGUAGE = ${languageName(language)}. The spoken "narration" and every "script_line" MUST be written in ${languageName(language)} — NOT English. These instructions are written in English for you, but your OUTPUT (the narration the viewer hears) is in ${languageName(language)}. (On-screen "content" text follows the LANGUAGE rule further down.) Writing the narration in the wrong language is a total failure.
+
+You are the director of a short-form video studio that makes dense, fast-cut, subject-specific videos.
 You plan the WHOLE film in one pass: the narration AND one visual per spoken beat. Script and shot list are the same artifact.
 
 ${style ? styleDirectiveBlock(style) : `## VISUAL STYLE: choose one for this video from:\n${styleMenuForDirector()}\nPick what fits the topic's tone. Lock it — every beat inherits it.`}
@@ -134,7 +150,7 @@ THE SCENE SYSTEM:
 - Every beat's visual_concept must be DISTINCT — different subject, different compositional idea, different energy from its neighbors. Two beats that would look alike is a failure.
 
 NARRATION — THE SINGLE MOST IMPORTANT PART. The voiceover is what the viewer HEARS; if it sounds like a list of captions being read out, the whole video fails.
-- FIRST write "narration": the COMPLETE voiceover as ONE flowing piece of spoken storytelling — real, connected sentences with the natural connective tissue people actually use when they talk ("and", "but", "which is why", "that's because", "so", "then", "back when", "today"). A narrator telling a story start to finish — NOT a slideshow of clipped phrases.
+- FIRST write "narration": the COMPLETE voiceover as ONE flowing piece of spoken storytelling — real, connected sentences with the natural connective tissue people actually use when they talk, IN THE OUTPUT LANGUAGE (${languageName(language)}). A narrator telling a story start to finish — NOT a slideshow of clipped phrases.
 - THEN break that exact narration into beats. Each beat's script_line is a CONTIGUOUS SLICE of the narration — copy the words verbatim, in order, adding nothing and removing nothing. Concatenating every script_line in order must reproduce the narration word-for-word.
 - A single sentence SPANS several beats. Within a sentence, ONLY the final beat ends with . ! or ? — every earlier beat ends on a comma, an em-dash, or nothing at all, so the speech flows straight through the visual cut with no pause.
 - FORBIDDEN — headline / telegram fragments as the spoken line. script_line is SPEECH, not a caption (captions live separately in content.headline). Clipped nominal fragments and "Label: value" colon-constructions, strung together, read as dead-air bullet points — one full stop after another. The cure is real connective tissue between ideas and letting one sentence flow across several scenes, so it sounds like a person talking, not a list being read.
@@ -230,6 +246,7 @@ Return ONLY valid JSON:
 ${JSON.stringify(research, null, 2)}
 
 TARGET DURATION: ${targetDuration} seconds of spoken narration.
+OUTPUT LANGUAGE: write the narration and every script_line in ${languageName(language)} (the research above is in English — translate/retell it; do NOT output English narration unless the language IS English).
 
 Write the flowing narration for this runtime, then direct the film scene by scene.`,
   };
@@ -340,8 +357,13 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
       attribution: typeof raw.attribution === "string" && raw.attribution.trim() ? raw.attribution.trim().slice(0, 50) : null,
     };
     if (assetType === "none" && (content.kind === "none" || !content.headline)) {
-      // An information frame without information — derive a title from the line
-      content = { kind: "title", headline: line.replace(/[.?!]$/, "").split(/\s+/).slice(0, 7).join(" "), subtext: null, items: null, attribution: null };
+      // An information frame without information — derive a title from the spoken line, UNLESS
+      // that line is non-Latin (e.g. Devanagari Hindi): on-screen fonts are Latin-only, so a
+      // Devanagari headline would render as boxes. In that case leave it for the design to
+      // handle from whatever Latin content exists rather than create tofu.
+      if (!hasNonLatinScript(line)) {
+        content = { kind: "title", headline: line.replace(/[.?!]$/, "").split(/\s+/).slice(0, 7).join(" "), subtext: null, items: null, attribution: null };
+      }
     }
     if (content.kind !== "none" && !content.headline) content.kind = "none";
 

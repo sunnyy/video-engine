@@ -543,7 +543,7 @@ export async function runPromptPipeline(params, onStep) {
 
   // ── Stage 4: Beat design (parallel) ───────────────────────────────────────
   step(PROMPT_STATUS_STEPS[4]);
-  const designCtx = { style, palette, canvasW: canvas.width, canvasH: canvas.height };
+  const designCtx = { style, palette, canvasW: canvas.width, canvasH: canvas.height, language };
   // Canvas-mode design for HTML/cutout beats; overlay-mode design for shot
   // beats carrying content. Clean shots (content.kind "none") get no design.
   const hasOverlayContent = (b) => b.content?.kind && b.content.kind !== "none";
