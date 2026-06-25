@@ -7,6 +7,17 @@ import { serverFetch } from "../../serverApi";
  * Promo page. onProgress({ step }) maps to the chatbox status list.
  * Resolves { projectId } (the editor project) when the render completes.
  */
+/** Phase 1 (free): narration-only plan for the "Review script" step. Returns full_script. */
+export async function planSaasVideo(payload) {
+  const res  = await serverFetch("/api/promo-video/create", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, plan_only: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || "Couldn't build that script"); if (data.code) e.code = data.code; throw e; }
+  return data.full_script || "";
+}
+
 export async function generateSaasVideo(payload, onProgress) {
   onProgress?.({ step: 0 }); // reading site / building plan
 

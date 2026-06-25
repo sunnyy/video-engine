@@ -52,9 +52,27 @@ function hexToRgba(hex, alpha) {
   return `rgba(0,0,0,${alpha})`;
 }
 
+// Concrete composition archetypes — the cure for "every scene is eyebrow + serif
+// headline + icons-in-rings + pill". One is assigned per scene (rotated and seeded by
+// the product), so scenes differ from each other AND the same scene-type differs across
+// products. These are STRUCTURAL directions, not pixel templates — the designer still
+// owns the craft within the approach.
+const LAYOUT_ARCHETYPES = [
+  "OVERSIZED HEADLINE — one enormous headline fills most of a clear band; everything else is small and secondary. No feature rings, no pill (unless this is the CTA). Maximal type, minimal chrome.",
+  "EDITORIAL SIDE-RAIL — a thin accent rule (or a vertical/stacked kicker) runs along one clear edge with the headline beside it; any points are a clean text list aligned to that rail — NO circular icon rings.",
+  "FULL-WIDTH BAND — compose as a single horizontal band across one clear third (top or bottom), edge to edge, content laid out in a ROW rather than a centered column.",
+  "MAGAZINE NUMBERED — present points as a numbered editorial list (01 / 02 …) with hairline dividers, no icons; set the headline like a magazine cover.",
+  "INLINE CHIP ROW — render any features as a single horizontal row of small inline chips/labels (no icons-in-rings, no vertical list), with a large headline above or beside.",
+  "CORNER-ANCHORED MINIMAL — tuck a compact group into ONE corner of the clear space with generous negative space; bare glyphs or no icons, and a tiny underlined link instead of a pill.",
+  "STAT / CLAIM DOMINANT — lead with the single biggest idea (a stat or a 1–3 word claim) at huge scale; supporting text minimal beneath.",
+  "RESTRAINED LEFT STACK — a clean left-aligned stack, but restrained: prefer bare glyphs over rings and avoid the eyebrow-with-a-rule cliché.",
+];
+function archetypeSeed(s = "") { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+
 export function buildProductScenePrompt(sceneScript, projectContext) {
   const {
     sceneIntent  = "showcase",
+    sceneIndex   = 0,
     accentColor  = "#C8954F",
     secondaryColor = null,
     theme        = "dark",
@@ -84,6 +102,9 @@ export function buildProductScenePrompt(sceneScript, projectContext) {
 
   const zone = ANCHOR_ZONES[anchor] ?? ANCHOR_ZONES["text-top"];
   const isCta = sceneIntent === "cta" || sceneIntent === "standalone";
+  // Rotate a concrete composition per scene, seeded by the product so different products
+  // (and consecutive scenes) don't converge on the same skeleton.
+  const archetype = LAYOUT_ARCHETYPES[(sceneIndex + archetypeSeed(`${brandName}|${productMood}`)) % LAYOUT_ARCHETYPES.length];
 
   // The content the director chose for this scene — WHAT to show (the exact strings
   // + each item's role/emphasis). HOW it looks is the designer's call, not a template.
@@ -129,7 +150,8 @@ CORE CONTENT TO REALIZE (the backbone — render ALL of it, spell every word exa
   ${content || `a confident headline drawn from the voiceover`}
 
 DESIGN A CLEAN, PREMIUM EDITORIAL OVERLAY — fewer, bigger, confident elements (aim for ~6–10 TOTAL). This is a 3-second scene, not a packed poster: clarity and hierarchy beat quantity. Realize ALL the content above with strong hierarchy — but the FORM is entirely YOURS: how the kicker, features, badge, CTA and any accents look is your design decision, NOT a fixed template.
-VARY THE TREATMENT SCENE TO SCENE — do NOT reuse the same devices on every scene. An eyebrow-with-a-rule + icons-in-rings + a rounded pill on every scene is exactly what makes a product video look templated and repetitive. Let THIS scene's purpose ("${sceneIntent}") drive a composition that is genuinely different from its neighbours — different focal scale, different arrangement, different supporting touches.
+COMPOSITION FOR THIS SCENE — realize this structural approach (this is what makes each scene distinct): ${archetype}
+Do NOT default to the generic "eyebrow + rule → serif headline → two icons-in-rings → rounded pill" stack — that exact template on every scene is what makes product videos look templated and identical across products. Commit to the approach above so THIS scene looks genuinely different from its neighbours AND from how other products are presented. Let the scene purpose ("${sceneIntent}") tune the energy and scale within it.
 Add a supporting touch (a rule, a divider, a glow, an icon, a frame) only when it elevates the content — never as default filler.
 PANEL: optional and usually unnecessary (a scrim already sits beneath you) — never add a box by default.
 COMPOSITION: ONE dominant focal element (usually the headline). Group related items, align to a tidy edge, leave generous breathing room.

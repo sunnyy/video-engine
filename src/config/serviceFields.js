@@ -133,7 +133,7 @@ export const SERVICE_FIELDS = {
       orientation:   { default: "9:16" },
     },
     specific: {
-      goal:    { options: PRODUCT_GOALS,   default: "promo" },
+      goal:    { options: PRODUCT_GOALS,   default: "launch" },
       length:  { options: PRODUCT_LENGTHS, default: 3 },
       visuals: { options: PRODUCT_VISUALS, default: "image" },
     },

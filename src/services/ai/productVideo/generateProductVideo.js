@@ -13,6 +13,17 @@ export async function scrapeProductUrl(url) {
   return data; // { productImageUrl, brandName, productDescription, ... }
 }
 
+/** Phase 1 (free): vision plan → returns the spoken script for review + the plan to reuse. */
+export async function planProductVideo(payload) {
+  const res  = await serverFetch("/api/product-video/plan", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || "Couldn't build that script"); if (data.code) e.code = data.code; throw e; }
+  return data; // { plan, full_script }
+}
+
 /**
  * generateProductVideo(payload, onProgress) — image-first product pipeline, streamed
  * over SSE (real progress: onProgress({ step }) fires at each pipeline boundary).

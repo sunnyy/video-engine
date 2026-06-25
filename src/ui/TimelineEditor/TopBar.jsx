@@ -369,14 +369,14 @@ export default function TopBar() {
           style={{
             display: "inline-flex", alignItems: "center", gap: 8, maxWidth: 620,
             padding: "5px 12px", borderRadius: 8,
-            background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.2)",
-            color: "#d8c074", fontSize: 12, lineHeight: 1.3, fontFamily: "'Outfit',sans-serif",
+            background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.1)",
+            color: "#C2AF72", fontSize: 12, lineHeight: 1.3, fontFamily: "'Outfit',sans-serif",
             overflow: "hidden", cursor: "default",
           }}
         >
           <span style={{ fontSize: 13, flexShrink: 0 }}>💡</span>
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            Best for light edits — swap media, tweak text, colors &amp; timing. Heavy restructuring may break the video.
+            Editing is best for light edits — swap media, tweak text, colors &amp; timing. Heavy restructuring may break the video.
           </span>
         </div>
       </div>

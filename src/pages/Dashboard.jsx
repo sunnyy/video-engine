@@ -9,8 +9,8 @@ import { invalidateProjectCaches } from "../services/projects/projectService";
 import { generatePromptVideo, planPromptVideo } from "../services/ai/promptVideo/generatePromptVideo";
 import { planSocialVideo, produceSocialVideo } from "../services/ai/socialVideo/generateSocialVideo";
 import ScriptConfirmModal from "../ui/ScriptConfirmModal";
-import { generateSaasVideo } from "../services/ai/saasVideo/generateSaasVideo";
-import { generateProductVideo, scrapeProductUrl } from "../services/ai/productVideo/generateProductVideo";
+import { generateSaasVideo, planSaasVideo } from "../services/ai/saasVideo/generateSaasVideo";
+import { generateProductVideo, planProductVideo, scrapeProductUrl } from "../services/ai/productVideo/generateProductVideo";
 import { planTypographyVideo, produceTypographyVideo } from "../services/ai/typographyVideo/generateTypographyVideo";
 import { generateCaptions } from "../services/captions/generateCaptions";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
@@ -138,7 +138,7 @@ function PromptVideoChatbox({ onBusy }) {
   const canPlan = !!prompt.trim() && !planning && !loading;
 
   useEffect(() => {
-    onBusy?.(planning || loading, loading ? STATUS_STEPS[statusStep] : "Planning your video…");
+    onBusy?.(planning || loading, loading ? STATUS_STEPS[statusStep] : "Planning your video…", loading ? { step: statusStep, total: STATUS_STEPS.length } : null);
   }, [planning, loading, statusStep, onBusy]);
 
   // Plan the script. With review on, open the modal; with review off, produce directly.
@@ -256,17 +256,6 @@ function PromptVideoChatbox({ onBusy }) {
       )}
 
       {/* Producing progress */}
-      {loading && (
-        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{STATUS_STEPS[statusStep]}</div>
-          <div style={{ display: "flex", gap: 5, marginBottom: 14 }}>
-            {STATUS_STEPS.map((_, i) => (
-              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? AI : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
-            ))}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
@@ -297,7 +286,7 @@ function SocialChatbox({ onBusy }) {
   const canGo = !!url.trim() && !planning && !loading;
 
   useEffect(() => {
-    onBusy?.(planning || loading, loading ? SOCIAL_STATUS[statusStep] : "Reading the post…");
+    onBusy?.(planning || loading, loading ? SOCIAL_STATUS[statusStep] : "Reading the post…", loading ? { step: statusStep, total: SOCIAL_STATUS.length } : null);
   }, [planning, loading, statusStep, onBusy]);
 
   // Fetch + script. With review on, open the modal; with review off, produce directly.
@@ -376,17 +365,6 @@ function SocialChatbox({ onBusy }) {
         </div>
       )}
 
-      {loading && (
-        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{SOCIAL_STATUS[statusStep]}</div>
-          <div style={{ display: "flex", gap: 5 }}>
-            {SOCIAL_STATUS.map((_, i) => (
-              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? SA : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {plan && (
         <ScriptConfirmModal
           scenes={plan.scenes}
@@ -417,36 +395,60 @@ function SaasChatbox({ onBusy }) {
   const [theme,       setTheme]       = useState("auto");
   const [accentColor, setAccentColor] = useState(null);
   const [accentColor2, setAccentColor2] = useState(null);
+  const [planning,    setPlanning]    = useState(false);
+  const [plan,        setPlan]        = useState(null);   // { full_script } when reviewing
   const [loading,     setLoading]     = useState(false);
   const [statusStep,  setStatusStep]  = useState(0);
   const [error,       setError]       = useState(null);
+  const [reviewFirst, setReviewFirstState] = useState(getReviewScriptFirst());
+  const reviewFirstSet = (v) => { setReviewFirstState(v); setReviewScriptFirst(v); };
 
-  const canGo = (mode === "url" ? !!url.trim() : (!!productName.trim() && !!description.trim())) && !loading;
+  const canGo = (mode === "url" ? !!url.trim() : (!!productName.trim() && !!description.trim())) && !planning && !loading;
 
   useEffect(() => {
-    onBusy?.(loading, SAAS_STATUS[statusStep]);
-  }, [loading, statusStep, onBusy]);
+    onBusy?.(planning || loading, loading ? SAAS_STATUS[statusStep] : "Writing your script…", loading ? { step: statusStep, total: SAAS_STATUS.length } : null);
+  }, [planning, loading, statusStep, onBusy]);
 
-  async function handleGenerate() {
-    if (!canGo) return;
-    setLoading(true); setError(null); setStatusStep(0);
-    const payload = {
+  function buildPayload(script) {
+    return {
       video_type: "faceless", video_goal: "saas_promo",
       product_name:        mode === "info" ? productName.trim() : "",
       product_url:         mode === "url"  ? url.trim() : null,
       text_source:         mode === "url"  ? "url" : "manual",
       product_description: mode === "info" ? description.trim() : "",
       notes: null, format_ratio: orientation, language, tone,
-      has_talking_head: false, has_voiceover: false, has_script: false,
+      has_talking_head: false, has_voiceover: false, has_script: !!script,
       has_logo: false, has_screenshots: false, has_recordings: false,
       talking_head_segments: null, talking_head_url: null, voiceover_url: null,
-      logo_url: null, logo_width: null, logo_height: null, script: null,
+      logo_url: null, logo_width: null, logo_height: null, script: script || null,
       pipeline_version: "v2",
       visual_style: styleId, theme, accent_color: accentColor, accent_color_2: accentColor2, typography_style: "modern",
       voice_id: voiceId, target_duration: duration,
     };
+  }
+
+  // With review on, write the script and open the modal; with review off, produce directly.
+  async function handleStart() {
+    if (!canGo) return;
+    if (reviewFirst) {
+      setPlanning(true); setError(null);
+      try {
+        const full_script = await planSaasVideo(buildPayload(null));
+        setPlan({ full_script });
+      } catch (err) {
+        setError(err.code === "NO_CREDITS" ? "Not enough credits for a SaaS video." : (err.message || "Couldn't build that script."));
+      } finally {
+        setPlanning(false);
+      }
+    } else {
+      await produce(null);
+    }
+  }
+
+  async function produce(script) {
+    setPlan(null); setLoading(true); setError(null); setStatusStep(0);
     try {
-      const result = await generateSaasVideo(payload, ({ step }) => setStatusStep(step));
+      const result = await generateSaasVideo(buildPayload(script), ({ step }) => setStatusStep(step));
       invalidateProjectCaches("promo_video", "all");
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
@@ -478,7 +480,7 @@ function SaasChatbox({ onBusy }) {
             value={url} onChange={(e) => setUrl(e.target.value)}
             placeholder="Your SaaS website URL — e.g. https://yourapp.com"
             disabled={loading}
-            onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleStart(); }}
             style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", padding: "8px 0", minHeight: 36 }}
           />
         ) : (
@@ -505,14 +507,28 @@ function SaasChatbox({ onBusy }) {
             <DurationField value={duration} onChange={setDuration} options={cfg.shared.duration.options} accent={SC} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={SC} />
             <OrientationField value={orientation} onChange={setOrientation} accent={SC} tinted />
-            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+            <button onClick={handleStart} disabled={!canGo} title={reviewFirst ? "Review the script first" : "Generate"}
               style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? SC : "rgba(245,197,24,0.25)", color: "#1c1408", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <ArrowUp size={18} strokeWidth={2.5} />
             </button>
           </div>
         </div>
       </div>
+
+      {plan && (
+        <ScriptConfirmModal
+          scenes={[{ script: plan.full_script }]}
+          scriptKey="script"
+          singleBlock
+          onConfirm={(scenes) => produce(scenes[0]?.script ?? plan.full_script)}
+          onCancel={() => setPlan(null)}
+          accent={SC}
+          title="Review your script"
+          sub="Your whole video is built from this narration — tweak it before we generate."
+        />
+      )}
 
       {/* Service-specific fields below the box */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
@@ -528,17 +544,6 @@ function SaasChatbox({ onBusy }) {
         </div>
       )}
 
-      {loading && (
-        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{SAAS_STATUS[statusStep]}</div>
-          <div style={{ display: "flex", gap: 5 }}>
-            {SAAS_STATUS.map((_, i) => (
-              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? SC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
-            ))}
-          </div>
-          <div style={{ fontSize: 11, color: T.faint, marginTop: 10 }}>SaaS renders take ~30s–2min — hang tight.</div>
-        </div>
-      )}
     </div>
   );
 }
@@ -560,16 +565,20 @@ function ProductChatbox({ onBusy }) {
   const [language,    setLanguage]    = useState(cfg.shared.voiceLanguage.default.language);
   const [voiceId,     setVoiceId]     = useState(cfg.shared.voiceLanguage.default.voiceId);
   const [orientation, setOrientation] = useState(cfg.shared.orientation?.default ?? "9:16");
+  const [planning,    setPlanning]    = useState(false);
+  const [plan,        setPlan]        = useState(null);   // { plan, full_script } when reviewing
   const [loading,     setLoading]     = useState(false);
   const [statusIdx,   setStatusIdx]   = useState(0);
   const [error,       setError]       = useState(null);
+  const [reviewFirst, setReviewFirstState] = useState(getReviewScriptFirst());
+  const reviewFirstSet = (v) => { setReviewFirstState(v); setReviewScriptFirst(v); };
 
   const hasInput = mode === "upload" ? !!imageFile : !!productUrl.trim();
-  const canGo = hasInput && !loading;
+  const canGo = hasInput && !planning && !loading;
 
   useEffect(() => {
-    onBusy?.(loading, PRODUCT_STATUS[statusIdx]);
-  }, [loading, statusIdx, onBusy]);
+    onBusy?.(planning || loading, loading ? PRODUCT_STATUS[statusIdx] : "Writing your script…", loading ? { step: statusIdx, total: PRODUCT_STATUS.length } : null);
+  }, [planning, loading, statusIdx, onBusy]);
 
   function pickFile(e) {
     const f = e.target.files?.[0];
@@ -578,38 +587,66 @@ function ProductChatbox({ onBusy }) {
     setImagePreview(URL.createObjectURL(f));
   }
 
-  async function handleGenerate() {
+  // Resolve the product image (upload or scrape) → returns the base params for plan/produce.
+  async function resolveInputs() {
+    let productImageUrl, scrapedBrand = "", scrapedDesc = "";
+    if (mode === "upload") {
+      const asset = await uploadUserAsset(imageFile, "image", null, "project", null);
+      productImageUrl = asset.url;
+    } else {
+      const data = await scrapeProductUrl(productUrl.trim());
+      productImageUrl = data.productImageUrl;
+      scrapedBrand = data.brandName || "";
+      scrapedDesc  = data.productDescription || "";
+      if (!productImageUrl) throw new Error("No product image found at that URL — try uploading instead.");
+    }
+    const goalCfg    = cfg.specific.goal.options.find(g => g.id === goal);
+    const effVisuals = (visuals === "hybrid" && length === 1) ? "image" : visuals; // hybrid needs multi-scene
+    return {
+      productImageUrl,
+      logoUrl: null,
+      brandName: brand.trim() || scrapedBrand,
+      productDescription: scrapedDesc,
+      goal,
+      ctaText: goalCfg?.cta || "Shop Now",
+      offerText: "",
+      website: mode === "url" ? productUrl.trim() : "",
+      visualMode: effVisuals,
+      orientation,
+      voice_id: voiceId,
+      language,
+      sceneCount: length,
+    };
+  }
+
+  // With review on, plan the script and open the modal; with review off, produce directly.
+  async function handleStart() {
     if (!canGo) return;
-    setLoading(true); setError(null); setStatusIdx(0);
-    try {
-      let productImageUrl, scrapedBrand = "", scrapedDesc = "";
-      if (mode === "upload") {
-        const asset = await uploadUserAsset(imageFile, "image", null, "project", null);
-        productImageUrl = asset.url;
-      } else {
-        const data = await scrapeProductUrl(productUrl.trim());
-        productImageUrl = data.productImageUrl;
-        scrapedBrand = data.brandName || "";
-        scrapedDesc  = data.productDescription || "";
-        if (!productImageUrl) throw new Error("No product image found at that URL — try uploading instead.");
+    if (reviewFirst) {
+      setPlanning(true); setError(null);
+      try {
+        const base = await resolveInputs();
+        const { plan: builtPlan, full_script } = await planProductVideo(base);
+        setPlan({ base, plan: builtPlan, full_script });
+      } catch (err) {
+        setError(err.code === "NO_CREDITS" ? "Not enough credits for a product video." : (err.message || "Couldn't build that script."));
+      } finally {
+        setPlanning(false);
       }
-      const goalCfg    = cfg.specific.goal.options.find(g => g.id === goal);
-      const effVisuals = (visuals === "hybrid" && length === 1) ? "image" : visuals; // hybrid needs multi-scene
-      const result = await generateProductVideo({
-        productImageUrl,
-        logoUrl: null,
-        brandName: brand.trim() || scrapedBrand,
-        productDescription: scrapedDesc,
-        goal,
-        ctaText: goalCfg?.cta || "Shop Now",
-        offerText: "",
-        website: mode === "url" ? productUrl.trim() : "",
-        visualMode: effVisuals,
-        orientation,
-        voice_id: voiceId,
-        language,
-        sceneCount: length,
-      }, ({ step }) => { if (typeof step === "number") setStatusIdx(step); });
+    } else {
+      setLoading(true); setError(null); setStatusIdx(0);
+      try { await produce(await resolveInputs(), null, null); }
+      catch (err) { setError(err.code === "NO_CREDITS" ? "Not enough credits for a product video." : (err.message || "Generation failed.")); setLoading(false); }
+    }
+  }
+
+  async function produce(base, approvedPlan, script) {
+    setPlan(null); setLoading(true); setError(null); setStatusIdx(0);
+    try {
+      const result = await generateProductVideo(
+        { ...base, plan: approvedPlan, script },
+        ({ step }) => { if (typeof step === "number") setStatusIdx(step); },
+      );
       invalidateProjectCaches("product_video", "all");
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
@@ -654,7 +691,7 @@ function ProductChatbox({ onBusy }) {
           <input
             value={productUrl} onChange={(e) => setProductUrl(e.target.value)}
             placeholder="Amazon / Flipkart / store product URL…" disabled={loading}
-            onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleStart(); }}
             style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", color: T.text, fontSize: 16, fontFamily: "inherit", padding: "8px 0", minHeight: 36 }}
           />
         )}
@@ -667,14 +704,31 @@ function ProductChatbox({ onBusy }) {
             <SelectField icon={<ImageIcon size={16} />} label="Visuals" value={visuals} onChange={setVisuals} options={cfg.specific.visuals.options} accent={PC} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ReviewToggleField value={reviewFirst} onChange={reviewFirstSet} accent={PC} />
             <OrientationField value={orientation} onChange={setOrientation} accent={PC} tinted />
-            <button onClick={handleGenerate} disabled={!canGo} title="Generate"
+            <button onClick={handleStart} disabled={!canGo} title={reviewFirst ? "Review the script first" : "Generate"}
               style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? PC : "rgba(249,115,22,0.25)", color: "#221207", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <ArrowUp size={18} strokeWidth={2.5} />
             </button>
           </div>
         </div>
       </div>
+
+      {plan && (
+        <ScriptConfirmModal
+          scenes={plan.plan?.scenes ?? [{ script_segment: plan.full_script }]}
+          scriptKey="script_segment"
+          onConfirm={(scenes) => {
+            const edited = scenes.map(s => ({ ...s, spoken: (s.script_segment || "").trim() }));
+            const full_script = edited.map(s => (s.script_segment || "").trim()).filter(Boolean).join(" ");
+            produce(plan.base, { ...plan.plan, scenes: edited }, full_script);
+          }}
+          onCancel={() => setPlan(null)}
+          accent={PC}
+          title="Review your script"
+          sub="Tweak any line — the voiceover is built from these."
+        />
+      )}
 
       {/* Service-specific below: brand + more options */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
@@ -695,16 +749,6 @@ function ProductChatbox({ onBusy }) {
         </div>
       )}
 
-      {loading && (
-        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{PRODUCT_STATUS[statusIdx]}</div>
-          <div style={{ display: "flex", gap: 5 }}>
-            {PRODUCT_STATUS.map((_, i) => (
-              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusIdx ? PC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -735,7 +779,7 @@ function TypographyChatbox({ onBusy }) {
   const canGo = !!input.trim() && !planning && !loading;
 
   useEffect(() => {
-    onBusy?.(planning || loading, loading ? TYPO_STATUS[statusStep] : "Building your script…");
+    onBusy?.(planning || loading, loading ? TYPO_STATUS[statusStep] : "Building your script…", loading ? { step: statusStep, total: TYPO_STATUS.length } : null);
   }, [planning, loading, statusStep, onBusy]);
 
   // Build the script. With review on, open the modal; with review off, produce directly.
@@ -819,17 +863,6 @@ function TypographyChatbox({ onBusy }) {
         </div>
       )}
 
-      {loading && (
-        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{TYPO_STATUS[statusStep]}</div>
-          <div style={{ display: "flex", gap: 5 }}>
-            {TYPO_STATUS.map((_, i) => (
-              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? TC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {plan && (
         <ScriptConfirmModal
           scenes={plan.scenes}
@@ -859,7 +892,7 @@ function CaptionsChatbox({ onBusy }) {
   const canGo = !!file && !loading;
 
   useEffect(() => {
-    onBusy?.(loading, CAPTION_STATUS[statusStep]);
+    onBusy?.(loading, CAPTION_STATUS[statusStep], loading ? { step: statusStep, total: CAPTION_STATUS.length } : null);
   }, [loading, statusStep, onBusy]);
 
   async function handleGenerate() {
@@ -913,16 +946,6 @@ function CaptionsChatbox({ onBusy }) {
         </div>
       )}
 
-      {loading && (
-        <div style={{ marginTop: 16, padding: "20px 24px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>{CAPTION_STATUS[statusStep]}</div>
-          <div style={{ display: "flex", gap: 5 }}>
-            {CAPTION_STATUS.map((_, i) => (
-              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= statusStep ? CC : "rgba(255,255,255,0.08)", transition: "background 0.3s" }} />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1040,9 +1063,10 @@ export default function Dashboard() {
 
   // Generation lock: while a chatbox is planning/producing, block service switches,
   // clicks elsewhere, and page unload so the in-flight job isn't orphaned on the front end.
-  const [busy,       setBusy]       = useState(false);
-  const [busyStatus, setBusyStatus] = useState("");
-  const reportBusy = useCallback((b, s) => { setBusy(b); if (b) setBusyStatus(s || "Creating your video…"); }, []);
+  const [busy,        setBusy]        = useState(false);
+  const [busyStatus,  setBusyStatus]  = useState("");
+  const [busyProgress, setBusyProgress] = useState(null); // { step, total } during produce; null = indeterminate
+  const reportBusy = useCallback((b, s, prog) => { setBusy(b); if (b) { setBusyStatus(s || "Creating your video…"); setBusyProgress(prog ?? null); } }, []);
 
   // Warn on refresh / tab close / external navigation while a job is running.
   useEffect(() => {
@@ -1099,11 +1123,22 @@ export default function Dashboard() {
             background: "rgba(6,7,12,0.82)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18,
             cursor: "wait",
+            // Portaled to document.body (outside the app font scope) — set the font here so
+            // children inherit it instead of the browser-default serif.
+            fontFamily: "'Inter', system-ui, sans-serif",
           }}>
           <div style={{ width: 48, height: 48, border: "3px solid rgba(255,255,255,0.14)", borderTopColor: AI, borderRadius: "50%", animation: "pv-spin 0.8s linear infinite" }} />
           <div style={{ fontSize: 15.5, fontWeight: 700, color: T.text, fontFamily: "'Outfit',sans-serif", textAlign: "center", padding: "0 24px" }}>
             {busyStatus || "Creating your video…"}
           </div>
+          {/* Step progress (moved here from the inline chatbox bars) — shown during produce */}
+          {busyProgress && busyProgress.total > 0 && (
+            <div style={{ display: "flex", gap: 5, width: 340, maxWidth: "80vw" }}>
+              {Array.from({ length: busyProgress.total }).map((_, i) => (
+                <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= busyProgress.step ? AI : "rgba(255,255,255,0.14)", transition: "background 0.3s" }} />
+              ))}
+            </div>
+          )}
           <div style={{ fontSize: 12.5, color: T.muted, maxWidth: 340, textAlign: "center", lineHeight: 1.55, padding: "0 24px" }}>
             Please keep this tab open — don't refresh or leave the page while we build your video.
           </div>

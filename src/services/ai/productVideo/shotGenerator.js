@@ -18,6 +18,7 @@ import { blankRefUrl } from "../shared/aiImage.js";
 
 const FAL_KEY    = () => process.env.FAL_API_KEY || process.env.FAL_KEY;
 const NANO_EDIT  = "https://fal.run/fal-ai/nano-banana/edit";
+const PIXVERSE_I2V = "https://fal.run/fal-ai/pixverse/v4/image-to-video";
 const NO_TEXT    = " Absolutely no text, letters, numbers, logos, watermarks, captions, or UI anywhere in the image.";
 
 // Nano Banana takes its output size from the LAST attached image. Append the blank
@@ -95,7 +96,7 @@ export async function generateBaseImage(productImageUrl, { userId, runId, prompt
 export async function generateSceneShot(referenceUrl, scene, { userId, runId, orientation = "9:16" } = {}) {
   const sceneDesc = (scene.image_generation_prompt || scene.shot_type || "premium editorial product photograph, dramatic lighting").trim();
   const anchored =
-    `Use the FIRST uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, and shape — completely unchanged. Only change the scene, environment, surface, lighting, and composition as described: ${sceneDesc}. Match the aspect ratio and framing of the blank canvas image provided.` + NO_TEXT;
+    `Use the FIRST uploaded photo as the product reference. Keep the exact same product — same design, colors, materials, branding, and shape — completely unchanged. Change the scene, environment, surface, lighting, camera angle and composition as described: ${sceneDesc}. When the description calls for a lifestyle / in-use / worn shot, naturally introduce a realistic person wearing, holding or using the product (and the setting around them) — but the product itself must stay identical to the reference. Match the aspect ratio and framing of the blank canvas image provided.` + NO_TEXT;
 
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
@@ -123,4 +124,53 @@ export async function generateAllSceneShots(referenceUrl, scenes, opts) {
     out.push(await generateSceneShot(referenceUrl, scene, opts));
   }
   return out;
+}
+
+// ── Image-to-video: animate a scene's still shot into a short clip (Pixverse i2v) ──
+async function persistVideo(falUrl, userId, runId, label) {
+  try {
+    const res = await fetch(falUrl);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const key = `product-videos/${userId}/${runId}/${label}-${Date.now()}.mp4`;
+    const { error } = await supabaseAdmin.storage.from("user-assets").upload(key, buffer, { contentType: "video/mp4", upsert: false });
+    if (error) return falUrl;
+    const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(key);
+    return pub?.publicUrl ?? falUrl;
+  } catch {
+    return falUrl;
+  }
+}
+
+/**
+ * generateSceneClip(imageUrl, motionPrompt, opts)
+ * Turn a scene's still shot into a short motion clip. Returns a persisted mp4 URL, or
+ * null on failure (caller falls back to the still + Ken Burns).
+ * @param {object} opts { userId, runId, label, durationSeconds }
+ */
+export async function generateSceneClip(imageUrl, motionPrompt, { userId, runId, label = "clip", durationSeconds = 5 } = {}) {
+  if (!imageUrl) return null;
+  const base = (motionPrompt || "gentle, premium camera move with subtle realistic motion").trim();
+  // Front-load the motion: i2v models tend to hold a static frame for the first ~2s,
+  // which is invisible in a short scene window. Tell it to move from frame one.
+  const prompt = `${base}. Begin the motion immediately from the very first frame and keep it continuous throughout — NO static or frozen hold at the start. Keep the product identical to the reference.`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch(PIXVERSE_I2V, {
+        method:  "POST",
+        headers: { Authorization: `Key ${FAL_KEY()}`, "Content-Type": "application/json" },
+        body:    JSON.stringify({ image_url: imageUrl, prompt, duration: durationSeconds <= 5 ? 5 : 8 }),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`pixverse ${res.status}: ${text.slice(0, 160)}`);
+      const data = JSON.parse(text);
+      const vurl = data.video?.url || data.url;
+      if (!vurl) throw new Error("pixverse: no video url");
+      return await persistVideo(vurl, userId, runId, label);
+    } catch (e) {
+      console.warn(`[productClips] ${label} attempt ${attempt + 1} failed: ${e.message}`);
+    }
+  }
+  console.error(`[productClips] ${label} — all attempts failed; falling back to still`);
+  return null;
 }

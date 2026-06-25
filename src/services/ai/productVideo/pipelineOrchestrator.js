@@ -14,15 +14,17 @@
  *  5.  Prepend pipeline shot (z0) + scrim (z1) beneath each overlay → buildTimeline.
  *  6.  Scene transitions + voiceover + music + logo → save (source: product_video).
  *
- * visualMode is passed through; only "image" is implemented. The per-scene `render`
- * flag + `motion_prompt` are carried for the deferred image-to-video step.
+ * visualMode drives motion: "image" → all stills (Ken Burns); "video" → every scene
+ * animated; "hybrid" → the director picks which scenes become clips. render:"video"
+ * scenes have their still shot animated into a clip (Pixverse image-to-video) using
+ * the scene's `motion_prompt`; clip failures fall back to the still + Ken Burns.
  */
 
 import { supabaseAdmin }            from "../../../server/middleware/shared.js";
 import { generateFullVoiceover }    from "../saasVideo/ttsGenerator.js";
 import { pickAutoMood }             from "../../../core/registries/musicRegistry.js";
 import { generateProductPlan }      from "./productDirector.js";
-import { generateBaseImage, generateAllSceneShots } from "./shotGenerator.js";
+import { generateBaseImage, generateAllSceneShots, generateSceneClip } from "./shotGenerator.js";
 import { designProductScene }       from "./sceneDesigner.js";
 import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
 import { applyTransitions, assignSceneTransitions } from "../shared/transitions.js";
@@ -31,6 +33,11 @@ import { buildTimeline }            from "./timelineBuilder.js";
 
 const CANVAS = { width: 1080, height: 1920 }; // default (9:16)
 const FPS    = 30;
+// i2v clips come back ~5s and look slow; play them faster and size the clip scene to fit
+// the sped-up source so the FULL motion is visible (not just the static first second).
+const CLIP_SPEED  = 1.3;
+const CLIP_SRC_S  = 5;                       // pixverse min duration for our ≤5s requests
+const CLIP_WINDOW = +(CLIP_SRC_S / CLIP_SPEED).toFixed(2); // ≈ 3.85s of screen time
 // Map the chosen orientation to canvas dimensions — drives shots, overlay design, measure + saved format.
 function orientationToCanvas(orientation) {
   switch (orientation) {
@@ -63,16 +70,25 @@ function assignWhisperTimestamps(scenes, whisperWords) {
 // legibility scrim (darker top + bottom, clear middle so the product reads) are
 // owned here and sit BENEATH the text — no z-index fights. Works for a still shot
 // now or an animated clip later (swap type:"image" → type:"video").
-function mediaScrimEntries(sceneIndex, src, canvas = CANVAS) {
+function mediaScrimEntries(sceneIndex, src, canvas = CANVAS, kind = "image") {
   const base = {
     role: "background", animation: "none", sceneElement: "background",
     rotation: 0, opacity: 1, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff",
     filter: null, boxShadow: null, mixBlendMode: null, backdropFilter: null, style: {},
   };
+  const isVideo = kind === "video";
+  const media = isVideo
+    ? { ...base, id: `s${sceneIndex}_media`, trackId: `s${sceneIndex}_media`,
+        layer: "video", type: "video", zIndex: 0, x: 0, y: 0, width: canvas.width, height: canvas.height,
+        src, objectFit: "cover", assetType: "product-clip",
+        // i2v clips run ~5s and look sluggish — play faster so the motion reads punchy.
+        playbackRate: CLIP_SPEED,
+        trimStart: 0, trimEnd: null, volume: 0, muted: true, loop: true }
+    : { ...base, id: `s${sceneIndex}_media`, trackId: `s${sceneIndex}_media`,
+        layer: "image", type: "image", zIndex: 0, x: 0, y: 0, width: canvas.width, height: canvas.height,
+        src, objectFit: "cover", assetType: "product-shot" };
   return [
-    { ...base, id: `s${sceneIndex}_media`, trackId: `s${sceneIndex}_media`,
-      layer: "image", type: "image", zIndex: 0, x: 0, y: 0, width: canvas.width, height: canvas.height,
-      src, objectFit: "cover", assetType: "product-shot" },
+    media,
     { ...base, id: `s${sceneIndex}_scrim`, trackId: `s${sceneIndex}_scrim`,
       layer: "gradient", type: "gradient", zIndex: 1, x: 0, y: 0, width: canvas.width, height: canvas.height,
       background: "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.18) 30%, rgba(0,0,0,0.02) 50%, rgba(0,0,0,0.30) 78%, rgba(0,0,0,0.82) 100%)" },
@@ -236,15 +252,13 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
  *   goal, voiceId
  * @returns {{ editor_project_id, total_duration, shots }}
  */
-export async function runProductVideoPipeline(project, onStep) {
-  const { userId, productImageUrl, visualMode = "image" } = project;
-  const canvas = orientationToCanvas(project.orientation ?? "9:16");
-  const runId = `pv4-${Date.now()}`;
-
-  // ── Step 1: Director (vision) — full plan from the product photo ───────────
-  onStep?.(0);
-  console.log("[productPipeline] step 1 — director (vision plan)");
-  const plan = await generateProductPlan(productImageUrl, {
+/**
+ * planProductVideo — vision-director plan for the optional "Review script" step.
+ * Returns the full plan (brief + scenes + full_script + base_image_prompt) so the user
+ * can review/edit the spoken script before the paid pipeline runs. No images, no TTS.
+ */
+export async function planProductVideo(project) {
+  return await generateProductPlan(project.productImageUrl, {
     brandName:          project.brandName,
     productDescription: project.productDescription,
     ctaText:            project.ctaText ?? "Shop Now",
@@ -252,11 +266,41 @@ export async function runProductVideoPipeline(project, onStep) {
     website:            project.website,
     goal:               project.goal ?? "promo",
     sceneCount:         project.sceneCount ?? 3,
+    visualMode:         project.visualMode ?? "image",
   });
+}
+
+export async function runProductVideoPipeline(project, onStep) {
+  const { userId, productImageUrl, visualMode = "image" } = project;
+  const canvas = orientationToCanvas(project.orientation ?? "9:16");
+  const runId = `pv4-${Date.now()}`;
+
+  // ── Step 1: Director (vision) — full plan from the product photo ───────────
+  // Reuse a pre-approved plan from the "Review script" step when provided (skips the
+  // vision call); otherwise generate it now.
+  onStep?.(0);
+  let plan;
+  if (project.plan?.scenes?.length) {
+    console.log("[productPipeline] step 1 — using approved plan (skipping director)");
+    plan = project.plan;
+  } else {
+    console.log("[productPipeline] step 1 — director (vision plan)");
+    plan = await generateProductPlan(productImageUrl, {
+      brandName:          project.brandName,
+      productDescription: project.productDescription,
+      ctaText:            project.ctaText ?? "Shop Now",
+      offerText:          project.offerText,
+      website:            project.website,
+      goal:               project.goal ?? "promo",
+      sceneCount:         project.sceneCount ?? 3,
+      visualMode:         project.visualMode ?? "image",
+    });
+  }
 
   const brief       = plan.brief;
   const scenes      = plan.scenes.map(s => ({ ...s }));
-  const full_script = plan.full_script;
+  // A user-reviewed/edited spoken script overrides the planned voiceover.
+  const full_script = (project.script && project.script.trim()) ? project.script.trim() : plan.full_script;
   const accentColor = project.accentColor ?? brief.accent_color;
   const productMood = brief.product_mood;
 
@@ -272,11 +316,12 @@ export async function runProductVideoPipeline(project, onStep) {
 
   // ── Step 3: Voiceover → per-scene durations (clamped 3–4s; no stretch) ─────
   console.log("[productPipeline] step 3 — voiceover");
-  let voiceoverUrl = null;
+  let voiceoverUrl = null, voiceoverDuration = 0;
   try {
     const voiceId = (project.voiceId && project.voiceId.length > 8) ? project.voiceId : null;
     const tts = await generateFullVoiceover(full_script, runId, voiceId);
     voiceoverUrl = tts.audio_url;
+    voiceoverDuration = tts.duration_seconds || 0;
     if (tts.wordTimestamps?.length) assignWhisperTimestamps(scenes, tts.wordTimestamps);
   } catch (err) {
     console.error("[productPipeline] TTS failed (non-fatal):", err.message);
@@ -312,6 +357,73 @@ export async function runProductVideoPipeline(project, onStep) {
   onStep?.(2);
   console.log(`[productPipeline] step 4a — ${scenes.length} scene shots`);
   const shotUrls = await generateAllSceneShots(baseImageUrl, scenes, { userId, runId, orientation: project.orientation ?? "9:16" });
+  const validShotsEarly = shotUrls.map(u => u ?? baseImageUrl ?? productImageUrl);
+
+  // ── Step 4a-2: Image→video clips for the scenes that call for motion ───────
+  // Mode decides the mix (clips are the costly part, so hybrid spends them only where
+  // they pay off):
+  //   image  → no clips (all stills + Ken Burns)
+  //   video  → every scene animated
+  //   hybrid → the HOOK is always a clip; for a 5-scene video ALSO the one extra
+  //            high-impact scene the director flagged. Cap = 1 clip (≤3 scenes) or 2
+  //            clips (≥5). Everything else is a still + Ken Burns.
+  // Each clip animates that scene's still shot (product identity preserved); a clip
+  // failure falls back to the still.
+  const n = scenes.length;
+  // A CTA scene is always a still + motion — a clip adds nothing to a CTA and wastes the
+  // most expensive call. Never animate the CTA.
+  const clipEligible = (i) => scenes[i].intent !== "cta" && scenes[i].shot_role !== "cta";
+  // Motion-worthy = real motion a Ken Burns zoom can't fake (a person moving, sparkle,
+  // fabric, a reveal). The director flags this via motion_value / render.
+  const motionWorthy = (i) => clipEligible(i) && (scenes[i].motion_value === "high" || scenes[i].render === "video");
+  const isLifestyle  = (i) => scenes[i].shot_role === "lifestyle" || scenes[i].intent === "lifestyle";
+  let clipFlags;
+  if (visualMode === "video")      clipFlags = scenes.map((_, i) => clipEligible(i));
+  else if (visualMode === "image") clipFlags = scenes.map(() => false);
+  else {
+    // Hybrid: spend the clip budget on the most motion-worthy scenes — LIFESTYLE first —
+    // never the CTA, never a static zoom-only scene. Cap: 1 (≤3 scenes) / 2 (≥5).
+    const cap = n >= 5 ? 2 : 1;
+    const ranked = scenes.map((s, i) => i)
+      .filter(motionWorthy)
+      .sort((a, b) => (isLifestyle(a) ? 0 : 1) - (isLifestyle(b) ? 0 : 1));
+    const chosen = new Set(ranked.slice(0, cap));
+    clipFlags = scenes.map((_, i) => chosen.has(i));
+  }
+
+  const clipUrls = new Array(n).fill(null);
+  const clipCount = clipFlags.filter(Boolean).length;
+  if (clipCount > 0) {
+    console.log(`[productPipeline] step 4a-2 — ${clipCount} motion clip(s) (mode=${visualMode}, ${n} scenes)`);
+    for (let i = 0; i < n; i++) {
+      if (!clipFlags[i]) { scenes[i].render = "image"; continue; }
+      const clip = await generateSceneClip(validShotsEarly[i], scenes[i].motion_prompt, {
+        userId, runId, label: `s${i}-${scenes[i].intent}`,
+        durationSeconds: Math.ceil(scenes[i].duration_seconds || 5),
+      });
+      if (clip) { clipUrls[i] = clip; scenes[i].render = "video"; }
+      else      { scenes[i].render = "image"; } // fallback: still + Ken Burns
+    }
+  } else {
+    scenes.forEach(s => { s.render = "image"; });
+  }
+
+  // ── Finalize scene durations ──────────────────────────────────────────────
+  // (1) Hybrid clip scenes get enough screen time to show the full (sped-up) clip — the
+  //     few clips can afford the extra seconds; full-video keeps voiceover-synced windows.
+  if (visualMode === "hybrid") {
+    for (let i = 0; i < n; i++) {
+      if (clipUrls[i]) scenes[i].duration_seconds = Math.max(scenes[i].duration_seconds || 0, CLIP_WINDOW);
+    }
+  }
+  // (2) The video must never end before the voiceover finishes (clamping long segments
+  //     can leave the scene-sum short of the VO — the tail was getting cut). Extend the
+  //     last scene to cover any deficit, plus a small tail so the VO lands comfortably.
+  if (voiceoverDuration > 0) {
+    const total = scenes.reduce((a, s) => a + (s.duration_seconds || 0), 0);
+    const deficit = (voiceoverDuration + 0.35) - total;
+    if (deficit > 0) scenes[n - 1].duration_seconds = +(((scenes[n - 1].duration_seconds || 0) + deficit).toFixed(3));
+  }
 
   // ── Step 4b: Overlay design (vision on each shot) + headless measure ───────
   console.log("[productPipeline] step 4b — overlays (vision)");
@@ -332,8 +444,10 @@ export async function runProductVideoPipeline(project, onStep) {
   const validShots = shotUrls.map(u => u ?? baseImageUrl ?? productImageUrl);
   const sceneGraphs = scenes.map((scene, i) => {
     const overlay = normalizeOverlayZ(overlayResults[i]?.overlay ?? [], canvas);
-    console.log(`[productPipeline] scene ${i} (${scene.intent}) — ${overlay.length} overlay layers, shot=${shotUrls[i] ? "ok" : "base-fallback"}`);
-    return [...mediaScrimEntries(i, validShots[i], canvas), ...overlay];
+    const isVideo = scene.render === "video" && !!clipUrls[i];
+    const mediaUrl = isVideo ? clipUrls[i] : validShots[i];
+    console.log(`[productPipeline] scene ${i} (${scene.intent}) — ${overlay.length} overlay layers, media=${isVideo ? "clip" : (shotUrls[i] ? "shot" : "base-fallback")}`);
+    return [...mediaScrimEntries(i, mediaUrl, canvas, isVideo ? "video" : "image"), ...overlay];
   });
   const sceneHTMLs = overlayResults.map(r => r?.html ?? null);
 

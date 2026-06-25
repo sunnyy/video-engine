@@ -7,7 +7,7 @@ import { generateAssetRequirements, updateAssetStatus } from "../../services/ai/
 import { markProjectApproved, transitionProjectStatus, getProjectSummary } from "../../services/ai/saasVideo/projectStateManager.js";
 import { orchestratePromoRender } from "../../services/ai/saasVideo/renderOrchestrator.js";
 import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../services/ai/saasVideo/talkingHeadProcessor.js";
-import { runV2Pipeline } from "../../services/ai/saasVideo/pipelineOrchestrator.js";
+import { runV2Pipeline, planPromoNarration } from "../../services/ai/saasVideo/pipelineOrchestrator.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
@@ -179,7 +179,15 @@ router.post("/create", requireAuth, async (req, res) => {
       target_duration:  Number(target_duration) || 30,
       scene_count:      scene_count ?? (Number(target_duration) <= 15 ? 1 : Number(target_duration) <= 30 ? 3 : 5),
       format_ratio:     req.body.format_ratio || '9:16',
+      // Reviewed/edited script (from the optional "Review script" step) — pipeline uses it verbatim.
+      script:           (req.body.script ?? "").trim() || null,
     };
+
+    // ── Plan-only: narration for the "Review script" step. No persist, no credits, no render. ──
+    if (req.body.plan_only) {
+      const { full_script } = await planPromoNarration(project);
+      return res.json({ plan_only: true, full_script });
+    }
 
     let thSegments = null; // raw segments with timestamps, saved to talking_head_segments column
 

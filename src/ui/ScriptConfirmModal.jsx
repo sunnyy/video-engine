@@ -26,6 +26,7 @@ export default function ScriptConfirmModal({
   title = "Review your script",
   sub = "Your whole video is built from this — tweak any line before we generate.",
   confirmLabel = "Looks good — Generate",
+  singleBlock = false,   // one continuous script (e.g. SaaS narration) → no "Scene N" labels
 }) {
   const [lines, setLines] = useState(() => scenes.map(s => s?.[scriptKey] ?? ""));
   const setLine = (i, v) => setLines(arr => arr.map((x, j) => (j === i ? v : x)));
@@ -54,7 +55,7 @@ export default function ScriptConfirmModal({
           {scenes.map((s, i) => (
             <div key={i}>
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: accent, marginBottom: 6 }}>
-                Scene {i + 1}{s?.intent ? ` · ${s.intent}` : ""}
+                {singleBlock ? "Voiceover script" : `Scene ${i + 1}${s?.intent ? ` · ${s.intent}` : ""}`}
               </div>
               <textarea
                 value={lines[i] ?? ""}

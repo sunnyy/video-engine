@@ -485,6 +485,27 @@ export async function runV2Pipeline(project) {
 
 // ── V2 Beat pipeline (voiceover-first, timed visual beats) ─────────────────────
 
+/**
+ * planPromoNarration — script-only plan for the "Review script" step. Harvests the URL
+ * (so URL-mode narration is grounded like the real run), generates the narration, and
+ * returns it for the user to review/edit BEFORE the full (paid) pipeline runs. No TTS,
+ * no design, no DB write.
+ */
+export async function planPromoNarration(project) {
+  const productUrl = (project.product_url ?? "").trim();
+  const textSource = project.text_source ?? (productUrl ? "url" : "manual");
+  if (productUrl) {
+    const harvest = await harvestAssets(productUrl, `promo-plan-${project.id}-${Date.now()}`);
+    if (textSource === "url") {
+      project = { ...project, product_name: harvest.title || project.product_name || "Product", product_description: harvest.description || project.product_description || "", _harvest: harvest };
+    } else {
+      project = { ...project, product_name: project.product_name || harvest.title || "Product", product_description: project.product_description || harvest.description || "" };
+    }
+  }
+  const n = await generateNarration(project);
+  return { full_script: n.full_script, projectName: n.projectName };
+}
+
 async function runV2BeatPipeline(project) {
   const projectId   = project.id;
   const formatRatio = project.format_ratio ?? '9:16';
@@ -547,9 +568,16 @@ async function runV2BeatPipeline(project) {
     screenshotCount: screenshots.length,
   };
 
-  // ── Step 1: Narration (single continuous voiceover script — always generated) ──
-  console.log(`[v2/beats] ${projectId} — generating narration`);
-  const narration = await generateNarration(project);
+  // ── Step 1: Narration (single continuous voiceover script) ──
+  // Honour a user-reviewed/edited script when provided (skip generation); else write one.
+  let narration;
+  if (project.script?.trim()) {
+    console.log(`[v2/beats] ${projectId} — using user-provided script (skipping narration generation)`);
+    narration = { full_script: project.script.trim(), creative_direction: null };
+  } else {
+    console.log(`[v2/beats] ${projectId} — generating narration`);
+    narration = await generateNarration(project);
+  }
   const full_script = narration.full_script;
   const creativeDirection = narration.creative_direction;
   if (creativeDirection) console.log(`[v2/beats] direction: ${creativeDirection}`);

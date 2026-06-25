@@ -19,6 +19,7 @@ export async function designProductScene(scene, productBrief, projectContext, at
   const { system, user } = buildProductScenePrompt(scene.script_segment, {
     ...projectContext,
     sceneIntent:       scene.intent,
+    sceneIndex:        scene.scene_index ?? 0,
     creativeDirection: scene.creative_direction ?? "",
     anchor:            scene.anchor   ?? "text-top",
     display:           scene.display  ?? {},

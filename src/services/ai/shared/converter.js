@@ -16,9 +16,36 @@
  */
 
 import puppeteer from "puppeteer";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const CANVAS_W_DEFAULT = 1080;
 const CANVAS_H_DEFAULT = 1920;
+
+// ── Local fonts for measurement ──────────────────────────────────────────────
+// The measure browser must use the SAME fonts as the final render, or text is sized
+// with fallback metrics (narrower) → boxes come out too small → real (wider) fonts
+// wrap/overflow at render. The scene HTML loads fonts via a Google @import, but that
+// CDN is slow/blocked on some hosts and we only wait 3s — so we inject the bundled
+// woff2 (public/fonts) as data-URI @font-face, which loads instantly and identically.
+const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../public/fonts");
+let _localFontCss; // cached
+function localFontsCss() {
+  if (_localFontCss !== undefined) return _localFontCss;
+  try {
+    const css = fs.readFileSync(path.join(FONTS_DIR, "fonts.css"), "utf8");
+    _localFontCss = css.replace(/url\(['"]?\.\/([^'")]+)['"]?\)/g, (m, file) => {
+      try {
+        const buf = fs.readFileSync(path.join(FONTS_DIR, file));
+        return `url(data:font/woff2;base64,${buf.toString("base64")}) format('woff2')`;
+      } catch { return m; }
+    });
+  } catch {
+    _localFontCss = ""; // bundle missing → fall back to the HTML's own @import
+  }
+  return _localFontCss;
+}
 
 // ── Role / layer mapping (mirrors htmlParser so output is a drop-in) ────────────
 
@@ -205,6 +232,9 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     // applied: load the DOM, then await document.fonts.ready behind a hard cap that
     // can never hang (a slow/blocked font CDN must not blank the scene).
     await page.setContent(htmlString, { waitUntil: "domcontentloaded", timeout: 15000 });
+    // Inject the bundled fonts so measurement matches the render exactly (no CDN wait).
+    const lf = localFontsCss();
+    if (lf) { try { await page.addStyleTag({ content: lf }); } catch {} }
     // Flex/grid items default to min-width:auto, so a single long word (e.g.
     // "MEDITERRANEAN") forces its column to min-content width and BLOWS OUT the whole
     // layout — sibling columns (a side illustration/notepad) get pushed off-canvas and
@@ -303,6 +333,11 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
       // a newline between block/inline-block words, which would otherwise render as a
       // one-word-per-line tower. The text re-wraps naturally at the measured width.
       entry.text = n.text.replace(/\s+/g, " ").trim();
+
+      // Width safety: round UP + a few px so sub-pixel rounding or any tiny metric drift
+      // can never force a one-line headline to wrap at render (tight boxes were causing
+      // the "Bold Style," / "Crafted for" overlap). Capped to the frame.
+      entry.width = Math.min(canvasW - x, entry.width + 4);
 
       // Gradient TEXT (background:gradient + background-clip:text + transparent fill)
       // must go in `color` so the renderer clips it to the glyphs. Otherwise the

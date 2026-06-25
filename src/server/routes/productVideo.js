@@ -1,6 +1,6 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
-import { runProductVideoPipeline } from "../../services/ai/productVideo/pipelineOrchestrator.js";
+import { runProductVideoPipeline, planProductVideo } from "../../services/ai/productVideo/pipelineOrchestrator.js";
 import { scrapeProductUrl } from "../../services/ai/productVideo/productScraper.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
@@ -23,6 +23,8 @@ router.post("/generate", requireAuth, async (req, res) => {
     sceneCount,
     voice_id,
     orientation,
+    plan,
+    script,
   } = req.body;
 
   if (!productImageUrl) {
@@ -65,6 +67,8 @@ router.post("/generate", requireAuth, async (req, res) => {
       sceneCount:         scenes,
       voiceId:            voice_id           ?? null,
       orientation:        ["9:16","16:9","1:1","4:5"].includes(orientation) ? orientation : "9:16",
+      plan:               plan               ?? null,   // approved plan from review (skips director)
+      script:             (script ?? "").trim() || null, // edited spoken script
     }, (step) => send({ step }));
 
     send({
@@ -78,6 +82,32 @@ router.post("/generate", requireAuth, async (req, res) => {
     console.error("[product-video/generate]", err);
     send({ error: err.message, code: err.code });
     res.end();
+  }
+});
+
+// ── Phase 1: PLAN (free) — vision director → script for review/editing ──
+router.post("/plan", requireAuth, async (req, res) => {
+  const { productImageUrl, brandName, productDescription, goal, ctaText, offerText, website, sceneCount, visualMode } = req.body;
+  if (!productImageUrl) return res.status(400).json({ error: "productImageUrl is required" });
+  if (!(await guardContent(res, { text: [brandName, productDescription], images: [productImageUrl], label: "product-video" }))) return;
+  try {
+    const scenes = Math.max(1, Math.min(5, parseInt(sceneCount, 10) || 3));
+    const plan = await planProductVideo({
+      productImageUrl,
+      brandName:          brandName          ?? "",
+      productDescription: productDescription ?? "",
+      goal:               goal               ?? "promo",
+      ctaText:            ctaText            ?? "Shop Now",
+      offerText:          offerText          ?? "",
+      website:            website            ?? "",
+      sceneCount:         scenes,
+      visualMode:         ["image","hybrid","video"].includes(visualMode) ? visualMode : "image",
+    });
+    res.json({ plan, full_script: plan.full_script || "" });
+  } catch (err) {
+    if (err.code === "CONTENT_BLOCKED") return res.status(422).json({ error: err.message, code: err.code });
+    console.error("[product-video/plan]", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
