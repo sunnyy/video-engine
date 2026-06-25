@@ -38,6 +38,13 @@ function watchCancel(jobId) {
  * the job id, and we skip if a charge for that job already exists — so a retried or
  * hard-killed-then-resumed job can never double-charge. Returns { deduped } when already paid.
  */
+// App-level daily upload budget per platform — protects the (free but finite) platform API
+// quota. YouTube's default project quota is ~6 uploads/day; keep a margin until the audit +
+// quota increase land. Over budget → defer the upload to the next day instead of failing.
+const PLATFORM_DAILY_CAP = { youtube: Math.max(1, parseInt(process.env.YT_DAILY_UPLOAD_CAP || "5", 10)) };
+const startOfUtcDayISO = () => { const d = new Date(); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString(); };
+const nextUtcWindowMs  = () => { const d = new Date(); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 5, 0); };
+
 async function chargeForGeneration(userId, cost, jobId) {
   const tag = `[job:${jobId}]`;
   const { data: prior } = await supabaseAdmin.from("credit_transactions")
@@ -181,6 +188,22 @@ registerHandler("publish_post", async (payload) => {
     const { data } = await supabaseAdmin.from("published_posts")
       .insert({ ...base, created_at: new Date().toISOString() }).select("id").single();
     postId = data?.id ?? null;
+  }
+
+  // App-level daily upload budget (protects the platform API quota). If today's app-wide
+  // uploads for this platform have hit the cap, DEFER this one to the next day instead of
+  // failing — a paying user's post just goes out later, never "quota exceeded".
+  const dailyCap = PLATFORM_DAILY_CAP[platform];
+  if (dailyCap) {
+    const { count } = await supabaseAdmin.from("published_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("platform", platform).eq("status", "published").gte("published_at", startOfUtcDayISO());
+    if ((count || 0) >= dailyCap) {
+      await enqueue("publish_post", { ...payload, postId }, { userId, runAt: nextUtcWindowMs(), maxAttempts: 5 });
+      if (postId) await supabaseAdmin.from("published_posts").update({ status: "deferred", error: `daily ${platform} upload cap (${dailyCap}) reached — deferred to tomorrow`, updated_at: new Date().toISOString() }).eq("id", postId);
+      logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "info", message: `deferred — daily ${platform} upload cap reached`, meta: { platform } });
+      return { deferred: true, platform, postId };
+    }
   }
 
   try {

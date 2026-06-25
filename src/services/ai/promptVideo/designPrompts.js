@@ -79,18 +79,24 @@ NEVER print the beat's internal kind/role as visible text — words like "Hook",
     // ── OVERLAY MODE ────────────────────────────────────────────────────────
     const bandTop = Math.round(canvasH * 0.52);
     const kickerBottom = Math.round(canvasH * 0.16);
-    const system = `You design the TYPOGRAPHIC OVERLAY for one shot of a fast-cut video — on screen ${duration.toFixed(1)}s. A cinematic ${beat.asset.kind === "video" ? "clip" : "image"} plays full-bleed behind you (pipeline-injected with a legibility scrim — you build NEITHER). Design with real CSS layout; a browser measures the result.
+    const system = `You design a PREMIUM KINETIC TEXT TREATMENT laid over one shot of a fast-cut video — on screen ${duration.toFixed(1)}s. A cinematic ${beat.asset.kind === "video" ? "clip" : "image"} plays full-bleed behind you (the pipeline injects the media AND a legibility scrim — you build NEITHER). Design with real CSS layout; a browser measures the result.
 
 ${styleDirectiveBlock(style)}
-PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white over the scrim.
+PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white over the scrim; the ONE key word/number in the accent colour.
 
 ${contentBlock(beat)}
 
-OVERLAY CONSTRAINTS (keep your design off the image's subject — absolute):
-- html,body background: TRANSPARENT. NO background element, NO scrim, NO images, NO full-canvas anything.
-- Just the content above as bold typography — only as many elements as it needs; no decorative chrome, no floating shapes.
-- Keep the content low — between y=${bandTop} and the bottom; anything small/secondary may sit at the top (y ≤ ${kickerBottom}). Leave the middle clear for the image.
-- Promo-grade type: strong hierarchy, the style's type system, accent colour on the key word/number, text-shadow for legibility.
+MAKE IT A DESIGNED, LAYERED TREATMENT — never a single subtitle line (that flat caption is the slideshow look). Build a small typographic composition of a few elements working as one block, and VARY the composition every scene so consecutive overlays never share the same skeleton — let THIS line's content and the shot behind it choose the form. There is NO fixed recipe; draw from this toolbox as the moment needs (use SOME, not all, and a different mix each scene):
+- the HEADLINE as hero — when it's more than ~3 words you MAY split it into stacked phrase-lines (exact words, spoken order, each its own element) so phrases land on the voice;
+- the ONE key word/number lifted in the accent colour and a bolder/larger weight;
+- optionally an eyebrow/kicker (1–3 word context label), a supporting sub-line, or a small stat/label — only when it adds real meaning;
+- optionally an accent underline/rule anchored to the heading (structure, not a floating shape).
+Vary the PLACEMENT too (a low band, a corner, a left-aligned stack, a centred block — different from the last scene). The bar: it must read as DESIGNED — clear hierarchy, the accent doing real work — not one flat caption.
+
+OVERLAY CONSTRAINTS (absolute):
+- html,body background: TRANSPARENT. NO background element, NO scrim, NO images, NO full-canvas anything (the pipeline already placed the photo and its scrim).
+- Keep the block low — the hero between y=${bandTop} and the bottom; the eyebrow/secondary may sit up top (y ≤ ${kickerBottom}). Leave the middle clear so the image reads.
+- Promo-grade type: bold hierarchy, the style's type system, text-shadow for legibility. Richness comes from typographic COMPOSITION, never from orphan ornament.
 
 ${dataContract}
 
@@ -99,7 +105,7 @@ OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;
     const user = `BEAT ${beat.beat_index} — overlay on a shot of: ${beat.image_prompt ?? beat.shot_query ?? beat.visual_concept}
 SPOKEN: "${beat.script_line}"
 
-Design the overlay.`;
+Design a layered, DESIGNED treatment for this line — vary the composition from other scenes; never a single flat caption.`;
     return { system, user };
   }
 

@@ -12,6 +12,14 @@ import { supabaseAdmin } from "../../middleware/shared.js";
 
 export const STATUSES = ["draft", "active", "paused", "stopped"];
 
+// Interim demand limits (configurable via env). Keep per-user demand within the YouTube
+// API quota window until the audit + quota increase land. See also the app-level upload
+// budget meter in jobs/handlers.js.
+export const LIMITS = {
+  maxCampaignsPerUser: Math.max(1, parseInt(process.env.MAX_CAMPAIGNS_PER_USER || "3", 10)),
+  maxPostsPerDay:      Math.max(1, parseInt(process.env.MAX_POSTS_PER_DAY || "5", 10)),
+};
+
 // Fields a user may set when creating/updating a campaign. `status` is NOT here — it only
 // changes through the lifecycle helpers so transitions stay explicit and auditable.
 const EDITABLE = [
@@ -46,10 +54,20 @@ export async function getCampaignForUser(userId, campaignId) {
 function clean(patch) {
   const row = {};
   for (const k of EDITABLE) if (k in patch) row[k] = patch[k];
+  // Cap posts/day to the interim limit (defense-in-depth — clamps even bad API input).
+  if (row.posts_per_day != null) {
+    row.posts_per_day = Math.max(1, Math.min(LIMITS.maxPostsPerDay, parseInt(row.posts_per_day, 10) || 1));
+  }
   return row;
 }
 
 export async function createCampaign(userId, patch = {}) {
+  // Cap how many campaigns a user can have (stopped ones don't count — delete/stop to free a slot).
+  const { count } = await supabaseAdmin.from("automation_campaigns")
+    .select("id", { count: "exact", head: true }).eq("user_id", userId).neq("status", "stopped");
+  if ((count || 0) >= LIMITS.maxCampaignsPerUser) {
+    throw new Error(`Campaign limit reached (${LIMITS.maxCampaignsPerUser}). Stop or delete an existing campaign to create a new one.`);
+  }
   const row = { user_id: userId, status: "draft", ...clean(patch) };
   const { data, error } = await supabaseAdmin.from("automation_campaigns").insert(row).select().single();
   if (error) throw new Error(error.message);
@@ -88,6 +106,24 @@ export async function touchLastGenerated(campaignId) {
 /** All active campaigns across all users — the scheduler's work list. */
 export async function listActiveCampaigns() {
   const { data, error } = await supabaseAdmin.from("automation_campaigns").select("*").eq("status", "active");
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Credit balances for a set of users → { userId: balance }. Scheduler credit gate. */
+export async function getBalancesForUsers(userIds) {
+  if (!userIds?.length) return {};
+  const { data, error } = await supabaseAdmin.from("user_credits").select("user_id, balance").in("user_id", userIds);
+  if (error) throw new Error(error.message);
+  const map = {};
+  for (const r of (data || [])) map[r.user_id] = r.balance ?? 0;
+  return map;
+}
+
+/** Pause ALL of a user's active campaigns at once (e.g., out of credits). Returns paused rows. */
+export async function pauseActiveCampaignsForUser(userId) {
+  const { data, error } = await supabaseAdmin.from("automation_campaigns")
+    .update({ status: "paused" }).eq("user_id", userId).eq("status", "active").select("id, name");
   if (error) throw new Error(error.message);
   return data || [];
 }

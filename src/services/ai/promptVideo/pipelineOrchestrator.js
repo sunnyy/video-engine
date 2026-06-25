@@ -183,6 +183,11 @@ function estimateDurations(beats) {
 // second half becoming a continuation beat (same visual family, new text).
 
 const MAX_BEAT_SECONDS = 4.2;
+// No single backdrop may hold longer than this — short-form needs a fresh visual every few
+// seconds. A held visual = a full-bleed beat plus its continues_previous followers sharing one
+// asset; capVisualHold() breaks any run that would exceed it into distinct visuals.
+const MAX_VISUAL_HOLD = 4.0;
+const FULL_BLEED_TYPES = new Set(["ai_image", "photo", "stock_video"]);
 
 function splitLongBeats(beats) {
   const out = [];
@@ -237,6 +242,40 @@ function splitLongBeats(beats) {
   }
   out.forEach((b, i) => { b.beat_index = i; });
   return out;
+}
+
+/**
+ * Visual-variety guard. The director sometimes chains many beats onto ONE held visual via
+ * continues_previous (e.g. 3 beats on a single image for 8s). Short-form needs a fresh visual
+ * every few seconds, so any continuation run of a full-bleed visual that would exceed
+ * MAX_VISUAL_HOLD is broken into a new, DISTINCT visual. The broken beat is given its own stock
+ * query (continuation beats usually carry none) so the resolver fetches a different asset rather
+ * than inheriting the same one. Runs BEFORE resolveVisuals so the new beats get real assets.
+ */
+function capVisualHold(beats) {
+  let runDur = 0, runIsVisual = false;
+  for (let i = 0; i < beats.length; i++) {
+    const b = beats[i];
+    const dur = b.duration_seconds ?? 0;
+    const visual = FULL_BLEED_TYPES.has(b.asset_type);
+    if (i === 0 || !b.continues_previous) { runDur = dur; runIsVisual = visual; continue; }
+
+    if (runIsVisual && visual && runDur + dur > MAX_VISUAL_HOLD + 0.05) {
+      b.continues_previous = false; // cut to a fresh, distinct visual here
+      if (!b.image_prompt && !b.subject_entity && !b.shot_query) {
+        const q = (Array.isArray(b.keywords) && b.keywords.length
+          ? b.keywords.join(" ")
+          : (b.visual_concept || b.script_line || "")).trim().slice(0, 120);
+        b.shot_query = q;
+        if (b.asset_type === "ai_image") b.asset_type = "stock_video"; // free + distinct beats a capped gen
+      }
+      console.log(`[ai-video] cap visual hold: broke continuation at beat ${b.beat_index} (held ${runDur.toFixed(1)}s)`);
+      runDur = dur; runIsVisual = visual;
+    } else {
+      runDur += dur;
+    }
+  }
+  return beats;
 }
 
 // ── Full-bleed asset layers + motion ─────────────────────────────────────────
@@ -300,6 +339,21 @@ function buildAssetLayer(beat, start, end, canvas = CANVAS) {
  * Template furniture for shot beats — deterministic, code-built, never
  * GPT-composed over imagery it can't see.
  */
+// Legibility scrims for content-bearing shots. EVERY variant darkens the lower region (where
+// the hero text lives) so readability is guaranteed; they differ in their secondary character
+// so the overlay furniture isn't identical every scene. Chosen by beat index → adjacent shots
+// always differ. Clean shots (no overlay) get a soft cinematic wash instead.
+const SCRIM_VARIANTS = [
+  // bottom band — the classic
+  "linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.66) 100%)",
+  // both ends — also protects a top eyebrow, clear middle for the image
+  "linear-gradient(180deg, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0.06) 26%, rgba(0,0,0,0.10) 55%, rgba(0,0,0,0.40) 72%, rgba(0,0,0,0.68) 100%)",
+  // diagonal lean toward the bottom-left — suits a left-aligned stack
+  "linear-gradient(155deg, rgba(0,0,0,0) 42%, rgba(0,0,0,0.30) 74%, rgba(0,0,0,0.68) 100%)",
+  // vignette + base — darkens edges and floor, keeps the centre clear
+  "radial-gradient(125% 85% at 50% 16%, rgba(0,0,0,0) 44%, rgba(0,0,0,0.42) 100%), linear-gradient(180deg, rgba(0,0,0,0) 56%, rgba(0,0,0,0.52) 100%)",
+];
+
 function buildShotScrim(beat, start, end, canvas = CANVAS) {
   const strong = !!(beat.content?.kind && beat.content.kind !== "none");
   return {
@@ -307,7 +361,7 @@ function buildShotScrim(beat, start, end, canvas = CANVAS) {
     name: "Scrim", type: "gradient", start, end, zIndex: 1,
     visible: true, locked: false, sfx: null,
     gradient: strong
-      ? "linear-gradient(180deg, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.30) 70%, rgba(0,0,0,0.62) 100%)"
+      ? SCRIM_VARIANTS[beat.beat_index % SCRIM_VARIANTS.length]
       : "linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.10) 60%, rgba(0,0,0,0.28) 100%)",
     keyframes: { ...NO_KF },
     transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
@@ -469,6 +523,7 @@ export async function runPromptPipeline(params, onStep) {
   }
   estimateDurations(beats);
   beats = splitLongBeats(beats);
+  beats = capVisualHold(beats); // enforce a fresh, distinct visual every ≤4s (before assets resolve)
   if (beats.length > 0) {
     const sum  = beats.reduce((a, b) => a + b.duration_seconds, 0);
     const last = beats[beats.length - 1];
@@ -566,6 +621,17 @@ export async function runPromptPipeline(params, onStep) {
     }
   }
   if (shotLayers.length) finalTimeline.layers = [...shotLayers, ...finalTimeline.layers];
+
+  // Self-audit visual variety so a too-static video is caught in logs, not by eye.
+  const distinctMedia = new Set(shotLayers.filter(l => l.type === "image" || l.type === "video").map(l => l.src)).size;
+  const htmlScenes    = beats.filter(b => !isFullBleedBeat(b)).length;
+  const variety       = distinctMedia + htmlScenes;
+  const expected      = Math.max(2, Math.round(totalDur / 4));
+  if (totalDur > 8 && variety < Math.round(expected * 0.7)) {
+    console.warn(`[ai-video] LOW VISUAL VARIETY: only ${variety} distinct visuals across ${totalDur.toFixed(0)}s (${distinctMedia} media + ${htmlScenes} html) — expected ~${expected}.`);
+  } else {
+    console.log(`[ai-video] visual variety: ${variety} distinct visuals across ${totalDur.toFixed(0)}s (${distinctMedia} media + ${htmlScenes} html)`);
+  }
 
   // Kinetic text: phrase elements land exactly when their words are spoken
   syncTextToSpeech(finalTimeline.layers, beats);

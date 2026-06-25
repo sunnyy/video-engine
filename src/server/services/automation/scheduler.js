@@ -9,10 +9,15 @@
 import { supabaseAdmin } from "../../middleware/shared.js";
 import { enqueue } from "../../jobs/queue.js";
 import { isKillSwitchOn } from "../../jobs/flags.js";
-import { listActiveCampaigns, touchLastGenerated } from "./campaigns.js";
+import { listActiveCampaigns, touchLastGenerated, getBalancesForUsers, pauseActiveCampaignsForUser } from "./campaigns.js";
 import { logEvent } from "./events.js";
+import { notifyUser } from "../notificationService.js";
+import { CREDIT_COSTS } from "../../../core/utils/creditCosts.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Cheapest video a campaign can produce (Social/Typography = 15). If a user can't afford
+// even this, none of their campaigns can run → pause them all and stop checking.
+const MIN_VIDEO_COST = Math.min(CREDIT_COSTS.social_video, CREDIT_COSTS.typography_video, CREDIT_COSTS.ai_video);
 
 function isDue(c) {
   const perDay = Math.max(1, c.posts_per_day || 1);
@@ -37,10 +42,38 @@ export async function tick() {
   try { campaigns = await listActiveCampaigns(); }
   catch (e) { console.warn("[scheduler] load campaigns failed:", e.message); return; }
 
-  for (const c of campaigns) {
+  // Only the campaigns that have something to make AND are due this tick.
+  const due = campaigns.filter(c => c.niches?.length && isDue(c));
+  if (!due.length) return;
+
+  // ── Credit gate ──────────────────────────────────────────────────────────
+  // Batch-fetch balances for just the due users. If a user can't afford even the
+  // cheapest video, pause ALL their active campaigns now (one update) and skip — so we
+  // never enqueue jobs that would just fail, and they drop out of future scheduler passes.
+  let balances = {};
+  try { balances = await getBalancesForUsers([...new Set(due.map(c => c.user_id))]); }
+  catch (e) { console.warn("[scheduler] balance fetch failed:", e.message); }
+  const brokeUsers = new Set();
+
+  for (const c of due) {
     try {
-      if (!c.niches?.length) continue;          // nothing to make
-      if (!isDue(c)) continue;
+      if (brokeUsers.has(c.user_id)) continue;  // already paused this user's campaigns this tick
+
+      if ((balances[c.user_id] ?? 0) < MIN_VIDEO_COST) {
+        brokeUsers.add(c.user_id);
+        const paused = await pauseActiveCampaignsForUser(c.user_id).catch(() => []);
+        for (const p of paused) {
+          logEvent({ userId: c.user_id, campaignId: p.id, action: "pause", entity: "campaign", status: "info", message: "insufficient credits" });
+        }
+        notifyUser(c.user_id, {
+          type: "automation_paused", icon: "⏸️", severity: "warning", link: "/automation",
+          title: "Automation paused — out of credits",
+          body: `Your ${paused.length} active campaign${paused.length === 1 ? " was" : "s were"} paused. Top up credits and resume to continue automatic videos.`,
+        });
+        console.log(`[scheduler] user ${c.user_id} out of credits — paused ${paused.length} campaign(s)`);
+        continue;
+      }
+
       if (await hasPendingGenerate(c.id)) continue;
 
       await enqueue("generate_video", { userId: c.user_id, campaignId: c.id }, { userId: c.user_id, maxAttempts: 3 });

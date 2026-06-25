@@ -13,6 +13,9 @@ import { LanguageVoicePicker } from "../ui/LanguageVoicePicker.jsx";
 
 const T = { bg: "#090b11", surface: "#0e1018", surface2: "#14141e", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", faint: "#55667a", accent: "#7c5cfc" };
 const DURATIONS = [{ id: 15, label: "15s" }, { id: 30, label: "30s" }, { id: 45, label: "45s" }, { id: 60, label: "60s" }];
+// Mirror of the server's MAX_POSTS_PER_DAY default — the backend clamps regardless, this just
+// keeps the picker honest and blocks a tampered <select> before it ever reaches the API.
+const MAX_POSTS_PER_DAY = 5;
 const STATUS = { draft: { label: "Draft", color: "#8896a8" }, active: { label: "Active", color: "#22c55e" }, paused: { label: "Paused", color: "#f59e0b" }, stopped: { label: "Stopped", color: "#f87171" } };
 const STAGE_LABEL = { generate_video: "Generating", render_timeline: "Rendering", publish_post: "Publishing" };
 const POST_COLOR = { awaiting_approval: "#f59e0b", queued: "#8896a8", running: "#38bdf8", published: "#22c55e", failed: "#f87171" };
@@ -57,11 +60,14 @@ export default function CampaignDetail() {
   const save = async () => {
     setSaving(true); setMsg(null);
     try {
+      // Guard against a tampered <select> (e.g. an extra option added via dev tools).
+      const perDay = parseInt(form.posts_per_day, 10) || 1;
+      if (perDay < 1 || perDay > MAX_POSTS_PER_DAY) throw new Error(`Posts / day must be between 1 and ${MAX_POSTS_PER_DAY}.`);
       const res = await serverFetch(`/api/automation/campaigns/${id}`, { method: "PUT", body: JSON.stringify({
         name: form.name, niches: form.niches.split(",").map(s => s.trim()).filter(Boolean),
         audience: form.audience || null, tone: form.tone || null, language: form.language, voice_id: form.voice_id,
         style_id: form.style_id, target_duration: parseInt(form.target_duration, 10) || 40, orientation: form.orientation,
-        posts_per_day: Math.max(1, parseInt(form.posts_per_day, 10) || 1),
+        posts_per_day: Math.max(1, Math.min(MAX_POSTS_PER_DAY, perDay)),
         posting_times: form.posting_times.split(",").map(s => s.trim()).filter(Boolean),
         privacy: form.privacy, auto_publish: form.auto_publish, target_accounts: form.target_accounts,
       }) });
@@ -145,7 +151,11 @@ export default function CampaignDetail() {
               </div>
 
               <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1 }}><span style={lbl}>Posts / day</span><input type="number" min="1" max="5" style={fieldStyle} value={form.posts_per_day} onChange={e => setForm(f => ({ ...f, posts_per_day: e.target.value }))} /></div>
+                <div style={{ flex: 1 }}><span style={lbl}>Posts / day</span>
+                  <select style={fieldStyle} value={form.posts_per_day} onChange={e => setForm(f => ({ ...f, posts_per_day: e.target.value }))}>
+                    {[1, 2, 3, 4, 5].map(n => <option key={n} value={n} style={opt}>{n}</option>)}
+                  </select>
+                </div>
                 <div style={{ flex: 1 }}><span style={lbl}>Privacy</span>
                   <select style={fieldStyle} value={form.privacy} onChange={e => setForm(f => ({ ...f, privacy: e.target.value }))}>
                     <option value="public" style={opt}>Public</option><option value="unlisted" style={opt}>Unlisted</option><option value="private" style={opt}>Private</option>

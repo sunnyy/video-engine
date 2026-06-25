@@ -33,15 +33,64 @@ const ASSET_TYPES = ["none", "ai_image", "photo", "cutout", "stock_video"];
 const TRANSITIONS = ["zoom", "slide-left", "slide-up", "slide-down", "fade", "none"];
 const CAMERAS = ["slow_zoom_in", "fast_zoom_in", "slow_zoom_out", "pan_left", "pan_right", "hold"];
 
-const MIN_BEATS = 8, MAX_BEATS = 32;
-const MAX_BEAT_WORDS = 8;
-const WORDS_PER_SECOND = 2.3; // measured ≈2.3 words/sec at our TTS speed (was 2.0 → under-budgeted, causing 60s→41s undershoot)
+// Soft floor + hard safety cap on scene count — NOT a word/length budget. The director
+// decides how many scenes the content needs; these only stop a degenerate plan or a runaway.
+const MIN_BEATS = 6, MAX_BEATS = 48;
 
 const wordsIn = (s) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
-const scriptWordCount = (beats) => (beats || []).reduce((n, b) => n + wordsIn(b.script_line), 0);
 
-// One director completion. `extraUser` appends a follow-up instruction (used for the
-// "too long → rewrite tighter" pass). Returns parsed JSON plan.
+// The voiceover the viewer hears is the beats' script_lines concatenated. To guarantee it
+// sounds like one flowing narration (not a list of headline fragments), we let the director
+// author the whole narration as prose, then re-slice THAT verbatim across the beats — using
+// each beat's own line length as the chunk size. Result: joined script_lines == narration
+// word-for-word, so TTS flows AND the count-based per-beat timing/sync is unchanged.
+// No-ops (keeps the model's per-beat lines) when narration is missing or clearly inconsistent.
+function reconcileNarrationToBeats(beats, narration) {
+  const narr = String(narration || "").trim();
+  if (!narr || !beats?.length) return;
+  const narrTokens = narr.split(/\s+/).filter(Boolean);
+  if (narrTokens.length < 4) return;
+
+  const beatWords = beats.map(b => wordsIn(b.script_line));
+  const totalBeatWords = beatWords.reduce((a, n) => a + n, 0);
+  if (totalBeatWords < 1) return;
+
+  // If the narration and the beat lines describe wildly different amounts of speech, the model
+  // likely wrote them inconsistently — don't force a re-slice that could scramble the script.
+  const ratio = narrTokens.length / totalBeatWords;
+  if (ratio < 0.45 || ratio > 2.5) {
+    console.warn(`[ai-video/director] narration/beat word ratio ${ratio.toFixed(2)} out of range — keeping per-beat lines`);
+    return;
+  }
+
+  // Hand each beat its proportional share of the narration tokens, in order; the last
+  // non-empty beat absorbs any rounding remainder so every word is placed exactly once.
+  let idx = 0;
+  for (let i = 0; i < beats.length; i++) {
+    const remainingBeats = beats.length - i;
+    let take = Math.round(beatWords[i] * ratio);
+    take = Math.max(1, Math.min(take, narrTokens.length - idx - (remainingBeats - 1)));
+    if (i === beats.length - 1) take = narrTokens.length - idx;
+    if (take <= 0) { beats[i].script_line = ""; continue; }
+    beats[i].script_line = narrTokens.slice(idx, idx + take).join(" ");
+    idx += take;
+  }
+  if (idx < narrTokens.length) {
+    const last = beats[beats.length - 1];
+    last.script_line = `${last.script_line} ${narrTokens.slice(idx).join(" ")}`.trim();
+  }
+}
+
+// Fixed assumed speaking pace → a concrete TOTAL word budget per runtime. This is a budget for
+// the WHOLE narration (the lever that actually holds duration), NOT a per-scene word cap — so it
+// controls length without chopping speech into the headline stubs that made it sound like a list.
+const WORDS_PER_MINUTE = 145;
+const budgetWords = (seconds) => Math.round(seconds * WORDS_PER_MINUTE / 60);
+const narrationWordCount = (plan) =>
+  wordsIn(plan?.narration) ||
+  (Array.isArray(plan?.beats) ? plan.beats.reduce((n, b) => n + wordsIn(b.script_line), 0) : 0);
+
+// One director completion. `extraUser` appends a follow-up instruction (the runtime-fit pass).
 async function runDirectorCompletion(prompt, extraUser = "") {
   const response = await openai.chat.completions.create({
     model: DIRECTOR_MODEL,
@@ -64,9 +113,8 @@ function languageBlock(language) {
 }
 
 function buildDirectorPrompt({ research, style, targetDuration, language, theme = "auto", accentColor = null, accentColor2 = null }) {
-  const beatTarget = Math.round(targetDuration / 2.2);
-  const targetWords = Math.round(targetDuration * WORDS_PER_SECOND);
   const themeBlock = themeDirective(theme, accentColor, accentColor2);
+  const targetWords = budgetWords(targetDuration);
 
   return {
     system: `You are the director of a short-form video studio that makes dense, fast-cut, subject-specific videos.
@@ -75,25 +123,24 @@ You plan the WHOLE film in one pass: the narration AND one visual per spoken bea
 ${style ? styleDirectiveBlock(style) : `## VISUAL STYLE: choose one for this video from:\n${styleMenuForDirector()}\nPick what fits the topic's tone. Lock it — every beat inherits it.`}
 ${themeBlock}
 
-THE BEAT SYSTEM — NON-NEGOTIABLE:
-- One beat = one spoken PHRASE = one visual moment. 3-6 words per beat, ${MAX_BEAT_WORDS} ABSOLUTE MAX. Beats are 1-2 seconds.
-- A full sentence SPANS 2-3 consecutive beats. Example: "March 2017: Yogi Adityanath—monk, temple head—sworn in as Chief Minister." is THREE beats:
-  beat A: "March 2017:" → a date slam (typography_punch)
-  beat B: "Yogi Adityanath—monk, temple head—" → his image (cutout/photo)
-  beat C: "sworn in as Chief Minister." → the oath moment (illustration/photo)
-  The phrases must concatenate into natural flowing narration.
-- CONTINUATION BEATS — use them GENEROUSLY: when a sentence spans multiple beats, set "continues_previous": true on the later beat(s) so the WHOLE sentence plays over ONE evolving visual (text landing piece by piece on the same backdrop). Do NOT cut to a brand-new visual for every phrase — hard cuts are for new IDEAS, not for each phrase of the same idea. One idea = one scene.
-- Target ~${beatTarget} beats for ${targetDuration}s. Keep it tight — never pad with extra beats to fill time.
-- LENGTH: write a COMPLETE mini-story — a hook, real substance, AND a closing line — totalling about ${targetWords} words across ~${beatTarget} beats (speech ≈ ${WORDS_PER_SECOND} words/sec, so ${targetWords} words ≈ ${targetDuration}s). HIT that length: don't pad past it, and DON'T under-deliver — even a short video needs an actual payoff, never just a hook + "tell me in the comments". STAY INTERNALLY CONSISTENT — if the hook promises N items or a countdown, deliver all N within the budget (each shorter), final item included; if the topic is too big for ${targetWords} words, pick a TIGHTER ANGLE that still has a clear beginning, middle, and end. Going well past ${targetWords} words makes the video longer than the ${targetDuration}s requested = FAILURE.
-- The viewer must never rest: every beat has motion, every cut has a transition.
+THE SCENE SYSTEM:
+- A "beat" is one SCENE: one visual moment with words spoken over it. Divide the narration into scenes by MEANING — start a new scene wherever the idea, subject, or image should change. Let the CONTENT decide how many scenes there are and how long each runs; there is no fixed scene count and no per-scene word limit. Some scenes carry a few words, some carry a full sentence — whatever the moment needs.
+- FAST PACING — EVERY scene is a DISTINCT visual, and NO visual may stay on screen longer than ~4 seconds (a longer hold is dead weight in short-form). Cut to a NEW, different visual every 2–4 seconds. That means roughly ${Math.max(3, Math.round(targetDuration / 3))} distinct visuals for this ${targetDuration}s video. Give EACH scene its OWN visual — its own image_prompt OR shot_query OR subject_entity — never let one backdrop carry several scenes.
+- "continues_previous" is a RARE exception, NOT the rule: use it only when two adjacent scenes are genuinely one quick moment of the SAME visual that together last under ~4s (e.g. a two-line title landing). NEVER chain 3+ scenes onto one held visual, and never hold a single visual past ~4s. When unsure, CUT to a fresh, distinct visual — variety beats holding.
+- RUNTIME IS ABSOLUTE — this is a ${targetDuration}-SECOND video. Assume narration is spoken at exactly 145 words per minute, so the COMPLETE narration must be about ${targetWords} WORDS total — that is the strict budget for what fits in ${targetDuration}s. COUNT your words; stay within a few words of ${targetWords}. This is a budget for the WHOLE script, NOT a per-scene limit — scenes can be any length as long as they SUM to ≈${targetWords} words.
+- If the story doesn't fit ${targetWords} words, SHORTEN the story (fewer points, a tighter angle) — never speak faster and never overrun. Meeting the ${targetDuration}-second runtime matters MORE than including every research fact; use the research for ACCURACY, not as a checklist to cram in.
+- SIZE THE STORY TO THE BUDGET: ${targetWords} words is short for a ${targetDuration}s slot — usually one tight idea (a hook, a single point, a closing line) for short runtimes, more substance for longer ones. Don't pad to fill the time and don't overrun to be "complete" — fitting ${targetWords} words comes first.
+- The viewer must never rest: every scene has motion, every cut has a transition.
 - Every beat's visual_concept must be DISTINCT — different subject, different compositional idea, different energy from its neighbors. Two beats that would look alike is a failure.
 
-NARRATION FLOW — beats are VISUAL cuts, not SPOKEN stops:
-- Write the narration as flowing spoken sentences FIRST, then split each sentence across beats.
-- Within a multi-beat sentence, ONLY the final beat ends with . ! or ? — earlier beats end with a comma, em-dash, or nothing, so the voiceover flows straight through the cut without pausing.
-- Telegram fragments are FORBIDDEN: "Tradeoff: clarity, but more control." spoken aloud sounds robotic with dead air at every period. Write "The tradeoff is more clarity," + "but also more control." instead.
+NARRATION — THE SINGLE MOST IMPORTANT PART. The voiceover is what the viewer HEARS; if it sounds like a list of captions being read out, the whole video fails.
+- FIRST write "narration": the COMPLETE voiceover as ONE flowing piece of spoken storytelling — real, connected sentences with the natural connective tissue people actually use when they talk ("and", "but", "which is why", "that's because", "so", "then", "back when", "today"). A narrator telling a story start to finish — NOT a slideshow of clipped phrases.
+- THEN break that exact narration into beats. Each beat's script_line is a CONTIGUOUS SLICE of the narration — copy the words verbatim, in order, adding nothing and removing nothing. Concatenating every script_line in order must reproduce the narration word-for-word.
+- A single sentence SPANS several beats. Within a sentence, ONLY the final beat ends with . ! or ? — every earlier beat ends on a comma, an em-dash, or nothing at all, so the speech flows straight through the visual cut with no pause.
+- FORBIDDEN — headline / telegram fragments as the spoken line. script_line is SPEECH, not a caption (captions live separately in content.headline). Clipped nominal fragments and "Label: value" colon-constructions, strung together, read as dead-air bullet points — one full stop after another. The cure is real connective tissue between ideas and letting one sentence flow across several scenes, so it sounds like a person talking, not a list being read.
+- The SAME rule holds in EVERY language (Hinglish included): write the way someone actually speaks that language, with its natural spoken connectors — never clipped keywords.
 - Minimize colons and semicolons — TTS reads them as long pauses.
-- Test: read the concatenated narration aloud in your head. It must sound like one person talking at a natural clip, never like bullet points being read out.
+- FINAL TEST before you return: read the narration aloud in your head, end to end. It must sound like one person talking naturally. If any stretch sounds like bullet points, rewrite it into flowing sentences.
 
 REAL SUBJECT IMAGERY:
 For beats featuring a real public figure, organization, country, or landmark, set "subject_entity" to its exact Wikipedia article title (e.g. "Yogi Adityanath", "European Union", "Taj Mahal") — the pipeline fetches a REAL photo. ONLY entities that have a Wikipedia page with a photo: people, orgs, places, products. NEVER documents, laws, events, or abstract concepts. Pair it with asset_type "photo" or "cutout". Real imagery beats generated likenesses.
@@ -104,11 +151,11 @@ YOU DECIDE THREE THINGS PER BEAT — source, content, and overlay-or-clean. A de
 
 1. SOURCE (asset_type) — what raw material the beat uses:
 - "none": an HTML/CSS INFORMATION FRAME. ONLY for content that IS information: a stat, a quote, a list, a title/date, a data comparison, a small chart, a CTA. NEVER for pictorial concepts — an iceberg, a ship, a crowd, a place, an animal, a person, an event are IMAGES, not HTML. If the moment can be SEEN, it is a shot, not a designed frame.
-- "ai_image": a generated cinematic SHOT (full-bleed). EXPENSIVE — reserve for genuinely un-photographable / stylized concepts (a metaphor, a dramatized historical moment, an abstract idea). The pipeline caps AI generations per video, so don't lean on it.
+- "ai_image": a generated cinematic SHOT (full-bleed). LAST RESORT — the pipeline generates AT MOST ~2 of these per video; any extra ai_image scenes are dropped, which is why videos end up with too few distinct visuals. Use it ONLY for a truly un-photographable concept (a metaphor, an abstract idea, a dramatized moment with no real footage). If a scene shows ANYTHING real — a person, place, building, object, landscape, event — it is a real photo or stock clip, NEVER ai_image. Defaulting to ai_image for depictable subjects is a FAILURE.
 - "photo": a realistic photo shot. With subject_entity set, a REAL photo of that person/org/landmark is fetched (free + strongest). Use this when SEEING that real person/org/place/landmark is the point of the beat — NOT merely because the line mentions a real name. If the beat is really about an idea, a number, or an argument that just references them, a designed frame beats a stock face.
 - "cutout": the subject on transparency, composed by the designer inside a designed frame.
 - "stock_video": real footage of a real-world moment (a city, a crowd, machinery, nature). Provide shot_query (concrete searchable phrase). PREFER this over ai_image for any real-world scene that footage could show.
-LEAD WITH IMAGERY. Faceless videos are carried by VISUALS, not UI cards — most beats should SHOW something with the spoken line as a text overlay: a real photo (→ photo + subject_entity), real footage (→ stock_video + shot_query), or a generated shot (→ ai_image). Reserve HTML/CSS frames (asset_type "none") for beats whose content genuinely IS information — a stat, quote, list, chart, data comparison, title, or the CTA. If a beat can be SHOWN — a person, animal, place, object, action, scene, or visual metaphor — it is an IMAGE with overlay, NOT a designed card. Aim for roughly TWO-THIRDS image-backed beats to one-third designed frames, and never more than 2 of the same asset type in a row. SOURCE PRIORITY for cost (unchanged): real entity photo > stock footage > ai_image (≤2 ai_image in a 30s video) — so leaning visual means leaning on FREE real photos/footage first, with ai_image reserved for un-photographable concepts and comparisons.
+LEAD WITH REAL IMAGERY. Faceless videos are carried by VISUALS, not UI cards — most scenes SHOW something with the spoken line as a text overlay. Each scene's visual comes from, IN STRICT PRIORITY ORDER: (1) a REAL photo of a named subject → subject_entity + asset_type "photo" (FREE, strongest); (2) real stock FOOTAGE of the scene → stock_video + a concrete shot_query (FREE); (3) only if neither can show it, ai_image (capped at ~2/video). Almost every depictable subject — people, places, buildings, objects, landscapes, events, even visual metaphors that have footage — should be (1) or (2), NOT ai_image. A topic like history, a country, a company, nature, sport is ALMOST ALL real photos + stock; if your plan has more than ~2 ai_image scenes, you've done it wrong — convert them to photo/stock_video. Reserve HTML/CSS frames (asset_type "none") for scenes whose content genuinely IS information — a stat, quote, list, chart, comparison, title, or the CTA. Aim for roughly two-thirds image-backed scenes to one-third designed frames, and give each its OWN distinct subject so consecutive scenes never look alike.
 
 2. CONTENT — the information of the beat, as a content object. Real strings, real numbers, from the research. You provide WHAT it says, never how it looks:
 "content": {
@@ -143,8 +190,8 @@ NARRATIVE ARC:
 - Final beat: the CTA from the research's cta_idea.
 
 SCRIPT RULES:
-- Conversational, punchy, spoken-word rhythm. One idea per beat.
-- script lines must concatenate into ONE natural flowing narration (this becomes the voiceover).
+- Conversational, natural spoken rhythm — the way a person actually talks, in full connected sentences. NOT clipped headline phrases.
+- The script_lines must concatenate into ONE natural flowing narration (this becomes the voiceover) — see the NARRATION section above; that is the priority.
 - Forbidden: "delve", "dive into", "game-changing", "revolutionary", "in today's video".
 
 PUBLISH METADATA — this video gets posted to social platforms, so also write its post copy:
@@ -160,10 +207,11 @@ Return ONLY valid JSON:
   "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient",
   "niche": "one-word content domain for asset reuse (e.g. tech, finance, business, fitness, health, history, science, nature, lifestyle, sports, food, travel)",
   "publish": { "title": "≤95-char post title", "description": "1-3 sentence caption", "hashtags": ["#tag1", "#tag2"] },
+  "narration": "the COMPLETE voiceover as ONE flowing spoken paragraph (real connected sentences, natural connectors), about ${targetWords} words total (≈${targetDuration}s at 145 wpm) — every script_line below MUST be a verbatim contiguous slice of this, in order",
   "beats": [
     {
       "beat_index": 0,
-      "script_line": "the exact spoken words for this beat",
+      "script_line": "this beat's spoken words — a verbatim contiguous SLICE of narration that flows from the previous beat into the next (usually a fragment, NOT a standalone caption)",
       "visual_concept": "one sentence: the intent of this moment (context for the designer)",
       "asset_type": "none",
       "content": { "kind": "hook", "headline": "...", "subtext": null, "items": null, "attribution": null },
@@ -181,9 +229,9 @@ Return ONLY valid JSON:
     user: `RESEARCH BRIEF:
 ${JSON.stringify(research, null, 2)}
 
-TARGET DURATION: ${targetDuration} seconds (~${beatTarget} beats)
+TARGET DURATION: ${targetDuration} seconds of spoken narration.
 
-Direct this film, beat by beat.`,
+Write the flowing narration for this runtime, then direct the film scene by scene.`,
   };
 }
 
@@ -191,11 +239,6 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
   const style = styleId && styleId !== "auto" ? STYLE_PRESETS[styleId] : null;
   const prompt = buildDirectorPrompt({ research, style, targetDuration, language, theme, accentColor, accentColor2 });
 
-  // Length is controlled at GENERATION, never by trimming the finished script/voiceover
-  // (trimming cuts the ending off). The prompt sets the word budget; if the model still
-  // runs well over, we regenerate ONE complete, shorter plan — we never cut beats post-hoc.
-  const targetWords = Math.round(targetDuration * WORDS_PER_SECOND);
-  const beatTarget = Math.round(targetDuration / 2.2);
   let plan;
   try {
     plan = await runDirectorCompletion(prompt);
@@ -203,21 +246,23 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     throw new Error(`beat director returned invalid JSON: ${e.message}`);
   }
 
-  // Length guard — regenerate (never trim) up to twice if the draft runs long, keeping the
-  // shortest COMPLETE result. Structural limits (max beats / words-per-beat) land better with
-  // the model than a raw total-word count, which it routinely ignores.
-  const perBeatMax = 5;
-  const maxBeats = Math.max(4, beatTarget);
-  let bestWords = scriptWordCount(plan.beats);
-  for (let attempt = 1; attempt <= 2 && bestWords > targetWords * 1.2; attempt++) {
-    console.warn(`[ai-video/director] draft ${bestWords}w > target ${targetWords}w — regen ${attempt}/2 (no trim)`);
+  // RUNTIME ENFORCEMENT — the prompt's word budget is necessary but not sufficient (LLMs can't
+  // feel speaking time), so we MEASURE the draft and, if it would run well over the requested
+  // duration, re-ask ONCE or twice for a shorter narration. This bounds TOTAL length only — the
+  // narration stays flowing prose, so it never reintroduces the per-scene list-speak. Never trim
+  // the finished script in code (that lops off the ending); always have the model rewrite shorter.
+  const targetWords = budgetWords(targetDuration);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const words = narrationWordCount(plan);
+    const estSeconds = Math.round((words / WORDS_PER_MINUTE) * 60);
+    if (words <= Math.round(targetWords * 1.2)) break; // within ~20% of budget — accept
+    console.warn(`[ai-video/director] draft ${words}w ≈ ${estSeconds}s > target ${targetDuration}s (${targetWords}w) — runtime-fit regen ${attempt}/2`);
     try {
       const tighter = await runDirectorCompletion(prompt,
-        `LENGTH FAILURE: your script ran ${bestWords} words — far too long for a ${targetDuration}-second video. Rewrite the ENTIRE plan (same JSON schema) under these HARD limits: at most ${maxBeats} beats; EACH script_line at most ${perBeatMax} words; ${targetWords} words TOTAL maximum — count the words in every line. Keep it a COMPLETE short (hook → the point → payoff). If the topic lists multiple items and they won't fit, COVER FEWER / name them in one line rather than running long. Do NOT exceed ${targetWords} words.`);
-      const w = scriptWordCount(tighter?.beats);
-      if (Array.isArray(tighter?.beats) && tighter.beats.length >= 4 && w < bestWords) { plan = tighter; bestWords = w; }
-      else break; // no improvement — don't waste more calls
-    } catch (_) { break; }
+        `RUNTIME FIX — your narration is ${words} words ≈ ${estSeconds} seconds, but this is a ${targetDuration}-second video, which is about ${targetWords} words at 145 wpm. Rewrite the ENTIRE plan (same JSON schema) so the narration is about ${targetWords} words: SHORTEN the story — fewer points, a tighter angle, cut whole scenes — do NOT just compress wording. Keep it ONE flowing, naturally-spoken narration (real connectors, never clipped headline fragments). Meeting the ${targetDuration}-second runtime is more important than covering every fact.`);
+      if (Array.isArray(tighter?.beats) && tighter.beats.length >= 3 && narrationWordCount(tighter) < words) plan = tighter;
+      else break; // no usable improvement — keep the best we have
+    } catch { break; }
   }
 
   // ── Validation — structure is code's job, not the model's ────────────────
@@ -276,13 +321,9 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     }
     b._assetType = assetType;
 
-    // Word cap — trim overlong lines at the last comfortable boundary
-    let line = (b.script_line ?? "").trim();
-    const words = line.split(/\s+/).filter(Boolean);
-    if (words.length > MAX_BEAT_WORDS + 3) {
-      line = words.slice(0, MAX_BEAT_WORDS + 1).join(" ").replace(/[,;—-]+$/, "") + ".";
-      console.warn(`[ai-video/director] beat ${i} trimmed from ${words.length} words`);
-    }
+    // Spoken line is kept verbatim — no word cap (that flattened speech into headlines).
+    // Length follows meaning; a too-long single visual is split later in the pipeline.
+    const line = (b.script_line ?? "").trim();
 
     let transition = TRANSITIONS.includes(b.transition_out) ? b.transition_out : resolvedStyle.motion.transitions[i % resolvedStyle.motion.transitions.length];
     if (i === beats.length - 1) transition = "none";
@@ -332,6 +373,11 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     };
   });
   beats.forEach(b => delete b._assetType);
+
+  // Re-slice the director's flowing narration verbatim across the beats so the concatenated
+  // voiceover IS that narration (flowing speech, not a list of headline fragments). No-ops if
+  // the model didn't return a usable narration field — then the per-beat lines stand as-is.
+  reconcileNarrationToBeats(beats, plan.narration);
 
   // Niche — one stable domain per video, used for library-image reuse matching.
   const niche = ((typeof plan.niche === "string" && plan.niche.trim()) ? plan.niche.trim().toLowerCase().split(/\s+/)[0] : "")
