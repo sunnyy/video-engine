@@ -2,7 +2,7 @@
  * shared/aiImage.js — FAL (FLUX schnell) image generation + a vision text-gate +
  * background removal (birefnet). The last-resort tier; everything else is cheaper.
  */
-import { openai, supabaseAdmin } from "../../../server/middleware/shared.js";
+import { supabaseAdmin } from "../../../server/middleware/shared.js";
 import { persistRemote } from "./persist.js";
 
 // ── Blank canvas references for Nano Banana ─────────────────────────────────
@@ -74,36 +74,14 @@ export async function falImage(prompt, { runId, label, orientation = "9:16" } = 
   }
 }
 
-/** Vision gate — true if the image contains any visible text/glyphs. */
-export async function imageHasText(imageUrl) {
-  try {
-    const res = await openai.chat.completions.create({
-      model: "gpt-4o", max_tokens: 5,
-      messages: [{ role: "user", content: [
-        { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
-        { type: "text", text: "Does this image contain any visible text, letters, numbers, or writing-like glyphs anywhere (including on screens, signs, labels, or clothing)? Answer only YES or NO." },
-      ] }],
-    });
-    return /yes/i.test(res.choices[0]?.message?.content ?? "");
-  } catch (e) {
-    console.warn("[assets/aiImage] vision text-check failed (accepting):", e.message);
-    return false;
-  }
-}
+// Hard no-text rule baked into every AI image prompt — diffusion models can't render real
+// text (it comes out as gibberish), and all real text is drawn by our typography layer on
+// top. One generation, no vision check, no retries.
+const NO_TEXT_RULE = ", plain surfaces only — absolutely NO text, letters, numbers, words, logos, watermarks, captions, signs, labels, or UI anywhere in the image";
 
-/** falImage + vision gate: regenerate once if text is detected, then best effort. */
+/** Single AI image generation with a baked-in no-text rule (no vision gate, no retries). */
 export async function generateAiImage(prompt, { runId, label, orientation = "9:16", noTextGate = true } = {}) {
-  if (!noTextGate) return falImage(prompt, { runId, label, orientation });
-  let best = null;
-  for (let i = 1; i <= 2; i++) {
-    const extra = i === 2 ? ", plain surfaces only, absolutely zero writing anywhere, no screens, no signs" : "";
-    const url = await falImage(prompt + extra, { runId, label: `${label}-v${i}`, orientation });
-    if (!url) return best;
-    best = url;
-    if (!(await imageHasText(url))) return url;
-    console.warn(`[assets/aiImage] ${label}: text detected (attempt ${i}${i < 2 ? " — regenerating" : " — accepting"})`);
-  }
-  return best;
+  return falImage(prompt + (noTextGate ? NO_TEXT_RULE : ""), { runId, label, orientation });
 }
 
 /** Background removal via FAL birefnet → transparent PNG URL (or null). */

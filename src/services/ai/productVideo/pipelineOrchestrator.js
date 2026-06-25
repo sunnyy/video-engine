@@ -38,6 +38,45 @@ const FPS    = 30;
 const CLIP_SPEED  = 1.3;
 const CLIP_SRC_S  = 5;                       // pixverse min duration for our ≤5s requests
 const CLIP_WINDOW = +(CLIP_SRC_S / CLIP_SPEED).toFixed(2); // ≈ 3.85s of screen time
+
+// ── Pure media-planning (no paid calls) — shared by the real run AND the pre-flight ──
+// Decide which scenes become motion clips. image → none; video → all non-CTA; hybrid →
+// the most motion-worthy non-CTA scenes (LIFESTYLE first), capped 1 (≤3) / 2 (≥5).
+function selectClipFlags(scenes, visualMode) {
+  const n = scenes.length;
+  const eligible  = (i) => scenes[i].intent !== "cta" && scenes[i].shot_role !== "cta";
+  const worthy    = (i) => eligible(i) && (scenes[i].motion_value === "high" || scenes[i].render === "video");
+  const lifestyle = (i) => scenes[i].shot_role === "lifestyle" || scenes[i].intent === "lifestyle";
+  if (visualMode === "video") return scenes.map((_, i) => eligible(i));
+  if (visualMode === "image") return scenes.map(() => false);
+  const cap = n >= 5 ? 2 : 1;
+  const ranked = scenes.map((s, i) => i).filter(worthy).sort((a, b) => (lifestyle(a) ? 0 : 1) - (lifestyle(b) ? 0 : 1));
+  const chosen = new Set(ranked.slice(0, cap));
+  return scenes.map((_, i) => chosen.has(i));
+}
+
+// Finalize scene durations (mutates): hybrid clip scenes get enough time for the sped-up
+// clip; the video never ends before the voiceover. isClip(i) → whether scene i is a clip.
+function finalizeSceneDurations(scenes, { visualMode, isClip, voiceoverDuration }) {
+  const n = scenes.length;
+  if (visualMode === "hybrid") {
+    for (let i = 0; i < n; i++) if (isClip(i)) scenes[i].duration_seconds = Math.max(scenes[i].duration_seconds || 0, CLIP_WINDOW);
+  }
+  if (voiceoverDuration > 0) {
+    const total = scenes.reduce((a, s) => a + (s.duration_seconds || 0), 0);
+    const deficit = (voiceoverDuration + 0.35) - total;
+    if (deficit > 0) scenes[n - 1].duration_seconds = +(((scenes[n - 1].duration_seconds || 0) + deficit).toFixed(3));
+  }
+}
+
+// Pre-flight: exercise the deterministic media-planning on a CLONE of the plan BEFORE any
+// paid image/clip/TTS call, so a logic bug aborts free instead of mid-pipeline.
+function preflightMediaPlan(scenes, visualMode) {
+  if (!Array.isArray(scenes) || !scenes.length) throw new Error("no scenes to plan");
+  const probe = scenes.map(s => ({ ...s, duration_seconds: s.duration_seconds ?? 3.5 }));
+  const flags = selectClipFlags(probe, visualMode);
+  finalizeSceneDurations(probe, { visualMode, isClip: (i) => flags[i], voiceoverDuration: 10 });
+}
 // Map the chosen orientation to canvas dimensions — drives shots, overlay design, measure + saved format.
 function orientationToCanvas(orientation) {
   switch (orientation) {
@@ -304,6 +343,15 @@ export async function runProductVideoPipeline(project, onStep) {
   const accentColor = project.accentColor ?? brief.accent_color;
   const productMood = brief.product_mood;
 
+  // ── Pre-flight: validate the deterministic plan BEFORE any paid step ───────
+  // (the director call already happened — the cheap one; base image / shots / clips /
+  // TTS are still ahead). A logic bug here aborts free instead of after Fal/TTS spend.
+  try {
+    preflightMediaPlan(scenes, visualMode);
+  } catch (e) {
+    throw new Error(`Pre-flight check failed — aborting before paid steps: ${e.message}`);
+  }
+
   // ── Step 2: Base image — clean studio packshot (canonical reference) ───────
   onStep?.(1);
   console.log("[productPipeline] step 2 — base image");
@@ -370,26 +418,7 @@ export async function runProductVideoPipeline(project, onStep) {
   // Each clip animates that scene's still shot (product identity preserved); a clip
   // failure falls back to the still.
   const n = scenes.length;
-  // A CTA scene is always a still + motion — a clip adds nothing to a CTA and wastes the
-  // most expensive call. Never animate the CTA.
-  const clipEligible = (i) => scenes[i].intent !== "cta" && scenes[i].shot_role !== "cta";
-  // Motion-worthy = real motion a Ken Burns zoom can't fake (a person moving, sparkle,
-  // fabric, a reveal). The director flags this via motion_value / render.
-  const motionWorthy = (i) => clipEligible(i) && (scenes[i].motion_value === "high" || scenes[i].render === "video");
-  const isLifestyle  = (i) => scenes[i].shot_role === "lifestyle" || scenes[i].intent === "lifestyle";
-  let clipFlags;
-  if (visualMode === "video")      clipFlags = scenes.map((_, i) => clipEligible(i));
-  else if (visualMode === "image") clipFlags = scenes.map(() => false);
-  else {
-    // Hybrid: spend the clip budget on the most motion-worthy scenes — LIFESTYLE first —
-    // never the CTA, never a static zoom-only scene. Cap: 1 (≤3 scenes) / 2 (≥5).
-    const cap = n >= 5 ? 2 : 1;
-    const ranked = scenes.map((s, i) => i)
-      .filter(motionWorthy)
-      .sort((a, b) => (isLifestyle(a) ? 0 : 1) - (isLifestyle(b) ? 0 : 1));
-    const chosen = new Set(ranked.slice(0, cap));
-    clipFlags = scenes.map((_, i) => chosen.has(i));
-  }
+  const clipFlags = selectClipFlags(scenes, visualMode);
 
   const clipUrls = new Array(n).fill(null);
   const clipCount = clipFlags.filter(Boolean).length;
@@ -408,22 +437,9 @@ export async function runProductVideoPipeline(project, onStep) {
     scenes.forEach(s => { s.render = "image"; });
   }
 
-  // ── Finalize scene durations ──────────────────────────────────────────────
-  // (1) Hybrid clip scenes get enough screen time to show the full (sped-up) clip — the
-  //     few clips can afford the extra seconds; full-video keeps voiceover-synced windows.
-  if (visualMode === "hybrid") {
-    for (let i = 0; i < n; i++) {
-      if (clipUrls[i]) scenes[i].duration_seconds = Math.max(scenes[i].duration_seconds || 0, CLIP_WINDOW);
-    }
-  }
-  // (2) The video must never end before the voiceover finishes (clamping long segments
-  //     can leave the scene-sum short of the VO — the tail was getting cut). Extend the
-  //     last scene to cover any deficit, plus a small tail so the VO lands comfortably.
-  if (voiceoverDuration > 0) {
-    const total = scenes.reduce((a, s) => a + (s.duration_seconds || 0), 0);
-    const deficit = (voiceoverDuration + 0.35) - total;
-    if (deficit > 0) scenes[n - 1].duration_seconds = +(((scenes[n - 1].duration_seconds || 0) + deficit).toFixed(3));
-  }
+  // Finalize scene durations: hybrid clip scenes get enough time for the sped-up clip,
+  // and the video never ends before the voiceover (see finalizeSceneDurations).
+  finalizeSceneDurations(scenes, { visualMode, isClip: (i) => !!clipUrls[i], voiceoverDuration });
 
   // ── Step 4b: Overlay design (vision on each shot) + headless measure ───────
   console.log("[productPipeline] step 4b — overlays (vision)");
