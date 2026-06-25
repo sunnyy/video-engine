@@ -21,6 +21,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     captionPos = 80,
     reframe = "source",
     music = true,
+    styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null,
   } = req.body;
 
   if (!videoUrl?.trim()) return res.status(400).json({ error: "videoUrl is required (upload the video first)" });
@@ -48,6 +49,7 @@ router.post("/generate", requireAuth, async (req, res) => {
         captionStyle, captionPos,
         reframe: reframe === "9:16" ? "9:16" : "source",
         music: music !== false,
+        styleId, theme, accentColor, accentColor2,
       },
       ({ step }) => send({ step }),
     );

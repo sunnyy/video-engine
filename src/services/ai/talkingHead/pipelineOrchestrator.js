@@ -169,6 +169,7 @@ export async function runTalkingHeadPipeline(params, onStep) {
   const {
     videoUrl, userId,
     captionStyle = "wordBlaze", captionPos = 80, reframe = "source", music = true,
+    styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null,
   } = params;
   const step = (msg) => { console.log(`[talking-head] ${msg}`); onStep?.({ step: msg }); };
   if (!videoUrl) throw new Error("no video provided");
@@ -186,7 +187,7 @@ export async function runTalkingHeadPipeline(params, onStep) {
   step(TH_STATUS_STEPS[3]);
   let style = null, palette = null, niche = "general", musicMood = "ambient", publish = null;
   try {
-    const directed = await directTalkingHead(beats, { language });
+    const directed = await directTalkingHead(beats, { language, styleId, theme, accentColor, accentColor2 });
     beats = directed.beats; style = directed.style; palette = directed.palette; niche = directed.niche;
     musicMood = directed.music_mood || "ambient"; publish = directed.publish || null;
   } catch (e) {
@@ -228,6 +229,11 @@ export async function runTalkingHeadPipeline(params, onStep) {
     lastSfx = s.key; sfxCount++;
     return { key: s.key, src: s.src, volume: 0.4, delay: -0.1 };
   };
+  // Varied scene-cut transitions — cycle the list so cutaways aren't all crossfades. Quick fade out
+  // so we return cleanly to the speaker.
+  const TRANSITIONS = ["zoom", "slide-left", "dissolve", "slide-right", "fade", "slide-up"];
+  let tIdx = 0;
+  const nextTransition = () => ({ in: { type: TRANSITIONS[tIdx++ % TRANSITIONS.length], duration: 0.3 }, out: { type: "fade", duration: 0.2 } });
 
   if (designBeats.length && style) {
     try {
@@ -238,7 +244,10 @@ export async function runTalkingHeadPipeline(params, onStep) {
         if (html) { try { graph = await measureSceneHTML(html, b.beat_index, canvas); } catch {} }
         if (!graph?.length) { b.visual_mode = "speaker"; continue; } // design failed → speaker shows
         const group = placeCardGraph(graph, b.start, b.end, 8);
-        if (b.visual_mode === "card" && group[0]) group[0].sfx = cutawaySfx("pop"); // cards land with a pop
+        if (b.visual_mode === "card" && group[0]) {
+          group[0].transition = nextTransition(); // the card cover wipes/zooms in
+          group[0].sfx = cutawaySfx("pop");        // cards land with a pop
+        }
         designOut.push(...group);
       }
     } catch (e) { console.warn("[talking-head] design failed:", e.message); }
@@ -252,7 +261,10 @@ export async function runTalkingHeadPipeline(params, onStep) {
   for (const b of beats) {
     if (b.visual_mode !== "broll" || !b.asset?.src) continue;
     const ls = brollLayers(b, canvas);
-    if (ls[0]) ls[0].sfx = cutawaySfx(b.asset.kind === "video" ? "whoosh" : "impact");
+    if (ls[0]) {
+      ls[0].sfx = cutawaySfx(b.asset.kind === "video" ? "whoosh" : "impact");
+      if (b.layout !== "pip") ls[0].transition = nextTransition(); // full cutaways vary; pip keeps its pop
+    }
     brollOut.push(...ls);
   }
   const brollCount = brollOut.filter((l) => l.type === "image" || l.type === "video").length;

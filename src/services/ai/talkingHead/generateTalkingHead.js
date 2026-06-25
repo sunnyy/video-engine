@@ -15,12 +15,12 @@ export async function uploadTalkingHeadVideo(file) {
  * Streams SSE progress; resolves { projectId, projectName }.
  */
 export async function generateTalkingHead(
-  { videoUrl, durationSeconds = 0, captionStyle = "wordBlaze", captionPos = 80, reframe = "source", music = true },
+  { videoUrl, durationSeconds = 0, captionStyle = "wordBlaze", captionPos = 80, reframe = "source", music = true, styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null },
   onProgress,
 ) {
   const res = await serverFetch("/api/talking-head/generate", {
     method: "POST",
-    body: JSON.stringify({ videoUrl, durationSeconds, captionStyle, captionPos, reframe, music }),
+    body: JSON.stringify({ videoUrl, durationSeconds, captionStyle, captionPos, reframe, music, styleId, theme, accentColor, accentColor2 }),
   });
 
   if (!res.ok && res.status !== 200) {

@@ -14,6 +14,7 @@
 import { openai } from "../../../server/middleware/shared.js";
 import { STYLE_IDS, STYLE_PRESETS, getStyle } from "./styleSystem.js";
 import { normalizeHex, ensureVividAccent } from "./utils.js";
+import { resolveThemePalette } from "../shared/themeRegistry.js";
 
 const MODEL = "gpt-4.1";
 const ASSET_TYPES = ["none", "ai_image", "photo", "stock_video"];
@@ -79,7 +80,7 @@ async function runChunk(beats, language) {
  * directTalkingHead(beats, { language }) → { style, palette, niche, beats }
  * beats: input beats augmented with visual_mode + (for broll) AI-Video-compatible visual fields.
  */
-export async function directTalkingHead(beats, { language = "en" } = {}) {
+export async function directTalkingHead(beats, { language = "en", styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null } = {}) {
   // Chunk long transcripts so the model stays accurate and within context.
   const CHUNK = 24;
   const decisionsByIndex = new Map();
@@ -100,13 +101,20 @@ export async function directTalkingHead(beats, { language = "en" } = {}) {
     }
   }
 
-  const style = STYLE_PRESETS[style_id] ?? getStyle("clean_minimal") ?? STYLE_PRESETS[STYLE_IDS[0]];
+  // User look overrides (Customize modal) win over the director's auto-pick: a chosen Visual Style
+  // locks the look; a chosen Theme/Accent locks the palette (same contract as AI Video).
+  let style = (styleId && styleId !== "auto" && STYLE_PRESETS[styleId])
+    ? STYLE_PRESETS[styleId]
+    : (STYLE_PRESETS[style_id] ?? getStyle("clean_minimal") ?? STYLE_PRESETS[STYLE_IDS[0]]);
   const palette = paletteRaw ?? {};
   palette.bg     = normalizeHex(palette.bg, "#07080f");
   palette.accent = ensureVividAccent(normalizeHex(palette.accent, "#f59e0b"), "#f59e0b");
   palette.accent2 = ensureVividAccent(normalizeHex(palette.accent2, "#38bdf8"), "#38bdf8");
   palette.text   = normalizeHex(palette.text, "#ffffff");
-  palette.theme  = "auto";
+  const themePalette = resolveThemePalette(theme, accentColor, accentColor2);
+  if (themePalette) { palette.bg = themePalette.background; palette.text = themePalette.primaryText; if (accentColor) palette.accent = accentColor; }
+  if (accentColor2) palette.accent2 = accentColor2;
+  palette.theme  = themePalette ? theme : "auto";
   niche = niche || "general";
 
   // Merge decisions back onto the real (timed) beats; default to "speaker" if a beat was missed.

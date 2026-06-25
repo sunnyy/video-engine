@@ -10,6 +10,8 @@ import { useCreditsStore } from "../store/useCreditsStore";
 import { uploadTalkingHeadVideo, generateTalkingHead } from "../services/ai/talkingHead/generateTalkingHead";
 import { captionStylePresets, captionStyleLabels, captionStyleAccents } from "../core/registries/captionTimelineRegistry.jsx";
 import { CAPTION_PREVIEWS as PREVIEWS } from "../ui/components/CaptionStylePreview.jsx";
+import { LookField } from "../ui/fields/index.js";
+import { VISUAL_STYLE_OPTIONS } from "../services/ai/shared/visualStyles.js";
 
 const T = { bg: "#0a0a10", surface: "#13131c", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", accent: "#7c5cfc" };
 
@@ -41,6 +43,10 @@ export default function TalkingHead() {
   const [captionPos, setPos]        = useState(80);
   const [reframe, setReframe]       = useState("source");
   const [music, setMusic]           = useState(true);
+  const [styleId, setStyleId]       = useState("auto");
+  const [theme, setTheme]           = useState("auto");
+  const [accentColor, setAccent]    = useState(null);
+  const [accentColor2, setAccent2]  = useState(null);
   const [busy, setBusy]             = useState(false);
   const [stepIdx, setStepIdx]       = useState(0);
   const [error, setError]           = useState(null);
@@ -57,7 +63,7 @@ export default function TalkingHead() {
     try {
       const { url } = await uploadTalkingHeadVideo(file);
       const result = await generateTalkingHead(
-        { videoUrl: url, durationSeconds: Math.round(duration), captionStyle, captionPos, reframe, music },
+        { videoUrl: url, durationSeconds: Math.round(duration), captionStyle, captionPos, reframe, music, styleId, theme, accentColor, accentColor2 },
         ({ step }) => setStepIdx((i) => Math.min(STEPS.length - 1, i + 1)),
       );
       fetchCredits?.();
@@ -146,6 +152,18 @@ export default function TalkingHead() {
                     <button key={v} onClick={() => setReframe(v)} style={{ flex: 1, background: reframe === v ? "rgba(124,92,252,0.14)" : "rgba(255,255,255,0.02)", border: `1.5px solid ${reframe === v ? "rgba(124,92,252,0.6)" : T.border}`, color: reframe === v ? "#c4b0ff" : T.text, borderRadius: 10, padding: "10px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>{label}</button>
                   ))}
                 </div>
+              </div>
+
+              {/* Look — visual style, theme, accent (drives B-roll cards/overlays) */}
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>Look</div>
+                <LookField
+                  styleId={styleId} onStyleChange={setStyleId} styleOptions={VISUAL_STYLE_OPTIONS}
+                  theme={theme} onThemeChange={setTheme}
+                  accentColor={accentColor} onAccentChange={setAccent}
+                  accentColor2={accentColor2} onAccentChange2={setAccent2}
+                  accent={T.accent}
+                />
               </div>
 
               {/* Music */}
