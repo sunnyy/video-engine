@@ -33,9 +33,9 @@ export const SERVICE_CATALOG = [
     blurb: "Repurpose a post or any content into a ready-to-publish video." },
 
   // ── Tier 2 — more video types (valuable, less proven; listed, not featured) ──
-  { key: "talking_head", name: "Talking Head", category: "create", tier: 2, featured: false, beta: false,
-    route: "/promo-video", creditKey: "promo_video_th", pricing: { model: "flat", credits: CREDIT_COSTS.promo_video_th }, publishable: false,
-    blurb: "Speaker-led videos with AI-designed overlays. (A mode within Promo Video.)" },
+  { key: "talking_head", name: "Talking Head", category: "create", tier: 2, featured: false, beta: true,
+    route: "/talking-head", creditKey: "talking_head", pricing: { model: "flat", credits: CREDIT_COSTS.talking_head }, publishable: false,
+    blurb: "Upload your talking-head clip — auto captions, cuts and B-roll. Charged by clip length." },
   { key: "product_video", name: "Product Video", category: "create", tier: 2, featured: false, beta: false,
     route: "/product-video", creditKey: "product_video", pricing: { model: "scene", perScene: CREDIT_COSTS.product_video_per_scene.image }, publishable: false,
     blurb: "Turn a product image into a designed promo video (charged per scene)." },

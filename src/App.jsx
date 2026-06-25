@@ -50,6 +50,7 @@ import Thumbnails           from "./pages/Thumbnails";
 import ThumbnailGenerator   from "./pages/ThumbnailGenerator";
 import TTSStudio       from "./pages/Voiceover";
 import CaptionStudio      from "./pages/VideoCaptions";
+import TalkingHead        from "./pages/TalkingHead";
 import VideoEditor        from "./pages/VideoEditor";
 import OutfitStudio              from "./pages/VirtualTryOn";
 import SocialPostGenerator       from "./pages/BannerDesign";
@@ -177,6 +178,7 @@ export default function App() {
             <Route path="/promo-video/:projectId"  element={<SaasVideo />} />
             <Route path="/product-video"      element={<ProductVideoGenerator />} />
             <Route path="/ai-video"       element={<PromptVideo />} />
+            <Route path="/talking-head"   element={<TalkingHead />} />
             <Route path="/typography-video"   element={<TypographyVideo />} />
             <Route path="/social-video"       element={<SocialVideo />} />
             <Route path="/product-poster"    element={<PosterStudio />} />

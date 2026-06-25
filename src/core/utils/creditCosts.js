@@ -30,7 +30,8 @@ export const CREDIT_COSTS = {
   // NOTE: timeline/editor video export is FREE — the user already paid to generate;
   // re-exports/edits aren't charged. Free-tier monetization is the watermark.
   promo_video:           { 1: 50, 3: 120, 5: 200 }, // SaaS/Promo Video — per scene count
-  promo_video_th:        180,                       // Talking Head video — flat rate
+  promo_video_th:        180,                       // SaaS Talking Head mode — flat rate
+  talking_head:          20,                         // standalone Talking Head — NOMINAL display only; real charge is duration-based (creditsForTalkingHead)
   // Dashboard video services (plan → produce)
   ai_video:              75,  // Prompt to Video / AI Video
   social_video:          15,  // Social Video
@@ -59,6 +60,14 @@ export function creditsForDuration(seconds, bands = VIDEO_DURATION_BANDS) {
   for (const k of keys) if (sec <= k) return bands[k];
   const top = keys[keys.length - 1];
   return Math.round(bands[top] * (sec / top)); // beyond the largest band → per-second extrapolation
+}
+
+// Standalone Talking Head service — DURATION-BASED (input clip length), unlike the flat SaaS TH
+// rate. Cost scales with minutes of footage (transcription + editorial director + B-roll). Tunable.
+export const TALKING_HEAD_PER_30S = 10;
+export function creditsForTalkingHead(seconds) {
+  const sec = Math.max(1, Math.round(Number(seconds)) || 30);
+  return Math.max(15, Math.ceil(sec / 30) * TALKING_HEAD_PER_30S);
 }
 
 // Full cost estimates per service — used by CreditConfirmModal
