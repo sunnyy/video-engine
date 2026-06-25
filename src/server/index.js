@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
@@ -60,49 +61,63 @@ app.use(cors());
 
 app.use(express.json({ limit: "100mb" }));
 
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: "Too many requests, please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
+// ── Rate limiting ─────────────────────────────────────────────────────────
+// Philosophy: limits exist to stop ONE actor's abuse (scripts / many tabs), NOT to throttle a
+// paying user moving across our many services. So we key by USER when signed in (shared IPs and
+// heavy multi-service sessions never collide), keep cheap calls on a very generous cap, and put
+// only a generous-but-bounded cap on heavy paid jobs (which already self-limit via time + credits).
+const WINDOW_MS = 15 * 60 * 1000;
+
+// Per signed-in user (hash of the bearer token) when present, else per IP (IPv6-safe).
+function clientKey(req) {
+  const m = (req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
+  if (m) return "u:" + crypto.createHash("sha256").update(m[1]).digest("hex").slice(0, 24);
+  return "ip:" + ipKeyGenerator(req.ip);
+}
+const makeLimiter = (max, message) => rateLimit({
+  windowMs: WINDOW_MS, max, keyGenerator: clientKey,
+  message: { error: message }, standardHeaders: true, legacyHeaders: false,
 });
 
-const generationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: "Generation limit reached, please wait before trying again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
+// Cheap, high-frequency calls: editor save/load, asset & voice lists, social connect, plan/analyze,
+// status. A legit heavy session bursts many of these — keep it roomy.
+const generalLimiter = makeLimiter(1000, "Too many requests, please slow down for a moment.");
+// Heavy paid generation/render. Each costs credits and takes time, so a human can't realistically
+// hit this from one tab — it only catches multi-tab/scripted bursts.
+const generationLimiter = makeLimiter(40, "You're starting jobs very fast — please wait a moment before the next one.");
+// Unauthenticated / brute-force surface (webhooks): strict, per IP (default IP key).
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: WINDOW_MS, max: 40,
   message: { error: "Too many attempts, please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
+  standardHeaders: true, legacyHeaders: false,
 });
+
+// Heavy, expensive endpoints (paid generation + Remotion render). Missing one here just means it
+// falls under the generous general limiter — not a failure — so this is the protective layer on the
+// KNOWN-expensive routes, not an exhaustive classifier.
+const HEAVY_PATHS = [
+  /\/generate(\/|$)/,                         // *-video/generate + image studios + tts/generate
+  /\/produce(\/|$)/,                          // social / typography produce
+  /\/generate-scenes(\/|$)/,                  // product scene generation
+  /^\/render\/timeline(\/|$)/,                // editor export (Remotion)
+  /^\/promo-video\/(create|transcribe-th)(\/|$)/,
+  /^\/promo-video\/[^/]+\/render(\/|$)/,      // saas project render
+];
+const isHeavyPath = (p) => HEAVY_PATHS.some((re) => re.test(p));
 
 app.use("/api", (req, res, next) => {
-  // Exempt high-frequency, read-only polling endpoints from the general limiter:
-  // render status, the AutoPilot calendar auto-refresh, and the admin monitoring feed.
-  // All are authenticated GETs with no security risk and would otherwise trip the cap.
-  if (req.path.startsWith("/render/status/")) return next();
-  if (req.path.startsWith("/automation/")) return next();  // campaign list/detail polling (user + admin)
-  if (req.path === "/monitoring/metrics") return next();
+  const p = req.path; // mount-relative (e.g. "/ai-video/generate", "/render/status/…")
+  // High-frequency read-only polling — never limited.
+  if (p.startsWith("/render/status/")) return next();
+  if (p.startsWith("/automation/")) return next();
+  if (p === "/monitoring/metrics") return next();
+  // Unauthenticated webhook surface — strict per-IP.
+  if (p.startsWith("/webhooks/")) return authLimiter(req, res, next);
+  // Heavy paid jobs — bounded per-user.
+  if (isHeavyPath(p)) return generationLimiter(req, res, next);
+  // Everything else — generous per-user.
   return generalLimiter(req, res, next);
 });
-app.use("/api/generate", generationLimiter);
-app.use("/api/image-generation/generate", generationLimiter);
-app.use("/api/poster/generate", generationLimiter);
-app.use("/api/thumbnail/generate", generationLimiter);
-app.use("/api/outfit/generate", generationLimiter);
-app.use("/api/social-post/generate", generationLimiter);
-app.use("/api/banner/generate", generationLimiter);
-app.use("/api/product-ad/generate", generationLimiter);
-app.use("/api/tts/generate", generationLimiter);
-app.use("/api/webhooks", authLimiter);
 
 app.use("/renders", express.static(TEMP_DIR));
 
@@ -131,12 +146,14 @@ cleanTempDir();
 setInterval(cleanTempDir, 6 * 60 * 60 * 1000);
 
 /* ── Route mounts ── */
-app.use("/api/promo-video",       generationLimiter, saasVideoRouter);
-app.use("/api/product-video",    generationLimiter, productVideoRouter);
-app.use("/api/product-video",    generationLimiter, productVideoSceneRouter);
-app.use("/api/typography-video", generationLimiter, typographyVideoRouter);
-app.use("/api/social-video",    generationLimiter, socialVideoRouter);
-app.use("/api/ai-video",    generationLimiter, promptVideoRouter);
+// Rate limiting for these is handled centrally by the /api dispatcher above (heavy paths →
+// per-user generationLimiter), so the routers mount plainly here.
+app.use("/api/promo-video",      saasVideoRouter);
+app.use("/api/product-video",    productVideoRouter);
+app.use("/api/product-video",    productVideoSceneRouter);
+app.use("/api/typography-video", typographyVideoRouter);
+app.use("/api/social-video",     socialVideoRouter);
+app.use("/api/ai-video",         promptVideoRouter);
 app.use("/api/render",       renderRouter);
 app.use("/api/brand-kit",    brandKitRouter);
 app.use("/api/social",       socialRouter);
