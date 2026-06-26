@@ -311,6 +311,16 @@ registerHandler("generate_video", async (payload, job) => {
     if (Array.isArray(campaign.target_accounts) && campaign.target_accounts.length) {
       const { data: accts } = await supabaseAdmin.from("social_accounts")
         .select("id, platform, status").in("id", campaign.target_accounts).eq("user_id", userId);
+      // Self-heal: prune target ids whose account row no longer EXISTS (deleted on disconnect —
+      // a reconnect creates a new id). Only drop truly-missing rows, never ones that merely exist
+      // with a non-connected status (transient), so a temporary error can't wipe the targets.
+      const existingIds = (accts || []).map((a) => a.id);
+      if (existingIds.length !== campaign.target_accounts.length) {
+        await supabaseAdmin.from("automation_campaigns")
+          .update({ target_accounts: existingIds, updated_at: new Date().toISOString() })
+          .eq("id", campaignId);
+        console.log(`[generate] pruned ${campaign.target_accounts.length - existingIds.length} dead account id(s) from campaign ${campaignId}`);
+      }
       accounts = (accts || []).filter((a) => a.status === "connected").map((a) => ({ id: a.id, platform: a.platform }));
     }
     // Publish copy from the director (AI-written title/caption/hashtags), with topic fallbacks.
