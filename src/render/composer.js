@@ -21,6 +21,7 @@ import { fileURLToPath } from "url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as LucideIcons from "lucide-react";
+import { getClipPathCSS } from "../core/registries/shapeRegistry.js";
 import { durationToFrames } from "./timeModel.js";
 
 /**
@@ -97,6 +98,7 @@ export function compose(project, { width = 1080, height = 1920, fps = 30 } = {})
     content: l.content ?? null, style: l.style || {}, src: l.src ?? null, objectFit: l.objectFit ?? null,
     objectPosition: l.objectPosition ?? null, gradient: l.gradient ?? null, iconName: l.iconName ?? null,
     iconSvg: l.type === "icon" ? iconToSvg(l.iconName, Math.min(l.transform?.width ?? 120, l.transform?.height ?? 120), l.style?.color) : null,
+    clipPath: l.maskShape ? getClipPathCSS(l.maskShape) : (l.clipPath ?? null),
     captionStyle: l.captionStyle || {}, segments: l.segments || null,
     filter: l.filter ?? null, backdropFilter: l.backdropFilter ?? null,
     mixBlendMode: l.mixBlendMode ?? l.blendMode ?? null,
@@ -210,6 +212,7 @@ const nodes = LAYERS.map((L)=>{
   if(L.boxShadow) el.style.boxShadow=L.boxShadow;
   if(L.backdropFilter) el.style.backdropFilter=L.backdropFilter;
   if(L.mixBlendMode) el.style.mixBlendMode=L.mixBlendMode;
+  if(L.clipPath) el.style.clipPath=L.clipPath; // maskShape (e.g. pentagon) → CSS clip-path
   el.style.display="none";
   stage.appendChild(el);
   return {el,L};
