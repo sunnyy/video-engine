@@ -16,6 +16,21 @@ export const router = express.Router();
 
 const INFLIGHT_TYPES = ["generate_video", "render_timeline", "publish_post"];
 
+// Self-heal: drop target_accounts ids whose social_accounts row no longer EXISTS (deleted on a
+// disconnect before reconnect made a new id). Runs on read so the "ACCOUNTS" count corrects itself
+// when the page loads — no manual cleanup. Only removes truly-missing rows, never a row that merely
+// exists with a non-connected status, so a transient error can't wipe the campaign's targets.
+async function pruneDeadTargetAccounts(campaign) {
+  const targets = campaign?.target_accounts || [];
+  if (!targets.length) return campaign;
+  const { data: accts } = await supabaseAdmin.from("social_accounts").select("id").in("id", targets).eq("user_id", campaign.user_id);
+  const existing = (accts || []).map((a) => a.id);
+  if (existing.length === targets.length) return campaign; // nothing dead
+  await supabaseAdmin.from("automation_campaigns")
+    .update({ target_accounts: existing, updated_at: new Date().toISOString() }).eq("id", campaign.id);
+  return { ...campaign, target_accounts: existing };
+}
+
 // Count queued + published per campaign so the list cards can show totals at a glance.
 async function campaignCounts(campaignId) {
   const [{ count: inflight }, { count: published }] = await Promise.all([
@@ -29,7 +44,10 @@ async function campaignCounts(campaignId) {
 router.get("/campaigns", requireAuth, async (req, res) => {
   try {
     const campaigns = await listCampaigns(req.user.id);
-    const withCounts = await Promise.all(campaigns.map(async (c) => ({ ...c, counts: await campaignCounts(c.id), queued: await getQueuedCount(c.id) })));
+    const withCounts = await Promise.all(campaigns.map(async (c0) => {
+      const c = await pruneDeadTargetAccounts(c0);
+      return { ...c, counts: await campaignCounts(c.id), queued: await getQueuedCount(c.id) };
+    }));
     res.json({ campaigns: withCounts });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -45,8 +63,9 @@ router.post("/campaigns", requireAuth, async (req, res) => {
 /* ── Detail feed (campaign + inflight jobs + published posts + queue + events) ── */
 router.get("/campaigns/:id", requireAuth, async (req, res) => {
   try {
-    const campaign = await getCampaignForUser(req.user.id, req.params.id);
+    let campaign = await getCampaignForUser(req.user.id, req.params.id);
     if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+    campaign = await pruneDeadTargetAccounts(campaign);
     const [{ data: jobs }, { data: posts }] = await Promise.all([
       supabaseAdmin.from("jobs").select("id, type, status, progress, created_at")
         .in("type", INFLIGHT_TYPES).in("status", ["queued", "running"])
