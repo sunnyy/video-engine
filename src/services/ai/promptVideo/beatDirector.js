@@ -143,9 +143,9 @@ THE SCENE SYSTEM:
 - A "beat" is one SCENE: one visual moment with words spoken over it. Divide the narration into scenes by MEANING — start a new scene wherever the idea, subject, or image should change. Let the CONTENT decide how many scenes there are and how long each runs; there is no fixed scene count and no per-scene word limit. Some scenes carry a few words, some carry a full sentence — whatever the moment needs.
 - FAST PACING — EVERY scene is a DISTINCT visual, and NO visual may stay on screen longer than ~4 seconds (a longer hold is dead weight in short-form). Cut to a NEW, different visual every 2–4 seconds. That means roughly ${Math.max(3, Math.round(targetDuration / 3))} distinct visuals for this ${targetDuration}s video. Give EACH scene its OWN visual — its own image_prompt OR shot_query OR subject_entity — never let one backdrop carry several scenes.
 - "continues_previous" is a RARE exception, NOT the rule: use it only when two adjacent scenes are genuinely one quick moment of the SAME visual that together last under ~4s (e.g. a two-line title landing). NEVER chain 3+ scenes onto one held visual, and never hold a single visual past ~4s. When unsure, CUT to a fresh, distinct visual — variety beats holding.
-- RUNTIME IS ABSOLUTE — this is a ${targetDuration}-SECOND video. Assume narration is spoken at exactly 145 words per minute, so the COMPLETE narration must be about ${targetWords} WORDS total — that is the strict budget for what fits in ${targetDuration}s. COUNT your words; stay within a few words of ${targetWords}. This is a budget for the WHOLE script, NOT a per-scene limit — scenes can be any length as long as they SUM to ≈${targetWords} words.
-- If the story doesn't fit ${targetWords} words, SHORTEN the story (fewer points, a tighter angle) — never speak faster and never overrun. Meeting the ${targetDuration}-second runtime matters MORE than including every research fact; use the research for ACCURACY, not as a checklist to cram in.
-- SIZE THE STORY TO THE BUDGET: ${targetWords} words is short for a ${targetDuration}s slot — usually one tight idea (a hook, a single point, a closing line) for short runtimes, more substance for longer ones. Don't pad to fill the time and don't overrun to be "complete" — fitting ${targetWords} words comes first.
+- TARGET RUNTIME ≈ ${targetDuration}s — a goal to PACE toward, not a hard cap. As a rough guide, narration runs ~145 words/minute, so ${targetDuration}s is ABOUT ${targetWords} words — use that only to gauge your pacing. Landing a little over is completely fine (a ${targetDuration}s request is happy anywhere up to ~${Math.round(targetDuration * 1.4)}s); just don't drift to roughly double the target.
+- RESPECT THE NATURE OF THE TOPIC OVER THE CLOCK. Read what the topic actually IS and deliver THAT in full — the runtime bends to the content, not the reverse. Whatever the request promises by its nature (a list covers all its items, a story reaches its ending, an explainer actually explains, a comparison weighs both sides, a how-to gives every step), deliver the whole of it; if it names a quantity that's just one such promise to keep. NEVER quietly drop part of what the topic is — a point, the hook, the CTA — to save seconds. When the content is fuller than the time, make each part TIGHTER and punchier (fewer words, zero filler) so all of it still fits close to the target. A 10-second video can still carry a 5-item topic if each item is a few crisp words. PACE it down, don't CUT it down.
+- Don't pad to fill time and don't ramble to sound "complete": say exactly what the topic needs, as tightly as the runtime wants, then stop. The aim is to honor BOTH the request AND a runtime near ${targetDuration}s — and when they tension, keep the content and tighten the words.
 - The viewer must never rest: every scene has motion, every cut has a transition.
 - Every beat's visual_concept must be DISTINCT — different subject, different compositional idea, different energy from its neighbors. Two beats that would look alike is a failure.
 
@@ -201,7 +201,8 @@ IMAGE PROMPT RULE — diffusion models garble any text they try to render:
 image_prompts must describe scenes WITHOUT text-bearing objects. NEVER request documents, stamps, certificates, posters, billboards, newspapers, books with visible covers, screens with UI, or signs. Describe places, people, objects, atmosphere. Anything that needs words on screen belongs in an "artifact" beat where WE render the text correctly in HTML.
 
 NARRATIVE ARC:
-- Beat 0: the hook — a question, bold claim, or striking number that stops the scroll. If the subject is at all depictable (a person, animal, place, object, or an "X vs Y"), OPEN ON AN IMAGE of it with the hook line overlaid — e.g. a cats topic opens on actual cats, never a bare text card. A pure-typography hook is only for genuinely abstract topics with nothing to show.
+- DELIVER WHAT THE REQUEST PROMISES. Whatever shape the topic asks for, the video must actually be that thing — an explainer must explain, a story must tell the story, a comparison must compare both sides, a how-to must give the steps. If it names a specific quantity (e.g. "5 facts", "3 reasons", "top 7"), cover that many distinct points — the promised count and the delivered count must match, never silently fewer. This is about honoring the user's intent, not about any one format; if time is tight, make each part terser, don't drop parts.
+- Beat 0: the hook — and the hook MUST FRAME THE PREMISE, not just tease. In its opening words the viewer has to understand WHAT this video is about and WHAT they're about to get — the subject named and the promise made — so they know why they're watching. A scroll-stopping question, bold claim, or number is great, but it must land ON the topic and set up what follows (e.g. "You think you know Shiva? Here are 5 things even devotees miss" — subject + promise — NOT a bare "Have you ever wondered…?" that dangles and then jumps into content). NEVER cold-open straight into explaining/listing as if the viewer already knows the context — they don't; an unframed video that just starts spitting facts loses people. The opening line must stand on its own as a complete framing thought. If the subject is at all depictable (a person, animal, place, object, or an "X vs Y"), OPEN ON AN IMAGE of it with the framing hook overlaid — e.g. a cats topic opens on actual cats, never a bare text card. A pure-typography hook is only for genuinely abstract topics with nothing to show.
 - Build: alternate substance (facts, contrasts) with personality (annotations, punches) — mostly over imagery.
 - Final beat: the CTA from the research's cta_idea.
 
@@ -263,20 +264,21 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
     throw new Error(`beat director returned invalid JSON: ${e.message}`);
   }
 
-  // RUNTIME ENFORCEMENT — the prompt's word budget is necessary but not sufficient (LLMs can't
-  // feel speaking time), so we MEASURE the draft and, if it would run well over the requested
-  // duration, re-ask ONCE or twice for a shorter narration. This bounds TOTAL length only — the
-  // narration stays flowing prose, so it never reintroduces the per-scene list-speak. Never trim
-  // the finished script in code (that lops off the ending); always have the model rewrite shorter.
+  // RUNTIME SAFETY NET — only catches an EGREGIOUS overrun (roughly double the target), never
+  // routine "a bit long". LLMs can't feel speaking time, so if a draft is way past the runtime we
+  // re-ask ONCE or twice to TIGHTEN — but the regen keeps EVERY requested point (facts, hook, CTA)
+  // and only cuts filler words, so it never drops the content the user asked for and never trims
+  // the script in code (that lops off the ending). A draft within the generous band is accepted.
   const targetWords = budgetWords(targetDuration);
+  const ACCEPT_WORDS = Math.round(targetWords * 1.6); // ~1.6× ≈ comfortably within the "a bit over is fine" band
   for (let attempt = 1; attempt <= 2; attempt++) {
     const words = narrationWordCount(plan);
     const estSeconds = Math.round((words / WORDS_PER_MINUTE) * 60);
-    if (words <= Math.round(targetWords * 1.2)) break; // within ~20% of budget — accept
-    console.warn(`[ai-video/director] draft ${words}w ≈ ${estSeconds}s > target ${targetDuration}s (${targetWords}w) — runtime-fit regen ${attempt}/2`);
+    if (words <= ACCEPT_WORDS) break; // within the generous band — accept, do not meddle
+    console.warn(`[ai-video/director] draft ${words}w ≈ ${estSeconds}s >> target ${targetDuration}s (band ≤ ${ACCEPT_WORDS}w) — tighten regen ${attempt}/2`);
     try {
       const tighter = await runDirectorCompletion(prompt,
-        `RUNTIME FIX — your narration is ${words} words ≈ ${estSeconds} seconds, but this is a ${targetDuration}-second video, which is about ${targetWords} words at 145 wpm. Rewrite the ENTIRE plan (same JSON schema) so the narration is about ${targetWords} words: SHORTEN the story — fewer points, a tighter angle, cut whole scenes — do NOT just compress wording. Keep it ONE flowing, naturally-spoken narration (real connectors, never clipped headline fragments). Meeting the ${targetDuration}-second runtime is more important than covering every fact.`);
+        `RUNTIME — your narration is ${words} words ≈ ${estSeconds} seconds, which is far over the ~${targetDuration}-second target. TIGHTEN it (same JSON schema): keep EVERY point the topic calls for — the hook, every requested fact/item, and the CTA — but make each line punchier by cutting filler words and shortening phrasing, so the whole thing lands closer to ${targetDuration}s (≈${targetWords} words is the guide). Do NOT drop any requested point and do NOT add new ones. Keep it ONE flowing, naturally-spoken narration with real connectors — never clipped headline fragments.`);
       if (Array.isArray(tighter?.beats) && tighter.beats.length >= 3 && narrationWordCount(tighter) < words) plan = tighter;
       else break; // no usable improvement — keep the best we have
     } catch { break; }

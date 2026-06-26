@@ -36,9 +36,26 @@ async function wikiExtract(title) {
   } catch { return null; }
 }
 
-// Top matching articles for the prompt → their intro extracts, as ground truth.
+// Strip instructional + listicle scaffolding to isolate the real SUBJECT for grounding.
+// "Generate a video on 5 unknown facts about Lord Shiva" → "Lord Shiva". Searching the full
+// verbose instruction mis-ranks Wikipedia (it matched the Brahmastra film / Shiva Trilogy novels
+// over the deity), and since grounding is treated as ground truth, that poisons the whole brief.
+function coreSubject(prompt) {
+  let s = String(prompt || "").trim();
+  // leading "(please) generate/make/create/… a short video (on|about|of|for|:) …"
+  s = s.replace(/^\s*(please\s+)?(generate|make|create|build|produce|do|write|give me|i want|i need|can you (?:make|create)?)\b[^]*?\b(video|short|reel|clip|animation)\b\s*(on|about|of|for|covering|explaining|showing|:)?\s*/i, "");
+  // leading listicle scaffold: "(top|the) 5 [unknown/amazing/…] facts/reasons/tips/… (about|on|of) …"
+  s = s.replace(/^\s*(top\s+|the\s+)?\d+\s+(?:[a-z][a-z\-]*\s+){0,3}(facts?|reasons?|tips?|ways?|things?|secrets?|myths?|examples?|lessons?|rules?|steps?|signs?|mistakes?|benefits?|types?|kinds?)\s+(about|on|of|in|to|for|behind)\s+/i, "");
+  s = s.trim().replace(/[.?!,:;\s]+$/, "");
+  return s.length >= 2 ? s : String(prompt || "").trim();
+}
+
+// Top matching articles for the SUBJECT → their intro extracts, as ground truth. We search the
+// cleaned subject (not the raw instruction) so grounding stays on the thing the user actually means.
 async function fetchGrounding(prompt) {
-  const titles = await wikiSearchTitles(prompt, 3);
+  const subject = coreSubject(prompt);
+  let titles = await wikiSearchTitles(subject, 3);
+  if (!titles.length && subject !== prompt) titles = await wikiSearchTitles(prompt, 3);
   if (!titles.length) return "";
   const extracts = (await Promise.all(titles.map(wikiExtract))).filter(Boolean);
   if (!extracts.length) return "";
@@ -62,6 +79,11 @@ function buildMessages(prompt, grounding) {
       {
         role: "system",
         content: `You are a research director for a short-form video studio. Given a video request, produce a tight research brief the creative team will build from. Use your knowledge of the subject AND the SOURCE MATERIAL provided.
+
+LITERAL INTENT — answer the request as it was actually asked, this comes FIRST:
+- The subject is the PRIMARY, most widely-known referent of the user's words. "Lord Shiva" means the Hindu deity — NOT a film, novel, or character named after him. Never drift to a tangential, modern, or pop-culture reinterpretation of the subject unless the user explicitly asks for it. If you find yourself reframing the topic into something cleverer than what was asked, stop and answer the literal request.
+- HONOR EXPLICIT STRUCTURE. If the request specifies a count or format — "5 facts", "3 reasons", "top 7 …", "myths vs facts" — deliver exactly that: that many real, on-subject points in "facts", in a sensible order, and set "angle" to match (e.g. "countdown"). Do not substitute a different framing.
+- SOURCE MATERIAL is a helper, not a mandate: if a provided extract is about a DIFFERENT sense of the term than the user clearly means (e.g. a movie when they mean the deity), IGNORE that extract and use your own knowledge of the real subject.
 
 ACCURACY — the most important rule:
 - When SOURCE MATERIAL is provided, ground your facts in it and NEVER contradict it.

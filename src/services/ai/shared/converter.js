@@ -88,11 +88,47 @@ let _browser = null;
 
 async function getBrowser() {
   if (_browser && _browser.connected) return _browser;
+  // Container-hardened flags. In a fixed-size container (e.g. the Railway worker) Chrome's
+  // default multi-process model spawns a GPU process + zygote + per-tab renderers, each with
+  // many threads — a burst of these exhausts the container's PID/thread budget and Chrome
+  // dies with "pthread_create: Resource temporarily unavailable (11)". These flags collapse
+  // Chrome to a minimal process/thread footprint; we only need it to lay out + measure DOM.
   _browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--font-render-hinting=none"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--font-render-hinting=none",
+      "--disable-gpu",                  // no GPU process (the "GPU process isn't usable" crashes)
+      "--no-zygote",                    // don't fork a zygote (the "Zygote could not fork" errors)
+      "--disable-software-rasterizer",
+      "--disable-extensions",
+      "--mute-audio",
+      "--no-first-run",
+    ],
   });
   return _browser;
+}
+
+// ── Concurrency gate ────────────────────────────────────────────────────────────
+// Callers measure many beats with Promise.all(beats.map(measureSceneHTML)). Against one
+// shared browser that opens a dozen pages AT ONCE — each page spins up Chrome threads — and
+// in a small container that burst blows past the PID/thread ceiling (EAGAIN). We cap how many
+// measures run concurrently here, so EVERY caller (AI Video, Social, Product, …) is bounded
+// without each having to know. Default 2; override with MEASURE_CONCURRENCY.
+const MEASURE_CONCURRENCY = Math.max(1, parseInt(process.env.MEASURE_CONCURRENCY || "2", 10));
+let _active = 0;
+const _waiters = [];
+async function acquireSlot() {
+  if (_active < MEASURE_CONCURRENCY) { _active++; return; }
+  await new Promise((resolve) => _waiters.push(resolve));
+  _active++;
+}
+function releaseSlot() {
+  _active--;
+  const next = _waiters.shift();
+  if (next) next();
 }
 
 export async function closeMeasureBrowser() {
@@ -220,8 +256,19 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
   const canvasH = canvas.height ?? CANVAS_H_DEFAULT;
   if (!htmlString) return [];
 
-  const browser = await getBrowser();
-  const page = await browser.newPage();
+  // Bound concurrent measures so a Promise.all over many beats can't open a dozen Chrome
+  // pages at once and exhaust the container's PID/thread budget.
+  await acquireSlot();
+  // If browser launch / new page fails (the very failure we're hardening against), release
+  // the slot here — otherwise a failed acquire leaks a slot and eventually deadlocks measuring.
+  let page;
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+  } catch (e) {
+    releaseSlot();
+    throw e;
+  }
   let collected;
   try {
     await page.setViewport({ width: canvasW, height: canvasH, deviceScaleFactor: 1 });
@@ -250,6 +297,7 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     collected = await page.evaluate(collectInPage, canvasW, canvasH);
   } finally {
     try { await page.close(); } catch {}
+    releaseSlot();
   }
 
   const { nodes, bodyBg } = collected;
