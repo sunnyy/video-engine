@@ -145,6 +145,9 @@ const easeOutQuart   = (t)=>1-Math.pow(1-t,4);
 const easeInQuart    = (t)=>t*t*t*t;
 const easeInOutQuart = (t)=>t<0.5?8*t*t*t*t:1-Math.pow(-2*t+2,4)/2;
 const clamp01 = (x)=>Math.max(0,Math.min(1,x));
+// Devanagari fallback so Hindi on-screen/captions render real glyphs (our display fonts are
+// Latin-only → tofu otherwise). Latin keeps the primary face; Devanagari per-glyph-falls-back to Noto.
+const withDeva = (f)=>{ const p=(f||"Outfit").split(",")[0].trim().replace(/['"]/g,""); return '"'+p+'", "Noto Sans Devanagari", sans-serif'; };
 
 function buildEntrance(type,p,i){ i=clamp01(i==null?1:i); const e=easeOutQuart(p),ef=easeInOutQuart(p);
   switch(type){
@@ -191,7 +194,7 @@ const nodes = LAYERS.map((L,i)=>{
   const el=document.createElement("div"); el.className="vq-layer"; el.style.zIndex=L.zIndex;
   if(L.type==="text"){
     const s=L.style||{};
-    Object.assign(el.style,{fontFamily:s.fontFamily||"Outfit",fontSize:(s.fontSize||48)+"px",fontWeight:s.fontWeight||700,
+    Object.assign(el.style,{fontFamily:withDeva(s.fontFamily),fontSize:(s.fontSize||48)+"px",fontWeight:s.fontWeight||700,
       fontStyle:s.fontStyle||"normal",color:s.color||"#fff",textAlign:s.textAlign||"center",lineHeight:s.lineHeight||1.2,
       letterSpacing:(s.letterSpacing||0)+"px",textTransform:s.textTransform||"none",background:s.background||"",
       borderRadius:(s.borderRadius||0)+"px",padding:(s.padding||0)+"px",textShadow:s.textShadow||"",
@@ -208,7 +211,7 @@ const nodes = LAYERS.map((L,i)=>{
       Object.assign(img.style,{width:"100%",height:"100%",objectFit:L.objectFit||"cover",objectPosition:L.objectPosition||""}); el.appendChild(img); }
   } else if(L.type==="gradient"){ el.style.background=L.gradient||"transparent";
   } else if(L.type==="captions"){ /* content set per-frame */ const s=L.captionStyle||{};
-    Object.assign(el.style,{fontFamily:s.fontFamily||"Outfit",fontSize:(s.fontSize||48)+"px",fontWeight:s.fontWeight||700,
+    Object.assign(el.style,{fontFamily:withDeva(s.fontFamily),fontSize:(s.fontSize||48)+"px",fontWeight:s.fontWeight||700,
       color:s.color||"#fff",textAlign:s.textAlign||"center",background:s.background||"rgba(0,0,0,0.5)",
       borderRadius:(s.borderRadius||8)+"px",padding:(s.padding||8)+"px"});
   } else if(L.type==="icon"){
