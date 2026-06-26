@@ -61,6 +61,32 @@ export async function sweepStaleJobs(staleMs = 600_000) {
   return data.length;
 }
 
+/**
+ * Re-queue specific jobs left 'running' when the worker is asked to drain (Railway SIGTERM on
+ * redeploy). Status-guarded (.eq("status","running")) so a job that completed during the drain
+ * grace window is never resurrected. This lets a redeploy resume interrupted work in seconds
+ * instead of waiting out the 10-minute stale sweeper. ONE bulk UPDATE — no polling, no per-row
+ * round-trips. attempts is left as-is (claim_job increments on the next claim).
+ */
+export async function requeueRunning(ids) {
+  if (!ids?.length) return 0;
+  const now = new Date().toISOString();
+  // Only rows still 'running' (a job that completed in the grace window must not be resurrected).
+  const { data: rows } = await supabaseAdmin.from("jobs")
+    .select("id, attempts").in("id", ids).eq("status", "running");
+  if (!rows?.length) return 0;
+  let n = 0;
+  for (const r of rows) {
+    // Decrement attempts so a deploy interruption doesn't burn the retry budget — claim_job
+    // re-increments on the next claim, so a clean deploy nets zero attempts against the job.
+    const { error } = await supabaseAdmin.from("jobs")
+      .update({ status: "queued", run_at: now, attempts: Math.max(0, (r.attempts || 0) - 1), error: "requeued: worker draining (deploy)", updated_at: now })
+      .eq("id", r.id).eq("status", "running");
+    if (!error) n++;
+  }
+  return n;
+}
+
 /** Cancel all QUEUED jobs for a campaign (Stop). Running jobs are left to finish. Returns count. */
 export async function cancelCampaignJobs(campaignId) {
   const { data } = await supabaseAdmin.from("jobs")

@@ -10,7 +10,7 @@
  */
 import "./middleware/shared.js";        // initialises env + supabaseAdmin
 import "./jobs/handlers.js";            // side-effect: registers all job handlers
-import { claimNext, complete, fail, sweepStaleJobs } from "./jobs/queue.js";
+import { claimNext, complete, fail, sweepStaleJobs, requeueRunning } from "./jobs/queue.js";
 import { isKillSwitchOn, touchWorkerHeartbeat } from "./jobs/flags.js";
 import { getHandler, registeredTypes } from "./jobs/registry.js";
 import { tick as schedulerTick } from "./services/automation/scheduler.js";
@@ -43,9 +43,20 @@ const OAUTH_HEALTH_MS = Math.max(600_000, parseInt(process.env.OAUTH_HEALTH_MS |
 
 let active  = 0;
 let running = true;
+// id → type of jobs currently in flight, so a SIGTERM drain can re-queue the safe-to-resume ones.
+const activeJobs = new Map();
+
+// Job types that are SAFE to auto-requeue when the worker is drained mid-flight (idempotent or
+// cheap to redo). render_timeline is keyed by renderId=jobId so a re-run upserts the same output.
+// publish_post is intentionally EXCLUDED — re-running could double-upload to YouTube; it's left to
+// the 10-min stale sweeper instead. Override via DRAIN_REQUEUE_TYPES (comma-separated).
+const DRAIN_REQUEUE_TYPES = new Set(
+  (process.env.DRAIN_REQUEUE_TYPES || "render_timeline").split(",").map((s) => s.trim()).filter(Boolean),
+);
 
 async function runJob(job) {
   active++;
+  activeJobs.set(job.id, job.type);
   try {
     const handler = getHandler(job.type);
     if (!handler) throw new Error(`no handler registered for job type "${job.type}"`);
@@ -58,6 +69,7 @@ async function runJob(job) {
     if (!retry) notifyJobFailed(job, err);
   } finally {
     active--;
+    activeJobs.delete(job.id);
   }
 }
 
@@ -106,12 +118,23 @@ const oauthTimer = setInterval(runOAuthHealth, OAUTH_HEALTH_MS);
 oauthTimer.unref?.();
 setTimeout(runOAuthHealth, 30_000); // first pass shortly after boot
 
-// Graceful shutdown — Railway sends SIGTERM on redeploy. Stop claiming, let active
-// jobs finish (in-flight rows stay 'running'; a stuck one can be requeued by a sweeper).
-function shutdown(sig) {
+// Graceful shutdown — Railway sends SIGTERM on redeploy. Stop claiming, then immediately
+// re-queue the drain-safe in-flight jobs so the NEXT container resumes them in seconds instead
+// of waiting out the 10-min stale sweeper (this is what left a Publish render stuck at 80% after
+// a deploy). Non-drain-safe jobs (e.g. publish_post) are left to finish or to the sweeper.
+async function shutdown(sig) {
   if (!running) return;
-  console.log(`[worker] ${sig} — draining ${active} active job(s)…`);
   running = false;
+  console.log(`[worker] ${sig} — draining ${active} active job(s)…`);
+
+  const resumeIds = [...activeJobs].filter(([, type]) => DRAIN_REQUEUE_TYPES.has(type)).map(([id]) => id);
+  if (resumeIds.length) {
+    try {
+      const n = await requeueRunning(resumeIds);
+      if (n) console.log(`[worker] re-queued ${n} interrupted job(s) for fast resume on next deploy`);
+    } catch (e) { console.warn("[worker] drain requeue failed:", e.message); }
+  }
+
   const start = Date.now();
   const wait = setInterval(() => {
     if (active === 0 || Date.now() - start > 25_000) {
@@ -121,7 +144,7 @@ function shutdown(sig) {
     }
   }, 500);
 }
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT",  () => shutdown("SIGINT"));
+process.on("SIGTERM", () => { shutdown("SIGTERM"); });
+process.on("SIGINT",  () => { shutdown("SIGINT"); });
 
 loop().catch((e) => { console.error("[worker] fatal:", e); process.exit(1); });
