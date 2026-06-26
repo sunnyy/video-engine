@@ -652,6 +652,43 @@ export async function runPromptPipeline(params, onStep) {
   applyTransitions(finalTimeline.layers, beats);
   await attachTransitionSfx(finalTimeline.layers, beats, { label: "ai-video" });
 
+  // ── Backdrop continuity — NEVER show black ────────────────────────────────
+  // The opaque scene media is the full-canvas image/video at z0; the gradients are scrims (mostly
+  // transparent), so a gap in media = black frames. Gaps happen when a beat's asset/design fails
+  // (a hole between scenes) or when the audio runs longer than the beats (a black tail — common
+  // with Hindi TTS, where speech is longer than the estimated windows). Fill every gap in [0,
+  // totalDur] by HOLDING the previous scene's image over it (or an opaque palette backdrop if the
+  // preceding media is a video / there's none yet).
+  {
+    const fullCanvas = (l) => (l.transform?.width ?? 0) >= canvas.width * 0.95 && (l.transform?.height ?? 0) >= canvas.height * 0.95;
+    const isMedia = (l) => (l.type === "image" || l.type === "video") && fullCanvas(l);
+    const media = finalTimeline.layers.filter(isMedia).sort((a, b) => (a.start || 0) - (b.start || 0));
+    const opaqueBg = palette?.bg || palette?.background || palette?.base || "#0b0b12";
+    const gradFill = `linear-gradient(160deg, ${opaqueBg} 0%, #000 100%)`;
+    const fills = [];
+    let cursor = 0, prevImg = null;
+    const fill = (s, e) => {
+      if (e - s < 0.08) return;
+      if (prevImg) {
+        fills.push({ ...JSON.parse(JSON.stringify(prevImg)), id: `hold_${s.toFixed(2)}`, trackId: "track_backdrop_fill", start: s, end: e, zIndex: 0, keyframes: {}, transition: null, sfx: null });
+      } else {
+        fills.push({ id: `bgfill_${s.toFixed(2)}`, trackId: "track_backdrop_fill", type: "gradient", name: "Backdrop", start: s, end: e, zIndex: 0, visible: true, locked: false, gradient: gradFill, keyframes: {}, transition: null, sfx: null,
+          transform: { x: 0, y: 0, width: canvas.width, height: canvas.height, opacity: 1, scale: 1, blur: 0, rotation: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" } });
+      }
+    };
+    for (const m of media) {
+      const s = m.start || 0, e = m.end || 0;
+      if (s > cursor + 0.08) fill(cursor, s);
+      if (m.type === "image") prevImg = m; // only images are safe to freeze-hold over a gap
+      cursor = Math.max(cursor, e);
+    }
+    if (cursor < totalDur - 0.08) fill(cursor, totalDur);
+    if (fills.length) {
+      console.log(`[ai-video] backdrop continuity: filled ${fills.length} gap(s) (no black frames)`);
+      finalTimeline.layers.unshift(...fills);
+    }
+  }
+
   if (voiceoverUrl) {
     finalTimeline.layers.push({
       id: "voiceover_full", trackId: "track_voiceover",
