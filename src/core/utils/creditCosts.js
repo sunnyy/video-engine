@@ -34,7 +34,7 @@ export const CREDIT_COSTS = {
   talking_head:          20,                         // standalone Talking Head — NOMINAL display only; real charge is duration-based (creditsForTalkingHead)
   // Dashboard video services (plan → produce)
   ai_video:              75,  // Prompt to Video / AI Video
-  social_video:          15,  // Social Video
+  social_video:          30,  // Social Video
   typography_video:      15,  // Typography Video
   // Product Video — per scene, by visual mode (hybrid/video use LTX clips → cost far more than image scenes)
   product_video_per_scene: { image: 20, hybrid: 35, video: 50 },

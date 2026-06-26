@@ -17,7 +17,7 @@ export const serviceCogs = {
   // → per-duration ≈ 15s $0.30 / 30s $0.53 / 45s $0.77 / 60s $0.99.
   ai_video:         { creditPrice: 30, usd: 0.53, ref: "30s", apis: "GPT-4.1 script + N×GPT-5.4 scenes + Fal images + TTS + render", measuredAt: "2026-06-23 (41s run)" },
   typography_video: { creditPrice: 30, usd: 0.50, ref: "30s", apis: "GPT-4.1 script + N×GPT-5.4 scenes + TTS + render (no images)", measuredAt: null },
-  social_video:     { creditPrice: 15, usd: 0.30, ref: "flat 15s band", apis: "GPT-4.1 + GPT-5.4 scenes + images + TTS + render", measuredAt: "2026-06-23 (derived)" },
+  social_video:     { creditPrice: 30, usd: 0.30, ref: "flat 15s band", apis: "GPT-4.1 + GPT-5.4 scenes + images + TTS + render", measuredAt: "2026-06-23 (derived)" },
 
   // ── Product Video (per scene by mode: image 20 / hybrid 35 / video 50) — ref = 3 image scenes ──
   product_video:    { creditPrice: 60,  usd: 0.41, ref: "3 image scenes", apis: "GPT-4.1 vision + per-scene GPT-5.4 overlay + nano-banana image + TTS + render; hybrid/video add LTX clips", measuredAt: null },

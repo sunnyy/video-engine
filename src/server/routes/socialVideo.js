@@ -1,7 +1,7 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runSocialPipeline, planSocial, produceSocial } from "../../services/ai/socialVideo/pipelineOrchestrator.js";
-import { creditsForDuration } from "../../core/utils/creditCosts.js";
+import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
 
@@ -20,7 +20,7 @@ router.post("/generate", requireAuth, async (req, res) => {
 
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
-  const cost = creditsForDuration(15); // short-form flat (no duration picker) — shortest band
+  const cost = CREDIT_COSTS.social_video; // short-form flat (no duration picker)
 
   try {
     const deduction = await deductCredits(userId, cost, "social_video", "Social video generation", projectId || null);
@@ -75,7 +75,7 @@ router.post("/produce", requireAuth, async (req, res) => {
   res.flushHeaders();
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
-  const cost = creditsForDuration(15); // short-form flat (no duration picker) — shortest band
+  const cost = CREDIT_COSTS.social_video; // short-form flat (no duration picker)
 
   try {
     const deduction = await deductCredits(userId, cost, "social_video", "Social video generation", projectId || null);

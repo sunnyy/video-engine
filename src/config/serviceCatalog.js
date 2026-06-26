@@ -29,7 +29,7 @@ export const SERVICE_CATALOG = [
     route: "/promo-video", creditKey: "promo_video", pricing: { model: "scene", tiers: CREDIT_COSTS.promo_video }, publishable: false,
     blurb: "Turn your product or website into a polished promo (includes URL mode)." },
   { key: "social_video", name: "Social Video", category: "create", tier: 1, featured: true, beta: false,
-    route: "/social-video", creditKey: "social_video", pricing: durationPricing, publishable: false,
+    route: "/social-video", creditKey: "social_video", pricing: { model: "flat", credits: CREDIT_COSTS.social_video }, publishable: false,
     blurb: "Repurpose a post or any content into a ready-to-publish video." },
 
   // ── Tier 2 — more video types (valuable, less proven; listed, not featured) ──
