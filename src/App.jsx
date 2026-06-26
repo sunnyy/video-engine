@@ -20,6 +20,8 @@ import RefundPolicy    from "./pages/legal/RefundPolicy";
 import About           from "./pages/About";
 import FAQ             from "./pages/FAQ";
 import Support         from "./pages/Support";
+import HelpCenter      from "./pages/HelpCenter";
+import HelpArticle     from "./pages/HelpArticle";
 import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
@@ -74,6 +76,8 @@ import RefundClaims   from "./pages/admin/RefundClaims";
 import AnnouncementCenter from "./pages/admin/AnnouncementCenter";
 import AdminSupport   from "./pages/admin/Support";
 import AdminReferrals from "./pages/admin/Referrals";
+import AdminCoupons   from "./pages/admin/Coupons";
+import AdminHelpCenter from "./pages/admin/HelpCenter";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -155,6 +159,8 @@ export default function App() {
         <Route path="/"              element={<LandingPage />} />
         <Route path="/about"         element={<About />} />
         <Route path="/faq"           element={<FAQ />} />
+        <Route path="/help"          element={<HelpCenter />} />
+        <Route path="/help/:slug"    element={<HelpArticle />} />
         <Route path="/terms"         element={<TermsOfService />} />
         <Route path="/privacy"       element={<PrivacyPolicy />} />
         <Route path="/refunds"       element={<RefundPolicy />} />
@@ -225,6 +231,8 @@ export default function App() {
                 <Route path="/admin/announcements"   element={<AnnouncementCenter />} />
                 <Route path="/admin/support"         element={<AdminSupport />} />
                 <Route path="/admin/referrals"       element={<AdminReferrals />} />
+                <Route path="/admin/coupons"         element={<AdminCoupons />} />
+                <Route path="/admin/help"            element={<AdminHelpCenter />} />
               </>
             ) : (
               <Route path="/admin/*" element={<Navigate to="/dashboard" />} />
