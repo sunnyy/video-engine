@@ -1,13 +1,19 @@
 /**
  * @vidquence/render — frameDriver.js
  *
- * Loads the composed page once in headless Chrome, then for every frame calls the page's
- * deterministic window.__seekTo(frame/fps) and screenshots the stage. Because every frame is
- * a pure function of its index, output is reproducible and safe to chunk/parallelise later.
+ * Renders every composite frame by driving the composed page's deterministic
+ * window.__seekTo(frame/fps) and screenshotting the stage. Because each frame is a pure
+ * function of its index, the work parallelises safely: we split the frame range into
+ * contiguous chunks and render them concurrently across several SEPARATE browser instances.
  *
- * Reuses the same container-hardened launch flags as the measure step (htmlMeasure) — the
- * minimal process/thread footprint that prevented the "pthread_create: Resource temporarily
- * unavailable" crash on the worker.
+ * NOTE: it must be separate browser *processes*, not multiple pages/tabs in one browser —
+ * Chrome serialises screenshot capture per browser process, so N tabs give ~no speedup. N
+ * browsers give ~N× (CPU-bound) because each captures independently.
+ *
+ * Concurrency is bounded (VQ_RENDER_CONCURRENCY, default 4) and uses the same container-
+ * hardened launch flags as the measure step — so the small Railway worker won't exhaust its
+ * PID/thread budget (the "pthread_create: Resource temporarily unavailable" class of crash).
+ * Set VQ_RENDER_CONCURRENCY=2 on the worker; bump it on bigger boxes.
  */
 import puppeteer from "puppeteer";
 import fs from "fs";
@@ -20,59 +26,81 @@ const LAUNCH_ARGS = [
   "--disable-software-rasterizer", "--disable-extensions", "--mute-audio", "--no-first-run",
 ];
 
+const CONCURRENCY = Math.max(1, parseInt(process.env.VQ_RENDER_CONCURRENCY || "4", 10));
+
+/** Spin up a page, load the composed HTML, and wait for fonts + images to settle. */
+async function setupPage(browser, html, width, height, scale) {
+  const page = await browser.newPage();
+  await page.setViewport({ width, height, deviceScaleFactor: scale });
+  await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.evaluate(async () => {
+    try { await (document.fonts && document.fonts.ready); } catch {}
+    const imgs = [...document.images].filter((i) => !i.complete);
+    await Promise.all(imgs.map((i) => new Promise((res) => { i.onload = i.onerror = res; })));
+  });
+  return page;
+}
+
+/** Inject each active video layer's extracted frame (data URI → no file:// origin block). */
+async function injectVideo(page, videoFrames, f) {
+  for (const vf of videoFrames) {
+    if (f < vf.startFrame || f >= vf.startFrame + vf.count) continue;
+    const k = Math.min(vf.count, f - vf.startFrame + 1);
+    const fp = path.join(vf.dir, `${vf.prefix}${String(k).padStart(5, "0")}.jpg`);
+    let dataUri;
+    try { dataUri = "data:image/jpeg;base64," + fs.readFileSync(fp).toString("base64"); } catch { continue; }
+    await page.evaluate(async (id, src) => {
+      const img = document.getElementById(id);
+      if (!img) return;
+      img.src = src;
+      if (!img.complete) await new Promise((r) => { img.onload = img.onerror = r; });
+    }, `vqv-${vf.i}`, dataUri);
+  }
+}
+
 /**
- * renderFrames({ html, framesDir, width, height, scale, fps, durationInFrames, onProgress, isCancelled })
- * Writes frame-00000.jpg … into framesDir. onProgress reports 0→100 across the frame range.
+ * renderFrames({ html, framesDir, width, height, scale, fps, durationInFrames, videoFrames, onProgress, isCancelled })
+ * Writes frame-00000.jpg … into framesDir across `concurrency` parallel pages.
  * Returns the number of frames written.
  */
 export async function renderFrames({ html, framesDir, width = 1080, height = 1920, scale = 1, fps = 30, durationInFrames, videoFrames = [], onProgress, isCancelled }) {
   if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
 
-  const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
-  let written = 0;
-  try {
-    const page = await browser.newPage();
-    await page.setViewport({ width, height, deviceScaleFactor: scale });
-    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
+  const concurrency = Math.max(1, Math.min(CONCURRENCY, durationInFrames));
+  const chunkSize = Math.ceil(durationInFrames / concurrency);
 
-    // Wait for fonts + images to settle before capturing (deterministic first frame).
-    await page.evaluate(async () => {
-      try { await (document.fonts && document.fonts.ready); } catch {}
-      const imgs = [...document.images].filter((i) => !i.complete);
-      await Promise.all(imgs.map((i) => new Promise((res) => { i.onload = i.onerror = res; })));
-    });
-
-    const stage = await page.$("#stage");
-    for (let f = 0; f < durationInFrames; f++) {
-      if (isCancelled && isCancelled()) throw new Error("RENDER_CANCELLED");
-      const t = frameToSeconds(f, fps);
-      await page.evaluate((sec) => window.__seekTo(sec), t);
-
-      // Inject each active video layer's extracted frame (as a data URI to avoid file:// origin
-      // blocks). Layers outside their window are already hidden by __seekTo.
-      for (const vf of videoFrames) {
-        if (f < vf.startFrame || f >= vf.startFrame + vf.count) continue;
-        const k = Math.min(vf.count, f - vf.startFrame + 1);
-        const fp = path.join(vf.dir, `${vf.prefix}${String(k).padStart(5, "0")}.jpg`);
-        let dataUri;
-        try { dataUri = "data:image/jpeg;base64," + fs.readFileSync(fp).toString("base64"); } catch { continue; }
-        await page.evaluate(async (id, src) => {
-          const img = document.getElementById(id);
-          if (!img) return;
-          img.src = src;
-          if (!img.complete) await new Promise((r) => { img.onload = img.onerror = r; });
-        }, `vqv-${vf.i}`, dataUri);
-      }
-
-      const file = path.join(framesDir, `frame-${String(f).padStart(5, "0")}.jpg`);
-      await stage.screenshot({ path: file, type: "jpeg", quality: 95 });
-      written++;
-      if (onProgress && (f % 5 === 0 || f === durationInFrames - 1)) {
-        onProgress(Math.round(((f + 1) / durationInFrames) * 100));
-      }
+  let done = 0;
+  const bump = () => {
+    done++;
+    if (onProgress && (done % 5 === 0 || done === durationInFrames)) {
+      onProgress(Math.round((done / durationInFrames) * 100));
     }
-  } finally {
-    try { await browser.close(); } catch {}
+  };
+
+  // Each chunk gets its OWN browser process so screenshot capture runs truly in parallel.
+  const renderChunk = async (lo, hi) => {
+    const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
+    try {
+      const page = await setupPage(browser, html, width, height, scale);
+      const stage = await page.$("#stage");
+      for (let f = lo; f < hi; f++) {
+        if (isCancelled && isCancelled()) throw new Error("RENDER_CANCELLED");
+        await page.evaluate((sec) => window.__seekTo(sec), frameToSeconds(f, fps));
+        if (videoFrames.length) await injectVideo(page, videoFrames, f);
+        await stage.screenshot({ path: path.join(framesDir, `frame-${String(f).padStart(5, "0")}.jpg`), type: "jpeg", quality: 95 });
+        bump();
+      }
+    } finally {
+      try { await browser.close(); } catch {}
+    }
+  };
+
+  const tasks = [];
+  for (let c = 0; c < concurrency; c++) {
+    const lo = c * chunkSize;
+    const hi = Math.min(lo + chunkSize, durationInFrames);
+    if (lo < hi) tasks.push(renderChunk(lo, hi));
   }
-  return written;
+  await Promise.all(tasks);
+  return done;
 }
