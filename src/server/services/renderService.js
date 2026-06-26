@@ -14,6 +14,11 @@ import fs from "fs";
 import path from "path";
 import { supabaseAdmin, TEMP_DIR, PUBLIC_DIR, PROJECT_ROOT } from "../middleware/shared.js";
 
+// Which engine produces the MP4. "remotion" (default) = the proven Remotion path; "vidquence"
+// = our own @vidquence/render engine (src/render). Per-deploy flag so we can flip a single
+// service to the new engine once it passes the shadow-diff, with Remotion as the fallback.
+const RENDER_ENGINE = (process.env.RENDER_ENGINE || "remotion").toLowerCase();
+
 /* ── Newest mtime under a dir (prebundle staleness detection) ── */
 function newestMtimeMs(dir) {
   let newest = 0;
@@ -104,75 +109,87 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
 
   const finalProject = await prepareProject(project, userId);
 
-  const serveUrl = await getBundle();
-  const { getCompositions, renderFrames, stitchFramesToVideo, makeCancelSignal } = await import("@remotion/renderer");
-  const comps = await getCompositions(serveUrl, { inputProps: { project: finalProject } });
-  const comp  = comps.find((c) => c.id === "TimelineComposition");
-  if (!comp) throw new Error("TimelineComposition not found in bundle");
-
   const fmt    = finalProject.format || {};
   const scale  = resolution === "4k" ? 2 : 1;
   const width  = (fmt.width || 1080) * scale;
   const height = (fmt.height || 1920) * scale;
-  const compositionWithRes = { ...comp, width, height };
-
   const outputPath = path.join(TEMP_DIR, `render-${renderId}.mp4`);
-  const framesDir  = path.join(TEMP_DIR, `frames-${renderId}`);
-  if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
 
-  // Clean cancellation: poll isCancelled() and trip Remotion's cancel signal. (Throwing inside
-  // onFrameUpdate instead crashes the Chromium tab — "browser crashed, retrying" + the static
-  // server tearing down → ERR_CONNECTION_REFUSED noise.) A cancelSignal is single-use, so we
-  // make a fresh one per stage and point the poller at whichever stage is currently active.
-  let wasCancelled = false;
-  let currentCancel = null;
-  const cancelPoll = isCancelled
-    ? setInterval(() => { try { if (isCancelled()) { wasCancelled = true; currentCancel?.(); } } catch {} }, 500)
-    : null;
-
-  try {
-    const hasVideoLayers = (finalProject.layers || []).some((l) => l.type === "video");
-    let rendered = 0;
-
-    const rf = makeCancelSignal();
-    currentCancel = rf.cancel;
-    const { assetsInfo } = await renderFrames({
-      composition: compositionWithRes,
-      serveUrl,
-      inputProps: { project: finalProject },
-      outputDir: framesDir,
-      imageFormat: "jpeg",
-      concurrency: hasVideoLayers ? 1 : 2,
-      chromiumOptions: { gl: "angle" },
-      cancelSignal: rf.cancelSignal,
-      onFrameUpdate: () => {
-        rendered++;
-        onProgress?.(Math.round((rendered / comp.durationInFrames) * 90));
-      },
+  if (RENDER_ENGINE === "vidquence") {
+    // @vidquence/render — our own engine. Produces the MP4 at outputPath; the shared upload +
+    // record block below handles persistence identically to the Remotion path.
+    const { renderToFile } = await import("../../render/index.js");
+    await renderToFile(finalProject, {
+      outputPath, renderId,
+      width: (fmt.width || 1080), height: (fmt.height || 1920), scale, fps: fmt.fps || 30,
+      onProgress: (p) => onProgress?.(Math.round(p * 0.9)), // reserve 90→100 for upload
+      isCancelled,
     });
+  } else {
+    const serveUrl = await getBundle();
+    const { getCompositions, renderFrames, stitchFramesToVideo, makeCancelSignal } = await import("@remotion/renderer");
+    const comps = await getCompositions(serveUrl, { inputProps: { project: finalProject } });
+    const comp  = comps.find((c) => c.id === "TimelineComposition");
+    if (!comp) throw new Error("TimelineComposition not found in bundle");
+    const compositionWithRes = { ...comp, width, height };
 
-    const sf = makeCancelSignal();
-    currentCancel = sf.cancel;
-    if (wasCancelled) throw new Error("RENDER_CANCELLED"); // cancelled between stages
-    await stitchFramesToVideo({
-      composition: compositionWithRes,
-      serveUrl,
-      inputProps: { project: finalProject },
-      codec: "h264",
-      crf: 23, // ~visually-lossless for short-form; ~40-50% smaller than Remotion's default (18)
-      assetsInfo,
-      outputLocation: outputPath,
-      fps: comp.fps,
-      width,
-      height,
-      cancelSignal: sf.cancelSignal,
-    });
-  } catch (e) {
-    if (wasCancelled || /cancel/i.test(e?.message || "")) throw new Error("RENDER_CANCELLED");
-    throw e;
-  } finally {
-    if (cancelPoll) clearInterval(cancelPoll);
-    try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
+    const framesDir  = path.join(TEMP_DIR, `frames-${renderId}`);
+    if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
+
+    // Clean cancellation: poll isCancelled() and trip Remotion's cancel signal. (Throwing inside
+    // onFrameUpdate instead crashes the Chromium tab — "browser crashed, retrying" + the static
+    // server tearing down → ERR_CONNECTION_REFUSED noise.) A cancelSignal is single-use, so we
+    // make a fresh one per stage and point the poller at whichever stage is currently active.
+    let wasCancelled = false;
+    let currentCancel = null;
+    const cancelPoll = isCancelled
+      ? setInterval(() => { try { if (isCancelled()) { wasCancelled = true; currentCancel?.(); } } catch {} }, 500)
+      : null;
+
+    try {
+      const hasVideoLayers = (finalProject.layers || []).some((l) => l.type === "video");
+      let rendered = 0;
+
+      const rf = makeCancelSignal();
+      currentCancel = rf.cancel;
+      const { assetsInfo } = await renderFrames({
+        composition: compositionWithRes,
+        serveUrl,
+        inputProps: { project: finalProject },
+        outputDir: framesDir,
+        imageFormat: "jpeg",
+        concurrency: hasVideoLayers ? 1 : 2,
+        chromiumOptions: { gl: "angle" },
+        cancelSignal: rf.cancelSignal,
+        onFrameUpdate: () => {
+          rendered++;
+          onProgress?.(Math.round((rendered / comp.durationInFrames) * 90));
+        },
+      });
+
+      const sf = makeCancelSignal();
+      currentCancel = sf.cancel;
+      if (wasCancelled) throw new Error("RENDER_CANCELLED"); // cancelled between stages
+      await stitchFramesToVideo({
+        composition: compositionWithRes,
+        serveUrl,
+        inputProps: { project: finalProject },
+        codec: "h264",
+        crf: 23, // ~visually-lossless for short-form; ~40-50% smaller than Remotion's default (18)
+        assetsInfo,
+        outputLocation: outputPath,
+        fps: comp.fps,
+        width,
+        height,
+        cancelSignal: sf.cancelSignal,
+      });
+    } catch (e) {
+      if (wasCancelled || /cancel/i.test(e?.message || "")) throw new Error("RENDER_CANCELLED");
+      throw e;
+    } finally {
+      if (cancelPoll) clearInterval(cancelPoll);
+      try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
+    }
   }
 
   // Upload + record (idempotent: deterministic key + upsert on renders.id = renderId).

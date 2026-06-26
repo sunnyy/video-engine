@@ -12,6 +12,7 @@
     "worker": "node src/server/worker.js",
     "worker:dev": "node --env-file=.env src/server/worker.js",
     "prebundle": "node scripts/prebundle.mjs",
+    "shadow": "node scripts/renderShadowDiff.mjs",
     "fetch-fonts": "node scripts/fetch-fonts.mjs",
     "fetch-music": "node --env-file=.env scripts/fetchMusic.js"
   },

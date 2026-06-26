@@ -40,3 +40,5 @@ promoPrompts.js
 autopilot.txt
 
 src/server/temp
+# @vidquence/render shadow-diff output
+.shadow-out/
