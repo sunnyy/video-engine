@@ -123,6 +123,7 @@ router.post("/init", requireAuth, async (req, res) => {
 
 // ── POST /promo-video/create ─────────────────────────────────────────────────
 router.post("/create", requireAuth, async (req, res) => {
+  let creditAmount = 0;
   try {
     const {
       video_goal, video_type, product_name, product_url, product_description,
@@ -132,8 +133,9 @@ router.post("/create", requireAuth, async (req, res) => {
       visual_style, accent_color, accent_color_2, typography_style, voice_id, scene_count, target_duration,
     } = req.body;
 
-    // Safety: moderate the user-supplied product text before building the video.
-    if (!(await guardContent(res, { text: [product_name, product_description, target_audience], label: "saas-video" }))) return;
+    // Safety: moderate ALL user-supplied text before building the video — including the optional
+    // reviewed/edited script, which is otherwise voiced verbatim by TTS without moderation.
+    if (!(await guardContent(res, { text: [product_name, product_description, target_audience, req.body.script], label: "saas-video" }))) return;
 
     // Use existing draft ID (from /init) if provided, otherwise generate new one
     const id = req.body.project_id || uuidv4();
@@ -189,6 +191,18 @@ router.post("/create", requireAuth, async (req, res) => {
       return res.json({ plan_only: true, full_script });
     }
 
+    // Charge for the EXPENSIVE generation up front (TTS + GPT narration + per-beat GPT-5.4 design +
+    // Fal image-gen + stock + headless measure all run below). Mirrors AI Video's deduct-then-run so
+    // generation isn't a free/abuse path; the render step itself is then free. Refunded on failure.
+    const isTH    = resolvedVideoType === "talking_head";
+    const genCost = isTH ? TH_VIDEO_CREDITS : promoCredits(project.scene_count ?? 3);
+    const deduction = await deductCredits(
+      req.user.id, genCost, "promo_video",
+      `SaaS/Promo Video generation (${isTH ? "talking head" : (project.scene_count ?? 3) + " scenes"})`, id,
+    );
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = genCost;
+
     let thSegments = null; // raw segments with timestamps, saved to talking_head_segments column
 
     if (resolvedVideoType === "talking_head") {
@@ -228,6 +242,7 @@ router.post("/create", requireAuth, async (req, res) => {
 
     // v2 pipeline pre-computes the manifest from the script; other paths compute it now.
     const assetManifest = project._assetManifest ?? generateAssetRequirements(project);
+    project.credits_charged = creditAmount; // generation paid above (render is free)
 
     const { error: dbErr } = await supabaseAdmin.from("promo_videos").upsert({
       id,
@@ -278,6 +293,7 @@ router.post("/create", requireAuth, async (req, res) => {
 
     res.json({ project, assetManifest });
   } catch (e) {
+    if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: promo generation failed").catch(() => {});
     console.error("[promo-video/create]", e.message);
     res.status(500).json({ error: e.message });
   }
@@ -389,7 +405,6 @@ router.post("/:projectId/upload-asset", requireAuth, async (req, res) => {
 
 // ── POST /promo-video/:projectId/render ─────────────────────────────────────
 router.post("/:projectId/render", requireAuth, async (req, res) => {
-  let creditAmount = 0;
   try {
     const { data: row, error: fetchErr } = await supabaseAdmin
       .from("promo_videos")
@@ -400,17 +415,8 @@ router.post("/:projectId/render", requireAuth, async (req, res) => {
 
     if (fetchErr || !row) return res.status(404).json({ error: "Project not found" });
 
-    const isTH            = row.video_type === "talking_head";
-    const sceneCount      = row.style?.scene_count ?? 3;
-    const creditsToDeduct = isTH ? TH_VIDEO_CREDITS : promoCredits(sceneCount);
-
-    const deduction = await deductCredits(
-      req.user.id, creditsToDeduct,
-      "promo_video", `SaaS/Promo Video render (${sceneCount} scenes)`,
-      req.params.projectId
-    );
-    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
-    creditAmount = creditsToDeduct;
+    // No charge here — the expensive generation was already paid at /create. Rendering (and
+    // re-rendering) is free, mirroring AI Video's free export.
 
     // If TH URL just uploaded by client, inject it into scenes + editor timeline
     const { talking_head_url: thUrl } = req.body || {};
@@ -448,12 +454,10 @@ router.post("/:projectId/render", requireAuth, async (req, res) => {
     // Respond immediately — orchestrator runs async; client polls
     res.json({ started: true, projectId: req.params.projectId });
 
-    orchestratePromoRender(req.params.projectId).catch(async err => {
+    orchestratePromoRender(req.params.projectId).catch(err => {
       console.error(`[promo-video/render] ${req.params.projectId}:`, err.message);
-      addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: promo render failed").catch(() => {});
     });
   } catch (e) {
-    if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: promo render failed").catch(() => {});
     console.error("[promo-video/render]", e.message);
     res.status(500).json({ error: e.message });
   }
