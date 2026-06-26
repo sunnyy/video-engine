@@ -83,6 +83,21 @@ export default function CampaignDetail() {
     try { await serverFetch(`/api/automation/campaigns/${id}/${action}`, { method: "POST", body: opts.body ? JSON.stringify(opts.body) : undefined }); await refresh(); }
     catch (_) {} finally { setBusy(""); }
   };
+  // Retry a failed/deferred publish. Gives instant feedback: the row flips to "queued" and the
+  // button shows "Retrying…" immediately; the enqueued publish_post then drives the 4s auto-refresh
+  // (publish_post is an inflight type) until it shows published. Errors surface in the message bar.
+  const retryPost = async (postId) => {
+    setBusy(`retry-${postId}`);
+    setData(d => d ? { ...d, posts: d.posts.map(x => x.id === postId ? { ...x, status: "queued", error: null } : x) } : d);
+    try {
+      const res = await serverFetch(`/api/automation/campaigns/${id}/retry-post`, { method: "POST", body: JSON.stringify({ postId }) });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || "Retry failed"); }
+      setMsg({ ok: true, text: "Re-publishing… this can take a moment." });
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    await refresh().catch(() => {});
+    setBusy("");
+  };
+
   const remove = async () => {
     if (!window.confirm("Delete this campaign? Queued videos will be cancelled.")) return;
     setBusy("delete");
@@ -233,7 +248,7 @@ export default function CampaignDetail() {
                     </span>
                     {p.platform_post_id && p.platform === "youtube"
                       ? <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>
-                      : (p.status === "failed" || p.status === "deferred") && <button onClick={() => act("retry-post", { body: { postId: p.id } })} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5 }}>Retry</button>}
+                      : (p.status === "failed" || p.status === "deferred") && <button onClick={() => retryPost(p.id)} disabled={busy === `retry-${p.id}`} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5, opacity: busy === `retry-${p.id}` ? 0.6 : 1 }}>{busy === `retry-${p.id}` ? "Retrying…" : "Retry"}</button>}
                   </div>
                 ))}
               </div>
