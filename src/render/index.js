@@ -17,6 +17,7 @@ import path from "path";
 import { compose } from "./composer.js";
 import { renderFrames } from "./frameDriver.js";
 import { stitch } from "./stitcher.js";
+import { extractVideoFrames } from "./videoFrames.js";
 
 /**
  * renderToFile(project, { outputPath, renderId, width, height, scale, fps, onProgress, isCancelled })
@@ -27,14 +28,23 @@ import { stitch } from "./stitcher.js";
 export async function renderToFile(project, { outputPath, renderId, width = 1080, height = 1920, scale = 1, fps = 30, onProgress, isCancelled } = {}) {
   if (!outputPath) throw new Error("renderToFile: outputPath required");
 
-  const { html, durationInFrames, audio } = compose(project, { width, height, fps });
+  const { html, durationInFrames, audio, videoLayers } = compose(project, { width, height, fps });
   const durationSec = durationInFrames / fps;
 
   const framesDir = path.join(path.dirname(outputPath), `vqframes-${renderId || Date.now()}`);
+  const videoDir = path.join(path.dirname(outputPath), `vqvframes-${renderId || Date.now()}`);
   try {
+    // Phase 3: extract each embedded video layer's frames via ffmpeg up front, so the
+    // frameDriver can inject the right one per composite frame.
+    const videoFrames = [];
+    for (const vl of videoLayers || []) {
+      try { videoFrames.push(await extractVideoFrames({ ...vl, fps, outDir: videoDir })); }
+      catch (e) { console.warn(`[@vidquence/render] video layer ${vl.i} extract failed (skipping): ${e.message}`); }
+    }
+
     // Frames take the bulk of the time → map them to 0–85% of progress.
     await renderFrames({
-      html, framesDir, width, height, scale, fps, durationInFrames,
+      html, framesDir, width, height, scale, fps, durationInFrames, videoFrames,
       isCancelled,
       onProgress: (p) => onProgress?.(Math.round(p * 0.85)),
     });
@@ -46,6 +56,7 @@ export async function renderToFile(project, { outputPath, renderId, width = 1080
     });
   } finally {
     try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(videoDir, { recursive: true, force: true }); } catch {}
   }
 
   onProgress?.(100);

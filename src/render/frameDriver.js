@@ -25,7 +25,7 @@ const LAUNCH_ARGS = [
  * Writes frame-00000.jpg … into framesDir. onProgress reports 0→100 across the frame range.
  * Returns the number of frames written.
  */
-export async function renderFrames({ html, framesDir, width = 1080, height = 1920, scale = 1, fps = 30, durationInFrames, onProgress, isCancelled }) {
+export async function renderFrames({ html, framesDir, width = 1080, height = 1920, scale = 1, fps = 30, durationInFrames, videoFrames = [], onProgress, isCancelled }) {
   if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
 
   const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
@@ -47,6 +47,23 @@ export async function renderFrames({ html, framesDir, width = 1080, height = 192
       if (isCancelled && isCancelled()) throw new Error("RENDER_CANCELLED");
       const t = frameToSeconds(f, fps);
       await page.evaluate((sec) => window.__seekTo(sec), t);
+
+      // Inject each active video layer's extracted frame (as a data URI to avoid file:// origin
+      // blocks). Layers outside their window are already hidden by __seekTo.
+      for (const vf of videoFrames) {
+        if (f < vf.startFrame || f >= vf.startFrame + vf.count) continue;
+        const k = Math.min(vf.count, f - vf.startFrame + 1);
+        const fp = path.join(vf.dir, `${vf.prefix}${String(k).padStart(5, "0")}.jpg`);
+        let dataUri;
+        try { dataUri = "data:image/jpeg;base64," + fs.readFileSync(fp).toString("base64"); } catch { continue; }
+        await page.evaluate(async (id, src) => {
+          const img = document.getElementById(id);
+          if (!img) return;
+          img.src = src;
+          if (!img.complete) await new Promise((r) => { img.onload = img.onerror = r; });
+        }, `vqv-${vf.i}`, dataUri);
+      }
+
       const file = path.join(framesDir, `frame-${String(f).padStart(5, "0")}.jpg`);
       await stage.screenshot({ path: file, type: "jpeg", quality: 95 });
       written++;

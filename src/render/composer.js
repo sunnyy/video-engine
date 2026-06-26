@@ -85,6 +85,10 @@ export function compose(project, { width = 1080, height = 1920, fps = 30 } = {})
 
   const visualLayers = allLayers.filter((l) => l.type !== "audio");
   const audio = extractAudio(allLayers);
+  // Video layers (Phase 3): frames are extracted by ffmpeg and injected per-frame by the
+  // frameDriver into the <img id="vqv-{i}"> the composer renders. `i` is the index in the
+  // page's layer array (= pageLayers order), so the driver can target the right element.
+  const videoLayers = [];
 
   const durationSec = project?.format?.duration || 30;
   const durationInFrames = durationToFrames(durationSec, fps);
@@ -97,6 +101,7 @@ export function compose(project, { width = 1080, height = 1920, fps = 30 } = {})
     transform: l.transform || {}, keyframes: l.keyframes || {}, transition: l.transition || null,
     content: l.content ?? null, style: l.style || {}, src: l.src ?? null, objectFit: l.objectFit ?? null,
     objectPosition: l.objectPosition ?? null, gradient: l.gradient ?? null, iconName: l.iconName ?? null,
+    trimStart: l.trimStart ?? 0, playbackRate: l.playbackRate ?? 1,
     iconSvg: l.type === "icon" ? iconToSvg(l.iconName, Math.min(l.transform?.width ?? 120, l.transform?.height ?? 120), l.style?.color) : null,
     clipPath: l.maskShape ? getClipPathCSS(l.maskShape) : (l.clipPath ?? null),
     captionStyle: l.captionStyle || {}, segments: l.segments || null,
@@ -108,8 +113,12 @@ export function compose(project, { width = 1080, height = 1920, fps = 30 } = {})
     boxShadow: l.boxShadow ?? null,
   }));
 
+  pageLayers.forEach((pl, i) => {
+    if (pl.type === "video" && pl.src) videoLayers.push({ i, src: pl.src, start: pl.start, end: pl.end, trimStart: pl.trimStart || 0, playbackRate: pl.playbackRate || 1 });
+  });
+
   const html = pageHtml({ width, height, fps, background, showWatermark, layers: pageLayers, fontCss: localFontsCss() });
-  return { html, durationInFrames, fps, width, height, audio };
+  return { html, durationInFrames, fps, width, height, audio, videoLayers };
 }
 
 /** The full HTML document, including the in-page render runtime. */
@@ -178,7 +187,7 @@ function interpTransform(L,t){
 }
 
 // ── Build DOM once ──
-const nodes = LAYERS.map((L)=>{
+const nodes = LAYERS.map((L,i)=>{
   const el=document.createElement("div"); el.className="vq-layer"; el.style.zIndex=L.zIndex;
   if(L.type==="text"){
     const s=L.style||{};
@@ -205,7 +214,11 @@ const nodes = LAYERS.map((L)=>{
   } else if(L.type==="icon"){
     if(L.iconSvg){ el.style.alignItems="center"; el.style.justifyContent="center"; el.innerHTML=L.iconSvg; }
     else { el.style.background=L.gradient||"rgba(255,255,255,0.15)"; el.style.borderRadius="12px"; } // fallback if icon name unknown
-  } else if(L.type==="video"){ /* Phase 3: paint real video frames. Skipped (audio still muxed). */ }
+  } else if(L.type==="video"){ // Phase 3: frameDriver injects ffmpeg-extracted frames into this img
+    const v=document.createElement("img"); v.id="vqv-"+i;
+    Object.assign(v.style,{width:"100%",height:"100%",objectFit:L.objectFit||"cover",objectPosition:L.objectPosition||""});
+    el.appendChild(v);
+  }
   // Common box styling
   if(L.borderRadius) el.style.borderRadius=(typeof L.borderRadius==="number"?L.borderRadius+"px":L.borderRadius);
   if(L.borderWidth) el.style.border=L.borderWidth+"px solid "+(L.borderColor||"#fff");
