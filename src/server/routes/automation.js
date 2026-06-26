@@ -135,11 +135,11 @@ router.post("/campaigns/:id/retry-post", requireAuth, async (req, res) => {
     if (post.platform_post_id) return res.status(400).json({ error: "Already published" });
     if (!post.video_url) return res.status(400).json({ error: "No rendered video to publish — re-run generation instead" });
 
-    // Resolve the CURRENT connected account for this platform (ignores a dead id from before a
-    // reconnect). target_accounts self-heals elsewhere; here we just need a live one.
-    const { data: accts } = await supabaseAdmin.from("social_accounts")
-      .select("id, platform, status").in("id", campaign.target_accounts || []).eq("user_id", req.user.id);
-    const acct = (accts || []).find((a) => a.platform === post.platform && a.status === "connected");
+    // Resolve the user's CURRENT connected account for this platform directly (NOT limited to the
+    // campaign's target_accounts, which may still hold a dead id from before a reconnect). One row
+    // per user+platform, so this is unambiguous.
+    const { data: acct } = await supabaseAdmin.from("social_accounts")
+      .select("id, platform, status").eq("user_id", req.user.id).eq("platform", post.platform).eq("status", "connected").maybeSingle();
     if (!acct) return res.status(400).json({ error: `No connected ${post.platform} account — reconnect it first` });
 
     // Rebuild publish metadata from the saved project's publish copy + the campaign's privacy.
