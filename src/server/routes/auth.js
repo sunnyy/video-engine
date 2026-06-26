@@ -107,6 +107,9 @@ router.post("/account/delete", requireAuth, async (req, res) => {
     await supabaseAdmin.from("subscriptions").delete().eq("user_id", userId);
     await supabaseAdmin.from("projects").delete().eq("user_id", userId);
     await supabaseAdmin.from("generated_images").delete().eq("user_id", userId);
+    // Social connections: stored OAuth tokens + the user's own BYO Google credentials.
+    await supabaseAdmin.from("social_accounts").delete().eq("user_id", userId);
+    await supabaseAdmin.from("social_app_credentials").delete().eq("user_id", userId);
 
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
     if (error) throw error;
