@@ -5,6 +5,14 @@ import assetShineRegistry from "../core/registries/assetShineRegistry";
 import { useMemo, useEffect } from "react";
 import * as LucideIcons from "lucide-react";
 
+// Append a Devanagari fallback so Hindi (and other Devanagari) on-screen text/captions render
+// real glyphs instead of tofu boxes — our display fonts (Inter/Outfit/…) are Latin-only. Keeps the
+// designer's primary font for Latin; Chrome's per-glyph fallback uses Noto for Devanagari chars.
+const withDevanagari = (fam) => {
+  const primary = (fam || "Outfit").split(",")[0].trim().replace(/['"]/g, "");
+  return `"${primary}", "Noto Sans Devanagari", sans-serif`;
+};
+
 export default function TimelineComposition({ project }) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -16,7 +24,7 @@ export default function TimelineComposition({ project }) {
 
   // Collect unique font families from text/caption layers
   const fontFamilies = useMemo(() => {
-    const families = new Set(["Outfit"]);
+    const families = new Set(["Outfit", "Noto Sans Devanagari"]); // always load the Devanagari fallback
     for (const l of project?.layers || []) {
       const f = l.style?.fontFamily || l.captionStyle?.fontFamily;
       if (f) families.add(f);
@@ -250,7 +258,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
           style={{
             ...baseStyle,
             position: "absolute",
-            fontFamily: s.fontFamily || "Outfit",
+            fontFamily: withDevanagari(s.fontFamily),
             fontSize: s.fontSize || 48,
             fontWeight: s.fontWeight || 700,
             fontStyle: s.fontStyle || "normal",
@@ -313,7 +321,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
           style={{
             ...baseStyle,
             position: "absolute",
-            fontFamily: cs.fontFamily || "Outfit",
+            fontFamily: withDevanagari(cs.fontFamily),
             fontSize: cs.fontSize || 48,
             fontWeight: cs.fontWeight || 700,
             color: cs.color || "#ffffff",

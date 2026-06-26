@@ -52,7 +52,14 @@ const FONTS = {
   "Fredoka One":        [400],
   "Caveat":             [400, 500, 600, 700],
   "Patrick Hand":       [400],
+  // Devanagari fallback for Hindi (and other Devanagari) on-screen text/captions — our display
+  // faces above are Latin-only, so without this Hindi renders as tofu boxes. Pulled from the
+  // DEVANAGARI subset (see SUBSET below), not latin.
+  "Noto Sans Devanagari": [400, 500, 600, 700, 800, 900],
 };
+
+// Per-family subset override: which Google subset's woff2 to pull. Default is "latin" (latinWoff2Url).
+const SUBSET = { "Noto Sans Devanagari": "devanagari" };
 
 // Desktop UA so Google returns woff2 (latin) URLs.
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
@@ -72,6 +79,14 @@ function latinWoff2Url(css) {
   return urls.length ? urls[urls.length - 1] : null;
 }
 
+// Pull a NAMED subset's woff2 URL (e.g. "devanagari"). Google labels each @font-face block with a
+// /* subset */ comment right before its src url().
+function subsetWoff2Url(css, subset) {
+  const re = new RegExp("/\\*\\s*" + subset + "\\s*\\*/[\\s\\S]*?url\\((https:[^)]+\\.woff2)\\)");
+  const m = css.match(re);
+  return m ? m[1] : null;
+}
+
 async function download(url, dest) {
   const res = await fetch(url, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`woff2 ${res.status}`);
@@ -88,7 +103,7 @@ async function main() {
       const file = `${slug(family)}-${weight}.woff2`;
       try {
         const css = await fetchCss(family, weight);
-        const url = latinWoff2Url(css);
+        const url = SUBSET[family] ? (subsetWoff2Url(css, SUBSET[family]) || latinWoff2Url(css)) : latinWoff2Url(css);
         if (!url) throw new Error("no woff2 in css");
         await download(url, path.join(OUT_DIR, file));
         faces.push(
