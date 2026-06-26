@@ -138,10 +138,14 @@ export default function Checkout() {
   }
 
   const baseUSD      = cycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
-  const finalUSD     = calcPrice(baseUSD, cycle === "annual" ? plan.discount_percent : 0);
+  // price_annual already includes the annual discount — never re-apply discount_percent here
+  // (that double-discounted the displayed total and mismatched the actual charge).
+  const finalUSD     = baseUSD;
   const finalINR     = toINR(finalUSD, rate);
-  const originalINR  = toINR(baseUSD, rate);
-  const saved        = cycle === "annual" && plan.discount_percent > 0;
+  // Annual savings are shown vs paying monthly for 12 months.
+  const originalUSD  = cycle === "annual" ? plan.price_monthly * 12 : baseUSD;
+  const originalINR  = toINR(originalUSD, rate);
+  const saved        = cycle === "annual" && !!plan.price_annual && plan.price_annual < plan.price_monthly * 12;
   const features     = PLAN_FEATURES[plan.slug] || (Array.isArray(plan.features) ? plan.features : []);
   const cycleLabel   = cycle === "annual" ? "year" : "month";
 
@@ -295,7 +299,7 @@ export default function Checkout() {
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
                   <span style={{ color: "#9494a8" }}>Original</span>
                   <span style={{ color: "#55556a" }}>
-                    <s>${baseUSD}/{cycleLabel}</s>
+                    <s>${originalUSD}/{cycleLabel}</s>
                     <span style={{ marginLeft: 8, fontSize: 12 }}>≈ <s>₹{originalINR}</s></span>
                   </span>
                 </div>
