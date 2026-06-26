@@ -46,6 +46,21 @@ export async function deleteAccount(userId, platform) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Soft-disconnect: KEEP the row (and its id) but mark it 'disconnected'. This preserves account
+ * identity across disconnect→reconnect — saveAccount upserts the SAME row (onConflict user+platform),
+ * so the id never changes and campaigns/jobs targeting this account survive a reconnect. Tokens are
+ * left encrypted-but-unused; the getFreshAccessToken* guards below refuse to publish to a
+ * 'disconnected' row, and a reconnect overwrites them. (Full hard-delete stays in deleteAccount,
+ * used only on full user-account deletion.)
+ */
+export async function disconnectAccount(userId, platform) {
+  const { error } = await supabaseAdmin.from("social_accounts")
+    .update({ status: "disconnected", updated_at: new Date().toISOString() })
+    .eq("user_id", userId).eq("platform", platform);
+  if (error) throw new Error(error.message);
+}
+
 /** Raw account row by id (server-internal — includes encrypted tokens). */
 export async function getAccountById(accountId) {
   const { data, error } = await supabaseAdmin.from("social_accounts").select("*").eq("id", accountId).maybeSingle();
@@ -60,10 +75,10 @@ export async function getAccountById(accountId) {
  */
 export async function getFreshAccessTokenByAccountId(accountId) {
   const data = await getAccountById(accountId);
-  // Permanent: the account row is gone (e.g. disconnected, or a job baked a stale id before a
-  // reconnect). Retrying can't bring it back, so mark noRetry → the queue fails it fast instead
-  // of burning 5 attempts with backoff.
-  if (!data) { const e = new Error("connected account not found"); e.noRetry = true; throw e; }
+  // Permanent: the account row is gone (job baked a stale id before a reconnect) OR the account
+  // was soft-disconnected. Retrying can't fix either, so mark noRetry → the queue fails it fast
+  // instead of burning 5 attempts with backoff.
+  if (!data || data.status === "disconnected") { const e = new Error("connected account not found"); e.noRetry = true; throw e; }
 
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
   if (expiresAt - Date.now() > 60_000) return { accessToken: decrypt(data.access_token), platform: data.platform };
@@ -90,7 +105,7 @@ export async function getFreshAccessToken(userId, platform) {
   const { data, error } = await supabaseAdmin.from("social_accounts")
     .select("*").eq("user_id", userId).eq("platform", platform).maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data) throw new Error(`${platform} is not connected`);
+  if (!data || data.status === "disconnected") throw new Error(`${platform} is not connected`);
 
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
   if (expiresAt - Date.now() > 60_000) return decrypt(data.access_token);

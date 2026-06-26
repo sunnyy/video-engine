@@ -11,7 +11,7 @@
  */
 import { getAdapter, capabilitiesOf } from "./adapters/index.js";
 import { signState, verifyState } from "./crypto.js";
-import { saveAccount, deleteAccount, getFreshAccessToken, getFreshAccessTokenByAccountId } from "./accounts.js";
+import { saveAccount, disconnectAccount, getFreshAccessToken, getFreshAccessTokenByAccountId } from "./accounts.js";
 import { getAppCredentials } from "./appCredentials.js";
 
 /** Public capability descriptor for a platform (scheduling/tags/privacy/limits). */
@@ -55,12 +55,13 @@ export async function completeConnect(state, code) {
   return { userId: data.userId, platform: data.platform };
 }
 
-/** Disconnect: revoke the channel (remove stored tokens) but KEEP the user's BYO credentials,
- *  so reconnecting is one click. A full wipe is a separate, explicit action (DELETE
- *  /credentials) or happens on account deletion. */
+/** Disconnect: SOFT-disconnect the channel (mark the row 'disconnected', keep its id) and KEEP
+ *  the user's BYO credentials, so reconnecting is one click AND reuses the same account id —
+ *  campaigns/jobs that target this account survive the reconnect. A full wipe is a separate,
+ *  explicit action (DELETE /credentials) or happens on account deletion. */
 export function disconnect(userId, platform) {
   getAdapter(platform); // validate platform
-  return deleteAccount(userId, platform);
+  return disconnectAccount(userId, platform);
 }
 
 /** Force-refresh and return a valid access token (also persists the new one). */
