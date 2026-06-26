@@ -369,7 +369,7 @@ function buildShotScrim(beat, start, end, canvas = CANVAS) {
   };
 }
 
-function buildShotOverlay(beat, start, end, style, canvas = CANVAS) {
+function buildShotOverlay(beat, start, end, canvas = CANVAS) {
   const dur = parseFloat((end - start).toFixed(3));
   const d = Math.min(0.35 * dur, 0.9); // the stark line lands shortly after the cut
   const y = Math.round(canvas.height * 0.74);
@@ -506,6 +506,18 @@ export async function runPromptPipeline(params, onStep) {
   const { style, palette } = film;
   let beats = film.beats;
 
+  // ── Safety: moderate the EFFECTIVE production content before synthesis ─────
+  // A plan from the review step is client-editable and skips the prompt moderation above, so a
+  // user could smuggle arbitrary script_line / image_prompt straight into TTS and image-gen.
+  // Moderate the actual text we're about to synthesize (script + image prompts + stock queries +
+  // on-screen copy) regardless of how we got here. Throws CONTENT_BLOCKED → route refunds.
+  const moderationText = beats.map((b) => {
+    const contentText = b.content && typeof b.content === "object"
+      ? Object.values(b.content).filter((v) => typeof v === "string").join(" ") : "";
+    return [b.script_line, b.image_prompt, b.shot_query, contentText].filter(Boolean).join(" ");
+  }).join("\n").trim();
+  if (moderationText) await moderateInput(moderationText, { label: "ai-video production content (script + prompts)" });
+
   // ── Stage 2: TTS FIRST — beat windows from real speech ───────────────────
   step(PROMPT_STATUS_STEPS[2]);
   let voiceoverUrl = null, voiceoverDuration = 0;
@@ -617,7 +629,7 @@ export async function runPromptPipeline(params, onStep) {
     // Fallback stark line only if overlay content exists but its design failed
     const hasDesignedOverlay = finalTimeline.layers.some(l => l.id?.startsWith(`s${beat.beat_index}_`) && l.type === "text");
     if (beat.content?.kind && beat.content.kind !== "none" && beat.content.headline && !hasDesignedOverlay) {
-      shotLayers.push(buildShotOverlay(beat, win.start, win.end, style, canvas));
+      shotLayers.push(buildShotOverlay(beat, win.start, win.end, canvas));
     }
   }
   if (shotLayers.length) finalTimeline.layers = [...shotLayers, ...finalTimeline.layers];
@@ -689,9 +701,14 @@ export async function runPromptPipeline(params, onStep) {
       })
       .select("id").single();
     editorProjectId = row?.id ?? null;
+    if (!editorProjectId) throw new Error("projects insert returned no id");
     console.log(`[ai-video] saved project: ${editorProjectId}`);
   } catch (e) {
-    console.warn("[ai-video] projects insert failed (non-fatal):", e.message);
+    // FATAL: the user paid for a deliverable. If we can't persist it there's nothing to open,
+    // so throw → the route's catch refunds the credits (instead of returning projectId:null
+    // with a misleading "done"). The render artifacts are cheap to regenerate on retry.
+    console.error("[ai-video] projects insert failed (fatal — refunding):", e.message);
+    throw new Error(`Save failed — your credits were refunded: ${e.message}`);
   }
 
   return {
