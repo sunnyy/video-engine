@@ -178,6 +178,13 @@ const Icons = {
       <line x1="21" y1="12" x2="9" y2="12"/>
     </svg>
   ),
+  support: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+      <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/>
+      <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>
+    </svg>
+  ),
   bell: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -460,7 +467,7 @@ export default function AppLayout({ children }) {
   // tools live under Explore; user projects under Projects. (Routes/pages kept intact.)
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
-  const inAccount = ["/credits", "/settings", "/feedback", "/brand-kit"].includes(path);
+  const inAccount = ["/credits", "/settings", "/feedback", "/brand-kit", "/support"].includes(path);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -531,6 +538,7 @@ export default function AppLayout({ children }) {
               <NavItem icon={Icons.brand}    label="Brand Kit" to="/brand-kit" active={path === "/brand-kit"} />
               <NavItem icon={Icons.credits}  label="Credits"  to="/credits"    active={path === "/credits"} />
               <NavItem icon={Icons.settings} label="Settings" to="/settings"   active={path === "/settings"} />
+              <NavItem icon={Icons.support}  label="Help & Support" to="/support" active={path === "/support"} />
               <NavItem icon={Icons.message}  label="Feedback" to="/feedback"   active={path === "/feedback"} />
             </FlyoutGroup>
 

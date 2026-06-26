@@ -318,3 +318,57 @@ export function userRenderCompleteEmail(name, videoUrl, projectName) {
     `),
   };
 }
+
+/* ── Support templates ─────────────────────────────────────── */
+
+export function adminSupportEmail({ kind = "new", ticketId, subject, category = "", userEmail = "", message = "" }) {
+  const isNew = kind === "new";
+  const snippet = (message || "").slice(0, 600);
+  return {
+    subject: `${isNew ? "New Support Ticket" : "Ticket Reply"} — ${subject || "(no subject)"}`,
+    html: adminWrap(`
+      <h2 style="margin:0 0 8px;font-size:18px;color:${isNew ? "#2563eb" : "#7c3aed"}">${isNew ? "New Support Ticket 🎫" : "User Replied to a Ticket 💬"}</h2>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px">
+        ${row("From", userEmail || "—")}
+        ${row("Subject", subject || "—")}
+        ${isNew ? row("Category", category || "—") : ""}
+        ${row("Ticket", `<span style="font-family:monospace;font-size:12px">${ticketId}</span>`)}
+      </table>
+      <p style="color:#71717a;font-size:13px;margin:14px 0 6px">Message:</p>
+      <div style="background:#f4f4f5;border:1px solid #e4e4e7;border-radius:8px;padding:12px 14px;color:#111118;font-size:13px;line-height:1.55;white-space:pre-wrap">${snippet}</div>
+      <a href="${APP_URL}/admin/support" style="display:inline-block;margin-top:16px;background:#111118;color:#fff;font-weight:700;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:13px">Open in Admin →</a>
+    `),
+  };
+}
+
+export function adminSlaDigestEmail({ tickets = [] }) {
+  const rows = tickets.map(t => `
+    <tr>
+      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;color:#111118;font-size:13px;font-weight:600">${t.subject || "—"}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;color:#71717a;font-size:12px">${t.user_email || "—"}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;color:#ef4444;font-size:12px;font-weight:700;text-align:right;white-space:nowrap">${t.hoursOverdue}h overdue</td>
+    </tr>`).join("");
+  return {
+    subject: `${tickets.length} support ticket${tickets.length === 1 ? "" : "s"} overdue`,
+    html: adminWrap(`
+      <h2 style="margin:0 0 8px;font-size:18px;color:#ef4444">Overdue Support Tickets ⏰</h2>
+      <p style="color:#71717a;font-size:13px;margin:0 0 14px">These tickets are past their response target and awaiting your reply:</p>
+      <table style="width:100%;border-collapse:collapse">${rows}</table>
+      <a href="${APP_URL}/admin/support" style="display:inline-block;margin-top:16px;background:#111118;color:#fff;font-weight:700;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:13px">Open Support →</a>
+    `),
+  };
+}
+
+export function userSupportReplyEmail(name, subject, message = "") {
+  const snippet = (message || "").slice(0, 600);
+  return {
+    subject: `Re: ${subject || "your support ticket"}`,
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">We've replied 💬</h2>
+      <p style="color:#c8c8d8;margin:0 0 8px">Hi ${name || "there"},</p>
+      <p style="color:#c8c8d8;margin:0 0 14px">Our team replied to your ticket <strong style="color:#e8e8f0">${subject || ""}</strong>:</p>
+      <div style="background:#0b0b10;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 16px;color:#c8c8d8;font-size:14px;line-height:1.6;white-space:pre-wrap;margin:0 0 22px">${snippet}</div>
+      <a href="${APP_URL}/support" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">View &amp; Reply →</a>
+    `),
+  };
+}

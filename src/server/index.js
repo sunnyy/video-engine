@@ -8,9 +8,10 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import {
   supabaseAdmin, TEMP_DIR, PROJECT_ROOT,
-  sendUserEmail, userPlanExpiredEmail, userPlanExpiringEmail,
+  sendUserEmail, sendAdminAlert, userPlanExpiredEmail, userPlanExpiringEmail,
 } from "./middleware/shared.js";
 import { notifyUser } from "./services/notificationService.js";
+import { adminSlaDigestEmail } from "./services/emailService.js";
 import { router as renderRouter }     from "./routes/render.js";
 import { router as ttsRouter }        from "./routes/tts.js";
 import { router as authRouter }       from "./routes/auth.js";
@@ -25,6 +26,7 @@ import { router as bannerRouter }     from "./routes/banner.js";
 import { router as adminRouter }        from "./routes/admin.js";
 import { router as announcementsRouter } from "./routes/announcements.js";
 import { router as refundClaimsRouter } from "./routes/refundClaims.js";
+import { router as supportRouter }       from "./routes/support.js";
 import { router as productVideoRouter } from "./routes/productVideo.js";
 import { router as productVideoSceneRouter } from "./routes/productVideoScene.js";
 import { router as typographyVideoRouter } from "./routes/typographyVideo.js";
@@ -175,6 +177,7 @@ app.use("/api",              authRouter);
 app.use("/api",              assetsRouter);
 app.use("/api",              paymentsRouter);
 app.use("/api",              refundClaimsRouter);
+app.use("/api",              supportRouter);
 
 /* ── Serve built frontend — must come after all API routes ── */
 app.use(express.static(path.join(PROJECT_ROOT, "dist")));
@@ -237,5 +240,41 @@ async function checkPlanExpiry() {
 }
 
 setInterval(checkPlanExpiry, 24 * 60 * 60 * 1000);
+
+// Support SLA: email the admin a digest of tickets past their response target (by priority).
+// Only counts tickets where it's the admin's turn (open/in_progress). Throttled per ticket
+// via sla_reminded_at (12h) so the same ticket isn't re-emailed every sweep.
+const SUPPORT_SLA_HOURS = { high: 4, normal: 24, low: 72 };
+async function checkSupportSla() {
+  try {
+    const now = Date.now();
+    const { data: tickets } = await supabaseAdmin
+      .from("support_tickets")
+      .select("id, subject, user_id, priority, last_message_at, sla_reminded_at")
+      .in("status", ["open", "in_progress"]);
+    const overdue = (tickets || []).filter((t) => {
+      const dueMs = new Date(t.last_message_at).getTime() + (SUPPORT_SLA_HOURS[t.priority] ?? 24) * 3600_000;
+      if (now < dueMs) return false;
+      if (t.sla_reminded_at && now - new Date(t.sla_reminded_at).getTime() < 12 * 3600_000) return false;
+      return true;
+    });
+    if (!overdue.length) return;
+
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const emailById = {}; for (const u of users || []) emailById[u.id] = u.email;
+    const rows = overdue.map((t) => ({
+      subject: t.subject, user_email: emailById[t.user_id] || "—",
+      hoursOverdue: Math.floor((now - (new Date(t.last_message_at).getTime() + (SUPPORT_SLA_HOURS[t.priority] ?? 24) * 3600_000)) / 3600_000),
+    }));
+    const mail = adminSlaDigestEmail({ tickets: rows });
+    sendAdminAlert(mail.subject, mail.html);
+    await supabaseAdmin.from("support_tickets").update({ sla_reminded_at: new Date().toISOString() }).in("id", overdue.map((t) => t.id));
+    console.log(`[support-sla] reminded admin of ${overdue.length} overdue ticket(s)`);
+  } catch (err) {
+    console.error("[support-sla] failed:", err.message);
+  }
+}
+setInterval(checkSupportSla, 60 * 60 * 1000);   // hourly
+setTimeout(checkSupportSla, 45_000);            // shortly after boot
 
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));

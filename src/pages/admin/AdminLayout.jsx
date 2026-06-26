@@ -22,6 +22,7 @@ const NAV = [
    { to: "/admin/model-avatars",  label: "Model Avatars",  icon: "◎" },
    { to: "/admin/samples",        label: "Samples",        icon: "▧" },
    { to: "/admin/feedback",       label: "Feedback",       icon: "◎" },
+   { to: "/admin/support",        label: "Support",        icon: "🎫" },
    { to: "/admin/announcements",  label: "Announcements",  icon: "📣" },
    { to: "/admin/refund-claims",  label: "Refund Claims",  icon: "⊖" },
    { to: "/admin/system",         label: "System",         icon: "◉" },

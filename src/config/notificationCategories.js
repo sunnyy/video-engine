@@ -16,6 +16,7 @@ export const NOTIFICATION_CATEGORIES = [
   { key: "renders",       label: "Renders & exports",       description: "When your videos finish rendering or fail" },
   { key: "automation",    label: "Automation & publishing", description: "Posts published, automation pauses and account reconnects" },
   { key: "account",       label: "Account",                 description: "Welcome and account updates" },
+  { key: "support",       label: "Support",                 description: "Replies and updates on your support tickets" },
   { key: "announcements", label: "Announcements",           description: "Product news and offers from Vidquence", locked: true },
 ];
 
@@ -33,6 +34,8 @@ const TYPE_TO_CATEGORY = {
   generate_video_failed: "automation", automation_paused: "automation", social_disconnected: "automation",
   // account
   welcome: "account",
+  // support
+  support_reply: "support", support_status: "support",
   // announcements
   announcement: "announcements",
 };

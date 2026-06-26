@@ -18,6 +18,7 @@ import PrivacyPolicy   from "./pages/legal/PrivacyPolicy";
 import RefundPolicy    from "./pages/legal/RefundPolicy";
 import About           from "./pages/About";
 import FAQ             from "./pages/FAQ";
+import Support         from "./pages/Support";
 import Auth            from "./pages/Auth";
 import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
@@ -69,6 +70,7 @@ import SFXLibrary     from "./pages/admin/SFXLibrary";
 import Samples        from "./pages/admin/Samples";
 import RefundClaims   from "./pages/admin/RefundClaims";
 import AnnouncementCenter from "./pages/admin/AnnouncementCenter";
+import AdminSupport   from "./pages/admin/Support";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -160,6 +162,7 @@ export default function App() {
             <Route path="/dashboard"        element={<Dashboard />} />
             <Route path="/projects"         element={<Projects />} />
             <Route path="/notifications"    element={<Notifications />} />
+            <Route path="/support"          element={<Support />} />
             <Route path="/explore"          element={<Explore />} />
             <Route path="/videos"           element={<Videos />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
@@ -211,6 +214,7 @@ export default function App() {
                 <Route path="/admin/samples"          element={<Samples />} />
                 <Route path="/admin/refund-claims"   element={<RefundClaims />} />
                 <Route path="/admin/announcements"   element={<AnnouncementCenter />} />
+                <Route path="/admin/support"         element={<AdminSupport />} />
               </>
             ) : (
               <Route path="/admin/*" element={<Navigate to="/dashboard" />} />
