@@ -55,6 +55,9 @@ export async function completeConnect(state, code) {
   return { userId: data.userId, platform: data.platform };
 }
 
+/** Disconnect: revoke the channel (remove stored tokens) but KEEP the user's BYO credentials,
+ *  so reconnecting is one click. A full wipe is a separate, explicit action (DELETE
+ *  /credentials) or happens on account deletion. */
 export function disconnect(userId, platform) {
   getAdapter(platform); // validate platform
   return deleteAccount(userId, platform);

@@ -79,9 +79,10 @@ export default function SocialAccounts() {
     } catch (e) { setConnMsg({ ok: false, text: e.message }); showToast(e.message || "Could not start connection"); setBusy(""); }
   };
 
-  // Connect button: BYO platforms route through the one-time setup if not configured yet.
+  // Connect button: BYO platforms ALWAYS open the setup modal (so the steps + credentials are
+  // always visible), then connect from there. Non-BYO platforms go straight to OAuth.
   const connectPlatform = async (platform) => {
-    if (isByo(platform) && !credStatus[platform]?.configured) { openSetup(platform); return; }
+    if (isByo(platform)) { openSetup(platform); return; }
     connectOAuth(platform);
   };
 
@@ -91,27 +92,49 @@ export default function SocialAccounts() {
     setSetup({ platform, redirectUri: info?.redirectUri || "", clientId: info?.clientId || "", clientSecret: "", configured: !!info?.configured });
   };
 
-  // Save the user's credentials, then immediately start OAuth.
+  // Save credentials (only if entered/changed), then start OAuth. When already configured, the
+  // user can just click Connect without re-typing the secret — we reuse the stored credentials.
   const saveAndConnect = async () => {
     const clientId = (setup.clientId || "").trim();
     const clientSecret = (setup.clientSecret || "").trim();
-    if (!clientId || !clientSecret) { showToast("Enter both Client ID and Client Secret"); return; }
     setBusy("setup");
     try {
-      const r = await serverFetch(`/api/social/${setup.platform}/credentials`, { method: "POST", body: JSON.stringify({ clientId, clientSecret }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) throw new Error(d.error || "Could not save credentials");
-      await loadCredStatus();
+      if (clientId && clientSecret) {
+        const r = await serverFetch(`/api/social/${setup.platform}/credentials`, { method: "POST", body: JSON.stringify({ clientId, clientSecret }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.ok) throw new Error(d.error || "Could not save credentials");
+        await loadCredStatus();
+      } else if (!setup.configured) {
+        showToast("Enter both Client ID and Client Secret"); setBusy(""); return;
+      }
       const platform = setup.platform;
       setSetup(null);
       await connectOAuth(platform);
     } catch (e) { showToast(e.message); setBusy(""); }
   };
 
+  // Disconnect = revoke the channel (tokens) but KEEP the saved credentials, so reconnect is
+  // one click. (loadCredStatus is harmless — creds remain, so the card still shows "configured".)
   const disconnectPlatform = async (platform) => {
     setBusy(`connect-${platform}`);
-    try { await serverFetch(`/api/social/${platform}/disconnect`, { method: "POST" }); await load(); showToast(`${platform} disconnected`, "info"); }
+    try { await serverFetch(`/api/social/${platform}/disconnect`, { method: "POST" }); await Promise.all([load(), loadCredStatus()]); showToast(`${platform} disconnected`, "info"); }
     catch (_) { showToast(`Couldn't disconnect ${platform}`); } finally { setBusy(""); }
+  };
+
+  // Explicit, deliberate full wipe — removes saved credentials (+ disconnects). Warned, because
+  // reconnecting afterwards means redoing the whole Google setup.
+  const removeCredentials = async () => {
+    if (!setup) return;
+    if (!window.confirm("Remove your saved Google project setup? To reconnect later you'll have to go through all the setup steps again.")) return;
+    const platform = setup.platform;
+    setBusy("setup");
+    try {
+      await serverFetch(`/api/social/${platform}/credentials`, { method: "DELETE" });
+      try { await serverFetch(`/api/social/${platform}/disconnect`, { method: "POST" }); } catch {}
+      await Promise.all([loadCredStatus(), load()]);
+      setSetup(null);
+      showToast("Setup removed", "info");
+    } catch (e) { showToast(e.message); } finally { setBusy(""); }
   };
 
   const copy = (text) => { try { navigator.clipboard.writeText(text); showToast("Copied", "success"); } catch {} };
@@ -173,6 +196,7 @@ export default function SocialAccounts() {
           setSetup={setSetup}
           busy={busy === "setup"}
           onSave={saveAndConnect}
+          onRemove={removeCredentials}
           onCopy={copy}
           T={T}
           btn={btn}
@@ -183,7 +207,7 @@ export default function SocialAccounts() {
 }
 
 /* ── One-time BYO setup modal ──────────────────────────────────────────────── */
-function SetupModal({ setup, setSetup, busy, onSave, onCopy, T, btn }) {
+function SetupModal({ setup, setSetup, busy, onSave, onRemove, onCopy, T, btn }) {
   const label = setup.platform === "youtube" ? "YouTube" : setup.platform;
   const consoleUrl = "https://console.cloud.google.com/";
   const steps = [
@@ -205,58 +229,100 @@ function SetupModal({ setup, setSetup, busy, onSave, onCopy, T, btn }) {
 
   const input = { width: "100%", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13, padding: "10px 12px", fontFamily: "inherit", boxSizing: "border-box" };
 
+  // Already configured users default to the compact reconnect view; first-timers see the full
+  // steps. "Use a different Google project" flips a configured user into the full editor.
+  const [editing, setEditing] = useState(!setup.configured);
+  const showFull = !setup.configured || editing;
+  const maskedId = setup.clientId ? setup.clientId.replace(/^(.{8}).*?(.{6})$/, "$1…$2") : "";
+  const title = !setup.configured ? `Connect ${label} — one-time setup` : editing ? `Update ${label} credentials` : `Reconnect ${label}`;
+
+  const unverifiedNote = (
+    <div style={{ background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.25)", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 12.5, color: "rgba(255,255,255,0.78)", lineHeight: 1.6 }}>
+      <strong style={{ color: "#f5c518" }}>What to expect next:</strong> Google shows a <strong style={{ color: T.text }}>"Google hasn't verified this app"</strong> screen. That's normal and <strong style={{ color: T.text }}>not a risk</strong> — it's <em>your own</em> app connecting to <em>your own</em> channel. Click <strong style={{ color: T.text }}>Advanced → Go to {label} (unsafe)</strong>, then <strong style={{ color: T.text }}>Allow</strong>. No verification is needed.
+      <img
+        src="/assets/images/google-unverified.png"
+        alt="Google 'hasn't verified this app' screen — click Advanced, then Go to your app"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        style={{ display: "block", width: "100%", borderRadius: 8, border: `1px solid ${T.border}`, marginTop: 10 }}
+      />
+    </div>
+  );
+
   return (
     <div onClick={() => !busy && setSetup(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "40px 16px" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24, maxWidth: 560, width: "100%", marginBottom: 40 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: T.text, margin: 0 }}>Connect {label} — one-time setup</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: T.text, margin: 0 }}>{title}</h2>
           <button onClick={() => setSetup(null)} disabled={busy} style={{ background: "none", border: "none", color: T.muted, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
         </div>
-        <p style={{ fontSize: 13, color: T.muted, marginTop: 0, marginBottom: 18, lineHeight: 1.6 }}>
-          This connects {label} through your own Google project so uploads run on your own quota. You only do this once.
-        </p>
 
-        <ol style={{ paddingLeft: 20, margin: "0 0 18px", display: "flex", flexDirection: "column", gap: 10 }}>
-          {steps.map((s, i) => (
-            <li key={i} style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
-              {s}
-              {i === 4 && (
-                <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                  <code style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 12, padding: "9px 11px", overflowX: "auto", whiteSpace: "nowrap" }}>{setup.redirectUri || "—"}</code>
-                  <button onClick={() => onCopy(setup.redirectUri)} style={{ ...btn(T.accent), padding: "9px 12px", flexShrink: 0 }}>Copy</button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ol>
+        {!showFull ? (
+          // ── Compact reconnect: creds already saved, no need to redo setup ──
+          <>
+            <p style={{ fontSize: 13, color: T.muted, marginTop: 0, marginBottom: 16, lineHeight: 1.6 }}>
+              Your Google project is already set up{maskedId ? <> (Client ID <code style={{ color: T.text }}>{maskedId}</code>)</> : ""}. Reconnecting just re-authorizes your channel — no setup needed.
+            </p>
+            {unverifiedNote}
+            <div style={{ fontSize: 12.5, marginBottom: 16 }}>
+              <button onClick={() => setEditing(true)} style={{ background: "none", border: "none", color: T.accent, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Use a different Google project →</button>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+              <button onClick={onRemove} disabled={busy} style={{ ...btn("transparent"), border: "1px solid rgba(248,113,113,0.4)", color: "#f87171" }}>Remove &amp; start over</button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setSetup(null)} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted }}>Cancel</button>
+                <button onClick={onSave} disabled={busy} style={{ ...btn(T.accent), opacity: busy ? 0.6 : 1 }}>{busy ? "Working…" : "Connect"}</button>
+              </div>
+            </div>
+          </>
+        ) : (
+          // ── Full setup: first-time, or switching to a different project ──
+          <>
+            <p style={{ fontSize: 13, color: T.muted, marginTop: 0, marginBottom: 18, lineHeight: 1.6 }}>
+              This connects {label} through your own Google project so uploads run on your own quota. You only do this once.
+            </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-          <div>
-            <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client ID</label>
-            <input style={input} value={setup.clientId} placeholder="xxxxx.apps.googleusercontent.com"
-              onChange={(e) => setSetup({ ...setup, clientId: e.target.value })} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client Secret</label>
-            <input style={input} type="password" value={setup.clientSecret} placeholder={setup.configured ? "•••••••• (re-enter to update)" : "GOCSPX-…"}
-              onChange={(e) => setSetup({ ...setup, clientSecret: e.target.value })} />
-          </div>
-        </div>
+            <ol style={{ paddingLeft: 20, margin: "0 0 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {steps.map((s, i) => (
+                <li key={i} style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
+                  {s}
+                  {i === 4 && (
+                    <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                      <code style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 12, padding: "9px 11px", overflowX: "auto", whiteSpace: "nowrap" }}>{setup.redirectUri || "—"}</code>
+                      <button onClick={() => onCopy(setup.redirectUri)} style={{ ...btn(T.accent), padding: "9px 12px", flexShrink: 0 }}>Copy</button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
 
-        <div style={{ background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.25)", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 12.5, color: "rgba(255,255,255,0.78)", lineHeight: 1.6 }}>
-          <strong style={{ color: "#f5c518" }}>What to expect next:</strong> after you click Save &amp; Connect, Google shows a <strong style={{ color: T.text }}>"Google hasn't verified this app"</strong> screen. That's normal and <strong style={{ color: T.text }}>not a risk</strong> — it's <em>your own</em> app connecting to <em>your own</em> channel. Click <strong style={{ color: T.text }}>Advanced → Go to {label} (unsafe)</strong>, then <strong style={{ color: T.text }}>Allow</strong>. No verification is needed.
-          <img
-            src="/assets/images/google-unverified.png"
-            alt="Google 'hasn't verified this app' screen — click Advanced, then Go to your app"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-            style={{ display: "block", width: "100%", borderRadius: 8, border: `1px solid ${T.border}`, marginTop: 10 }}
-          />
-        </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+              <div>
+                <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client ID</label>
+                <input style={input} value={setup.clientId} placeholder="xxxxx.apps.googleusercontent.com"
+                  onChange={(e) => setSetup({ ...setup, clientId: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client Secret</label>
+                <input style={input} type="password" value={setup.clientSecret} placeholder="GOCSPX-…"
+                  onChange={(e) => setSetup({ ...setup, clientSecret: e.target.value })} />
+              </div>
+            </div>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={() => setSetup(null)} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted }}>Cancel</button>
-          <button onClick={onSave} disabled={busy} style={{ ...btn(T.accent), opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : "Save & Connect"}</button>
-        </div>
+            {unverifiedNote}
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                {setup.configured && (
+                  <button onClick={() => setEditing(false)} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted }}>← Back</button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setSetup(null)} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted }}>Cancel</button>
+                <button onClick={onSave} disabled={busy} style={{ ...btn(T.accent), opacity: busy ? 0.6 : 1 }}>{busy ? "Working…" : "Save & Connect"}</button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

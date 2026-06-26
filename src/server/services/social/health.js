@@ -21,11 +21,11 @@ async function notifyBroken(userId, platform, reason) {
     const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
     if (user?.email) {
       await sendUserEmail(user.email, `Reconnect your ${platform} account`,
-        `<p>Your <b>${platform}</b> connection stopped working (${reason}) and AutoPilot can no longer publish to it.</p>
-         <p>Open AutoPilot and reconnect ${platform} to resume automatic posting.</p>`);
+        `<p>Your <b>${platform}</b> connection stopped working, so Automation can no longer publish to it.</p>
+         <p>Open Vidquence and reconnect ${platform} to resume automatic posting.</p>`);
     }
   } catch (_) {}
-  notifyUser(userId, { type: "social_disconnected", icon: "🔌", severity: "error", link: "/autopilot",
+  notifyUser(userId, { type: "social_disconnected", icon: "🔌", severity: "error", link: "/connections",
     title: `Reconnect your ${platform} account`, body: `Your ${platform} connection stopped working — reconnect to resume posting.` });
 }
 
