@@ -12,6 +12,7 @@
 import { getAdapter, capabilitiesOf } from "./adapters/index.js";
 import { signState, verifyState } from "./crypto.js";
 import { saveAccount, deleteAccount, getFreshAccessToken, getFreshAccessTokenByAccountId } from "./accounts.js";
+import { getAppCredentials } from "./appCredentials.js";
 
 /** Public capability descriptor for a platform (scheduling/tags/privacy/limits). */
 export function capabilities(platform) {
@@ -35,18 +36,21 @@ export function normalizeMetadata(platform, metadata = {}) {
   return out;
 }
 
-/** Build the OAuth consent URL (state carries the userId across the redirect). */
-export function connect(userId, platform) {
+/** Build the OAuth consent URL (state carries the userId across the redirect). Uses the user's
+ *  own OAuth app credentials (BYO) so consent + upload run on their project. */
+export async function connect(userId, platform) {
   const adapter = getAdapter(platform);
-  return adapter.getAuthUrl(signState({ userId, platform }));
+  const creds = await getAppCredentials(userId, platform); // null → adapter falls back to env
+  return adapter.getAuthUrl(signState({ userId, platform }), creds);
 }
 
-/** Finish OAuth: verify state, exchange the code, persist encrypted tokens. */
+/** Finish OAuth: verify state, exchange the code with the user's credentials, persist tokens. */
 export async function completeConnect(state, code) {
   const data = verifyState(state);
   if (!data?.userId || !data?.platform) throw new Error("Invalid or expired OAuth state");
   const adapter = getAdapter(data.platform);
-  const tokens = await adapter.handleCallback(code);
+  const creds = await getAppCredentials(data.userId, data.platform);
+  const tokens = await adapter.handleCallback(code, creds);
   await saveAccount(data.userId, data.platform, tokens);
   return { userId: data.userId, platform: data.platform };
 }

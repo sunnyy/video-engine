@@ -11,6 +11,7 @@ import { supabaseAdmin, sendUserEmail } from "../../middleware/shared.js";
 import { notifyUser } from "../notificationService.js";
 import { encrypt, decrypt } from "./crypto.js";
 import { getAdapter } from "./adapters/index.js";
+import { getAppCredentials } from "./appCredentials.js";
 import { logEvent } from "../automation/events.js";
 
 const REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000; // refresh anything expiring within 24h
@@ -55,7 +56,8 @@ export async function checkOAuthHealth() {
       const refreshToken = decrypt(acct.refresh_token);
       if (!refreshToken) { if (await markBroken(acct, "no refresh token")) broken++; continue; }
 
-      const fresh = await getAdapter(acct.platform).refresh(refreshToken);
+      const creds = await getAppCredentials(acct.user_id, acct.platform);
+      const fresh = await getAdapter(acct.platform).refresh(refreshToken, creds);
       await supabaseAdmin.from("social_accounts").update({
         access_token: encrypt(fresh.access_token), expires_at: fresh.expires_at,
         status: "connected", updated_at: new Date().toISOString(),

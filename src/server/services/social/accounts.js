@@ -6,6 +6,7 @@
 import { supabaseAdmin } from "../../middleware/shared.js";
 import { encrypt, decrypt } from "./crypto.js";
 import { getAdapter } from "./adapters/index.js";
+import { getAppCredentials } from "./appCredentials.js";
 
 /** Public, token-free view safe to send to the client. */
 function publicAccount(row) {
@@ -69,7 +70,8 @@ export async function getFreshAccessTokenByAccountId(accountId) {
     await supabaseAdmin.from("social_accounts").update({ status: "error" }).eq("id", data.id);
     throw new Error(`${data.platform} token expired and has no refresh token — reconnect required`);
   }
-  const fresh = await getAdapter(data.platform).refresh(refreshToken);
+  const creds = await getAppCredentials(data.user_id, data.platform);
+  const fresh = await getAdapter(data.platform).refresh(refreshToken, creds);
   await supabaseAdmin.from("social_accounts").update({
     access_token: encrypt(fresh.access_token), expires_at: fresh.expires_at,
     status: "connected", updated_at: new Date().toISOString(),
@@ -95,7 +97,8 @@ export async function getFreshAccessToken(userId, platform) {
     await supabaseAdmin.from("social_accounts").update({ status: "error" }).eq("id", data.id);
     throw new Error(`${platform} token expired and has no refresh token — reconnect required`);
   }
-  const fresh = await getAdapter(platform).refresh(refreshToken);
+  const creds = await getAppCredentials(userId, platform);
+  const fresh = await getAdapter(platform).refresh(refreshToken, creds);
   await supabaseAdmin.from("social_accounts").update({
     access_token: encrypt(fresh.access_token), expires_at: fresh.expires_at,
     status: "connected", updated_at: new Date().toISOString(),

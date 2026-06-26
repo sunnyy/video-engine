@@ -6,6 +6,7 @@ import express from "express";
 import { requireAuth } from "../middleware/shared.js";
 import { connect, completeConnect, disconnect } from "../services/social/service.js";
 import { listAccounts } from "../services/social/accounts.js";
+import { saveAppCredentials, deleteAppCredentials, hasAppCredentials } from "../services/social/appCredentials.js";
 import { supportedPlatforms, allCapabilities } from "../services/social/adapters/index.js";
 import { enqueue } from "../jobs/queue.js";
 import { supabaseAdmin } from "../middleware/shared.js";
@@ -14,6 +15,10 @@ export const router = express.Router();
 
 // Where to send the browser back to after the OAuth round-trip (frontend origin).
 const APP_URL = process.env.APP_PUBLIC_URL || process.env.VITE_APP_URL || "";
+// The OAuth callback URL users must add to THEIR own Google OAuth client's authorized
+// redirect URIs (must match the adapter's cfg() exactly).
+const OAUTH_BASE = process.env.OAUTH_REDIRECT_BASE || process.env.VITE_APP_URL || "";
+const redirectUriFor = (platform) => `${OAUTH_BASE}/api/social/${platform}/callback`;
 
 /** List the user's connected accounts (no tokens) + which platforms are supported. */
 router.get("/accounts", requireAuth, async (req, res) => {
@@ -23,7 +28,32 @@ router.get("/accounts", requireAuth, async (req, res) => {
 
 /** Start OAuth — returns the consent URL for the client to navigate to. */
 router.get("/:platform/connect", requireAuth, async (req, res) => {
-  try { res.json({ url: connect(req.user.id, req.params.platform) }); }
+  try { res.json({ url: await connect(req.user.id, req.params.platform) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+/**
+ * BYO OAuth app credentials — the user's own cloud project client_id/secret, so publishing
+ * runs on their quota. Secrets are encrypted server-side and never returned to the client.
+ * GET returns only whether it's configured + the redirect URI to paste into their OAuth client.
+ */
+router.get("/:platform/credentials", requireAuth, async (req, res) => {
+  try {
+    const status = await hasAppCredentials(req.user.id, req.params.platform);
+    res.json({ ...status, redirectUri: redirectUriFor(req.params.platform) });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post("/:platform/credentials", requireAuth, async (req, res) => {
+  try {
+    const { clientId, clientSecret } = req.body || {};
+    const saved = await saveAppCredentials(req.user.id, req.params.platform, { clientId, clientSecret });
+    res.json({ ok: true, clientId: saved.clientId, redirectUri: redirectUriFor(req.params.platform) });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.delete("/:platform/credentials", requireAuth, async (req, res) => {
+  try { await deleteAppCredentials(req.user.id, req.params.platform); res.json({ ok: true }); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 

@@ -3,9 +3,10 @@
  * contract: getAuthUrl / handleCallback / refresh / publish. All Google-specific code
  * lives here so other platforms are just sibling adapters.
  *
- * Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and OAUTH_REDIRECT_BASE (the PUBLIC URL of
- * this API, e.g. https://api.vidquence.com). The registered redirect URI must be exactly
- * `${OAUTH_REDIRECT_BASE}/api/social/youtube/callback`.
+ * BYO-only: per-user client_id/secret are passed in (stored via appCredentials.js); there is
+ * no central app. Env: OAUTH_REDIRECT_BASE (the PUBLIC URL of this API, e.g.
+ * https://api.vidquence.com). Each user registers `${OAUTH_REDIRECT_BASE}/api/social/youtube/callback`
+ * as an authorized redirect URI in their own OAuth client.
  */
 import fs from "fs";
 
@@ -19,11 +20,15 @@ const SCOPES = [
   "https://www.googleapis.com/auth/youtube.readonly",
 ];
 
-function cfg() {
-  const id     = process.env.GOOGLE_CLIENT_ID;
-  const secret = process.env.GOOGLE_CLIENT_SECRET;
+// Resolve the OAuth client for this call. BYO-only: each user supplies their own
+// client_id/secret (creds), so uploads always run on the user's own project quota — there is
+// no shared/central app. The redirect URI is always OURS (from OAUTH_REDIRECT_BASE); users add
+// it to their own OAuth client's authorized redirects.
+function cfg(creds) {
+  const id     = creds?.id;
+  const secret = creds?.secret;
   const base   = process.env.OAUTH_REDIRECT_BASE || process.env.VITE_APP_URL || "http://localhost:5000";
-  if (!id || !secret) throw new Error("YouTube is not configured (set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)");
+  if (!id || !secret) throw new Error("Connect your own Google project first — YouTube uses your own credentials");
   return { id, secret, redirect: `${base}/api/social/youtube/callback` };
 }
 
@@ -55,8 +60,8 @@ export const youtube = {
     maxTags: 30,
   },
 
-  getAuthUrl(state) {
-    const { id, redirect } = cfg();
+  getAuthUrl(state, creds) {
+    const { id, redirect } = cfg(creds);
     const p = new URLSearchParams({
       client_id: id, redirect_uri: redirect, response_type: "code",
       scope: SCOPES.join(" "), access_type: "offline", prompt: "consent",
@@ -65,8 +70,8 @@ export const youtube = {
     return `${AUTH_URL}?${p.toString()}`;
   },
 
-  async handleCallback(code) {
-    const { id, secret, redirect } = cfg();
+  async handleCallback(code, creds) {
+    const { id, secret, redirect } = cfg(creds);
     const res = await fetch(TOKEN_URL, {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ code, client_id: id, client_secret: secret, redirect_uri: redirect, grant_type: "authorization_code" }),
@@ -84,8 +89,8 @@ export const youtube = {
     };
   },
 
-  async refresh(refreshToken) {
-    const { id, secret } = cfg();
+  async refresh(refreshToken, creds) {
+    const { id, secret } = cfg(creds);
     const res = await fetch(TOKEN_URL, {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ refresh_token: refreshToken, client_id: id, client_secret: secret, grant_type: "refresh_token" }),
