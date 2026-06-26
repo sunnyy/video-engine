@@ -161,6 +161,15 @@ router.post("/campaigns/:id/retry-post", requireAuth, async (req, res) => {
       .select("id, platform, status").eq("user_id", req.user.id).eq("platform", post.platform).eq("status", "connected").maybeSingle();
     if (!acct) return res.status(400).json({ error: `No connected ${post.platform} account — reconnect it first` });
 
+    // Serialize publishes: refuse if one is already queued/running for this campaign, so repeated
+    // Retry clicks (or direct API calls) can't stack a burst of uploads. The UI also disables the
+    // buttons while publishing; this is the server-side backstop.
+    const { count: activePublishes } = await supabaseAdmin.from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "publish_post").in("status", ["queued", "running"])
+      .filter("payload->>campaignId", "eq", campaign.id);
+    if (activePublishes > 0) return res.status(409).json({ error: "A publish is already in progress — wait for it to finish, then retry." });
+
     // Rebuild publish metadata from the saved project's publish copy + the campaign's privacy.
     const { data: proj } = await supabaseAdmin.from("projects").select("name, safe_project_json").eq("id", post.project_id).maybeSingle();
     const pub = proj?.safe_project_json?.meta?.publish || {};

@@ -110,6 +110,10 @@ export default function CampaignDetail() {
   const c = data.campaign;
   const st = STATUS[c.status] || STATUS.draft;
   const generating = (data.active || []).some(j => j.type === "generate_video"); // a video is already being made
+  // Serialize retries: disable ALL Retry buttons while any publish is in flight (a queued/running
+  // publish_post, or a retry we just fired) so a user can't mass-click Retry across many failed
+  // posts and stack a pile of uploads at once.
+  const publishing = busy.startsWith("retry-") || (data.active || []).some(j => j.type === "publish_post");
   const fieldStyle = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13, padding: "8px 10px", outline: "none", fontFamily: "inherit" };
   const lbl = { fontSize: 11, fontWeight: 700, color: T.muted, marginBottom: 4, display: "block" };
   const opt = { background: T.surface, color: T.text };
@@ -248,7 +252,7 @@ export default function CampaignDetail() {
                     </span>
                     {p.platform_post_id && p.platform === "youtube"
                       ? <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>
-                      : (p.status === "failed" || p.status === "deferred") && <button onClick={() => retryPost(p.id)} disabled={busy === `retry-${p.id}`} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5, opacity: busy === `retry-${p.id}` ? 0.6 : 1 }}>{busy === `retry-${p.id}` ? "Retrying…" : "Retry"}</button>}
+                      : (p.status === "failed" || p.status === "deferred") && <button onClick={() => retryPost(p.id)} disabled={publishing} title={publishing ? "A publish is in progress — wait for it to finish" : "Re-publish this video"} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5, opacity: publishing ? 0.45 : 1, cursor: publishing ? "not-allowed" : "pointer" }}>{busy === `retry-${p.id}` ? "Retrying…" : "Retry"}</button>}
                   </div>
                 ))}
               </div>
