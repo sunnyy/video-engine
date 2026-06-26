@@ -38,7 +38,12 @@ function localFontsCss() {
     _localFontCss = css.replace(/url\(['"]?\.\/([^'")]+)['"]?\)/g, (m, file) => {
       try {
         const buf = fs.readFileSync(path.join(FONTS_DIR, file));
-        return `url(data:font/woff2;base64,${buf.toString("base64")}) format('woff2')`;
+        // Replace ONLY the url(); the original rule already ends with format('woff2').
+        // Appending another here makes a double-format src descriptor — Chrome then can't
+        // load the exact weight face and SYNTHESIZES bold from a different weight, measuring
+        // text ~4% narrower than the real render font → boxes too tight → wrap/overflow at
+        // render. Keeping the original's single format() makes measure match render.
+        return `url(data:font/woff2;base64,${buf.toString("base64")})`;
       } catch { return m; }
     });
   } catch {
