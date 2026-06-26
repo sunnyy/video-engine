@@ -93,7 +93,7 @@ router.post("/publish", requireAuth, async (req, res) => {
     for (const id of accountIds) {
       const acct = byId[id];
       if (!acct || acct.status !== "connected") continue;
-      await enqueue("publish_post", { userId: req.user.id, accountId: acct.id, platform: acct.platform, videoUrl, projectId, metadata }, { userId: req.user.id, maxAttempts: 5 });
+      await enqueue("publish_post", { userId: req.user.id, accountId: acct.id, platform: acct.platform, videoUrl, projectId, metadata }, { userId: req.user.id, maxAttempts: 5, priority: -10 });
       queued++;
     }
     if (!queued) return res.status(400).json({ error: "No connected accounts selected" });
@@ -120,7 +120,7 @@ router.post("/render-and-publish", requireAuth, async (req, res) => {
     const job = await enqueue(
       "render_timeline",
       { userId: req.user.id, projectId, project, chain: { publish: { accounts, metadata, autoPublish: true } } },
-      { userId: req.user.id, maxAttempts: 3 },
+      { userId: req.user.id, maxAttempts: 3, priority: -5 },
     );
     res.json({ jobId: job.id, accounts: accounts.length });
   } catch (e) { res.status(400).json({ error: e.message }); }

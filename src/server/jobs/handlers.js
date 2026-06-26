@@ -39,6 +39,15 @@ function watchCancel(jobId) {
  * hard-killed-then-resumed job can never double-charge. Returns { deduped } when already paid.
  */
 
+// Next time the platform's daily quota resets, as an epoch ms. YouTube resets at midnight
+// Pacific (07:00 UTC PDT / 08:00 UTC PST); we target 09:00 UTC so we're safely past both.
+const nextQuotaResetMs = () => {
+  const now = new Date();
+  const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 9, 0, 0));
+  if (t.getTime() <= now.getTime()) t.setUTCDate(t.getUTCDate() + 1);
+  return t.getTime();
+};
+
 async function chargeForGeneration(userId, cost, jobId) {
   const tag = `[job:${jobId}]`;
   const { data: prior } = await supabaseAdmin.from("credit_transactions")
@@ -106,7 +115,7 @@ registerHandler("render_timeline", async (payload, job) => {
     const { accounts, metadata = {}, autoPublish = true } = payload.chain.publish;
     if (autoPublish) {
       for (const acct of accounts) {
-        await enqueue("publish_post", { userId, campaignId, accountId: acct.id, platform: acct.platform, videoUrl, projectId, metadata }, { userId, maxAttempts: 5 });
+        await enqueue("publish_post", { userId, campaignId, accountId: acct.id, platform: acct.platform, videoUrl, projectId, metadata }, { userId, maxAttempts: 5, priority: -10 });
       }
     } else {
       const nowIso = new Date().toISOString();
@@ -198,6 +207,14 @@ registerHandler("publish_post", async (payload) => {
       title: `Published to ${platform}`, body: "Your video is now live." });
     return { postId, platform_post_id: result.platform_post_id, url: result.url };
   } catch (err) {
+    if (err.quota) {
+      // Temporary quota/rate limit (not an auth failure): defer to after the reset instead of
+      // failing the post or flagging the account. The user's own quota frees up daily.
+      await enqueue("publish_post", { ...payload, postId }, { userId, runAt: nextQuotaResetMs(), maxAttempts: 5, priority: -10 });
+      if (postId) await supabaseAdmin.from("published_posts").update({ status: "deferred", error: "Daily upload quota reached — will retry after it resets", updated_at: new Date().toISOString() }).eq("id", postId);
+      logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "info", message: "deferred — upload quota reached", meta: { platform } });
+      return { deferred: true, platform, postId };
+    }
     await supabaseAdmin.from("published_posts").update({
       status: "failed", error: (err.message || "").slice(0, 1000), updated_at: new Date().toISOString(),
     }).eq("id", postId);
@@ -309,7 +326,7 @@ registerHandler("generate_video", async (payload, job) => {
     await enqueue("render_timeline", {
       userId, campaignId, projectId,
       chain: { publish: { accounts, metadata, autoPublish: campaign.auto_publish !== false } },
-    }, { userId, maxAttempts: 3 });
+    }, { userId, maxAttempts: 3, priority: -5 });
 
     logEvent({ userId, campaignId, action: "generate", entity: "project", entityId: projectId, status: "ok", message: topic.title, meta: { topicId: topic.id, attempt: job.attempts } });
     return { projectId, topicId: topic.id };

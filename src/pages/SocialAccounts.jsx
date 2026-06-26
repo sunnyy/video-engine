@@ -210,22 +210,42 @@ export default function SocialAccounts() {
 function SetupModal({ setup, setSetup, busy, onSave, onRemove, onCopy, T, btn }) {
   const label = setup.platform === "youtube" ? "YouTube" : setup.platform;
   const consoleUrl = "https://console.cloud.google.com/";
-  const steps = [
-    <>Open the <a href={consoleUrl} target="_blank" rel="noreferrer" style={{ color: "#f5c518" }}>Google Cloud Console</a>, create or pick a project, then in <strong style={{ color: T.text }}>APIs &amp; Services → Library</strong> enable <strong style={{ color: T.text }}>YouTube Data API v3</strong>.</>,
+  // Two guided paths — Google's UI differs for brand-new projects vs. ones already set up.
+  // Both keep the redirect-URI copy box at index 4 (step 5).
+  const firstTimeSteps = [
+    <>Open the <a href={consoleUrl} target="_blank" rel="noreferrer" style={{ color: "#f5c518" }}>Google Cloud Console</a>, create or pick a project, then in <a href="https://console.cloud.google.com/apis/dashboard?authuser=1" target="_blank" rel="noreferrer" style={{ color: "#f5c518" }}>APIs &amp; Services</a> → <strong style={{ color: T.text }}>Library</strong> enable <strong style={{ color: T.text }}>YouTube Data API v3</strong>.</>,
     <>
-      Open <strong style={{ color: T.text }}>Google Auth Platform</strong> (APIs &amp; Services → OAuth consent screen), click <strong style={{ color: T.text }}>Get started</strong>, and fill the short wizard:
+      Open <strong style={{ color: T.text }}>Google Auth Platform</strong> (APIs &amp; Services → OAuth consent screen) and click <strong style={{ color: T.text }}>Get started</strong>. Fill the short wizard:
       <ul style={{ paddingLeft: 18, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 5 }}>
         <li><strong style={{ color: T.text }}>App Information</strong> → App name (anything — e.g. your channel name or "My Publisher", only you see it) + your email as support email.</li>
         <li><strong style={{ color: T.text }}>Audience</strong> → choose <strong style={{ color: T.text }}>External</strong>.</li>
-        <li><strong style={{ color: T.text }}>Contact Information</strong> → enter your email (Google uses it for project notices).</li>
+        <li><strong style={{ color: T.text }}>Contact Information</strong> → enter your email.</li>
         <li><strong style={{ color: T.text }}>Finish</strong> → agree, then click <strong style={{ color: T.text }}>Create</strong>.</li>
       </ul>
     </>,
     <>Open the <strong style={{ color: T.text }}>Audience</strong> tab. Under <strong style={{ color: T.text }}>Publishing status</strong> (it starts on "Testing"), click <strong style={{ color: T.text }}>Publish app</strong>, then <strong style={{ color: T.text }}>Confirm</strong> on the "Push to production?" dialog. <strong style={{ color: "#f5c518" }}>This step is essential</strong> — on "Testing" your connection breaks every 7 days. Connecting your own channel needs no verification, so ignore that note in the dialog.</>,
     <>Open the <strong style={{ color: T.text }}>Clients</strong> tab → <strong style={{ color: T.text }}>Create client</strong> → application type <strong style={{ color: T.text }}>Web application</strong>.</>,
     <>In that client's <strong style={{ color: T.text }}>Authorized redirect URIs</strong>, add this exact URL:</>,
-    <>Click <strong style={{ color: T.text }}>Create</strong>, then copy the <strong style={{ color: T.text }}>Client ID</strong> and <strong style={{ color: T.text }}>Client Secret</strong> into the fields below.</>,
+    <>Click <strong style={{ color: T.text }}>Create</strong> — Google shows the <strong style={{ color: T.text }}>Client ID</strong> and <strong style={{ color: T.text }}>Client Secret</strong> once. Copy both into the <strong style={{ color: T.text }}>Client ID</strong> and <strong style={{ color: T.text }}>Client Secret</strong> fields right side.</>,
   ];
+
+  const returningSteps = [
+    <>Open the <a href={consoleUrl} target="_blank" rel="noreferrer" style={{ color: "#f5c518" }}>Google Cloud Console</a> and select your existing project. Make sure <strong style={{ color: T.text }}>YouTube Data API v3</strong> is enabled under <a href="https://console.cloud.google.com/apis/dashboard?authuser=1" target="_blank" rel="noreferrer" style={{ color: "#f5c518" }}>APIs &amp; Services</a> → <strong style={{ color: T.text }}>Library</strong>.</>,
+    <>
+      Open <strong style={{ color: T.text }}>Google Auth Platform</strong> (APIs &amp; Services → OAuth consent screen) — it opens on the <strong style={{ color: T.text }}>Overview</strong> page. Your app is already configured; if you want to double-check, the settings live in the tabs on the left:
+      <ul style={{ paddingLeft: 18, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 5 }}>
+        <li><strong style={{ color: T.text }}>Branding</strong> → app name, support email, developer contact email.</li>
+        <li><strong style={{ color: T.text }}>Audience</strong> → <strong style={{ color: T.text }}>User type</strong> is <strong style={{ color: T.text }}>External</strong>.</li>
+      </ul>
+    </>,
+    <>Open the <strong style={{ color: T.text }}>Audience</strong> tab. If <strong style={{ color: T.text }}>Publishing status</strong> shows <strong style={{ color: T.text }}>"Testing"</strong>, click <strong style={{ color: T.text }}>Publish app</strong> → <strong style={{ color: T.text }}>Confirm</strong>. <strong style={{ color: "#f5c518" }}>This is essential</strong> — on "Testing" your connection breaks every 7 days. (If it already says "In production", you're set.)</>,
+    <>Open the <strong style={{ color: T.text }}>Clients</strong> tab and open your existing <strong style={{ color: T.text }}>Web application</strong> client (or <strong style={{ color: T.text }}>Create client</strong> → Web application if you don't have one).</>,
+    <>In that client's <strong style={{ color: T.text }}>Authorized redirect URIs</strong>, make sure this exact URL is listed — add it if it's missing:</>,
+    <>Google won't show an existing client's secret. Under <strong style={{ color: T.text }}>Client secrets</strong> click <strong style={{ color: T.text }}>Add secret</strong>, copy the new secret it shows, and paste it with your <strong style={{ color: T.text }}>Client ID</strong> into the fields on right side.</>,
+  ];
+
+  const [mode, setMode] = useState("first");
+  const steps = mode === "first" ? firstTimeSteps : returningSteps;
 
   const input = { width: "100%", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13, padding: "10px 12px", fontFamily: "inherit", boxSizing: "border-box" };
 
@@ -250,16 +270,16 @@ function SetupModal({ setup, setSetup, busy, onSave, onRemove, onCopy, T, btn })
 
   return (
     <div onClick={() => !busy && setSetup(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "40px 16px" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24, maxWidth: 560, width: "100%", marginBottom: 40 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: T.text, margin: 0 }}>{title}</h2>
-          <button onClick={() => setSetup(null)} disabled={busy} style={{ background: "none", border: "none", color: T.muted, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24, width: showFull ? "min(1040px, 82vw)" : "min(480px, 94vw)", maxWidth: "100%", marginBottom: 40 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 4 }}>
+          <button onClick={() => setSetup(null)} disabled={busy} style={{ background: "none", border: "none", color: T.muted, fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
         </div>
 
         {!showFull ? (
           // ── Compact reconnect: creds already saved, no need to redo setup ──
           <>
-            <p style={{ fontSize: 13, color: T.muted, marginTop: 0, marginBottom: 16, lineHeight: 1.6 }}>
+            <h2 style={{ fontSize: 19, fontWeight: 800, color: T.text, margin: "0 0 8px" }}>{title}</h2>
+            <p style={{ fontSize: 13.5, color: T.muted, marginTop: 0, marginBottom: 16, lineHeight: 1.6 }}>
               Your Google project is already set up{maskedId ? <> (Client ID <code style={{ color: T.text }}>{maskedId}</code>)</> : ""}. Reconnecting just re-authorizes your channel — no setup needed.
             </p>
             {unverifiedNote}
@@ -277,38 +297,61 @@ function SetupModal({ setup, setSetup, busy, onSave, onRemove, onCopy, T, btn })
         ) : (
           // ── Full setup: first-time, or switching to a different project ──
           <>
-            <p style={{ fontSize: 13, color: T.muted, marginTop: 0, marginBottom: 18, lineHeight: 1.6 }}>
-              This connects {label} through your own Google project so uploads run on your own quota. You only do this once.
-            </p>
-
-            <ol style={{ paddingLeft: 20, margin: "0 0 18px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {steps.map((s, i) => (
-                <li key={i} style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
-                  {s}
-                  {i === 4 && (
-                    <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                      <code style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 12, padding: "9px 11px", overflowX: "auto", whiteSpace: "nowrap" }}>{setup.redirectUri || "—"}</code>
-                      <button onClick={() => onCopy(setup.redirectUri)} style={{ ...btn(T.accent), padding: "9px 12px", flexShrink: 0 }}>Copy</button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ol>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-              <div>
-                <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client ID</label>
-                <input style={input} value={setup.clientId} placeholder="xxxxx.apps.googleusercontent.com"
-                  onChange={(e) => setSetup({ ...setup, clientId: e.target.value })} />
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "stretch", marginBottom: 18 }}>
+              {/* Left — title, intro + the step-by-step guide */}
+              <div style={{ flex: "1 1 380px", minWidth: 0 }}>
+                <h2 style={{ fontSize: 19, fontWeight: 800, color: T.text, margin: "0 0 6px" }}>{title}</h2>
+                <p style={{ fontSize: 14, color: T.muted, marginTop: 0, marginBottom: 16, lineHeight: 1.6 }}>
+                  This connects {label} through your own Google project so uploads run on your own quota. You only do this once.
+                </p>
+                <div style={{ display: "inline-flex", gap: 4, padding: 4, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 16 }}>
+                  {[{ k: "first", label: "First time" }, { k: "returning", label: "Already have a Google Cloud project" }].map(({ k, label: tl }) => (
+                    <button key={k} onClick={() => setMode(k)} style={{
+                      background: mode === k ? T.accent : "transparent", color: mode === k ? "#0b0b10" : T.muted,
+                      border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 12.5, fontWeight: 700,
+                      cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                    }}>{tl}</button>
+                  ))}
+                </div>
+                <ol style={{ paddingLeft: 20, margin: 0, display: "flex", flexDirection: "column", gap: 11 }}>
+                  {steps.map((s, i) => (
+                    <li key={i} style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
+                      {s}
+                      {i === 4 && (
+                        <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                          <code style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 12, padding: "9px 11px", overflowX: "auto", whiteSpace: "nowrap" }}>{setup.redirectUri || "—"}</code>
+                          <button onClick={() => onCopy(setup.redirectUri)} style={{ ...btn(T.accent), padding: "9px 12px", flexShrink: 0 }}>Copy</button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ol>
               </div>
-              <div>
-                <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client Secret</label>
-                <input style={input} type="password" value={setup.clientSecret} placeholder="GOCSPX-…"
-                  onChange={(e) => setSetup({ ...setup, clientSecret: e.target.value })} />
+
+              {/* Right — enter credentials + what to expect (separated by a divider) */}
+              <div style={{ flex: "1 1 320px", minWidth: 0, borderLeft: `1px solid ${T.border}`, paddingLeft: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 12 }}>Paste your credentials (from step 6)</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client ID</label>
+                      <input style={input} value={setup.clientId} placeholder="xxxxx.apps.googleusercontent.com"
+                        name="yt-oauth-client-id" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+                        data-lpignore="true" data-1p-ignore data-form-type="other"
+                        onChange={(e) => setSetup({ ...setup, clientId: e.target.value })} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 5 }}>Client Secret</label>
+                      <input style={input} type="password" value={setup.clientSecret} placeholder="GOCSPX-…"
+                        name="yt-oauth-client-secret" autoComplete="new-password" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+                        data-lpignore="true" data-1p-ignore data-form-type="other"
+                        onChange={(e) => setSetup({ ...setup, clientSecret: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+                {unverifiedNote}
               </div>
             </div>
-
-            {unverifiedNote}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
               <div>

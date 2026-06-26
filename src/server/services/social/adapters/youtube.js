@@ -13,6 +13,12 @@ import fs from "fs";
 // Errors marked `noRetry` are permanent (auth/permission) — the queue won't retry them.
 function permanent(msg) { const e = new Error(msg); e.noRetry = true; return e; }
 function transient(msg) { return new Error(msg); }
+// Quota / rate / upload-cap errors are TEMPORARY (reset at Pacific midnight), not auth failures.
+// Marked `quota` so the publish handler DEFERS to after the reset instead of failing the post or
+// flagging the account "broken". (YouTube returns these as 403, or 400 for uploadLimitExceeded.)
+function quotaErr(msg) { const e = new Error(msg); e.quota = true; return e; }
+const QUOTA_REASONS = /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|userRateLimitExceeded|uploadLimitExceeded/i;
+const isQuotaBody = (txt) => QUOTA_REASONS.test(txt || "");
 const AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPES = [
@@ -145,15 +151,23 @@ export const youtube = {
       },
       body,
     });
-    if (init.status === 401 || init.status === 403) throw permanent(`YouTube auth/permission error: ${(await init.text()).slice(0, 200)}`);
-    if (!init.ok) throw transient(`YouTube init failed (${init.status}): ${(await init.text()).slice(0, 200)}`);
+    if (!init.ok) {
+      const txt = await init.text();
+      if (isQuotaBody(txt)) throw quotaErr(`YouTube quota reached: ${txt.slice(0, 200)}`);
+      if (init.status === 401 || init.status === 403) throw permanent(`YouTube auth/permission error: ${txt.slice(0, 200)}`);
+      throw transient(`YouTube init failed (${init.status}): ${txt.slice(0, 200)}`);
+    }
     const uploadUrl = init.headers.get("location");
     if (!uploadUrl) throw transient("YouTube did not return an upload URL");
 
     // 2) Upload the bytes.
     const up = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "video/*", "Content-Length": String(bytes.length) }, body: bytes });
-    if (up.status === 401 || up.status === 403) throw permanent(`YouTube auth/permission error during upload: ${(await up.text()).slice(0, 200)}`);
-    if (!up.ok) throw transient(`YouTube upload failed (${up.status}): ${(await up.text()).slice(0, 200)}`);
+    if (!up.ok) {
+      const txt = await up.text();
+      if (isQuotaBody(txt)) throw quotaErr(`YouTube quota reached during upload: ${txt.slice(0, 200)}`);
+      if (up.status === 401 || up.status === 403) throw permanent(`YouTube auth/permission error during upload: ${txt.slice(0, 200)}`);
+      throw transient(`YouTube upload failed (${up.status}): ${txt.slice(0, 200)}`);
+    }
 
     const data = await up.json().catch(() => ({}));
     const videoId = data.id || null;
