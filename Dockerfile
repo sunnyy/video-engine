@@ -7,6 +7,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# Use the apt-installed Chromium for Puppeteer (measure + @vidquence/render) instead of letting
+# `npm ci` download a SECOND ~170MB Chromium. Shrinks the image and speeds cold builds. Remotion
+# is unaffected (it manages its own chrome-headless-shell). Local dev is unaffected — these are
+# only set inside the Docker build. To revert: delete these two ENV lines + redeploy.
+ENV PUPPETEER_SKIP_DOWNLOAD=1 \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 WORKDIR /app
 
 # Install dependencies

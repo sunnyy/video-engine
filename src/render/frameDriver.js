@@ -79,7 +79,7 @@ export async function renderFrames({ html, framesDir, width = 1080, height = 192
 
   // Each chunk gets its OWN browser process so screenshot capture runs truly in parallel.
   const renderChunk = async (lo, hi) => {
-    const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
+    const browser = await puppeteer.launch({ headless: true, executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, args: LAUNCH_ARGS });
     try {
       const page = await setupPage(browser, html, width, height, scale);
       const stage = await page.$("#stage");

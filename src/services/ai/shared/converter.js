@@ -110,6 +110,9 @@ async function getBrowser() {
   // Chrome to a minimal process/thread footprint; we only need it to lay out + measure DOM.
   _browser = await puppeteer.launch({
     headless: true,
+    // On the server this points at the apt-installed Chromium (PUPPETEER_EXECUTABLE_PATH); locally
+    // it's undefined → Puppeteer's own bundled Chromium.
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
