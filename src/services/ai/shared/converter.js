@@ -1,18 +1,18 @@
 /**
- * htmlMeasure.js
- * src/services/ai/saasVideo/htmlMeasure.js
+ * converter.js
+ * src/services/ai/shared/converter.js
  *
- * EXPERIMENTAL alternative to htmlParser.js for the beat pipeline.
+ * The DEFAULT (and only) HTML→layers converter for the beat pipeline, shared by all five video
+ * services (promptVideo / socialVideo / productVideo / saasVideo / talkingHead). The old flat-pixel
+ * parser (htmlParser.js) has been deleted.
  *
- * Instead of computing element positions from CSS ourselves (which only works for
- * already-absolute elements and forces GPT to hand-place everything), this renders
- * the scene HTML in a headless browser and MEASURES the real laid-out result via
- * getBoundingClientRect() + getComputedStyle(). GPT can then write natural nested
- * HTML/CSS (flexbox, grid, flow, auto-sizing) and we flatten the measured output
- * into the same flat, absolutely-positioned layer entries the rest of the pipeline
- * already consumes.
+ * GPT writes natural nested HTML/CSS (flexbox, grid, flow, auto-sizing); this renders that HTML in
+ * a headless browser and MEASURES the real laid-out result via getBoundingClientRect() +
+ * getComputedStyle(), then flattens it to the flat, absolutely-positioned layer entries the rest
+ * of the pipeline consumes.
  *
- * Gated behind a flag in the orchestrator; htmlParser.js remains the default.
+ * The browser is a shared, warm singleton with a concurrency-safe lifecycle (ref-counted pages +
+ * idle close) — see getBrowser/closeMeasureBrowser below.
  */
 
 import puppeteer from "puppeteer";
@@ -90,8 +90,18 @@ function normalizeIconName(str) {
 // ── Headless browser (one shared instance, reused across scenes) ────────────────
 
 let _browser = null;
+// Concurrency-safe lifecycle. The web server runs OVERLAPPING generations against this shared
+// browser, so we must never close it out from under an in-flight run (that throws "Target/Session
+// closed" → blank scenes in the other user's video). We ref-count open pages (_inFlight) and
+// only close when idle. closeMeasureBrowser() therefore just ARMS an idle timer instead of
+// closing immediately — which also keeps the instance warm for back-to-back/concurrent runs
+// (no ~0.5–2s relaunch per generation). Override the warm window with MEASURE_BROWSER_IDLE_MS.
+let _inFlight = 0;
+let _idleTimer = null;
+const BROWSER_IDLE_MS = Math.max(0, parseInt(process.env.MEASURE_BROWSER_IDLE_MS || "30000", 10));
 
 async function getBrowser() {
+  if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; } // work arriving → stay warm
   if (_browser && _browser.connected) return _browser;
   // Container-hardened flags. In a fixed-size container (e.g. the Railway worker) Chrome's
   // default multi-process model spawns a GPU process + zygote + per-tab renderers, each with
@@ -136,9 +146,20 @@ function releaseSlot() {
   if (next) next();
 }
 
-export async function closeMeasureBrowser() {
-  if (_browser) { try { await _browser.close(); } catch {} _browser = null; }
+// Request a close. Deferred + ref-counted: never closes while pages are in flight (which would
+// throw "Target/Session closed" in a concurrent run), and stays warm for BROWSER_IDLE_MS so
+// rapid successive generations reuse one instance. Set MEASURE_BROWSER_IDLE_MS=0 to close as soon
+// as idle. The timer is unref'd so it never keeps the process alive on its own.
+function armIdleClose() {
+  if (_idleTimer) clearTimeout(_idleTimer);
+  _idleTimer = setTimeout(async () => {
+    _idleTimer = null;
+    if (_inFlight > 0) { armIdleClose(); return; }          // still busy → re-check later
+    if (_browser) { const b = _browser; _browser = null; try { await b.close(); } catch {} }
+  }, Math.max(250, BROWSER_IDLE_MS));
+  if (_idleTimer.unref) _idleTimer.unref();
 }
+export function closeMeasureBrowser() { armIdleClose(); }
 
 // The in-page collector. Runs inside the browser; returns plain serializable data
 // for every element carrying a data-role, in DOM order.
@@ -270,6 +291,7 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
   try {
     const browser = await getBrowser();
     page = await browser.newPage();
+    _inFlight++; // page open → keep the shared browser alive until this measure finishes
   } catch (e) {
     releaseSlot();
     throw e;
@@ -302,6 +324,7 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     collected = await page.evaluate(collectInPage, canvasW, canvasH);
   } finally {
     try { await page.close(); } catch {}
+    _inFlight = Math.max(0, _inFlight - 1);
     releaseSlot();
   }
 
