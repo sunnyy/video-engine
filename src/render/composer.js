@@ -18,7 +18,23 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import * as LucideIcons from "lucide-react";
 import { durationToFrames } from "./timeModel.js";
+
+/**
+ * Render a Lucide icon to a static SVG string (server-side) so headless Chrome paints the
+ * exact same glyph as the editor/Remotion path, which uses the same lucide-react components.
+ * Mirrors TimelineComposition: size = min(width,height), color from style, strokeWidth 1.5.
+ */
+function iconToSvg(iconName, size, color) {
+  const Comp = iconName && LucideIcons[iconName];
+  if (!Comp) return null;
+  try {
+    return renderToStaticMarkup(createElement(Comp, { size, color: color || "#ffffff", strokeWidth: 1.5 }));
+  } catch { return null; }
+}
 
 const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../public/fonts");
 let _localFontCss;
@@ -80,6 +96,7 @@ export function compose(project, { width = 1080, height = 1920, fps = 30 } = {})
     transform: l.transform || {}, keyframes: l.keyframes || {}, transition: l.transition || null,
     content: l.content ?? null, style: l.style || {}, src: l.src ?? null, objectFit: l.objectFit ?? null,
     objectPosition: l.objectPosition ?? null, gradient: l.gradient ?? null, iconName: l.iconName ?? null,
+    iconSvg: l.type === "icon" ? iconToSvg(l.iconName, Math.min(l.transform?.width ?? 120, l.transform?.height ?? 120), l.style?.color) : null,
     captionStyle: l.captionStyle || {}, segments: l.segments || null,
     filter: l.filter ?? null, backdropFilter: l.backdropFilter ?? null,
     mixBlendMode: l.mixBlendMode ?? l.blendMode ?? null,
@@ -183,8 +200,9 @@ const nodes = LAYERS.map((L)=>{
     Object.assign(el.style,{fontFamily:s.fontFamily||"Outfit",fontSize:(s.fontSize||48)+"px",fontWeight:s.fontWeight||700,
       color:s.color||"#fff",textAlign:s.textAlign||"center",background:s.background||"rgba(0,0,0,0.5)",
       borderRadius:(s.borderRadius||8)+"px",padding:(s.padding||8)+"px"});
-  } else if(L.type==="icon"){ /* Phase 1: real Lucide SVG. Placeholder box for now. */
-    el.style.background=L.gradient||"rgba(255,255,255,0.15)"; el.style.borderRadius="12px";
+  } else if(L.type==="icon"){
+    if(L.iconSvg){ el.style.alignItems="center"; el.style.justifyContent="center"; el.innerHTML=L.iconSvg; }
+    else { el.style.background=L.gradient||"rgba(255,255,255,0.15)"; el.style.borderRadius="12px"; } // fallback if icon name unknown
   } else if(L.type==="video"){ /* Phase 3: paint real video frames. Skipped (audio still muxed). */ }
   // Common box styling
   if(L.borderRadius) el.style.borderRadius=(typeof L.borderRadius==="number"?L.borderRadius+"px":L.borderRadius);
@@ -201,7 +219,7 @@ window.__seekTo = function(t){
   for(const {el,L} of nodes){
     if(t<L.start||t>=L.end){ el.style.display="none"; continue; }
     const tr=interpTransform(L,t), ts=transitionStyle(L,t);
-    el.style.display = (L.type==="text"||L.type==="captions")?"flex":"block";
+    el.style.display = (L.type==="text"||L.type==="captions"||L.type==="icon")?"flex":"block";
     el.style.left=tr.x+"px"; el.style.top=tr.y+"px"; el.style.width=tr.width+"px"; el.style.height=tr.height+"px";
     el.style.opacity=tr.opacity*ts.opacity;
     el.style.transform=(ts.tX?("translateX("+ts.tX+"%) "):"")+(ts.tY?("translateY("+ts.tY+"%) "):"")+"rotate("+tr.rotation+"deg) scale("+(tr.scale*ts.scale)+")";
