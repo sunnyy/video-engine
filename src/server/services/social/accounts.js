@@ -60,7 +60,10 @@ export async function getAccountById(accountId) {
  */
 export async function getFreshAccessTokenByAccountId(accountId) {
   const data = await getAccountById(accountId);
-  if (!data) throw new Error("connected account not found");
+  // Permanent: the account row is gone (e.g. disconnected, or a job baked a stale id before a
+  // reconnect). Retrying can't bring it back, so mark noRetry → the queue fails it fast instead
+  // of burning 5 attempts with backoff.
+  if (!data) { const e = new Error("connected account not found"); e.noRetry = true; throw e; }
 
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
   if (expiresAt - Date.now() > 60_000) return { accessToken: decrypt(data.access_token), platform: data.platform };
