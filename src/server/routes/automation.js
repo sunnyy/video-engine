@@ -118,6 +118,52 @@ router.post("/campaigns/:id/cancel-job", requireAuth, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+/* ── Retry a failed/deferred publish for ONE post — re-publishes the already-rendered video to
+ *    the campaign's CURRENT connected account (so a reconnect that changed the account id just
+ *    works). Reuses the same published_posts row; no re-render. ── */
+router.post("/campaigns/:id/retry-post", requireAuth, async (req, res) => {
+  try {
+    const campaign = await getCampaignForUser(req.user.id, req.params.id);
+    if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+    const postId = req.body?.postId;
+    if (!postId) return res.status(400).json({ error: "postId required" });
+
+    const { data: post } = await supabaseAdmin.from("published_posts")
+      .select("id, platform, status, video_url, project_id, platform_post_id")
+      .eq("id", postId).eq("campaign_id", campaign.id).maybeSingle();
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    if (post.platform_post_id) return res.status(400).json({ error: "Already published" });
+    if (!post.video_url) return res.status(400).json({ error: "No rendered video to publish — re-run generation instead" });
+
+    // Resolve the CURRENT connected account for this platform (ignores a dead id from before a
+    // reconnect). target_accounts self-heals elsewhere; here we just need a live one.
+    const { data: accts } = await supabaseAdmin.from("social_accounts")
+      .select("id, platform, status").in("id", campaign.target_accounts || []).eq("user_id", req.user.id);
+    const acct = (accts || []).find((a) => a.platform === post.platform && a.status === "connected");
+    if (!acct) return res.status(400).json({ error: `No connected ${post.platform} account — reconnect it first` });
+
+    // Rebuild publish metadata from the saved project's publish copy + the campaign's privacy.
+    const { data: proj } = await supabaseAdmin.from("projects").select("name, safe_project_json").eq("id", post.project_id).maybeSingle();
+    const pub = proj?.safe_project_json?.meta?.publish || {};
+    const hashtags = Array.isArray(pub.hashtags) ? pub.hashtags.filter(Boolean) : [];
+    const metadata = {
+      title: (pub.title || proj?.name || "").slice(0, 100),
+      description: [pub.description, hashtags.join(" ")].filter(Boolean).join("\n\n"),
+      tags: hashtags.map((h) => String(h).replace(/^#/, "")).filter(Boolean),
+      privacyStatus: campaign.privacy || "public",
+    };
+
+    await supabaseAdmin.from("published_posts")
+      .update({ status: "queued", error: null, account_id: acct.id, updated_at: new Date().toISOString() }).eq("id", post.id);
+    const job = await enqueue("publish_post", {
+      userId: req.user.id, campaignId: campaign.id, accountId: acct.id, platform: acct.platform,
+      videoUrl: post.video_url, projectId: post.project_id, metadata, postId: post.id,
+    }, { userId: req.user.id, maxAttempts: 5, priority: -10 });
+    logEvent({ userId: req.user.id, campaignId: campaign.id, action: "retry_publish", entity: "post", entityId: post.id, message: "manual retry" });
+    res.json({ ok: true, jobId: job.id });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 /* ── Topic queue ── */
 router.post("/campaigns/:id/topics/refill", requireAuth, async (req, res) => {
   try {

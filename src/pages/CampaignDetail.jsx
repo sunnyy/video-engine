@@ -231,7 +231,9 @@ export default function CampaignDetail() {
                       <span style={{ color: POST_COLOR[p.status] || T.faint }}>●</span> {p.platform}
                       <span style={{ color: T.faint, marginLeft: 6 }}>{p.status.replace("_", " ")}</span>
                     </span>
-                    {p.platform_post_id && p.platform === "youtube" && <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>}
+                    {p.platform_post_id && p.platform === "youtube"
+                      ? <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>
+                      : (p.status === "failed" || p.status === "deferred") && <button onClick={() => act("retry-post", { body: { postId: p.id } })} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5 }}>Retry</button>}
                   </div>
                 ))}
               </div>
