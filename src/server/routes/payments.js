@@ -9,6 +9,7 @@ import {
   userCreditsPurchasedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
 } from "../middleware/shared.js";
 import { notifyUser } from "../services/notificationService.js";
+import { rewardReferrerOnFirstPurchase } from "./referrals.js";
 
 export const router = express.Router();
 
@@ -169,7 +170,7 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
     const periodDays = billingCycle === "annual" ? 365 : 30;
     const periodEnd  = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
     // Annual = 12 months of credits granted up front (credits never expire). Monthly = one month.
-    const creditsToGrant = billingCycle === "annual" ? creditsToGrant * 12 : creditsToGrant;
+    const creditsToGrant = billingCycle === "annual" ? plan.credits * 12 : plan.credits;
 
     // Detect upgrade vs renewal: check for existing active subscription
     const { data: existingSub } = await supabaseAdmin
@@ -211,6 +212,9 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
       req.user.id, creditsToGrant, "purchase", "plan_subscription",
       `${plan.name} plan – ${billingCycle}`, razorpay_payment_id,
     );
+
+    // Referral: a referee's first purchase rewards their referrer (idempotent, best-effort).
+    rewardReferrerOnFirstPurchase(req.user.id);
 
     // Emails (fire-and-forget)
     supabaseAdmin.auth.admin.getUserById(req.user.id).then(({ data: { user } }) => {

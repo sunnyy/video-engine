@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { getSession, onAuthStateChange } from "./services/auth/authService";
 import posthog from "posthog-js";
 import { setInsufficientCreditsHandler } from "./services/serverApi";
+import { captureRefFromUrl, claimStoredReferral } from "./services/referrals/referralService";
 import { ToastContainer, showToast } from "./ui/Toast";
 import { initLayoutRegistry } from "./core/registries/layoutRegistry";
 import { useCreditsStore } from "./store/useCreditsStore";
@@ -24,6 +25,7 @@ import ResetPassword   from "./pages/ResetPassword";
 import Dashboard       from "./pages/Dashboard";
 import Projects       from "./pages/Projects";
 import Notifications  from "./pages/Notifications";
+import Invite         from "./pages/Invite";
 import Explore        from "./pages/Explore";
 import Videos         from "./pages/Videos";
 import AdminDashboard  from "./pages/admin/AdminDashboard";
@@ -71,6 +73,7 @@ import Samples        from "./pages/admin/Samples";
 import RefundClaims   from "./pages/admin/RefundClaims";
 import AnnouncementCenter from "./pages/admin/AnnouncementCenter";
 import AdminSupport   from "./pages/admin/Support";
+import AdminReferrals from "./pages/admin/Referrals";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -81,6 +84,9 @@ export default function App() {
 
   useEffect(() => {
     initLayoutRegistry().catch(() => {});
+
+    // Capture a referral code from ?ref= before anything navigates it away.
+    captureRefFromUrl();
 
     setInsufficientCreditsHandler(() => {
       showToast("Not enough credits. Purchase more to continue.");
@@ -108,6 +114,8 @@ export default function App() {
         const isNewUser = sess?.user?.created_at &&
           Date.now() - new Date(sess.user.created_at).getTime() < 15_000;
         if (isNewUser) fetchCreditsForNewUser(); else fetchCredits();
+        // Attribute a pending referral (server validates it's a genuinely new account).
+        claimStoredReferral().then((r) => { if (r?.claimed) fetchCredits(); });
       } else if (event === "SIGNED_OUT") {
         setRecovering(false);
         setSession(null);
@@ -163,6 +171,7 @@ export default function App() {
             <Route path="/projects"         element={<Projects />} />
             <Route path="/notifications"    element={<Notifications />} />
             <Route path="/support"          element={<Support />} />
+            <Route path="/invite"           element={<Invite />} />
             <Route path="/explore"          element={<Explore />} />
             <Route path="/videos"           element={<Videos />} />
             <Route path="/image-generation" element={<ImageGeneration />} />
@@ -215,6 +224,7 @@ export default function App() {
                 <Route path="/admin/refund-claims"   element={<RefundClaims />} />
                 <Route path="/admin/announcements"   element={<AnnouncementCenter />} />
                 <Route path="/admin/support"         element={<AdminSupport />} />
+                <Route path="/admin/referrals"       element={<AdminReferrals />} />
               </>
             ) : (
               <Route path="/admin/*" element={<Navigate to="/dashboard" />} />

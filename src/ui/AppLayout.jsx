@@ -68,6 +68,15 @@ const Icons = {
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
     </svg>
   ),
+  gift: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 12 20 22 4 22 4 12"/>
+      <rect x="2" y="7" width="20" height="5"/>
+      <line x1="12" y1="22" x2="12" y2="7"/>
+      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+    </svg>
+  ),
   settings: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/>
@@ -467,7 +476,7 @@ export default function AppLayout({ children }) {
   // tools live under Explore; user projects under Projects. (Routes/pages kept intact.)
   const inImages  = ["/image-generation", "/product-poster", "/banner-design", "/virtual-tryon"].includes(path) || path.startsWith("/thumbnail");
   const inAudio   = path === "/voiceover" || path === "/speech-to-text";
-  const inAccount = ["/credits", "/settings", "/feedback", "/brand-kit", "/support"].includes(path);
+  const inAccount = ["/credits", "/settings", "/feedback", "/brand-kit", "/support", "/invite"].includes(path);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -535,6 +544,7 @@ export default function AppLayout({ children }) {
 
             <FlyoutGroup icon={Icons.settings} label="Account" active={inAccount}>
               <NavItem icon={Icons.star}     label="Upgrade"  href="/#pricing" active={false} />
+              <NavItem icon={Icons.gift}     label="Invite & Earn" to="/invite" active={path === "/invite"} />
               <NavItem icon={Icons.brand}    label="Brand Kit" to="/brand-kit" active={path === "/brand-kit"} />
               <NavItem icon={Icons.credits}  label="Credits"  to="/credits"    active={path === "/credits"} />
               <NavItem icon={Icons.settings} label="Settings" to="/settings"   active={path === "/settings"} />

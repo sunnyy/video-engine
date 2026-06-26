@@ -27,6 +27,7 @@ import { router as adminRouter }        from "./routes/admin.js";
 import { router as announcementsRouter } from "./routes/announcements.js";
 import { router as refundClaimsRouter } from "./routes/refundClaims.js";
 import { router as supportRouter }       from "./routes/support.js";
+import { router as referralsRouter }     from "./routes/referrals.js";
 import { router as productVideoRouter } from "./routes/productVideo.js";
 import { router as productVideoSceneRouter } from "./routes/productVideoScene.js";
 import { router as typographyVideoRouter } from "./routes/typographyVideo.js";
@@ -178,6 +179,7 @@ app.use("/api",              assetsRouter);
 app.use("/api",              paymentsRouter);
 app.use("/api",              refundClaimsRouter);
 app.use("/api",              supportRouter);
+app.use("/api",              referralsRouter);
 
 /* ── Serve built frontend — must come after all API routes ── */
 app.use(express.static(path.join(PROJECT_ROOT, "dist")));
