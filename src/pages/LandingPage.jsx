@@ -1265,10 +1265,10 @@ export default function LandingPage() {
                 FAQ
               </a>
               <a href="/terms" className="footer-link">
-                Terms
+                Terms of Service
               </a>
               <a href="/privacy" className="footer-link">
-                Privacy
+                Privacy Policy
               </a>
               <a href="/refunds" className="footer-link">
                 Refunds
