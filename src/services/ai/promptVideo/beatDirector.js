@@ -38,9 +38,6 @@ const CAMERAS = ["slow_zoom_in", "fast_zoom_in", "slow_zoom_out", "pan_left", "p
 const MIN_BEATS = 6, MAX_BEATS = 48;
 
 const wordsIn = (s) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
-// True if the string carries a non-Latin script (Devanagari, Arabic, CJK, …). Our on-screen
-// fonts are Latin-only, so such text must never become an overlay (it would render as boxes).
-const hasNonLatinScript = (s) => /[ऀ-ॿ؀-ۿ֐-׿฀-๿぀-ヿ一-鿿가-힯]/.test(String(s || ""));
 
 // The voiceover the viewer hears is the beats' script_lines concatenated. To guarantee it
 // sounds like one flowing narration (not a list of headline fragments), we let the director
@@ -118,10 +115,10 @@ function languageName(language) {
 function languageBlock(language) {
   if (language === "en") return "LANGUAGE: English.";
   if (language === "hinglish" || language === "hi") {
-    return `LANGUAGE — STRICT, TWO SCRIPTS BY FIELD (this matters for both pronunciation AND on-screen rendering):
-- SPOKEN — the "narration" and every "script_line": conversational Hindi WRITTEN IN DEVANAGARI. Keep the natural, casual Hinglish FLOW (the way people actually talk), and you MAY leave genuine English / brand / tech terms or acronyms in Latin where a speaker truly says them in English (e.g. "AI", "iPhone", "reels") — but ALL Hindi words MUST be in Devanagari, never romanized. Romanized Hindi ("Ek haddi, pure sheher ko badal de") is a FAILURE: the voice mispronounces it. Write it as Devanagari, e.g. "एक हड्डी पूरे शहर को बदल देती है, और लोग उसे सम्मान देते हैं।"
-- ON-SCREEN — the "content" fields (headline / subtext / items / attribution) and anything shown on screen: keep these in LATIN script (short, punchy romanized-Hinglish or English keywords, e.g. "EK HADDI", "ONE BONE", "150+ CITIES"). NEVER put Devanagari in content/on-screen strings — the on-screen fonts cannot render it and it shows as empty boxes.
-So the viewer HEARS Devanagari Hindi (correct pronunciation) and SEES Latin text. Different scripts, on purpose.`;
+    return `LANGUAGE — STRICT: HINDI in DEVANAGARI for BOTH the spoken script AND the on-screen text (the renderer now has a Devanagari font, so on-screen Hindi renders correctly):
+- SPOKEN — "narration" and every "script_line": conversational Hindi WRITTEN IN DEVANAGARI. Keep the natural, casual Hinglish FLOW (the way people actually talk); you MAY leave genuine English / brand / tech terms or acronyms in Latin where a speaker truly says them in English (e.g. "AI", "iPhone", "reels") — but ALL Hindi words MUST be Devanagari, never romanized. Romanized Hindi ("Ek haddi, pure sheher ko badal de") is a FAILURE: the voice mispronounces it. Write "एक हड्डी पूरे शहर को बदल देती है, और लोग उसे सम्मान देते हैं।"
+- ON-SCREEN — the "content" fields (headline / subtext / items / attribution): SHORT, punchy Hindi IN DEVANAGARI (e.g. "एक हड्डी", "150+ शहर", "सम्मान की निशानी"). A few words, NOT full sentences. Genuine English/brand terms or numbers may stay Latin (e.g. "AI", "150+"). Do NOT romanize Hindi on screen.
+So the viewer HEARS and SEES Devanagari Hindi.`;
   }
   return `LANGUAGE — STRICT: Every script_line must be written in ${language}. content strings may use short Latin-script keywords.`;
 }
@@ -359,13 +356,9 @@ export async function directBeats({ research, styleId, targetDuration = 45, lang
       attribution: typeof raw.attribution === "string" && raw.attribution.trim() ? raw.attribution.trim().slice(0, 50) : null,
     };
     if (assetType === "none" && (content.kind === "none" || !content.headline)) {
-      // An information frame without information — derive a title from the spoken line, UNLESS
-      // that line is non-Latin (e.g. Devanagari Hindi): on-screen fonts are Latin-only, so a
-      // Devanagari headline would render as boxes. In that case leave it for the design to
-      // handle from whatever Latin content exists rather than create tofu.
-      if (!hasNonLatinScript(line)) {
-        content = { kind: "title", headline: line.replace(/[.?!]$/, "").split(/\s+/).slice(0, 7).join(" "), subtext: null, items: null, attribution: null };
-      }
+      // An information frame without information — derive a short title from the spoken line. Works
+      // for Devanagari now too (the renderer + measure both have a Devanagari font).
+      content = { kind: "title", headline: line.replace(/[।.?!]$/, "").split(/\s+/).slice(0, 7).join(" "), subtext: null, items: null, attribution: null };
     }
     if (content.kind !== "none" && !content.headline) content.kind = "none";
 

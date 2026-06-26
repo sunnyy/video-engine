@@ -63,11 +63,10 @@ export function buildBeatPrompt(beat, ctx) {
   const { style, palette, canvasW, canvasH, language } = ctx;
   const duration = beat.duration_seconds ?? 3;
   const isOverlay = !!beat.asset?.src && (beat.asset.kind === "image" || beat.asset.kind === "video");
-  // Hindi VO is Devanagari (spoken) but on-screen text must be Latin — our fonts can't render
-  // Devanagari. The CONTENT strings are already Latin; the SPOKEN line below is Devanagari and is
-  // for context only. This guard stops the designer from putting that Devanagari on screen.
+  // Hindi is Devanagari on BOTH the spoken line and the on-screen CONTENT (the renderer + measure
+  // now have a Devanagari font). Render the Devanagari content as-is; keep it short so it fits.
   const latinOnScreenRule = (language === "hi" || language === "hinglish")
-    ? `\nON-SCREEN SCRIPT — render ONLY the Latin CONTENT strings exactly as given. The SPOKEN line is Devanagari Hindi and is CONTEXT ONLY — NEVER put any Devanagari (Hindi script) on screen; the fonts render it as empty boxes. Every visible character must be Latin.\n`
+    ? `\nON-SCREEN SCRIPT — the CONTENT strings are Hindi in DEVANAGARI; render them EXACTLY as given (do NOT romanize/transliterate to Latin). Genuine English/brand terms or numbers in the content stay as-is. Keep on-screen Hindi SHORT (a few words) so it fits the frame.\n`
     : "";
 
   const dataContract = `Tag every MEANINGFUL element (these become animated layers; layout wrappers don't need tags):

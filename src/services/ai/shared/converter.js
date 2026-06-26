@@ -318,6 +318,17 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     // culled, and headlines refuse to wrap. The standard remedy is min-width:0 on
     // flex/grid children; inject it so columns respect their fr ratios as intended.
     try { await page.addStyleTag({ content: "*{min-width:0!important;}" }); } catch {}
+    // Devanagari (Hindi on-screen) must MEASURE with a real Devanagari font or the box widths come
+    // out wrong (tofu metrics). Append the Noto fallback to every element's font stack — Latin keeps
+    // its face, Devanagari glyphs fall back to Noto — matching the render's withDevanagari().
+    try {
+      await page.evaluate(() => {
+        for (const el of document.querySelectorAll("body *")) {
+          const ff = getComputedStyle(el).fontFamily || "";
+          if (!/Noto Sans Devanagari/i.test(ff)) el.style.fontFamily = (ff ? ff + ", " : "") + '"Noto Sans Devanagari", sans-serif';
+        }
+      });
+    } catch {}
     try {
       await Promise.race([
         page.evaluate(() => document.fonts && document.fonts.ready),
