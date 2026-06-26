@@ -127,7 +127,10 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
   const height = (fmt.height || 1920) * scale;
   const outputPath = path.join(TEMP_DIR, `render-${renderId}.mp4`);
 
-  if (pickEngine(finalProject, source) === "vidquence") {
+  // Which engine actually rendered this — logged so the cutover is observable (grep "[render] engine=").
+  const engine = pickEngine(finalProject, source);
+  console.log(`[render] engine=${engine} · renderId=${renderId} · source=${source || finalProject?.meta?.source || "unknown"} · ${width}x${height}`);
+  if (engine === "vidquence") {
     // @vidquence/render — our own engine. Produces the MP4 at outputPath; the shared upload +
     // record block below handles persistence identically to the Remotion path.
     const { renderToFile } = await import("../../render/index.js");

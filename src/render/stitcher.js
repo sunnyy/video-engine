@@ -26,6 +26,7 @@ function framesToVideo({ framesDir, outputPath, fps, width, height }) {
       .outputOptions([
         "-pix_fmt yuv420p", "-crf 23", "-preset medium",
         `-vf scale=${width}:${height}:flags=lanczos`, `-r ${fps}`,
+        "-metadata comment=vidquence-render", // fingerprint: which engine made this file
       ])
       .on("end", resolve)
       .on("error", reject)
@@ -62,6 +63,7 @@ function muxAudio({ videoPath, audio, outputPath, durationSec }) {
         "-map 0:v", "-map [aout]",
         "-c:v copy", "-c:a aac", "-b:a 192k",
         "-shortest", `-t ${durationSec}`,
+        "-metadata comment=vidquence-render", // fingerprint: which engine made this file
       ])
       .on("end", resolve)
       .on("error", reject)
