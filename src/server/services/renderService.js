@@ -18,6 +18,18 @@ import { supabaseAdmin, TEMP_DIR, PUBLIC_DIR, PROJECT_ROOT } from "../middleware
 // = our own @vidquence/render engine (src/render). Per-deploy flag so we can flip a single
 // service to the new engine once it passes the shadow-diff, with Remotion as the fallback.
 const RENDER_ENGINE = (process.env.RENDER_ENGINE || "remotion").toLowerCase();
+// Per-service cutover: a comma-list of project sources to route to @vidquence/render while every
+// other service stays on Remotion — e.g. VIDQUENCE_RENDER_SERVICES="typography_video,social_video".
+// RENDER_ENGINE stays the global override ("vidquence" forces ALL; default "remotion" = none).
+// This is how we flip ONE service at a time and watch it, with an instant env-only rollback.
+const VIDQUENCE_SERVICES = new Set(
+  (process.env.VIDQUENCE_RENDER_SERVICES || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+);
+function pickEngine(project, source) {
+  if (RENDER_ENGINE === "vidquence") return "vidquence";          // global override
+  const svc = String(source || project?.meta?.source || "").toLowerCase();
+  return VIDQUENCE_SERVICES.has(svc) ? "vidquence" : "remotion";  // per-service, else Remotion
+}
 
 /* ── Newest mtime under a dir (prebundle staleness detection) ── */
 function newestMtimeMs(dir) {
@@ -103,7 +115,7 @@ async function prepareProject(project, userId) {
  *   If the upload fails, `outputPath` (local mp4) is returned so a caller can still serve it.
  * Throws on render failure (caller decides retry/refund). Frame temp dir is always cleaned.
  */
-export async function renderTimeline(project, { userId, renderId, resolution = "1080p", projectId = null, onProgress, isCancelled } = {}) {
+export async function renderTimeline(project, { userId, renderId, resolution = "1080p", projectId = null, source = null, onProgress, isCancelled } = {}) {
   if (!userId)   throw new Error("renderTimeline: userId required");
   if (!renderId) throw new Error("renderTimeline: renderId required");
 
@@ -115,7 +127,7 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
   const height = (fmt.height || 1920) * scale;
   const outputPath = path.join(TEMP_DIR, `render-${renderId}.mp4`);
 
-  if (RENDER_ENGINE === "vidquence") {
+  if (pickEngine(finalProject, source) === "vidquence") {
     // @vidquence/render — our own engine. Produces the MP4 at outputPath; the shared upload +
     // record block below handles persistence identically to the Remotion path.
     const { renderToFile } = await import("../../render/index.js");

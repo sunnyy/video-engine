@@ -81,11 +81,13 @@ registerHandler("render_timeline", async (payload, job) => {
   if (!userId) throw new Error("render_timeline: userId required");
 
   let project = payload?.project;
+  let projectSource = project?.meta?.source ?? null;
   if (!project && projectId) {
     const { data, error } = await supabaseAdmin
-      .from("projects").select("safe_project_json").eq("id", projectId).single();
+      .from("projects").select("safe_project_json, source").eq("id", projectId).single();
     if (error) throw new Error(`render_timeline: load project ${projectId} failed: ${error.message}`);
     project = data?.safe_project_json;
+    projectSource = data?.source ?? project?.meta?.source ?? null; // for per-service render-engine gating
   }
   if (!project) throw new Error("render_timeline: no project or projectId in payload");
 
@@ -93,7 +95,7 @@ registerHandler("render_timeline", async (payload, job) => {
   let videoUrl, filePath;
   try {
     ({ videoUrl, filePath } = await renderTimeline(project, {
-      userId, renderId: job.id, projectId, resolution,
+      userId, renderId: job.id, projectId, resolution, source: projectSource,
       onProgress: (pct) => setProgress(job.id, pct),
       isCancelled: () => watch.state.cancelled,
     }));
