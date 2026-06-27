@@ -1,6 +1,7 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runTypographyPipeline, planTypography, produceTypography } from "../../services/ai/typographyVideo/pipelineOrchestrator.js";
+import { moderateInput } from "../../services/ai/shared/moderation.js";
 import { creditsForDuration } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
@@ -78,6 +79,14 @@ router.post("/produce", requireAuth, async (req, res) => {
   const cost = creditsForDuration(targetDuration || plan?.targetDuration || 40);
 
   try {
+    // Moderate the (possibly client-edited or fully client-crafted) plan BEFORE any paid work —
+    // each scene's voiceover is joined verbatim into the TTS narration and otherwise bypasses it.
+    const planText = plan.scenes.flatMap((s) => [
+      s.voiceover, s.text, s.headline,
+      ...(Array.isArray(s.words) ? s.words : []), ...(Array.isArray(s.lines) ? s.lines : []),
+    ]).filter(Boolean).join("\n").trim();
+    if (planText) await moderateInput(planText, { label: "typography-video produce plan" });
+
     const deduction = await deductCredits(userId, cost, "typography_video", "Typography video generation", projectId || null);
     if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
     creditAmount = cost;
