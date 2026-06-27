@@ -20,6 +20,16 @@ const APP_URL = process.env.APP_PUBLIC_URL || process.env.VITE_APP_URL || "";
 const OAUTH_BASE = process.env.OAUTH_REDIRECT_BASE || process.env.VITE_APP_URL || "";
 const redirectUriFor = (platform) => `${OAUTH_BASE}/api/social/${platform}/callback`;
 
+// Turn a stored deferral error into a short, user-facing reason + fix, so the editor can tell the
+// user WHY a "Publish now" keeps deferring instead of letting them click forever.
+function deferralReason(errText = "") {
+  if (/upload limit/i.test(errText))
+    return "YouTube's daily upload limit for your channel was reached. Verify your channel at youtube.com/verify to raise it (or wait for the daily reset), then try again.";
+  if (/api quota/i.test(errText))
+    return "Your Google project's daily YouTube API quota is used up. Request a quota increase in Google Cloud (or wait for the reset), then try again.";
+  return "YouTube can't accept this upload right now (daily limit). Check your channel's upload limit and verification, then try again.";
+}
+
 /** List the user's connected accounts (no tokens) + which platforms are supported. */
 router.get("/accounts", requireAuth, async (req, res) => {
   try { res.json({ accounts: await listAccounts(req.user.id), supported: supportedPlatforms(), capabilities: allCapabilities() }); }
@@ -127,6 +137,40 @@ router.post("/render-and-publish", requireAuth, async (req, res) => {
 });
 
 /**
+ * Try-publish-now: re-run a DEFERRED publish immediately (the user fixed the cause — e.g. verified
+ * their YouTube channel) instead of waiting for the scheduled quota-reset retry. Reschedules the
+ * queued retry job(s) to run now, deduped per account (older duplicate queued jobs are cancelled so
+ * we never double-upload), and flips the deferred post rows to running. Reuses the existing render +
+ * post — no re-render. Returns { ran }: how many will publish now (0 = nothing queued → the caller
+ * should fall back to a fresh publish).
+ */
+router.post("/publish-now", requireAuth, async (req, res) => {
+  try {
+    const projectId = String(req.body?.projectId || "");
+    if (!projectId) return res.status(400).json({ error: "projectId required" });
+    const now = new Date().toISOString();
+    const { data: jobs = [] } = await supabaseAdmin
+      .from("jobs")
+      .select("id, created_at, payload")
+      .eq("user_id", req.user.id).eq("type", "publish_post").eq("status", "queued")
+      .filter("payload->>projectId", "eq", projectId)
+      .order("created_at", { ascending: false });
+    if (!jobs.length) return res.json({ ran: 0 });
+    // Dedupe per account: the newest queued job per account runs now; older duplicates are cancelled.
+    const seen = new Set(); const toRun = []; const toCancel = [];
+    for (const j of jobs) {
+      const acct = j.payload?.accountId || j.id;
+      if (seen.has(acct)) toCancel.push(j.id); else { seen.add(acct); toRun.push(j.id); }
+    }
+    if (toRun.length)    await supabaseAdmin.from("jobs").update({ run_at: now, updated_at: now }).in("id", toRun);
+    if (toCancel.length) await supabaseAdmin.from("jobs").update({ status: "failed", error: "superseded by Try publish now", finished_at: now, updated_at: now }).in("id", toCancel);
+    await supabaseAdmin.from("published_posts").update({ status: "running", updated_at: now })
+      .eq("user_id", req.user.id).eq("project_id", projectId).eq("status", "deferred");
+    res.json({ ran: toRun.length });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+/**
  * Durable publish status for a project's editor publish (campaign_id null). Recomputed from the
  * jobs table on every call, so a reloaded/reopened editor shows the live state instead of a fresh
  * Publish button. Looks at the latest editor render_timeline job + the publish_post jobs it spawns.
@@ -178,7 +222,21 @@ router.get("/publish-status", requireAuth, async (req, res) => {
       (j) => j.type === "render_timeline" && !j.payload?.campaignId && j.payload?.chain?.publish,
     );
     const r = renders[0];
-    if (!r) return res.json({ active: false, phase: "idle", last });
+    if (!r) {
+      // No EDITOR publish for this project — but it may have been generated + published by
+      // AUTOMATION (campaign-scoped). Surface an active/deferred automation publish so the editor
+      // reflects the real state instead of a fresh Publish button (which would duplicate the upload).
+      const { data: autoPosts = [] } = await supabaseAdmin
+        .from("published_posts")
+        .select("status, error")
+        .eq("user_id", req.user.id).eq("project_id", projectId).not("campaign_id", "is", null)
+        .order("updated_at", { ascending: false }).limit(20);
+      const aLive     = autoPosts.filter((p) => p.status === "running" || p.status === "awaiting_approval").length;
+      const aDeferred = autoPosts.filter((p) => p.status === "deferred").length;
+      if (aLive)     return res.json({ active: true,  phase: "publishing", via: "automation", last });
+      if (aDeferred) return res.json({ active: false, phase: "deferred", via: "automation", deferred: aDeferred, reason: deferralReason(autoPosts.find((p) => p.status === "deferred")?.error), last });
+      return res.json({ active: false, phase: "idle", last });
+    }
 
     // publish_post jobs that belong to THIS render batch (created at/after its render job).
     const posts = (jobs || []).filter(
@@ -197,7 +255,7 @@ router.get("/publish-status", requireAuth, async (req, res) => {
     // that's genuinely in flight right now vs a retry scheduled for the future (quota defer).
     const { data: batch = [] } = await supabaseAdmin
       .from("published_posts")
-      .select("status")
+      .select("status, error")
       .eq("user_id", req.user.id).eq("project_id", projectId).is("campaign_id", null)
       .gte("created_at", r.created_at);
 
@@ -222,7 +280,7 @@ router.get("/publish-status", requireAuth, async (req, res) => {
       return res.json({ active: true, phase: "publishing", progress: 100, published, failed, total: tot, last });
     // Deferred: daily quota/limit hit → a retry is scheduled. NOT a spinner — tell the user when.
     if (deferred > 0 && published < tot)
-      return res.json({ active: false, phase: "deferred", published, failed, deferred, total: tot, retryAt: futureRetryAt, jobId: r.id, finishedAt: r.finished_at, last });
+      return res.json({ active: false, phase: "deferred", published, failed, deferred, total: tot, retryAt: futureRetryAt, reason: deferralReason(batch.find((p) => p.status === "deferred")?.error), jobId: r.id, finishedAt: r.finished_at, last });
     if (failed && !published)
       return res.json({ active: false, phase: "failed", error: "Publish failed", published, failed, total: tot, jobId: r.id, finishedAt: r.finished_at, last });
     return res.json({ active: false, phase: "published", published, failed, total: tot, jobId: r.id, finishedAt: r.finished_at, last });

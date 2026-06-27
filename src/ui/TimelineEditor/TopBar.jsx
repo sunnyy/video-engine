@@ -46,6 +46,7 @@ export default function TopBar() {
   const [pubStatus, setPubStatus] = useState(null); // { active, phase, progress, published, failed, total, last }
   const seededPub = useRef(false);  // first poll seeds; don't toast a pre-existing completion on open
   const lastPubJob = useRef(null);  // last terminal batch we toasted, so we toast each batch once
+  const triedNow = useRef(false);   // user just hit "Publish now" → surface the next deferral's reason
 
   // Authoritative service source from the DB (store's project.meta may be stale/missing it).
   const [source, setSource] = useState(null);
@@ -74,6 +75,12 @@ export default function TopBar() {
         const firstTick = !seededPub.current;
         seededPub.current = true;
         setPubStatus(s);
+        // If the user just hit "Publish now" and it came back DEFERRED again, surface the actual
+        // reason every time (don't let them keep clicking blindly) — YouTube still isn't accepting it.
+        if (s.phase === "deferred" && triedNow.current) {
+          triedNow.current = false;
+          showToast(s.reason || "YouTube still won't accept this upload — check your channel's daily upload limit and verification (youtube.com/verify), then try again.", "info");
+        }
         // Toast once per batch when it reaches a terminal state — but not for a batch that was
         // already finished when we opened the editor (firstTick seeds without toasting).
         const terminal = !s.active && (s.phase === "published" || s.phase === "failed" || s.phase === "deferred");
@@ -81,7 +88,7 @@ export default function TopBar() {
           lastPubJob.current = s.jobId;
           if (!firstTick) {
             if (s.phase === "published") showToast(s.total > 1 ? `Published to ${s.published}/${s.total} accounts ✓` : "Published ✓", "success");
-            else if (s.phase === "deferred") showToast("YouTube daily upload limit reached — we'll retry automatically after the daily reset (≈ midnight Pacific). To upload more per day, request a YouTube API quota increase in Google Cloud.", "info");
+            else if (s.phase === "deferred") showToast(s.reason || "YouTube paused this publish at its daily limit — we'll retry automatically after it resets. Check Alerts for how to raise it.", "info");
             else if (s.published) showToast(`Published ${s.published}/${s.total} — ${s.failed} failed.`, "info");
             else showToast(s.error || "Publish failed.");
           }
@@ -246,13 +253,33 @@ export default function TopBar() {
     } catch (err) { showToast(err.message || "Publish failed"); }
   };
 
+  // "Try publish now" — when a publish was deferred (quota/upload-limit), re-run the already-queued
+  // retry immediately instead of waiting for the scheduled reset. Reuses the existing render + post
+  // (no re-render, no duplicate). If nothing is queued anymore, fall back to a fresh publish.
+  const publishNow = async () => {
+    if (!projectId || pubStatus?.active) return;
+    try {
+      const res = await serverFetch("/api/social/publish-now", { method: "POST", body: JSON.stringify({ projectId }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Couldn't start publishing");
+      if (d.ran > 0) {
+        seededPub.current = true;
+        triedNow.current = true; // surface the reason if it comes back deferred again
+        setPubStatus({ active: true, phase: "publishing", progress: 100, total: d.ran });
+        showToast("Publishing now…", "info");
+      } else {
+        setShowPublish(true); // nothing queued to resume — open a fresh publish
+      }
+    } catch (err) { showToast(err.message || "Couldn't start publishing"); }
+  };
+
   const pubActive = !!pubStatus?.active;
   const lastPub = pubStatus?.last || null; // persistent "already published" history for this project
   const publishedAccounts = {};            // accountId -> published_at, for the re-publish guard
   (lastPub?.posts || []).forEach((p) => { if (p.status === "published" && p.accountId) publishedAccounts[p.accountId] = p.at; });
   const publishLabel = pubActive
-    ? (pubStatus.phase === "rendering" ? `Rendering… ${pubStatus.progress || 0}%` : "Publishing…")
-    : pubStatus?.phase === "deferred" ? "⏳ Retry scheduled"
+    ? (pubStatus.phase === "rendering" ? `Rendering… ${pubStatus.progress || 0}%` : pubStatus.via === "automation" ? "Auto-publishing…" : "Publishing…")
+    : pubStatus?.phase === "deferred" ? "↗ Publish now"
     : (lastPub ? "↗ Publish again" : "↗ Publish");
 
   const relTime = (iso) => {
@@ -378,7 +405,7 @@ export default function TopBar() {
         >
           <span style={{ fontSize: 13, flexShrink: 0 }}>💡</span>
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            Editing is best for light edits — swap media, tweak text, colors &amp; timing. Heavy restructuring may break the video.
+            Editing is best for light edits — swap media, tweak text, colors &amp; etc. Heavy restructuring may break the video.
           </span>
         </div>
       </div>
@@ -540,9 +567,9 @@ export default function TopBar() {
 
         {canPublish && (
           <button
-            onClick={() => !pubActive && setShowPublish(true)}
+            onClick={() => { if (exporting || pubActive) return; pubStatus?.phase === "deferred" ? publishNow() : setShowPublish(true); }}
             disabled={exporting || pubActive}
-            title={pubActive ? "Publishing in progress — you can keep editing" : "Render & publish to your connected social accounts"}
+            title={pubActive ? "Publishing in progress — you can keep editing" : pubStatus?.phase === "deferred" ? "Retry the deferred publish now (reuses the render)" : "Render & publish to your connected social accounts"}
             style={{
               background: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.45)",
               color: "#34d399", cursor: (exporting || pubActive) ? "default" : "pointer", padding: "7px 16px",

@@ -223,16 +223,22 @@ registerHandler("publish_post", async (payload, job) => {
     if (err.quota) {
       const retryAt = nextQuotaResetMs();
       await enqueue("publish_post", { ...payload, postId }, { userId, runAt: retryAt, maxAttempts: 5, priority: -10 });
+      // Two different daily caps with different fixes — message accordingly (don't tell the user to
+      // raise a Cloud API quota when it's actually YouTube's per-account upload limit).
+      const upload = err.quotaKind === "uploadLimit";
+      const label = upload ? "YouTube daily upload limit reached" : "YouTube daily API quota reached";
       if (postId) await supabaseAdmin.from("published_posts").update({
         status: "deferred",
-        error: `YouTube daily API quota reached — auto-retry after reset. (${(err.message || "").slice(0, 280)})`,
+        error: `${label} — auto-retry after reset. (${(err.message || "").slice(0, 280)})`,
         updated_at: new Date().toISOString(),
       }).eq("id", postId);
-      logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "info", message: "deferred — daily quota reached", meta: { platform, retryAt: new Date(retryAt).toISOString() } });
+      logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "info", message: `deferred — ${upload ? "account upload limit" : "API quota"} reached`, meta: { platform, retryAt: new Date(retryAt).toISOString() } });
       notifyUser(userId, { type: "publish_deferred", icon: "⏳", severity: "warning",
         link: projectId ? `/video-editor/${projectId}` : "/automation",
-        title: "Publishing paused — YouTube daily limit",
-        body: "Your Google project's daily upload quota is used up. We'll retry automatically after it resets (≈ midnight Pacific). To upload more per day, request a YouTube API quota increase in Google Cloud." });
+        title: upload ? "Publishing paused — YouTube upload limit" : "Publishing paused — YouTube API quota",
+        body: upload
+          ? "YouTube limits how many videos an account can upload per day — and that cap is low for new or unverified channels. We'll retry automatically after it resets. To raise it: verify your channel at youtube.com/verify and finish Google app verification (set the OAuth app to Production)."
+          : "Your Google project's daily API quota is used up. We'll retry automatically after it resets. To upload more per day, request a YouTube API quota increase in Google Cloud." });
       return { deferred: true, platform, postId, retryAt: new Date(retryAt).toISOString() };
     }
     await supabaseAdmin.from("published_posts").update({

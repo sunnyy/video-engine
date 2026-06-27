@@ -22,12 +22,19 @@ function transient(msg) { return new Error(msg); }
 //  • SHORT-TERM rate limit (too many calls in a short window) → mark `rateLimit` so the handler
 //    just retries with normal exponential backoff (seconds/minutes), NOT a next-day defer.
 //    YouTube: 403 rateLimitExceeded/userRateLimitExceeded, or a 5xx/backendError blip.
-function quotaErr(msg) { const e = new Error(msg); e.quota = true; return e; }
+function quotaErr(msg, kind) { const e = new Error(msg); e.quota = true; e.quotaKind = kind || "apiQuota"; return e; }
 function rateErr(msg)  { const e = new Error(msg); e.rateLimit = true; return e; }
-const DAILY_QUOTA = /quotaExceeded|dailyLimitExceeded|uploadLimitExceeded/i;
-const RATE_LIMIT  = /rateLimitExceeded|userRateLimitExceeded|backendError|SERVICE_UNAVAILABLE|internalError/i;
-const isDailyQuota = (txt) => DAILY_QUOTA.test(txt || "");
-const isRateLimit  = (txt) => RATE_LIMIT.test(txt || "");
+// Two DIFFERENT daily limits that both reset (so both defer), but have different fixes:
+//  • ACCOUNT upload cap — YouTube limits how many videos a CHANNEL may upload per day; low for new
+//    or unverified channels and apps still in OAuth "Testing". Fix = verify the channel + finish
+//    Google app verification. (HTTP 400 uploadLimitExceeded / "exceeded the number of videos…")
+//  • Project API UNITS quota (10k/day default) — fix = request a Cloud quota increase.
+const UPLOAD_LIMIT = /uploadLimitExceeded|exceeded the number of videos/i;
+const API_QUOTA    = /quotaExceeded|dailyLimitExceeded/i;
+const RATE_LIMIT   = /rateLimitExceeded|userRateLimitExceeded|backendError|SERVICE_UNAVAILABLE|internalError/i;
+const isUploadLimit = (txt) => UPLOAD_LIMIT.test(txt || "");
+const isApiQuota    = (txt) => API_QUOTA.test(txt || "");
+const isRateLimit   = (txt) => RATE_LIMIT.test(txt || "");
 const AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPES = [
@@ -168,8 +175,9 @@ export const youtube = {
     }).catch((e) => { throw transient(`YouTube init stalled/failed: ${e.message}`); });
     if (!init.ok) {
       const txt = await init.text();
-      if (isRateLimit(txt))  throw rateErr(`YouTube rate-limited (init): ${txt.slice(0, 220)}`);
-      if (isDailyQuota(txt)) throw quotaErr(`YouTube daily quota reached (init): ${txt.slice(0, 220)}`);
+      if (isRateLimit(txt))   throw rateErr(`YouTube rate-limited (init): ${txt.slice(0, 220)}`);
+      if (isUploadLimit(txt)) throw quotaErr(`YouTube account upload limit reached (init): ${txt.slice(0, 220)}`, "uploadLimit");
+      if (isApiQuota(txt))    throw quotaErr(`YouTube daily API quota reached (init): ${txt.slice(0, 220)}`, "apiQuota");
       if (init.status === 401 || init.status === 403) throw permanent(`YouTube auth/permission error: ${txt.slice(0, 220)}`);
       throw transient(`YouTube init failed (${init.status}): ${txt.slice(0, 220)}`);
     }
@@ -185,8 +193,9 @@ export const youtube = {
     }).catch((e) => { throw transient(`YouTube upload stalled/failed: ${e.message}`); });
     if (!up.ok) {
       const txt = await up.text();
-      if (isRateLimit(txt))  throw rateErr(`YouTube rate-limited (upload): ${txt.slice(0, 220)}`);
-      if (isDailyQuota(txt)) throw quotaErr(`YouTube daily quota reached (upload): ${txt.slice(0, 220)}`);
+      if (isRateLimit(txt))   throw rateErr(`YouTube rate-limited (upload): ${txt.slice(0, 220)}`);
+      if (isUploadLimit(txt)) throw quotaErr(`YouTube account upload limit reached (upload): ${txt.slice(0, 220)}`, "uploadLimit");
+      if (isApiQuota(txt))    throw quotaErr(`YouTube daily API quota reached (upload): ${txt.slice(0, 220)}`, "apiQuota");
       if (up.status === 401 || up.status === 403) throw permanent(`YouTube auth/permission error during upload: ${txt.slice(0, 220)}`);
       throw transient(`YouTube upload failed (${up.status}): ${txt.slice(0, 220)}`);
     }
