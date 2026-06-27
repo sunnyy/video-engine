@@ -32,8 +32,13 @@ router.post("/generate", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "productImageUrl is required" });
   }
 
-  // Safety: moderate the product image + any user text before generating.
-  if (!(await guardContent(res, { text: [brandName, productDescription], images: [productImageUrl], label: "product-video" }))) return;
+  // Safety: moderate the product image + ALL user-supplied text before generating — including the
+  // edited script and, when a reviewed plan is supplied (vision director skipped), the plan's
+  // per-scene script segments + image-generation prompts (which drive Nano Banana image edits).
+  const planText = Array.isArray(plan?.scenes)
+    ? plan.scenes.flatMap((s) => [s.script_segment, s.image_generation_prompt, s.headline, s.subtext, s.visual_concept]).filter(Boolean)
+    : [];
+  if (!(await guardContent(res, { text: [brandName, productDescription, script, ...planText], images: [productImageUrl], label: "product-video" }))) return;
 
   // Stream real progress (SSE) — the pipeline emits a step index at each boundary.
   res.setHeader("Content-Type", "text/event-stream");
@@ -72,6 +77,11 @@ router.post("/generate", requireAuth, async (req, res) => {
       plan:               plan               ?? null,   // approved plan from review (skips director)
       script:             (script ?? "").trim() || null, // edited spoken script
     }, (step) => send({ step }));
+
+    // Charged-no-deliverable guard: credits were deducted up front, so a swallowed timeline-save
+    // (saveTimeline → null editor_project_id) must fail → the catch refunds, instead of sending
+    // "done" with nothing to open.
+    if (!result?.editor_project_id) throw new Error("generation produced no editor project (save failed)");
 
     send({
       done: true,
