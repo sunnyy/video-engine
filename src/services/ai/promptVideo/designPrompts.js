@@ -63,7 +63,11 @@ VARY THE BACKGROUND scene to scene — do NOT default every frame to the same co
 export function buildBeatPrompt(beat, ctx) {
   const { style, palette, canvasW, canvasH, language } = ctx;
   const duration = beat.duration_seconds ?? 3;
-  const isOverlay = !!beat.asset?.src && (beat.asset.kind === "image" || beat.asset.kind === "video");
+  // Mode follows the art-director's directive: `overlay` (text over a fetched image/video) vs `full`
+  // (a self-contained designed frame). A media-backed beat defaults to overlay unless the directive
+  // explicitly pinned `full`; a typographic beat has no media → always the full canvas frame.
+  const hasMedia = !!beat.asset?.src && (beat.asset.kind === "image" || beat.asset.kind === "video");
+  const isOverlay = hasMedia && beat.layout !== "full";
   // Hindi is Devanagari on BOTH the spoken line and the on-screen CONTENT (the renderer + measure
   // now have a Devanagari font). Render the Devanagari content as-is; keep it short so it fits.
   const latinOnScreenRule = (language === "hi" || language === "hinglish")
@@ -135,8 +139,9 @@ ${paletteBlock(palette, beat)}
 
 ${contentBlock(beat)}
 ${latinOnScreenRule}
-THE DESIRE: a premium, clean, instantly-readable frame with the polish of Linear / Vercel / Stripe — one dominant focal point, hard contrast, confident negative space. The key word/number/idea must land in under a second. Thin, timid, mid-sized type is what makes a frame feel weak — be bold.
-RICHNESS COMES FROM CONTENT, NEVER ORNAMENT. Interest comes from the real content, well-composed — never from shapes added to fill or "balance" space. NEGATIVE SPACE IS PREMIUM: if a frame feels empty, strengthen the content or enrich the background field; never sprinkle decoration. (The CONTENT-FIRST / no-orphan rule below is absolute.)
+THE DESIRE: a premium, clean, instantly-readable frame with the polish of Linear / Vercel / Stripe — one dominant focal point, hard contrast. The key word/number/idea must land in under a second. Thin, timid, mid-sized type is what makes a frame feel weak — be bold.
+FILL THE FRAME — there is NO photo behind this frame, so the DESIGN is the entire visual. The focal content (the hero type, the key number, the composition) must DOMINATE the canvas, set as large as it can go while still fitting edge-to-edge. A few small words floating in a big empty colour block is the #1 failure — it looks broken and empty. Negative space FRAMES a dominant element; it is never vast emptiness around a small one.
+RICHNESS COMES FROM CONTENT MADE BIG, NEVER FROM ORNAMENT. Fill the frame by making the real content dominant (huge type, a large confident composition) — never by sprinkling decorative shapes. If a frame feels empty, make the content BIGGER or enrich the background field; never add orphan decoration. (The CONTENT-FIRST / no-orphan rule below is absolute.)
 CONSTRAINTS: everything fits fully inside the ${canvasW}×${canvasH} frame — nothing clipped or running off the edge (a long line wraps or sizes down; never force one line wider than the frame). Use only as many elements as the content genuinely needs; on-screen words ≤ ${maxWords}. Fewer, bolder, content-bearing elements beat more-and-smaller every time.
 DEPICT REAL THINGS WITH IMAGES, NOT CSS: never build a map, country, building, landmark, vehicle, animal, person/face, emblem/crest/flag/logo, or any specific real-world object/scene out of CSS shapes — it always renders as crude blobs (those moments are IMAGE beats, not this frame). NO clip-path and NO inline <svg> — our renderer drops both.
 

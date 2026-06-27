@@ -2,34 +2,31 @@
  * visualResolver.js
  * src/services/ai/promptVideo/visualResolver.js
  *
- * Stage 3 — resolves every beat's visual via the shared asset waterfall
- * (entity → stock → ai_image_library → generate), capped by an AI budget.
- * This file only maps AI Video's beat taxonomy to AssetRequests and supplies the
- * service-specific generation (cutout / styled illustration / photo). All the
- * sourcing, reuse, persistence and shape analysis live in shared/.
+ * Stage 3 — THE EXECUTOR. It does NOT decide anything: it faithfully fetches the asset the
+ * art-director specified per beat (`beat.source` + its query), via the shared waterfall
+ * (entity → stock → library → generate). Free sources are UNLIMITED; only `ai_image` is bounded by
+ * the director's allocation (a hard COGS ceiling). When a beat genuinely resolves to nothing, it
+ * becomes a DELIBERATE full typographic frame (the designer fills it) — never a silent empty block.
  *
- *   ai_image  → styled illustration (locked style string)
- *   photo     → real photo (entity) → stock → generated photo
- *   cutout    → real/generated portrait → birefnet bg-removal → transparent PNG
- *   stock_video → stock clip → stock image → generated photo
- *
- * Over-budget or failed beats downgrade to "none" → GPT-5.4 HTML frame.
+ *   entity       → real photo (Wikipedia) → stock → library → generate
+ *   stock_image  → stock image → library → generate
+ *   stock_video  → stock video → stock image → library → generate
+ *   ai_image     → library → generate (paid; only where the director allocated it)
+ *   typographic  → no asset; the designer composes a full frame
  */
 import { resolveAssets } from "../shared/assetResolver.js";
-import { generateAiImage, removeBackground } from "../shared/aiImage.js";
+import { generateAiImage } from "../shared/aiImage.js";
+import { aiImageBudgetFor } from "./artDirector.js";
 
-const NEEDS_ASSET = new Set(["ai_image", "photo", "cutout", "stock_video"]);
-
-// AI generations allowed per video — ~1 per 12s, clamped to 2–4.
-function aiBudgetFor(totalDuration) {
-  return Math.max(2, Math.min(4, Math.round((totalDuration || 30) / 12)));
-}
+// Sources that need a fetched asset (typographic needs none).
+const NEEDS_ASSET = new Set(["entity", "stock_image", "stock_video", "ai_image"]);
 
 function stockQuery(beat) {
   return (beat.shot_query
     || beat.subject_entity
     || (beat.image_prompt ? beat.image_prompt.split(/[,.]/)[0].split(/\s+/).slice(0, 6).join(" ") : "")
     || beat.content?.headline
+    || beat.visual_concept
     || "").trim();
 }
 
@@ -44,75 +41,47 @@ function libMeta(beat) {
   };
 }
 
-// AI Video beat → shared AssetRequest.
+// Art-director directive (beat.source) → shared AssetRequest. The shared waterfall handles each
+// source's internal free fallbacks; only ai_image is allowed to spend the paid budget.
 function toRequest(beat) {
   const lib    = libMeta(beat);
   const minDur = Math.max(2, Math.ceil(beat.duration_seconds ?? 3));
+  const q      = stockQuery(beat);
 
-  if (beat.subject_entity) {
-    return {
-      asset_type: "entity", entity: beat.subject_entity, stock_query: stockQuery(beat),
-      motion: beat.asset_type === "stock_video", minDuration: minDur,
-      noStockFallback: beat.asset_type === "cutout",       // cutouts can't use a flat stock photo
-      gen_prompt: beat.image_prompt,
-      library: beat.asset_type === "cutout" ? null : lib,  // cutouts aren't reusable
-      priority: 1, _ref: beat,
-    };
-  }
-  if (beat.asset_type === "stock_video")
-    return { asset_type: "stock", stock_query: beat.shot_query, motion: true, minDuration: minDur, gen_prompt: beat.image_prompt, library: lib, priority: 1, _ref: beat };
-  if (beat.asset_type === "photo")
-    return { asset_type: "stock", stock_query: stockQuery(beat), motion: false, gen_prompt: beat.image_prompt, library: lib, priority: 1, _ref: beat };
-
-  // ai_image (conceptual) or cutout without an entity — skip stock, go library→generate.
-  return {
-    asset_type: "ai_image",
-    gen_prompt: beat.image_prompt || beat.shot_query || beat.content?.headline || beat.visual_concept || "",
-    library: beat.asset_type === "cutout" ? null : lib,
-    priority: beat.asset_type === "ai_image" ? 0 : 1,     // ai_image beats get first claim on the budget
-    _ref: beat,
-  };
+  if (beat.source === "entity" && beat.subject_entity)
+    return { asset_type: "entity", entity: beat.subject_entity, stock_query: q, motion: false, minDuration: minDur, gen_prompt: beat.image_prompt || q, library: lib, priority: 1, _ref: beat };
+  if (beat.source === "stock_video")
+    return { asset_type: "stock", stock_query: beat.shot_query || q, motion: true, minDuration: minDur, gen_prompt: beat.image_prompt || beat.shot_query || q, library: lib, priority: 1, _ref: beat };
+  if (beat.source === "stock_image")
+    return { asset_type: "stock", stock_query: beat.shot_query || q, motion: false, gen_prompt: beat.image_prompt || q, library: lib, priority: 1, _ref: beat };
+  // ai_image — the only paid-first source; gets first claim on the generation budget.
+  return { asset_type: "ai_image", gen_prompt: beat.image_prompt || q, library: lib, priority: 0, _ref: beat };
 }
 
 /**
- * resolveVisuals(beats, style, runId, orientation) — maps beats → requests, runs
- * the shared waterfall (budgeted), writes beat.asset, and lets continuation beats
- * inherit the asset they extend.
+ * resolveVisuals(beats, style, runId, orientation) — executes each beat's directive, writes
+ * beat.asset, degrades a true miss to a deliberate full typographic frame, and lets continuation
+ * beats inherit the visual they extend. Same signature as before (drop-in for the orchestrator).
  */
 export async function resolveVisuals(beats, style, runId, orientation = "9:16") {
   const totalDur = beats.reduce((a, b) => a + (b.duration_seconds ?? 0), 0);
-  const aiBudget = aiBudgetFor(totalDur);
+  // The paid ceiling. The art-director already capped its ai_image picks to this; here it also lets
+  // a rare free miss fall through to one generated image rather than an empty frame.
+  const aiBudget = aiImageBudgetFor(totalDur);
   beats.forEach(b => { b.asset = null; });
 
-  const assetBeats = beats.filter(b => !b.continues_previous && NEEDS_ASSET.has(b.asset_type));
+  const assetBeats = beats.filter(b => !b.continues_previous && NEEDS_ASSET.has(b.source));
   const requests   = assetBeats.map(toRequest);
 
-  // Service-specific generation (cutout / styled illustration / photo).
   const generate = async (req) => {
     const beat = req._ref, label = req._label;
-    if (beat.asset_type === "cutout") {
-      const portrait = await generateAiImage(
-        `${beat.image_prompt}, studio portrait, full subject visible, plain solid light grey background, ${style.photoStyle}`,
-        { runId, label: `${label}-portrait`, orientation, noTextGate: true });
-      if (!portrait) return null;
-      const cut = await removeBackground(portrait, { runId, label: `${label}-cutout` });
-      return { src: cut ?? portrait, kind: cut ? "cutout" : "image", libraryEligible: false };
-    }
-    const styleStr  = beat.asset_type === "ai_image" ? style.illustrationStyle : style.photoStyle;
+    const styleStr  = beat.source === "ai_image" ? style.illustrationStyle : style.photoStyle;
     const promptSrc = beat.image_prompt || beat.shot_query || beat.content?.headline || beat.visual_concept || "";
     const src = await generateAiImage(`${promptSrc}, ${styleStr}`, { runId, label: `${label}-ai`, orientation, noTextGate: true });
     return src ? { src, kind: "image", libraryEligible: true } : null;
   };
 
-  // Transform a resolved real-entity photo (cutout beats → transparent PNG).
-  const onEntity = async (src, req) => {
-    const beat = req._ref;
-    if (beat.asset_type === "cutout") {
-      const cut = await removeBackground(src, { runId, label: `${req._label}-cutout` });
-      return { src: cut ?? src, kind: cut ? "cutout" : "image" };
-    }
-    return { src, kind: "image" };
-  };
+  const onEntity = async (src) => ({ src, kind: "image" });
 
   const results = await resolveAssets(requests, {
     runId, orientation, aiBudget, generate, onEntity,
@@ -126,17 +95,25 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
       if (r.real) b.asset.real = true;
       if (r.assetMeta) b.asset.assetMeta = r.assetMeta;
     } else {
-      b.asset = null; b.asset_type = "none"; // cheapest downgrade: GPT-5.4 HTML frame
+      // No asset resolved anywhere — this is the directive's graceful fallback: a DELIBERATE full
+      // typographic frame the designer fills. Logged, never a silent empty color block.
+      console.warn(`[ai-video/executor] beat ${b.beat_index} (${b.source}) resolved no asset → full typographic frame`);
+      b.asset = null;
+      b.source = "typographic";
+      b.asset_type = "none";
+      b.layout = "full";
     }
   });
 
-  // Continuation beats inherit the asset from the beat they extend.
+  // Continuation beats inherit the visual (and its layout/source) of the beat they extend.
   for (let i = 1; i < beats.length; i++) {
     if (!beats[i].continues_previous) continue;
     beats[i].asset      = beats[i - 1].asset;
+    beats[i].source     = beats[i - 1].source;
     beats[i].asset_type = beats[i - 1].asset_type;
+    beats[i].layout     = beats[i - 1].layout;
   }
 
-  console.log(`[ai-video/resolve] budget ${aiBudget} for ${totalDur.toFixed(0)}s — ${beats.map(b => `b${b.beat_index}:${b.continues_previous ? "+" : ""}${b.asset_type}${b.asset ? `(${b.asset.kind}${b.asset.real ? "/real" : ""})` : ""}`).join(" ")}`);
+  console.log(`[ai-video/executor] ai≤${aiBudget} for ${totalDur.toFixed(0)}s — ${beats.map(b => `b${b.beat_index}:${b.continues_previous ? "+" : ""}${b.source}${b.asset ? `(${b.asset.kind}${b.asset.real ? "/real" : ""})` : ""}`).join(" ")}`);
   return beats;
 }

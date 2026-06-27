@@ -18,7 +18,8 @@
 import { supabaseAdmin }         from "../../../server/middleware/shared.js";
 import { simplifyTimelineKeyframes } from "../shared/motion.js";
 import { researchTopic }         from "./researcher.js";
-import { directBeats }           from "./beatDirector.js";
+import { writeScript }           from "./scriptWriter.js";
+import { directVisuals }         from "./artDirector.js";
 import { resolveVisuals }        from "./visualResolver.js";
 import { designAllBeats }        from "./beatDesigner.js";
 import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
@@ -268,7 +269,8 @@ function capVisualHold(beats) {
           ? b.keywords.join(" ")
           : (b.visual_concept || b.script_line || "")).trim().slice(0, 120);
         b.shot_query = q;
-        if (b.asset_type === "ai_image") b.asset_type = "stock_video"; // free + distinct beats a capped gen
+        // free + distinct beats a capped gen — flip the directive's source too (the executor keys on it)
+        if (b.source === "ai_image") { b.source = "stock_video"; b.asset_type = "stock_video"; }
       }
       console.log(`[ai-video] cap visual hold: broke continuation at beat ${b.beat_index} (held ${runDur.toFixed(1)}s)`);
       runDur = dur; runIsVisual = visual;
@@ -451,13 +453,34 @@ function applyTransitions(layers, beats) {
 // ── Main export ──────────────────────────────────────────────────────────────
 
 /**
+ * composeFilm — plan the whole film: WRITER (script + on-screen content) then ART-DIRECTOR
+ * (every per-scene visual decision + style + palette). Replaces the old single directBeats() call;
+ * both the cheap plan/review path and the full pipeline call this, so a film is planned ONE way.
+ */
+async function composeFilm({ research, styleId = "auto", targetDuration = 45, language = "en", theme = "auto", accentColor = null, accentColor2 = null, orientation = "9:16" }) {
+  const script = await writeScript({ research, targetDuration, language });
+  const dir    = await directVisuals({ research, beats: script.beats, targetDuration, styleId, theme, accentColor, accentColor2, orientation });
+  const beats  = dir.beats.map(b => ({ ...b, niche: script.niche }));
+  return {
+    project_name: script.project_name,
+    style:        dir.style,
+    palette:      dir.palette,
+    niche:        script.niche,
+    music_mood:   script.music_mood,
+    publish:      script.publish,
+    narration:    script.narration,
+    beats,
+  };
+}
+
+/**
  * runPromptPlan — the cheap half: research + direction only. Shown to the
  * user for review/revision BEFORE any production money is spent.
  */
-export async function runPromptPlan({ prompt, styleId = "auto", targetDuration = 45, language = "en", theme = "auto", accentColor = null, accentColor2 = null }) {
+export async function runPromptPlan({ prompt, styleId = "auto", targetDuration = 45, language = "en", theme = "auto", accentColor = null, accentColor2 = null, orientation = "9:16" }) {
   await moderateInput(prompt, { label: "prompt-to-video input" });
   const research = await researchTopic(prompt);
-  const film = await directBeats({ research, styleId, targetDuration, language, theme, accentColor, accentColor2 });
+  const film = await composeFilm({ research, styleId, targetDuration, language, theme, accentColor, accentColor2, orientation });
   const words = film.beats.reduce((a, b) => a + b.script_line.trim().split(/\s+/).filter(Boolean).length, 0);
   return {
     plan: { research, film },
@@ -469,7 +492,7 @@ export async function runPromptPlan({ prompt, styleId = "auto", targetDuration =
       words,
       estSeconds:  Math.round(words / 2.1),
       beatCount:   film.beats.length,
-      shotCount:   film.beats.filter(b => ["ai_image", "photo", "stock_video"].includes(b.asset_type)).length,
+      shotCount:   film.beats.filter(b => b.source && b.source !== "typographic").length,
       references:  (research.entities ?? []).slice(0, 5).map(e => e.name),
     },
   };
@@ -500,9 +523,9 @@ export async function runPromptPipeline(params, onStep) {
     step(PROMPT_STATUS_STEPS[0]);
     research = await researchTopic(prompt);
 
-    // ── Stage 1: Beat direction (script + shot list, one call) ─────────────
+    // ── Stage 1: Writer (script + content) → Art-Director (visuals + style) ──
     step(PROMPT_STATUS_STEPS[1]);
-    film = await directBeats({ research, styleId, targetDuration, language, theme, accentColor, accentColor2 });
+    film = await composeFilm({ research, styleId, targetDuration, language, theme, accentColor, accentColor2, orientation });
   }
   const { style, palette } = film;
   let beats = film.beats;
@@ -740,7 +763,9 @@ export async function runPromptPipeline(params, onStep) {
           palette,
           research: { topic: research.topic, angle: research.angle, entities: research.entities, facts: research.facts, artifacts: research.artifacts },
           beats: beats.map(b => ({
-            beat_index: b.beat_index, asset_type: b.asset_type, script_line: b.script_line,
+            beat_index: b.beat_index, asset_type: b.asset_type,
+            source: b.source ?? null, layout: b.layout ?? null, fallback: b.fallback ?? null,
+            script_line: b.script_line,
             content: b.content, visual_concept: b.visual_concept, camera: b.camera ?? null,
             image_prompt: b.image_prompt, shot_query: b.shot_query,
             transition_out: b.transition_out, duration_seconds: b.duration_seconds,
