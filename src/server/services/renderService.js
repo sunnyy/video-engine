@@ -27,7 +27,11 @@ const VIDQUENCE_SERVICES = new Set(
 );
 function pickEngine(project, source) {
   if (RENDER_ENGINE === "vidquence") return "vidquence";          // global override
-  const svc = String(source || project?.meta?.source || "").toLowerCase();
+  // Resolve the service: explicit `source` from the render handler (project row) wins; else the
+  // timeline's own tag — some services put it at meta.source (AI Video / Product / Talking Head),
+  // others at top-level source (Social / Typography / Promo). Checking both makes the per-service
+  // flip work on BOTH the automation and editor-export paths for every service.
+  const svc = String(source || project?.meta?.source || project?.source || "").toLowerCase();
   return VIDQUENCE_SERVICES.has(svc) ? "vidquence" : "remotion";  // per-service, else Remotion
 }
 
