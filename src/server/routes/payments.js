@@ -2,7 +2,7 @@ import express from "express";
 import crypto  from "node:crypto";
 import Razorpay from "razorpay";
 import {
-  supabaseAdmin, requireAuth, requireAdmin, addCredits, uuidv4,
+  supabaseAdmin, requireAuth, requireAdmin, addCredits, uuidv4, safeMessage,
   sendAdminAlert, sendUserEmail,
   adminNewSaleEmail, adminPlanRenewalEmail, adminPlanUpgradeEmail,
   adminCreditsTopupEmail,
@@ -58,7 +58,7 @@ router.get("/plans", async (_req, res) => {
     res.json(data || []);
   } catch (err) {
     console.error("[plans]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -131,7 +131,7 @@ router.post("/payments/create-order", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("[payments/create-order]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -281,7 +281,7 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
     res.json({ success: true, credits: creditsToGrant, balance: newBalance });
   } catch (err) {
     console.error("[payments/verify]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -300,7 +300,7 @@ router.get("/payments/subscription", requireAuth, async (req, res) => {
     res.json({ subscription: data || null });
   } catch (err) {
     console.error("[payments/subscription]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -356,7 +356,7 @@ router.post("/credits/topup/create-order", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("[credits/topup/create-order]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -404,7 +404,7 @@ router.post("/credits/topup/verify", requireAuth, async (req, res) => {
     res.json({ success: true, credits: pkg.credits, balance: newBalance });
   } catch (err) {
     console.error("[credits/topup/verify]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -429,6 +429,6 @@ router.get("/subscriptions/all", requireAuth, requireAdmin, async (_req, res) =>
     res.json({ subscriptions: rows.map(r => ({ ...r, email: emailMap[r.user_id] || r.user_id })) });
   } catch (err) {
     console.error("[subscriptions/all]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });

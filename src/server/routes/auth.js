@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  supabaseAdmin, requireAuth, addCredits,
+  supabaseAdmin, requireAuth, addCredits, safeMessage,
   sendAdminAlert, sendUserEmail,
   adminNewUserEmail, adminUserDeletedEmail,
   userWelcomeEmail, userAccountDeletedEmail,
@@ -20,7 +20,7 @@ router.get("/user/profile", requireAuth, async (req, res) => {
     if (error && error.code !== "PGRST116") throw error;
     res.json(data || {});
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -40,7 +40,7 @@ router.post("/user/profile", requireAuth, async (req, res) => {
     if (error) throw error;
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -56,7 +56,7 @@ router.get("/user/transactions", requireAuth, async (req, res) => {
     if (error) throw error;
     res.json(data || []);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -94,7 +94,7 @@ router.get("/user/credit-history", requireAuth, async (req, res) => {
       hasMore: offset + rows.length < (count ?? 0),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -109,7 +109,7 @@ router.get("/user/credits", requireAuth, async (req, res) => {
     if (error && error.code !== "PGRST116") throw error;
     res.json(data || { balance: 0, lifetime_credits: 0 });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -163,7 +163,7 @@ router.post("/account/delete", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("[account/delete]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });
 
@@ -209,6 +209,6 @@ router.post("/webhooks/user-created", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("[webhook/user-created]", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeMessage(err) });
   }
 });

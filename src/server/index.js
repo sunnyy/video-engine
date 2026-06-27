@@ -128,9 +128,10 @@ const authLimiter = rateLimit({
 // falls under the generous general limiter — not a failure — so this is the protective layer on the
 // KNOWN-expensive routes, not an exhaustive classifier.
 const HEAVY_PATHS = [
-  /\/generate(\/|$)/,                         // *-video/generate + image studios + tts/generate
+  /\/generate[\w-]*(\/|$)/,                   // /generate AND hyphenated paid generators
+                                             // (generate-clip / -tts / -image(s) / -base-image / -scenes / -concepts / -zone-assets / -layout-*)
   /\/produce(\/|$)/,                          // social / typography produce
-  /\/generate-scenes(\/|$)/,                  // product scene generation
+  /\/plan(\/|$)/,                             // free-but-paid review step (GPT) — bound the per-user burst
   /^\/render\/timeline(\/|$)/,                // editor export (Remotion)
   /^\/promo-video\/(create|transcribe-th)(\/|$)/,
   /^\/promo-video\/[^/]+\/render(\/|$)/,      // saas project render
