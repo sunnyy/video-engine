@@ -64,7 +64,7 @@ HOW TO DIRECT EACH BEAT:
   • a bespoke metaphor/concept NO free source can show → "ai_image" with a cinematic, TEXT-FREE prompt. Budget = ${aiImageBudget}; allocate sparingly.
   • a pure-information moment (stat, quote, list, title, CTA, comparison) OR nothing depictable → "typographic" (a deliberate FULL designed frame).
 - DEPICTABLE SUBJECTS GET IMAGERY. If the beat is about something you could photograph or find as stock, it MUST be entity/stock/ai — never typographic. A topic that enumerates concrete subjects (each zodiac sign, each animal, each city, each tool) gives EVERY subject its own real image. Typographic is for genuine information frames only.
-- VARIETY: consecutive beats must not look alike — different subject + different source/treatment. Don't let one source dominate a whole run.
+- VARIETY — THE ANTI-SLIDESHOW RULE: consecutive beats must not look alike. Vary the SUBJECT, the SOURCE, the CAMERA move and the TRANSITION scene to scene — never the same camera or transition twice in a row, never one source dominating a run. (The designer varies the typography per scene; you make sure the shots + motion underneath are varied too, so it never feels like one photo-with-a-caption repeated.)
 - continues_previous beats inherit the previous beat's visual (a quick same-image build) — you may leave their source matching the previous.
 
 PER BEAT YOU ALSO CHOOSE:

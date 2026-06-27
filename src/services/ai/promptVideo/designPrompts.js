@@ -82,41 +82,37 @@ export function buildBeatPrompt(beat, ctx) {
 - Icons: data-icon="kebab-name" (Lucide) ONLY on a single standalone glyph — NEVER on something built from shapes/divs (it gets replaced by a generic icon and your design is lost; leave hand-built shapes as data-layer="decoration").
 TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Spell every word EXACTLY as given; minimum readable font ~26px.
 NO PSEUDO-ELEMENTS — our renderer DROPS ::before and ::after entirely (and any content:"" decoration). EVERY visible mark must be its OWN real tagged element: build glows, halos, ring highlights, accent arcs/sweeps, underlines, lines, dots, sparkles, and gradient overlays as actual <div>s with data-role/data-layer (e.g. a glow = a <div data-role="glow" data-layer="effect"> radial-gradient). If you draw an accent with ::before/::after it will VANISH in the render — never rely on it.
-CONTENT-FIRST — NO ORPHAN DECORATION (the #1 thing that makes frames look amateur and cluttered). EVERY element must BELONG to the content: it either IS content, HOLDS content (a card / panel / chart / mockup wrapped around real content), or DIRECTLY structures content (an accent underline beneath a heading, a divider between two related blocks, the connectors/nodes of a diagram that link labels). BANNED as standalone "design" — these are exactly what makes frames look horrific: free-floating lines / bars / rules in the margins, lone outline circles / rings / dots, arrows that don't point from one labelled thing to another, scattered ticks / sparkles / confetti, corner doodads, and decorative kicker / badge / chip / "01" pills used as garnish. If a shape is not part of a content structure, it does not belong — delete it. Negative space is PREMIUM, never something to fill with shapes.
+CONTENT-FIRST — NO ORPHAN DECORATION (the #1 thing that makes frames look amateur and cluttered). EVERY element must BELONG to the content: it either IS content, HOLDS content (a card / panel / chart / mockup wrapped around real content), or DIRECTLY structures content (an accent underline beneath a heading, a divider between two related blocks, the connectors/nodes of a diagram that link labels). BANNED as standalone "design" — these are exactly what makes frames look horrific: free-floating lines / bars / rules in the margins, lone outline circles / rings / dots, arrows that don't point from one labelled thing to another, scattered ticks / sparkles / confetti, corner doodads, and decorative kicker / badge / chip / "01" pills used as garnish. If a shape is not part of a content structure, it does not belong — delete it. Negative space is PREMIUM, never something to fill with shapes. NEVER draw an empty box, input, search bar, comment field, progress bar, or hollow placeholder container — if a container holds no real content, delete it (an empty "type a comment" pill or a hollow card is exactly this failure).
 NEVER print the beat's internal kind/role as visible text — words like "Hook", "Fact", "Stat", "Quote", "List", "CTA", "Title", "Reveal" are internal direction, never on screen. Render only the real CONTENT strings.
 ${RENDERER_CONSTRAINTS}`;
 
   if (isOverlay) {
-    // ── OVERLAY MODE ────────────────────────────────────────────────────────
-    const bandTop = Math.round(canvasH * 0.52);
-    const kickerBottom = Math.round(canvasH * 0.16);
-    const system = `You design a PREMIUM KINETIC TEXT TREATMENT laid over one shot of a fast-cut video — on screen ${duration.toFixed(1)}s. A cinematic ${beat.asset.kind === "video" ? "clip" : "image"} plays full-bleed behind you (the pipeline injects the media AND a legibility scrim — you build NEITHER). Design with real CSS layout; a browser measures the result.
+    // ── OVERLAY MODE (type over a full-bleed shot) ──────────────────────────
+    const system = `You art-direct ONE frame of a fast-cut video — a cinematic ${beat.asset.kind === "video" ? "clip" : "image"} plays full-bleed behind you (the pipeline injects the media AND a legibility scrim — you build NEITHER). On screen ${duration.toFixed(1)}s. Design real CSS; a browser measures it.
 
 ${styleDirectiveBlock(style)}
-PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white over the scrim; the ONE key word/number in the accent colour.
+PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white over the scrim; lift the ONE key word/number in a BRIGHT, vivid accent that POPS on a dark photo — never a dark/muddy accent that disappears.
 
 ${contentBlock(beat)}
 ${latinOnScreenRule}
-MAKE IT A DESIGNED, LAYERED TREATMENT — never a single subtitle line (that flat caption is the slideshow look). Build a small typographic composition of a few elements working as one block, and VARY the composition every scene so consecutive overlays never share the same skeleton — let THIS line's content and the shot behind it choose the form. There is NO fixed recipe; draw from this toolbox as the moment needs (use SOME, not all, and a different mix each scene):
-- the HEADLINE as hero — when it's more than ~3 words you MAY split it into stacked phrase-lines (exact words, spoken order, each its own element) so phrases land on the voice;
-- the ONE key word/number lifted in the accent colour and a bolder/larger weight;
-- optionally an eyebrow/kicker (1–3 word context label), a supporting sub-line, or a small stat/label — only when it adds real meaning;
-- optionally an accent underline/rule anchored to the heading (structure, not a floating shape).
-Vary the PLACEMENT too (a low band, a corner, a left-aligned stack, a centred block — different from the last scene). The bar: it must read as DESIGNED — clear hierarchy, the accent doing real work — not one flat caption.
+THE TYPE IS THE DESIGN — and it MUST look different every scene, or the video becomes a slideshow of identical captions (THE failure you must avoid). This is NOT a subtitle and NOT a fixed lower-third caption:
+- GO BIG. The hero line is large and confident — often filling a THIRD TO HALF the frame, type as a graphic. Timid mid-sized text pinned at the bottom is exactly the caption look that is forbidden.
+- VARY EVERY SCENE — change the scale, the placement, and the structure scene to scene so no two share a skeleton: one scene a single GIANT word; the next a tall stacked phrase; another a huge number; another a centred statement; another hugged to a top or side edge; another a tight block low. PLACE the type anywhere that composes with the shot — read the shot description and put the words where the image is calm/empty (sky, shadow, negative space), in a DIFFERENT region than the previous scene. Use the full canvas — top, centre, side, low — not always the bottom.
+- HERO-ONLY BY DEFAULT. Most scenes are JUST the big hero line. Do NOT staple a kicker + sub-line + underline onto every scene — that repeated label / heading / divider trio IS the slideshow. Add an eyebrow, a supporting line, or an accent rule ONLY on the rare scene that truly needs it, never as a default garnish.
+- Split a multi-word hero into phrase-lines (exact words, spoken order, each its own element) so they land on the voice; the ONE key word in the bright accent + a heavier/bigger weight.
 
 OVERLAY CONSTRAINTS (absolute):
 - html,body background: TRANSPARENT. NO background element, NO scrim, NO images, NO full-canvas anything (the pipeline already placed the photo and its scrim).
-- Keep the block low — the hero between y=${bandTop} and the bottom; the eyebrow/secondary may sit up top (y ≤ ${kickerBottom}). Leave the middle clear so the image reads.
-- Promo-grade type: bold hierarchy, the style's type system, text-shadow for legibility. Richness comes from typographic COMPOSITION, never from orphan ornament.
+- Bold promo type with text-shadow for legibility. Richness is the typographic COMPOSITION and SCALE — never orphan ornament.
 
 ${dataContract}
 
 OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;height:${canvasH}px;margin:0;overflow:hidden;background:transparent}.`;
 
-    const user = `BEAT ${beat.beat_index} — overlay on a shot of: ${beat.image_prompt ?? beat.shot_query ?? beat.visual_concept}
+    const user = `BEAT ${beat.beat_index} — type over a shot of: ${beat.image_prompt ?? beat.shot_query ?? beat.visual_concept}
 SPOKEN: "${beat.script_line}"
 
-Design a layered, DESIGNED treatment for this line — vary the composition from other scenes; never a single flat caption.`;
+Design a BOLD, BIG typographic treatment for this line — a different scale/placement/structure than other scenes; never a small flat caption, never the same skeleton twice.`;
     return { system, user };
   }
 
