@@ -8,7 +8,10 @@ import { moderateInput }                     from "../shared/moderation.js";
 // ── Beat timing: two-level match (scene → timestamps, beat → scene timestamps) ──
 
 function assignBeatTimings(scenes, globalWordTimestamps) {
-  const norm = w => (w ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Keep letters/digits of ANY script (Unicode-aware), not just a-z0-9 — otherwise Devanagari
+  // (Hindi) beat words normalize to "" and never match the timestamps → kinetic sync falls back to
+  // sequential. \p{L}\p{N} keeps Hindi/Latin/etc.; toLowerCase is a no-op for caseless scripts.
+  const norm = w => (w ?? "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
   let gWi = 0; // global word index into ElevenLabs timestamps
   const timedBeats = [];
 
@@ -41,7 +44,7 @@ function assignBeatTimings(scenes, globalWordTimestamps) {
       // Find first word of beat in remaining scene timestamps
       let beatStartLocal = lWi;
       if (sceneTs.length > 0) {
-        for (let i = lWi; i < Math.min(lWi + sceneTs.length, sceneTs.length); i++) {
+        for (let i = lWi; i < sceneTs.length; i++) { // search from the current local index to the end
           if (norm(sceneTs[i].word) === norm(beatWords[0])) {
             beatStartLocal = i;
             lWi = i;
