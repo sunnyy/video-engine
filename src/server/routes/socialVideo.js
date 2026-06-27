@@ -1,6 +1,7 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
 import { runSocialPipeline, planSocial, produceSocial } from "../../services/ai/socialVideo/pipelineOrchestrator.js";
+import { moderateInput } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
@@ -34,6 +35,9 @@ router.post("/generate", requireAuth, async (req, res) => {
       { url: url.trim(), userId, targetDuration, includeAuthor: !!includeAuthor, voiceId: voiceId ?? null, language: language ?? "en" },
       ({ step }) => send({ step }),
     );
+
+    // Charged-no-deliverable guard: a swallowed save (null projectId) must refund, not "done".
+    if (!result?.projectId) throw new Error("generation produced no project (save failed)");
 
     send({ done: true, projectId: result.projectId, projectName: result.projectName });
     res.end();
@@ -78,6 +82,14 @@ router.post("/produce", requireAuth, async (req, res) => {
   const cost = CREDIT_COSTS.social_video; // short-form flat (no duration picker)
 
   try {
+    // Moderate the (possibly client-edited or fully client-crafted) plan BEFORE any paid work —
+    // the reviewed script_segments + on-screen content go to TTS/design and otherwise bypass it.
+    const planText = plan.scenes.flatMap((s) => [
+      s.script_segment, s.spoken, s.content?.headline, s.content?.subtext, s.content?.body, s.content?.attribution,
+      ...(Array.isArray(s.content?.items) ? s.content.items : []),
+    ]).filter(Boolean).join("\n").trim();
+    if (planText) await moderateInput(planText, { label: "social-video produce plan" });
+
     const deduction = await deductCredits(userId, cost, "social_video", "Social video generation", projectId || null);
     if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
     creditAmount = cost;
@@ -87,6 +99,9 @@ router.post("/produce", requireAuth, async (req, res) => {
       { userId, voiceId: voiceId ?? null, language: language ?? "en", includeAuthor: !!includeAuthor, styleId: styleId ?? "auto", orientation: ["9:16","16:9","1:1","4:5"].includes(orientation) ? orientation : "9:16" },
       ({ step }) => send({ step }),
     );
+
+    // Charged-no-deliverable guard: a swallowed save (null projectId) must refund, not "done".
+    if (!result?.projectId) throw new Error("generation produced no project (save failed)");
 
     send({ done: true, projectId: result.projectId, projectName: result.projectName });
     res.end();
