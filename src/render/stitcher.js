@@ -13,6 +13,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegStatic from "ffmpeg-static";
 import fs from "fs";
 import path from "path";
+import { downloadToTemp, extFromUrl } from "./download.js";
 
 if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -77,20 +78,35 @@ function muxAudio({ videoPath, audio, outputPath, durationSec }) {
  */
 export async function stitch({ framesDir, outputPath, fps, width, height, audio = [], durationSec, onProgress }) {
   onProgress?.(0);
-  if (!audio.length) {
-    await framesToVideo({ framesDir, outputPath, fps, width, height });
+
+  // Download remote audio to local temp files first — ffmpeg reading remote https SIGSEGVs on the
+  // worker. A track that fails to download is dropped (never fatal); if none remain we go silent.
+  const audioDir = path.join(path.dirname(outputPath), `vqaudio-${path.basename(outputPath, ".mp4")}`);
+  const localAudio = [];
+  for (let i = 0; i < audio.length; i++) {
+    const a = audio[i];
+    try { localAudio.push({ ...a, src: await downloadToTemp(a.src, audioDir, `a${i}${extFromUrl(a.src, ".mp3")}`) }); }
+    catch (e) { console.warn(`[@vidquence/render] audio ${i} download failed (skipping): ${e.message}`); }
+  }
+
+  try {
+    if (!localAudio.length) {
+      await framesToVideo({ framesDir, outputPath, fps, width, height });
+      onProgress?.(100);
+      return outputPath;
+    }
+    // Render silent video to a temp file, then mux audio into the real output.
+    const silent = outputPath.replace(/\.mp4$/i, ".silent.mp4");
+    await framesToVideo({ framesDir, outputPath: silent, fps, width, height });
+    onProgress?.(60);
+    try {
+      await muxAudio({ videoPath: silent, audio: localAudio, outputPath, durationSec });
+    } finally {
+      try { fs.unlinkSync(silent); } catch {}
+    }
     onProgress?.(100);
     return outputPath;
-  }
-  // Render silent video to a temp file, then mux audio into the real output.
-  const silent = outputPath.replace(/\.mp4$/i, ".silent.mp4");
-  await framesToVideo({ framesDir, outputPath: silent, fps, width, height });
-  onProgress?.(60);
-  try {
-    await muxAudio({ videoPath: silent, audio, outputPath, durationSec });
   } finally {
-    try { fs.unlinkSync(silent); } catch {}
+    try { fs.rmSync(audioDir, { recursive: true, force: true }); } catch {}
   }
-  onProgress?.(100);
-  return outputPath;
 }

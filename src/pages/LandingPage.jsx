@@ -1048,8 +1048,8 @@ export default function LandingPage() {
               </div>
               {[
               ["AI Video (prompt → video)", false, true],
-              ["Promo Video (incl. URL mode)", false, true],
-              ["Social-to-Video", false, true],
+              ["SaaS/Promo Video (incl. URL mode)", false, true],
+              ["Social Post to Video", false, true],
               ["Typography Video", false, true],
               ["Talking Head Video", false, true],
               ["Product Video & Ads", false, true],

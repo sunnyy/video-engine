@@ -25,10 +25,10 @@ export const SERVICE_CATALOG = [
   { key: "ai_video", name: "AI Video", category: "create", tier: 1, featured: true, beta: false,
     route: "/ai-video", creditKey: "ai_video", pricing: durationPricing, publishable: true,
     blurb: "Generate a unique video from a prompt — every scene designed by AI, no templates." },
-  { key: "promo_video", name: "Promo Video", category: "create", tier: 1, featured: true, beta: false,
+  { key: "promo_video", name: "SaaS/Promo Video", category: "create", tier: 1, featured: true, beta: false,
     route: "/promo-video", creditKey: "promo_video", pricing: { model: "scene", tiers: CREDIT_COSTS.promo_video }, publishable: false,
     blurb: "Turn your product or website into a polished promo (includes URL mode)." },
-  { key: "social_video", name: "Social Video", category: "create", tier: 1, featured: true, beta: false,
+  { key: "social_video", name: "Social Post to Video", category: "create", tier: 1, featured: true, beta: false,
     route: "/social-video", creditKey: "social_video", pricing: { model: "flat", credits: CREDIT_COSTS.social_video }, publishable: false,
     blurb: "Repurpose a post or any content into a ready-to-publish video." },
 

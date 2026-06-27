@@ -5,7 +5,8 @@
  * Chromium — the bundled Chromium lacks proprietary H.264/AAC codecs, so the element stays
  * black. Instead we let ffmpeg (which DOES decode H.264) extract the exact frames we need as
  * JPEGs, and the frameDriver feeds them into the page per composite-frame. Deterministic and
- * codec-safe. ffmpeg reads remote URLs directly, so no separate download step.
+ * codec-safe. The source is downloaded to a local temp file first (ffmpeg-static can SIGSEGV
+ * reading remote https on some containers — the worker), then ffmpeg reads the local file.
  *
  * Mapping: composite frame f (start*fps ≤ f < end*fps) → extracted frame (f - startFrame + 1),
  * where the extracted sequence samples the source from `trimStart` at fps/playbackRate so frame
@@ -15,6 +16,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegStatic from "ffmpeg-static";
 import fs from "fs";
 import path from "path";
+import { downloadToTemp, extFromUrl } from "./download.js";
 
 if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -29,9 +31,13 @@ export async function extractVideoFrames({ i, src, fps, start, end, trimStart = 
   const prefix = `v${i}-`;
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
+  // Download the source locally first — ffmpeg reading the remote URL directly SIGSEGVs on the
+  // worker. (Cleaned up with the rest of videoDir by the caller's finally block.)
+  const localSrc = await downloadToTemp(src, outDir, `${prefix}src${extFromUrl(src, ".mp4")}`);
+
   await new Promise((resolve, reject) => {
     ffmpeg()
-      .input(src)
+      .input(localSrc)
       .inputOptions(trimStart ? [`-ss ${trimStart}`] : [])
       .outputOptions([
         "-an",                       // video only
