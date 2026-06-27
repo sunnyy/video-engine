@@ -10,7 +10,7 @@ import {
 } from "../services/automation/campaigns.js";
 import { ensureTopics, getQueuedCount, skipOldestQueued } from "../services/automation/topics.js";
 import { listCampaignEvents, logEvent } from "../services/automation/events.js";
-import { enqueue, cancelCampaignJobs, cancelJob } from "../jobs/queue.js";
+import { enqueue, cancelCampaignJobs, cancelJob, isJobLive } from "../jobs/queue.js";
 
 export const router = express.Router();
 
@@ -67,14 +67,19 @@ router.get("/campaigns/:id", requireAuth, async (req, res) => {
     if (!campaign) return res.status(404).json({ error: "Campaign not found" });
     campaign = await pruneDeadTargetAccounts(campaign);
     const [{ data: jobs }, { data: posts }] = await Promise.all([
-      supabaseAdmin.from("jobs").select("id, type, status, progress, created_at")
+      supabaseAdmin.from("jobs").select("id, type, status, progress, created_at, run_at")
         .in("type", INFLIGHT_TYPES).in("status", ["queued", "running"])
         .filter("payload->>campaignId", "eq", campaign.id).order("created_at", { ascending: true }),
       supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at")
         .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(60),
     ]);
+    // Only jobs running/queued-to-run-now are "active". A deferral SCHEDULED for later (run_at in the
+    // future) goes in `scheduled` — so it no longer shows as a phantom "Publishing…" row nor disables
+    // the deferred post's Retry button (the source of the confusing "publish in progress" state).
+    const active    = (jobs || []).filter(isJobLive);
+    const scheduled = (jobs || []).filter((j) => !isJobLive(j));
     res.json({
-      campaign, active: jobs || [], posts: posts || [],
+      campaign, active, scheduled, posts: posts || [],
       queued: await getQueuedCount(campaign.id),
       events: await listCampaignEvents(campaign.id, 40),
     });
@@ -161,14 +166,16 @@ router.post("/campaigns/:id/retry-post", requireAuth, async (req, res) => {
       .select("id, platform, status").eq("user_id", req.user.id).eq("platform", post.platform).eq("status", "connected").maybeSingle();
     if (!acct) return res.status(400).json({ error: `No connected ${post.platform} account — reconnect it first` });
 
-    // Serialize publishes: refuse if one is already queued/running for this campaign, so repeated
-    // Retry clicks (or direct API calls) can't stack a burst of uploads. The UI also disables the
-    // buttons while publishing; this is the server-side backstop.
-    const { count: activePublishes } = await supabaseAdmin.from("jobs")
-      .select("id", { count: "exact", head: true })
+    // Serialize publishes: only a publish running NOW (or queued to run now) blocks a retry. A
+    // deferral SCHEDULED for later (run_at in the future) is NOT in progress — it must neither block
+    // nor hide Retry. We also reuse that scheduled job by pulling it forward instead of stacking a
+    // second one. (isJobLive is the shared definition used by every status view.)
+    const { data: pubJobs = [] } = await supabaseAdmin.from("jobs")
+      .select("id, status, run_at, payload")
       .eq("type", "publish_post").in("status", ["queued", "running"])
       .filter("payload->>campaignId", "eq", campaign.id);
-    if (activePublishes > 0) return res.status(409).json({ error: "A publish is already in progress — wait for it to finish, then retry." });
+    if (pubJobs.some((j) => isJobLive(j) && j.payload?.postId !== post.id))
+      return res.status(409).json({ error: "Another publish is already running — wait for it to finish, then retry." });
 
     // Rebuild publish metadata from the saved project's publish copy + the campaign's privacy.
     const { data: proj } = await supabaseAdmin.from("projects").select("name, safe_project_json").eq("id", post.project_id).maybeSingle();
@@ -181,14 +188,28 @@ router.post("/campaigns/:id/retry-post", requireAuth, async (req, res) => {
       privacyStatus: campaign.privacy || "public",
     };
 
+    const nowIso = new Date().toISOString();
     await supabaseAdmin.from("published_posts")
-      .update({ status: "queued", error: null, account_id: acct.id, updated_at: new Date().toISOString() }).eq("id", post.id);
-    const job = await enqueue("publish_post", {
-      userId: req.user.id, campaignId: campaign.id, accountId: acct.id, platform: acct.platform,
-      videoUrl: post.video_url, projectId: post.project_id, metadata, postId: post.id,
-    }, { userId: req.user.id, maxAttempts: 5, priority: -10 });
+      .update({ status: "queued", error: null, account_id: acct.id, updated_at: nowIso }).eq("id", post.id);
+    // If a retry for THIS post is already scheduled (the deferral's queued job), pull it forward to
+    // run now (refresh account/metadata in case of a reconnect) — no duplicate job. Else enqueue one.
+    const scheduled = pubJobs.find((j) => j.payload?.postId === post.id);
+    let jobId;
+    if (scheduled) {
+      await supabaseAdmin.from("jobs").update({
+        status: "queued", run_at: nowIso, updated_at: nowIso,
+        payload: { ...scheduled.payload, accountId: acct.id, platform: acct.platform, videoUrl: post.video_url, projectId: post.project_id, metadata, postId: post.id },
+      }).eq("id", scheduled.id);
+      jobId = scheduled.id;
+    } else {
+      const job = await enqueue("publish_post", {
+        userId: req.user.id, campaignId: campaign.id, accountId: acct.id, platform: acct.platform,
+        videoUrl: post.video_url, projectId: post.project_id, metadata, postId: post.id,
+      }, { userId: req.user.id, maxAttempts: 5, priority: -10 });
+      jobId = job.id;
+    }
     logEvent({ userId: req.user.id, campaignId: campaign.id, action: "retry_publish", entity: "post", entityId: post.id, message: "manual retry" });
-    res.json({ ok: true, jobId: job.id });
+    res.json({ ok: true, jobId });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -245,14 +266,16 @@ router.get("/admin/campaigns/:id", requireAuth, requireAdmin, async (req, res) =
     const campaign = await getCampaign(req.params.id);
     if (!campaign) return res.status(404).json({ error: "Campaign not found" });
     const [{ data: jobs }, { data: posts }] = await Promise.all([
-      supabaseAdmin.from("jobs").select("id, type, status, progress, created_at")
+      supabaseAdmin.from("jobs").select("id, type, status, progress, created_at, run_at")
         .in("type", INFLIGHT_TYPES).in("status", ["queued", "running"])
         .filter("payload->>campaignId", "eq", campaign.id).order("created_at", { ascending: true }),
       supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at")
         .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(60),
     ]);
+    const active    = (jobs || []).filter(isJobLive);
+    const scheduled = (jobs || []).filter((j) => !isJobLive(j));
     res.json({
-      campaign, active: jobs || [], posts: posts || [],
+      campaign, active, scheduled, posts: posts || [],
       queued: await getQueuedCount(campaign.id),
       events: await listCampaignEvents(campaign.id, 40),
     });

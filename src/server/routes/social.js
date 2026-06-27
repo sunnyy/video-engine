@@ -8,7 +8,7 @@ import { connect, completeConnect, disconnect } from "../services/social/service
 import { listAccounts } from "../services/social/accounts.js";
 import { saveAppCredentials, deleteAppCredentials, hasAppCredentials } from "../services/social/appCredentials.js";
 import { supportedPlatforms, allCapabilities } from "../services/social/adapters/index.js";
-import { enqueue } from "../jobs/queue.js";
+import { enqueue, isJobLive } from "../jobs/queue.js";
 import { supabaseAdmin } from "../middleware/shared.js";
 
 export const router = express.Router();
@@ -264,13 +264,12 @@ router.get("/publish-status", requireAuth, async (req, res) => {
     const deferred  = batch.filter((p) => p.status === "deferred").length;
     const ppLive    = batch.filter((p) => p.status === "running" || p.status === "awaiting_approval").length;
 
-    const now = Date.now();
     // A publish_post queued to run in the FUTURE = a scheduled quota-retry, not active work.
     const futureRetryAt = posts
-      .filter((p) => p.status === "queued" && p.run_at && new Date(p.run_at).getTime() > now)
+      .filter((p) => p.status === "queued" && !isJobLive(p))
       .map((p) => p.run_at).sort()[0] || null;
     // Jobs actually running now (running, or queued to run now) — real in-flight work.
-    const liveJobs = posts.filter((p) => p.status === "running" || (p.status === "queued" && (!p.run_at || new Date(p.run_at).getTime() <= now))).length;
+    const liveJobs = posts.filter(isJobLive).length;
 
     const tot = total || batch.length || posts.length;
 

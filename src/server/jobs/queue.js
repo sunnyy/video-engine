@@ -128,6 +128,16 @@ export async function isCancelRequested(jobId) {
   return v;
 }
 
+// THE one definition of "this job is in progress RIGHT NOW", used by every status view + guard so
+// they never disagree. A job queued with run_at in the FUTURE (e.g. a publish deferred to the daily
+// reset) is SCHEDULED, not live — it must not show as "Publishing…" or block/disable a Retry.
+export function isJobLive(job) {
+  if (!job) return false;
+  if (job.status === "running") return true;
+  if (job.status !== "queued") return false;
+  return !job.run_at || new Date(job.run_at).getTime() <= Date.now();
+}
+
 /** Mark a job completed with an optional result payload. */
 export async function complete(id, result = null) {
   const { error } = await supabaseAdmin.from("jobs")
