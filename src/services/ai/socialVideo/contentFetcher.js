@@ -8,15 +8,16 @@
  */
 
 import { supabaseAdmin } from "../../../server/middleware/shared.js";
+import { safeFetch } from "../shared/safeFetch.js"; // SSRF-safe fetch for arbitrary user/scraped URLs
 
 const FXTWITTER_API  = "https://api.fxtwitter.com";
 const STORAGE_BUCKET = "user-assets";
 
 async function uploadImageToSupabase(sourceUrl, tweetId) {
   try {
-    const res = await fetch(sourceUrl, {
+    const res = await safeFetch(sourceUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; SocialVideoBot/1.0)" },
-      signal: AbortSignal.timeout(10000),
+      timeoutMs: 10000,
     });
     if (!res.ok) throw new Error(`Image fetch returned ${res.status}`);
 
@@ -308,12 +309,13 @@ async function fetchLinkedInContent(url) {
 }
 
 async function fetchOGContent(url) {
-  const res = await fetch(url, {
+  // SSRF-safe: this fetches an ARBITRARY user-supplied URL (generic path + platform fallback).
+  const res = await safeFetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; Twitterbot/1.0)",
       "Accept": "text/html,application/xhtml+xml",
     },
-    signal: AbortSignal.timeout(8000),
+    timeoutMs: 8000,
   });
 
   if (!res.ok) throw new Error(`Page returned ${res.status}`);

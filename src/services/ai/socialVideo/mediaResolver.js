@@ -17,6 +17,7 @@ import { searchStockImage, searchStockVideo, probeImageDims, treatmentFor } from
 import { styleImagePrompt } from "../shared/visualStyles.js";
 import { generateAiImage } from "../shared/aiImage.js";
 import { resolveEntityImage } from "../shared/entityImage.js";
+import { safeFetch } from "../shared/safeFetch.js"; // SSRF-safe (a client plan can inject content.imageUrl)
 
 // AI generations allowed per video — social posts usually carry their own image,
 // so AI is a rare fallback. ~1 per 22s, capped at 2.
@@ -26,7 +27,7 @@ function aiBudgetFor(totalDuration) {
 
 async function persistRemote(url, runId, label, contentType = "image/jpeg", referer = null) {
   try {
-    const res = await fetch(url, { headers: referer ? { Referer: referer } : {} });
+    const res = await safeFetch(url, { headers: referer ? { Referer: referer } : {} });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buffer = Buffer.from(await res.arrayBuffer());
     if (buffer.length > 25 * 1024 * 1024) throw new Error(`too large (${Math.round(buffer.length / 1e6)}MB)`);
