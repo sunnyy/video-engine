@@ -166,7 +166,7 @@ router.get("/publish-status", requireAuth, async (req, res) => {
 
     const { data: jobs = [] } = await supabaseAdmin
       .from("jobs")
-      .select("id, type, status, progress, error, created_at, finished_at, payload")
+      .select("id, type, status, progress, error, created_at, finished_at, run_at, payload")
       .eq("user_id", req.user.id)
       .in("type", ["render_timeline", "publish_post"])
       .filter("payload->>projectId", "eq", projectId)
@@ -191,14 +191,40 @@ router.get("/publish-status", requireAuth, async (req, res) => {
     if (r.status === "failed")
       return res.json({ active: false, phase: "failed", error: r.error || "Render failed", total, jobId: r.id, finishedAt: r.finished_at, last });
 
-    // Render done → look at the publish jobs.
-    const done    = posts.filter((p) => p.status === "completed").length;
-    const failed  = posts.filter((p) => p.status === "failed").length;
-    const pending = posts.filter((p) => p.status === "queued" || p.status === "running").length;
-    if (!posts.length || pending > 0)
-      return res.json({ active: true, phase: "publishing", progress: 100, published: done, failed, total, last });
-    if (failed && !done)
-      return res.json({ active: false, phase: "failed", error: "Publish failed", published: done, failed, total, jobId: r.id, finishedAt: r.finished_at, last });
-    return res.json({ active: false, phase: "published", published: done, failed, total, jobId: r.id, finishedAt: r.finished_at, last });
+    // Render done → determine the publish OUTCOME from published_posts (what the worker actually
+    // wrote), not just job-row matching — so a finished/deferred publish can't leave the editor
+    // stuck on "Publishing…" if a job row isn't matched. Job rows are still used to detect work
+    // that's genuinely in flight right now vs a retry scheduled for the future (quota defer).
+    const { data: batch = [] } = await supabaseAdmin
+      .from("published_posts")
+      .select("status")
+      .eq("user_id", req.user.id).eq("project_id", projectId).is("campaign_id", null)
+      .gte("created_at", r.created_at);
+
+    const published = batch.filter((p) => p.status === "published").length;
+    const failed    = batch.filter((p) => p.status === "failed").length;
+    const deferred  = batch.filter((p) => p.status === "deferred").length;
+    const ppLive    = batch.filter((p) => p.status === "running" || p.status === "awaiting_approval").length;
+
+    const now = Date.now();
+    // A publish_post queued to run in the FUTURE = a scheduled quota-retry, not active work.
+    const futureRetryAt = posts
+      .filter((p) => p.status === "queued" && p.run_at && new Date(p.run_at).getTime() > now)
+      .map((p) => p.run_at).sort()[0] || null;
+    // Jobs actually running now (running, or queued to run now) — real in-flight work.
+    const liveJobs = posts.filter((p) => p.status === "running" || (p.status === "queued" && (!p.run_at || new Date(p.run_at).getTime() <= now))).length;
+
+    const tot = total || batch.length || posts.length;
+
+    // Still publishing: a post mid-flight, a job running now, or render just finished and nothing
+    // has been recorded yet (brief window before the publish_post rows exist).
+    if (ppLive > 0 || liveJobs > 0 || (batch.length === 0 && posts.length === 0))
+      return res.json({ active: true, phase: "publishing", progress: 100, published, failed, total: tot, last });
+    // Deferred: daily quota/limit hit → a retry is scheduled. NOT a spinner — tell the user when.
+    if (deferred > 0 && published < tot)
+      return res.json({ active: false, phase: "deferred", published, failed, deferred, total: tot, retryAt: futureRetryAt, jobId: r.id, finishedAt: r.finished_at, last });
+    if (failed && !published)
+      return res.json({ active: false, phase: "failed", error: "Publish failed", published, failed, total: tot, jobId: r.id, finishedAt: r.finished_at, last });
+    return res.json({ active: false, phase: "published", published, failed, total: tot, jobId: r.id, finishedAt: r.finished_at, last });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });

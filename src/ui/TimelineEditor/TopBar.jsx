@@ -76,11 +76,12 @@ export default function TopBar() {
         setPubStatus(s);
         // Toast once per batch when it reaches a terminal state — but not for a batch that was
         // already finished when we opened the editor (firstTick seeds without toasting).
-        const terminal = !s.active && (s.phase === "published" || s.phase === "failed");
+        const terminal = !s.active && (s.phase === "published" || s.phase === "failed" || s.phase === "deferred");
         if (terminal && s.jobId && lastPubJob.current !== s.jobId) {
           lastPubJob.current = s.jobId;
           if (!firstTick) {
             if (s.phase === "published") showToast(s.total > 1 ? `Published to ${s.published}/${s.total} accounts ✓` : "Published ✓", "success");
+            else if (s.phase === "deferred") showToast("YouTube daily upload limit reached — we'll retry automatically after the daily reset (≈ midnight Pacific). To upload more per day, request a YouTube API quota increase in Google Cloud.", "info");
             else if (s.published) showToast(`Published ${s.published}/${s.total} — ${s.failed} failed.`, "info");
             else showToast(s.error || "Publish failed.");
           }
@@ -249,9 +250,10 @@ export default function TopBar() {
   const lastPub = pubStatus?.last || null; // persistent "already published" history for this project
   const publishedAccounts = {};            // accountId -> published_at, for the re-publish guard
   (lastPub?.posts || []).forEach((p) => { if (p.status === "published" && p.accountId) publishedAccounts[p.accountId] = p.at; });
-  const publishLabel = !pubActive ? (lastPub ? "↗ Publish again" : "↗ Publish")
-    : pubStatus.phase === "rendering" ? `Rendering… ${pubStatus.progress || 0}%`
-    : "Publishing…";
+  const publishLabel = pubActive
+    ? (pubStatus.phase === "rendering" ? `Rendering… ${pubStatus.progress || 0}%` : "Publishing…")
+    : pubStatus?.phase === "deferred" ? "⏳ Retry scheduled"
+    : (lastPub ? "↗ Publish again" : "↗ Publish");
 
   const relTime = (iso) => {
     if (!iso) return "";

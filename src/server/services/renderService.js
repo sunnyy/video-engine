@@ -12,7 +12,24 @@
  */
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { supabaseAdmin, TEMP_DIR, PUBLIC_DIR, PROJECT_ROOT } from "../middleware/shared.js";
+
+/* ── Render-reuse fingerprint ──────────────────────────────────────────────
+ * A stable content hash of the timeline + resolution. If the exact same project was already
+ * rendered (e.g. the user hit Export, then Publish without editing), we reuse that MP4 instead
+ * of rendering again. Canonical (sorted-key) serialization so the hash is order-independent —
+ * the same timeline always hashes the same whether it arrives from the editor or from the DB. */
+function canonical(v) {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+  if (v && typeof v === "object") {
+    return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(v === undefined ? null : v);
+}
+function projectHash(project, resolution) {
+  return crypto.createHash("sha256").update(`${resolution || "1080p"}|${canonical(project)}`).digest("hex");
+}
 
 // Which engine produces the MP4. "remotion" (default) = the proven Remotion path; "vidquence"
 // = our own @vidquence/render engine (src/render). Per-deploy flag so we can flip a single
@@ -123,6 +140,29 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
   if (!userId)   throw new Error("renderTimeline: userId required");
   if (!renderId) throw new Error("renderTimeline: renderId required");
 
+  // Render-reuse: if this exact timeline (+resolution) was already rendered for this project,
+  // reuse that MP4 instead of rendering again. This is what makes Publish-after-Export skip the
+  // redundant second render. Best-effort + scoped to the project; any failure falls through to a
+  // fresh render. (Pre-migration, the project_hash column may not exist — the query just returns
+  // nothing and we render normally.)
+  let phash = null;
+  if (projectId) {
+    try {
+      phash = projectHash(project, resolution);
+      const { data: prior } = await supabaseAdmin
+        .from("renders")
+        .select("id, video_url, file_path")
+        .eq("project_id", projectId).eq("project_hash", phash).eq("status", "done")
+        .not("video_url", "is", null)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (prior?.video_url) {
+        console.log(`[render] reuse cached render ${prior.id} for project ${projectId} (timeline unchanged) — skipping re-render`);
+        onProgress?.(100);
+        return { videoUrl: prior.video_url, filePath: prior.file_path, outputPath: null, renderId: prior.id, reused: true };
+      }
+    } catch { phash = phash || null; /* column missing or lookup failed → render fresh */ }
+  }
+
   const finalProject = await prepareProject(project, userId);
 
   const fmt    = finalProject.format || {};
@@ -225,6 +265,9 @@ export async function renderTimeline(project, { userId, renderId, resolution = "
       video_url: videoUrl, status: "done", file_path: storageKey,
       created_at: new Date().toISOString(),
     }, { onConflict: "id" });
+    // Record the content hash for render-reuse (best-effort, separate update so a missing
+    // project_hash column pre-migration can't fail the render record itself).
+    if (phash) { try { await supabaseAdmin.from("renders").update({ project_hash: phash }).eq("id", renderId); } catch {} }
     try { fs.unlinkSync(outputPath); } catch {}
   } catch (e) {
     console.warn("[renderService] upload/save failed (keeping local file):", e.message);

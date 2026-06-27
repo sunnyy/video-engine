@@ -13,12 +13,21 @@ import fs from "fs";
 // Errors marked `noRetry` are permanent (auth/permission) — the queue won't retry them.
 function permanent(msg) { const e = new Error(msg); e.noRetry = true; return e; }
 function transient(msg) { return new Error(msg); }
-// Quota / rate / upload-cap errors are TEMPORARY (reset at Pacific midnight), not auth failures.
-// Marked `quota` so the publish handler DEFERS to after the reset instead of failing the post or
-// flagging the account "broken". (YouTube returns these as 403, or 400 for uploadLimitExceeded.)
+// YouTube throttling comes in two flavours that need DIFFERENT handling — conflating them is what
+// made a momentary rate-limit defer an entire day:
+//  • DAILY quota exhausted (resets at Pacific midnight) → mark `quota` so the handler defers the
+//    retry to after the reset. videos.insert costs ~1600 of the project's 10k/day units (~6/day
+//    default) so this is the common real cap. YouTube: 403 quotaExceeded/dailyLimitExceeded, or
+//    400 uploadLimitExceeded (the channel's per-day video cap).
+//  • SHORT-TERM rate limit (too many calls in a short window) → mark `rateLimit` so the handler
+//    just retries with normal exponential backoff (seconds/minutes), NOT a next-day defer.
+//    YouTube: 403 rateLimitExceeded/userRateLimitExceeded, or a 5xx/backendError blip.
 function quotaErr(msg) { const e = new Error(msg); e.quota = true; return e; }
-const QUOTA_REASONS = /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|userRateLimitExceeded|uploadLimitExceeded/i;
-const isQuotaBody = (txt) => QUOTA_REASONS.test(txt || "");
+function rateErr(msg)  { const e = new Error(msg); e.rateLimit = true; return e; }
+const DAILY_QUOTA = /quotaExceeded|dailyLimitExceeded|uploadLimitExceeded/i;
+const RATE_LIMIT  = /rateLimitExceeded|userRateLimitExceeded|backendError|SERVICE_UNAVAILABLE|internalError/i;
+const isDailyQuota = (txt) => DAILY_QUOTA.test(txt || "");
+const isRateLimit  = (txt) => RATE_LIMIT.test(txt || "");
 const AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPES = [
@@ -113,9 +122,14 @@ export const youtube = {
    */
   async publish({ accessToken, video, metadata = {} }) {
     // Resolve the rendered bytes (durable URL preferred; local path fallback).
+    // Timeouts on every network call below: without them a stalled connection (seen on the worker)
+    // hangs the publish_post job forever with no error → the editor sits at "Publishing…" with no
+    // terminal state. A timeout instead surfaces a transient error so the job retries/fails cleanly.
     let bytes;
     if (video?.url) {
-      const r = await fetch(video.url);
+      const r = await fetch(video.url, { signal: AbortSignal.timeout(120000) }).catch((e) => {
+        throw transient(`fetch rendered video stalled/failed: ${e.message}`);
+      });
       if (!r.ok) throw transient(`fetch rendered video failed (${r.status})`);
       bytes = Buffer.from(await r.arrayBuffer());
     } else if (video?.path) {
@@ -150,27 +164,38 @@ export const youtube = {
         "X-Upload-Content-Length": String(bytes.length),
       },
       body,
-    });
+      signal: AbortSignal.timeout(30000),
+    }).catch((e) => { throw transient(`YouTube init stalled/failed: ${e.message}`); });
     if (!init.ok) {
       const txt = await init.text();
-      if (isQuotaBody(txt)) throw quotaErr(`YouTube quota reached: ${txt.slice(0, 200)}`);
-      if (init.status === 401 || init.status === 403) throw permanent(`YouTube auth/permission error: ${txt.slice(0, 200)}`);
-      throw transient(`YouTube init failed (${init.status}): ${txt.slice(0, 200)}`);
+      if (isRateLimit(txt))  throw rateErr(`YouTube rate-limited (init): ${txt.slice(0, 220)}`);
+      if (isDailyQuota(txt)) throw quotaErr(`YouTube daily quota reached (init): ${txt.slice(0, 220)}`);
+      if (init.status === 401 || init.status === 403) throw permanent(`YouTube auth/permission error: ${txt.slice(0, 220)}`);
+      throw transient(`YouTube init failed (${init.status}): ${txt.slice(0, 220)}`);
     }
     const uploadUrl = init.headers.get("location");
     if (!uploadUrl) throw transient("YouTube did not return an upload URL");
 
     // 2) Upload the bytes.
-    const up = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "video/*", "Content-Length": String(bytes.length) }, body: bytes });
+    const up = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "video/*", "Content-Length": String(bytes.length) },
+      body: bytes,
+      signal: AbortSignal.timeout(300000), // 5 min — generous for short-form; only trips on a real stall
+    }).catch((e) => { throw transient(`YouTube upload stalled/failed: ${e.message}`); });
     if (!up.ok) {
       const txt = await up.text();
-      if (isQuotaBody(txt)) throw quotaErr(`YouTube quota reached during upload: ${txt.slice(0, 200)}`);
-      if (up.status === 401 || up.status === 403) throw permanent(`YouTube auth/permission error during upload: ${txt.slice(0, 200)}`);
-      throw transient(`YouTube upload failed (${up.status}): ${txt.slice(0, 200)}`);
+      if (isRateLimit(txt))  throw rateErr(`YouTube rate-limited (upload): ${txt.slice(0, 220)}`);
+      if (isDailyQuota(txt)) throw quotaErr(`YouTube daily quota reached (upload): ${txt.slice(0, 220)}`);
+      if (up.status === 401 || up.status === 403) throw permanent(`YouTube auth/permission error during upload: ${txt.slice(0, 220)}`);
+      throw transient(`YouTube upload failed (${up.status}): ${txt.slice(0, 220)}`);
     }
 
     const data = await up.json().catch(() => ({}));
     const videoId = data.id || null;
+    // A 2xx with no video id means the upload didn't actually register — treat as transient so we
+    // retry rather than recording a phantom "published" post with no video. (Was silently passing.)
+    if (!videoId) throw transient(`YouTube upload returned ${up.status} but no video id — treating as failed`);
     return {
       platform_post_id: videoId,
       url: videoId ? `https://youtu.be/${videoId}` : null,

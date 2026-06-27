@@ -62,7 +62,11 @@ async function runJob(job) {
     if (!handler) throw new Error(`no handler registered for job type "${job.type}"`);
     const result = await handler(job.payload ?? {}, job);
     await complete(job.id, result ?? null);
-    console.log(`[worker] done ${job.type} (${job.id})`);
+    // A handler can succeed WITHOUT doing the headline action (e.g. publish deferred to after the
+    // quota reset, or deduped) — log that honestly so the logs don't claim a publish that didn't happen.
+    if (result?.deferred) console.log(`[worker] deferred ${job.type} (${job.id}) — retry at ${result.retryAt || "next reset"}`);
+    else if (result?.deduped) console.log(`[worker] skipped ${job.type} (${job.id}) — already done`);
+    else console.log(`[worker] done ${job.type} (${job.id})`);
   } catch (err) {
     const retry = await fail(job, err);
     console.warn(`[worker] ${retry ? "retry" : "FAILED"} ${job.type} (${job.id}): ${err.message}`);

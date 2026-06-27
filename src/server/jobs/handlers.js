@@ -154,7 +154,7 @@ registerHandler("render_timeline", async (payload, job) => {
  * permanent auth/permission errors (noRetry) stop retrying and flag the account.
  * payload: { userId, campaignId, accountId, platform, videoUrl, projectId?, metadata?, postId? }
  */
-registerHandler("publish_post", async (payload) => {
+registerHandler("publish_post", async (payload, job) => {
   const { userId, campaignId = null, accountId, platform, videoUrl, projectId = null, metadata = {} } = payload || {};
   if (!userId || !accountId || !videoUrl) throw new Error("publish_post: userId, accountId, videoUrl required");
 
@@ -209,13 +209,31 @@ registerHandler("publish_post", async (payload) => {
       title: `Published to ${platform}`, body: "Your video is now live." });
     return { postId, platform_post_id: result.platform_post_id, url: result.url };
   } catch (err) {
+    // SHORT-TERM rate limit (too many calls in a short window) → retry with the queue's normal
+    // exponential backoff (seconds/minutes), NOT a next-day defer and NOT an account flag. Only
+    // while attempts remain; once exhausted it falls through to the generic failure path below.
+    if (err.rateLimit && (job?.attempts ?? 1) < (job?.max_attempts ?? 5)) {
+      if (postId) await supabaseAdmin.from("published_posts").update({ status: "running", error: (err.message || "").slice(0, 1000), updated_at: new Date().toISOString() }).eq("id", postId);
+      logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "retry", message: "rate-limited — backing off", meta: { platform } });
+      throw err; // transient → fail() re-queues with backoff
+    }
+    // DAILY quota exhausted → defer the retry to after the platform's reset. Not an auth failure and
+    // not "stuck": we re-queue for the reset, mark the post `deferred` (with the raw reason for
+    // diagnosis), and notify the user so a manual publish doesn't silently sit at "Publishing…".
     if (err.quota) {
-      // Temporary quota/rate limit (not an auth failure): defer to after the reset instead of
-      // failing the post or flagging the account. The user's own quota frees up daily.
-      await enqueue("publish_post", { ...payload, postId }, { userId, runAt: nextQuotaResetMs(), maxAttempts: 5, priority: -10 });
-      if (postId) await supabaseAdmin.from("published_posts").update({ status: "deferred", error: "Daily upload quota reached — will retry after it resets", updated_at: new Date().toISOString() }).eq("id", postId);
-      logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "info", message: "deferred — upload quota reached", meta: { platform } });
-      return { deferred: true, platform, postId };
+      const retryAt = nextQuotaResetMs();
+      await enqueue("publish_post", { ...payload, postId }, { userId, runAt: retryAt, maxAttempts: 5, priority: -10 });
+      if (postId) await supabaseAdmin.from("published_posts").update({
+        status: "deferred",
+        error: `YouTube daily API quota reached — auto-retry after reset. (${(err.message || "").slice(0, 280)})`,
+        updated_at: new Date().toISOString(),
+      }).eq("id", postId);
+      logEvent({ userId, campaignId, action: "publish", entity: "post", entityId: postId, status: "info", message: "deferred — daily quota reached", meta: { platform, retryAt: new Date(retryAt).toISOString() } });
+      notifyUser(userId, { type: "publish_deferred", icon: "⏳", severity: "warning",
+        link: projectId ? `/video-editor/${projectId}` : "/automation",
+        title: "Publishing paused — YouTube daily limit",
+        body: "Your Google project's daily upload quota is used up. We'll retry automatically after it resets (≈ midnight Pacific). To upload more per day, request a YouTube API quota increase in Google Cloud." });
+      return { deferred: true, platform, postId, retryAt: new Date(retryAt).toISOString() };
     }
     await supabaseAdmin.from("published_posts").update({
       status: "failed", error: (err.message || "").slice(0, 1000), updated_at: new Date().toISOString(),
