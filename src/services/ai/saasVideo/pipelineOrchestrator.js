@@ -1,28 +1,24 @@
 /**
  * pipelineOrchestrator.js
- * src/services/ai/saasVideo/v2/pipelineOrchestrator.js
+ * src/services/ai/saasVideo/pipelineOrchestrator.js
  *
- * V2 pipeline — single continuous voiceover model.
+ * SaaS / Promo Video pipeline — VOICEOVER-FIRST beat model. The live path is runV2BeatPipeline
+ * (faceless); talking-head forks to runTHPipeline. The legacy scene pipeline + its helpers have
+ * been removed (it was unreachable behind BEAT_PIPELINE=true).
  *
- * Flow:
- *   1.  Generate script  → full_script + scenes (intent-based duration budgets)
- *   1.5 Save asset manifest early
- *   2.  Design scenes as HTML
- *   3.  Parse HTML → scene graphs
- *   4.  Generate ONE TTS voiceover for full_script
- *   5.  Whisper transcription → word-level timestamps
- *   6.  Assign actual scene durations from Whisper timestamps
- *   7.  Build timeline (cursor-based, using Whisper-corrected durations)
- *   8.  Inject single global voiceover audio layer
- *   9.  Background music
- *  10.  Pixabay stock images
- *  11.  Save timeline to projects table
+ * Flow (runV2BeatPipeline):
+ *   1. (URL mode) harvest the product page for grounding (copy / brand / screenshots)
+ *   2. Generate narration → ONE TTS voiceover FIRST, with real word timestamps
+ *   3. planVisualBeats — time the visual beats to the spoken word timestamps (no drift)
+ *   4. Design each beat as HTML → headless measure / parse → positioned layers
+ *   5. Resolve visuals (stock / AI image), build the timeline, inject voiceover + music
+ *   6. Save the timeline to the projects table (opens in the editor)
  */
 
 import { supabaseAdmin, openai }                      from "../../../server/middleware/shared.js";
 import { generateFullVoiceover } from "./ttsGenerator.js";
 import { pickAutoMood }                               from "../../../core/registries/musicRegistry.js";
-import { generateScriptV2, generateNarration, INTENT_PATTERNS, SCENE_WORD_BUDGETS } from "./scriptGenerator.js";
+import { generateNarration } from "./scriptGenerator.js";
 import { planVisualBeats }                           from "./visualDirector.js";
 import { designScene }                               from "./sceneDesigner.js";
 import { designFreeScene }                           from "./sceneDesignerFree.js";
@@ -76,38 +72,6 @@ async function fetchPixabayVideo(hint, orientation = "9:16", runId = "promo") {
   return persisted ?? hit.url;
 }
 
-/**
- * assignWhisperTimestamps(scenes, whisperWords)
- *
- * Matches each scene's script_segment to the sequential Whisper word list
- * by word count. Sets scene.vo_start, scene.vo_end, scene.duration_seconds.
- */
-function assignWhisperTimestamps(scenes, whisperWords) {
-  if (!whisperWords.length) return;
-
-  let wordIdx = 0;
-
-  for (const scene of scenes) {
-    const segText  = (scene.script_segment ?? scene.spoken ?? "").trim();
-    const segWords = segText.split(/\s+/).filter(Boolean).length;
-
-    if (segWords === 0 || wordIdx >= whisperWords.length) continue;
-
-    const startWord = whisperWords[wordIdx];
-    const endWord   = whisperWords[Math.min(wordIdx + segWords - 1, whisperWords.length - 1)];
-
-    scene.vo_start = parseFloat((startWord?.start ?? 0).toFixed(3));
-    scene.vo_end   = parseFloat((endWord?.end   ?? scene.vo_start + (scene.duration ?? 3)).toFixed(3));
-
-    const whisperDur = scene.vo_end - scene.vo_start;
-    // Use Whisper duration; enforce a 1s minimum so the scene doesn't vanish
-    scene.duration_seconds = parseFloat(Math.max(1.0, whisperDur).toFixed(3));
-
-    wordIdx = Math.min(wordIdx + segWords, whisperWords.length);
-  }
-
-  console.log(`[v2/pipeline] Whisper timestamps assigned to ${scenes.length} scenes`);
-}
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
@@ -117,40 +81,6 @@ const CANVAS_SIZES = {
   '1:1':  { width: 1080, height: 1080 },
 };
 
-// -- Custom script parser -------------------------------------------------------
-// Skips GPT script generation when the user provides their own script.
-function parseCustomScript(script, project) {
-  const sceneCount      = project.scene_count ?? 3;
-  const patterns        = INTENT_PATTERNS?.[sceneCount] ?? [{ intents: ['hook', 'solution', 'cta'] }];
-  const selectedPattern = patterns[0];
-  const intents         = selectedPattern.intents;
-
-  const sentences = script
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  const perScene = Math.ceil(sentences.length / sceneCount);
-  const sceneSentences = Array.from({ length: sceneCount }, (_, i) =>
-    sentences.slice(i * perScene, (i + 1) * perScene).join(' ')
-  );
-
-  const scenes = intents.map((intent, i) => {
-    const budget      = SCENE_WORD_BUDGETS[intent] ?? { duration: 4, words: 16 };
-    const segmentText = sceneSentences[i] ?? '';
-    return {
-      scene_index:      i,
-      intent,
-      script_segment:   segmentText,
-      spoken:           segmentText,
-      visual_concept:   `${intent} scene — ${segmentText.slice(0, 60)}`,
-      duration_seconds: budget.duration,
-    };
-  });
-
-  console.log(`[v2/pipeline] custom script: ${scenes.length} scenes parsed from user-provided text`);
-  return { full_script: script, scenes, pattern_name: 'custom', pattern_tone: 'User-provided script — follow the text exactly as written.' };
-}
 // Phase 1 beat pipeline toggle — set false to fall back to the legacy scene pipeline.
 const BEAT_PIPELINE = true;
 // EXPERIMENTAL: let GPT write natural nested HTML/CSS and flatten it via a headless
@@ -164,323 +94,6 @@ export async function runV2Pipeline(project) {
   if (BEAT_PIPELINE) {
     return await runV2BeatPipeline(project);
   }
-
-  const projectId = project.id;
-
-  const formatRatio = project.format_ratio ?? '9:16';
-  const canvas      = CANVAS_SIZES[formatRatio] ?? CANVAS_SIZES['9:16'];
-
-  // ── Build projectContext ──────────────────────────────────────────────────
-  const projectContext = {
-    projectId,
-    productName:     project.product_name          ?? "Product",
-    niche:           project.style?.niche           ?? "saas",
-    accentColor:     project.accent_color           ?? project.style?.color_palette ?? "#6366f1",
-    visualStyle:     project.visual_style           ?? "radiant",
-    typographyStyle: project.typography_style       ?? "modern",
-    logoUrl:         project.logo_url               ?? null,
-    logoWidth:       project.logo_width             ?? null,
-    logoHeight:      project.logo_height            ?? null,
-    fps:             30,
-    mood:            project.style?.music_mood      ?? null,
-    musicMood:       project.style?.music_mood      ?? "upbeat",
-    voiceId:         project.voice_id               ?? null,
-    sceneCount:      project.scene_count            ?? "auto",
-    language:        project.language               ?? "en",
-    canvasWidth:     canvas.width,
-    canvasHeight:    canvas.height,
-    formatRatio,
-    theme:           project.theme ?? 'dark',
-    tone:            project.tone  ?? 'professional',
-  };
-
-  // ── Step 1: Generate or parse script ────────────────────────────────────────
-  let scriptResult;
-  if (project.script?.trim()) {
-    console.log(`[v2/pipeline] ${projectId} — using user-provided script (skipping GPT generation)`);
-    scriptResult = parseCustomScript(project.script.trim(), project);
-  } else {
-    console.log(`[v2/pipeline] ${projectId} — generating script`);
-    scriptResult = await generateScriptV2(project);
-  }
-  let scenes        = scriptResult.scenes.map(s => ({ ...s }));
-  const full_script = scriptResult.full_script ?? "";
-
-  // Expose pattern name so scene designer knows if script is user-provided
-  projectContext.patternName = scriptResult.pattern_name ?? null;
-  const creativeDirection = scriptResult.creative_direction ?? null;
-  if (creativeDirection) console.log(`[v2/pipeline] ${projectId} — creative direction: ${creativeDirection}`);
-
-  // ── Steps 2+3: Design scenes in parallel (visual_concept planned upfront, no sequential dependency) ──
-  console.log(`[v2/pipeline] ${projectId} — designing ${scenes.length} scenes in parallel`);
-  const sceneResults = await Promise.all(
-    scenes.map(async (scene, index) => {
-      try {
-        const sceneProjectContext = {
-          ...projectContext,
-          archetype:      scene.archetype      ?? null,
-          visualConcept:  scene.visual_concept ?? null,
-          previousScenes: scenes
-            .filter((_, i) => i !== index)
-            .map(s => ({ index: s.scene_index, intent: s.intent, archetype: s.archetype ?? null, visual_concept: s.visual_concept })),
-        };
-        const html = await designScene(scene, sceneProjectContext);
-        console.log(`[v2/pipeline] scene ${scene.scene_index} (${scene.intent}) — ${html?.length ?? 0} chars`);
-        const graph = parseSceneHTML(html || "", scene.scene_index, canvas);
-        console.log(`[v2/pipeline] scene ${scene.scene_index} graph: ${graph.length} layers${graph.length > 0 ? ` — first: ${JSON.stringify(graph[0]).slice(0, 120)}` : " — EMPTY"}`);
-        return { graph, html };
-      } catch (err) {
-        console.error(`[v2/pipeline] scene ${scene.scene_index} design failed:`, err.message);
-        return { graph: [], html: null };
-      }
-    })
-  );
-  const sceneGraphs = sceneResults.map(r => r.graph);
-  const sceneHTMLs  = sceneResults.map(r => r.html);
-
-  // ── Step 4: Single TTS for the full continuous voiceover ──────────────────
-  // Trim full_script to dev-capped scenes if needed
-  const devScript = process.env.NODE_ENV !== "production"
-    ? scenes.map(s => s.script_segment ?? s.spoken ?? "").join(" ").trim()
-    : full_script;
-
-  let voiceoverAudioUrl    = null;
-  let voiceoverDuration    = 0;
-  let voiceoverBuffer      = null;
-
-  if (devScript.trim()) {
-    console.log(`[v2/pipeline] ${projectId} — generating single voiceover (${devScript.split(/\s+/).length} words)`);
-    try {
-      const result = await generateFullVoiceover(devScript, projectId, projectContext.voiceId);
-      voiceoverAudioUrl = result.audio_url;
-      voiceoverDuration = result.duration_seconds;
-      voiceoverBuffer   = result.buffer;
-      if (result.wordTimestamps?.length) assignWhisperTimestamps(scenes, result.wordTimestamps);
-    } catch (err) {
-      console.error("[v2/pipeline] TTS failed (non-fatal):", err.message);
-    }
-  }
-
-  // ── Step 5: timestamps already assigned from ElevenLabs during TTS step ───
-  if (!voiceoverBuffer) {
-    console.warn("[v2/pipeline] no audio — using intent-based durations");
-  }
-
-  // Extend last scene so total scene duration covers the full voiceover audio.
-  // Whisper timestamps often leave a small gap at the end because the last word
-  // boundary doesn't perfectly align with the actual audio file length.
-  if (voiceoverDuration > 0 && scenes.length > 0) {
-    const TRAIL_BUFFER = 0.4;
-    const sumDurations = scenes.reduce((acc, s) => acc + (s.duration_seconds ?? 0), 0);
-    const last = scenes[scenes.length - 1];
-    if (voiceoverDuration > sumDurations) {
-      const extension = parseFloat((voiceoverDuration - sumDurations).toFixed(3));
-      last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + extension).toFixed(3));
-      console.log(`[v2/pipeline] extended last scene by ${extension}s to match voiceover`);
-    }
-    last.duration_seconds = parseFloat(((last.duration_seconds ?? 0) + TRAIL_BUFFER).toFixed(3));
-    console.log(`[v2/pipeline] added ${TRAIL_BUFFER}s trail buffer to last scene`);
-  }
-
-  // ── Step 6: Build final timeline ──────────────────────────────────────────
-  // scene.duration_seconds is now set from Whisper (or falls back to intent budget)
-  const { timeline, asset_queue } = buildTimeline(sceneGraphs, scenes, projectContext);
-
-  // ── Step 7: Inject single global voiceover layer ──────────────────────────
-  let finalTimeline = timeline;
-  if (voiceoverAudioUrl) {
-    const totalDur = finalTimeline.format.duration;
-    finalTimeline = {
-      ...finalTimeline,
-      layers: [
-        ...finalTimeline.layers,
-        {
-          id:        "voiceover_full",
-          trackId:   "track_voiceover",
-          type:      "audio",
-          audioType: "voiceover",
-          src:       voiceoverAudioUrl,
-          start:     0,
-          end:       totalDur,
-          zIndex:    0,
-          visible:   true,
-          locked:    false,
-          trimStart: 0,
-          trimEnd:   totalDur,
-          volume:    1.0,
-          muted:     false,
-          fadeIn:    0.1,
-          fadeOut:   0.3,
-          sfx:       null,
-          keyframes: {},
-          animation: null,
-          transition: null,
-          transform:  null,
-        },
-      ],
-    };
-  }
-
-  // ── Step 8: Background music ──────────────────────────────────────────────
-  try {
-    const mood = pickAutoMood(project.video_goal, project.tone);
-    const { data: allTracks } = await supabaseAdmin
-      .from("music_tracks")
-      .select("public_url, title, mood")
-      .eq("is_active", true);
-
-    if (allTracks?.length) {
-      const moodTracks = allTracks.filter(t => t.mood === mood);
-      const pool  = moodTracks.length ? moodTracks : allTracks;
-      const track = pool[Math.floor(Math.random() * pool.length)];
-      const musicDur = finalTimeline.format.duration;
-      finalTimeline.layers.push({
-        id: "music_global", trackId: "track_music",
-        type: "audio", audioType: "music", src: track.public_url,
-        start: 0, end: musicDur, zIndex: 0,
-        visible: true, locked: false,
-        trimStart: 0, trimEnd: musicDur,
-        volume: 0.25, muted: false, fadeIn: 1, fadeOut: 1,
-        sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
-      });
-      console.log(`[v2/pipeline] music injected: "${track.title}" (${mood})`);
-    }
-  } catch (e) {
-    console.warn("[v2/pipeline] music injection skipped:", e.message);
-  }
-
-  // ── Step 9: Resolve image placeholders (stock via Pixabay, ai via Fal.ai, asset queued) ──
-  const placeholderLayers = finalTimeline.layers.filter(l => l.type === "image" && !l.src && l.assetHint);
-  if (placeholderLayers.length > 0) {
-    await Promise.all(placeholderLayers.map(async (layer) => {
-      if (layer.assetType === "stock") {
-        const query = extractSearchQuery(layer.assetHint);
-        layer.src = await fetchPixabayImage(query, formatRatio, projectId);
-      } else if (layer.assetType === "ai") {
-        layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style, formatRatio);
-      } else if (layer.assetType === "asset") {
-        layer.assetQueued = true;
-        layer.src = ASSET_PLACEHOLDER_SRC;
-        layer.isPlaceholder = true;
-      }
-      if (layer.src) console.log(`[v2/pipeline] resolved ${layer.assetType} placeholder: ${layer.id}`);
-    }));
-  }
-
-  // Legacy: also resolve old-style asset_requirement="image" scenes from scriptGenerator
-  const imageScenes = scenes.filter(s => s.asset_requirement === "image");
-  if (imageScenes.length > 0) {
-    await Promise.all(imageScenes.map(async (scene) => {
-      const query    = extractSearchQuery(scene.asset_hint || project.product_name || "");
-      const imageUrl = await fetchPixabayImage(query, formatRatio, projectId);
-      if (imageUrl) {
-        scene.asset_url = imageUrl;
-        const sceneIdx  = scene.scene_index;
-        for (const layer of finalTimeline.layers) {
-          if (layer.type === "image" && layer.id?.startsWith(`s${sceneIdx}_`) && !layer.src) {
-            layer.src = imageUrl;
-          }
-        }
-      }
-    }));
-  }
-
-  // Embed full_script in the timeline JSON so it's accessible from the saved project
-  if (full_script) finalTimeline.full_script = full_script;
-
-  // ── Build asset manifest from actual queued layers (after placeholder resolution) ──
-  // Step 1.5 was removed — v2 scene objects don't carry asset requirements, the
-  // timeline layers do. We scan here when the truth is known.
-  function deriveAspectRatio(w, h) {
-    if (!w || !h) return null;
-    const r = w / h;
-    if (r >= 1.6)            return '16:9 — Landscape';
-    if (r <= 0.65)           return '9:16 — Portrait';
-    if (r > 0.9 && r < 1.1) return '1:1 — Square';
-    if (r > 1.1 && r < 1.6) return '4:3 — Landscape';
-    return '3:4 — Portrait';
-  }
-
-  const queuedLayers = finalTimeline.layers.filter(
-    l => l.type === 'image' && l.assetQueued === true && l.assetType === 'asset'
-  );
-  const userRequired = queuedLayers.map(layer => {
-    const sceneIndex = parseInt((layer.id.match(/^s(d+)_/) || [])[1] ?? '0', 10);
-    const w = Math.round(layer.transform?.width  ?? 0);
-    const h = Math.round(layer.transform?.height ?? 0);
-    return {
-      scene_id:     sceneIndex + 1,
-      layer_id:     layer.id,
-      asset_hint:   layer.assetHint || 'product interface screenshot',
-      asset_type:   'asset',
-      width:        w || null,
-      height:       h || null,
-      aspect_ratio: deriveAspectRatio(w, h),
-      status:       'pending',
-      asset_url:    null,
-    };
-  });
-  const assetManifest = {
-    user_required:               userRequired,
-    ai_generate:                 [],
-    stock_fetch:                 [],
-    placeholders:                [],
-    total_user_uploads_required: userRequired.length,
-    all_assets_provided:         userRequired.length === 0,
-  };
-  console.log(`[v2/pipeline] ${projectId} — asset manifest: ${userRequired.length} user uploads required`);
-  try {
-    await supabaseAdmin
-      .from("promo_videos")
-      .update({ asset_manifest: assetManifest })
-      .eq("id", projectId);
-  } catch (e) {
-    console.warn("[v2/pipeline] asset manifest save failed (non-fatal):", e.message);
-  }
-
-  // ── Step 10: Save timeline to projects table ──────────────────────────────
-  let editorProjectId = null;
-  try {
-    const { data: editorRow } = await supabaseAdmin
-      .from("projects")
-      .insert({
-        user_id:           project.user_id,
-        name:              `${project.product_name ?? "Promo Video"} — Promo`,
-        safe_project_json: finalTimeline,
-        orientation:       formatRatio,
-        mode:              "timeline",
-        source:            "promo_video",
-        editor_version:    "timeline",
-        raw_ai_json:       {
-          creative_direction: creativeDirection,
-          scenes:     scenes.map(s => ({ sceneIndex: s.scene_index, intent: s.intent, creative_brief: s.creative_brief ?? s.visual_concept ?? null, wants_product_visual: s.wants_product_visual ?? null })),
-          sceneHTMLs: sceneHTMLs,
-        },
-      })
-      .select("id")
-      .single();
-    editorProjectId = editorRow?.id ?? null;
-    console.log(`[v2/pipeline] ${projectId} — timeline saved to projects (editor: ${editorProjectId})`);
-  } catch (e) {
-    console.warn("[v2/pipeline] projects insert failed (non-fatal):", e.message);
-  }
-
-  const totalDuration = parseFloat(finalTimeline.format.duration.toFixed(2));
-
-  return {
-    ...project,
-    scenes,
-    full_script,
-    scene_format:       "v2",
-    pipeline_version:   "v2",
-    status:             "script_generated",
-    duration_seconds:   totalDuration,
-    editor_project_id:  editorProjectId,
-    _timeline:          finalTimeline,
-    _asset_queue:       asset_queue,
-    _assetManifest:     assetManifest,
-    updated_at:         new Date().toISOString(),
-  };
 }
 
 // ── V2 Beat pipeline (voiceover-first, timed visual beats) ─────────────────────
