@@ -43,6 +43,7 @@ import { router as socialRouter }           from "./routes/social.js";
 import { router as automationRouter }       from "./routes/automation.js";
 import { router as flagsRouter }            from "./routes/flags.js";
 import { router as monitoringRouter }       from "./routes/monitoring.js";
+import { router as devLabRouter }            from "./routes/devLab.js";
 import { installLogGate } from "../core/utils/logger.js";
 
 // Gate all process-narration logs by level (quiet in production, verbose locally or
@@ -202,6 +203,7 @@ app.use("/api/social-post",  socialPostRouter);
 app.use("/api/banner",       bannerRouter);
 app.use("/api/admin",        adminRouter);
 app.use("/api/admin",        announcementsRouter);
+app.use("/api/dev",          devLabRouter); // private AI Video step-through lab (admin only)
 app.use("/api",              ttsRouter);
 app.use("/api",              authRouter);
 app.use("/api",              assetsRouter);

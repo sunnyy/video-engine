@@ -14,6 +14,7 @@ import { initLayoutRegistry } from "./core/registries/layoutRegistry";
 import { useCreditsStore } from "./store/useCreditsStore";
 import "./App.css"
 import LandingPage     from "./pages/LandingPage";
+import AivLab          from "./pages/AivLab";
 import TermsOfService  from "./pages/legal/TermsOfService";
 import PrivacyPolicy   from "./pages/legal/PrivacyPolicy";
 import RefundPolicy    from "./pages/legal/RefundPolicy";
@@ -210,6 +211,7 @@ export default function App() {
             {isAdmin ? (
               <>
                 <Route path="/admin"                   element={<AdminDashboard />} />
+                <Route path="/admin/aiv-lab"           element={<AivLab />} />
                 <Route path="/admin/analytics"         element={<Analytics />} />
                 <Route path="/admin/users"             element={<UserManager />} />
                 <Route path="/admin/credits"           element={<Credits />} />
