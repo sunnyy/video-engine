@@ -704,8 +704,17 @@ export async function runPromptPipeline(params, onStep) {
 
   finalTimeline.full_script = fullScript;
   // Persist source + generated publish copy in the project meta so the editor's Publish
-  // button can detect Prompt-to-Video and pre-fill the title/caption/hashtags.
-  finalTimeline.meta = { ...(finalTimeline.meta || {}), source: "ai_video", publish: film.publish || null };
+  // button can detect Prompt-to-Video and pre-fill the title/caption/hashtags. Also persist the
+  // exact user prompt + the resolved visual style (incl. "auto" picks) so they're visible/traceable
+  // in the saved project (previously only in raw_ai_json, which isn't in the exported timeline).
+  finalTimeline.meta = {
+    ...(finalTimeline.meta || {}),
+    source: "ai_video",
+    publish: film.publish || null,
+    user_prompt: prompt || null,
+    visual_style: style?.id || null,
+    visual_style_label: style?.label || null,
+  };
 
   // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
   simplifyTimelineKeyframes(finalTimeline);
