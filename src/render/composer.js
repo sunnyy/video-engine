@@ -12,8 +12,8 @@
  *
  * Phase 0/1 scope: text, image/sticker, gradient, captions, icon (box), watermark, plus
  * transforms, keyframes and in/out transitions, and audio extraction for the stitcher.
- * Embedded VIDEO layers are recognised but not yet painted (Phase 3) — their audio is still
- * collected so voiceover/music are correct.
+ * Embedded VIDEO layers are painted via ffmpeg-extracted frames (Phase 3); a non-muted video
+ * layer also contributes its OWN audio track (e.g. a Talking Head clip's voice) to the mux.
  */
 import fs from "fs";
 import path from "path";
@@ -68,7 +68,12 @@ function extractAudio(layers) {
     if (l.sfx?.src) {
       out.push({ src: l.sfx.src, start: (l.start || 0) + (l.sfx.delay || 0), end: null, trimStart: 0, volume: l.sfx.volume ?? 1, playbackRate: 1 });
     }
-    // TODO Phase 3: non-muted embedded video layers contribute their own audio track.
+    // Non-muted embedded VIDEO layers contribute their OWN audio track. For Talking Head the
+    // speaker's voice lives in the video's audio (there's no separate voiceover layer), so without
+    // this the export has music/SFX but no voice. (Muted b-roll has muted:true/volume:0 → skipped.)
+    if (l.type === "video" && l.src && !l.muted && (l.volume ?? 1) > 0) {
+      out.push({ src: l.src, start: l.start || 0, end: l.end ?? null, trimStart: l.trimStart || 0, volume: l.volume ?? 1, playbackRate: l.playbackRate ?? 1 });
+    }
   }
   return out;
 }

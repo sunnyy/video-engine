@@ -136,31 +136,34 @@ async function prepareProject(project, userId) {
  *   If the upload fails, `outputPath` (local mp4) is returned so a caller can still serve it.
  * Throws on render failure (caller decides retry/refund). Frame temp dir is always cleaned.
  */
-export async function renderTimeline(project, { userId, renderId, resolution = "1080p", projectId = null, source = null, onProgress, isCancelled } = {}) {
+export async function renderTimeline(project, { userId, renderId, resolution = "1080p", projectId = null, source = null, reuse = false, onProgress, isCancelled } = {}) {
   if (!userId)   throw new Error("renderTimeline: userId required");
   if (!renderId) throw new Error("renderTimeline: renderId required");
 
-  // Render-reuse: if this exact timeline (+resolution) was already rendered for this project,
-  // reuse that MP4 instead of rendering again. This is what makes Publish-after-Export skip the
-  // redundant second render. Best-effort + scoped to the project; any failure falls through to a
-  // fresh render. (Pre-migration, the project_hash column may not exist — the query just returns
-  // nothing and we render normally.)
+  // Content hash for render-reuse. We ALWAYS compute + store it below (so a later Publish can reuse
+  // this render), but we only REUSE a prior render when the caller opts in via `reuse:true`.
+  //   • Export NEVER reuses (reuse:false) — it must always produce a FRESH render so the user sees
+  //     their latest timeline and so engine/code changes are actually reflected.
+  //   • Publish opts in (reuse:true) — Publish right after an Export of the same unedited timeline
+  //     skips the redundant second render by finding the export's render via the matching hash.
   let phash = null;
   if (projectId) {
-    try {
-      phash = projectHash(project, resolution);
-      const { data: prior } = await supabaseAdmin
-        .from("renders")
-        .select("id, video_url, file_path")
-        .eq("project_id", projectId).eq("project_hash", phash).eq("status", "done")
-        .not("video_url", "is", null)
-        .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      if (prior?.video_url) {
-        console.log(`[render] reuse cached render ${prior.id} for project ${projectId} (timeline unchanged) — skipping re-render`);
-        onProgress?.(100);
-        return { videoUrl: prior.video_url, filePath: prior.file_path, outputPath: null, renderId: prior.id, reused: true };
-      }
-    } catch { phash = phash || null; /* column missing or lookup failed → render fresh */ }
+    try { phash = projectHash(project, resolution); } catch { phash = null; }
+    if (reuse && phash) {
+      try {
+        const { data: prior } = await supabaseAdmin
+          .from("renders")
+          .select("id, video_url, file_path")
+          .eq("project_id", projectId).eq("project_hash", phash).eq("status", "done")
+          .not("video_url", "is", null)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (prior?.video_url) {
+          console.log(`[render] reuse cached render ${prior.id} for project ${projectId} (timeline unchanged) — skipping re-render`);
+          onProgress?.(100);
+          return { videoUrl: prior.video_url, filePath: prior.file_path, outputPath: null, renderId: prior.id, reused: true };
+        }
+      } catch { /* column missing or lookup failed → render fresh */ }
+    }
   }
 
   const finalProject = await prepareProject(project, userId);

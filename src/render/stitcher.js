@@ -42,6 +42,10 @@ function muxAudio({ videoPath, audio, outputPath, durationSec }) {
     audio.forEach((a) => {
       const inOpts = [];
       if (a.trimStart) inOpts.push(`-ss ${a.trimStart}`);
+      // Limit the read to the layer's on-screen span so a source longer than its segment (e.g. a
+      // trimmed b-roll/video-layer audio) doesn't bleed past where the clip ends. Music/SFX have
+      // end:null → no limit (plays through, cut by the output -t).
+      if (a.end != null) inOpts.push(`-t ${Math.max(0.05, a.end - (a.start || 0))}`);
       cmd.input(a.src).inputOptions(inOpts);
     });
 

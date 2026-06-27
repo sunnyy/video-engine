@@ -405,7 +405,7 @@ export default function TopBar() {
         >
           <span style={{ fontSize: 13, flexShrink: 0 }}>💡</span>
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            Editing is best for light edits — swap media, tweak text, colors &amp; etc. Heavy restructuring may break the video.
+            Editing is best for light edits — swap media, tweak text, or change colors. Heavy restructuring may break the video.
           </span>
         </div>
       </div>

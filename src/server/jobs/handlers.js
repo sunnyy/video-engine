@@ -96,6 +96,9 @@ registerHandler("render_timeline", async (payload, job) => {
   try {
     ({ videoUrl, filePath } = await renderTimeline(project, {
       userId, renderId: job.id, projectId, resolution, source: projectSource,
+      // Reuse a prior render ONLY for the publish chain (e.g. Publish right after an Export of the
+      // same unedited timeline → skip the redundant re-render). A plain render job renders fresh.
+      reuse: !!payload?.chain?.publish,
       onProgress: (pct) => setProgress(job.id, pct),
       isCancelled: () => watch.state.cancelled,
     }));
