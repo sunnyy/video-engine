@@ -11,36 +11,13 @@ import { getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
 import AuthModal from "../ui/AuthModal";
 import { videoServices } from "../config/serviceCatalog";
-import { CREDIT_COSTS, VIDEO_DURATION_BANDS, TALKING_HEAD_PER_30S } from "../core/utils/creditCosts";
+import { SERVICE_COST_LABEL, TOOLS_COST_LABEL } from "../config/serviceCostLabels";
 import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown } from "lucide-react";
 
 const FALLBACK_RATE = 92.6;
 function toINR(usd, rate) {
   return Math.round(usd * rate);
 }
-
-// Per-service credit costs for the pricing page — derived from the single source of truth
-// (CREDIT_COSTS) so this marketing copy can never drift from what billing actually charges.
-// Fixed-rate tools show one number; duration/scene-priced videos show a min–max range.
-const _durMin = Math.min(...Object.values(VIDEO_DURATION_BANDS));
-const _durMax = Math.max(...Object.values(VIDEO_DURATION_BANDS));
-const _promo  = Object.values(CREDIT_COSTS.promo_video);
-const COST_GUIDE = [
-  { label: "AI Image",         cost: `${CREDIT_COSTS.ai_image} / image` },
-  { label: "Voiceover",        cost: `${CREDIT_COSTS.tts_generation}` },
-  { label: "Transcription",    cost: `${CREDIT_COSTS.transcription}` },
-  { label: "Captions",         cost: `${CREDIT_COSTS.caption_studio}` },
-  { label: "Thumbnail",        cost: `${CREDIT_COSTS.thumbnail_generate}` },
-  { label: "Poster",           cost: `${CREDIT_COSTS.poster_generate}` },
-  { label: "Banner / Post",    cost: `${CREDIT_COSTS.social_post}` },
-  { label: "Virtual Try-On",   cost: `${CREDIT_COSTS.outfit_tryon}` },
-  { label: "Typography Video", cost: `${_durMin}–${_durMax}` },
-  { label: "Social Video",     cost: `${CREDIT_COSTS.social_video}` },
-  { label: "AI Video",         cost: `${_durMin}–${_durMax}` },
-  { label: "Product Video",    cost: `${CREDIT_COSTS.product_video_per_scene.image}–${CREDIT_COSTS.product_video_per_scene.video} / scene` },
-  { label: "Promo Video",      cost: `${Math.min(..._promo)}–${Math.max(..._promo)}` },
-  { label: "Talking Head",     cost: `~${TALKING_HEAD_PER_30S} / 30s` },
-];
 
 function useReveal() {
   useEffect(() => {
@@ -614,15 +591,25 @@ function Cross({ children }) {
     </div>
   );
 }
-// The full service list shown on every pricing card (from the catalog, so it never drifts).
+// A feature row with the service name on the left and its credit cost on the right.
+function ServiceCostRow({ name, cost }) {
+  return (
+    <div style={{ display: "flex", gap: 9, alignItems: "center", fontSize: 13.5, color: "var(--muted)", lineHeight: 1.45 }}>
+      <span style={{ color: "var(--yellow)", fontWeight: 800, flexShrink: 0, fontSize: 12 }}>✓</span>
+      <span>{name}{cost ? <span style={{ color: "var(--dim)" }}> ({cost})</span> : null}</span>
+    </div>
+  );
+}
+// The full service list shown on every pricing card (from the catalog, so it never drifts), with
+// each service's credit cost on the right so users see exactly how far their credits go.
 function VideoServicesList() {
   return (
     <>
       <PlusLabel>All video services</PlusLabel>
       {videoServices().map((s) => (
-        <Check key={s.key}>{s.beta ? `${s.name} (Beta)` : s.name}</Check>
+        <ServiceCostRow key={s.key} name={s.name} cost={SERVICE_COST_LABEL[s.key]} />
       ))}
-      <Check>10+ AI image &amp; audio tools</Check>
+      <ServiceCostRow name="10+ AI image & audio tools" cost={TOOLS_COST_LABEL} />
     </>
   );
 }
@@ -1224,7 +1211,6 @@ export default function LandingPage() {
               <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>150 free credits first · cancel anytime</div>
               <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
                 <Check>⚡ 1,500 credits / month</Check>
-                <Check>≈ 50 short videos or 750 images — your mix</Check>
                 <VideoServicesList />
                 <PlusLabel>Everything in Free, plus:</PlusLabel>
                 <Check>Automation &amp; auto-publish to social</Check>
@@ -1261,28 +1247,12 @@ export default function LandingPage() {
               <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
               <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
                 <Check>⚡ 4,000 credits / month</Check>
-                <Check>≈ 130 short videos or 2,000 images — your mix</Check>
                 <VideoServicesList />
                 <PlusLabel>Everything in Pro, plus:</PlusLabel>
                 <Check>More credits for high-volume output</Check>
                 <Check>Best value — lower cost per credit</Check>
               </div>
             </div>
-          </div>
-
-          {/* What your credits buy — per-service cost guide (sourced from CREDIT_COSTS) */}
-          <div data-reveal style={{ marginTop: 44, maxWidth: 900, marginLeft: "auto", marginRight: "auto" }}>
-            <div style={{ textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--dim)", marginBottom: 6 }}>What your credits buy</div>
-            <p style={{ textAlign: "center", color: "var(--muted)", fontSize: 14, margin: "0 0 20px", lineHeight: 1.55 }}>One wallet, every tool — spend your credits however you like. No per-service caps.</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(212px, 1fr))", gap: 8 }}>
-              {COST_GUIDE.map((it) => (
-                <div key={it.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 10, padding: "11px 14px" }}>
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--text)" }}>{it.label}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 700, color: "var(--yellow)", whiteSpace: "nowrap" }}>⚡ {it.cost}</span>
-                </div>
-              ))}
-            </div>
-            <p style={{ textAlign: "center", color: "var(--dim)", fontSize: 11.5, margin: "14px 0 0" }}>Videos are priced by length or scene count; tools are a flat rate.</p>
           </div>
         </div>
       </section>

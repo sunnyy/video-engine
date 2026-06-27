@@ -9,52 +9,10 @@ import { SERVER, serverFetch } from "../services/serverApi";
 import { supabase } from "../lib/supabase";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { validateCouponCode } from "../services/coupons/couponService";
+import { videoServices } from "../config/serviceCatalog";
+import { SERVICE_COST_LABEL, TOOLS_COST_LABEL } from "../config/serviceCostLabels";
 
 const FALLBACK_RATE = 92.60;
-
-const PLAN_FEATURES = {
-  starter: [
-    "1,800 Credits/month",
-    "Product Ad Studio",
-    "TTS Voiceover",
-    "AI Image Generator",
-    "Product Poster",
-    "Video Captions",
-    "AI Video Generator",
-    "Typography Videos",
-  ],
-  pro: [
-    "3,500 Credits/month",
-    "Product Ad Studio",
-    "TTS Voiceover",
-    "AI Image Generator",
-    "Product Poster",
-    "Video Captions",
-    "AI Video Generator",
-    "Typography Videos",
-    "Explainer Videos",
-    "Banner & Thumbnail Generator",
-    "Virtual Try-On",
-    "Speech to Text",
-  ],
-  agency: [
-    "6,000 Credits/month",
-    "Product Ad Studio",
-    "TTS Voiceover",
-    "AI Image Generator",
-    "Product Poster",
-    "Video Captions",
-    "AI Video Generator",
-    "Typography Videos",
-    "Explainer Videos",
-    "Banner & Thumbnail Generator",
-    "Virtual Try-On",
-    "Speech to Text",
-    "Product Video Ads",
-    "Social Media Post Generator",
-    "Best credit value per dollar",
-  ],
-};
 
 function calcPrice(base, discountPct) {
   if (!discountPct) return base;
@@ -156,7 +114,15 @@ export default function Checkout() {
   const originalUSD  = cycle === "annual" ? plan.price_monthly * 12 : baseUSD;
   const originalINR  = toINR(originalUSD, rate);
   const saved        = cycle === "annual" && !!plan.price_annual && plan.price_annual < plan.price_monthly * 12;
-  const features     = PLAN_FEATURES[plan.slug] || (Array.isArray(plan.features) ? plan.features : []);
+  // Features from the LIVE catalog (never hardcoded/stale). Every paid plan unlocks every service;
+  // only the credit allotment differs — and that's shown in the badge from plan.credits, so we don't
+  // repeat a (previously stale) "N Credits/month" line here.
+  const features     = [
+    ...videoServices().map((s) => ({ label: s.name, cost: SERVICE_COST_LABEL[s.key] })),
+    { label: "10+ AI image & audio tools", cost: TOOLS_COST_LABEL },
+    { label: "Automation & auto-publish to social" },
+    { label: "Credit top-ups anytime" },
+  ];
   const cycleLabel   = cycle === "annual" ? "year" : "month";
 
   // Effective amount after any applied promo code.
@@ -386,8 +352,9 @@ export default function Checkout() {
           {features.length > 0 && (
             <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
               {features.map((f, i) => (
-                <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#c8c8d8" }}>
-                  <span style={{ color: "#f5c518", flexShrink: 0 }}>✓</span>{f}
+                <li key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#c8c8d8" }}>
+                  <span style={{ color: "#f5c518", flexShrink: 0 }}>✓</span>
+                  <span>{f.label}{f.cost ? <span> ({f.cost})</span> : null}</span>
                 </li>
               ))}
             </ul>
@@ -418,6 +385,11 @@ export default function Checkout() {
                   ₹{payableINR}
                 </div>
                 <div style={{ fontSize: 13, color: "#55556a" }}>${payableUSD} per {cycleLabel}</div>
+                {saved && (
+                  <div style={{ fontSize: 12.5, color: "#22c55e", fontWeight: 600, marginTop: 5 }}>
+                    <s style={{ color: "#55556a", fontWeight: 400 }}>${originalUSD}/{cycleLabel}</s> · save {plan.discount_percent}% (2 months free)
+                  </div>
+                )}
               </div>
               <div style={{ fontSize: 40, opacity: 0.5 }}>💳</div>
             </div>
