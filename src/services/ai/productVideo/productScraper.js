@@ -6,6 +6,7 @@
 
 import { parse } from "node-html-parser";
 import { supabaseAdmin } from "../../../server/middleware/shared.js";
+import { safeFetch } from "../shared/safeFetch.js";
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -19,7 +20,8 @@ export function detectProductPlatform(url) {
 }
 
 async function fetchPage(url) {
-  const res = await fetch(url, {
+  // SSRF-safe: validates the host (+ each redirect hop) is public before connecting.
+  const res = await safeFetch(url, {
     headers: {
       "User-Agent":                BROWSER_UA,
       "Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -27,8 +29,7 @@ async function fetchPage(url) {
       "Cache-Control":             "max-age=0",
       "Upgrade-Insecure-Requests": "1",
     },
-    signal:   AbortSignal.timeout(14000),
-    redirect: "follow",
+    timeoutMs: 14000,
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching product page`);
   return res.text();
@@ -60,10 +61,7 @@ function findProductSchema(items) {
 async function uploadProductImage(sourceUrl, prefix = "product") {
   if (!sourceUrl) return null;
   try {
-    const res = await fetch(sourceUrl, {
-      headers: { "User-Agent": BROWSER_UA },
-      signal:  AbortSignal.timeout(12000),
-    });
+    const res = await safeFetch(sourceUrl, { headers: { "User-Agent": BROWSER_UA }, timeoutMs: 12000 });
     if (!res.ok) throw new Error(`Image fetch ${res.status}`);
 
     const buffer      = Buffer.from(await res.arrayBuffer());
