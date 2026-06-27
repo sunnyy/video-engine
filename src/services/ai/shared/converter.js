@@ -680,25 +680,27 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     }
   }
 
-  // Text-over-container guard: when flattening, a card/panel can end up with a higher
-  // z than the text it visually CONTAINS (e.g. an explicit-z card → 100+ band, while its
-  // label kept the auto/role z), so the card paints OVER its own text and hides it. In
-  // the DOM the text is a child and paints above the card; restore that by lifting each
-  // text above any larger non-text layer that geometrically contains it and sits at/above
-  // its z. Geometric (no DOM needed) so it generalises to all cards/panels/columns.
-  for (const tx of graph) {
-    if (tx.type !== "text") continue;
-    const cx = tx.x + tx.width / 2, cy = tx.y + tx.height / 2;
-    let lift = tx.zIndex;
+  // Containment z-lift: when flattening, a container (card / panel / mockup window) can share or
+  // exceed the z of the content it visually CONTAINS — its nested cards, decorations, dots, bars,
+  // text — and, painted later, hide them (every card/decoration defaults to z=3, so a parent card
+  // covers its own children). In the DOM the children paint above the parent; restore that by
+  // lifting EVERY element above any strictly-larger element that geometrically contains it and sits
+  // at/above its z. Computed from the ORIGINAL z (then assigned) so multi-level nesting is stable.
+  // (Text wins ties via the text branch already; we never treat a text layer as a container.)
+  const ZLIFT = new Map();
+  for (const el of graph) {
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    let lift = el.zIndex;
     for (const g of graph) {
-      if (g === tx || g.type === "text") continue;
-      const containsText =
+      if (g === el || g.type === "text") continue; // text isn't a container
+      const contains =
         cx >= g.x && cx <= g.x + g.width && cy >= g.y && cy <= g.y + g.height &&
-        g.width * g.height > tx.width * tx.height; // g is a larger container behind the text
-      if (containsText && g.zIndex >= tx.zIndex) lift = Math.max(lift, g.zIndex + 1);
+        g.width * g.height > el.width * el.height; // g is strictly larger → an enclosing container
+      if (contains && g.zIndex >= el.zIndex) lift = Math.max(lift, g.zIndex + 1);
     }
-    tx.zIndex = lift;
+    ZLIFT.set(el, lift);
   }
+  for (const el of graph) el.zIndex = ZLIFT.get(el);
 
   graph.sort((a, b) => a.zIndex - b.zIndex);
   return graph;

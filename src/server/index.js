@@ -64,7 +64,32 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 const app = express();
 app.set("trust proxy", 1);
-app.use(cors());
+app.disable("x-powered-by"); // don't advertise Express
+
+// ── CORS: allow only our own origins for browser cross-origin calls. Server-to-server
+// requests (Razorpay/Supabase webhooks, OAuth redirects) send no Origin header → allowed.
+// Override the list with ALLOWED_ORIGINS (comma-separated) without a code change.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
+  "https://vidquence.com,https://www.vidquence.com,http://localhost:5173,http://localhost:5000")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"));
+  },
+}));
+
+// ── Baseline security headers (dependency-free). CSP is intentionally omitted here — the app
+// loads many external origins (Razorpay, PostHog, Supabase, Google Fonts, stock CDNs, video),
+// so a Content-Security-Policy needs careful per-source allowlisting and is a separate task.
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader("Permissions-Policy", "geolocation=(), browsing-topics=()");
+  next();
+});
 
 app.use(express.json({ limit: "100mb" }));
 
