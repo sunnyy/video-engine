@@ -22,6 +22,7 @@ import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
 import { track, easeOutCubic } from "../shared/easing.js";
 import { loadSfxTracks, pickSfx } from "./sfx.js";
 import { injectMusic } from "../shared/music.js";
+import { moderateInput } from "../shared/moderation.js";
 
 export const TH_STATUS_STEPS = [
   "Listening to your video…",
@@ -165,7 +166,7 @@ function placeCardGraph(graph, start, end, zBase = 8) {
   });
 }
 
-export async function runTalkingHeadPipeline(params, onStep) {
+export async function runTalkingHeadPipeline(params, onStep, onCharge) {
   const {
     videoUrl, userId,
     captionStyle = "wordBlaze", captionPos = 80, reframe = "source", music = true,
@@ -178,6 +179,14 @@ export async function runTalkingHeadPipeline(params, onStep) {
   // ── Transcribe + segment ──────────────────────────────────────────────────
   step(TH_STATUS_STEPS[0]);
   const { words, full_transcript, language, total_duration, dimensions, videoUrl: baseVideoUrl } = await transcribeVideo(videoUrl);
+
+  // Moderate the transcript BEFORE any synthesis — it drives B-roll search + AI image prompts.
+  if (full_transcript) await moderateInput(full_transcript, { label: "talking-head transcript" });
+  // Charge off the REAL transcribed duration (the client-supplied duration is NOT trusted for
+  // billing). Throws on insufficient credits / over-length → aborts before the expensive director,
+  // visual resolution, and image-gen run (only the cheap transcription is sunk).
+  if (onCharge) await onCharge(total_duration);
+
   step(TH_STATUS_STEPS[1]);
   let beats = segmentWords(words);
 
