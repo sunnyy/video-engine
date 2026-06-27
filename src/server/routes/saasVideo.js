@@ -240,6 +240,11 @@ router.post("/create", requireAuth, async (req, res) => {
       project = await runV2Pipeline(project);
     }
 
+    // Charged-no-deliverable guard: now that generation is paid above, a swallowed timeline-save
+    // (saveTimeline → null editor_project_id) must NOT silently return a charged project with no
+    // openable video. Fail → the catch refunds.
+    if (!project?.editor_project_id) throw new Error("generation produced no editor project (save failed)");
+
     // v2 pipeline pre-computes the manifest from the script; other paths compute it now.
     const assetManifest = project._assetManifest ?? generateAssetRequirements(project);
     project.credits_charged = creditAmount; // generation paid above (render is free)
