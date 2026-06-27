@@ -15,7 +15,9 @@
  *   6. Save the timeline to the projects table (opens in the editor)
  */
 
+import sharp from "sharp";
 import { supabaseAdmin, openai }                      from "../../../server/middleware/shared.js";
+import { simplifyTimelineKeyframes }                  from "../shared/motion.js";
 import { generateFullVoiceover } from "./ttsGenerator.js";
 import { pickAutoMood }                               from "../../../core/registries/musicRegistry.js";
 import { generateNarration } from "./scriptGenerator.js";
@@ -60,6 +62,50 @@ async function generateFalImage(hint, projectId, styleId = "auto", orientation =
   if (!hint) return null;
   const prompt = `${hint}, ${styleImagePrompt(styleId, "photo")}, sharp focus, 8k quality, no people, no faces`;
   return await generateAiImage(prompt, { runId: projectId ?? "promo", label: `ai-${Date.now()}`, orientation });
+}
+
+// ── Orientation-aware reframing ────────────────────────────────────────────────
+// A landscape/horizontal asset center-cropped to a full-bleed 9:16 frame loses most of
+// itself and looks bad. After media is resolved we probe each full-bleed IMAGE's real
+// orientation and, if it's landscape, reframe it like Social's "framed" treatment: the
+// REAL image is CONTAINED (whole thing visible) over a blurred cover-fill of itself.
+const LANDSCAPE_MIN_ASPECT = 1.25;
+async function imageAspectRatio(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    return (meta.width && meta.height) ? meta.width / meta.height : null;
+  } catch { return null; }
+}
+async function reframeLandscapeMedia(timeline) {
+  const W = timeline.format?.width, H = timeline.format?.height;
+  if (!W || !H) return;
+  // Only full-canvas cover IMAGES (the egregious case). Videos are requested 9:16 + need ffprobe; skip.
+  const fullBleed = timeline.layers.filter(l =>
+    l.type === "image" && l.src && l.objectFit === "cover" &&
+    Math.abs((l.transform?.width ?? 0) - W) < 2 && Math.abs((l.transform?.height ?? 0) - H) < 2);
+  if (!fullBleed.length) return;
+
+  const extras = [];
+  await Promise.all(fullBleed.map(async (l) => {
+    const aspect = await imageAspectRatio(l.src);
+    if (aspect == null || aspect < LANDSCAPE_MIN_ASPECT) return; // portrait/square stays full-bleed cover
+    // Blurred cover-fill backdrop (a clone, keeps the cover Ken Burns) sits beneath at z0.
+    const bg = JSON.parse(JSON.stringify(l));
+    bg.id = `${l.id}bg`; bg.trackId = `${l.id}bg`; bg.name = "Media BG";
+    bg.objectFit = "cover";
+    bg.filter = "blur(42px) brightness(0.5)";
+    bg.zIndex = 0;
+    extras.push(bg);
+    // The real image: show the WHOLE thing (contain) at z1 — above the blurred bg, below text (z≥8).
+    l.objectFit = "contain";
+    l.zIndex = 1;
+    // Panning a letterboxed image looks wrong — keep only a gentle zoom, drop x/y drift.
+    if (l.keyframes) l.keyframes = { ...l.keyframes, x: [], y: [] };
+    console.log(`[v2/beats] reframed landscape media ${l.id} (aspect ${aspect.toFixed(2)}) → contain + blurred fill`);
+  }));
+  if (extras.length) timeline.layers.push(...extras);
 }
 
 // Stock video b-roll — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
@@ -346,11 +392,17 @@ async function runV2BeatPipeline(project) {
     console.log(`[v2/beats] dropped ${beforeDrop - finalTimeline.layers.length} unresolved media layer(s)`);
   }
 
+  // ── Step 8.5: Reframe landscape assets (don't crop a horizontal image to full-bleed) ──
+  try { await reframeLandscapeMedia(finalTimeline); }
+  catch (e) { console.warn("[v2/beats] landscape reframe skipped:", e.message); }
+
   // ── Step 9: Asset manifest (product screenshots only) ─────────────────────
   const assetManifest = buildAssetManifest(finalTimeline);
   await persistAssetManifest(assetManifest, projectId);
 
   // ── Step 10: Save timeline ────────────────────────────────────────────────
+  // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
+  simplifyTimelineKeyframes(finalTimeline);
   if (full_script) finalTimeline.full_script = full_script;
   const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video', {
     creative_direction: creativeDirection,

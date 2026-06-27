@@ -94,7 +94,7 @@ const narrationWordCount = (plan) =>
 async function runDirectorCompletion(prompt, extraUser = "") {
   const response = await openai.chat.completions.create({
     model: DIRECTOR_MODEL,
-    max_tokens: 6000,
+    max_tokens: 8000, // JSON beats array grows with duration — headroom so long videos don't truncate
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: prompt.system },

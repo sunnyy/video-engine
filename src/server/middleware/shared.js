@@ -145,6 +145,29 @@ export async function addCredits(userId, amount, type, action, description, paym
   return { success: true, balance: newBalance };
 }
 
+/**
+ * safeMessage(err) — a user-safe version of an error for client-facing responses (SSE/JSON).
+ * Our own intentional messages pass through; anything that looks like a raw internal/library error
+ * (PostgREST/Postgres, a vendor name, a network/system code, a file path, or a stack trace) is
+ * replaced with a generic line so we never leak the DB, schema, vendors, or server paths.
+ */
+const _INTERNAL_ERR = [
+  /coerce the result/i,
+  /\bPGRST\d+/i,
+  /violates .* constraint|duplicate key|permission denied|relation .* does not exist|column .* does not exist|null value in column/i,
+  /\b(openai|anthropic|elevenlabs|razorpay|supabase|postgrest|puppeteer|ffmpeg|fal\.ai|pixabay|pexels|whisper|nano banana|pixverse)\b/i,
+  /\b(ENOENT|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ECONNRESET|getaddrinfo|socket hang up)\b/i,
+  /\n\s+at\s/,
+  /([A-Za-z]:\\|\/(app|home|usr|src|var|node_modules)\/)/,
+];
+export function safeMessage(err, fallback = "Something went wrong. Please try again.") {
+  const msg = typeof err === "string" ? err : (err?.message || "");
+  if (!msg) return fallback;
+  if (msg.length > 200) return fallback;
+  if (_INTERNAL_ERR.some((re) => re.test(msg))) return fallback;
+  return msg;
+}
+
 export const upload = multer({ dest: TEMP_DIR });
 export const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 // Sample uploads can be short videos, which are legitimately larger than images.

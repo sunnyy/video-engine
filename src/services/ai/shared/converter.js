@@ -194,6 +194,29 @@ function collectInPage(cw, ch) {
     if (r.width <= 0 && r.height <= 0) continue;
     const cs = getComputedStyle(el);
 
+    // Typography can live on text-bearing CHILDREN while the data-role sits on a layout
+    // WRAPPER — e.g. <div data-role="headline"><div class="headline-line">…</div></div>,
+    // where the font-family/size are on .headline-line, not the wrapper. Reading the
+    // wrapper's own computed font then yields the inherited page default (16px) and the
+    // headline renders tiny inside a correctly-measured (large) box. So when the element
+    // has no direct text of its own, read the font fields from the first descendant that
+    // actually holds text. (When the role element carries the text directly, tcs === cs.)
+    const tcs = (() => {
+      const hasDirectText = (node) => {
+        for (const c of node.childNodes) if (c.nodeType === 3 && c.textContent.trim()) return true;
+        return false;
+      };
+      if (hasDirectText(el)) return cs;
+      for (const d of el.querySelectorAll("*")) if (hasDirectText(d)) return getComputedStyle(d);
+      return cs;
+    })();
+
+    // writing-mode vertical (left/right rail labels) rotates the glyph run 90° off
+    // horizontal, but that is NOT a transform — it never shows up in the matrix below. Fold
+    // it into the rotation so the renderer (horizontal text + rotation) reproduces it, and
+    // flag it so the box width/height get swapped (text flows along the long axis).
+    const isVertical = /vertical|sideways/.test(cs.writingMode || "");
+
     // rotation from the computed transform matrix
     let rotation = 0;
     const tr = cs.transform;
@@ -201,6 +224,7 @@ function collectInPage(cw, ch) {
       const m = tr.match(/matrix\(([^)]+)\)/);
       if (m) { const p = m[1].split(",").map(parseFloat); rotation = Math.round(Math.atan2(p[1], p[0]) * 180 / Math.PI); }
     }
+    if (isVertical) rotation = ((rotation + 90) % 360 + 360) % 360;
 
     const bgImage = cs.backgroundImage && cs.backgroundImage !== "none" ? cs.backgroundImage : null;
     const bgColor = cs.backgroundColor && !/rgba?\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor) ? cs.backgroundColor : null;
@@ -238,20 +262,26 @@ function collectInPage(cw, ch) {
       exitDir:        el.getAttribute("data-exit-dir")  || el.getAttribute("data-dir") || null,
       motionIntensity: el.getAttribute("data-intensity") || null,
       text:         (el.innerText || "").trim(),
+      // Text from this element's OWN direct text nodes (NOT descendants). Lets us tell a real
+      // layout wrapper (text lives in tagged children) from a text element that merely contains a
+      // small decorative tagged child (e.g. a typed line + a <div data-role="divider"> cursor).
+      ownText:      Array.from(el.childNodes).filter(c => c.nodeType === 3).map(c => c.textContent).join(" ").replace(/\s+/g, " ").trim(),
       rect:         { x: r.x, y: r.y, width: r.width, height: r.height },
       offsetW:      el.offsetWidth,
       offsetH:      el.offsetHeight,
       rotation,
+      vertical:     isVertical,
+      // Font fields come from tcs (the text-bearing element); everything else from el's own cs.
       css: {
-        color:          cs.color,
-        fontFamily:     cs.fontFamily,
-        fontSize:       parseFloat(cs.fontSize) || 0,
-        fontWeight:     parseInt(cs.fontWeight, 10) || 400,
-        letterSpacing:  cs.letterSpacing === "normal" ? 0 : (parseFloat(cs.letterSpacing) || 0),
-        lineHeightPx:   cs.lineHeight === "normal" ? null : (parseFloat(cs.lineHeight) || null),
-        textAlign:      cs.textAlign,
-        textTransform:  cs.textTransform,
-        textShadow:     cs.textShadow === "none" ? null : cs.textShadow,
+        color:          tcs.color,
+        fontFamily:     tcs.fontFamily,
+        fontSize:       parseFloat(tcs.fontSize) || 0,
+        fontWeight:     parseInt(tcs.fontWeight, 10) || 400,
+        letterSpacing:  tcs.letterSpacing === "normal" ? 0 : (parseFloat(tcs.letterSpacing) || 0),
+        lineHeightPx:   tcs.lineHeight === "normal" ? null : (parseFloat(tcs.lineHeight) || null),
+        textAlign:      tcs.textAlign,
+        textTransform:  tcs.textTransform,
+        textShadow:     tcs.textShadow === "none" ? null : tcs.textShadow,
         backgroundClip: cs.webkitBackgroundClip || cs.backgroundClip || null,
         bgImage, bgColor,
         borderRadius:   borderRadiusPx,
@@ -371,11 +401,14 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     }
     // text living directly in a gradient-typed element with no child roles
     if (type === "gradient" && n.text && !n.hasRoleChildren) type = "text";
-    // A container (has data-role descendants) must NOT render text — its innerText
-    // includes the children's text, which would double/overlap with the child layers.
-    // Keep it only if it carries a real background; otherwise it's a layout wrapper.
+    // A container (has data-role descendants) must NOT render its full innerText — that includes
+    // the children's text and would double/overlap with the child layers. BUT if the element has
+    // its OWN direct text (e.g. a typed line that also holds a tiny <div data-role="divider">
+    // cursor), that text is real and belongs to THIS layer — keep it, rendering only its own text
+    // (the children stay separate layers). Only a true wrapper (no own text) is dropped/treated as bg.
     if (type === "text" && n.hasRoleChildren) {
-      if (n.css.bgImage || n.css.bgColor) { type = "gradient"; }
+      if (n.ownText) { n.text = n.ownText; }
+      else if (n.css.bgImage || n.css.bgColor) { type = "gradient"; }
       else { continue; }
     }
 
@@ -384,9 +417,12 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     // store the UNROTATED size (offsetWidth/Height) centered on the measured box's
     // center — otherwise rotated elements are double-transformed (wrong pos + size).
     let x, y, width, height;
-    if (n.rotation && n.offsetW && n.offsetH) {
-      width  = Math.round(n.offsetW);
-      height = Math.round(n.offsetH);
+    if ((n.rotation || n.vertical) && n.offsetW && n.offsetH) {
+      // Store the UNROTATED horizontal box. For vertical writing-mode the text run is the
+      // element's HEIGHT (long axis) and its thickness is the WIDTH — swap them so the
+      // horizontal text layer is wide enough not to wrap, then rotation lays it back vertical.
+      width  = Math.round(n.vertical ? n.offsetH : n.offsetW);
+      height = Math.round(n.vertical ? n.offsetW : n.offsetH);
       x = Math.round(n.rect.x + n.rect.width  / 2 - width  / 2);
       y = Math.round(n.rect.y + n.rect.height / 2 - height / 2);
     } else {
@@ -426,8 +462,9 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
 
       // Width safety: round UP + a few px so sub-pixel rounding or any tiny metric drift
       // can never force a one-line headline to wrap at render (tight boxes were causing
-      // the "Bold Style," / "Crafted for" overlap). Capped to the frame.
-      entry.width = Math.min(canvasW - x, entry.width + 4);
+      // the "Bold Style," / "Crafted for" overlap). Capped to the frame. (Horizontal text
+      // only — see the !n.vertical guard on the fit block below.)
+      if (!n.vertical) entry.width = Math.min(canvasW - x, entry.width + 4);
 
       // Gradient TEXT (background:gradient + background-clip:text + transparent fill)
       // must go in `color` so the renderer clips it to the glyphs. Otherwise the
@@ -460,38 +497,45 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
       // padding piles up on the right. Center it to restore the pill's symmetry.
       if (entry.style.background) entry.style.textAlign = "center";
 
-      // Text-fit safety buffer. The headless measurement and the editor/Remotion
-      // render can disagree by a few sub-pixels on text width (font hinting +
-      // rounding). When the measured box is tight to a single line, that drift
-      // makes the LAST word wrap — and because text uses auto-height, the now
-      // two-line block grows and overlaps its neighbours. Widen the box by a
-      // small, font-size-proportional amount so single-line text stays on one
-      // line. Grow it according to alignment so the text doesn't visually shift.
-      const wrapBuffer = Math.ceil((n.css.fontSize || 16) * 0.14) + 2;
-      const ta = entry.style.textAlign;
-      if (ta === "center") { entry.x -= Math.round(wrapBuffer / 2); entry.width += wrapBuffer; }
-      else if (ta === "right" || ta === "end") { entry.x -= wrapBuffer; entry.width += wrapBuffer; }
-      else { entry.width += wrapBuffer; }
+      // The text-fit buffer + clamps below all assume an AXIS-ALIGNED HORIZONTAL box.
+      // A vertical (writing-mode) label's box was stored as the rotated run (wide) centered
+      // on its rail; widening/clamping it to the canvas would move its rotation center off
+      // the rail and shrink the font against the wrong axis. Its box is already correct, so
+      // skip the horizontal fit pass entirely for vertical text.
+      if (!n.vertical) {
+        // Text-fit safety buffer. The headless measurement and the editor/Remotion
+        // render can disagree by a few sub-pixels on text width (font hinting +
+        // rounding). When the measured box is tight to a single line, that drift
+        // makes the LAST word wrap — and because text uses auto-height, the now
+        // two-line block grows and overlaps its neighbours. Widen the box by a
+        // small, font-size-proportional amount so single-line text stays on one
+        // line. Grow it according to alignment so the text doesn't visually shift.
+        const wrapBuffer = Math.ceil((n.css.fontSize || 16) * 0.14) + 2;
+        const ta = entry.style.textAlign;
+        if (ta === "center") { entry.x -= Math.round(wrapBuffer / 2); entry.width += wrapBuffer; }
+        else if (ta === "right" || ta === "end") { entry.x -= wrapBuffer; entry.width += wrapBuffer; }
+        else { entry.width += wrapBuffer; }
 
-      // Text-fit guard that PRESERVES the designer's composition. The headless
-      // measure can size a box to its (narrower) measured text, so the longest word
-      // breaks mid-way at the final render font ("OUTSIDE" -> "OUTSI DE"). Fix by
-      // scaling the FONT down to fit the box AS-IS — keep the box's position/width so
-      // left/right panel and column layouts survive (do NOT widen the box to full
-      // canvas, which yanks panel text to the centre). Only when the box itself runs
-      // past the canvas do we clamp its width + re-anchor it inside the frame.
-      const FIT_PAD = Math.round(canvasW * 0.03);
-      const maxTextW = canvasW - FIT_PAD * 2;
-      if (entry.width > maxTextW) entry.width = maxTextW;
-      const fsNow = entry.style.fontSize || 48;
-      const longestWord = (entry.text || "").split(/\s+/).filter(Boolean)
-        .reduce((a, w) => (w.length > a.length ? w : a), "");
-      const wordNeed = Math.ceil(longestWord.length * fsNow * 0.6); // safe upper bound for display glyphs
-      if (wordNeed > entry.width) {
-        entry.style.fontSize = Math.max(20, Math.floor(fsNow * entry.width / wordNeed));
+        // Text-fit guard that PRESERVES the designer's composition. The headless
+        // measure can size a box to its (narrower) measured text, so the longest word
+        // breaks mid-way at the final render font ("OUTSIDE" -> "OUTSI DE"). Fix by
+        // scaling the FONT down to fit the box AS-IS — keep the box's position/width so
+        // left/right panel and column layouts survive (do NOT widen the box to full
+        // canvas, which yanks panel text to the centre). Only when the box itself runs
+        // past the canvas do we clamp its width + re-anchor it inside the frame.
+        const FIT_PAD = Math.round(canvasW * 0.03);
+        const maxTextW = canvasW - FIT_PAD * 2;
+        if (entry.width > maxTextW) entry.width = maxTextW;
+        const fsNow = entry.style.fontSize || 48;
+        const longestWord = (entry.text || "").split(/\s+/).filter(Boolean)
+          .reduce((a, w) => (w.length > a.length ? w : a), "");
+        const wordNeed = Math.ceil(longestWord.length * fsNow * 0.6); // safe upper bound for display glyphs
+        if (wordNeed > entry.width) {
+          entry.style.fontSize = Math.max(20, Math.floor(fsNow * entry.width / wordNeed));
+        }
+        if (entry.x < FIT_PAD) entry.x = FIT_PAD;
+        else if (entry.x + entry.width > canvasW - FIT_PAD) entry.x = Math.max(FIT_PAD, canvasW - FIT_PAD - entry.width);
       }
-      if (entry.x < FIT_PAD) entry.x = FIT_PAD;
-      else if (entry.x + entry.width > canvasW - FIT_PAD) entry.x = Math.max(FIT_PAD, canvasW - FIT_PAD - entry.width);
     } else if (type === "gradient") {
       entry.background = n.css.bgImage || n.css.bgColor || null;
     } else if (type === "image") {
@@ -595,6 +639,46 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
 
   // No element-count cap: it amputated legit dense scenes (cards, the clock pattern).
   // Over-building is handled upstream (asset guard, screen-time budget, beat split).
+
+  // ── Collapse stacked duplicate text (RGB-split / layered-shadow glitch) ───────
+  // GPT sometimes builds a headline as several IDENTICAL <hN> copies stacked in one spot —
+  // an offset red + cyan + white "chromatic aberration" glitch (mix-blend-mode + clip-path +
+  // a few px translate). In a browser those fuse into one glitchy headline, but our flatten
+  // drops the clip-paths/offsets that fused them, so they become 2-3 separated colored copies
+  // of the same words (each its own animated layer). Keep ONE — the normally-drawn base (no
+  // blend mode, drawn on top) — and drop the decorative duplicates.
+  {
+    const norm = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+    const overlaps = (a, b) => {
+      const ix = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const iy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      if (ix <= 0 || iy <= 0) return false;
+      const minArea = Math.min(a.width * a.height, b.width * b.height) || 1;
+      return (ix * iy) > minArea * 0.6; // boxes mostly coincide → same logical text
+    };
+    // Of two duplicates, the "real" text is the one drawn normally: no blend mode wins, else
+    // the topmost (highest z), else keep the first seen.
+    const base = (a, b) => {
+      if (!!a.mixBlendMode !== !!b.mixBlendMode) return a.mixBlendMode ? b : a;
+      if (a.zIndex !== b.zIndex) return a.zIndex > b.zIndex ? a : b;
+      return a;
+    };
+    const kept = [];
+    const drop = new Set();
+    for (const e of graph) {
+      if (e.type !== "text" || !norm(e.text)) continue;
+      const twin = kept.find(k => norm(k.text) === norm(e.text) && overlaps(k, e));
+      if (!twin) { kept.push(e); continue; }
+      const winner = base(twin, e);
+      const loser  = winner === twin ? e : twin;
+      drop.add(loser.id);
+      if (loser === twin) kept[kept.indexOf(twin)] = e; // e became the survivor
+    }
+    if (drop.size) {
+      graph = graph.filter(e => !drop.has(e.id));
+      console.log(`[htmlMeasure] scene ${sceneIndex} — collapsed ${drop.size} stacked duplicate text layer(s)`);
+    }
+  }
 
   // Text-over-container guard: when flattening, a card/panel can end up with a higher
   // z than the text it visually CONTAINS (e.g. an explicit-z card → 100+ band, while its

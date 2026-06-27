@@ -12,6 +12,8 @@
  * premium, measured HTML/CSS. No flat-pixel contract, no overflow math.
  */
 
+import { RENDERER_CONSTRAINTS } from "../shared/designConstraints.js";
+
 // Canvas W/H are per-call (orientation-driven) — derived inside buildProductScenePrompt.
 
 // What each scene is FOR — energy/role, not a layout template. Gives the designer
@@ -177,6 +179,7 @@ TAG every meaningful element (layout wrappers don't need tags):
 - data-animation: fade-in | fade-up | scale-in | slide-left | none   (animate at least 2 elements)
 - data-scene-element: hero | supporting | decoration
 Only REAL tagged elements render — no ::before/::after.
+${RENDERER_CONSTRAINTS}
 
 OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 

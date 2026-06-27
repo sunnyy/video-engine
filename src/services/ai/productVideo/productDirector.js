@@ -170,7 +170,7 @@ export async function generateProductPlan(productImageUrl, params = {}) {
       response = await openai.chat.completions.create({
         model:       "gpt-4.1",
         temperature: 0.7,
-        max_tokens:  3000,
+        max_tokens:  6000, // scenes JSON — headroom so more/denser scenes don't truncate
         messages: [
           { role: "system", content: system },
           { role: "user", content: [

@@ -165,7 +165,7 @@ Topic: "${input.trim()}"`;
 
   const completion = await openai.chat.completions.create({
     model:                 "gpt-4.1",
-    max_completion_tokens: 3000,
+    max_completion_tokens: 8000, // scenes+beats JSON grows with duration — headroom so it doesn't truncate
     response_format:       { type: "json_object" },
     messages: [
       { role: "system", content: SCRIPT_SYSTEM + styleBlock + themeBlock },

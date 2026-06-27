@@ -1,4 +1,5 @@
 import { supabaseAdmin }               from "../../../server/middleware/shared.js";
+import { simplifyTimelineKeyframes }    from "../shared/motion.js";
 import { generateTypographyScript }     from "./scriptGenerator.js";
 import { buildTypographyTimelineDirect } from "./timelineBuilderDirect.js";
 import { generateFullVoiceover }         from "../saasVideo/ttsGenerator.js";
@@ -101,6 +102,8 @@ function orientationToCanvas(orientation) {
 }
 
 async function saveTimeline(timeline, projectName, userId, orientation = "9:16") {
+  // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
+  simplifyTimelineKeyframes(timeline);
   const { data: row, error } = await supabaseAdmin
     .from("projects")
     .insert({

@@ -269,7 +269,7 @@ NARRATION (segment this exactly, verbatim, in order):
   const response = await openai.chat.completions.create({
     model:           "gpt-4.1",
     temperature:     0.6,
-    max_tokens:      2500,
+    max_tokens:      8000, // beats JSON segmented from the full narration — grows with duration; headroom
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM },

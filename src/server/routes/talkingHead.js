@@ -1,5 +1,5 @@
 import express from "express";
-import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
+import { requireAuth, deductCredits, addCredits, safeMessage } from "../middleware/shared.js";
 import { runTalkingHeadPipeline } from "../../services/ai/talkingHead/pipelineOrchestrator.js";
 import { creditsForTalkingHead } from "../../core/utils/creditCosts.js";
 
@@ -71,7 +71,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Talking Head failed").catch(() => {});
     }
     console.error("[talking-head/generate]", err);
-    send({ error: err.message, code: err.code });
+    send({ error: safeMessage(err), code: err.code });
     res.end();
   }
 });

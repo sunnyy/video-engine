@@ -1,5 +1,5 @@
 import express from "express";
-import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
+import { requireAuth, deductCredits, addCredits, safeMessage } from "../middleware/shared.js";
 import { runProductVideoPipeline, planProductVideo } from "../../services/ai/productVideo/pipelineOrchestrator.js";
 import { scrapeProductUrl } from "../../services/ai/productVideo/productScraper.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
@@ -92,7 +92,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   } catch (err) {
     if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: Product Video failed").catch(() => {});
     console.error("[product-video/generate]", err);
-    send({ error: err.message, code: err.code });
+    send({ error: safeMessage(err), code: err.code });
     res.end();
   }
 });

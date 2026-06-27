@@ -146,6 +146,75 @@ export function expandEmphasis(intent, ctx) {
   return build({ ...ctx, holdStart, holdEnd });
 }
 
+// ── Keyframe simplification ─────────────────────────────────────────────────────
+// We SAMPLE eased curves into many keyframes (linear playback traces the curve). But a lot
+// of that output is redundant: tracks that never move (e.g. y stays constant) still emit a
+// full point set, and gentle eases are over-sampled. Thousands of these bog down the editor
+// preview. This pass removes ONLY points that don't change the rendered (piecewise-linear)
+// result, so motion looks identical — just with far fewer keyframes.
+//
+//  - Ramer–Douglas–Peucker per track: drop any point within `eps` of the straight line between
+//    its kept neighbours. A constant track collapses to its 2 endpoints; a real eased curve
+//    keeps the points that define its shape (overshoot peaks, accel, etc.).
+//  - opacity/blur that move in ONE direction (a plain fade) collapse to 2 points — a linear
+//    fade is visually identical to an eased one, so the middle points buy nothing. (Oscillating
+//    opacity/blur — e.g. flicker — is non-monotonic and is preserved by RDP.)
+const KF_EPS = { x: 1.5, y: 1.5, scale: 0.012, rotation: 0.6, opacity: 0.04, blur: 0.5 };
+
+function rdpTrack(points, eps) {
+  if (points.length <= 2) return points;
+  const a = points[0], b = points[points.length - 1];
+  const dt = b.time - a.time;
+  let maxDev = 0, idx = -1;
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i];
+    const chord = dt === 0 ? a.value : a.value + (b.value - a.value) * ((p.time - a.time) / dt);
+    const dev = Math.abs(p.value - chord);
+    if (dev > maxDev) { maxDev = dev; idx = i; }
+  }
+  if (maxDev <= eps) return [a, b];
+  const left  = rdpTrack(points.slice(0, idx + 1), eps);
+  const right = rdpTrack(points.slice(idx), eps);
+  return [...left.slice(0, -1), ...right];
+}
+
+const isMonotonic = (vals) => {
+  let up = true, down = true;
+  for (let i = 1; i < vals.length; i++) {
+    if (vals[i] > vals[i - 1] + 1e-6) down = false;
+    if (vals[i] < vals[i - 1] - 1e-6) up = false;
+  }
+  return up || down;
+};
+
+export function simplifyKeyframes(kf) {
+  if (!kf || typeof kf !== "object") return kf;
+  const out = {};
+  for (const [prop, arr] of Object.entries(kf)) {
+    if (!Array.isArray(arr) || arr.length <= 2) { out[prop] = arr; continue; }
+    if ((prop === "opacity" || prop === "blur") && isMonotonic(arr.map(k => k.value))) {
+      out[prop] = [arr[0], arr[arr.length - 1]]; // plain fade → 2 points (visually identical)
+      continue;
+    }
+    out[prop] = rdpTrack(arr, KF_EPS[prop] ?? 0.01);
+  }
+  return out;
+}
+
+// Apply simplifyKeyframes to every layer of a built timeline (in place). One call per pipeline.
+export function simplifyTimelineKeyframes(timeline) {
+  let before = 0, after = 0;
+  for (const l of timeline?.layers ?? []) {
+    if (!l.keyframes) continue;
+    const count = (k) => Object.values(k).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0);
+    before += count(l.keyframes);
+    l.keyframes = simplifyKeyframes(l.keyframes);
+    after += count(l.keyframes);
+  }
+  if (before !== after) console.log(`[motion] keyframe simplify: ${before} → ${after} (-${before - after})`);
+  return timeline;
+}
+
 export const ENTER_TYPES    = Object.keys(ENTER);
 export const EXIT_TYPES     = Object.keys(EXIT);
 export const EMPHASIS_TYPES = Object.keys(EMPHASIS);

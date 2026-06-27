@@ -1,5 +1,5 @@
 import express from "express";
-import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
+import { requireAuth, deductCredits, addCredits, safeMessage } from "../middleware/shared.js";
 import { runSocialPipeline, planSocial, produceSocial } from "../../services/ai/socialVideo/pipelineOrchestrator.js";
 import { moderateInput } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
@@ -46,7 +46,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Social video failed").catch(() => {});
     }
     console.error("[social-video/generate]", err);
-    send({ error: err.message });
+    send({ error: safeMessage(err) });
     res.end();
   }
 });
@@ -108,7 +108,7 @@ router.post("/produce", requireAuth, async (req, res) => {
   } catch (err) {
     if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Social video failed").catch(() => {});
     console.error("[social-video/produce]", err);
-    send({ error: err.message });
+    send({ error: safeMessage(err) });
     res.end();
   }
 });

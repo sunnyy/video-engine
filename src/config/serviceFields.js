@@ -101,7 +101,7 @@ export const SERVICE_FIELDS = {
     shared: {
       style:         { options: VISUAL_STYLE_OPTIONS, default: "auto" },   // shared visual styles
       voiceLanguage: { default: { language: "en", voiceId: null } },
-      duration:      { options: [{ id: 20, label: "20s" }, { id: 30, label: "30s" }, { id: 45, label: "45s" }], default: 30 },
+      duration:      { options: [{ id: 30, label: "30s" }, { id: 45, label: "45s" }, { id: 60, label: "60s" }], default: 30 },
       orientation:   { default: "9:16" },
     },
   },

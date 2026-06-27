@@ -13,9 +13,12 @@
  * htmlMeasure flattens the result. No flat-pixel contract, no overflow math.
  */
 
+import { RENDERER_CONSTRAINTS } from "../shared/designConstraints.js";
+
 export function buildSocialScenePrompt(visualText, sceneContext) {
   const {
     sceneIntent      = "scene",
+    entranceHint     = "fade-up",
     creativeBrief    = "",
     visualConcept    = "",
     hasFetchedImage  = false,
@@ -49,9 +52,11 @@ FONTS (load via @import): hero/display "${heroFont}" · body "${bodyFont}".
 Tag every MEANINGFUL element (these become animated layers; layout wrappers don't need tags):
 - data-role: headline | subhead | stat | quote | attribution | badge | label | cta | card | divider | glow | icon | background | image-placeholder
 - data-layer: text | gradient | image | effect | decoration
-- data-animation: fade-in | fade-up | scale-in | slide-left | none   (animate at least 2 elements)
+- data-animation: fade-in | fade-up | scale-in | slide-left | slide-right | none   (animate at least 2 elements, staggered)
 - data-scene-element: hero | background | supporting | decoration
-TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colors/gradients inside a text block. Only REAL tagged elements render — no ::before/::after. Spell every word EXACTLY as given. A glow is a <div> radial-gradient + blur with NO text inside. A CTA/button is ONE element (bg+padding+radius on the text element, white-space:nowrap).
+ENTRANCE: lead THIS scene's hero with data-animation="${entranceHint}" (entrances are rotated scene-to-scene for rhythm — honor it), and stagger the supporting elements in after it.
+${RENDERER_CONSTRAINTS}
+Spell every word EXACTLY as given. A glow is a <div> radial-gradient + blur with NO text inside. A CTA/button is ONE element (bg+padding+radius on the text element, white-space:nowrap).
 NEVER print the scene's intent/role as visible text. Words like "Hook", "Fact", "Reveal", "Setup", "Payoff", "Stat", "CTA", "Turn", "Side A/B" are INTERNAL direction — they must NOT appear on screen. A kicker/badge/label, if used, must be REAL content (a topic tag, source, or short phrase from the brief), never the intent keyword. Only ever render the DISPLAY TEXT given below.
 
 ABSOLUTE PROHIBITIONS (violating any invalidates the scene):

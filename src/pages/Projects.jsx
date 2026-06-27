@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProjectsStore } from "../store/useProjectsStore";
+import { deleteProject } from "../services/projects/projectService";
 import AppLayout from "../ui/AppLayout";
+import { showToast } from "../ui/Toast";
 
 /**
  * Projects — the home for the user's videos (moved out of the Dashboard hub).
@@ -58,9 +60,26 @@ function previewFor(project) {
 
 function Card({ project }) {
   const navigate = useNavigate();
+  const removeProject = useProjectsStore(s => s.removeProject);
   const [hov, setHov] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const preview = previewFor(project);
   const href = `/video-editor/${project.id}`;
+
+  const handleDelete = async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (deleting) return;
+    if (!window.confirm(`Delete "${project.name || "Untitled"}"? This can't be undone.`)) return;
+    setDeleting(true);
+    try {
+      await deleteProject(project.id);
+      removeProject(project.id);
+      showToast("Project deleted", "success");
+    } catch {
+      setDeleting(false);
+      showToast("Couldn't delete the project — please try again.");
+    }
+  };
   return (
     <a
       href={href}
@@ -81,6 +100,21 @@ function Card({ project }) {
           </div>
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}><span style={{ fontSize: 28, opacity: 0.35 }}>🎬</span></div>
+        )}
+        {(hov || deleting) && (
+          <button onClick={handleDelete} title="Delete project" disabled={deleting} aria-label="Delete project"
+            style={{ position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: 8, border: "none", cursor: deleting ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(8,10,16,0.8)", color: "#f87171", backdropFilter: "blur(4px)", zIndex: 2 }}>
+            {deleting ? (
+              <span style={{ fontSize: 14, lineHeight: 1 }}>…</span>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            )}
+          </button>
         )}
       </div>
       <div style={{ padding: "10px 12px" }}>

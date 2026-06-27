@@ -20,6 +20,7 @@
  */
 
 import { styleDirectiveBlock } from "./styleSystem.js";
+import { RENDERER_CONSTRAINTS } from "../shared/designConstraints.js";
 
 // ── Content spec block — the information the frame must carry ───────────────
 function contentBlock(beat) {
@@ -78,7 +79,8 @@ export function buildBeatPrompt(beat, ctx) {
 TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Spell every word EXACTLY as given; minimum readable font ~26px.
 NO PSEUDO-ELEMENTS — our renderer DROPS ::before and ::after entirely (and any content:"" decoration). EVERY visible mark must be its OWN real tagged element: build glows, halos, ring highlights, accent arcs/sweeps, underlines, lines, dots, sparkles, and gradient overlays as actual <div>s with data-role/data-layer (e.g. a glow = a <div data-role="glow" data-layer="effect"> radial-gradient). If you draw an accent with ::before/::after it will VANISH in the render — never rely on it.
 CONTENT-FIRST — NO ORPHAN DECORATION (the #1 thing that makes frames look amateur and cluttered). EVERY element must BELONG to the content: it either IS content, HOLDS content (a card / panel / chart / mockup wrapped around real content), or DIRECTLY structures content (an accent underline beneath a heading, a divider between two related blocks, the connectors/nodes of a diagram that link labels). BANNED as standalone "design" — these are exactly what makes frames look horrific: free-floating lines / bars / rules in the margins, lone outline circles / rings / dots, arrows that don't point from one labelled thing to another, scattered ticks / sparkles / confetti, corner doodads, and decorative kicker / badge / chip / "01" pills used as garnish. If a shape is not part of a content structure, it does not belong — delete it. Negative space is PREMIUM, never something to fill with shapes.
-NEVER print the beat's internal kind/role as visible text — words like "Hook", "Fact", "Stat", "Quote", "List", "CTA", "Title", "Reveal" are internal direction, never on screen. Render only the real CONTENT strings.`;
+NEVER print the beat's internal kind/role as visible text — words like "Hook", "Fact", "Stat", "Quote", "List", "CTA", "Title", "Reveal" are internal direction, never on screen. Render only the real CONTENT strings.
+${RENDERER_CONSTRAINTS}`;
 
   if (isOverlay) {
     // ── OVERLAY MODE ────────────────────────────────────────────────────────

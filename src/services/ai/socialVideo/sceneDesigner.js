@@ -3,12 +3,16 @@ import { buildSocialScenePrompt } from "./intentPrompts.js";
 
 const MODEL = "gpt-5.4";
 
+// Rotate the hero's entrance per scene so the video doesn't slide-up-fade on every cut.
+const ENTRANCE_POOL = ["fade-up", "scale-in", "slide-left", "slide-right", "fade-in"];
+
 export async function designSocialScene(scene, projectContext, attempt = 1) {
   const isCta          = scene.intent === "cta";
   const showAttribution = isCta && projectContext.includeAuthor === true;
 
   const { system, user } = buildSocialScenePrompt(scene.visual_text || scene.script_segment, {
     sceneIntent:     scene.intent,
+    entranceHint:    ENTRANCE_POOL[(scene.scene_index ?? 0) % ENTRANCE_POOL.length],
     creativeBrief:   scene.creative_brief  ?? scene.visual_concept ?? "",
     visualConcept:   scene.visual_concept  ?? "",
     hasFetchedImage: !!scene.resolvedImage,

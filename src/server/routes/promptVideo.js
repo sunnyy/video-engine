@@ -1,5 +1,5 @@
 import express from "express";
-import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
+import { requireAuth, deductCredits, addCredits, safeMessage } from "../middleware/shared.js";
 import { runPromptPipeline, runPromptPlan } from "../../services/ai/promptVideo/pipelineOrchestrator.js";
 import { creditsForDuration } from "../../core/utils/creditCosts.js";
 
@@ -79,7 +79,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: AI Video failed").catch(() => {});
     }
     console.error("[ai-video/generate]", err);
-    send({ error: err.message });
+    send({ error: safeMessage(err) });
     res.end();
   }
 });

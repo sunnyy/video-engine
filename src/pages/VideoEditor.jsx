@@ -63,8 +63,9 @@ export default function VideoEditor() {
               .from("projects")
               .select("*")
               .eq("id", id)
-              .single();
+              .maybeSingle();
             if (fetchError) throw fetchError;
+            if (!data) { const e = new Error("not found"); e.code = "NOT_FOUND"; throw e; }
             setProjectId(data.id);
             // Backfill meta.source from the DB column so service detection (Publish button,
             // Back target) works even for projects saved before meta.source existed.
@@ -75,7 +76,11 @@ export default function VideoEditor() {
         }
       } catch (err) {
         console.error("[VideoEditor] Load error:", err);
-        setError(err.message);
+        // Show a friendly message — never surface raw DB/PostgREST errors (leaks the stack).
+        const notFound = err.code === "NOT_FOUND" || err.code === "PGRST116";
+        setError(notFound
+          ? "This project no longer exists — it may have been deleted."
+          : "We couldn't open this project. Please try again.");
       } finally {
         setLoading(false);
         initialLoad.current = false;

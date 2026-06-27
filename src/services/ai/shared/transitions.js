@@ -19,10 +19,11 @@ export const TRANSITION_MAP = {
   zoom:         { out: "none",       in: "zoom-in" },
   "slide-left": { out: "slide-left", in: "slide-left" },
   "slide-up":   { out: "slide-up",   in: "slide-up" },
+  "slide-down": { out: "slide-down", in: "slide-down" },
   fade:         { out: "none",       in: "fade" },
 };
 
-export const TRANSITION_POOL = ["fade", "slide-left", "zoom", "slide-up"];
+export const TRANSITION_POOL = ["fade", "slide-left", "zoom", "slide-up", "slide-down"];
 
 /**
  * applyTransitions(layers, scenes)

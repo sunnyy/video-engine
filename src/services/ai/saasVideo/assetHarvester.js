@@ -123,16 +123,20 @@ function extractCopy(root, pageUrl) {
 // ── Screenshots via puppeteer ─────────────────────────────────────────────────────
 
 async function captureScreenshots(url, runId) {
+  // Returns { urls, copy }. `copy` is text extracted from the RENDERED DOM (so SPAs — whose static
+  // HTML is an empty shell — still yield real headlines/bullets/body for script grounding). Free:
+  // we already load the page here for screenshots.
   // SSRF: puppeteer would navigate to ANY host (incl. internal). Validate before launching.
   try { await assertPublicUrl(url); }
-  catch (e) { console.warn("[promo/harvest] screenshot blocked (unsafe url):", e.message); return []; }
+  catch (e) { console.warn("[promo/harvest] screenshot blocked (unsafe url):", e.message); return { urls: [], copy: null }; }
 
   let puppeteer;
   try { puppeteer = (await import("puppeteer")).default; }
-  catch (e) { console.warn("[promo/harvest] puppeteer unavailable:", e.message); return []; }
+  catch (e) { console.warn("[promo/harvest] puppeteer unavailable:", e.message); return { urls: [], copy: null }; }
 
   let browser = null;
   const urls = [];
+  let rendered = null;
   try {
     browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] });
     const page = await browser.newPage();
@@ -146,6 +150,23 @@ async function captureScreenshots(url, runId) {
       for (const sel of kill) document.querySelectorAll(sel).forEach(el => { if (el.tagName !== "HTML" && el.tagName !== "BODY") el.style.display = "none"; });
     }).catch(() => {});
 
+    // Pull copy from the LIVE rendered DOM (the whole reason static extraction fails on SPAs).
+    rendered = await page.evaluate(() => {
+      const clean = (s, n = 200) => (s || "").replace(/\s+/g, " ").trim().slice(0, n);
+      const meta = (k) => document.querySelector(`meta[property="${k}"]`)?.content || document.querySelector(`meta[name="${k}"]`)?.content || null;
+      const headlines = [];
+      for (const sel of ["h1", "h2", "h3"]) for (const el of document.querySelectorAll(sel)) { const t = clean(el.innerText, 120); if (t && t.length >= 4 && !headlines.includes(t)) headlines.push(t); }
+      const bullets = [];
+      for (const li of document.querySelectorAll("li")) { const t = clean(li.innerText, 110); if (t && t.length >= 12 && t.length <= 110 && !/cookie|privacy|terms|login|sign in/i.test(t) && !bullets.includes(t)) bullets.push(t); }
+      return {
+        title:       clean(meta("og:title") || document.title, 120),
+        description: clean(meta("og:description") || meta("description"), 300),
+        headlines:   headlines.slice(0, 12),
+        bullets:     bullets.slice(0, 14),
+        bodyText:    document.body ? clean(document.body.innerText, 4000) : "",
+      };
+    }).catch(() => null);
+
     const heroBuf = await page.screenshot({ type: "png" });
     const heroUrl = await uploadBufferToStorage(heroBuf, `promo-video/${runId}/shot-hero-${Date.now()}.png`, "image/png");
     if (heroUrl) urls.push(heroUrl);
@@ -158,10 +179,10 @@ async function captureScreenshots(url, runId) {
       const midUrl = await uploadBufferToStorage(midBuf, `promo-video/${runId}/shot-mid-${Date.now()}.png`, "image/png");
       if (midUrl) urls.push(midUrl);
     }
-    return urls;
+    return { urls, copy: rendered };
   } catch (e) {
     console.warn("[promo/harvest] screenshot capture failed:", e.message);
-    return urls;
+    return { urls, copy: rendered };
   } finally {
     if (browser) { try { await browser.close(); } catch {} }
   }
@@ -209,8 +230,22 @@ export async function harvestAssets(url, runId) {
     console.warn("[promo/harvest] page fetch failed (non-fatal):", e.message);
   }
 
-  harvest.screenshotUrls = await captureScreenshots(url, runId);
+  const shot = await captureScreenshots(url, runId);
+  harvest.screenshotUrls = shot.urls;
   console.log(`[promo/harvest] screenshots: ${harvest.screenshotUrls.length}`);
+
+  // SPA fix: the static fetch above sees only an empty shell, so prefer the RENDERED-DOM copy
+  // whenever it came back richer. Without this, the script generator gets no real grounding and
+  // hallucinates the product (e.g. inventing "video messaging" for an AI-video tool).
+  const r = shot.copy;
+  if (r) {
+    if (!harvest.title && r.title)             harvest.title = r.title;
+    if (!harvest.description && r.description) harvest.description = r.description;
+    if ((r.headlines?.length ?? 0) > (harvest.headlines?.length ?? 0)) harvest.headlines = r.headlines;
+    if ((r.bullets?.length   ?? 0) > (harvest.bullets?.length   ?? 0)) harvest.bullets   = r.bullets;
+    if ((r.bodyText?.length  ?? 0) > (harvest.bodyText?.length  ?? 0)) harvest.bodyText  = r.bodyText;
+    console.log(`[promo/harvest] rendered copy: ${harvest.headlines.length} headlines, ${harvest.bullets.length} bullets, ${harvest.bodyText.length} body chars`);
+  }
 
   let brand = copy?.themeColor ? ensureVividAccent(normalizeHex(copy.themeColor, null), null) : null;
   if (!brand && harvest.logoUrl)           brand = await dominantColorFromImage(harvest.logoUrl);

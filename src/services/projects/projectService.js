@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { friendlyError } from "../friendlyError";
 
 // ── In-memory TTL cache (avoids redundant Supabase calls during a session) ────
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -54,9 +55,10 @@ export async function getProjectById(id) {
     .from("projects")
     .select("*")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
-  if (error) throw error;
+  if (error) throw new Error(friendlyError(error));
+  if (!data) throw new Error("This project no longer exists — it may have been deleted.");
   return data;
 }
 
@@ -259,10 +261,10 @@ export async function getRenderedVideo(projectId) {
     .from("projects")
     .select("rendered_video_url, last_rendered_at")
     .eq("id", projectId)
-    .single();
+    .maybeSingle();
 
-  if (error) throw error;
-  return data;
+  if (error) throw new Error(friendlyError(error));
+  return data; // may be null if the project is gone
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -304,8 +306,9 @@ export async function restoreProjectVersion(versionId) {
     .from("project_versions")
     .select("safe_project_json")
     .eq("id", versionId)
-    .single();
+    .maybeSingle();
 
-  if (error) throw error;
+  if (error) throw new Error(friendlyError(error));
+  if (!data) throw new Error("This version is no longer available.");
   return data.safe_project_json;
 }

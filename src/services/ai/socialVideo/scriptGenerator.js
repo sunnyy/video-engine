@@ -21,7 +21,7 @@ Before writing anything, work out:
 
 ━━━ STEP 2 — DESIGN THE VIDEO AROUND THAT ━━━
 Let the content dictate the structure. There is NO fixed scene pattern and NO required opening or closing.
-- YOU decide how many scenes (3–7), their order, and what each one does.
+- YOU decide the order and what each scene does; the NUMBER of scenes follows the post's content — one per point (see VIDEO FORMAT below).
 - The shape must match the story. Inspiration only, never rules:
     • a reveal builds curiosity, then drops the payoff hard
     • a comparison sets up two sides, then lets one win — or hands the choice to the viewer
@@ -31,20 +31,20 @@ Let the content dictate the structure. There is NO fixed scene pattern and NO re
 - Invent the structure that fits. Do not force a generic hook-then-CTA mold onto content that doesn't want one.
 - A call-to-action ending is OPTIONAL — use it only when it genuinely serves the piece. If you do end on a CTA, set that scene's intent to "cta".
 
-━━━ VIDEO FORMAT ━━━
-Duration 15–60s. Scale scene count to content volume:
-  - Short post (<100 words): 3–4 scenes
-  - Medium post (100–300 words): 4–5 scenes
-  - Long post (>300 words): 5–7 scenes
-  - Thread: up to 7 scenes — cover the full thread's key ideas
-Each scene's voiceover is a NATURAL, CONNECTED slice of ONE flowing narration — vary its length to the idea, never a fixed per-scene word count. The video AMPLIFIES the content — it does not invent new facts.
+━━━ VIDEO FORMAT — ONE SCENE PER POINT, COVER EVERYTHING ━━━
+Pull out EVERY distinct point, item, tip, step or idea the post makes. Give EACH ONE its OWN scene with its own visual — this is what creates variety and lets the viewer absorb one idea at a time. Then add a punchy opening HOOK scene and (when it fits) a short CTA.
+- COVER ALL of the post's content. NEVER merge several points into one scene, NEVER compress points into an on-screen list, NEVER distill multiple points into a summary, NEVER prioritise some and drop the rest. Every point earns its own scene.
+- Each scene carries ONE idea, and its spoken line is SHORT and punchy — at most ~8 words so the scene runs UNDER 4 seconds. Snappy, fast-cut pacing; no long lingering scenes.
+- Scene count follows the POST, not a fixed range: a 3-point post → ~5 scenes (hook + 3 + CTA); an 11-point post → ~13 scenes. There is NO scene cap — cover everything.
+- Aim to land near the target duration below. With many points the video fills the time naturally; it's fine to run a little over to keep every point — but keep EVERY scene tight (≤4s). NEVER pad a thin post with filler or repeat yourself to stretch the time.
+The video AMPLIFIES the content — it does not invent new facts.
 
 ━━━ VOICEOVER RULES ━━━
-- Write ONE flowing piece of spoken narration that reads like a person actually talking — connected sentences with natural connective tissue, NOT a list of clipped fragments read out. Then split it across scenes; each scene's segment continues naturally into the next. (A deliberate rapid-fire list is fine as ONE moment, never the whole script.)
+- The narration moves through the points, ONE per scene. Each scene's spoken line is SHORT and punchy (≤~8 words) and lands its ONE point cleanly. The lines still connect naturally scene to scene so it sounds like a person talking — not a robotic list — but keep every line tight enough to run under 4 seconds.
 - NEVER mention the author's name, username, or handle — not even a first name. The video is about the idea, not who said it.
 - Product names, tools, companies, and AI models from the post ARE allowed and should be used. When the post leads with a named product (e.g. "Claude = 550 videos/day"), USE that name in the opening — it is the hook.
 - NEVER mention the platform name (Twitter, X, Instagram, etc.) in any scene.
-- Size the WHOLE narration to the target duration given below (≈2.3 words/sec) — NOT by a per-scene word count. Let each scene's length follow its idea.
+- Each scene's spoken line is ≤~8 words (≈4 seconds at speaking pace). The whole video's length = all those short lines back to back, so it grows with the number of points — that is expected and good. Don't shrink the point count to hit a duration; cover every point.
 - Tone must match the content: inspiring, surprising, funny, informational, dramatic.
 
 ━━━ MEDIA STRATEGY (real imagery beats text-only when the content has a clear subject) ━━━
@@ -53,8 +53,9 @@ Each scene can carry ONE image, resolved cheapest-first by the pipeline. Set the
   subject_entity: "<exact Wikipedia article title>" → a REAL photo of a named person/company/product/place central to this scene (e.g. "Sam Altman", "OpenAI", "Mount Fuji"). ONLY real notable entities that have a Wikipedia page with a photo — never documents, events, or abstract ideas.
   stock_query: "<concrete searchable phrase>" → real-world footage/photo for a scene with no specific entity (e.g. "city traffic at night", "hands typing on laptop").
   stock_motion: true → pair with stock_query to use a short real VIDEO clip (b-roll with motion) instead of a still. Choose this for dynamic, atmospheric, or kinetic moments (flowing traffic, ocean waves, a busy crowd, typing hands, city timelapse). Leave false when a crisp still lands better.
-  none of these → a pure TYPE/GRAPHIC scene (headline, stat, quote, comparison, list, cta).
+  none of these → a pure TYPE/GRAPHIC scene for this ONE point (headline, stat, quote, comparison, cta) — never a multi-item list.
 Prefer real imagery for scenes with a clear visual subject; keep text/graphic scenes for claims, stats, and CTAs. Don't force an image onto a scene that lands harder as bold type. Set at most ONE of the three per scene.
+MIX FOR RHYTHM — abstract points (tips, steps, rules, warnings with NO concrete visual subject) should be bold TYPE/GRAPHIC scenes, NOT generic stock. Putting a stock photo behind every point makes every scene look identical (image + overlay text) and flat. Across the video, ALTERNATE: image scenes only where the point has a genuinely concrete, recognizable subject; everything else is a designed type/graphic frame. A list of abstract points should be mostly type/graphic, with images the exception — variety of layout is what makes it watchable.
 
 ━━━ PALETTE GUIDE ━━━
 Match the emotional tone:
@@ -66,7 +67,7 @@ Match the emotional tone:
   Drama/controversy → near-black (#08080E), violet accent (#E879F9)
 
 ━━━ PUNCTUATION & RHYTHM — controls TTS pacing ━━━
-- DEFAULT TO FLOWING connected sentences (commas, connectors like "and / but / so / which is why") so the voice sounds like a person talking, NOT bullet points being read out. A clipped period-separated rhythm ("Too slow. Too expensive. Too complicated.") is a tool for ONE deliberate punchy moment — never the whole script.
+- Each scene's line is SHORT but must still read naturally — use commas/connectors within the line so it sounds spoken, not a robotic staccato of single words. Lines connect from one scene to the next.
 - Periods end a complete statement; commas connect within a thought; em dash (—) is a dramatic pause between two contrasting beats ("Stuck for hours — done in seconds."); question marks for direct-address hooks.
 - CTA — use a comma for one continuous energetic thought, never an em dash: "Follow for more, save this now."
 
@@ -74,7 +75,7 @@ Match the emotional tone:
 For each scene you are briefing the art director who designs the actual frame. Give them:
 - intent: a short keyword in your own words for this scene's job ("reveal", "setup", "turn", "side-a", "side-b", "payoff", "stat", "cta", …). Invent what fits the story.
 - creative_brief: 1–2 sentences — what this scene DOES narratively AND how it should LOOK and FEEL (energy, focal point, motion feeling). This is the most important field; be vivid and specific so the art director can realize your vision.
-- visual_text: the exact text to DISPLAY on screen (can differ from voiceover — shorter, punchier). For a list, newline-separate the real items.
+- visual_text: the exact text to DISPLAY on screen for THIS one point — short and punchy (a few words / one line), distinct from the spoken line. One point per scene, so NEVER dump a multi-item list here — covering each point IS the job of its own scene.
 - script_segment: the spoken words for this scene.
 
 ━━━ OUTPUT — valid JSON only ━━━
@@ -134,52 +135,57 @@ export async function generateSocialScript({ content, targetDuration = 25, langu
       ? "Image available: 1 — use image_index: 0 for any scene using the image."
       : "Image available: false";
 
-  const wordCount  = postText.split(/\s+/).filter(Boolean).length;
-  const lengthNote = wordCount > 300 ? `\nPost length: ${wordCount} words — this is a long post, use 5–7 scenes to cover the key ideas.`
-                   : wordCount > 100 ? `\nPost length: ${wordCount} words.`
-                   : "";
-
   const langDirective     = LANGUAGE_DIRECTIVES[language] ?? "";
   const platformDirective = PLATFORM_TONE_DIRECTIVES[content.platform] ?? "";
 
-  // Final video length = spoken length, so anchor the narration to the target by word count
-  // (~2.3 words/sec) rather than letting it run long. The model decides scene count itself.
-  const wordBudget = Math.round(targetDuration * 2.3);
+  // Length comes from COVERAGE, not a word cap: one short scene per point. The target duration is a
+  // guide to aim near (cover all points snappily) — covering everything matters more than hitting it
+  // exactly. Each scene's spoken line must be ≤~8 words so no scene runs past ~4s (MAX_SCENE_WORDS).
+  const MAX_SCENE_WORDS = 11; // ~8 target + tolerance before we regenerate for snappier scenes
+  const wordCount  = postText.split(/\s+/).filter(Boolean).length;
+  const lengthNote = wordCount > 120
+    ? `\nThis post is ~${wordCount} words and packs several distinct points — give EACH point its own short scene; cover them ALL, do not merge or drop any.`
+    : "";
 
   const userText = `Post text:
 "${postText}"
 ${imageNote}
-Write a ~${targetDuration}-second narration — roughly ${wordBudget} words total across all scenes (the spoken length is the video length, so stay close to that).${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}${themeDirective(theme, accentColor, accentColor2)}`;
+TARGET DURATION: ~${targetDuration}s — aim near it, but COVERING EVERY POINT in the post matters more than hitting it exactly. Build ONE short scene per point (each spoken line ≤~8 words, under 4 seconds); the video's length follows the number of points. Do not pad a thin post to fill the time, and do not drop points to shorten it.${threadNote}${lengthNote}${platformDirective ? `\n${platformDirective}` : ""}${langDirective ? `\n${langDirective}` : ""}${themeDirective(theme, accentColor, accentColor2)}`;
 
-  const messages = [{ role: "system", content: SCRIPT_SYSTEM }];
+  const countWords = (s) => (typeof s === "string" ? s.split(/\s+/).filter(Boolean).length : 0);
 
-  if (imageUrls.length > 0) {
-    messages.push({
-      role: "user",
-      content: [
-        { type: "text", text: userText },
-        ...imageUrls.map(url => ({ type: "image_url", image_url: { url } })),
-      ],
-    });
-  } else {
-    messages.push({ role: "user", content: userText });
+  // One model call. `correction` (optional) is appended when a draft needs snappier scenes.
+  async function runModel(correction) {
+    const ut = correction ? `${userText}\n\n${correction}` : userText;
+    const messages = [{ role: "system", content: SCRIPT_SYSTEM }];
+    if (imageUrls.length > 0) {
+      messages.push({ role: "user", content: [{ type: "text", text: ut }, ...imageUrls.map(url => ({ type: "image_url", image_url: { url } }))] });
+    } else {
+      messages.push({ role: "user", content: ut });
+    }
+    // Cap sized for the LONGEST case: a 60s one-scene-per-point list can be 15-20 scenes, each with
+    // creative_brief + script_segment + visual_text + media fields. At 2500 the JSON truncated mid-array
+    // (parse error) for 60s videos. 8000 is a ceiling, not a cost — the model only emits what it needs.
+    const response = await openai.chat.completions.create({ model: "gpt-4.1", temperature: 0.6, max_tokens: 8000, messages });
+    const choice = response.choices[0];
+    const raw = (choice.message.content ?? "").trim();
+    try { return JSON.parse(raw); }
+    catch {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) { try { return JSON.parse(match[0]); } catch {} }
+      // A truncated (finish_reason="length") response can't be repaired — surface it clearly.
+      const why = choice.finish_reason === "length" ? " (response hit the token cap — increase max_tokens)" : "";
+      throw new Error(`socialScriptGenerator: JSON parse failed${why}\n${raw.slice(0, 300)}`);
+    }
   }
 
-  const response = await openai.chat.completions.create({
-    model:       "gpt-4.1",
-    temperature: 0.7,
-    max_tokens:  2000,
-    messages,
-  });
-
-  const raw = (response.choices[0].message.content ?? "").trim();
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) parsed = JSON.parse(match[0]);
-    else throw new Error(`socialScriptGenerator: JSON parse failed\n${raw.slice(0, 300)}`);
+  let parsed = await runModel(null);
+  // Enforce snappy ≤4s scenes: if any scene's spoken line is too long, regenerate ONCE asking it to
+  // split long scenes into more one-point scenes (keep coverage, just shorter). Cheap — pre-TTS.
+  const longScenes = (parsed.scenes || []).filter(s => countWords(s.script_segment) > MAX_SCENE_WORDS);
+  if (longScenes.length) {
+    console.warn(`[socialScriptGen] ${longScenes.length} scene(s) over ~4s — regenerating snappier`);
+    parsed = await runModel(`${longScenes.length} of your scenes had a spoken line longer than ~8 words (over 4 seconds). Rewrite so EVERY scene is ONE point with a spoken line of at most ~8 words. Split any long scene into multiple one-point scenes — keep covering ALL the points, just make each scene shorter.`);
   }
 
   const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];

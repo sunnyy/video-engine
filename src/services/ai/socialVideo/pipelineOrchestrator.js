@@ -21,6 +21,8 @@ import { designSocialScene }      from "./sceneDesigner.js";
 import { resolveSocialMedia }     from "./mediaResolver.js";
 import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
 import { applyTransitions, assignSceneTransitions } from "../shared/transitions.js";
+import { attachTransitionSfx }   from "../shared/sfx.js";
+import { simplifyTimelineKeyframes } from "../shared/motion.js";
 import { buildTimeline }          from "./timelineBuilder.js";
 import { injectMusic }            from "../shared/music.js";
 import { moderateInput }          from "../shared/moderation.js";
@@ -40,24 +42,31 @@ const FPS    = 30;
 
 // ── Timestamp assignment (same pattern as saasVideo) ────────────────────────
 
-function assignWordTimestamps(scenes, wordTimestamps) {
-  if (!wordTimestamps?.length) return;
+// Assign each scene a start + duration from the real word timestamps. A scene spans from its first
+// spoken word UNTIL THE NEXT SCENE'S first spoken word — i.e. it INCLUDES the pause after its last
+// word. (Using lastWord.end − firstWord.start instead leaves every inter-scene pause owned by no
+// scene; the summed visual time then falls behind the audio, scenes drift progressively AHEAD of the
+// voiceover, and all the lost pause-time dumps onto the final scene — both bugs we saw.)
+function assignWordTimestamps(scenes, wordTimestamps, totalDuration = 0) {
+  if (!wordTimestamps?.length || !scenes.length) return;
+
+  // Pass 1 — walk the word list scene by scene, recording where each scene's speech STARTS.
   let wordIdx = 0;
-
   for (const scene of scenes) {
-    const segWords = (scene.script_segment ?? "").trim().split(/\s+/).filter(Boolean).length;
-    if (segWords === 0 || wordIdx >= wordTimestamps.length) continue;
+    const segWords  = (scene.script_segment ?? "").trim().split(/\s+/).filter(Boolean).length;
+    const startWord = wordTimestamps[Math.min(wordIdx, wordTimestamps.length - 1)];
+    scene.vo_start  = parseFloat((startWord?.start ?? 0).toFixed(3));
+    wordIdx = Math.min(wordIdx + Math.max(0, segWords), wordTimestamps.length);
+  }
+  // The first scene owns everything from t=0 (incl. any leading silence) so the cuts line up cleanly.
+  scenes[0].vo_start = 0;
 
-    const startWord = wordTimestamps[wordIdx];
-    const endWord   = wordTimestamps[Math.min(wordIdx + segWords - 1, wordTimestamps.length - 1)];
-
-    scene.vo_start = parseFloat((startWord?.start ?? 0).toFixed(3));
-    scene.vo_end   = parseFloat((endWord?.end ?? scene.vo_start + (scene.duration_seconds ?? 3)).toFixed(3));
-
-    const whisperDur = scene.vo_end - scene.vo_start;
-    scene.duration_seconds = parseFloat(Math.max(1.0, whisperDur).toFixed(3));
-
-    wordIdx = Math.min(wordIdx + segWords, wordTimestamps.length);
+  // Pass 2 — each scene runs until the next scene's start; the last runs to the real audio end.
+  const audioEnd = totalDuration || parseFloat((wordTimestamps[wordTimestamps.length - 1]?.end ?? 0).toFixed(3));
+  for (let i = 0; i < scenes.length; i++) {
+    const end = i + 1 < scenes.length ? scenes[i + 1].vo_start : audioEnd;
+    scenes[i].vo_end           = parseFloat(Math.max(scenes[i].vo_start, end).toFixed(3));
+    scenes[i].duration_seconds = parseFloat(Math.max(1.0, scenes[i].vo_end - scenes[i].vo_start).toFixed(3));
   }
 }
 
@@ -103,6 +112,47 @@ function mediaScrimEntries(sceneIndex, src, meta, kind = "image", canvas = CANVA
   ];
 }
 
+// ── Ken Burns camera motion on background media ──────────────────────────────
+// Static full-bleed photos/videos look dead. Give each scene's background a slow,
+// varied camera move (zoom in/out, pan L/R) so the assets breathe — the same eased
+// camera vocabulary AI Video uses. Varied by scene index so neighbours differ.
+const SOCIAL_CAMERAS = ["slow_zoom_in", "slow_zoom_out", "pan_left", "pan_right"];
+function cameraKeyframes(camera, kind, dur) {
+  const d = Math.max(0.1, dur || 3);
+  const isVideo = kind === "video";
+  const base = { x: [], y: [], blur: [], scale: [], opacity: [], rotation: [] };
+  switch (camera) {
+    case "slow_zoom_out":
+      return { ...base, scale: isVideo ? [{ time: 0, value: 1.08 }, { time: d, value: 1.0 }] : [{ time: 0, value: 1.18 }, { time: d, value: 1.04 }] };
+    case "pan_left":
+      return { ...base, scale: [{ time: 0, value: 1.16 }, { time: d, value: 1.16 }], x: [{ time: 0, value: 40 }, { time: d, value: -40 }] };
+    case "pan_right":
+      return { ...base, scale: [{ time: 0, value: 1.16 }, { time: d, value: 1.16 }], x: [{ time: 0, value: -40 }, { time: d, value: 40 }] };
+    case "slow_zoom_in":
+    default:
+      return { ...base, scale: isVideo ? [{ time: 0, value: 1.0 }, { time: d, value: 1.08 }] : [{ time: 0, value: 1.06 }, { time: d, value: 1.16 }] };
+  }
+}
+// Gentle zoom only — for a CONTAINED (framed/landscape) image, where a pan would shift the photo.
+function gentleZoomKeyframes(dur) {
+  const d = Math.max(0.1, dur || 3);
+  return { x: [], y: [], blur: [], scale: [{ time: 0, value: 1.0 }, { time: d, value: 1.05 }], opacity: [], rotation: [] };
+}
+function applyKenBurns(layers) {
+  for (const l of layers) {
+    const m = String(l.id || "").match(/^s(\d+)_(media|mediabg)$/);
+    if (!m || (l.type !== "image" && l.type !== "video")) continue;
+    const dur = Math.max(0.1, (l.end ?? 0) - (l.start ?? 0));
+    // A contained framed image (object-fit:contain, inset box) gets a gentle zoom; full-bleed
+    // covers (the portrait _media + the blurred _mediabg) get the full varied camera.
+    const contained = l.id.endsWith("_media") && l.objectFit === "contain";
+    const kf = contained ? gentleZoomKeyframes(dur) : cameraKeyframes(SOCIAL_CAMERAS[(+m[1]) % SOCIAL_CAMERAS.length], l.type, dur);
+    l.keyframes = { ...(l.keyframes || {}), ...kf };
+    const startScale = kf.scale?.[0]?.value;
+    if (startScale != null) l.transform = { ...(l.transform || {}), scale: startScale };
+  }
+}
+
 // Scene transitions are shared: ../shared/transitions.js (applyTransitions +
 // assignSceneTransitions). AI Video keeps its own beat-aware variant.
 
@@ -122,15 +172,11 @@ export async function planSocial(params, onStep) {
   await moderateInput(content.text, { label: "social post content" });
 
   step("Shaping the story…");
-  const wordCount = (content.text || "").split(/\s+/).filter(Boolean).length;
-  const effectiveDuration = content.isThread
-    ? Math.min(targetDuration + content.threadLength * 3, 60)
-    : wordCount > 300
-      ? Math.min(targetDuration + Math.floor(wordCount / 100) * 5, 60)
-      : targetDuration;
-  if (wordCount > 300) console.log(`[social] long post detected: ${wordCount} words → duration ${effectiveDuration}s`);
+  // Duration is the USER'S hard budget — we no longer silently inflate it for long posts/threads.
+  // Over-long content is handled inside the script generator (distill / show-the-list strategy),
+  // not by making the video longer than the user asked for.
   const { full_script, scenes: rawScenes, palette, fontPair, musicMood, projectName: gptName, creativeDirection } =
-    await generateSocialScript({ content, targetDuration: effectiveDuration, language, theme, accentColor, accentColor2 });
+    await generateSocialScript({ content, targetDuration, language, theme, accentColor, accentColor2 });
 
   const scenes = rawScenes.map(s => ({ ...s }));
   if (creativeDirection) console.log(`[social] creative direction: ${creativeDirection}`);
@@ -178,7 +224,7 @@ export async function produceSocial(plan, params, onStep) {
       const ttsResult = await generateFullVoiceover(ttsScript, runId, voiceId);
       voiceoverUrl      = ttsResult.audio_url;
       voiceoverDuration = ttsResult.duration_seconds;
-      if (ttsResult.wordTimestamps?.length) assignWordTimestamps(scenes, ttsResult.wordTimestamps);
+      if (ttsResult.wordTimestamps?.length) assignWordTimestamps(scenes, ttsResult.wordTimestamps, voiceoverDuration);
     } catch (err) {
       console.warn("[social] TTS failed (non-fatal):", err.message);
     }
@@ -233,9 +279,16 @@ export async function produceSocial(plan, params, onStep) {
   step("Putting it together…");
   const { timeline } = buildTimeline(sceneGraphs, scenes, { ...projectContext, productName: projectName });
 
+  // Slow varied camera move on every background image/video so assets aren't dead-static.
+  applyKenBurns(timeline.layers);
+
   // Assign a varied transition per scene cut, then apply (whole-scene in/out).
   assignSceneTransitions(scenes);
   applyTransitions(timeline.layers, scenes);
+
+  // Subtle transition SFX on the harder cuts (whoosh on slides/pans, impact on zooms) — quiet on
+  // fades. Shared with AI Video; degrades gracefully if the SFX library is unavailable.
+  try { await attachTransitionSfx(timeline.layers, scenes, { label: "social" }); } catch {}
 
   // ── Step 7: Inject voiceover layer ────────────────────────────────────────
   let finalTimeline = timeline;
@@ -279,6 +332,9 @@ export async function produceSocial(plan, params, onStep) {
   await injectMusic(finalTimeline, { mood: musicMood, volume: 0.2, fadeIn: 1, fadeOut: 1, label: "social" });
 
   if (full_script) finalTimeline.full_script = full_script;
+
+  // Strip redundant keyframes (constant tracks, plain fades) — keeps motion identical, far less bloat.
+  simplifyTimelineKeyframes(finalTimeline);
 
   // ── Step 10: Save to projects table ──────────────────────────────────────
   step("Almost ready…");

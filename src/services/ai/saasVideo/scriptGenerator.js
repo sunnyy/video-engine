@@ -261,7 +261,7 @@ Scene Count: ${isAuto ? "Auto — you decide (3–7 scenes)" : targetCount}`;
   const response = await openai.chat.completions.create({
     model:       "gpt-4.1",
     temperature: 0.7,
-    max_tokens:  4000,
+    max_tokens:  8000, // scenes JSON grows with scene count — headroom so it doesn't truncate
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user",   content: userPrompt   },

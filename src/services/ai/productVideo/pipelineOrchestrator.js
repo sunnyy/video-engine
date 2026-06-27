@@ -21,6 +21,7 @@
  */
 
 import { supabaseAdmin }            from "../../../server/middleware/shared.js";
+import { simplifyTimelineKeyframes } from "../shared/motion.js";
 import { generateFullVoiceover }    from "../saasVideo/ttsGenerator.js";
 import { pickAutoMood }             from "../../../core/registries/musicRegistry.js";
 import { generateProductPlan }      from "./productDirector.js";
@@ -244,6 +245,8 @@ function fontPairFor(mood) { return FONT_PAIRS[mood] ?? FONT_PAIRS.premium; }
 
 async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
   try {
+    // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
+    simplifyTimelineKeyframes(timeline);
     const { data: row } = await supabaseAdmin
       .from("projects")
       .insert({

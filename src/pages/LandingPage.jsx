@@ -1134,6 +1134,12 @@ export default function LandingPage() {
 
           
 
+          <p style={{ textAlign: "center", margin: "18px auto 0", maxWidth: 580, fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.55, color: "var(--muted)" }}>
+            {cycle === "annual"
+              ? <>★ <strong style={{ color: "var(--text)" }}>Best value — save 17%</strong> — that's 2 months free.</>
+              : <>Tip: switch to <button onClick={() => setCycle("annual")} style={{ background: "none", border: "none", padding: 0, color: "var(--yellow)", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 14 }}>Annual</button> and save 17% — that's 2 months free.</>}
+          </p>
+
           <div
             className="pricing-grid"
             data-reveal

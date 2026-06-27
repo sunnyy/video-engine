@@ -16,6 +16,7 @@
  */
 
 import { supabaseAdmin }         from "../../../server/middleware/shared.js";
+import { simplifyTimelineKeyframes } from "../shared/motion.js";
 import { researchTopic }         from "./researcher.js";
 import { directBeats }           from "./beatDirector.js";
 import { resolveVisuals }        from "./visualResolver.js";
@@ -705,6 +706,9 @@ export async function runPromptPipeline(params, onStep) {
   // Persist source + generated publish copy in the project meta so the editor's Publish
   // button can detect Prompt-to-Video and pre-fill the title/caption/hashtags.
   finalTimeline.meta = { ...(finalTimeline.meta || {}), source: "ai_video", publish: film.publish || null };
+
+  // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
+  simplifyTimelineKeyframes(finalTimeline);
 
   // ── Stage 7: Save with regen context ──────────────────────────────────────
   step(PROMPT_STATUS_STEPS[7]);

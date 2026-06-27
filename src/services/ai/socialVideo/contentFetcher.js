@@ -218,12 +218,14 @@ async function fetchInstagramContent(url) {
   const shortcode = shortcodeMatch?.[1];
   console.log(`[contentFetcher] instagram shortcode: ${shortcode}`);
 
-  const res = await fetch(url, {
+  // safeFetch (not raw fetch): detectPlatform matches "instagram.com" as a substring anywhere in the
+  // URL, so an internal target like http://169.254.169.254/instagram.com/p/x would route here — guard it.
+  const res = await safeFetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
       "Accept": "text/html,application/xhtml+xml",
     },
-    signal: AbortSignal.timeout(10000),
+    timeoutMs: 10000,
   });
   if (!res.ok) throw new Error(`Instagram page returned ${res.status} — post may be private`);
   const html = await res.text();
@@ -264,12 +266,14 @@ async function fetchInstagramContent(url) {
 }
 
 async function fetchLinkedInContent(url) {
-  const res = await fetch(url, {
+  // safeFetch (not raw fetch): same substring-routing risk as Instagram — a "linkedin.com" substring in
+  // an otherwise-internal URL would land here, so validate the host + every redirect hop before fetching.
+  const res = await safeFetch(url, {
     headers: {
       "User-Agent": "LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient/VERSION (java 1.4))",
       "Accept": "text/html,application/xhtml+xml",
     },
-    signal: AbortSignal.timeout(10000),
+    timeoutMs: 10000,
   });
   if (!res.ok) throw new Error(`LinkedIn page returned ${res.status} — post may require login`);
   const html = await res.text();

@@ -16,6 +16,7 @@
 
 import { getStyle } from "../shared/visualStyles.js";
 import { resolveThemePalette } from "../shared/themeRegistry.js";
+import { RENDERER_CONSTRAINTS } from "../shared/designConstraints.js";
 
 export function buildFreeSceneDesignerPrompt(sceneScript, projectContext) {
   const canvasW     = projectContext.canvasWidth  ?? 1080;
@@ -67,6 +68,7 @@ Icons: data-icon="kebab-name" (Lucide) ONLY on a single standalone glyph. NEVER 
 Only REAL tagged elements render — so anything that must be visible (a cross-out line, a divider, a chip, an icon) must be its own real element with the attributes above. Do NOT use ::before/::after pseudo-elements.
 TEXT IS ONE UNIFORM STYLE PER ELEMENT: a text element renders as a single color (or ONE gradient applied to the WHOLE element). NEVER give individual words or inline <span>s a different color/gradient/highlight inside a text block — that cannot be represented and will break. For emphasis, use a bolder weight, ALL-CAPS, or put the emphasized phrase on its own line/element.
 NEVER print the scene's intent/role as visible text. Words like "Hook", "Fact", "Reveal", "Feature", "CTA", "Proof", "Problem", "Solution" are INTERNAL direction — they must NOT appear on screen. A kicker/badge/label must be REAL content (product name, benefit, or short phrase), never the intent keyword.
+${RENDERER_CONSTRAINTS}
 
 ${layout ? `LAYOUT FOR THIS FRAME (from the director — build exactly this structure): ${layout}\nCompose for THIS structure specifically — do NOT fall back to the generic kicker + headline + subhead stack; that sameness across scenes is the #1 thing to avoid.\n` : ""}ART DIRECTION (your call): anchor on brand accent ${accentColor} but build a real palette around it (neutrals, tints, a tasteful secondary) — not monochrome. ${themeDir} Strong contrast. "${visualStyle}" is a loose leaning; vary treatment scene to scene.
 ONE FOCAL IDEA per frame. Keep the element count low — a viewer reads a few things in a few seconds, not a full app screen. Never build a busy product UI crammed with floating chips, callouts, and chrome.

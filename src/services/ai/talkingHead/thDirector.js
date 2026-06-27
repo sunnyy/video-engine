@@ -70,7 +70,7 @@ Every input beat must appear exactly once, by beat_index.`,
 async function runChunk(beats, language) {
   const prompt = buildPrompt(beats, language);
   const res = await openai.chat.completions.create({
-    model: MODEL, max_tokens: 4000, response_format: { type: "json_object" },
+    model: MODEL, max_tokens: 8000, response_format: { type: "json_object" }, // beats JSON per chunk grows with video length — headroom
     messages: [{ role: "system", content: prompt.system }, { role: "user", content: prompt.user }],
   });
   return JSON.parse(res.choices[0].message.content);

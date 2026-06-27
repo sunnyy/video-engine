@@ -1,5 +1,5 @@
 import express from "express";
-import { requireAuth, deductCredits, addCredits } from "../middleware/shared.js";
+import { requireAuth, deductCredits, addCredits, safeMessage } from "../middleware/shared.js";
 import { runTypographyPipeline, planTypography, produceTypography } from "../../services/ai/typographyVideo/pipelineOrchestrator.js";
 import { moderateInput } from "../../services/ai/shared/moderation.js";
 import { creditsForDuration } from "../../core/utils/creditCosts.js";
@@ -43,7 +43,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Typography video failed").catch(() => {});
     }
     console.error("[typography-video/generate]", err);
-    send({ error: err.message });
+    send({ error: safeMessage(err) });
     res.end();
   }
 });
@@ -102,7 +102,7 @@ router.post("/produce", requireAuth, async (req, res) => {
   } catch (err) {
     if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Typography video failed").catch(() => {});
     console.error("[typography-video/produce]", err);
-    send({ error: err.message });
+    send({ error: safeMessage(err) });
     res.end();
   }
 });
