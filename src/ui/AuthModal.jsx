@@ -43,7 +43,7 @@ const CSS = `
   .vq-auth-legal a:hover { color: #f5f5fb; text-decoration: underline; }
 `;
 
-export default function AuthModal({ open, onClose }) {
+export default function AuthModal({ open, onClose, next = null }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
@@ -63,7 +63,7 @@ export default function AuthModal({ open, onClose }) {
         <h2 className="vq-auth-title">Welcome to Vidquence</h2>
         <p className="vq-auth-sub">Sign in to start creating — free to begin.</p>
 
-        <button className="vq-auth-google" onClick={signInWithGoogle}>
+        <button className="vq-auth-google" onClick={() => signInWithGoogle(next)}>
           {GoogleIcon}
           Continue with Google
         </button>

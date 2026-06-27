@@ -9,6 +9,7 @@ import ffmpegPath from "ffmpeg-static";
 import {
   supabaseAdmin, TEMP_DIR, PROJECT_ROOT,
   sendUserEmail, sendAdminAlert, userPlanExpiredEmail, userPlanExpiringEmail,
+  userOnboardingNudgeEmail, userWinbackEmail,
 } from "./middleware/shared.js";
 import { notifyUser } from "./services/notificationService.js";
 import { adminSlaDigestEmail } from "./services/emailService.js";
@@ -282,5 +283,76 @@ async function checkSupportSla() {
 }
 setInterval(checkSupportSla, 60 * 60 * 1000);   // hourly
 setTimeout(checkSupportSla, 45_000);            // shortly after boot
+
+// Lifecycle re-engagement emails (triggered, in-house). Two nudges, deduped via lifecycle_email_log
+// and gated by the user's "tips" notification preference (so they're opt-out):
+//   • onboarding_nudge — signed up 2–14 days ago, still hasn't created a project (sent once).
+//   • winback — activated, but inactive 14–45 days; sent once per inactivity episode (re-arms when
+//     they become active again, since their last activity then moves past the last-sent marker).
+const DAY_MS = 24 * 60 * 60 * 1000;
+async function checkLifecycleEmails() {
+  try {
+    const now = Date.now();
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    if (!users?.length) return;
+
+    // Last activity (latest project update) + which users have any project.
+    const { data: projs } = await supabaseAdmin.from("projects").select("user_id, updated_at");
+    const lastActivity = {}; const hasProject = new Set();
+    for (const p of projs || []) {
+      hasProject.add(p.user_id);
+      const t = new Date(p.updated_at).getTime();
+      if (!lastActivity[p.user_id] || t > lastActivity[p.user_id]) lastActivity[p.user_id] = t;
+    }
+
+    // Already-sent log (dedupe).
+    const { data: logs } = await supabaseAdmin.from("lifecycle_email_log").select("user_id, type, sent_at");
+    const sentAt = {}; for (const l of logs || []) sentAt[`${l.user_id}|${l.type}`] = new Date(l.sent_at).getTime();
+
+    const fire = async (u, type, notif, buildEmail) => {
+      const name = u.user_metadata?.full_name || u.user_metadata?.name || "";
+      const tpl = buildEmail(name);
+      await notifyUser(u.id, { ...notif, email: { to: u.email, subject: tpl.subject, html: tpl.html } });
+      await supabaseAdmin.from("lifecycle_email_log").upsert(
+        { user_id: u.id, type, sent_at: new Date().toISOString() }, { onConflict: "user_id,type" });
+    };
+
+    let nudges = 0, winbacks = 0;
+    for (const u of users) {
+      if (!u.email) continue;
+      const created = u.created_at ? new Date(u.created_at).getTime() : 0;
+      const ageDays = created ? (now - created) / DAY_MS : 0;
+
+      // Onboarding nudge — hasn't created anything yet.
+      if (!hasProject.has(u.id) && ageDays >= 2 && ageDays <= 14 && !sentAt[`${u.id}|onboarding_nudge`]) {
+        await fire(u, "onboarding_nudge", {
+          type: "onboarding_nudge", icon: "🎬", severity: "info", link: "/dashboard",
+          title: "Ready to make your first video?", body: "Your free credits are waiting — it takes about two minutes.",
+        }, userOnboardingNudgeEmail);
+        nudges++;
+        continue;
+      }
+
+      // Win-back — activated but gone quiet for 14–45 days, once per episode.
+      const la = lastActivity[u.id];
+      if (la) {
+        const inactiveDays = (now - la) / DAY_MS;
+        const nudgedThisEpisode = (sentAt[`${u.id}|winback`] || 0) > la;
+        if (inactiveDays >= 14 && inactiveDays <= 45 && !nudgedThisEpisode) {
+          await fire(u, "winback", {
+            type: "winback", icon: "👋", severity: "info", link: "/dashboard",
+            title: "We saved your spot", body: "Your projects and credits are right where you left them.",
+          }, userWinbackEmail);
+          winbacks++;
+        }
+      }
+    }
+    if (nudges || winbacks) console.log(`[lifecycle] sent ${nudges} onboarding nudge(s), ${winbacks} win-back(s)`);
+  } catch (err) {
+    console.error("[lifecycle] failed:", err.message);
+  }
+}
+setInterval(checkLifecycleEmails, 24 * 60 * 60 * 1000);  // daily
+setTimeout(checkLifecycleEmails, 90_000);                // shortly after boot
 
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));

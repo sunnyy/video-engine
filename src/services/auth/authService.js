@@ -44,7 +44,12 @@ export async function updatePassword(newPassword) {
   if (error) throw error;
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(next = null) {
+  // OAuth must redirect to an allow-listed URL (/dashboard). When a specific destination is
+  // wanted afterwards (e.g. a plan checkout), stash it and Dashboard resumes it on landing.
+  if (next) {
+    try { localStorage.setItem("vq_post_login", next); } catch { /* ignore */ }
+  }
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: `${window.location.origin}/dashboard` },

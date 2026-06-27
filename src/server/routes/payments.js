@@ -10,6 +10,7 @@ import {
 } from "../middleware/shared.js";
 import { notifyUser } from "../services/notificationService.js";
 import { rewardReferrerOnFirstPurchase } from "./referrals.js";
+import { validateCoupon, recordRedemption } from "./coupons.js";
 
 export const router = express.Router();
 
@@ -74,7 +75,7 @@ router.get("/exchange-rate", async (_req, res) => {
 /** POST /api/payments/create-order — create a Razorpay order for a plan */
 router.post("/payments/create-order", requireAuth, async (req, res) => {
   try {
-    const { planSlug, billingCycle, exchangeRate: clientRate } = req.body;
+    const { planSlug, billingCycle, exchangeRate: clientRate, couponCode } = req.body;
     if (!planSlug || !billingCycle) return res.status(400).json({ error: "planSlug and billingCycle required" });
 
     const { data: plan, error } = await supabaseAdmin
@@ -93,7 +94,17 @@ router.post("/payments/create-order", requireAuth, async (req, res) => {
     const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
     // price_annual already includes the annual discount, so charge it directly. discount_percent
     // is display-only ("Save X%") — re-applying it here double-discounted annual buyers.
-    const discounted = baseUSD;
+    let discounted   = baseUSD;
+    let appliedCode  = null;
+
+    // Promo code (server-authoritative — the client preview never sets the price).
+    if (couponCode) {
+      const cv = await validateCoupon({ code: couponCode, userId: req.user.id, baseUSD });
+      if (!cv.valid) return res.status(400).json({ error: "This promo code can't be applied.", code: "COUPON_INVALID" });
+      discounted  = cv.finalUSD;
+      appliedCode = cv.coupon.code;
+    }
+
     const amountPaise = Math.round(discounted * rate) * 100;
 
     const razorpay = getRazorpay();
@@ -105,6 +116,7 @@ router.post("/payments/create-order", requireAuth, async (req, res) => {
         user_id:       req.user.id,
         plan_slug:     planSlug,
         billing_cycle: billingCycle,
+        coupon_code:   appliedCode || "",
       },
     });
 
@@ -126,7 +138,7 @@ router.post("/payments/create-order", requireAuth, async (req, res) => {
 /** POST /api/payments/verify — verify signature, provision credits, insert subscription */
 router.post("/payments/verify", requireAuth, async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planSlug, billingCycle } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planSlug, billingCycle, couponCode } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !planSlug) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -162,7 +174,18 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
     const baseUSD    = billingCycle === "annual" && plan.price_annual ? plan.price_annual : plan.price_monthly;
     // price_annual already includes the annual discount, so charge it directly. discount_percent
     // is display-only ("Save X%") — re-applying it here double-discounted annual buyers.
-    const discounted = baseUSD;
+    let discounted     = baseUSD;
+    let appliedCoupon  = null;
+
+    // Re-validate the promo code (server-authoritative) so price_paid + redemption match the charge.
+    if (couponCode) {
+      const cv = await validateCoupon({ code: couponCode, userId: req.user.id, baseUSD });
+      if (cv.valid) {
+        discounted    = cv.finalUSD;
+        appliedCoupon = { id: cv.coupon.id, discountUSD: cv.discountUSD };
+      }
+    }
+
     const rate       = await getUSDtoINR();
     const amountINR  = +(discounted * rate).toFixed(2);
 
@@ -215,6 +238,14 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
 
     // Referral: a referee's first purchase rewards their referrer (idempotent, best-effort).
     rewardReferrerOnFirstPurchase(req.user.id);
+
+    // Record the promo redemption (idempotent on payment_id; bumps the coupon's counter).
+    if (appliedCoupon) {
+      recordRedemption({
+        couponId: appliedCoupon.id, userId: req.user.id, paymentId: razorpay_payment_id,
+        planSlug, billingCycle, discountUSD: appliedCoupon.discountUSD,
+      });
+    }
 
     // Emails (fire-and-forget)
     supabaseAdmin.auth.admin.getUserById(req.user.id).then(({ data: { user } }) => {

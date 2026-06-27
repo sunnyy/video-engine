@@ -15,7 +15,7 @@ import {
   userWelcomeEmail, userCreditsPurchasedEmail, userLowCreditsEmail,
   userAccountDeletedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
   userPaymentFailedEmail, userPlanExpiringEmail, userPlanExpiredEmail,
-  userRenderCompleteEmail,
+  userRenderCompleteEmail, userOnboardingNudgeEmail, userWinbackEmail,
 } from "../services/emailService.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -158,5 +158,5 @@ export {
   userWelcomeEmail, userCreditsPurchasedEmail, userLowCreditsEmail,
   userAccountDeletedEmail, userPlanUpgradeEmail, userPlanRenewalEmail,
   userPaymentFailedEmail, userPlanExpiringEmail, userPlanExpiredEmail,
-  userRenderCompleteEmail,
+  userRenderCompleteEmail, userOnboardingNudgeEmail, userWinbackEmail,
 };

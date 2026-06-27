@@ -1068,6 +1068,13 @@ export default function Dashboard() {
   const [busyProgress, setBusyProgress] = useState(null); // { step, total } during produce; null = indeterminate
   const reportBusy = useCallback((b, s, prog) => { setBusy(b); if (b) { setBusyStatus(s || "Creating your video…"); setBusyProgress(prog ?? null); } }, []);
 
+  // Resume an intended destination saved before Google sign-in (e.g. a plan checkout the
+  // visitor clicked while logged out). OAuth always lands on /dashboard, so we redirect here.
+  useEffect(() => {
+    const next = localStorage.getItem("vq_post_login");
+    if (next) { localStorage.removeItem("vq_post_login"); navigate(next); }
+  }, [navigate]);
+
   // Warn on refresh / tab close / external navigation while a job is running.
   useEffect(() => {
     if (!busy) return;

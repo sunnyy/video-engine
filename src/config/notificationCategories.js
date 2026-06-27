@@ -18,6 +18,7 @@ export const NOTIFICATION_CATEGORIES = [
   { key: "account",       label: "Account",                 description: "Welcome and account updates" },
   { key: "support",       label: "Support",                 description: "Replies and updates on your support tickets" },
   { key: "referrals",     label: "Referrals",               description: "When friends join with your invite and rewards you earn" },
+  { key: "tips",          label: "Tips & reminders",        description: "Occasional nudges to help you get the most out of Vidquence" },
   { key: "announcements", label: "Announcements",           description: "Product news and offers from Vidquence", locked: true },
 ];
 
@@ -39,6 +40,8 @@ const TYPE_TO_CATEGORY = {
   support_reply: "support", support_status: "support",
   // referrals
   referral_joined: "referrals", referral_reward: "referrals", referral_bonus: "referrals",
+  // tips & reminders (lifecycle)
+  onboarding_nudge: "tips", winback: "tips",
   // announcements
   announcement: "announcements",
 };

@@ -60,6 +60,44 @@ router.get("/user/transactions", requireAuth, async (req, res) => {
   }
 });
 
+/* ── User: paginated credit ledger (with project names + filter) ── */
+router.get("/user/credit-history", requireAuth, async (req, res) => {
+  try {
+    const limit  = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const filter = req.query.filter; // "spent" | "added" | undefined (all)
+
+    let q = supabaseAdmin
+      .from("credit_transactions")
+      .select("id, amount, type, action, description, balance_after, created_at, project_id", { count: "exact" })
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (filter === "spent")  q = q.lt("amount", 0);
+    if (filter === "added")  q = q.gt("amount", 0);
+
+    const { data, count, error } = await q;
+    if (error) throw error;
+    const rows = data || [];
+
+    // Batch-resolve project names for rows that reference one.
+    const ids = [...new Set(rows.map(r => r.project_id).filter(Boolean))];
+    const nameById = {};
+    if (ids.length) {
+      const { data: projs } = await supabaseAdmin.from("projects").select("id, name").in("id", ids);
+      for (const p of projs || []) nameById[p.id] = p.name;
+    }
+
+    res.json({
+      transactions: rows.map(r => ({ ...r, project_name: r.project_id ? (nameById[r.project_id] || null) : null })),
+      total: count ?? 0,
+      hasMore: offset + rows.length < (count ?? 0),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── User: own credit balance + lifetime ── */
 router.get("/user/credits", requireAuth, async (req, res) => {
   try {

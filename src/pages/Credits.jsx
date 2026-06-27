@@ -33,9 +33,27 @@ export default function Credits() {
   const { balance, fetchCredits } = useCreditsStore();
 
   const [lifetimeCredits, setLifetimeCredits] = useState(null);
-  const [transactions,    setTransactions]    = useState([]);
-  const [txLoading,       setTxLoading]       = useState(true);
   const [subscription,    setSubscription]    = useState(undefined);
+
+  // Credit ledger
+  const [ledger,    setLedger]    = useState([]);
+  const [ledgerFilter, setLedgerFilter] = useState("all"); // all | spent | added
+  const [ledgerLoading, setLedgerLoading] = useState(true);
+  const [ledgerMore, setLedgerMore] = useState(false);
+  const LEDGER_PAGE = 20;
+
+  async function loadLedger(reset) {
+    setLedgerLoading(true);
+    const offset = reset ? 0 : ledger.length;
+    const filterQ = ledgerFilter === "all" ? "" : `&filter=${ledgerFilter}`;
+    try {
+      const d = await serverFetch(`/api/user/credit-history?limit=${LEDGER_PAGE}&offset=${offset}${filterQ}`).then(r => r.json());
+      const rows = d.transactions || [];
+      setLedger(prev => reset ? rows : [...prev, ...rows]);
+      setLedgerMore(!!d.hasMore);
+    } catch { if (reset) setLedger([]); }
+    setLedgerLoading(false);
+  }
 
   const [packages,     setPackages]     = useState([]);
   const [selectedPkg,  setSelectedPkg]  = useState(null);
@@ -50,11 +68,6 @@ export default function Credits() {
       .then(r => r.json())
       .then(d => setLifetimeCredits(d.lifetime_credits ?? null))
       .catch(() => {});
-    serverFetch("/api/user/transactions")
-      .then(r => r.json())
-      .then(d => setTransactions(Array.isArray(d) ? d : []))
-      .catch(() => {})
-      .finally(() => setTxLoading(false));
     serverFetch("/api/payments/subscription")
       .then(r => r.json())
       .then(d => setSubscription(d.subscription || null))
@@ -72,6 +85,9 @@ export default function Credits() {
       .then(d => { if (d.rate) setExchangeRate(d.rate); })
       .catch(() => {});
   }, []);
+
+  // (Re)load the ledger whenever the filter changes.
+  useEffect(() => { loadLedger(true); }, [ledgerFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleTopup() {
     if (!selectedPkg) return;
@@ -182,8 +198,10 @@ export default function Credits() {
               </div>
               <div className="rounded-[14px] border p-5 flex flex-col gap-1" style={{ background: "#111118", borderColor: "rgba(255,255,255,0.07)" }}>
                 <div className="text-[12px]" style={{ color: "#606078", fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1 }}>LIFETIME USED</div>
-                <div className="text-[42px] font-bold leading-none mt-1" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>{lifetimeCredits ?? "—"}</div>
-                <div className="text-[13px]" style={{ color: "#8888a8" }}>credits total</div>
+                <div className="text-[42px] font-bold leading-none mt-1" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>
+                  {(lifetimeCredits != null && balance != null) ? Math.max(0, lifetimeCredits - balance) : "—"}
+                </div>
+                <div className="text-[13px]" style={{ color: "#8888a8" }}>credits spent</div>
               </div>
             </div>
 
@@ -330,20 +348,44 @@ export default function Credits() {
               </div>
             )}
 
-            {/* Transaction history */}
-            <div className="rounded-[14px] border p-6 flex flex-col gap-5" style={{ background: "#111118", borderColor: "rgba(255,255,255,0.07)" }}>
-              <div className="text-[12px] font-bold uppercase tracking-[1.5px]" style={{ color: "#8888a8", fontFamily: "'JetBrains Mono',monospace" }}>Recent Transactions</div>
-              {txLoading ? (
+            {/* Credit ledger */}
+            <div className="rounded-[14px] border p-6 flex flex-col gap-4" style={{ background: "#111118", borderColor: "rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-[12px] font-bold uppercase tracking-[1.5px]" style={{ color: "#8888a8", fontFamily: "'JetBrains Mono',monospace" }}>Credit History</div>
+                <div className="flex gap-1.5">
+                  {[["all", "All"], ["spent", "Spent"], ["added", "Added"]].map(([k, lbl]) => (
+                    <button key={k} onClick={() => setLedgerFilter(k)} style={{
+                      fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "'Outfit',sans-serif",
+                      border: "1px solid " + (ledgerFilter === k ? "rgba(245,197,24,0.4)" : "rgba(255,255,255,0.08)"),
+                      background: ledgerFilter === k ? "rgba(245,197,24,0.12)" : "transparent",
+                      color: ledgerFilter === k ? "#f5c518" : "#8888a8",
+                    }}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
+
+              {ledgerLoading && ledger.length === 0 ? (
                 <div className="text-[13px] animate-pulse" style={{ color: "#55556a" }}>Loading…</div>
-              ) : transactions.length === 0 ? (
-                <div className="text-[13px]" style={{ color: "#55556a" }}>No transactions yet.</div>
+              ) : ledger.length === 0 ? (
+                <div className="text-[13px]" style={{ color: "#55556a" }}>
+                  {ledgerFilter === "spent" ? "No spending yet." : ledgerFilter === "added" ? "No credits added yet." : "No transactions yet."}
+                </div>
               ) : (
                 <div className="flex flex-col gap-1">
-                  {transactions.map((tx, i) => (
-                    <div key={tx.id || i} className="flex items-center justify-between gap-3 py-2 border-b" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                  {ledger.map((tx, i) => (
+                    <div key={tx.id || i} className="flex items-center justify-between gap-3 py-2.5 border-b" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
                       <div className="flex-1 min-w-0">
                         <div className="text-[13px] truncate" style={{ color: "#c8c8d8" }}>{tx.description || tx.action || tx.type}</div>
-                        <div className="text-[11px] mt-0.5" style={{ color: "#606078", fontFamily: "'JetBrains Mono',monospace" }}>{fmtDate(tx.created_at)}</div>
+                        <div className="text-[11px] mt-0.5 flex items-center gap-2" style={{ color: "#606078" }}>
+                          <span style={{ fontFamily: "'JetBrains Mono',monospace" }}>{fmtDate(tx.created_at)}</span>
+                          {tx.project_name && tx.project_id && (
+                            <button onClick={() => navigate(`/video-editor/${tx.project_id}`)}
+                              className="truncate max-w-[180px]"
+                              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#7c5cfc", fontFamily: "'Outfit',sans-serif" }}>
+                              ↗ {tx.project_name}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-[14px] font-bold" style={{ color: tx.amount > 0 ? "#22c55e" : "#f97316" }}>
@@ -355,6 +397,14 @@ export default function Credits() {
                       </div>
                     </div>
                   ))}
+
+                  {ledgerMore && (
+                    <button onClick={() => loadLedger(false)} disabled={ledgerLoading}
+                      className="mt-3 self-center text-[13px] font-bold px-4 py-2 rounded-[8px] cursor-pointer"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#c8c8d8", fontFamily: "'Outfit',sans-serif", opacity: ledgerLoading ? 0.6 : 1 }}>
+                      {ledgerLoading ? "Loading…" : "Load more"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

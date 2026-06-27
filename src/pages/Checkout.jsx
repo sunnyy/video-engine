@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { SERVER, serverFetch } from "../services/serverApi";
 import { supabase } from "../lib/supabase";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { validateCouponCode } from "../services/coupons/couponService";
 
 const FALLBACK_RATE = 92.60;
 
@@ -88,6 +89,15 @@ export default function Checkout() {
   const [success, setSuccess] = useState(null);
   const [rate,    setRate]    = useState(FALLBACK_RATE);
 
+  // Promo code
+  const [couponInput,   setCouponInput]   = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discountUSD, finalUSD }
+  const [couponMsg,     setCouponMsg]     = useState("");
+  const [couponBusy,    setCouponBusy]    = useState(false);
+
+  // The base price differs by billing cycle, so any applied code must be re-checked — clear it.
+  useEffect(() => { setAppliedCoupon(null); setCouponMsg(""); }, [cycle]);
+
   useEffect(() => {
     Promise.all([
       fetch(`${SERVER}/api/plans`).then(r => { if (!r.ok) throw new Error(`plans ${r.status}`); return r.json(); }),
@@ -149,6 +159,39 @@ export default function Checkout() {
   const features     = PLAN_FEATURES[plan.slug] || (Array.isArray(plan.features) ? plan.features : []);
   const cycleLabel   = cycle === "annual" ? "year" : "month";
 
+  // Effective amount after any applied promo code.
+  const couponDiscountUSD = appliedCoupon ? appliedCoupon.discountUSD : 0;
+  const payableUSD = +(finalUSD - couponDiscountUSD).toFixed(2);
+  const payableINR = toINR(payableUSD, rate);
+
+  async function applyCoupon() {
+    const code = couponInput.trim();
+    if (!code || couponBusy) return;
+    setCouponBusy(true);
+    setCouponMsg("");
+    try {
+      const r = await validateCouponCode({ code, planSlug: slug, billingCycle: cycle });
+      if (r.valid) {
+        setAppliedCoupon({ code: r.code, discountUSD: r.discountUSD, finalUSD: r.finalUSD });
+        setCouponMsg("");
+      } else {
+        setAppliedCoupon(null);
+        setCouponMsg(r.message || "That code isn't valid.");
+      }
+    } catch (e) {
+      setAppliedCoupon(null);
+      setCouponMsg(e.message || "Couldn't check that code.");
+    } finally {
+      setCouponBusy(false);
+    }
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponMsg("");
+  }
+
   async function handlePay() {
     setError("");
     setPaying(true);
@@ -157,7 +200,7 @@ export default function Checkout() {
       const orderRes = await serverFetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planSlug: slug, billingCycle: cycle, exchangeRate: rate }),
+        body: JSON.stringify({ planSlug: slug, billingCycle: cycle, exchangeRate: rate, couponCode: appliedCoupon?.code || null }),
       });
       if (!orderRes.ok) {
         const e = await orderRes.json();
@@ -200,6 +243,7 @@ export default function Checkout() {
                   razorpay_signature:  response.razorpay_signature,
                   planSlug:            slug,
                   billingCycle:        cycle,
+                  couponCode:          appliedCoupon?.code || null,
                 }),
               });
               if (!verifyRes.ok) {
@@ -309,14 +353,23 @@ export default function Checkout() {
                 </div>
               </>
             )}
+            {appliedCoupon && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+                <span style={{ color: "#9494a8" }}>Promo <span style={{ color: "#e8e8f0", fontWeight: 700 }}>{appliedCoupon.code}</span></span>
+                <span style={{ color: "#22c55e", fontWeight: 600 }}>−${couponDiscountUSD}</span>
+              </div>
+            )}
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
               <span style={{ fontSize: 18, fontWeight: 800, color: "#e8e8f0" }}>Total</span>
               <div style={{ textAlign: "right" }}>
+                {appliedCoupon && (
+                  <div style={{ fontSize: 14, color: "#55556a" }}><s>${finalUSD}</s></div>
+                )}
                 <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, color: "#f5c518", lineHeight: 1 }}>
-                  ${finalUSD}<span style={{ fontSize: 16, color: "#9494a8" }}>/{cycleLabel}</span>
+                  ${payableUSD}<span style={{ fontSize: 16, color: "#9494a8" }}>/{cycleLabel}</span>
                 </div>
-                <div style={{ fontSize: 13, color: "#55556a" }}>≈ ₹{finalINR}/{cycleLabel}</div>
+                <div style={{ fontSize: 13, color: "#55556a" }}>≈ ₹{payableINR}/{cycleLabel}</div>
               </div>
             </div>
           </div>
@@ -362,11 +415,38 @@ export default function Checkout() {
               <div>
                 <div style={{ fontSize: 13, color: "#9494a8" }}>{plan.name} · {cycle}</div>
                 <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 44, color: "#f5c518", lineHeight: 1 }}>
-                  ₹{finalINR}
+                  ₹{payableINR}
                 </div>
-                <div style={{ fontSize: 13, color: "#55556a" }}>${finalUSD} per {cycleLabel}</div>
+                <div style={{ fontSize: 13, color: "#55556a" }}>${payableUSD} per {cycleLabel}</div>
               </div>
               <div style={{ fontSize: 40, opacity: 0.5 }}>💳</div>
+            </div>
+
+            {/* Promo code */}
+            <div>
+              {appliedCoupon ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 8, padding: "10px 14px" }}>
+                  <span style={{ fontSize: 13, color: "#22c55e", fontWeight: 700 }}>✓ {appliedCoupon.code} applied — you save ${couponDiscountUSD}</span>
+                  <button onClick={removeCoupon} style={{ background: "none", border: "none", color: "#9494a8", fontSize: 13, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Remove</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={couponInput}
+                      onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyDown={e => { if (e.key === "Enter") applyCoupon(); }}
+                      placeholder="Promo code"
+                      style={{ flex: 1, background: "#0b0b10", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#e8e8f0", fontSize: 14, padding: "11px 13px", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.05em", textTransform: "uppercase", outline: "none", boxSizing: "border-box" }}
+                    />
+                    <button onClick={applyCoupon} disabled={couponBusy || !couponInput.trim()}
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#e8e8f0", borderRadius: 8, padding: "0 18px", fontSize: 14, fontWeight: 700, cursor: couponBusy || !couponInput.trim() ? "default" : "pointer", fontFamily: "'Outfit',sans-serif", opacity: couponBusy || !couponInput.trim() ? 0.5 : 1 }}>
+                      {couponBusy ? "…" : "Apply"}
+                    </button>
+                  </div>
+                  {couponMsg && <div style={{ fontSize: 12.5, color: "#f87171", marginTop: 7 }}>{couponMsg}</div>}
+                </>
+              )}
             </div>
 
             {error && (
@@ -393,7 +473,7 @@ export default function Checkout() {
               onMouseEnter={e => { if (!paying) e.currentTarget.style.background = "#e0b016"; }}
               onMouseLeave={e => { if (!paying) e.currentTarget.style.background = "#f5c518"; }}
             >
-              {paying ? "Processing…" : `Pay ₹${finalINR} now >`}
+              {paying ? "Processing…" : `Pay ₹${payableINR} now >`}
             </button>
 
             <div style={{ fontSize: 12, color: "#55556a", textAlign: "center", lineHeight: 1.6 }}>

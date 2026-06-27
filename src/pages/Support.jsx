@@ -183,6 +183,11 @@ export default function Support() {
                 <button onClick={() => { setView("new"); setErr(""); }} style={btnPrimary}>New ticket</button>
               </div>
 
+              <a href="/help" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, textDecoration: "none", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 22 }}>
+                <span style={{ fontSize: 13.5, color: T.text }}>📚 Browse the <strong>Help Center</strong> — many questions are answered there instantly.</span>
+                <span style={{ fontSize: 13, color: T.accent, fontWeight: 700, whiteSpace: "nowrap" }}>Open →</span>
+              </a>
+
               {tickets === null ? (
                 <div style={{ color: T.faint, fontSize: 13 }}>Loading…</div>
               ) : tickets.length === 0 ? (

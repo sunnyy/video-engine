@@ -213,6 +213,30 @@ export function userCreditsPurchasedEmail(name, amount, balance) {
   };
 }
 
+export function userOnboardingNudgeEmail(name) {
+  return {
+    subject: "Your free credits are waiting 🎬",
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Make your first video, ${name || "Creator"}</h2>
+      <p style="color:#c8c8d8;margin:0 0 16px">You signed up but haven't created anything yet — and your <strong style="color:#f5c518">free credits</strong> are still here.</p>
+      <p style="color:#c8c8d8;margin:0 0 24px">It takes about two minutes: just describe what you want on the dashboard and Vidquence builds the video for you.</p>
+      <a href="${APP_URL}/dashboard" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Create your first video →</a>
+    `),
+  };
+}
+
+export function userWinbackEmail(name) {
+  return {
+    subject: "We saved your spot at Vidquence 👋",
+    html: wrap(`
+      <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Welcome back whenever you're ready, ${name || "there"}</h2>
+      <p style="color:#c8c8d8;margin:0 0 16px">It's been a little while. Your projects and credits are right where you left them — <strong style="color:#f5c518">credits never expire</strong>.</p>
+      <p style="color:#c8c8d8;margin:0 0 24px">Pick up where you left off, or start something new in a couple of minutes.</p>
+      <a href="${APP_URL}/dashboard" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Back to your dashboard →</a>
+    `),
+  };
+}
+
 export function userLowCreditsEmail(name, balance) {
   return {
     subject: "Your Vidquence credits are running low",

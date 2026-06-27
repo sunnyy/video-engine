@@ -612,6 +612,7 @@ export default function LandingPage() {
   const [rate, setRate] = useState(FALLBACK_RATE);
   const [cycle, setCycle] = useState("annual");
   const [authOpen, setAuthOpen] = useState(false);
+  const [authNext, setAuthNext] = useState(null);
 
   useEffect(() => {
     getSession()
@@ -651,7 +652,17 @@ export default function LandingPage() {
 
   const handleCTA = () => {
     if (session) { navigate("/dashboard"); return; }
+    setAuthNext(null);
     setAuthOpen(true); // open the sign-in modal for logged-out visitors
+  };
+
+  // Plan "Get Started": signed-in users go straight to checkout; logged-out visitors sign in
+  // first, then resume to that exact checkout (so the click never just bounces back to home).
+  const goToPlan = (slug) => {
+    const dest = `/checkout?plan=${slug}&cycle=${cycle}`;
+    if (session) { navigate(dest); return; }
+    setAuthNext(dest);
+    setAuthOpen(true);
   };
 
   // Service cards: signed-in users go straight to the tool; logged-out visitors are
@@ -1177,7 +1188,7 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
-              <button className="plan-btn plan-btn-hot" style={{ marginTop: 16 }} onClick={() => navigate(`/checkout?plan=pro&cycle=${cycle}`)}>
+              <button className="plan-btn plan-btn-hot" style={{ marginTop: 16 }} onClick={() => goToPlan("pro")}>
                 Get Started
               </button>
               <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>150 free credits first · cancel anytime</div>
@@ -1214,7 +1225,7 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
-              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={() => navigate(`/checkout?plan=agency&cycle=${cycle}`)}>
+              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={() => goToPlan("agency")}>
                 Get Started
               </button>
               <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
@@ -1261,6 +1272,9 @@ export default function LandingPage() {
               <a href="/about" className="footer-link">
                 About
               </a>
+              <a href="/help" className="footer-link">
+                Help Center
+              </a>
               <a href="/faq" className="footer-link">
                 FAQ
               </a>
@@ -1282,7 +1296,7 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} next={authNext} />
     </div>
   );
 }
