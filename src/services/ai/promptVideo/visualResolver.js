@@ -14,7 +14,7 @@
  *   ai_image     → library → generate (paid; only where the director allocated it)
  *   typographic  → no asset; the designer composes a full frame
  */
-import { resolveAssets } from "../shared/assetResolver.js";
+import { resolveAssets, resolveAsset } from "../shared/assetResolver.js";
 import { generateAiImage } from "../shared/aiImage.js";
 import { aiImageBudgetFor } from "./artDirector.js";
 
@@ -104,6 +104,24 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
       b.layout = "full";
     }
   });
+
+  // Dedupe: stock picks RANDOMLY from a pool, so two similar queries can fetch the SAME photo
+  // (e.g. two "roman statue" beats → identical image). For any beat whose image repeats an earlier
+  // one, re-resolve once on the FREE tiers only (different random pick) to keep scenes distinct.
+  const usedSrc = new Set();
+  for (let i = 0; i < assetBeats.length; i++) {
+    const b = assetBeats[i];
+    if (!b.asset?.src) continue;
+    if (!usedSrc.has(b.asset.src)) { usedSrc.add(b.asset.src); continue; }
+    try {
+      const alt = await resolveAsset({ ...requests[i], _label: `${requests[i]._label}-dedup` }, { runId, orientation, aiAllowed: false, onEntity });
+      if (alt?.src && !usedSrc.has(alt.src)) {
+        b.asset = { kind: alt.kind, src: alt.src, ...(alt.real ? { real: true } : {}), ...(alt.assetMeta ? { assetMeta: alt.assetMeta } : {}) };
+        console.log(`[ai-video/executor] beat ${b.beat_index} duplicate image → re-picked a distinct one`);
+      }
+    } catch { /* keep original on failure */ }
+    usedSrc.add(b.asset.src);
+  }
 
   // Continuation beats inherit the visual (and its layout/source) of the beat they extend.
   for (let i = 1; i < beats.length; i++) {

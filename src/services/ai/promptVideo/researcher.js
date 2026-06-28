@@ -89,13 +89,14 @@ ACCURACY — the most important rule:
 - When SOURCE MATERIAL is provided, ground your facts in it and NEVER contradict it.
 - Do NOT state a specific number, date, statistic, or quote unless you are confident it is correct, or it appears in the source. When unsure, omit the specific or phrase it qualitatively ("collapsed gradually over centuries", not "fell in 476 AD when 80%…"). A wrong fact on screen is worse than a missing one.
 - If the subject is obscure or you are not confident, return FEWER facts rather than fabricate.
+- ENTITIES — prioritise CONCRETE, PHOTOGRAPHABLE named subjects, each as its OWN entry with its real name: specific landmarks (e.g. Colosseum, Roman Forum), peoples/groups (e.g. Visigoths, Vandals), and named figures (e.g. Romulus Augustulus). Do NOT bury these inside another entity's visual_identity text — surfaced as named entities, they unlock free real photos downstream. Abstract "concept" entities are fine too, but always list the concrete named ones separately.
 
 Return ONLY valid JSON:
 {
   "topic": "one-line restatement of what the video is about",
   "angle": "the most engaging framing for a short-form video (debate, countdown, reveal, story, comparison, explainer)",
   "tone": "fun | dramatic | informative | inspiring | provocative",
-  "entities": [{ "name": "...", "kind": "person|company|product|place|concept", "visual_identity": "what they look like / are visually known for" }],
+  "entities": [{ "name": "...", "kind": "person|company|product|place|landmark|group|concept", "visual_identity": "what they look like / are visually known for" }],
   "facts": ["short, true, interesting facts with numbers ONLY where you are confident — these become on-screen stats and script lines"],
   "contrasts": ["X vs Y framings inside the topic, if any"],
   "artifacts": ["concrete REAL visual artifacts the video can reference: famous moments, objects, logos, quotes, covers, datasets — each described in one line"],

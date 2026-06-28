@@ -102,16 +102,19 @@ NARRATION — THE SINGLE MOST IMPORTANT PART. The voiceover is what the viewer H
 - Minimize colons/semicolons (TTS reads them as long pauses).
 - FINAL TEST: read the narration aloud in your head — it must sound like one person talking naturally.
 
-PER-BEAT ON-SCREEN CONTENT — the short text shown on screen for the beat (the art-director decides how it looks). Real strings, real numbers, from the research:
+PER-BEAT ON-SCREEN CONTENT — the short text shown on screen (the art-director decides how it LOOKS; you decide WHAT it says). It MUST VARY in shape beat to beat. Stamping the SAME "Title + supporting line" on every beat is the #1 cause of a slideshow — DO NOT do it. Pick the shape that fits each moment and make it CONCRETE from the research:
 "content": {
-  "kind": "hook | stat | quote | list | fact | chart | title | cta | none",
-  "headline": "the main on-screen line, exact text (a few words, not a sentence)",
+  "kind": "hook | stat | quote | list | fact | title | cta | none",
+  "headline": "the main on-screen line, exact text",
   "subtext": "supporting line or null",
-  "items": null or ["list item", ...] or [{"label":"...","value":"..."}] for a chart,
+  "items": null or ["real item", "real item", ...],
   "attribution": "for quotes, else null"
 }
-- kind "none" = a clean moment with no on-screen text (pure atmosphere) — use sparingly.
-- visual_concept: ONE plain sentence naming what this moment is ABOUT (e.g. "the Aries sign, fiery and impulsive") — this is context the art-director will turn into a visual. Be concrete about the SUBJECT; do not describe colors/layout.
+- VARY THE SHAPE across the video — rotate intentionally between: a real STAT (a number/date IS the headline, e.g. "476 AD", "3 continents", "26 emperors in 50 years"); a real LIST (items[] of ≥2 real named things, e.g. ["Visigoths","Vandals","Huns"]); a QUOTE (+ attribution); a single PUNCHY word/phrase (headline only, subtext null); a clean NO-TEXT beat (kind "none", headline ""). Use 2-3 clean beats across the video — they earn impact.
+- HONEST KINDS — the kind must MATCH the content: "stat" ONLY with an actual number; "list" ONLY with items[] of ≥2 real items; "quote" ONLY with a real quote. If it's none of those, use "fact"/"title"/"hook"/"cta" with a headline (+ optional subtext). Never tag "stat" or "list" without the real number/items.
+- HEADLINE-ONLY is often stronger — set subtext null unless it adds real, new information. Do NOT add a supporting line to every beat.
+- USE REAL SPECIFICS from the research — numbers, dates, names. Generic labels ("Political Instability") are weak; specifics ("26 emperors murdered in 50 years") are strong.
+- visual_concept: ONE plain sentence naming the SUBJECT of the moment (e.g. "the Colosseum, monumental and decaying") — context for the art-director. Concrete subject; no colours/layout.
 
 NARRATIVE ARC:
 - Beat 0 is the HOOK and must FRAME THE PREMISE: name the subject and the promise so the viewer knows what they're getting (e.g. "You think you know Shiva? Here are 5 things even devotees miss"). Never cold-open into facts with no framing.
@@ -131,7 +134,7 @@ PUBLISH METADATA — this gets posted to social, so also write post copy:
 Return ONLY valid JSON:
 {
   "project_name": "short title",
-  "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient",
+  "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient — MUST match the topic's tone (see research.tone): dramatic/serious/somber → cinematic; fun/playful/satirical → upbeat or energetic; calm/reflective → chill or ambient; motivational → inspiring. Do NOT default to upbeat.",
   "niche": "one-word content domain for asset reuse (e.g. tech, finance, history, science, nature, lifestyle, sports, food, travel)",
   "publish": { "title": "≤95-char post title", "description": "1-3 sentence caption", "hashtags": ["#tag1", "#tag2"] },
   "narration": "the COMPLETE voiceover as ONE flowing spoken paragraph (real connected sentences), about ${targetWords} words (≈${targetDuration}s at 145 wpm) — every script_line below MUST be a verbatim contiguous slice of this, in order",
@@ -169,6 +172,15 @@ async function runWriterCompletion(prompt, extraUser = "") {
 }
 
 const CONTENT_KINDS = ["hook", "stat", "quote", "list", "fact", "chart", "title", "cta", "none"];
+
+// Fallback music mood derived from the research tone (so a dramatic topic never defaults to upbeat).
+function moodFromTone(tone = "") {
+  const t = String(tone).toLowerCase();
+  if (/dramat|serious|somber|dark|tense|epic|tragic/.test(t)) return "cinematic";
+  if (/calm|reflect|gentle|soothing|peace/.test(t))           return "chill";
+  if (/inspir|motivat|uplift|hope/.test(t))                   return "inspiring";
+  return "upbeat";
+}
 
 /**
  * writeScript({ research, targetDuration, language }) →
@@ -248,7 +260,7 @@ export async function writeScript({ research, targetDuration = 45, language = "e
   return {
     project_name: plan.project_name || research.topic?.slice(0, 60) || "Prompt Video",
     niche,
-    music_mood: ["upbeat", "inspiring", "chill", "cinematic", "energetic", "ambient"].includes(plan.music_mood) ? plan.music_mood : "upbeat",
+    music_mood: ["upbeat", "inspiring", "chill", "cinematic", "energetic", "ambient"].includes(plan.music_mood) ? plan.music_mood : moodFromTone(research.tone),
     publish,
     narration: String(plan.narration || ""),
     beats,

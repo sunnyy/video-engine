@@ -58,11 +58,12 @@ ${themeBlock}
 
 HOW TO DIRECT EACH BEAT:
 - Read the beat's visual_concept + script_line + content and decide what the viewer should SEE. Then pick the cheapest source that shows it WELL (free first):
-  • a named real person/org/place/landmark → "entity" with its exact Wikipedia title.
-  • a real-world moment that footage shows → "stock_video" with a concrete search phrase.
-  • any other concrete/depictable subject, object, symbol, emblem, place, mood → "stock_image" with a concrete search phrase (this includes iconic symbol art like zodiac signs, logos-as-concept, flags, animals).
+  • a named real person/org/place/landmark → "entity" with its exact Wikipedia title — BUT only when that subject's canonical photo actually fits the moment AND era. A generic place's Wikipedia lead image is often modern/anachronistic (e.g. "City of Rome" → a Baroque fountain); for era-specific or "crumbling/ancient" needs, prefer stock_image instead.
+  • a real-world moment that footage shows → "stock_video" with a SHORT search phrase.
+  • any other concrete/depictable subject, object, symbol, emblem, place, mood → "stock_image" with a SHORT search phrase (this includes iconic symbol art like zodiac signs, logos-as-concept, flags, animals).
   • a bespoke metaphor/concept NO free source can show → "ai_image" with a cinematic, TEXT-FREE prompt. Budget = ${aiImageBudget}; allocate sparingly.
   • a pure-information moment (stat, quote, list, title, CTA, comparison) OR nothing depictable → "typographic" (a deliberate FULL designed frame).
+- STOCK QUERIES MUST BE SHORT & ICONIC — 2-4 words naming the core subject ("roman emperor bust", "gold roman coins", "roman ruins arch", "barbarian horsemen"), NOT a cinematic sentence. Stock engines match keywords, not prose — a long descriptive phrase returns a generic or wrong image. Save the cinematic composition/lighting/mood detail for "ai_image" image_prompts ONLY. Also: give DIFFERENT beats DIFFERENT queries (don't send two near-identical phrases — they fetch the same photo twice).
 - DEPICTABLE SUBJECTS GET IMAGERY. If the beat is about something you could photograph or find as stock, it MUST be entity/stock/ai — never typographic. A topic that enumerates concrete subjects (each zodiac sign, each animal, each city, each tool) gives EVERY subject its own real image. Typographic is for genuine information frames only.
 - VARIETY — THE ANTI-SLIDESHOW RULE: consecutive beats must not look alike. Vary the SUBJECT, the SOURCE, the CAMERA move and the TRANSITION scene to scene — never the same camera or transition twice in a row, never one source dominating a run. (The designer varies the typography per scene; you make sure the shots + motion underneath are varied too, so it never feels like one photo-with-a-caption repeated.)
 - continues_previous beats inherit the previous beat's visual (a quick same-image build) — you may leave their source matching the previous.
