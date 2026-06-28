@@ -63,6 +63,7 @@ VARY THE BACKGROUND scene to scene — do NOT default every frame to the same co
 export function buildBeatPrompt(beat, ctx) {
   const { style, palette, canvasW, canvasH, language } = ctx;
   const duration = beat.duration_seconds ?? 3;
+  const isPortrait = canvasH > canvasW; // vertical video → splits must be horizontal (stacked bands), not side columns
   // Three modes: a VIDEO beat (type over the full-bleed clip the pipeline injects); an IMAGE beat
   // (the designer COMPOSES the fetched image(s) into the frame — full-bleed / framed / split, or a
   // row/grid/triptych for several images); a TYPOGRAPHIC beat (no asset → full designed frame).
@@ -134,7 +135,8 @@ ${contentBlock(beat)}
 ${latinOnScreenRule}
 HOW TO COMPOSE — ${isMulti
   ? `this is a MULTI-IMAGE scene (a list / comparison / trio). The images are LANDSCAPE — stack them as full-width HORIZONTAL BANDS (one above the next), or a clean grid. Do NOT slice them into tall vertical columns (thin vertical strips look broken in a vertical video). Each image its OWN large <img> (object-fit:cover), optionally with its short label beside/under it. Use ALL ${images.length}; never drop or duplicate one. THIS is how a list becomes real images instead of a text list.`
-  : `you have ONE image — pick the composition that fits THIS moment and differs from other scenes: full-bleed with bold type over it; OR the image as a large FRAMED block with the type beside/below it in the cleared space; OR the image bleeding off one edge with type in the open area; OR a banded split. VARY it scene to scene — do NOT default to full-bleed-with-a-caption every time.`}
+  : `you have ONE image — pick a composition that fits THIS moment and differs from other scenes: full-bleed with bold type over it; OR a HORIZONTAL BAND split (the image as a wide band across the TOP or BOTTOM, the type in the other band); OR the image bleeding off the top or bottom edge with type in the cleared area. VARY it scene to scene — do NOT default to full-bleed-with-a-caption every time.`}
+${isPortrait ? `- THIS IS A TALL / PORTRAIT FRAME: do NOT split it LEFT/RIGHT into side-by-side columns — a side panel squeezes the image (and the text) into a thin vertical strip. Split TOP/BOTTOM (horizontal bands) or go full-bleed. Multi-image scenes stack as horizontal bands, never side-by-side columns.` : ""}
 - Place each image as <img data-layer="image" data-role="card" src="..." data-animation="scale-in" data-scene-element="hero" style="object-fit:cover; (your size + position)" />. The images ARE the visual — size them LARGE.
 - TYPE is bold and varied (a different scale/placement than other scenes).
 - LEGIBILITY IS YOURS HERE — the pipeline adds NO scrim. Wherever text sits over an image, guarantee contrast: place it over a darker region, use strong text-shadow, OR add a real gradient scrim as a <div data-role="glow" data-layer="effect" style="position:absolute; ...linear-gradient..."> behind the text.
