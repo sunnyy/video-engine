@@ -134,7 +134,7 @@ PUBLISH METADATA — this gets posted to social, so also write post copy:
 Return ONLY valid JSON:
 {
   "project_name": "short title",
-  "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient — MUST match the topic's tone (see research.tone): dramatic/serious/somber → cinematic; fun/playful/satirical → upbeat or energetic; calm/reflective → chill or ambient; motivational → inspiring. Do NOT default to upbeat.",
+  "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient — MUST match the SUBJECT'S FEELING, not just the tone label: dramatic/serious/somber → cinematic; fun/playful/satirical → upbeat or energetic; calm/reflective/explainer → chill or ambient; motivational → inspiring. A HEAVY, TIRING, STRESSFUL or SAD subject (e.g. burnout, decline, loss) → chill/ambient or cinematic, NEVER upbeat. Do NOT default to upbeat.",
   "niche": "one-word content domain for asset reuse (e.g. tech, finance, history, science, nature, lifestyle, sports, food, travel)",
   "publish": { "title": "≤95-char post title", "description": "1-3 sentence caption", "hashtags": ["#tag1", "#tag2"] },
   "narration": "the COMPLETE voiceover as ONE flowing spoken paragraph (real connected sentences), about ${targetWords} words (≈${targetDuration}s at 145 wpm) — every script_line below MUST be a verbatim contiguous slice of this, in order",
