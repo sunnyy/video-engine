@@ -140,11 +140,11 @@ export default function AivLab() {
               const ra = b.resolvedAssets || [];
               return (
               <div key={b.beat_index} style={{ ...box, padding: 8 }}>
-                <div style={{ aspectRatio: "9/16", background: "#0e0e16", borderRadius: 6, overflow: "hidden", display: "flex", gap: 2 }}>
+                <div style={{ aspectRatio: "9/16", background: "#0e0e16", borderRadius: 6, overflow: "hidden", display: "flex", flexDirection: ra.length > 1 ? "column" : "row", gap: 2 }}>
                   {ra.length
                     ? ra.map((a, k) => a.kind === "video"
-                        ? <video key={k} src={a.src} muted style={{ flex: 1, minWidth: 0, height: "100%", objectFit: "cover" }} />
-                        : <img key={k} src={a.src} alt="" style={{ flex: 1, minWidth: 0, height: "100%", objectFit: "cover" }} />)
+                        ? <video key={k} src={a.src} muted style={{ flex: 1, minHeight: 0, minWidth: 0, width: "100%", objectFit: "cover" }} />
+                        : <img key={k} src={a.src} alt="" style={{ flex: 1, minHeight: 0, minWidth: 0, width: "100%", objectFit: "cover" }} />)
                     : <span style={{ margin: "auto", color: C.warn, fontSize: 11 }}>typographic</span>}
                 </div>
                 <div style={{ fontSize: 10.5, color: C.muted, marginTop: 5 }}>#{b.beat_index} {ra.length ? `${ra.length}×${ra.map(a => a.kind).join("/")}${ra.some(a => a.real) ? " real" : ""}` : "—"}</div>

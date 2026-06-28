@@ -38,7 +38,10 @@ const VIDEO_META = { treatment: "full_bleed", orientation: "portrait", aspect: n
 
 // Free tiers: entity → stock → library. No generation cost.
 async function resolveFreeTiers(req, ctx) {
-  const { runId, orientation } = ctx;
+  const { runId } = ctx;
+  // A request may override the batch orientation (e.g. multi-image scenes fetch LANDSCAPE tiles so
+  // they stack as bands in a vertical video instead of tall slices).
+  const orientation = req.orientation ?? ctx.orientation;
   const label = req._label ?? "a";
 
   // 1. Entity (real photo), optionally transformed (e.g. cutout)

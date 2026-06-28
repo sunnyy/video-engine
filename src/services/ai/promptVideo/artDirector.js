@@ -67,7 +67,7 @@ HOW TO DIRECT EACH BEAT — you give it an "assets" list, the designer composes 
 - DEPICTABLE SUBJECTS GET IMAGERY — never leave a depictable beat empty.
 
 CRITICAL SOURCE RULES (the lab caught these):
-- MAPS, DIAGRAMS, charts, and ABSTRACT CONCEPTS are NOT on stock — use "ai_image" for them (a stock search for "empire map" returns a random statue).
+- MAPS, DIAGRAMS, charts, and ABSTRACT CONCEPTS are NOT on stock — use "ai_image" for them (a stock search for "empire map" returns a random statue). But use AT MOST ONE map in the whole video — multiple generated maps look near-identical and repetitive. For a geographic comparison/split (e.g. East vs West, Rome vs Constantinople), do a 2-asset SPLIT of the two real places (two entity/stock images), NOT a second map.
 - STOCK QUERIES MUST BE SHORT & ICONIC — 2-4 keywords ("roman emperor bust", "gold roman coins", "byzantine walls"), NOT a sentence. Stock matches keywords, not prose. Give different beats DIFFERENT queries.
 - RESPECT THE MOOD — the chosen style/palette sets the mood; don't pick a source that breaks it (no bright midday stock in a dark, somber film). Add mood words to stock queries when needed ("dark", "ruins", "night").
 - VARIETY — THE ANTI-SLIDESHOW RULE: consecutive beats must differ — vary SUBJECTS, mix single vs multi-asset, vary CAMERA and TRANSITION (never the same twice in a row). The designer will compose each scene differently; you make the underlying material varied.

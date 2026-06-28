@@ -56,8 +56,11 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
     b.asset = null;
     if (b.continues_previous) return;
     const minDur = Math.max(2, Math.ceil(b.duration_seconds ?? 3));
+    // Multi-image scenes fetch LANDSCAPE tiles so they stack as bands/rows in a vertical video
+    // instead of tall slices; a single image fills the frame, so it uses the video orientation.
+    const assetOrientation = (b.assets || []).length > 1 ? "16:9" : orientation;
     (b.assets || []).forEach((asset, assetIdx) => {
-      flat.push({ beatIdx, assetIdx, asset, req: { ...toRequest(asset, b, minDur), _ref: { beat: b, asset }, _label: `b${b.beat_index}a${assetIdx}` } });
+      flat.push({ beatIdx, assetIdx, asset, req: { ...toRequest(asset, b, minDur), orientation: assetOrientation, _ref: { beat: b, asset }, _label: `b${b.beat_index}a${assetIdx}` } });
     });
   });
 
@@ -66,7 +69,7 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
     const { beat, asset } = req._ref;
     const styleStr  = asset.source === "ai_image" ? style.illustrationStyle : style.photoStyle;
     const promptSrc = asset.prompt || asset.query || beat.content?.headline || beat.visual_concept || "";
-    const src = await generateAiImage(`${promptSrc}, ${styleStr}`, { runId, label: `${req._label}-ai`, orientation, noTextGate: true });
+    const src = await generateAiImage(`${promptSrc}, ${styleStr}`, { runId, label: `${req._label}-ai`, orientation: req.orientation ?? orientation, noTextGate: true });
     return src ? { src, kind: "image", libraryEligible: true } : null;
   };
   const onEntity = async (src) => ({ src, kind: "image" });

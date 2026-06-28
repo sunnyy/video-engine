@@ -132,7 +132,7 @@ ${imgList}
 ${contentBlock(beat)}
 ${latinOnScreenRule}
 HOW TO COMPOSE — ${isMulti
-  ? `this is a MULTI-IMAGE scene (a list / comparison / trio). Lay the images out as a ROW, GRID, TRIPTYCH, stacked split, or staggered cluster — each image its OWN large <img>, optionally with its short label beside/under it. Use ALL ${images.length}; never drop or duplicate one. THIS is how a list becomes real images instead of a text list.`
+  ? `this is a MULTI-IMAGE scene (a list / comparison / trio). The images are LANDSCAPE — stack them as full-width HORIZONTAL BANDS (one above the next), or a clean grid. Do NOT slice them into tall vertical columns (thin vertical strips look broken in a vertical video). Each image its OWN large <img> (object-fit:cover), optionally with its short label beside/under it. Use ALL ${images.length}; never drop or duplicate one. THIS is how a list becomes real images instead of a text list.`
   : `you have ONE image — pick the composition that fits THIS moment and differs from other scenes: full-bleed with bold type over it; OR the image as a large FRAMED block with the type beside/below it in the cleared space; OR the image bleeding off one edge with type in the open area; OR a banded split. VARY it scene to scene — do NOT default to full-bleed-with-a-caption every time.`}
 - Place each image as <img data-layer="image" data-role="card" src="..." data-animation="scale-in" data-scene-element="hero" style="object-fit:cover; (your size + position)" />. The images ARE the visual — size them LARGE.
 - TYPE is bold and varied (a different scale/placement than other scenes).
