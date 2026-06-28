@@ -63,11 +63,12 @@ VARY THE BACKGROUND scene to scene — do NOT default every frame to the same co
 export function buildBeatPrompt(beat, ctx) {
   const { style, palette, canvasW, canvasH, language } = ctx;
   const duration = beat.duration_seconds ?? 3;
-  // Mode follows the art-director's directive: `overlay` (text over a fetched image/video) vs `full`
-  // (a self-contained designed frame). A media-backed beat defaults to overlay unless the directive
-  // explicitly pinned `full`; a typographic beat has no media → always the full canvas frame.
-  const hasMedia = !!beat.asset?.src && (beat.asset.kind === "image" || beat.asset.kind === "video");
-  const isOverlay = hasMedia && beat.layout !== "full";
+  // Three modes: a VIDEO beat (type over the full-bleed clip the pipeline injects); an IMAGE beat
+  // (the designer COMPOSES the fetched image(s) into the frame — full-bleed / framed / split, or a
+  // row/grid/triptych for several images); a TYPOGRAPHIC beat (no asset → full designed frame).
+  const assets = Array.isArray(beat.resolvedAssets) ? beat.resolvedAssets.filter(a => a?.src) : (beat.asset?.src ? [beat.asset] : []);
+  const video  = assets.find(a => a.kind === "video") || null;
+  const images = assets.filter(a => a.kind === "image");
   // Hindi is Devanagari on BOTH the spoken line and the on-screen CONTENT (the renderer + measure
   // now have a Devanagari font). Render the Devanagari content as-is; keep it short so it fits.
   const latinOnScreenRule = (language === "hi" || language === "hinglish")
@@ -86,9 +87,9 @@ CONTENT-FIRST — NO ORPHAN DECORATION (the #1 thing that makes frames look amat
 NEVER print the beat's internal kind/role as visible text — words like "Hook", "Fact", "Stat", "Quote", "List", "CTA", "Title", "Reveal" are internal direction, never on screen. Render only the real CONTENT strings.
 ${RENDERER_CONSTRAINTS}`;
 
-  if (isOverlay) {
-    // ── OVERLAY MODE (type over a full-bleed shot) ──────────────────────────
-    const system = `You art-direct ONE frame of a fast-cut video — a cinematic ${beat.asset.kind === "video" ? "clip" : "image"} plays full-bleed behind you (the pipeline injects the media AND a legibility scrim — you build NEITHER). On screen ${duration.toFixed(1)}s. Design real CSS; a browser measures it.
+  if (video) {
+    // ── VIDEO OVERLAY MODE (type over the full-bleed clip the pipeline injects) ──
+    const system = `You art-direct ONE frame of a fast-cut video — a cinematic clip plays full-bleed behind you (the pipeline injects the media AND a legibility scrim — you build NEITHER). On screen ${duration.toFixed(1)}s. Design real CSS; a browser measures it.
 
 ${styleDirectiveBlock(style)}
 PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white over the scrim; lift the ONE key word/number in a BRIGHT, vivid accent that POPS on a dark photo — never a dark/muddy accent that disappears.
@@ -116,12 +117,41 @@ Design a BOLD, BIG typographic treatment for this line — a different scale/pla
     return { system, user };
   }
 
-  // ── CANVAS MODE ───────────────────────────────────────────────────────────
+  if (images.length) {
+    // ── COMPOSE MODE (the designer PLACES the fetched image(s) and composes the whole frame) ──
+    const isMulti = images.length > 1;
+    const imgList = images.map((im, k) => `  - image ${k + 1}${im.label ? ` "${im.label}"` : ""}: ${im.src}`).join("\n");
+    const system = `You are a world-class motion-graphics ART DIRECTOR composing ONE frame of a fast-cut video — ${canvasW}x${canvasH}px, on screen ${duration.toFixed(1)}s, Linear/Vercel/Stripe quality. You are given ${images.length} real image${isMulti ? "s" : ""}, and you COMPOSE the whole frame WITH ${isMulti ? "them" : "it"} plus the text. There is NO fixed layout — make this frame structurally DIFFERENT from a plain "photo with a caption" AND different from neighbouring scenes. Design real CSS (flex/grid/absolute); a browser lays it out and we measure it.
+
+${styleDirectiveBlock(style)}
+PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white; lift the ONE key word/number in a BRIGHT accent that POPS.
+
+IMAGE(S) — use ALL of them, placed as real <img> elements:
+${imgList}
+
+${contentBlock(beat)}
+${latinOnScreenRule}
+HOW TO COMPOSE — ${isMulti
+  ? `this is a MULTI-IMAGE scene (a list / comparison / trio). Lay the images out as a ROW, GRID, TRIPTYCH, stacked split, or staggered cluster — each image its OWN large <img>, optionally with its short label beside/under it. Use ALL ${images.length}; never drop or duplicate one. THIS is how a list becomes real images instead of a text list.`
+  : `you have ONE image — pick the composition that fits THIS moment and differs from other scenes: full-bleed with bold type over it; OR the image as a large FRAMED block with the type beside/below it in the cleared space; OR the image bleeding off one edge with type in the open area; OR a banded split. VARY it scene to scene — do NOT default to full-bleed-with-a-caption every time.`}
+- Place each image as <img data-layer="image" data-role="card" src="..." data-animation="scale-in" data-scene-element="hero" style="object-fit:cover; (your size + position)" />. The images ARE the visual — size them LARGE.
+- TYPE is bold and varied (a different scale/placement than other scenes).
+- LEGIBILITY IS YOURS HERE — the pipeline adds NO scrim. Wherever text sits over an image, guarantee contrast: place it over a darker region, use strong text-shadow, OR add a real gradient scrim as a <div data-role="glow" data-layer="effect" style="position:absolute; ...linear-gradient..."> behind the text.
+- FIT: everything fully inside ${canvasW}x${canvasH}; size the largest headline word so it fits the width — never let it overflow.
+
+${dataContract}
+
+OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;height:${canvasH}px;margin:0;overflow:hidden;background:${palette.bg}}.`;
+
+    const user = `BEAT ${beat.beat_index} — ${duration.toFixed(1)}s. Compose the frame with the image${isMulti ? "s" : ""} above.
+SPOKEN: "${beat.script_line}"
+
+Make it look DIFFERENT from a plain caption and from the other scenes.`;
+    return { system, user };
+  }
+
+  // ── TYPOGRAPHIC / CANVAS MODE (no asset → a full designed frame) ────────────
   const maxWords = Math.max(4, Math.round(duration * 3));
-  const cutoutBlock = beat.asset?.src && beat.asset.kind === "cutout"
-    ? `\nRAW MATERIAL: a transparent-background cutout of the subject${beat.asset.real ? " (a REAL photo)" : ""}: ${beat.asset.src}
-Place it with <img data-layer="image" data-role="card" src="${beat.asset.src}" data-animation="scale-in" data-scene-element="hero" style="object-fit:contain" /> at the size/spot you choose (cutouts shine LARGE), composed with the text.\n`
-    : "";
   const continuation = beat.continues_previous
     ? `\nCONTINUATION: this beat EXTENDS the previous frame — keep the same field/background family and composition skeleton; the new content arrives as the next element.\n`
     : "";
@@ -146,7 +176,7 @@ ${dataContract}
 KINETIC TEXT SYNC: when your text mirrors the spoken line, split it into one element per phrase (spoken order, exact words) — the pipeline lands each as its words are spoken.
 
 LAYOUT: entirely yours — invent the strongest, boldest composition for THIS line's content and this film's style. Don't reach for a default; let the words decide the form.
-${cutoutBlock}${continuation}
+${continuation}
 OUTPUT: only the HTML, from <!DOCTYPE html>.`;
 
   const user = `BEAT ${beat.beat_index} — ${duration.toFixed(1)}s on screen

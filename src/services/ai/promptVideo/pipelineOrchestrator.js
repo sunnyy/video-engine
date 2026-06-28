@@ -59,6 +59,11 @@ export const PROMPT_STATUS_STEPS = [
 // embedded by the designer instead)
 const isFullBleedBeat = (beat) =>
   !!beat.asset?.src && (beat.asset.kind === "image" || beat.asset.kind === "video");
+// Only VIDEO beats are injected full-bleed by the pipeline; IMAGE beats are now COMPOSED by the
+// designer (the image lives in the measured HTML), so they go through the design path like
+// typographic beats. (Video can't be placed as an <img>, so it stays a pipeline full-bleed layer.)
+const isVideoBeat = (beat) =>
+  (Array.isArray(beat.resolvedAssets) && beat.resolvedAssets.some(a => a?.kind === "video")) || beat.asset?.kind === "video";
 const NO_KF = { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] };
 
 // ── Timing ───────────────────────────────────────────────────────────────────
@@ -538,7 +543,9 @@ export async function runPromptPipeline(params, onStep) {
   const moderationText = beats.map((b) => {
     const contentText = b.content && typeof b.content === "object"
       ? Object.values(b.content).filter((v) => typeof v === "string").join(" ") : "";
-    return [b.script_line, b.image_prompt, b.shot_query, contentText].filter(Boolean).join(" ");
+    // Every asset's query/prompt/entity (multi-asset beats carry several) goes to stock/image-gen.
+    const assetText = (b.assets || []).map((a) => [a.query, a.prompt, a.entity].filter(Boolean).join(" ")).join(" ");
+    return [b.script_line, assetText, contentText].filter(Boolean).join(" ");
   }).join("\n").trim();
   if (moderationText) await moderateInput(moderationText, { label: "ai-video production content (script + prompts)" });
 
@@ -583,8 +590,8 @@ export async function runPromptPipeline(params, onStep) {
   // Canvas-mode design for HTML/cutout beats; overlay-mode design for shot
   // beats carrying content. Clean shots (content.kind "none") get no design.
   const hasOverlayContent = (b) => b.content?.kind && b.content.kind !== "none";
-  const designedBeats = beats.filter(b => !isFullBleedBeat(b) || hasOverlayContent(b));
-  console.log(`[ai-video] designing ${designedBeats.length}/${beats.length} beats (${beats.filter(b => isFullBleedBeat(b) && !hasOverlayContent(b)).length} clean shots)`);
+  const designedBeats = beats.filter(b => !isVideoBeat(b) || hasOverlayContent(b));
+  console.log(`[ai-video] designing ${designedBeats.length}/${beats.length} beats (${beats.filter(b => isVideoBeat(b) && !hasOverlayContent(b)).length} clean video shots)`);
   const designs = await designAllBeats(designedBeats, designCtx);
   const beatHTMLs = beats.map(b => designs.find(d => d.beatIndex === b.beat_index)?.html ?? "");
 
@@ -593,8 +600,7 @@ export async function runPromptPipeline(params, onStep) {
   // HTML, a real browser renders it, htmlMeasure flattens it to positioned layers.
   step(PROMPT_STATUS_STEPS[5]);
   const beatGraphs = await Promise.all(beats.map(async (beat, i) => {
-    const overlayMode = isFullBleedBeat(beat);
-    if (overlayMode && !hasOverlayContent(beat)) return []; // clean shots carry no designed layers
+    if (isVideoBeat(beat) && !hasOverlayContent(beat)) return []; // clean video shots carry no designed layers
     const html = beatHTMLs[i];
     if (!html) return [];
     try {
@@ -632,7 +638,7 @@ export async function runPromptPipeline(params, onStep) {
   const shotLayers = [];
   let lastMedia = null; // { layer, src, beatIndex }
   for (const beat of beats) {
-    if (!isFullBleedBeat(beat)) { lastMedia = null; continue; }
+    if (!isVideoBeat(beat)) { lastMedia = null; continue; } // only VIDEO beats inject full-bleed media; image beats are composed by the designer
     const win = windows[beat.beat_index];
 
     if (beat.continues_previous && lastMedia && lastMedia.src === beat.asset.src && lastMedia.beatIndex === beat.beat_index - 1) {
@@ -658,9 +664,26 @@ export async function runPromptPipeline(params, onStep) {
   }
   if (shotLayers.length) finalTimeline.layers = [...shotLayers, ...finalTimeline.layers];
 
+  // Ken Burns on designer-placed FULL-BLEED images (a composed/framed image stays static — its
+  // motion is the composition). Only image beats; video already has camera motion via buildAssetLayer.
+  for (const beat of beats) {
+    if (isVideoBeat(beat)) continue;
+    const win = windows[beat.beat_index];
+    const dur = parseFloat(((win?.end ?? 0) - (win?.start ?? 0)).toFixed(3));
+    if (dur <= 0) continue;
+    for (const l of finalTimeline.layers) {
+      if (l.type !== "image" || !l.id?.startsWith(`s${beat.beat_index}_`)) continue;
+      const w = l.transform?.width ?? 0, h = l.transform?.height ?? 0;
+      const hasKf = l.keyframes && Object.values(l.keyframes).some(a => Array.isArray(a) && a.length);
+      if (!hasKf && w >= canvas.width * 0.9 && h >= canvas.height * 0.9) {
+        l.keyframes = cameraKeyframes(beat.camera ?? "slow_zoom_in", "image", dur);
+      }
+    }
+  }
+
   // Self-audit visual variety so a too-static video is caught in logs, not by eye.
   const distinctMedia = new Set(shotLayers.filter(l => l.type === "image" || l.type === "video").map(l => l.src)).size;
-  const htmlScenes    = beats.filter(b => !isFullBleedBeat(b)).length;
+  const htmlScenes    = beats.filter(b => !isVideoBeat(b)).length;
   const variety       = distinctMedia + htmlScenes;
   const expected      = Math.max(2, Math.round(totalDur / 4));
   if (totalDur > 8 && variety < Math.round(expected * 0.7)) {
@@ -763,13 +786,12 @@ export async function runPromptPipeline(params, onStep) {
           palette,
           research: { topic: research.topic, angle: research.angle, entities: research.entities, facts: research.facts, artifacts: research.artifacts },
           beats: beats.map(b => ({
-            beat_index: b.beat_index, asset_type: b.asset_type,
-            source: b.source ?? null, layout: b.layout ?? null, fallback: b.fallback ?? null,
+            beat_index: b.beat_index, asset_type: b.asset_type, source: b.source ?? null, fallback: b.fallback ?? null,
+            assets: b.assets ?? [],
             script_line: b.script_line,
             content: b.content, visual_concept: b.visual_concept, camera: b.camera ?? null,
-            image_prompt: b.image_prompt, shot_query: b.shot_query,
             transition_out: b.transition_out, duration_seconds: b.duration_seconds,
-            asset: b.asset ? { kind: b.asset.kind, src: b.asset.src } : null,
+            resolvedAssets: (b.resolvedAssets || []).map(a => ({ kind: a.kind, src: a.src, label: a.label ?? null })),
           })),
           beatHTMLs,
         },

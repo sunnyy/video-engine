@@ -115,32 +115,42 @@ export default function AivLab() {
               {["bg","accent","accent2","text"].map(k => <span key={k} title={`${k} ${direct.palette?.[k]}`} style={{ width: 18, height: 18, borderRadius: 4, background: direct.palette?.[k], border: `1px solid ${C.border}` }} />)}
               <span style={{ color: C.faint }}>theme {direct.palette?.theme}</span>
             </div>
-            {direct.beats.map(b => (
+            {direct.beats.map(b => {
+              const as = b.assets || [];
+              return (
               <div key={b.beat_index} style={{ borderBottom: `1px solid ${C.border}`, padding: "7px 0", fontSize: 12 }}>
                 <span style={{ color: C.faint }}>#{b.beat_index}{b.continues_previous ? "+" : ""}</span>{" "}
-                <span style={{ color: b.source === "typographic" ? C.warn : C.ok, fontWeight: 700 }}>{b.source}</span>
-                <span style={{ color: C.faint }}> /{b.layout}{b.camera ? ` /${b.camera}` : ""} →{b.transition_out}{b.sfx_hint ? ` ♪${b.sfx_hint}` : ""} (fb:{b.fallback})</span>
-                <div style={{ color: C.muted, fontSize: 11.5, marginTop: 2 }}>{b.subject_entity ? `entity: ${b.subject_entity}` : b.image_prompt ? `ai: ${b.image_prompt}` : b.shot_query ? `query: ${b.shot_query}` : "—"}</div>
+                <span style={{ color: as.length === 0 ? C.warn : C.ok, fontWeight: 700 }}>{as.length === 0 ? "typographic" : as.length > 1 ? `${as.length}× multi` : as[0].source}</span>
+                <span style={{ color: C.faint }}>{b.camera ? ` /${b.camera}` : ""} →{b.transition_out}{b.sfx_hint ? ` ♪${b.sfx_hint}` : ""} (fb:{b.fallback})</span>
+                {as.map((a, k) => (
+                  <div key={k} style={{ color: C.muted, fontSize: 11.5, marginTop: 2 }}>
+                    <span style={{ color: C.faint }}>{a.source}{a.label ? ` "${a.label}"` : ""}:</span> {a.entity || a.query || a.prompt || "—"}
+                  </div>
+                ))}
               </div>
-            ))}
+              );
+            })}
           </>}
         </Section>
 
         {/* 4 — Resolve */}
         <Section n={4} title="resolve" can={!!direct} onRun={runResolve} runLabel="resolve">
           {resolved && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))", gap: 10 }}>
-            {resolved.map(b => (
+            {resolved.map(b => {
+              const ra = b.resolvedAssets || [];
+              return (
               <div key={b.beat_index} style={{ ...box, padding: 8 }}>
-                <div style={{ aspectRatio: "9/16", background: "#0e0e16", borderRadius: 6, overflow: "hidden", display: "grid", placeItems: "center" }}>
-                  {b.asset?.src
-                    ? (b.asset.kind === "video"
-                        ? <video src={b.asset.src} muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : <img src={b.asset.src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />)
-                    : <span style={{ color: C.warn, fontSize: 11 }}>typographic</span>}
+                <div style={{ aspectRatio: "9/16", background: "#0e0e16", borderRadius: 6, overflow: "hidden", display: "flex", gap: 2 }}>
+                  {ra.length
+                    ? ra.map((a, k) => a.kind === "video"
+                        ? <video key={k} src={a.src} muted style={{ flex: 1, minWidth: 0, height: "100%", objectFit: "cover" }} />
+                        : <img key={k} src={a.src} alt="" style={{ flex: 1, minWidth: 0, height: "100%", objectFit: "cover" }} />)
+                    : <span style={{ margin: "auto", color: C.warn, fontSize: 11 }}>typographic</span>}
                 </div>
-                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 5 }}>#{b.beat_index} {b.source}{b.asset ? ` · ${b.asset.kind}${b.asset.real ? "/real" : ""}` : ""}</div>
+                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 5 }}>#{b.beat_index} {ra.length ? `${ra.length}×${ra.map(a => a.kind).join("/")}${ra.some(a => a.real) ? " real" : ""}` : "—"}</div>
               </div>
-            ))}
+              );
+            })}
           </div>}
         </Section>
 
@@ -153,27 +163,28 @@ export default function AivLab() {
   );
 }
 
-// Composite each beat's designed HTML over its fetched asset, scaled to a thumbnail.
+// Render each beat's designed HTML scaled to a thumbnail. Image beats now place their image(s) IN
+// the HTML, so we render the HTML directly. Only a VIDEO beat keeps a separate full-bleed clip
+// behind the (transparent) overlay HTML, so we composite the video behind for those.
 function DesignGrid({ design, beats }) {
   const { designs, canvas } = design;
   const previewW = 200;
   const scale = previewW / canvas.width;
   const boxH = Math.round(canvas.height * scale);
   const byIdx = Object.fromEntries(beats.map(b => [b.beat_index, b]));
+  const videoOf = (b) => (b.resolvedAssets || []).find(a => a?.kind === "video") || (b.asset?.kind === "video" ? b.asset : null);
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill,minmax(${previewW}px,1fr))`, gap: 14 }}>
       {designs.map(d => {
         const beat = byIdx[d.beatIndex] || {};
-        const isImg = beat.asset?.src && beat.asset.kind !== "video";
+        const vid = videoOf(beat);
         return (
           <div key={d.beatIndex} style={{ ...box, padding: 8 }}>
             <div style={{ position: "relative", width: previewW, height: boxH, background: "#000", borderRadius: 6, overflow: "hidden" }}>
-              {beat.asset?.src && (beat.asset.kind === "video"
-                ? <video src={beat.asset.src} muted style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-                : <img src={beat.asset.src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />)}
+              {vid && <video src={vid.src} muted style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
               {d.html
                 ? <iframe title={`b${d.beatIndex}`} srcDoc={d.html} scrolling="no"
-                    style={{ position: "absolute", top: 0, left: 0, width: canvas.width, height: canvas.height, border: 0, transform: `scale(${scale})`, transformOrigin: "top left", background: isImg ? "transparent" : "#000", pointerEvents: "none" }} />
+                    style={{ position: "absolute", top: 0, left: 0, width: canvas.width, height: canvas.height, border: 0, transform: `scale(${scale})`, transformOrigin: "top left", background: vid ? "transparent" : "#000", pointerEvents: "none" }} />
                 : <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#f87171", fontSize: 11 }}>no design</div>}
             </div>
             <div style={{ fontSize: 10.5, color: "#9aa3b2", marginTop: 5, display: "flex", justifyContent: "space-between" }}>

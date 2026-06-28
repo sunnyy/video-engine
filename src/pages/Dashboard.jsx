@@ -968,7 +968,30 @@ const SAMPLE_SERVICE_LABELS = {
   virtual_tryon: "Virtual Try-On",
 };
 
-function SampleCard({ sample }) {
+// Click-to-play lightbox — plays with sound (controls + autoPlay), mirrors the landing page.
+function SampleLightbox({ sample, onClose }) {
+  useEffect(() => {
+    if (!sample) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sample, onClose]);
+  if (!sample) return null;
+  const isVid = sample.type === "video";
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(4,6,12,0.86)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 16, right: 22, background: "none", border: "none", color: "#fff", fontSize: 34, lineHeight: 1, cursor: "pointer", opacity: 0.85 }}>×</button>
+      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: "min(92vw, 520px)", maxHeight: "90vh", display: "flex" }}>
+        {isVid
+          ? <video src={sample.src} poster={sample.poster || undefined} controls autoPlay playsInline style={{ width: "100%", maxHeight: "90vh", borderRadius: 14, display: "block", background: "#000" }} />
+          : <img src={sample.src} alt="" style={{ width: "100%", maxHeight: "90vh", objectFit: "contain", borderRadius: 14, display: "block" }} />}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function SampleCard({ sample, onOpen }) {
   const [hov, setHov] = useState(false);
   const vidRef = useRef(null);
   const isVid  = sample.type === "video";
@@ -989,8 +1012,9 @@ function SampleCard({ sample }) {
 
   return (
     <div className="sample-card"
+      onClick={() => onOpen?.(sample)}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: `1px solid ${hov ? "rgba(124,92,252,0.4)" : T.border}`, background: T.surface, transition: "border-color 0.2s, transform 0.2s", transform: hov ? "translateY(-2px)" : "none" }}>
+      style={{ position: "relative", borderRadius: 14, overflow: "hidden", cursor: "pointer", border: `1px solid ${hov ? "rgba(124,92,252,0.4)" : T.border}`, background: T.surface, transition: "border-color 0.2s, transform 0.2s", transform: hov ? "translateY(-2px)" : "none" }}>
       {isVid ? (
         <video ref={vidRef} src={sample.src} poster={sample.poster || undefined} muted loop playsInline preload="metadata"
           style={{ width: "100%", display: "block", background: "#060a14" }} />
@@ -1006,6 +1030,7 @@ function SampleCard({ sample }) {
 
 function SamplesGrid() {
   const [samples, setSamples] = useState(null); // null = loading
+  const [active, setActive] = useState(null);   // sample opened in the lightbox
 
   useEffect(() => {
     let alive = true;
@@ -1046,8 +1071,9 @@ function SamplesGrid() {
         </p>
       </div>
       <div className="samples-masonry">
-        {samples.map(s => <SampleCard key={s.id} sample={s} />)}
+        {samples.map(s => <SampleCard key={s.id} sample={s} onOpen={setActive} />)}
       </div>
+      <SampleLightbox sample={active} onClose={() => setActive(null)} />
     </div>
   );
 }
