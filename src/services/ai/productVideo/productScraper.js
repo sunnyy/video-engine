@@ -6,7 +6,7 @@
 
 import { parse } from "node-html-parser";
 import { supabaseAdmin } from "../../../server/middleware/shared.js";
-import { safeFetch } from "../shared/safeFetch.js";
+import { safeFetch, normalizeUrl } from "../shared/safeFetch.js";
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -214,7 +214,8 @@ async function scrapeGeneric(url) {
   };
 }
 
-export async function scrapeProductUrl(url) {
+export async function scrapeProductUrl(rawUrl) {
+  const url = normalizeUrl(rawUrl); // accept a bare domain ("arcade.dev") — prepend https://
   const platform = detectProductPlatform(url);
 
   let scraped;

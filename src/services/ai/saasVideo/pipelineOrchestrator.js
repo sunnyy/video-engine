@@ -32,6 +32,7 @@ import { searchStockImage, searchStockVideo }         from "../shared/stock.js";
 import { styleImagePrompt }                            from "../shared/visualStyles.js";
 import { generateAiImage }                             from "../shared/aiImage.js";
 import { persistRemote }                               from "../shared/persist.js";
+import { normalizeUrl }                                from "../shared/safeFetch.js";
 import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
 import { generateAssetRequirements }                  from "./assetRequirements.js";
 import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
@@ -153,7 +154,7 @@ export async function runV2Pipeline(project) {
  * no design, no DB write.
  */
 export async function planPromoNarration(project) {
-  const productUrl = (project.product_url ?? "").trim();
+  const productUrl = normalizeUrl(project.product_url ?? ""); // "arcade.dev" → "https://arcade.dev"
   const textSource = project.text_source ?? (productUrl ? "url" : "manual");
   if (productUrl) {
     const harvest = await harvestAssets(productUrl, `promo-plan-${project.id}-${Date.now()}`);

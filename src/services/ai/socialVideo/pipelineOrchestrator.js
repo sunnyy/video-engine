@@ -29,6 +29,7 @@ import { moderateInput }          from "../shared/moderation.js";
 import { generateFullVoiceover }  from "../saasVideo/ttsGenerator.js";
 import { VoiceoverError }          from "../shared/voiceoverError.js";
 import { saveIncompleteProject }   from "../shared/incompleteProject.js";
+import { normalizeUrl }            from "../shared/safeFetch.js";
 
 const CANVAS = { width: 1080, height: 1920 }; // default (9:16)
 // Map the chosen orientation to canvas dimensions — drives design, measure, timeline + saved format.
@@ -163,7 +164,8 @@ function applyKenBurns(layers) {
 // ── Phase 1: PLAN (fetch + script) — returned for the user to confirm/edit the
 // script BEFORE the voiceover & everything else is generated from it (no re-run).
 export async function planSocial(params, onStep) {
-  const { url, targetDuration = 25, language = "en", theme = "auto", accentColor = null, accentColor2 = null } = params;
+  const { targetDuration = 25, language = "en", theme = "auto", accentColor = null, accentColor2 = null } = params;
+  const url = normalizeUrl(params.url); // accept a bare domain ("arcade.dev") — prepend https://
   const step = (msg) => { console.log(`[social] ${msg}`); onStep?.({ step: msg }); };
 
   step("Tuning in…");

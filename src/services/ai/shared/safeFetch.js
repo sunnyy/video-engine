@@ -32,6 +32,17 @@ export function isPrivateIP(ip) {
   return true; // unparseable → unsafe
 }
 
+// Add a scheme to a bare host the user typed (e.g. "arcade.dev" → "https://arcade.dev"). Without
+// this, `new URL("arcade.dev")` throws → safeFetch + assertPublicUrl + page.goto all fail → the
+// scrape comes back EMPTY and the script generator hallucinates a "false" product/video. Returns ""
+// for empty input. Leaves an existing http(s):// scheme untouched.
+export function normalizeUrl(raw) {
+  const s = (raw ?? "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  return `https://${s.replace(/^\/+/, "")}`;
+}
+
 export async function assertPublicUrl(raw) {
   let u;
   try { u = new URL(raw); } catch { throw new Error("invalid URL"); }
