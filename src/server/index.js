@@ -46,7 +46,6 @@ import { router as monitoringRouter }       from "./routes/monitoring.js";
 import { router as statusRouter }            from "./routes/status.js";
 import { router as devLabRouter }            from "./routes/devLab.js";
 import { router as devSnapshotRouter }       from "./routes/devSnapshot.js";
-import { router as motionRouter }             from "./routes/motion.js";
 import { installLogGate } from "../core/utils/logger.js";
 import { instrumentOpenAI } from "./services/apiHealth.js";
 import { openai } from "./middleware/shared.js";
@@ -214,7 +213,6 @@ app.use("/api/admin",        adminRouter);
 app.use("/api/admin",        announcementsRouter);
 app.use("/api/dev",          devSnapshotRouter); // local-dev project snapshot (fetch + preview frames); BEFORE the auth'd lab router
 app.use("/api/dev",          devLabRouter); // private AI Video step-through lab (admin only)
-app.use("/api/motion",       motionRouter); // EXPERIMENTAL Claude+Remotion pipeline (local-dev only)
 app.use("/api",              ttsRouter);
 app.use("/api",              authRouter);
 app.use("/api",              assetsRouter);
