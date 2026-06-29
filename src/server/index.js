@@ -43,6 +43,7 @@ import { router as socialRouter }           from "./routes/social.js";
 import { router as automationRouter }       from "./routes/automation.js";
 import { router as flagsRouter }            from "./routes/flags.js";
 import { router as monitoringRouter }       from "./routes/monitoring.js";
+import { router as statusRouter }            from "./routes/status.js";
 import { router as devLabRouter }            from "./routes/devLab.js";
 import { router as devSnapshotRouter }       from "./routes/devSnapshot.js";
 import { installLogGate } from "../core/utils/logger.js";
@@ -196,6 +197,7 @@ app.use("/api/social",       socialRouter);
 app.use("/api/automation",   automationRouter);
 app.use("/api/flags",        flagsRouter);
 app.use("/api/monitoring",   monitoringRouter);
+app.use("/api/status",       statusRouter); // PUBLIC system status (no auth) — sanitized component states
 app.use("/api/product-ad",   productAdRouter);
 app.use("/api/poster",       posterRouter);
 app.use("/api/thumbnail",    thumbnailRouter);

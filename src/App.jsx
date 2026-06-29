@@ -20,6 +20,7 @@ import PrivacyPolicy   from "./pages/legal/PrivacyPolicy";
 import RefundPolicy    from "./pages/legal/RefundPolicy";
 import About           from "./pages/About";
 import FAQ             from "./pages/FAQ";
+import StatusPage      from "./pages/StatusPage";
 import Support         from "./pages/Support";
 import HelpCenter      from "./pages/HelpCenter";
 import HelpArticle     from "./pages/HelpArticle";
@@ -160,6 +161,7 @@ export default function App() {
         <Route path="/"              element={<LandingPage />} />
         <Route path="/about"         element={<About />} />
         <Route path="/faq"           element={<FAQ />} />
+        <Route path="/status"        element={<StatusPage />} />
         <Route path="/help"          element={<HelpCenter />} />
         <Route path="/help/:slug"    element={<HelpArticle />} />
         <Route path="/terms"         element={<TermsOfService />} />

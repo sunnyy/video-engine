@@ -94,6 +94,29 @@ export default function Monitoring() {
               sub={`${data.publish.published7d} ok · ${data.publish.failed7d} failed`} />
           </div>
 
+          {/* API health (external dependencies) */}
+          {data.apiHealth && (
+            <div className="bg-[#111118] border border-white/[0.08] rounded-2xl p-6 mb-6">
+              <div className="text-base font-semibold text-[#888] uppercase tracking-wider mb-4">API health</div>
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+                {data.apiHealth.map((h) => {
+                  const down = h.status === "down";
+                  return (
+                    <div key={h.capability} className="flex items-center gap-2.5 py-2 px-3 rounded-xl border" style={{ borderColor: down ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.08)", background: down ? "rgba(248,113,113,0.08)" : "transparent" }}>
+                      <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: down ? "#f87171" : "#22c55e" }} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[#e8e8f0] truncate">{h.label}{h.critical ? "" : <span className="text-[#555] font-normal"> · optional</span>}</div>
+                        <div className="text-xs" style={{ color: down ? "#f87171" : "#666" }}>
+                          {down ? `Down — ${ago(h.tripped_at)}` : "Operational"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-6 mb-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
             {/* Throughput timings */}
             <div className="bg-[#111118] border border-white/[0.08] rounded-2xl p-6">

@@ -5,6 +5,7 @@ import ffmpeg     from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { openai, supabaseAdmin } from "../../../server/middleware/shared.js";
 import { VoiceoverError, classifyTtsHttp } from "../shared/voiceoverError.js";
+import { track } from "../../../server/services/apiHealth.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -163,7 +164,14 @@ function charAlignmentToWords(alignment) {
  */
 export async function generateFullVoiceover(script, projectId, voiceId, speed = 1.0) {
   if (!script?.trim()) return { audio_url: null, duration_seconds: 0, buffer: null, wordTimestamps: [] };
+  // Report voiceover-provider health (Phase-1 detection). A bad_request (user input) doesn't count
+  // toward tripping the breaker; everything else (quota/5xx/network/storage) does.
+  return track("voiceover",
+    () => _generateFullVoiceover(script, projectId, voiceId, speed),
+    (err) => (err?.isVoiceoverError ? err.internal : true));
+}
 
+async function _generateFullVoiceover(script, projectId, voiceId, speed = 1.0) {
   const vid = voiceId || DEFAULT_EL_VOICE;
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new VoiceoverError("ELEVENLABS_API_KEY not set", { cause: "config", retryable: false, internal: true });

@@ -4,6 +4,7 @@
  */
 import { supabaseAdmin } from "../../../server/middleware/shared.js";
 import { persistRemote } from "./persist.js";
+import { reportOk, reportFail } from "../../../server/services/apiHealth.js";
 
 // ── Blank canvas references for Nano Banana ─────────────────────────────────
 // Nano Banana (fal nano-banana/edit) takes its OUTPUT size from the LAST attached
@@ -63,12 +64,14 @@ export async function falImage(prompt, { runId, label, orientation = "9:16" } = 
       headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
       body:    JSON.stringify({ prompt: prompt + NO_TEXT_SUFFIX, image_size: falImageSize(orientation), num_images: 1, num_inference_steps: 4, enable_safety_checker: false }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) { reportFail("ai_image", { message: `HTTP ${res.status}` }).catch(() => {}); return null; }
+    reportOk("ai_image").catch(() => {});            // provider responded — healthy
     const data   = await res.json();
     const falUrl = data?.images?.[0]?.url ?? null;
     if (!falUrl) return null;
     return (await persistRemote(falUrl, { runId, label, contentType: "image/jpeg" })) ?? falUrl;
   } catch (e) {
+    reportFail("ai_image", { message: e.message }).catch(() => {});   // network/timeout → provider unreachable
     console.warn(`[assets/aiImage] fal error (${label}):`, e.message);
     return null;
   }
