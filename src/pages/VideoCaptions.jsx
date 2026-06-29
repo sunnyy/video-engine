@@ -171,6 +171,7 @@ function GeneratorForm() {
   const [projectName,  setProjectName]  = useState("");
   const [captionStyle, setCaptionStyle] = useState("wordBlaze");
   const [captionPos,   setCaptionPos]   = useState(80);
+  const [captionLang,  setCaptionLang]  = useState("auto");
   const [creating,     setCreating]     = useState(false);
   const [error,        setError]        = useState(null);
   const [dragging,     setDragging]     = useState(false);
@@ -210,6 +211,7 @@ function GeneratorForm() {
 
       const form2 = new FormData();
       form2.append("file", file);
+      form2.append("language", captionLang);
       const { supabase } = await import("../lib/supabase");
       const token = (await supabase.auth.getSession())?.data?.session?.access_token;
       const transRes = await fetch(`${SERVER}/api/transcription/transcribe`, {
@@ -380,9 +382,20 @@ function GeneratorForm() {
           </div>
         )}
 
-        {/* Transcribe button */}
+        {/* Caption language + transcribe button */}
         {file && !transcribing && !done && (
           <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontSize: 13, color: "#9aa3b2", marginBottom: 8, fontFamily: "'Outfit',sans-serif" }}>Caption language</label>
+            <select
+              value={captionLang}
+              onChange={(e) => setCaptionLang(e.target.value)}
+              style={{ width: "100%", padding: "12px", marginBottom: 12, background: "#14141e", color: "#e8e8f0", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 14, fontFamily: "'Outfit',sans-serif" }}
+            >
+              <option value="auto">Auto-detect</option>
+              <option value="en">English</option>
+              <option value="hinglish">Hindi</option>
+              <option value="es">Spanish</option>
+            </select>
             <button
               onClick={handleUploadAndTranscribe}
               style={{ width: "100%", padding: "14px", background: "#7c5cfc", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}

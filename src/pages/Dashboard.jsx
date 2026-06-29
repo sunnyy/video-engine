@@ -19,7 +19,7 @@ import { VoiceLanguageField, DurationField, OrientationField, SelectField, Revie
 import { SERVICE_FIELDS } from "../config/serviceFields.js";
 import { creditsForDuration } from "../core/utils/creditCosts.js";
 import { getReviewScriptFirst, setReviewScriptFirst } from "../core/utils/reviewScriptPref.js";
-import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, ArrowUp, Megaphone, Contrast, Droplet, Target, Film, Image as ImageIcon, ImagePlus, Video, MoveVertical, Loader2 } from "lucide-react";
+import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, ArrowUp, Megaphone, Contrast, Droplet, Target, Film, Image as ImageIcon, ImagePlus, Video, MoveVertical, Languages, Loader2 } from "lucide-react";
 import AppLayout from "../ui/AppLayout";
 import Onboarding from "./Onboarding";
 import FeedbackModal from "../ui/components/FeedbackModal";
@@ -112,6 +112,9 @@ const CAPTION_STATUS = [
 ];
 
 const CAPTION_STYLE_OPTIONS = Object.keys(captionStylePresets).map(k => ({ id: k, label: captionStyleLabels[k] || k }));
+// Caption language — Auto-detect works for single-language audio; override forces the language/script
+// (e.g. English/Latin captions on a mixed Hinglish video). Passed to Scribe as language_code.
+const CAPTION_LANG_OPTIONS = [{ id: "auto", label: "Auto-detect" }, { id: "en", label: "English" }, { id: "hinglish", label: "Hindi" }, { id: "es", label: "Spanish" }];
 
 /* ── AI Video chatbox (the morphing create surface) ── */
 function PromptVideoChatbox({ onBusy }) {
@@ -890,6 +893,7 @@ function CaptionsChatbox({ onBusy }) {
   const [file,         setFile]         = useState(null);
   const [captionStyle, setCaptionStyle] = useState(cfg.specific.captionStyle.default);
   const [position,     setPosition]     = useState(cfg.specific.position.default);
+  const [captionLang,  setCaptionLang]  = useState("auto");
   const [loading,      setLoading]      = useState(false);
   const [statusStep,   setStatusStep]   = useState(0);
   const [error,        setError]        = useState(null);
@@ -905,7 +909,7 @@ function CaptionsChatbox({ onBusy }) {
     setLoading(true); setError(null); setStatusStep(0);
     try {
       const result = await generateCaptions(
-        { file, captionStyle, captionPos: position },
+        { file, captionStyle, captionPos: position, language: captionLang },
         ({ step }) => { if (typeof step === "number") setStatusStep(step); },
       );
       invalidateProjectCaches("caption_studio", "all");
@@ -936,6 +940,7 @@ function CaptionsChatbox({ onBusy }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <CaptionStyleField value={captionStyle} onChange={setCaptionStyle} options={CAPTION_STYLE_OPTIONS} accent={CC} />
+            <SelectField icon={<Languages size={16} />}    label="Language"      value={captionLang}  onChange={setCaptionLang}  options={CAPTION_LANG_OPTIONS} accent={CC} />
             <SelectField icon={<MoveVertical size={16} />} label="Position"      value={position}     onChange={setPosition}     options={cfg.specific.position.options} accent={CC} />
           </div>
           <button onClick={handleGenerate} disabled={!canGo} title="Add captions"

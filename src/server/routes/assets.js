@@ -426,6 +426,12 @@ router.post("/transcription/transcribe", requireAuth, uploadTranscription.single
     sttForm.append("model_id", "scribe_v1");
     sttForm.append("timestamps_granularity", "word");
     sttForm.append("tag_audio_events", "false");
+    // Caption language: the user picks the language/script they want — auto-detect can't know (e.g. a
+    // mixed Hinglish video where they want English/Latin captions, not Devanagari). Map UI code →
+    // ISO-639-1 and pass to Scribe to bias the transcription; omit → Scribe auto-detects.
+    const CAPTION_LANG_MAP = { en: "en", hinglish: "hi", hi: "hi", es: "es" };
+    const reqLang = CAPTION_LANG_MAP[String(req.body?.language || "").toLowerCase()];
+    if (reqLang) sttForm.append("language_code", reqLang);
     const sttRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
       method: "POST", headers: { "xi-api-key": elKey }, body: sttForm,
     });

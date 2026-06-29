@@ -29,7 +29,7 @@ function chunkSegments(segments, wordsPerChunk = 3) {
   return result;
 }
 
-export async function generateCaptions({ file, captionStyle = "wordBlaze", captionPos = 80 }, onProgress) {
+export async function generateCaptions({ file, captionStyle = "wordBlaze", captionPos = 80, language = "auto" }, onProgress) {
   if (!file) throw new Error("No video selected");
 
   // 1. Upload
@@ -42,7 +42,7 @@ export async function generateCaptions({ file, captionStyle = "wordBlaze", capti
 
   // 2. Transcribe
   onProgress?.({ step: 1 });
-  const form2 = new FormData(); form2.append("file", file);
+  const form2 = new FormData(); form2.append("file", file); form2.append("language", language);
   const token = (await supabase.auth.getSession())?.data?.session?.access_token;
   const transRes  = await fetch(`${SERVER}/api/transcription/transcribe`, {
     method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form2,
