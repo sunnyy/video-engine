@@ -27,6 +27,8 @@ import { buildTimeline }          from "./timelineBuilder.js";
 import { injectMusic }            from "../shared/music.js";
 import { moderateInput }          from "../shared/moderation.js";
 import { generateFullVoiceover }  from "../saasVideo/ttsGenerator.js";
+import { VoiceoverError }          from "../shared/voiceoverError.js";
+import { saveIncompleteProject }   from "../shared/incompleteProject.js";
 
 const CANVAS = { width: 1080, height: 1920 }; // default (9:16)
 // Map the chosen orientation to canvas dimensions — drives design, measure, timeline + saved format.
@@ -188,7 +190,7 @@ export async function planSocial(params, onStep) {
 // ── Phase 2: PRODUCE (voiceover → media → design → build → save) from a plan whose
 // scenes may carry the user's edited script_segment text.
 export async function produceSocial(plan, params, onStep) {
-  const { userId, voiceId = null, includeAuthor = false, styleId = "auto" } = params;
+  const { userId, voiceId = null, includeAuthor = false, styleId = "auto", existingProjectId = null } = params;
   const { content, full_script, palette, fontPair, musicMood, projectName, creativeDirection, sourceUrl } = plan;
   const scenes = plan.scenes.map(s => ({ ...s }));
   const orientation = params.orientation ?? "9:16"; // drives canvas, stock search + saved project
@@ -226,7 +228,16 @@ export async function produceSocial(plan, params, onStep) {
       voiceoverDuration = ttsResult.duration_seconds;
       if (ttsResult.wordTimestamps?.length) assignWordTimestamps(scenes, ttsResult.wordTimestamps, voiceoverDuration);
     } catch (err) {
-      console.warn("[social] TTS failed (non-fatal):", err.message);
+      const ve = VoiceoverError.from(err);
+      // Voiceover is REQUIRED — never ship a silent video. On a retryable failure, save this as an
+      // INCOMPLETE project (plan kept) so the user can Finish it later for free; the route refunds.
+      if (ve.retryable && userId) {
+        try {
+          ve.projectId  = await saveIncompleteProject({ userId, source: "social_video", name: projectName, orientation, canvas, ve, existingProjectId, resume: { plan, params } });
+          ve.incomplete = !!ve.projectId;
+        } catch (saveErr) { console.error("[social] could not save incomplete project:", saveErr.message); }
+      }
+      throw ve;
     }
   }
 
@@ -341,32 +352,35 @@ export async function produceSocial(plan, params, onStep) {
 
   let editorProjectId = null;
   try {
-    const { data: row } = await supabaseAdmin
-      .from("projects")
-      .insert({
-        user_id:           userId,
-        name:              projectName,
-        safe_project_json: finalTimeline,
-        orientation:       orientation,
-        mode:              "timeline",
-        source:            "social_video",
-        editor_version:    "timeline",
-        raw_ai_json: {
-          platform:  content.platform,
-          author:    content.author,
-          sourceUrl: url,
-          creative_direction: creativeDirection ?? null,
-          scenes:    scenes.map(s => ({
-            sceneIndex:    s.scene_index,
-            intent:        s.intent,
-            creative_brief: s.creative_brief ?? s.visual_concept ?? null,
-          })),
-          sceneHTMLs,
-        },
-      })
-      .select("id")
-      .single();
-    editorProjectId = row?.id ?? null;
+    const rawJson = {
+      platform:  content.platform,
+      author:    content.author,
+      sourceUrl: url,
+      creative_direction: creativeDirection ?? null,
+      scenes:    scenes.map(s => ({
+        sceneIndex:    s.scene_index,
+        intent:        s.intent,
+        creative_brief: s.creative_brief ?? s.visual_concept ?? null,
+      })),
+      sceneHTMLs,
+    };
+    if (existingProjectId) {
+      // FINISHING a previously-incomplete project — overwrite the placeholder + clear the flag.
+      const { error } = await supabaseAdmin.from("projects")
+        .update({ name: projectName, safe_project_json: finalTimeline, orientation, mode: "timeline", source: "social_video", editor_version: "timeline", status: null, raw_ai_json: rawJson, updated_at: new Date().toISOString() })
+        .eq("id", existingProjectId).eq("user_id", userId);
+      if (error) throw error;
+      editorProjectId = existingProjectId;
+    } else {
+      const { data: row } = await supabaseAdmin
+        .from("projects")
+        .insert({
+          user_id: userId, name: projectName, safe_project_json: finalTimeline, orientation,
+          mode: "timeline", source: "social_video", editor_version: "timeline", raw_ai_json: rawJson,
+        })
+        .select("id").single();
+      editorProjectId = row?.id ?? null;
+    }
     console.log(`[social] saved project: ${editorProjectId}`);
   } catch (e) {
     console.warn("[social] projects insert failed (non-fatal):", e.message);

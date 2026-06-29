@@ -34,6 +34,16 @@ export async function generateProductVideo(payload, onProgress) {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  return readProductSse(res, onProgress);
+}
+
+/** Finish a saved INCOMPLETE product video (voiceover stage had failed). */
+export async function finishProductVideo(projectId, onProgress) {
+  const res = await serverFetch(`/api/product-video/${projectId}/finish`, { method: "POST" });
+  return readProductSse(res, onProgress);
+}
+
+async function readProductSse(res, onProgress) {
   if (!res.ok && res.status !== 200) {
     const err = await res.json().catch(() => ({}));
     const e = new Error(err.error || `Pipeline failed (${res.status})`);
@@ -61,6 +71,9 @@ export async function generateProductVideo(payload, onProgress) {
         throw e;
       }
       if (event.step != null && onProgress) onProgress({ step: event.step });
+      if (event.incomplete) {
+        return { incomplete: true, projectId: event.projectId, message: event.message };
+      }
       if (event.done) {
         if (!event.editor_project_id) throw new Error("No editor project returned from the pipeline");
         return { projectId: event.editor_project_id };

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProjectsStore } from "../store/useProjectsStore";
 import { deleteProject } from "../services/projects/projectService";
+import { finisherFor } from "../services/ai/finishVideo";
 import AppLayout from "../ui/AppLayout";
 import { showToast } from "../ui/Toast";
 
@@ -61,10 +62,36 @@ function previewFor(project) {
 function Card({ project }) {
   const navigate = useNavigate();
   const removeProject = useProjectsStore(s => s.removeProject);
+  const fetchProjects = useProjectsStore(s => s.fetchProjects);
   const [hov, setHov] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const preview = previewFor(project);
   const href = `/video-editor/${project.id}`;
+  const finish = finisherFor(project.source);                  // service-specific Finish fn (or null)
+  const incomplete = project.status === "incomplete" && !!finish; // voiceover stage failed — needs Finishing
+
+  // Finish a saved incomplete video: re-runs production from the saved plan (no re-research) and
+  // charges credits on success. Stays incomplete (with a generic toast) if the outage hasn't cleared.
+  const handleFinish = async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (finishing || !finish) return;
+    setFinishing(true);
+    try {
+      const r = await finish(project.id);
+      if (r.incomplete) {
+        showToast(r.message || "Still couldn’t finish — please try again shortly.");
+        setFinishing(false);
+        return;
+      }
+      await fetchProjects(true);
+      showToast("Video finished", "success");
+      navigate(`/video-editor/${project.id}`, { state: { from: "/projects" } });
+    } catch (err) {
+      showToast(err?.code === "NO_CREDITS" ? "Not enough credits to finish this video." : "Couldn’t finish — please try again.");
+      setFinishing(false);
+    }
+  };
 
   const handleDelete = async (e) => {
     e.preventDefault(); e.stopPropagation();
@@ -83,7 +110,12 @@ function Card({ project }) {
   return (
     <a
       href={href}
-      onClick={(e) => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); navigate(href, { state: { from: "/projects" } }); } }}
+      onClick={(e) => {
+        if (e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        if (incomplete) { handleFinish(e); return; } // empty placeholder — Finish, don't open the editor
+        navigate(href, { state: { from: "/projects" } });
+      }}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ display: "block", textDecoration: "none", borderRadius: 14, overflow: "hidden", border: `1px solid ${hov ? "rgba(124,92,252,0.35)" : T.border}`, background: T.surface, transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none" }}
     >
@@ -100,6 +132,11 @@ function Card({ project }) {
           </div>
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#0f0820,#1a0a2e,#2d1060)" }}><span style={{ fontSize: 28, opacity: 0.35 }}>🎬</span></div>
+        )}
+        {incomplete && (
+          <div style={{ position: "absolute", top: 8, left: 8, padding: "4px 8px", borderRadius: 8, background: "rgba(8,10,16,0.82)", color: "#fbbf24", fontSize: 10, fontWeight: 800, letterSpacing: 0.3, backdropFilter: "blur(4px)", zIndex: 2 }}>
+            ⏳ NEEDS FINISHING
+          </div>
         )}
         {(hov || deleting) && (
           <button onClick={handleDelete} title="Delete project" disabled={deleting} aria-label="Delete project"
@@ -119,7 +156,14 @@ function Card({ project }) {
       </div>
       <div style={{ padding: "10px 12px" }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project.name || "Untitled"}</div>
-        <div style={{ fontSize: 11, color: T.faint, marginTop: 2 }}>{timeLabel(project.updated_at)}</div>
+        {incomplete ? (
+          <button onClick={handleFinish} disabled={finishing}
+            style={{ marginTop: 7, width: "100%", padding: "7px 0", borderRadius: 8, border: "none", cursor: finishing ? "default" : "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit", background: finishing ? "rgba(124,92,252,0.5)" : "#7c5cfc", color: "#fff" }}>
+            {finishing ? "Finishing…" : "Finish video"}
+          </button>
+        ) : (
+          <div style={{ fontSize: 11, color: T.faint, marginTop: 2 }}>{timeLabel(project.updated_at)}</div>
+        )}
       </div>
     </a>
   );

@@ -27,6 +27,12 @@ export async function generateTypographyVideo({ input, inputType = "topic", targ
   return readSseResult(res, onProgress);
 }
 
+/** Finish a saved INCOMPLETE typography video (voiceover stage had failed). */
+export async function finishTypographyVideo(projectId, onProgress) {
+  const res = await serverFetch(`/api/typography-video/${projectId}/finish`, { method: "POST" });
+  return readSseResult(res, onProgress);
+}
+
 async function readSseResult(res, onProgress) {
   if (!res.ok && res.status !== 200) {
     const err = await res.json().catch(() => ({ error: "Generation failed" }));
@@ -57,6 +63,9 @@ async function readSseResult(res, onProgress) {
       }
       if (event.step != null && onProgress) {
         onProgress({ step: event.step });
+      }
+      if (event.incomplete) {
+        return { incomplete: true, projectId: event.projectId, message: event.message };
       }
       if (event.done) {
         return { projectId: event.projectId, projectName: event.projectName };

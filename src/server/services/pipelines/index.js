@@ -46,6 +46,7 @@ registerPipeline("ai_video", {
       voiceId: campaign.voice_id || null,
       orientation: campaign.orientation || "9:16",
       plan: null,
+      allowIncomplete: false, // automation pauses the campaign on a TTS outage — no orphan incomplete drafts
     }, onStep);
     return { projectId: result.projectId, publish: result.publish || null };
   },

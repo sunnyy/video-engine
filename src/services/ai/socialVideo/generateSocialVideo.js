@@ -27,6 +27,12 @@ export async function generateSocialVideo({ url, targetDuration = 25, includeAut
   return readSseResult(res, onProgress);
 }
 
+/** Finish a saved INCOMPLETE social video (voiceover stage had failed). */
+export async function finishSocialVideo(projectId, onProgress) {
+  const res = await serverFetch(`/api/social-video/${projectId}/finish`, { method: "POST" });
+  return readSseResult(res, onProgress);
+}
+
 async function readSseResult(res, onProgress) {
   if (!res.ok && res.status !== 200) {
     const err = await res.json().catch(() => ({ error: "Generation failed" }));
@@ -57,6 +63,9 @@ async function readSseResult(res, onProgress) {
       }
       if (event.step != null && onProgress) {
         onProgress({ step: event.step });
+      }
+      if (event.incomplete) {
+        return { incomplete: true, projectId: event.projectId, message: event.message };
       }
       if (event.done) {
         return { projectId: event.projectId, projectName: event.projectName };

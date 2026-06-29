@@ -9,6 +9,10 @@ import { ASSET_SHINE_OPTIONS } from "../../core/registries/assetShineRegistry";
 import PresetsModal from "./modals/PresetsModal";
 import IconModal from "./modals/IconModal";
 import MediaModal from "./modals/MediaModal";
+import { serverFetch } from "../../services/serverApi";
+import { showToast } from "../Toast";
+
+const isVoiceoverLayer = (l) => l?.type === "audio" && (l.audioType === "voiceover" || /voiceover/i.test(l.id || ""));
 
 const FONT_FAMILIES = [
   "Outfit", "Inter", "Roboto", "Montserrat",
@@ -1616,6 +1620,91 @@ function CaptionStyleSection({ layer }) {
   );
 }
 
+// Project-level "Generate voiceover" tool — narrates the saved script and drops a voiceover layer.
+// Recovers a never-made (TTS outage) or accidentally-deleted voiceover. Free; one undoable step.
+function VoiceoverTool() {
+  const project       = useTimelineStore((s) => s.project);
+  const projectId     = useTimelineStore((s) => s.projectId);
+  const updateProject = useTimelineStore((s) => s.updateProject);
+  const [voices, setVoices] = useState([]);
+  const [voiceId, setVoiceId] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const script = (project?.full_script ?? "").trim();
+  const hasVO  = (project?.layers ?? []).some(isVoiceoverLayer);
+
+  useEffect(() => {
+    let alive = true;
+    serverFetch("/api/video/voices").then((r) => r.json()).then((d) => {
+      if (!alive) return;
+      const list = d.voices ?? [];
+      setVoices(list);
+      setVoiceId((prev) => prev || list[0]?.id || "");
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const handleGenerate = async () => {
+    if (!script || busy) return;
+    setBusy(true);
+    try {
+      const res  = await serverFetch("/api/voiceover/generate", {
+        method: "POST",
+        body: JSON.stringify({ script, voiceId: voiceId || null, projectId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn’t generate the voiceover.");
+
+      const dur = Math.max(0.1, Number(data.duration) || 0);
+      const src = data.url + (data.url.includes("?") ? "&" : "?") + "v=" + Date.now(); // cache-bust
+      const layers = (project.layers ?? []).filter((l) => !isVoiceoverLayer(l));
+      layers.push({
+        id: "voiceover_full", trackId: "track_voiceover", type: "audio", audioType: "voiceover",
+        name: "Voiceover", src, start: 0, end: dur, zIndex: 0, visible: true, locked: false,
+        trimStart: 0, trimEnd: dur, volume: 1.0, muted: false, fadeIn: 0.1, fadeOut: 0.3,
+        sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+      });
+      const newDuration = Math.max(project.format?.duration ?? 0, ...layers.map((l) => l.end || 0));
+      updateProject({ layers, format: { ...project.format, duration: newDuration } });
+      showToast(hasVO ? "Voiceover regenerated" : "Voiceover generated", "success");
+    } catch (e) {
+      showToast(e.message || "Couldn’t generate the voiceover — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 16, padding: "12px 12px 14px", background: "rgba(124,92,252,0.06)", border: "1px solid rgba(124,92,252,0.22)", borderRadius: 8 }}>
+      <span style={labelStyle}>Voiceover</span>
+      {script ? (
+        <>
+          <select style={{ ...selectStyle, marginBottom: 8 }} value={voiceId} onChange={(e) => setVoiceId(e.target.value)} disabled={busy}>
+            {voices.length === 0 && <option value="">Default voice</option>}
+            {voices.map((v) => (
+              <option key={v.id} value={v.id}>{v.label}{v.gender ? ` · ${v.gender}` : ""}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleGenerate}
+            disabled={busy}
+            style={{ width: "100%", padding: "8px 0", borderRadius: 7, border: "none", cursor: busy ? "default" : "pointer", fontWeight: 700, fontSize: 12.5, fontFamily: "inherit", background: busy ? "rgba(124,92,252,0.5)" : "#7c5cfc", color: "#fff" }}
+          >
+            {busy ? "Generating…" : hasVO ? "Regenerate voiceover" : "Generate voiceover"}
+          </button>
+          <p style={{ margin: "8px 0 0", fontSize: 11, color: "#7a7a98", lineHeight: 1.5 }}>
+            Narrates this video’s script and {hasVO ? "replaces the current voiceover." : "adds it to the timeline."}
+          </p>
+        </>
+      ) : (
+        <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "#7a7a98", lineHeight: 1.5 }}>
+          This video has no saved script to voice.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function PropertiesPanel() {
   const project = useTimelineStore((s) => s.project);
   const selectedLayerId = useTimelineStore((s) => s.selectedLayerId);
@@ -1743,20 +1832,11 @@ export default function PropertiesPanel() {
           </div>
         </div>
       ) : !layer ? (
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#55556a",
-            fontSize: 13,
-            textAlign: "center",
-            padding: 24,
-            lineHeight: 1.6,
-          }}
-        >
-          Select a layer to edit its properties
+        <div className="dark-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 16px" }}>
+          <VoiceoverTool />
+          <div style={{ color: "#55556a", fontSize: 13, textAlign: "center", padding: "16px 8px 0", lineHeight: 1.6 }}>
+            Select a layer to edit its properties
+          </div>
         </div>
       ) : (
         <div className="dark-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 16px", position: "relative" }}>

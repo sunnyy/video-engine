@@ -9,8 +9,36 @@ import {
 } from "../middleware/shared.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 import { moderateInput } from "../middleware/moderateInput.js";
+import { generateFullVoiceover } from "../../services/ai/promptVideo/ttsGenerator.js";
 
 export const router = express.Router();
+
+// ── POST /voiceover/generate ────────────────────────────────────────────────
+// FREE editor utility: (re)generate a full voiceover for an EXISTING video from its saved script —
+// recovers a never-made (TTS-outage) or accidentally-deleted-then-unrecoverable voiceover layer.
+// Uses the same engine as the pipelines (loudnorm + upload) so it matches; no credit charge.
+router.post("/voiceover/generate", requireAuth, async (req, res) => {
+  try {
+    const { script, voiceId, projectId } = req.body;
+    if (!script?.trim()) return res.status(400).json({ error: "This video has no script to voice." });
+    const { flagged } = await moderateInput(script);
+    if (flagged) return res.status(400).json({ error: "That script was flagged. Please edit it and try again.", code: "CONTENT_FLAGGED" });
+
+    // Unique storage path each time (timestamp) → fresh URL, no stale CDN/browser cache on regenerate.
+    const key = `${projectId || "editor"}-${Date.now()}`;
+    const tts = await generateFullVoiceover(script.trim(), key, voiceId || undefined);
+    if (!tts?.audio_url) throw new Error("no audio produced");
+    res.json({ url: tts.audio_url, duration: tts.duration_seconds ?? 0 });
+  } catch (err) {
+    // Mask the internal cause (our TTS quota/outage) — generic message; never leak provider/quota.
+    if (err?.isVoiceoverError) {
+      console.warn("[voiceover/generate] unavailable:", err.cause, "-", err.message);
+      return res.status(503).json({ error: "We couldn’t generate the voiceover right now. Please try again shortly." });
+    }
+    console.error("[voiceover/generate]", err?.message || err);
+    res.status(500).json({ error: "Couldn’t generate the voiceover. Please try again." });
+  }
+});
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 

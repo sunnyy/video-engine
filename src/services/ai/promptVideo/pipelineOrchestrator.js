@@ -25,6 +25,8 @@ import { designAllBeats }        from "./beatDesigner.js";
 import { measureSceneHTML, closeMeasureBrowser } from "../shared/converter.js";
 import { buildTimeline }         from "./timelineBuilder.js";
 import { generateFullVoiceover } from "./ttsGenerator.js";
+import { VoiceoverError }        from "../shared/voiceoverError.js";
+import { saveIncompleteProject } from "../shared/incompleteProject.js";
 import { track, easeOutCubic }   from "../shared/easing.js";
 import { injectMusic }           from "../shared/music.js";
 import { attachTransitionSfx }   from "../shared/sfx.js";
@@ -533,11 +535,16 @@ export async function runPromptPipeline(params, onStep) {
     styleId = "auto", targetDuration = 45, language = "en", voiceId = null,
     theme = "auto", accentColor = null, accentColor2 = null,
     plan = null,
+    existingProjectId = null, // set when FINISHING a saved incomplete project — update that row, not insert
+    allowIncomplete = true,   // manual route: save an incomplete project on a retryable TTS failure.
+                              // Automation passes false — it pauses the campaign instead (no orphan drafts).
   } = params;
 
   const runId = `prompt-${userId}-${Date.now()}`;
   const orientation = params.orientation ?? "9:16"; // drives canvas, stock search + saved project
   const canvas = orientationToCanvas(orientation);
+  // Everything the Finish-later flow needs to re-run production from a saved plan (no re-research).
+  const generateParams = { prompt, styleId, targetDuration, language, voiceId, orientation, theme, accentColor, accentColor2 };
   const step  = (msg) => { console.log(`[ai-video] ${msg}`); onStep?.({ step: msg }); };
 
   let research, film;
@@ -586,7 +593,23 @@ export async function runPromptPipeline(params, onStep) {
     voiceoverDuration = tts.duration_seconds ?? 0;
     if (tts.wordTimestamps?.length) assignWordTimestamps(beats, tts.wordTimestamps);
   } catch (e) {
-    console.warn("[ai-video] TTS failed (non-fatal):", e.message);
+    const ve = VoiceoverError.from(e);
+    // Voiceover is REQUIRED — never continue and ship a silent video. On a RETRYABLE failure (our
+    // quota/outage), persist this as an INCOMPLETE project (plan saved) so the user can Finish it
+    // later for FREE; the route refunds the up-front charge and shows a generic message. A
+    // non-retryable failure (bad voice id, etc.) just propagates → refund + error.
+    if (ve.retryable && userId && allowIncomplete) {
+      try {
+        ve.projectId  = await saveIncompleteProject({
+          userId, source: "ai_video", name: film.project_name, orientation, canvas, ve, existingProjectId,
+          resume: { plan: { research, film }, generateParams, prompt },
+        });
+        ve.incomplete = !!ve.projectId;
+      } catch (saveErr) {
+        console.error("[ai-video] could not save incomplete project (will refund + error instead):", saveErr.message);
+      }
+    }
+    throw ve;
   }
   estimateDurations(beats);
   beats = splitLongBeats(beats);
@@ -805,36 +828,52 @@ export async function runPromptPipeline(params, onStep) {
   step(PROMPT_STATUS_STEPS[7]);
   let editorProjectId = null;
   try {
-    const { data: row } = await supabaseAdmin
-      .from("projects")
-      .insert({
-        user_id:           userId,
-        name:              film.project_name,
-        safe_project_json: finalTimeline,
-        orientation:       orientation,
-        mode:              "timeline",
-        source:            "ai_video",
-        editor_version:    "timeline",
-        raw_ai_json: {
-          pipeline: "ai_video_v1",
-          prompt,
-          style_id: style.id,
-          palette,
-          research: { topic: research.topic, angle: research.angle, entities: research.entities, facts: research.facts, artifacts: research.artifacts },
-          beats: beats.map(b => ({
-            beat_index: b.beat_index, asset_type: b.asset_type, source: b.source ?? null, fallback: b.fallback ?? null,
-            assets: b.assets ?? [],
-            script_line: b.script_line,
-            content: b.content, visual_concept: b.visual_concept, camera: b.camera ?? null,
-            transition_out: b.transition_out, duration_seconds: b.duration_seconds,
-            resolvedAssets: (b.resolvedAssets || []).map(a => ({ kind: a.kind, src: a.src, label: a.label ?? null })),
-          })),
-          beatHTMLs,
-        },
-      })
-      .select("id").single();
-    editorProjectId = row?.id ?? null;
-    if (!editorProjectId) throw new Error("projects insert returned no id");
+    const rawJson = {
+      pipeline: "ai_video_v1",
+      prompt,
+      style_id: style.id,
+      palette,
+      research: { topic: research.topic, angle: research.angle, entities: research.entities, facts: research.facts, artifacts: research.artifacts },
+      beats: beats.map(b => ({
+        beat_index: b.beat_index, asset_type: b.asset_type, source: b.source ?? null, fallback: b.fallback ?? null,
+        assets: b.assets ?? [],
+        script_line: b.script_line,
+        content: b.content, visual_concept: b.visual_concept, camera: b.camera ?? null,
+        transition_out: b.transition_out, duration_seconds: b.duration_seconds,
+        resolvedAssets: (b.resolvedAssets || []).map(a => ({ kind: a.kind, src: a.src, label: a.label ?? null })),
+      })),
+      beatHTMLs,
+    };
+    if (existingProjectId) {
+      // FINISHING a previously-incomplete project — overwrite the placeholder row with the real
+      // timeline and clear the incomplete flag (status → null = ready).
+      const { error } = await supabaseAdmin
+        .from("projects")
+        .update({
+          name: film.project_name, safe_project_json: finalTimeline, orientation, mode: "timeline",
+          source: "ai_video", editor_version: "timeline", status: null, raw_ai_json: rawJson,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingProjectId).eq("user_id", userId);
+      if (error) throw new Error(error.message);
+      editorProjectId = existingProjectId;
+    } else {
+      const { data: row } = await supabaseAdmin
+        .from("projects")
+        .insert({
+          user_id:           userId,
+          name:              film.project_name,
+          safe_project_json: finalTimeline,
+          orientation:       orientation,
+          mode:              "timeline",
+          source:            "ai_video",
+          editor_version:    "timeline",
+          raw_ai_json:       rawJson,
+        })
+        .select("id").single();
+      editorProjectId = row?.id ?? null;
+    }
+    if (!editorProjectId) throw new Error("projects save returned no id");
     console.log(`[ai-video] saved project: ${editorProjectId}`);
   } catch (e) {
     // FATAL: the user paid for a deliverable. If we can't persist it there's nothing to open,

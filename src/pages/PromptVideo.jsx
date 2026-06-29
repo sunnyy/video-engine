@@ -271,6 +271,12 @@ function GeneratorForm() {
         },
       );
       invalidateProjectCaches("ai_video", "all");
+      if (result.incomplete) {
+        // Voiceover outage — work saved as an incomplete project. Send them to Projects, where it
+        // shows with a "Finish" button (re-runs only the voiceover; no extra charge yet).
+        navigate("/projects", { state: { from: "/ai-video", incompleteId: result.projectId } });
+        return;
+      }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/ai-video" } });
     } catch (err) {
       if (err.code === "NO_CREDITS") {

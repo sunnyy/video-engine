@@ -19,6 +19,8 @@ import sharp from "sharp";
 import { supabaseAdmin, openai }                      from "../../../server/middleware/shared.js";
 import { simplifyTimelineKeyframes }                  from "../shared/motion.js";
 import { generateFullVoiceover } from "./ttsGenerator.js";
+import { VoiceoverError }                             from "../shared/voiceoverError.js";
+import { saveIncompleteProject }                      from "../shared/incompleteProject.js";
 import { pickAutoMood }                               from "../../../core/registries/musicRegistry.js";
 import { generateNarration } from "./scriptGenerator.js";
 import { planVisualBeats }                           from "./visualDirector.js";
@@ -249,7 +251,20 @@ async function runV2BeatPipeline(project) {
     voiceoverDuration = tts.duration_seconds;
     wordTimestamps    = tts.wordTimestamps ?? [];
   } catch (err) {
-    console.error("[v2/beats] TTS failed (non-fatal):", err.message);
+    const ve = VoiceoverError.from(err);
+    // Voiceover is REQUIRED — never ship a silent video. On a retryable failure, save this as an
+    // INCOMPLETE project (config + script kept) so the user can Finish it later for free; the route refunds.
+    if (ve.retryable && project.user_id) {
+      try {
+        ve.projectId  = await saveIncompleteProject({
+          userId: project.user_id, source: "promo_video", name: `${project.product_name ?? "Promo Video"} — Promo`,
+          orientation: project.format_ratio ?? "9:16", canvas, ve, existingProjectId: project.existingProjectId ?? null,
+          resume: { project: { ...project, script: full_script } },
+        });
+        ve.incomplete = !!ve.projectId;
+      } catch (saveErr) { console.error("[v2/beats] could not save incomplete project:", saveErr.message); }
+    }
+    throw ve;
   }
 
   // ── Step 3: Visual director → timed beats ─────────────────────────────────
@@ -543,11 +558,21 @@ async function persistAssetManifest(assetManifest, projectId) {
 
 async function saveTimeline(finalTimeline, project, source = 'promo_video', rawAiJson = null) {
   try {
+    const name = `${project.product_name ?? "Promo Video"} — Promo`;
+    if (project.existingProjectId) {
+      // FINISHING a previously-incomplete project — overwrite the placeholder + clear the flag.
+      const { error } = await supabaseAdmin.from("projects")
+        .update({ name, safe_project_json: finalTimeline, orientation: project.format_ratio ?? '9:16', mode: "timeline", source, editor_version: "timeline", status: null, raw_ai_json: rawAiJson, updated_at: new Date().toISOString() })
+        .eq("id", project.existingProjectId).eq("user_id", project.user_id);
+      if (error) throw new Error(error.message);
+      console.log(`[v2/pipeline] timeline saved to projects (finished: ${project.existingProjectId})`);
+      return project.existingProjectId;
+    }
     const { data: editorRow } = await supabaseAdmin
       .from("projects")
       .insert({
         user_id:           project.user_id,
-        name:              `${project.product_name ?? "Promo Video"} — Promo`,
+        name,
         safe_project_json: finalTimeline,
         orientation:       project.format_ratio ?? '9:16',
         mode:              "timeline",

@@ -72,6 +72,40 @@ async function pauseCampaign(campaign, reason) {
 }
 
 /**
+ * Pause ALL of a user's active campaigns at once — for a SHARED outage (e.g. our voiceover provider
+ * is down/over quota) that will hit every video, not just one campaign. The user sees a GENERIC
+ * reason ("temporary internal issue") and the true cause is kept only in the event meta for admins.
+ * One batched email + notification (never one-per-campaign spam).
+ */
+async function pauseAllUserCampaigns(userId, publicReason, internalMeta = {}) {
+  const { data: active } = await supabaseAdmin.from("automation_campaigns")
+    .select("id, name").eq("user_id", userId).eq("status", "active");
+  const list = active || [];
+  for (const c of list) {
+    await setCampaignStatus(c.id, "paused").catch(() => {});
+    logEvent({ userId, campaignId: c.id, action: "pause", entity: "campaign", status: "info",
+               message: `Paused — ${publicReason}`, meta: { internal: true, ...internalMeta } });
+  }
+  if (!list.length) return;
+  notifyUser(userId, { type: "automation_paused", icon: "⏸️", severity: "warning", link: "/automation",
+    title: list.length > 1 ? `${list.length} campaigns paused` : `Campaign paused: ${list[0].name}`,
+    body: `Paused due to a ${publicReason}. Everything's safe — resume when you're ready.` });
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (user?.email) {
+      await sendUserEmail(user.email, "Your campaigns were paused",
+        `<p>We paused your active campaign${list.length > 1 ? "s" : ""} due to a <b>${publicReason}</b>. Nothing was lost — just resume when you're ready.</p>`);
+    }
+  } catch (_) {}
+}
+
+/** True if a saved timeline carries its (required) voiceover audio layer — the pre-publish gate. */
+function hasVoiceover(project) {
+  const layers = project?.layers || [];
+  return layers.some((l) => l?.type === "audio" && (l.audioType === "voiceover" || /voiceover/i.test(l.id || "")));
+}
+
+/**
  * render_timeline — render a project's timeline to a durable MP4.
  * payload: { userId, campaignId?, projectId?, project?, resolution?, chain? }
  * Idempotent: renderId = job.id, so retries overwrite the same output (no duplicates).
@@ -90,6 +124,16 @@ registerHandler("render_timeline", async (payload, job) => {
     projectSource = data?.source ?? project?.meta?.source ?? null; // for per-service render-engine gating
   }
   if (!project) throw new Error("render_timeline: no project or projectId in payload");
+
+  // Pre-publish gate (defense-in-depth): NEVER auto-publish a video missing its required voiceover.
+  // Phase-1 makes generation fail loudly on a TTS error, so a fresh automation video always has audio
+  // — but if one ever doesn't (a regression, a hand-edited project), pause that campaign instead of
+  // posting a silent clip. Manual exports (no publish chain) are untouched — a user may want silence.
+  if (payload?.chain?.publish && !hasVoiceover(project)) {
+    if (campaignId) { const c = await getCampaign(campaignId); if (c) await pauseCampaign(c, "temporary internal issue"); }
+    logEvent({ userId, campaignId, action: "render", entity: "project", entityId: projectId, status: "fail", message: "missing voiceover — publish blocked", meta: { internal: true, stage: "voiceover" } });
+    const e = new Error("Campaign paused: missing voiceover"); e.noRetry = true; throw e;
+  }
 
   const watch = watchCancel(job.id);
   let videoUrl, filePath;
@@ -373,6 +417,13 @@ registerHandler("generate_video", async (payload, job) => {
     // Generation failed or was canceled → release the topic so it's freed/retried. No refund
     // needed: we charge only on success, so a failed/canceled run was never charged.
     await releaseTopic(topic.id);
+    // Voiceover provider down / over quota (our side) → a SHARED outage that will hit EVERY video.
+    // Pause ALL of this user's active campaigns at once (so we don't churn out failed jobs across
+    // campaigns) and stop retrying. Generic reason to the user; true cause logged for admins only.
+    if (err?.isVoiceoverError && err.internal) {
+      await pauseAllUserCampaigns(userId, "temporary internal issue", { stage: "voiceover", cause: err.cause });
+      const paused = new Error("Campaign paused: temporary internal issue"); paused.noRetry = true; throw paused;
+    }
     const status = err.noRetry ? "fail" : (job.attempts < job.max_attempts ? "retry" : "fail");
     logEvent({ userId, campaignId, action: "generate", entity: "topic", entityId: topic.id, status, message: err.message, meta: { attempt: job.attempts } });
     throw err;

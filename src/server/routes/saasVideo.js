@@ -299,7 +299,47 @@ router.post("/create", requireAuth, async (req, res) => {
     res.json({ project, assetManifest });
   } catch (e) {
     if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: promo generation failed").catch(() => {});
+    // Voiceover unavailable (our TTS quota/outage) — work may be saved as an incomplete project the
+    // user can Finish later. NEVER reveal the internal cause; show generic copy.
+    if (e?.isVoiceoverError) {
+      console.warn("[promo-video/create] voiceover unavailable:", e.cause, "-", e.message);
+      if (e.incomplete && e.projectId) {
+        return res.json({ incomplete: true, projectId: e.projectId, message: "We couldn’t finish the voiceover just now — your video is saved. Tap Finish to complete it shortly (you won’t be charged twice)." });
+      }
+      return res.status(503).json({ error: "We couldn’t finish your video right now. Please try again shortly." });
+    }
     console.error("[promo-video/create]", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── POST /promo-video/:id/finish — complete a saved INCOMPLETE promo video ──────
+// Voiceover stage had failed; re-runs production from the saved config + script, charges on success.
+router.post("/:id/finish", requireAuth, async (req, res) => {
+  let creditAmount = 0;
+  const projectId = req.params.id;
+  try {
+    const { data: proj, error } = await supabaseAdmin
+      .from("projects").select("id, user_id, status, raw_ai_json")
+      .eq("id", projectId).eq("user_id", req.user.id).single();
+    if (error || !proj)              return res.status(404).json({ error: "Project not found." });
+    if (proj.status !== "incomplete") return res.status(400).json({ error: "This video is already complete." });
+
+    const saved = proj.raw_ai_json?.resume?.project;
+    if (!saved) return res.status(422).json({ error: "We can’t finish this one automatically — please regenerate it." });
+
+    const genCost = promoCredits(saved.scene_count ?? 3);
+    const deduction = await deductCredits(req.user.id, genCost, "promo_video", `SaaS/Promo Video generation (${saved.scene_count ?? 3} scenes)`, projectId);
+    if (!deduction.success) return res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+    creditAmount = genCost;
+
+    const project = await runV2Pipeline({ ...saved, existingProjectId: projectId });
+    if (!project?.editor_project_id) throw new Error("finish produced no editor project (save failed)");
+    res.json({ project });
+  } catch (e) {
+    if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: promo finish failed").catch(() => {});
+    if (e?.isVoiceoverError) return res.json({ incomplete: true, projectId, message: "Still couldn’t finish the voiceover — please try again shortly." });
+    console.error("[promo-video/finish]", e.message);
     res.status(500).json({ error: e.message });
   }
 });

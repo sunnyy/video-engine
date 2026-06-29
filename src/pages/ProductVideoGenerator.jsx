@@ -389,6 +389,7 @@ function GeneratorForm() {
       });
 
       invalidateProjectCaches("product_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/product-video" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/product-video" } });
     } catch (err) {
       console.error("[ProductVideoGenerator]", err);

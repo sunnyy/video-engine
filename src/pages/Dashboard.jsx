@@ -167,6 +167,7 @@ function PromptVideoChatbox({ onBusy }) {
         ({ step }) => { const i = STATUS_STEPS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("ai_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/dashboard" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
       setError(err.code === "NO_CREDITS" ? `Not enough credits — you need ${creditsForDuration(duration)} to produce this video.` : (err.message || "Generation failed."));
@@ -314,6 +315,7 @@ function SocialChatbox({ onBusy }) {
         ({ step }) => { const i = SOCIAL_STATUS.indexOf(step); if (i !== -1) setStatusStep(i); },
       );
       invalidateProjectCaches("social_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/dashboard" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
       setError(err.code === "NO_CREDITS" ? "Not enough credits — you need 15 to generate a social video." : (err.message || "Generation failed."));
@@ -450,6 +452,7 @@ function SaasChatbox({ onBusy }) {
     try {
       const result = await generateSaasVideo(buildPayload(script), ({ step }) => setStatusStep(step));
       invalidateProjectCaches("promo_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/dashboard" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
       setError(err.code === "NO_CREDITS" ? "Not enough credits for a SaaS video." : (err.message || "Generation failed."));
@@ -648,6 +651,7 @@ function ProductChatbox({ onBusy }) {
         ({ step }) => { if (typeof step === "number") setStatusIdx(step); },
       );
       invalidateProjectCaches("product_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/dashboard" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
       setError(err.code === "NO_CREDITS" ? "Not enough credits for a product video." : (err.message || "Generation failed."));
@@ -807,6 +811,7 @@ function TypographyChatbox({ onBusy }) {
         ({ step }) => { if (typeof step === "number") setStatusStep(step); },
       );
       invalidateProjectCaches("typography_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/dashboard" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/dashboard" } });
     } catch (err) {
       setError(err.code === "NO_CREDITS" ? "Not enough credits for a typography video." : (err.message || "Generation failed."));

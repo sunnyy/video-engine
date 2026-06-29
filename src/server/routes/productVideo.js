@@ -1,11 +1,24 @@
 import express from "express";
-import { requireAuth, deductCredits, addCredits, safeMessage } from "../middleware/shared.js";
+import { requireAuth, deductCredits, addCredits, safeMessage, supabaseAdmin } from "../middleware/shared.js";
 import { runProductVideoPipeline, planProductVideo } from "../../services/ai/productVideo/pipelineOrchestrator.js";
 import { scrapeProductUrl } from "../../services/ai/productVideo/productScraper.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 
 export const router = express.Router();
+
+// Voiceover outage → mask the real cause; if the work was saved as an incomplete project, tell the
+// client so it can offer "Finish later". Returns true when it has written the response.
+function handleVoiceoverError(send, err) {
+  if (!err?.isVoiceoverError) return false;
+  console.warn("[product-video] voiceover unavailable:", err.cause, "-", err.message);
+  if (err.incomplete && err.projectId) {
+    send({ incomplete: true, projectId: err.projectId, message: "We couldn’t finish the voiceover just now — your video is saved. Tap Finish to complete it shortly (you won’t be charged twice)." });
+  } else {
+    send({ error: "We couldn’t finish your video right now. Please try again shortly." });
+  }
+  return true;
+}
 
 router.post("/generate", requireAuth, async (req, res) => {
   const {
@@ -91,7 +104,50 @@ router.post("/generate", requireAuth, async (req, res) => {
     res.end();
   } catch (err) {
     if (creditAmount > 0) addCredits(req.user.id, creditAmount, "refund", "ai_failure_refund", "Refund: Product Video failed").catch(() => {});
+    if (handleVoiceoverError(send, err)) return res.end();
     console.error("[product-video/generate]", err);
+    send({ error: safeMessage(err), code: err.code });
+    res.end();
+  }
+});
+
+// ── Finish a saved INCOMPLETE product video (voiceover stage had failed) ──────
+router.post("/:id/finish", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const projectId = req.params.id;
+  let creditAmount = 0;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
+  try {
+    const { data: project, error } = await supabaseAdmin
+      .from("projects").select("id, user_id, status, raw_ai_json")
+      .eq("id", projectId).eq("user_id", userId).single();
+    if (error || !project)               { send({ error: "Project not found." }); return res.end(); }
+    if (project.status !== "incomplete") { send({ error: "This video is already complete." }); return res.end(); }
+
+    const saved = project.raw_ai_json?.resume?.project;
+    if (!saved?.plan?.scenes?.length) { send({ error: "We can’t finish this one automatically — please regenerate it." }); return res.end(); }
+
+    const scenes = Math.max(1, Math.min(5, parseInt(saved.sceneCount, 10) || 3));
+    const mode = ["image", "hybrid", "video"].includes(saved.visualMode) ? saved.visualMode : "image";
+    const perScene = CREDIT_COSTS.product_video_per_scene[mode] ?? CREDIT_COSTS.product_video_per_scene.image;
+    const cost = scenes * perScene;
+    const deduction = await deductCredits(userId, cost, "product_video", `Product Video (${scenes} ${mode} scenes)`, projectId);
+    if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
+    creditAmount = cost;
+
+    const result = await runProductVideoPipeline({ ...saved, userId, existingProjectId: projectId }, (step) => send({ step }));
+    if (!result?.editor_project_id) throw new Error("finish produced no editor project (save failed)");
+    send({ done: true, editor_project_id: result.editor_project_id, total_duration: result.total_duration });
+    res.end();
+  } catch (err) {
+    if (creditAmount > 0) addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Product Video finish failed").catch(() => {});
+    if (err?.isVoiceoverError) { send({ incomplete: true, projectId, message: "Still couldn’t finish the voiceover — please try again shortly." }); return res.end(); }
+    console.error("[product-video/finish]", err);
     send({ error: safeMessage(err), code: err.code });
     res.end();
   }

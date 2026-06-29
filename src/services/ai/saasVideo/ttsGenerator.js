@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import ffmpeg     from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { openai, supabaseAdmin } from "../../../server/middleware/shared.js";
+import { VoiceoverError, classifyTtsHttp } from "../shared/voiceoverError.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -165,25 +166,30 @@ export async function generateFullVoiceover(script, projectId, voiceId, speed = 
 
   const vid = voiceId || DEFAULT_EL_VOICE;
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
+  if (!apiKey) throw new VoiceoverError("ELEVENLABS_API_KEY not set", { cause: "config", retryable: false, internal: true });
 
-  const response = await fetch(`${ELEVENLABS_API}/${vid}/with-timestamps`, {
-    method:  "POST",
-    headers: {
-      "xi-api-key":   apiKey,
-      "Content-Type": "application/json",
-      "Accept":       "application/json",
-    },
-    body: JSON.stringify({
-      text:           normalizeTtsText(script.trim()),
-      model_id:       "eleven_multilingual_v2",
-      voice_settings: { stability: 0.4, similarity_boost: 0.75, speed },
-    }),
-  });
+  let response;
+  try {
+    response = await fetch(`${ELEVENLABS_API}/${vid}/with-timestamps`, {
+      method:  "POST",
+      headers: {
+        "xi-api-key":   apiKey,
+        "Content-Type": "application/json",
+        "Accept":       "application/json",
+      },
+      body: JSON.stringify({
+        text:           normalizeTtsText(script.trim()),
+        model_id:       "eleven_multilingual_v2",
+        voice_settings: { stability: 0.4, similarity_boost: 0.75, speed },
+      }),
+    });
+  } catch (netErr) {
+    throw new VoiceoverError(`TTS network error: ${netErr.message}`, { cause: "network", retryable: true, internal: true });
+  }
 
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`ElevenLabs TTS error ${response.status}: ${errText.slice(0, 200)}`);
+    throw classifyTtsHttp(response.status, errText);
   }
 
   const json         = await response.json();

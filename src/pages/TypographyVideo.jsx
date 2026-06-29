@@ -232,6 +232,7 @@ function GeneratorForm() {
         ({ step }) => setStatusIdx(step),
       );
       invalidateProjectCaches("typography_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/typography-video" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/typography-video" } });
     } catch (err) {
       setError(err.message || "Generation failed. Please try again.");

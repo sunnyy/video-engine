@@ -71,7 +71,7 @@ export async function getUserProjects() {
 
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, created_at, updated_at, source, safe_project_json")
+    .select("id, name, created_at, updated_at, source, status, safe_project_json")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 

@@ -245,6 +245,7 @@ function GeneratorForm() {
         },
       );
       invalidateProjectCaches("social_video", "all");
+      if (result.incomplete) { navigate("/projects", { state: { from: "/social-video" } }); return; }
       navigate(`/video-editor/${result.projectId}`, { state: { from: "/social-video" } });
     } catch (err) {
       if (err.code === "NO_CREDITS") {

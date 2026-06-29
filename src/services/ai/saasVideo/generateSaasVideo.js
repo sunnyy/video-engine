@@ -18,6 +18,19 @@ export async function planSaasVideo(payload) {
   return data.full_script || "";
 }
 
+/** Finish a saved INCOMPLETE promo video (voiceover stage had failed). Returns { projectId } or { incomplete }. */
+export async function finishPromoVideo(projectId) {
+  const res  = await serverFetch(`/api/promo-video/${projectId}/finish`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || "Couldn't finish the video"); if (data.code) e.code = data.code; throw e; }
+  if (data.incomplete) return { incomplete: true, projectId, message: data.message };
+  const pid = data.project?.editor_project_id;
+  if (!pid) throw new Error("Finish produced no editor project");
+  return { projectId: pid };
+}
+
 export async function generateSaasVideo(payload, onProgress) {
   onProgress?.({ step: 0 }); // reading site / building plan
 
@@ -31,6 +44,9 @@ export async function generateSaasVideo(payload, onProgress) {
     if (cData.code) e.code = cData.code;
     throw e;
   }
+  // Voiceover outage — the work was saved as an incomplete project; surface it so the caller can
+  // route the user to Projects to Finish it later (no render to kick off).
+  if (cData.incomplete) return { incomplete: true, projectId: cData.projectId, message: cData.message };
   const pid = cData.project?.id;
   if (!pid) throw new Error("No project returned from create");
 

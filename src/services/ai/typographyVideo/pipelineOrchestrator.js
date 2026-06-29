@@ -3,6 +3,8 @@ import { simplifyTimelineKeyframes }    from "../shared/motion.js";
 import { generateTypographyScript }     from "./scriptGenerator.js";
 import { buildTypographyTimelineDirect } from "./timelineBuilderDirect.js";
 import { generateFullVoiceover }         from "../saasVideo/ttsGenerator.js";
+import { VoiceoverError }                 from "../shared/voiceoverError.js";
+import { saveIncompleteProject }          from "../shared/incompleteProject.js";
 import { pickMoodForNiche, pickMusicByMood } from "../../../core/registries/musicRegistry.js";
 import { moderateInput }                     from "../shared/moderation.js";
 
@@ -101,9 +103,18 @@ function orientationToCanvas(orientation) {
   }
 }
 
-async function saveTimeline(timeline, projectName, userId, orientation = "9:16") {
+async function saveTimeline(timeline, projectName, userId, orientation = "9:16", existingProjectId = null) {
   // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
   simplifyTimelineKeyframes(timeline);
+  if (existingProjectId) {
+    // FINISHING a previously-incomplete project — overwrite the placeholder + clear the flag.
+    const { error } = await supabaseAdmin.from("projects")
+      .update({ name: projectName, safe_project_json: timeline, orientation, mode: "timeline", source: "typography_video", editor_version: "timeline", status: null, updated_at: new Date().toISOString() })
+      .eq("id", existingProjectId).eq("user_id", userId);
+    if (error) throw new Error(`DB save failed: ${error.message}`);
+    console.log(`[typography] saved → project ${existingProjectId} (finished)`);
+    return existingProjectId;
+  }
   const { data: row, error } = await supabaseAdmin
     .from("projects")
     .insert({
@@ -143,7 +154,7 @@ export async function planTypography(project) {
 // scenes may carry the user's edited voiceover text; narration is rebuilt from them.
 
 export async function produceTypography(plan, params, onProgress = () => {}) {
-  const { userId, voiceId = null, orientation = "9:16" } = params;
+  const { userId, voiceId = null, orientation = "9:16", existingProjectId = null } = params;
   const canvas = orientationToCanvas(orientation);
   const scenes = (plan.scenes ?? []).map(s => ({ ...s }));
   const { projectName, palette, fontPair, musicMood, niche } = plan;
@@ -167,7 +178,16 @@ export async function produceTypography(plan, params, onProgress = () => {}) {
       audioDuration  = tts.duration_seconds ?? 0;
       console.log(`[typography] TTS: ${audioDuration.toFixed(2)}s, ${wordTimestamps.length} word timestamps`);
     } catch (err) {
-      console.warn("[typography] TTS failed, using estimated timings:", err.message);
+      const ve = VoiceoverError.from(err);
+      // Voiceover is REQUIRED — never ship a silent video. On a retryable failure, save this as an
+      // INCOMPLETE project (plan kept) so the user can Finish it later for free; the route refunds.
+      if (ve.retryable && userId) {
+        try {
+          ve.projectId  = await saveIncompleteProject({ userId, source: "typography_video", name: projectName, orientation, canvas, ve, existingProjectId, resume: { plan, params } });
+          ve.incomplete = !!ve.projectId;
+        } catch (saveErr) { console.error("[typography] could not save incomplete project:", saveErr.message); }
+      }
+      throw ve;
     }
   }
 
@@ -235,7 +255,7 @@ export async function produceTypography(plan, params, onProgress = () => {}) {
 
   // Step 6: Save
   console.log("[typography] step 6 — saving");
-  const projectId = await saveTimeline(timeline, projectName, userId, orientation);
+  const projectId = await saveTimeline(timeline, projectName, userId, orientation, existingProjectId);
 
   console.log(`[typography] done — ${timedBeats.length} beats, ${timeline.format.duration.toFixed(2)}s, project=${projectId}`);
   return { projectId, projectName };
@@ -247,7 +267,7 @@ export async function runTypographyPipeline(project, onProgress = () => {}) {
   const plan = await planTypography(project);
   return produceTypography(
     plan,
-    { userId: project.userId, voiceId: project.voiceId ?? null, language: project.language ?? "en" },
+    { userId: project.userId, voiceId: project.voiceId ?? null, language: project.language ?? "en", targetDuration: project.targetDuration, orientation: project.orientation },
     onProgress,
   );
 }

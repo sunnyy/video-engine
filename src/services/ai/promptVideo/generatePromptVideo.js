@@ -13,15 +13,9 @@ export async function planPromptVideo({ prompt, styleId = "auto", targetDuration
   return res.json(); // { plan, summary }
 }
 
-export async function generatePromptVideo(
-  { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null, theme = "auto", accentColor = null, accentColor2 = null },
-  onProgress,
-) {
-  const res = await serverFetch("/api/ai-video/generate", {
-    method: "POST",
-    body: JSON.stringify({ prompt, styleId, targetDuration, language, voiceId, orientation, plan, theme, accentColor, accentColor2 }),
-  });
-
+// Consume the generate/finish SSE stream. Resolves with a normal result {projectId,...}, or an
+// {incomplete:true, projectId, message} result when the voiceover stage failed but the work was saved.
+async function readGenerationStream(res, onProgress) {
   if (!res.ok && res.status !== 200) {
     const err = await res.json().catch(() => ({ error: "Generation failed" }));
     throw new Error(err.error || "Generation failed");
@@ -50,6 +44,9 @@ export async function generatePromptVideo(
         throw err;
       }
       if (event.step != null && onProgress) onProgress({ step: event.step });
+      if (event.incomplete) {
+        return { incomplete: true, projectId: event.projectId, message: event.message };
+      }
       if (event.done) {
         return { projectId: event.projectId, projectName: event.projectName, beatCount: event.beatCount };
       }
@@ -57,4 +54,21 @@ export async function generatePromptVideo(
   }
 
   throw new Error("Stream ended without a result");
+}
+
+export async function generatePromptVideo(
+  { prompt, styleId = "auto", targetDuration = 45, language = "en", voiceId = null, orientation = "9:16", plan = null, theme = "auto", accentColor = null, accentColor2 = null },
+  onProgress,
+) {
+  const res = await serverFetch("/api/ai-video/generate", {
+    method: "POST",
+    body: JSON.stringify({ prompt, styleId, targetDuration, language, voiceId, orientation, plan, theme, accentColor, accentColor2 }),
+  });
+  return readGenerationStream(res, onProgress);
+}
+
+/** Finish a saved INCOMPLETE generation (voiceover stage had failed). Re-runs from the saved plan. */
+export async function finishPromptVideo(projectId, onProgress) {
+  const res = await serverFetch(`/api/ai-video/${projectId}/finish`, { method: "POST" });
+  return readGenerationStream(res, onProgress);
 }

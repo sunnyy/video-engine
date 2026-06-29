@@ -23,6 +23,8 @@
 import { supabaseAdmin }            from "../../../server/middleware/shared.js";
 import { simplifyTimelineKeyframes } from "../shared/motion.js";
 import { generateFullVoiceover }    from "../saasVideo/ttsGenerator.js";
+import { VoiceoverError }            from "../shared/voiceoverError.js";
+import { saveIncompleteProject }     from "../shared/incompleteProject.js";
 import { pickAutoMood }             from "../../../core/registries/musicRegistry.js";
 import { generateProductPlan }      from "./productDirector.js";
 import { generateBaseImage, generateAllSceneShots, generateSceneClip } from "./shotGenerator.js";
@@ -247,6 +249,30 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
   try {
     // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
     simplifyTimelineKeyframes(timeline);
+    const rawJson = {
+      brief:      project._brief ?? null,
+      sceneHTMLs,
+      scenes: scenes.map(s => ({
+        intent:         s.intent,
+        creative_direction: s.creative_direction,
+        shot_type:      s.shot_type,
+        image_generation_prompt: s.image_generation_prompt,
+        anchor:         s.anchor,
+        display:        s.display,
+        render:         s.render,
+        motion_prompt:  s.motion_prompt,
+        script_segment: s.script_segment,
+      })),
+    };
+    if (project.existingProjectId) {
+      // FINISHING a previously-incomplete project — overwrite the placeholder + clear the flag.
+      const { error } = await supabaseAdmin.from("projects")
+        .update({ name: timeline.name, safe_project_json: timeline, orientation: project.orientation ?? "9:16", mode: "timeline", source: "product_video", editor_version: "timeline", status: null, raw_ai_json: rawJson, updated_at: new Date().toISOString() })
+        .eq("id", project.existingProjectId).eq("user_id", project.userId);
+      if (error) throw new Error(error.message);
+      console.log(`[productPipeline] saved → project ${project.existingProjectId} (finished)`);
+      return project.existingProjectId;
+    }
     const { data: row } = await supabaseAdmin
       .from("projects")
       .insert({
@@ -257,21 +283,7 @@ async function saveTimeline(timeline, project, scenes, sceneHTMLs = []) {
         mode:              "timeline",
         source:            "product_video",
         editor_version:    "timeline",
-        raw_ai_json: {
-          brief:      project._brief ?? null,
-          sceneHTMLs,
-          scenes: scenes.map(s => ({
-            intent:         s.intent,
-            creative_direction: s.creative_direction,
-            shot_type:      s.shot_type,
-            image_generation_prompt: s.image_generation_prompt,
-            anchor:         s.anchor,
-            display:        s.display,
-            render:         s.render,
-            motion_prompt:  s.motion_prompt,
-            script_segment: s.script_segment,
-          })),
-        },
+        raw_ai_json:       rawJson,
       })
       .select("id")
       .single();
@@ -314,7 +326,7 @@ export async function planProductVideo(project) {
 }
 
 export async function runProductVideoPipeline(project, onStep) {
-  const { userId, productImageUrl, visualMode = "image" } = project;
+  const { userId, productImageUrl, visualMode = "image", existingProjectId = null } = project;
   const canvas = orientationToCanvas(project.orientation ?? "9:16");
   const runId = `pv4-${Date.now()}`;
 
@@ -359,13 +371,18 @@ export async function runProductVideoPipeline(project, onStep) {
 
   // ── Step 2: Base image — clean studio packshot (canonical reference) ───────
   onStep?.(1);
-  console.log("[productPipeline] step 2 — base image");
-  const baseImageUrl = await generateBaseImage(productImageUrl, {
-    userId, runId,
-    prompt:       plan.base_image_prompt,
-    hasWatermark: brief.has_watermark,
-    orientation:  project.orientation ?? "9:16",
-  });
+  // Reuse a base image carried over from a prior incomplete run (Finish-later) so we don't re-pay
+  // the image step; otherwise generate it now.
+  let baseImageUrl = project.baseImageUrl || null;
+  if (!baseImageUrl) {
+    console.log("[productPipeline] step 2 — base image");
+    baseImageUrl = await generateBaseImage(productImageUrl, {
+      userId, runId,
+      prompt:       plan.base_image_prompt,
+      hasWatermark: brief.has_watermark,
+      orientation:  project.orientation ?? "9:16",
+    });
+  }
 
   // ── Step 3: Voiceover → per-scene durations (clamped 3–4s; no stretch) ─────
   console.log("[productPipeline] step 3 — voiceover");
@@ -377,7 +394,18 @@ export async function runProductVideoPipeline(project, onStep) {
     voiceoverDuration = tts.duration_seconds || 0;
     if (tts.wordTimestamps?.length) assignWhisperTimestamps(scenes, tts.wordTimestamps);
   } catch (err) {
-    console.error("[productPipeline] TTS failed (non-fatal):", err.message);
+    const ve = VoiceoverError.from(err);
+    // Voiceover is REQUIRED — never ship a silent video. On a retryable failure, save this as an
+    // INCOMPLETE project (plan + base image kept) so the user can Finish it later for free without
+    // re-paying the image step; the route refunds the up-front charge.
+    if (ve.retryable && userId) {
+      try {
+        const resumeProject = { ...project, plan, script: full_script, baseImageUrl };
+        ve.projectId  = await saveIncompleteProject({ userId, source: "product_video", name: brief?.product_name || project.brandName || "Product Video", orientation: project.orientation ?? "9:16", canvas, ve, existingProjectId, resume: { project: resumeProject } });
+        ve.incomplete = !!ve.projectId;
+      } catch (saveErr) { console.error("[productPipeline] could not save incomplete project:", saveErr.message); }
+    }
+    throw ve;
   }
 
   // Clamp scene durations so each beat stays short (the 19s bug was the old
