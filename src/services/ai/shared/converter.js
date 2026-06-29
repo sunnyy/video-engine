@@ -721,6 +721,35 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     }
   }
 
+  // Frame floor: an OPAQUE fill that nearly coincides with an image's box IS that image's frame /
+  // card / container background. Flattened to a sibling it can tie or exceed the image's z and,
+  // painted later, BURY the photo — the card renders as a dead colour panel (e.g. a framed hero
+  // photo that came out an empty beige rectangle). This is the card-sized cousin of the page floor
+  // above: same disease, just not full-canvas, so the rule there misses it. Demote any such opaque
+  // fill just below its image. A legibility SCRIM (transparent→dark gradient laid over the photo)
+  // has alpha and is intentionally ABOVE — detect any sub-1 alpha / "transparent" and leave it.
+  {
+    const hasTransparency = (bg) => !bg || /transparent/i.test(bg) ||
+      /rgba?\([^)]*,\s*(?:0|0?\.\d+)\s*\)/i.test(bg); // any colour stop with <1 alpha → it's a scrim
+    const sameBox = (a, b) => {
+      const ix = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const iy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      if (ix <= 0 || iy <= 0) return false;
+      const inter = ix * iy, union = a.width * a.height + b.width * b.height - inter;
+      return union > 0 && inter / union > 0.7; // IoU > 0.7 → essentially the same rectangle
+    };
+    for (const img of graph) {
+      if (img.type !== "image" || !img.src) continue;
+      for (const g of graph) {
+        if (g.type !== "gradient" || g === img) continue;
+        if ((g.opacity ?? 1) >= 0.98 && !hasTransparency(g.background) &&
+            g.zIndex >= img.zIndex && sameBox(g, img)) {
+          g.zIndex = img.zIndex - 1;
+        }
+      }
+    }
+  }
+
   graph.sort((a, b) => a.zIndex - b.zIndex);
   return graph;
 }

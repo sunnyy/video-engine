@@ -101,7 +101,7 @@ ${RENDERER_CONSTRAINTS}`;
 • Say each fact ONCE — never print the same info in two elements; a kicker/label must add NEW context, not echo the headline. To stress a word, style it IN PLACE — never copy it into a second element, and never overlap two text elements.
 • No orphan decoration — every mark belongs to content (it IS content, HOLDS content, or STRUCTURES it). No floating lines / rings / dots / chips, and NEVER an empty box / hollow card / placeholder panel with nothing inside it.
 • Compose for the WHOLE vertical frame as ONE picture — don't cram everything into the top and strand a kicker/line at the very bottom with a dead empty band in the middle. Either anchor it as one cohesive block or distribute the elements so there is no large hollow gap.
-• Never invent a number, date, or fact that isn't in the information above. Never print internal/direction words on screen — e.g. Hook / Stat / CTA / SPOKEN / BEAT / scene numbers are instructions to you, never visible text.`;
+• Never invent a number, date, or fact that isn't in the information above. Never print internal/direction words on screen — e.g. Hook / Stat / CTA / SPOKEN / BEAT / scene numbers, AND the design style's name ("${style.label}") or any word from it, are art-direction notes for you, never visible text (never render the style name as a masthead, byline, footer or label).`;
 
   const continuation = beat.continues_previous
     ? `\nThis frame continues the previous thought — you may keep its world/palette and bring the new info in as the focus.\n`
