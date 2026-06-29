@@ -28,6 +28,15 @@ import { ASSET_PLACEHOLDER_SRC } from "../../core/utils/placeholders";
 const DRAGGABLE_TYPES = new Set(["video", "image", "text", "sticker", "gradient", "shape", "icon", "html_block"]);
 const SNAP_T = 12; // canvas-space pixels
 
+// Devanagari fallback — MUST match the render path (composer withDeva / measure step). Our display
+// fonts are Latin-only, so without this the editor substitutes a wider OS Devanagari font (Nirmala/
+// Mangal); Hindi text then needs more width than the measured box and WRAPS, colliding with the line
+// below. Appending the SAME Noto face the measure used makes the measured width fit on one line again.
+const withDeva = (f) => {
+  const p = (f || "Outfit").split(",")[0].trim().replace(/['"]/g, "");
+  return `"${p}", "Noto Sans Devanagari", sans-serif`;
+};
+
 // Snap layer top-left (x,y) to canvas edges and center during body drag
 function snapBody(x, y, w, h, cW, cH) {
   let sx = x, sy = y;
@@ -936,7 +945,7 @@ function LayerElement({
     const baseTextStyle = {
       width: autoW ? undefined : "100%",
       height: autoH ? undefined : "100%",
-      fontFamily: s.fontFamily ?? "Outfit, sans-serif",
+      fontFamily: withDeva(s.fontFamily),
       fontSize: s.fontSize ?? 72,
       fontWeight: s.fontWeight ?? 800,
       fontStyle: s.fontStyle ?? "normal",
@@ -1083,7 +1092,7 @@ function LayerElement({
     content = seg ? (
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{
-          fontFamily: cs.fontFamily ?? "Outfit, sans-serif",
+          fontFamily: withDeva(cs.fontFamily),
           fontSize: cs.fontSize ?? 48,
           fontWeight: cs.fontWeight ?? 700,
           color: cs.color ?? "#ffffff",
@@ -1385,7 +1394,7 @@ function StackedTextGroup({ groupLayers, currentTime, selectedLayerId }) {
               opacity:         (kf.opacity ?? 1) * (ts.opacity ?? 1),
               transform:       `${ts.translateX ? `translateX(${ts.translateX}%) ` : ""}${ts.translateY ? `translateY(${ts.translateY}%) ` : ""}scale(${(kf.scale ?? 1) * (ts.scale ?? 1)})`,
               transformOrigin: "center center",
-              fontFamily:      s.fontFamily    ?? "Outfit, sans-serif",
+              fontFamily:      withDeva(s.fontFamily),
               fontSize:        s.fontSize      ?? 48,
               fontWeight:      s.fontWeight    ?? 700,
               fontStyle:       s.fontStyle     ?? "normal",

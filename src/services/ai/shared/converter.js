@@ -31,7 +31,7 @@ const CANVAS_H_DEFAULT = 1920;
 // woff2 (public/fonts) as data-URI @font-face, which loads instantly and identically.
 const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../public/fonts");
 let _localFontCss; // cached
-function localFontsCss() {
+export function localFontsCss() {
   if (_localFontCss !== undefined) return _localFontCss;
   try {
     const css = fs.readFileSync(path.join(FONTS_DIR, "fonts.css"), "utf8");
@@ -682,25 +682,44 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
 
   // Containment z-lift: when flattening, a container (card / panel / mockup window) can share or
   // exceed the z of the content it visually CONTAINS — its nested cards, decorations, dots, bars,
-  // text — and, painted later, hide them (every card/decoration defaults to z=3, so a parent card
-  // covers its own children). In the DOM the children paint above the parent; restore that by
-  // lifting EVERY element above any strictly-larger element that geometrically contains it and sits
-  // at/above its z. Computed from the ORIGINAL z (then assigned) so multi-level nesting is stable.
-  // (Text wins ties via the text branch already; we never treat a text layer as a container.)
-  const ZLIFT = new Map();
-  for (const el of graph) {
+  // text — and, painted later, hide them (GPT writes the text INSIDE the box, where the DOM paints
+  // it above; flattened to siblings at the same z, the later box buries it). Restore DOM order by
+  // lifting EVERY element strictly above any larger element that geometrically contains it.
+  //
+  // This must ITERATE to a fixpoint: a single pass computed from the ORIGINAL z collapses nested
+  // equal-z stacks — text in a card in a section all at z=11 lift child AND parent to the SAME 11,
+  // so the card still ties with (and, by array order, buries) the text. Re-running with the CURRENT
+  // z separates each level: pass 2 sees the card now at 11 and pushes the text to 12. (Text is never
+  // treated as a container; siblings don't contain each other, so this converges in a few passes.)
+  const contains = (g, el) => {
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
-    let lift = el.zIndex;
-    for (const g of graph) {
-      if (g === el || g.type === "text") continue; // text isn't a container
-      const contains =
-        cx >= g.x && cx <= g.x + g.width && cy >= g.y && cy <= g.y + g.height &&
-        g.width * g.height > el.width * el.height; // g is strictly larger → an enclosing container
-      if (contains && g.zIndex >= el.zIndex) lift = Math.max(lift, g.zIndex + 1);
+    return cx >= g.x && cx <= g.x + g.width && cy >= g.y && cy <= g.y + g.height &&
+           g.width * g.height > el.width * el.height; // g strictly larger → an enclosing container
+  };
+  for (let pass = 0, changed = true; changed && pass < 8; pass++) {
+    changed = false;
+    for (const el of graph) {
+      for (const g of graph) {
+        if (g === el || g.type === "text") continue; // text isn't a container
+        if (contains(g, el) && g.zIndex >= el.zIndex) { el.zIndex = g.zIndex + 1; changed = true; }
+      }
     }
-    ZLIFT.set(el, lift);
   }
-  for (const el of graph) el.zIndex = ZLIFT.get(el);
+
+  // Page floor: a full-canvas role="background" GRADIENT is the page backdrop / tint / vignette and
+  // belongs BENEATH the hero. Image beats are now composed BY the designer (GPT writes the <img>),
+  // and GPT tags BOTH the hero <img> and its backdrop/tint gradients role="background"; flattened
+  // they tie at z=0 and a gradient, painted later, BURIES the photo (the scene renders as a dead
+  // colour field). Demote every full-canvas background gradient below the floor so the image — and
+  // all content — always sits above it. A LOCAL text-band scrim is partial-height (not full-canvas),
+  // so it's untouched and still sits over its photo as the designer authored it.
+  for (const el of graph) {
+    if (el.type === "gradient" && el.role === "background" &&
+        el.width >= canvasW * 0.92 && el.height >= canvasH * 0.92 &&
+        el.x <= canvasW * 0.08 && el.y <= canvasH * 0.08) {
+      el.zIndex = Math.min(el.zIndex, -1);
+    }
+  }
 
   graph.sort((a, b) => a.zIndex - b.zIndex);
   return graph;

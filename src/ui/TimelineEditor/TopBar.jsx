@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTimelineStore } from "../../store/useTimelineStore";
 import { serverFetch } from "../../services/serverApi";
-import { getProjectRenders } from "../../services/projects/projectService";
+import { getProjectRenders, deleteProject } from "../../services/projects/projectService";
 import { supabase } from "../../lib/supabase";
 import { showToast } from "../Toast";
 import PublishModal from "./modals/PublishModal";
@@ -298,6 +298,22 @@ export default function TopBar() {
     updateProject({ format: { ...project.format, width: height, height: width } });
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDeleteProject = async () => {
+    if (!projectId) { showToast("Nothing to delete yet — this project hasn't been saved.", "info"); return; }
+    if (deleting) return;
+    if (!window.confirm(`Delete "${name || "this project"}"? This permanently removes the project and can't be undone.`)) return;
+    setDeleting(true);
+    try {
+      await deleteProject(projectId);
+      showToast("Project deleted", "success");
+      navigate("/projects");
+    } catch {
+      setDeleting(false);
+      showToast("Couldn't delete the project — please try again.");
+    }
+  };
+
   return (
     <>
       {showPublish && (
@@ -391,6 +407,21 @@ export default function TopBar() {
         onMouseOut={(e) => (e.target.style.background = "transparent")}
       />
 
+      {/* Delete this project (permanent, with confirmation) — red outline, like Publish */}
+      <button
+        onClick={handleDeleteProject}
+        disabled={deleting}
+        title="Delete this project (permanent)"
+        style={{
+          background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.45)",
+          color: "#f87171", cursor: deleting ? "default" : "pointer", padding: "7px 14px",
+          borderRadius: 6, fontSize: 13, fontWeight: 700, marginLeft: 6, flexShrink: 0,
+          opacity: deleting ? 0.55 : 1,
+        }}
+      >
+        {deleting ? "Deleting…" : "🗑 Delete"}
+      </button>
+
       {/* Center: editing guidance note */}
       <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0, padding: "0 8px" }}>
         <div
@@ -429,25 +460,31 @@ export default function TopBar() {
           ↪ Redo
         </button>
 
-        <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", margin: "0 8px" }} />
-
-        <button
-          onClick={handleFormatToggle}
-          title="Toggle aspect ratio"
-          style={{
-            background: "rgba(124,92,252,0.14)",
-            border: "1px solid rgba(124,92,252,0.4)",
-            color: "#a080ff",
-            cursor: "pointer",
-            padding: "5px 12px",
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: "0.03em",
-          }}
-        >
-          {isPortrait ? "9:16" : "16:9"}
-        </button>
+        {/* Orientation toggle hidden: a naive width/height swap mis-positions every scene
+            (layouts are measured per-canvas). A real aspect switch = regenerate each scene.
+            Kept here (flip false→true) so it's trivial to revive if we build a reframe flow. */}
+        {false && (
+          <>
+            <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", margin: "0 8px" }} />
+            <button
+              onClick={handleFormatToggle}
+              title="Toggle aspect ratio"
+              style={{
+                background: "rgba(124,92,252,0.14)",
+                border: "1px solid rgba(124,92,252,0.4)",
+                color: "#a080ff",
+                cursor: "pointer",
+                padding: "5px 12px",
+                borderRadius: 6,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: "0.03em",
+              }}
+            >
+              {isPortrait ? "9:16" : "16:9"}
+            </button>
+          </>
+        )}
 
         {/* Download dropdown — previous exports (versions), newest first */}
         {renders.length > 0 && (

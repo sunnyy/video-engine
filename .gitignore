@@ -42,3 +42,6 @@ autopilot.txt
 src/server/temp
 # @vidquence/render shadow-diff output
 .shadow-out/
+
+# Local dev: AI Video snapshot frames/JSON
+.aiv-preview/

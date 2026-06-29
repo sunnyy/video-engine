@@ -237,6 +237,10 @@ function splitLongBeats(beats) {
       vo_start: wordsB[0].start,
       duration_seconds: parseFloat(Math.max(1.1, beat.vo_end - wordsB[0].start).toFixed(3)),
       continues_previous: true,
+      // A split is ONE sentence cut for timing — its second half HOLDS the first half's frame
+      // (same visual + same on-screen text) while the narration finishes, instead of getting its
+      // own scene that restates/fragments the line. The assembly extends the anchor scene across it.
+      split_hold: true,
       content: {
         kind: beat.content?.kind === "none" ? "none" : (beat.content?.kind ?? "title"),
         headline: partB.replace(/[.?!]$/, "").slice(0, 80),
@@ -266,6 +270,11 @@ function capVisualHold(beats) {
     const dur = b.duration_seconds ?? 0;
     const visual = FULL_BLEED_TYPES.has(b.asset_type);
     if (i === 0 || !b.continues_previous) { runDur = dur; runIsVisual = visual; continue; }
+
+    // A split_hold beat is the second half of ONE sentence — NEVER cut it to a fresh, distinct
+    // visual (that produces the off-brand "fragment frame": a new image under a mid-sentence
+    // fragment like "predator because they spread"). It always holds its anchor's frame.
+    if (b.split_hold) { runDur += dur; continue; }
 
     if (runIsVisual && visual && runDur + dur > MAX_VISUAL_HOLD + 0.05) {
       b.continues_previous = false; // cut to a fresh, distinct visual here
@@ -316,6 +325,21 @@ function cameraKeyframes(camera, kind, dur) {
       return { ...NO_KF, scale: isVideo
         ? [{ time: 0, value: 1.0 }, { time: dur, value: 1.07 }]
         : [{ time: 0, value: 1.06 }, { time: dur, value: 1.16 }] };
+  }
+}
+
+// Gentle Ken Burns for designer-PLACED images that are NOT full-bleed (bands/insets). Scale stays
+// modest (≤~1.08) so the layer doesn't grow far over its neighbours, and pans keep enough overscan
+// that no edge is revealed. Used to give EVERY image continuous motion, not just full-canvas ones.
+const KB_MOVES = ["slow_zoom_in", "slow_zoom_out", "pan_left", "pan_right", "hold"];
+function gentleKenBurns(move, dur) {
+  switch (move) {
+    case "slow_zoom_out": return { ...NO_KF, scale: [{ time: 0, value: 1.08 }, { time: dur, value: 1.0 }] };
+    case "pan_left":      return { ...NO_KF, scale: [{ time: 0, value: 1.08 }, { time: dur, value: 1.08 }], x: [{ time: 0, value: 20 }, { time: dur, value: -20 }] };
+    case "pan_right":     return { ...NO_KF, scale: [{ time: 0, value: 1.08 }, { time: dur, value: 1.08 }], x: [{ time: 0, value: -20 }, { time: dur, value: 20 }] };
+    case "hold":          return { ...NO_KF, scale: [{ time: 0, value: 1.02 }, { time: dur, value: 1.05 }] };
+    case "slow_zoom_in":
+    default:              return { ...NO_KF, scale: [{ time: 0, value: 1.0 }, { time: dur, value: 1.08 }] };
   }
 }
 
@@ -590,8 +614,9 @@ export async function runPromptPipeline(params, onStep) {
   // Canvas-mode design for HTML/cutout beats; overlay-mode design for shot
   // beats carrying content. Clean shots (content.kind "none") get no design.
   const hasOverlayContent = (b) => b.content?.kind && b.content.kind !== "none";
-  const designedBeats = beats.filter(b => !isVideoBeat(b) || hasOverlayContent(b));
-  console.log(`[ai-video] designing ${designedBeats.length}/${beats.length} beats (${beats.filter(b => isVideoBeat(b) && !hasOverlayContent(b)).length} clean video shots)`);
+  // split_hold beats are NOT designed — they hold the anchor scene's frame (extended in assembly).
+  const designedBeats = beats.filter(b => !b.split_hold && (!isVideoBeat(b) || hasOverlayContent(b)));
+  console.log(`[ai-video] designing ${designedBeats.length}/${beats.length} beats (${beats.filter(b => isVideoBeat(b) && !hasOverlayContent(b)).length} clean video shots, ${beats.filter(b => b.split_hold).length} held splits)`);
   const designs = await designAllBeats(designedBeats, designCtx);
   const beatHTMLs = beats.map(b => designs.find(d => d.beatIndex === b.beat_index)?.html ?? "");
 
@@ -600,6 +625,7 @@ export async function runPromptPipeline(params, onStep) {
   // HTML, a real browser renders it, htmlMeasure flattens it to positioned layers.
   step(PROMPT_STATUS_STEPS[5]);
   const beatGraphs = await Promise.all(beats.map(async (beat, i) => {
+    if (beat.split_hold) return []; // held splits carry no layers; the anchor scene extends across them
     if (isVideoBeat(beat) && !hasOverlayContent(beat)) return []; // clean video shots carry no designed layers
     const html = beatHTMLs[i];
     if (!html) return [];
@@ -635,6 +661,14 @@ export async function runPromptPipeline(params, onStep) {
   // Consecutive continuation beats sharing the same asset get ONE media layer
   // spanning all of them — the backdrop plays through the cuts continuously.
   const windows = windowsFromDurations(beats);
+  // Held splits (the 2nd half of a sentence) extend their ANCHOR scene across their window so the
+  // SAME frame stays up while the line finishes. Video anchors are covered by the media-extend
+  // below; non-video anchors stretch their designed layers after assembly. anchor = the beat just
+  // before the held split. anchorEnd[anchorBeatIndex] = how long that frame must stay.
+  const anchorEnd = {};
+  for (let i = 1; i < beats.length; i++) {
+    if (beats[i].split_hold && !isVideoBeat(beats[i])) anchorEnd[beats[i - 1].beat_index] = windows[i].end;
+  }
   const shotLayers = [];
   let lastMedia = null; // { layer, src, beatIndex }
   for (const beat of beats) {
@@ -656,34 +690,53 @@ export async function runPromptPipeline(params, onStep) {
     }
 
     shotLayers.push(buildShotScrim(beat, win.start, win.end, canvas));
-    // Fallback stark line only if overlay content exists but its design failed
+    // Fallback stark line only if overlay content exists but its design failed — never on a held
+    // split (it would re-print the mid-sentence fragment over the anchor's frame).
     const hasDesignedOverlay = finalTimeline.layers.some(l => l.id?.startsWith(`s${beat.beat_index}_`) && l.type === "text");
-    if (beat.content?.kind && beat.content.kind !== "none" && beat.content.headline && !hasDesignedOverlay) {
+    if (!beat.split_hold && beat.content?.kind && beat.content.kind !== "none" && beat.content.headline && !hasDesignedOverlay) {
       shotLayers.push(buildShotOverlay(beat, win.start, win.end, canvas));
     }
   }
   if (shotLayers.length) finalTimeline.layers = [...shotLayers, ...finalTimeline.layers];
 
-  // Ken Burns on designer-placed FULL-BLEED images (a composed/framed image stays static — its
-  // motion is the composition). Only image beats; video already has camera motion via buildAssetLayer.
+  // Stretch each non-video anchor scene's designed layers across its held split (the held beat
+  // produced no scene of its own, so the anchor frame must cover that window — no gap, no restate).
+  if (Object.keys(anchorEnd).length) {
+    for (const l of finalTimeline.layers) {
+      const m = l.id?.match(/^s(\d+)_/);
+      if (!m) continue;
+      const end = anchorEnd[Number(m[1])];
+      if (end != null && (l.end ?? 0) < end) l.end = end;
+    }
+  }
+
+  // Continuous Ken Burns on EVERY designer-placed image (not just full-bleed) — a static image is
+  // what makes the video feel like a slideshow. Full-bleed images get the full camera move; bands/
+  // insets get a gentle move (bounded scale so they don't grow far over neighbours). The move
+  // ROTATES per scene so no two images drift the same way. The image's opacity entrance is kept;
+  // its scale/x are taken over by the move. Video beats already move via buildAssetLayer.
   for (const beat of beats) {
     if (isVideoBeat(beat)) continue;
     const win = windows[beat.beat_index];
-    const dur = parseFloat(((win?.end ?? 0) - (win?.start ?? 0)).toFixed(3));
+    // Run across the FULL held window when this anchor extends over a split, so the move plays
+    // through the whole hold instead of freezing after the anchor's own (shorter) window.
+    const end = anchorEnd[beat.beat_index] ?? win?.end ?? 0;
+    const dur = parseFloat((end - (win?.start ?? 0)).toFixed(3));
     if (dur <= 0) continue;
+    const move = beat.camera ?? KB_MOVES[beat.beat_index % KB_MOVES.length];
     for (const l of finalTimeline.layers) {
       if (l.type !== "image" || !l.id?.startsWith(`s${beat.beat_index}_`)) continue;
       const w = l.transform?.width ?? 0, h = l.transform?.height ?? 0;
-      const hasKf = l.keyframes && Object.values(l.keyframes).some(a => Array.isArray(a) && a.length);
-      if (!hasKf && w >= canvas.width * 0.9 && h >= canvas.height * 0.9) {
-        l.keyframes = cameraKeyframes(beat.camera ?? "slow_zoom_in", "image", dur);
-      }
+      const fullBleed = w >= canvas.width * 0.9 && h >= canvas.height * 0.9;
+      const kf = fullBleed ? cameraKeyframes(move, "image", dur) : gentleKenBurns(move, dur);
+      const prevOpacity = Array.isArray(l.keyframes?.opacity) ? l.keyframes.opacity : [];
+      l.keyframes = { ...kf, opacity: prevOpacity.length ? prevOpacity : kf.opacity };
     }
   }
 
   // Self-audit visual variety so a too-static video is caught in logs, not by eye.
   const distinctMedia = new Set(shotLayers.filter(l => l.type === "image" || l.type === "video").map(l => l.src)).size;
-  const htmlScenes    = beats.filter(b => !isVideoBeat(b)).length;
+  const htmlScenes    = beats.filter(b => !isVideoBeat(b) && !b.split_hold).length; // held splits add no new visual
   const variety       = distinctMedia + htmlScenes;
   const expected      = Math.max(2, Math.round(totalDur / 4));
   if (totalDur > 8 && variety < Math.round(expected * 0.7)) {
@@ -699,41 +752,24 @@ export async function runPromptPipeline(params, onStep) {
   applyTransitions(finalTimeline.layers, beats);
   await attachTransitionSfx(finalTimeline.layers, beats, { label: "ai-video" });
 
-  // ── Backdrop continuity — NEVER show black ────────────────────────────────
-  // The opaque scene media is the full-canvas image/video at z0; the gradients are scrims (mostly
-  // transparent), so a gap in media = black frames. Gaps happen when a beat's asset/design fails
-  // (a hole between scenes) or when the audio runs longer than the beats (a black tail — common
-  // with Hindi TTS, where speech is longer than the estimated windows). Fill every gap in [0,
-  // totalDur] by HOLDING the previous scene's image over it (or an opaque palette backdrop if the
-  // preceding media is a video / there's none yet).
+  // ── Backdrop continuity — NEVER show black, NEVER leak a scene's photo ──────
+  // One opaque palette backdrop spans the whole video at the very BOTTOM of the stack (z below every
+  // scene's own background). It only shows where a scene leaves the frame uncovered — a typographic
+  // scene whose root background is transparent, a hole where a design failed, or an audio tail past
+  // the last beat. Every scene's own media/backdrop renders above it; this is exactly the palette.bg
+  // the designer's HTML assumed as its body background. We deliberately do NOT hold a previous
+  // scene's image over gaps: that froze an earlier photo (e.g. scene 3's) full-bleed under later
+  // typographic scenes, which surfaced once their own backdrops stopped masking it.
   {
-    const fullCanvas = (l) => (l.transform?.width ?? 0) >= canvas.width * 0.95 && (l.transform?.height ?? 0) >= canvas.height * 0.95;
-    const isMedia = (l) => (l.type === "image" || l.type === "video") && fullCanvas(l);
-    const media = finalTimeline.layers.filter(isMedia).sort((a, b) => (a.start || 0) - (b.start || 0));
     const opaqueBg = palette?.bg || palette?.background || palette?.base || "#0b0b12";
-    const gradFill = `linear-gradient(160deg, ${opaqueBg} 0%, #000 100%)`;
-    const fills = [];
-    let cursor = 0, prevImg = null;
-    const fill = (s, e) => {
-      if (e - s < 0.08) return;
-      if (prevImg) {
-        fills.push({ ...JSON.parse(JSON.stringify(prevImg)), id: `hold_${s.toFixed(2)}`, trackId: "track_backdrop_fill", start: s, end: e, zIndex: 0, keyframes: {}, transition: null, sfx: null });
-      } else {
-        fills.push({ id: `bgfill_${s.toFixed(2)}`, trackId: "track_backdrop_fill", type: "gradient", name: "Backdrop", start: s, end: e, zIndex: 0, visible: true, locked: false, gradient: gradFill, keyframes: {}, transition: null, sfx: null,
-          transform: { x: 0, y: 0, width: canvas.width, height: canvas.height, opacity: 1, scale: 1, blur: 0, rotation: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" } });
-      }
-    };
-    for (const m of media) {
-      const s = m.start || 0, e = m.end || 0;
-      if (s > cursor + 0.08) fill(cursor, s);
-      if (m.type === "image") prevImg = m; // only images are safe to freeze-hold over a gap
-      cursor = Math.max(cursor, e);
-    }
-    if (cursor < totalDur - 0.08) fill(cursor, totalDur);
-    if (fills.length) {
-      console.log(`[ai-video] backdrop continuity: filled ${fills.length} gap(s) (no black frames)`);
-      finalTimeline.layers.unshift(...fills);
-    }
+    finalTimeline.layers.unshift({
+      id: "backdrop_base", trackId: "track_backdrop_fill", type: "gradient", name: "Backdrop",
+      start: 0, end: totalDur, zIndex: -10, visible: true, locked: false,
+      gradient: `linear-gradient(160deg, ${opaqueBg} 0%, #000 100%)`,
+      keyframes: {}, transition: null, sfx: null,
+      transform: { x: 0, y: 0, width: canvas.width, height: canvas.height, opacity: 1, scale: 1, blur: 0, rotation: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+    });
+    console.log(`[ai-video] backdrop continuity: single opaque palette base at z-10 (no held photos)`);
   }
 
   if (voiceoverUrl) {

@@ -2,190 +2,131 @@
  * designPrompts.js
  * src/services/ai/promptVideo/designPrompts.js
  *
- * FREE design prompt (headless-measure path) — same approach as Promo Video's
- * freeDesignPrompt. GPT-5.4 designs ONE premium frame as NATURAL HTML/CSS
- * (flexbox/grid/flow/auto-sizing); a real browser lays it out and htmlMeasure
- * flattens the result into positioned layers. No flat-pixel parser contract, no
- * fixed "treatment" taxonomy, no "typography only" rule, no lint/repair scaffolding.
+ * The design prompt for ONE frame of an AI Video (headless-measure path): GPT-5.4 writes natural
+ * HTML/CSS, a real browser lays it out, htmlMeasure flattens it to positioned layers.
  *
- * De-rigidified (2026-06-16): the old version locked ONE palette and a craft
- * "toolbox" into every beat, so every scene came out the same colour (the cream/
- * orange Titanic look). Now each beat OWNS its own field — the designer varies the
- * background scene-to-scene within a topic-grounded palette — and may build shapes
- * or simple illustration when the idea calls for it, not just type.
- *
- * Two modes:
- *   CANVAS  — html/data/cutout beats: the designer owns the whole frame.
- *   OVERLAY — shot beats with content: a typographic overlay over pipeline media.
+ * Design philosophy (rewritten 2026-06-28): ONE coherent brief, NO rigidity. The prompt states only
+ * (a) the SITUATION (what assets this frame has + how the pipeline handles media), (b) the real
+ * TECHNICAL CONSTRAINTS of our renderer, (c) a few DON'T-BREAK-IT quality guards, and (d) total
+ * creative freedom. There are deliberately NO layout archetypes, no "default" structure, no
+ * per-"kind" recipes, and no "hero-only / go-big / band-split" prescriptions — those accreted over
+ * time, contradicted each other, and made every scene the same skeleton. The single creative
+ * instruction is: make each frame gorgeous and structurally UNLIKE its neighbours.
  */
 
 import { styleDirectiveBlock } from "./styleSystem.js";
 import { RENDERER_CONSTRAINTS } from "../shared/designConstraints.js";
 
-// ── Content spec block — the information the frame must carry ───────────────
-function contentBlock(beat) {
-  const c = beat.content ?? { kind: "none" };
-  const lines = [`CONTENT (render these EXACT strings — this is the frame's information):`, `- kind: ${c.kind}`];
-  if (c.headline)    lines.push(`- headline: "${c.headline}"`);
-  if (c.subtext)     lines.push(`- subtext: "${c.subtext}"`);
-  if (c.attribution) lines.push(`- attribution: "${c.attribution}"`);
+// The facts this frame conveys — NOT a layout and NOT a list that must be rendered in full.
+function infoBlock(beat) {
+  const c = beat.content ?? {};
+  const lines = [`INFORMATION — the facts for THIS frame (verbatim; convey them, never fabricate):`];
+  if (c.headline)    lines.push(`• "${c.headline}"`);
+  if (c.subtext)     lines.push(`• "${c.subtext}"`);
+  if (c.attribution) lines.push(`• — ${c.attribution}`);
   if (Array.isArray(c.items) && c.items.length) {
-    lines.push(`- items: ${JSON.stringify(c.items)}`);
     lines.push(c.items[0]?.value != null
-      ? `  (chart data — render as clean bars/blocks with the labels and values shown)`
-      : `  (list items — each its own row/element, staggered entrances)`);
+      ? `• values to compare honestly: ${JSON.stringify(c.items)}`
+      : `• items: ${JSON.stringify(c.items)}`);
   }
-  lines.push(`What each kind is ABOUT (emphasis only — you choose the form): hook = stop the scroll, maximum impact · stat = the number is the point, make it dominate · quote = the words carry it, with their source · list = each item distinct and scannable · chart = the real values, honestly compared · title = the name/date as the moment · cta = the ask, unmissable.`);
+  if (lines.length === 1) lines.push(`• (no text required — this may be a pure-visual frame)`);
+  lines.push(`You choose what to surface and how big — feature ONE as a giant line/number, distil it, or use all. You are NOT required to show a kicker + headline + subtext. Spell every word exactly as given.`);
   return lines.join("\n");
 }
 
-// Per-beat palette variation — the cure for "every scene is the same colour". The
-// topic palette is the family; each frame picks its OWN field so consecutive scenes
-// don't all look identical.
-function paletteBlock(palette, beat) {
+// The video's palette family; each frame still owns its own field so scenes don't all look alike.
+function paletteBlock(palette) {
   const theme = palette.theme || "auto";
-  if (theme === "light") {
-    return `PALETTE (this video's family — anchor on it, but THIS frame owns its own field):
-- accent ${palette.accent} · accent2 ${palette.accent2} · a LIGHT field ${palette.bg} · dark text ${palette.text}
-LIGHT THEME — every frame is BRIGHT; NO dark fields and NO luminous glows. VARY THE BACKGROUND scene to scene between: a clean near-white field, a pale tint of the accent, a soft accent wash, a light card on off-white, or a subtle light gradient. Text is dark and high-contrast. Build a real palette around the accent (neutrals, a tint, a tasteful secondary) — never monochrome, never the same wash every frame.`;
-  }
-  if (theme === "medium") {
-    return `PALETTE (this video's family — anchor on it, but THIS frame owns its own field):
-- accent ${palette.accent} · accent2 ${palette.accent2} · a MID-TONE field ${palette.bg} · light text ${palette.text}
-MEDIUM THEME — mid-tone fields with light high-contrast text (no pure black, no pure white). VARY THE BACKGROUND scene to scene between: a mid-tone field, a slightly deeper tonal block, a saturated accent block, a tint of the accent, or a soft gradient. Build a real palette around the accent — never monochrome, never the same wash every frame.`;
-  }
-  return `PALETTE (this video's family — anchor on it, but THIS frame owns its own field):
-- accent ${palette.accent} · accent2 ${palette.accent2} · a deep/near-black ${palette.bg} · a light/near-white ${palette.text === "#ffffff" ? "#f4f1ea" : palette.text}
-VARY THE BACKGROUND scene to scene — do NOT default every frame to the same colour. Rotate intentionally between: a deep dark field, a near-white field, a saturated accent block, a tonal tint of the accent, or (for stat/quote) a moody gradient. Pick the field that suits THIS line; the next beat should look different from this one. Build a real palette around the accent (neutrals, a tint, a tasteful secondary) — never monochrome, never the same wash every frame.`;
+  const field = theme === "light"  ? "a LIGHT / near-white field with dark text (no dark fields, no glows)"
+              : theme === "medium" ? "a MID-TONE field with light text (no pure black or white)"
+              :                      "a DEEP / near-black field with light text";
+  return `PALETTE — the video's family; THIS frame owns its own field within it:
+• accent ${palette.accent} · accent2 ${palette.accent2} · base ${field} · text ${palette.text}
+Vary the field scene to scene (deep dark / near-white / an accent block / a tint / a moody gradient) so consecutive frames don't look identical. Build a real palette around the accent — never flat monochrome.`;
 }
 
-// ── Main prompt builder ──────────────────────────────────────────────────────
 export function buildBeatPrompt(beat, ctx) {
   const { style, palette, canvasW, canvasH, language } = ctx;
   const duration = beat.duration_seconds ?? 3;
-  const isPortrait = canvasH > canvasW; // vertical video → splits must be horizontal (stacked bands), not side columns
-  // Three modes: a VIDEO beat (type over the full-bleed clip the pipeline injects); an IMAGE beat
-  // (the designer COMPOSES the fetched image(s) into the frame — full-bleed / framed / split, or a
-  // row/grid/triptych for several images); a TYPOGRAPHIC beat (no asset → full designed frame).
+
   const assets = Array.isArray(beat.resolvedAssets) ? beat.resolvedAssets.filter(a => a?.src) : (beat.asset?.src ? [beat.asset] : []);
   const video  = assets.find(a => a.kind === "video") || null;
   const images = assets.filter(a => a.kind === "image");
-  // Hindi is Devanagari on BOTH the spoken line and the on-screen CONTENT (the renderer + measure
-  // now have a Devanagari font). Render the Devanagari content as-is; keep it short so it fits.
+
   const latinOnScreenRule = (language === "hi" || language === "hinglish")
-    ? `\nON-SCREEN SCRIPT — the CONTENT strings are Hindi in DEVANAGARI; render them EXACTLY as given (do NOT romanize/transliterate to Latin). Genuine English/brand terms or numbers in the content stay as-is. Keep on-screen Hindi SHORT (a few words) so it fits the frame.\n`
+    ? `ON-SCREEN SCRIPT — the strings are Hindi in DEVANAGARI; render them EXACTLY as given (never romanize). English/brand terms and numbers stay as-is. Keep on-screen Hindi short so it fits.\n`
     : "";
 
-  const dataContract = `Tag every MEANINGFUL element (these become animated layers; layout wrappers don't need tags):
-- data-role: headline | subhead | kicker | label | badge | stat-number | card | divider | glow | background | icon | decoration
-- data-layer: text | gradient | image | effect | decoration
-- data-animation: fade-in | fade-up | scale-in | slide-left | slide-right | none  (at least 2 elements animated; entrances land with the voice)
-- data-scene-element: hero | background | supporting | decoration
-- Icons: data-icon="kebab-name" (Lucide) ONLY on a single standalone glyph — NEVER on something built from shapes/divs (it gets replaced by a generic icon and your design is lost; leave hand-built shapes as data-layer="decoration").
-TEXT IS ONE UNIFORM STYLE PER ELEMENT — never per-word colours/gradients inside a text block. Spell every word EXACTLY as given; minimum readable font ~26px.
-NO PSEUDO-ELEMENTS — our renderer DROPS ::before and ::after entirely (and any content:"" decoration). EVERY visible mark must be its OWN real tagged element: build glows, halos, ring highlights, accent arcs/sweeps, underlines, lines, dots, sparkles, and gradient overlays as actual <div>s with data-role/data-layer (e.g. a glow = a <div data-role="glow" data-layer="effect"> radial-gradient). If you draw an accent with ::before/::after it will VANISH in the render — never rely on it.
-CONTENT-FIRST — NO ORPHAN DECORATION (the #1 thing that makes frames look amateur and cluttered). EVERY element must BELONG to the content: it either IS content, HOLDS content (a card / panel / chart / mockup wrapped around real content), or DIRECTLY structures content (an accent underline beneath a heading, a divider between two related blocks, the connectors/nodes of a diagram that link labels). BANNED as standalone "design" — these are exactly what makes frames look horrific: free-floating lines / bars / rules in the margins, lone outline circles / rings / dots, arrows that don't point from one labelled thing to another, scattered ticks / sparkles / confetti, corner doodads, and decorative kicker / badge / chip / "01" pills used as garnish. If a shape is not part of a content structure, it does not belong — delete it. Negative space is PREMIUM, never something to fill with shapes. NEVER draw an empty box, input, search bar, comment field, progress bar, or hollow placeholder container — if a container holds no real content, delete it (an empty "type a comment" pill or a hollow card is exactly this failure).
-NEVER print the beat's internal kind/role as visible text — words like "Hook", "Fact", "Stat", "Quote", "List", "CTA", "Title", "Reveal" are internal direction, never on screen. Render only the real CONTENT strings.
-NEVER FABRICATE NUMBERS OR FACTS — do not invent a statistic, number, date, percentage, or claim that isn't in the CONTENT (e.g. don't turn "sedentary days" into "8+ HOURS SEATED"). You may add a SHORT non-factual eyebrow/label drawn from the content's topic (e.g. "SOCIAL MEDIA"), but never a made-up figure.
+  // ── SITUATION: what this frame is given, and how the pipeline handles its media ──
+  let situation, rootBg;
+  if (video) {
+    situation = `SITUATION: a cinematic clip plays FULL-BLEED behind this frame — the pipeline already placed the video AND a legibility scrim. You build NEITHER: html/body stay transparent, no background element, no <img>, no full-canvas element. You compose ONLY the type/graphics that sit over the clip.`;
+    rootBg = "transparent";
+  } else if (images.length) {
+    const imgList = images.map((im, k) => `   image ${k + 1}${im.label ? ` "${im.label}"` : ""}: ${im.src}`).join("\n");
+    const multi = images.length > 1
+      ? ` Lead with the STRONGEST as the hero; use a second ONLY if it genuinely composes as a true diptych/collage where both sides fill — NEVER as a small floating inset / picture-in-picture rectangle parked in a corner (that is the amateur look). Don't slice them into thin vertical strips. Using just one is fine if the rest don't earn their place.`
+      : "";
+    situation = `SITUATION: you have ${images.length} real photo${images.length > 1 ? "s" : ""} to place as <img> (object-fit:cover) and compose WITH the type. A photo can be the entire frame or a small accent — your call.${multi}\n${imgList}`;
+    rootBg = palette.bg;
+  } else {
+    situation = `SITUATION: NO photo — the design IS the whole frame, built in pure HTML/CSS: either TYPE as the picture (one commanding mass) OR a built graphic that ILLUSTRATES the idea (a UI / app panel, a meter, a labelled diagram, a comparison diptych, a stat/quote card, a tile grid, a flat device frame, an abstract composition). Whichever you choose must OWN the frame. THE failure to avoid: a headline parked at the very top, a line parked at the very bottom, and a dead empty gap between them — never a header-top / footer-bottom split with a void in the middle, and no floating divider/line stranded in empty space. Don't CSS-draw a realistic photo subject (a real map, face, animal, logo or object as if photographed) — illustrate the concept graphically instead.`;
+    rootBg = palette.bg;
+  }
+
+  const direction = `YOUR JOB — COMPOSE one striking picture that ILLUSTRATES this moment, not a screen with parts arranged on it. This is the whole game and it's where frames fail: a number parked at the top, a photo parked at the bottom, a caption labelling it — three things coexisting in zones reads as a slide deck made by a beginner. Instead, design with an art director's taste:
+• COMPOSE, don't arrange — every element shares ONE frame and relates to the others. Type sits OVER / inside the composition, not stranded in a panel beside or below it like a caption.
+• ONE hero carries the feeling — a full-bleed photo, a giant word/number, OR a built graphic — give it real presence and let it own the frame; never reduce the lead to a small passive rectangle floating in empty space.
+• ILLUSTRATE THE IDEA, don't just label it — you may build the concept in pure HTML/CSS: a UI / app panel, a meter or progress state, a labelled diagram, a comparison diptych, a stat/quote card, a tile grid, a flat device frame, an abstract graphic. A photo can be the hero, an accent, or absent entirely — whatever expresses the moment best. Cards / panels / tiles are excellent when they ARE the composition; they're only amateur when used as a caption stuck beside or below a photo.
+• ONE idea, ruthless hierarchy — the single most important thing is HUGE and owns the frame; everything else is small and quiet. Do NOT lay out kicker + headline + stat + caption + divider at equal weight — that even, labelled checklist IS the amateur look.
+• Make the viewer FEEL the idea, not read a fact sheet — the composition should express what this moment is ABOUT.
+
+Within that taste you have TOTAL freedom of form, and you MUST make each frame structurally UNLIKE the one before — there is no default layout. Fair game (inspiration, not a checklist or an order): full-bleed photo with type punched into its calm space · a bold top/bottom or left/right split where EACH side genuinely fills · a comparison diptych · a giant number or word as the hero · a built UI / app / dashboard panel that illustrates the idea · a labelled diagram or meter · a stat or quote card · a tile / icon grid · a flat device frame · a duotone / treated backdrop · a clean listicle · type overlapping an edge · an asymmetric collage. Combine, ignore, invent. Be bold — surprise me.`;
+
+  const technical = `TECHNICAL CONSTRAINTS — the ONLY hard limits; everything else is yours:
+• Real HTML/CSS with flow / flex / grid / auto-sizing — a browser lays it out and we flatten it. Never hand-compute pixel coordinates.
+• Everything fits fully inside ${canvasW}×${canvasH}: nothing clipped or off the edge; a long line wraps or sizes down; smallest readable text ~26px.
+• Tag every MEANINGFUL element (layout wrappers don't need tags) — each becomes an animatable layer:
+   data-role="headline|subhead|kicker|label|badge|stat-number|card|divider|glow|background|icon|decoration"
+   data-layer="text|gradient|image|effect|decoration" · data-scene-element="hero|background|supporting|decoration"
+   data-animation="fade-in|fade-up|scale-in|slide-left|slide-right|none"  (≥2 elements animate)
+• ONE uniform style per text element (no per-word colours except a single accent word/number).
+• Our renderer DROPS ::before / ::after, content:"", clip-path and inline <svg>. Build EVERY visible mark (glow, underline, line, dot, sweep, scrim, shape) as its own real tagged <div> (e.g. a glow = <div data-role="glow" data-layer="effect"> with a radial-gradient). Icons: data-icon="kebab-name" (Lucide) only on a lone glyph, never on shapes built from divs.
+• Place photos as <img data-layer="image" data-role="..." data-scene-element="..." style="object-fit:cover; your size+position">. Real photos for real things; never CSS-draw a map / face / animal / object / logo.
+• Optional kinetic text: split a spoken line into one element per phrase (exact words, in spoken order) and the pipeline lands each on the voice.
 ${RENDERER_CONSTRAINTS}`;
 
-  if (video) {
-    // ── VIDEO OVERLAY MODE (type over the full-bleed clip the pipeline injects) ──
-    const system = `You art-direct ONE frame of a fast-cut video — a cinematic clip plays full-bleed behind you (the pipeline injects the media AND a legibility scrim — you build NEITHER). On screen ${duration.toFixed(1)}s. Design real CSS; a browser measures it.
+  const quality = `DON'T BREAK IT (quality guards, not layout rules):
+• Legibility is yours, but NEVER darken the whole photo — no full-frame dark wash and no filter:brightness on the <img> (that murk is a top failure). Keep the photo bright; win contrast with text-shadow, by sitting type over a naturally calm/dark region, or with ONE local gradient scrim that is fully transparent over the image and dark ONLY under the text band (e.g. linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.7) 100%)).
+• Say each fact ONCE — never print the same info in two elements; a kicker/label must add NEW context, not echo the headline. To stress a word, style it IN PLACE — never copy it into a second element, and never overlap two text elements.
+• No orphan decoration — every mark belongs to content (it IS content, HOLDS content, or STRUCTURES it). No floating lines / rings / dots / chips, and NEVER an empty box / hollow card / placeholder panel with nothing inside it.
+• Compose for the WHOLE vertical frame as ONE picture — don't cram everything into the top and strand a kicker/line at the very bottom with a dead empty band in the middle. Either anchor it as one cohesive block or distribute the elements so there is no large hollow gap.
+• Never invent a number, date, or fact that isn't in the information above. Never print internal/direction words on screen — e.g. Hook / Stat / CTA / SPOKEN / BEAT / scene numbers are instructions to you, never visible text.`;
 
-${styleDirectiveBlock(style)}
-PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white over the scrim; lift the ONE key word/number in a BRIGHT, vivid accent that POPS on a dark photo — never a dark/muddy accent that disappears.
-
-${contentBlock(beat)}
-${latinOnScreenRule}
-THE TYPE IS THE DESIGN — and it MUST look different every scene, or the video becomes a slideshow of identical captions (THE failure you must avoid). This is NOT a subtitle and NOT a fixed lower-third caption:
-- GO BIG. The hero line is large and confident — often filling a THIRD TO HALF the frame, type as a graphic. Timid mid-sized text pinned at the bottom is exactly the caption look that is forbidden.
-- VARY EVERY SCENE — change the scale, the placement, and the structure scene to scene so no two share a skeleton: one scene a single GIANT word; the next a tall stacked phrase; another a huge number; another a centred statement; another hugged to a top or side edge; another a tight block low. PLACE the type anywhere that composes with the shot — read the shot description and put the words where the image is calm/empty (sky, shadow, negative space), in a DIFFERENT region than the previous scene. Use the full canvas — top, centre, side, low — not always the bottom.
-- HERO-ONLY BY DEFAULT. Most scenes are JUST the big hero line. Do NOT staple a kicker + sub-line + underline onto every scene — that repeated label / heading / divider trio IS the slideshow. Add an eyebrow, a supporting line, or an accent rule ONLY on the rare scene that truly needs it, never as a default garnish.
-- Split a multi-word hero into phrase-lines (exact words, spoken order, each its own element) so they land on the voice; the ONE key word in the bright accent + a heavier/bigger weight.
-
-OVERLAY CONSTRAINTS (absolute):
-- html,body background: TRANSPARENT. NO background element, NO scrim, NO images, NO full-canvas anything (the pipeline already placed the photo and its scrim).
-- Bold promo type with text-shadow for legibility. Richness is the typographic COMPOSITION and SCALE — never orphan ornament.
-
-${dataContract}
-
-OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;height:${canvasH}px;margin:0;overflow:hidden;background:transparent}.`;
-
-    const user = `BEAT ${beat.beat_index} — type over a shot of: ${beat.image_prompt ?? beat.shot_query ?? beat.visual_concept}
-SPOKEN: "${beat.script_line}"
-
-Design a BOLD, BIG typographic treatment for this line — a different scale/placement/structure than other scenes; never a small flat caption, never the same skeleton twice.`;
-    return { system, user };
-  }
-
-  if (images.length) {
-    // ── COMPOSE MODE (the designer PLACES the fetched image(s) and composes the whole frame) ──
-    const isMulti = images.length > 1;
-    const imgList = images.map((im, k) => `  - image ${k + 1}${im.label ? ` "${im.label}"` : ""}: ${im.src}`).join("\n");
-    const system = `You are a world-class motion-graphics ART DIRECTOR composing ONE frame of a fast-cut video — ${canvasW}x${canvasH}px, on screen ${duration.toFixed(1)}s, Linear/Vercel/Stripe quality. You are given ${images.length} real image${isMulti ? "s" : ""}, and you COMPOSE the whole frame WITH ${isMulti ? "them" : "it"} plus the text. There is NO fixed layout — make this frame structurally DIFFERENT from a plain "photo with a caption" AND different from neighbouring scenes. Design real CSS (flex/grid/absolute); a browser lays it out and we measure it.
-
-${styleDirectiveBlock(style)}
-PALETTE: accent ${palette.accent} · accent2 ${palette.accent2} · text near-white; lift the ONE key word/number in a BRIGHT accent that POPS.
-
-IMAGE(S) — use ALL of them, placed as real <img> elements:
-${imgList}
-
-${contentBlock(beat)}
-${latinOnScreenRule}
-HOW TO COMPOSE — ${isMulti
-  ? `this is a MULTI-IMAGE scene (a list / comparison / trio). The images are LANDSCAPE — stack them as full-width HORIZONTAL BANDS (one above the next), or a clean grid. Do NOT slice them into tall vertical columns (thin vertical strips look broken in a vertical video). Each image its OWN large <img> (object-fit:cover), optionally with its short label beside/under it. Use ALL ${images.length}; never drop or duplicate one. THIS is how a list becomes real images instead of a text list.`
-  : `you have ONE image — pick a composition that fits THIS moment and differs from other scenes: full-bleed with bold type over it; OR a HORIZONTAL BAND split (the image as a wide band across the TOP or BOTTOM, the type in the other band); OR the image bleeding off the top or bottom edge with type in the cleared area. VARY it scene to scene — do NOT default to full-bleed-with-a-caption every time.`}
-${isPortrait ? `- THIS IS A TALL / PORTRAIT FRAME: do NOT split it LEFT/RIGHT into side-by-side columns — a side panel squeezes the image (and the text) into a thin vertical strip. Split TOP/BOTTOM (horizontal bands) or go full-bleed. Multi-image scenes stack as horizontal bands, never side-by-side columns.` : ""}
-- Place each image as <img data-layer="image" data-role="card" src="..." data-animation="scale-in" data-scene-element="hero" style="object-fit:cover; (your size + position)" />. The images ARE the visual — size them LARGE.
-- TYPE is bold and varied (a different scale/placement than other scenes).
-- LEGIBILITY IS YOURS HERE — the pipeline adds NO scrim. Wherever text sits over an image, guarantee contrast: place it over a darker region, use strong text-shadow, OR add a real gradient scrim as a <div data-role="glow" data-layer="effect" style="position:absolute; ...linear-gradient..."> behind the text.
-- FIT: everything fully inside ${canvasW}x${canvasH}; size the largest headline word so it fits the width — never let it overflow.
-
-${dataContract}
-
-OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;height:${canvasH}px;margin:0;overflow:hidden;background:${palette.bg}}.`;
-
-    const user = `BEAT ${beat.beat_index} — ${duration.toFixed(1)}s. Compose the frame with the image${isMulti ? "s" : ""} above.
-SPOKEN: "${beat.script_line}"
-
-Make it look DIFFERENT from a plain caption and from the other scenes.`;
-    return { system, user };
-  }
-
-  // ── TYPOGRAPHIC / CANVAS MODE (no asset → a full designed frame) ────────────
-  const maxWords = Math.max(4, Math.round(duration * 3));
   const continuation = beat.continues_previous
-    ? `\nCONTINUATION: this beat EXTENDS the previous frame — keep the same field/background family and composition skeleton; the new content arrives as the next element.\n`
+    ? `\nThis frame continues the previous thought — you may keep its world/palette and bring the new info in as the focus.\n`
     : "";
 
-  const system = `You are a world-class motion-graphics designer making ONE premium frame of a fast-cut video — a single ${canvasW}x${canvasH}px frame, Linear / Vercel / Stripe quality, on screen ${duration.toFixed(1)}s. The director chose WHAT it says; HOW it looks is entirely yours. No templates — make every frame feel different from its neighbours.
+  const system = `You are a world-class motion-graphics designer making ONE frame of a fast-cut vertical video — ${canvasW}×${canvasH}px, on screen ${duration.toFixed(1)}s, Linear / Vercel / Stripe polish. The director chose WHAT it says; HOW it looks is entirely yours.
 
-Design like a real designer: use flexbox/grid/flow/auto-sizing; a browser lays it out and we measure it, so NEVER hand-position or compute pixel coordinates. Root: html,body{width:${canvasW}px;height:${canvasH}px;margin:0;overflow:hidden}.
+${situation}
 
 ${styleDirectiveBlock(style)}
-${paletteBlock(palette, beat)}
+${paletteBlock(palette)}
 
-${contentBlock(beat)}
+${infoBlock(beat)}
 ${latinOnScreenRule}
-THE DESIRE: a premium, clean, instantly-readable frame with the polish of Linear / Vercel / Stripe — one dominant focal point, hard contrast. The key word/number/idea must land in under a second. Thin, timid, mid-sized type is what makes a frame feel weak — be bold.
-FILL THE FRAME — there is NO photo behind this frame, so the DESIGN is the entire visual. The focal content (the hero type, the key number, the composition) must DOMINATE the canvas, set as large as it can go while still fitting edge-to-edge. A few small words floating in a big empty colour block is the #1 failure — it looks broken and empty. Negative space FRAMES a dominant element; it is never vast emptiness around a small one.
-RICHNESS COMES FROM CONTENT MADE BIG, NEVER FROM ORNAMENT. Fill the frame by making the real content dominant (huge type, a large confident composition) — never by sprinkling decorative shapes. If a frame feels empty, make the content BIGGER or enrich the background field; never add orphan decoration. (The CONTENT-FIRST / no-orphan rule below is absolute.)
-CONSTRAINTS: everything fits fully inside the ${canvasW}×${canvasH} frame — nothing clipped or running off the edge (a long line wraps or sizes down; never force one line wider than the frame). Use only as many elements as the content genuinely needs; on-screen words ≤ ${maxWords}. Fewer, bolder, content-bearing elements beat more-and-smaller every time.
-DEPICT REAL THINGS WITH IMAGES, NOT CSS: never build a map, country, building, landmark, vehicle, animal, person/face, emblem/crest/flag/logo, or any specific real-world object/scene out of CSS shapes — it always renders as crude blobs (those moments are IMAGE beats, not this frame). NO clip-path and NO inline <svg> — our renderer drops both.
+${direction}
 
-${dataContract}
+${technical}
 
-KINETIC TEXT SYNC: when your text mirrors the spoken line, split it into one element per phrase (spoken order, exact words) — the pipeline lands each as its words are spoken.
-
-LAYOUT: entirely yours — invent the strongest, boldest composition for THIS line's content and this film's style. Don't reach for a default; let the words decide the form.
+${quality}
 ${continuation}
-OUTPUT: only the HTML, from <!DOCTYPE html>.`;
+OUTPUT: only the HTML, from <!DOCTYPE html>. Root: html,body{width:${canvasW}px;height:${canvasH}px;margin:0;overflow:hidden;background:${rootBg}}.`;
 
-  const user = `BEAT ${beat.beat_index} — ${duration.toFixed(1)}s on screen
-SPOKEN: "${beat.script_line}"
+  const user = `On screen ${duration.toFixed(1)}s while the voiceover says: "${beat.script_line}".
 
-Design this frame. Make it look different from a plain headline-on-cream card.`;
+Design this frame: gorgeous, unlike the neighbouring scenes, and FILLING the whole vertical frame — the composition reaches top to bottom with NO empty dead band left in the middle.`;
 
   return { system, user };
 }
