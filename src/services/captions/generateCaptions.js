@@ -63,7 +63,7 @@ export async function generateCaptions({ file, captionStyle = "wordBlaze", capti
   const captionLayers = chunks.map((chunk, i) => ({
     id: `caption_${i}`, trackId: `caption_${i}`, name: `Caption ${i + 1}`,
     type: "text", content: chunk.text,
-    style: { ...preset.style, _captionStyle: captionStyle }, captionStyle,
+    style: { ...preset.style, fontSize: Math.round((preset.style.fontSize || 52) * 1.4), _captionStyle: captionStyle }, captionStyle,
     start: chunk.start, end: chunk.end, zIndex: 10,
     visible: true, locked: false, sfx: null, animation: null,
     keyframes:  { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },

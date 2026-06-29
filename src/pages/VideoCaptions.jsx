@@ -250,7 +250,7 @@ function GeneratorForm() {
         name:      `Caption ${i + 1}`,
         type:      "text",
         content:   chunk.text,
-        style:     { ...preset.style, _captionStyle: captionStyle },
+        style:     { ...preset.style, fontSize: Math.round((preset.style.fontSize || 52) * 1.4), _captionStyle: captionStyle },
         captionStyle,
         start:     chunk.start,
         end:       chunk.end,
