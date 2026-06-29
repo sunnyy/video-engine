@@ -359,6 +359,28 @@ function getFileDuration(filePath) {
   });
 }
 
+// Group ElevenLabs Scribe word-level results into phrase segments for caption timing. Keeps only
+// real "word" tokens; starts a new segment on a long pause, after sentence-ending punctuation, or
+// every ~12 words. Each segment carries accurate start/end from Scribe's word timestamps.
+function wordsToSegments(words) {
+  const segs = [];
+  let cur = null, lastEnd = 0;
+  for (const w of (words || [])) {
+    if (w?.type && w.type !== "word") continue;
+    const text = String(w.text || "").trim();
+    if (!text) continue;
+    const start = typeof w.start === "number" ? w.start : lastEnd;
+    const end   = typeof w.end   === "number" ? w.end   : start;
+    const newSeg = !cur || (start - lastEnd) > 0.7 || cur._n >= 12 || /[.!?]$/.test(cur._last);
+    if (newSeg) { cur = { start, end, text, _n: 1, _last: text }; segs.push(cur); }
+    else { cur.text += " " + text; cur.end = end; cur._n += 1; cur._last = text; }
+    lastEnd = end;
+  }
+  return segs
+    .map(s => ({ start: +Number(s.start).toFixed(3), end: +Number(s.end).toFixed(3), text: s.text.trim() }))
+    .filter(s => s.text);
+}
+
 router.post("/transcription/transcribe", requireAuth, uploadTranscription.single("file"), async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
@@ -393,20 +415,29 @@ router.post("/transcription/transcribe", requireAuth, uploadTranscription.single
         .save(audioPath);
     });
 
-    const transcription = await openai.audio.transcriptions.create({
-      file:            fs.createReadStream(audioPath),
-      model:           "whisper-1",
-      response_format: "verbose_json",
-      timestamp_granularities: ["segment"],
+    // Transcribe with ElevenLabs Scribe — far more accurate than Whisper on accented speech, with
+    // reliable language auto-detection (so no language picker is needed) and word-level timestamps,
+    // which we group into phrase segments for caption timing.
+    const elKey = process.env.ELEVENLABS_API_KEY;
+    if (!elKey) throw new Error("ELEVENLABS_API_KEY not set");
+    const audioBuf = fs.readFileSync(audioPath);
+    const sttForm = new FormData();
+    sttForm.append("file", new Blob([audioBuf], { type: "audio/mpeg" }), "audio.mp3");
+    sttForm.append("model_id", "scribe_v1");
+    sttForm.append("timestamps_granularity", "word");
+    sttForm.append("tag_audio_events", "false");
+    const sttRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+      method: "POST", headers: { "xi-api-key": elKey }, body: sttForm,
     });
-
-    const transcript = transcription.text || "";
-    const segments   = (transcription.segments || []).map(s => ({
-      start: s.start ?? 0,
-      end:   s.end   ?? 0,
-      text:  s.text?.trim() || "",
-    })).filter(s => s.text);
-    const language   = transcription.language || "en";
+    if (!sttRes.ok) {
+      const errText = await sttRes.text().catch(() => "");
+      console.warn(`[transcribe] Scribe ${sttRes.status}: ${errText.slice(0, 200)}`);
+      throw new Error("Transcription failed");
+    }
+    const stt        = await sttRes.json();
+    const transcript = stt.text || "";
+    const segments   = wordsToSegments(stt.words || []);
+    const language   = stt.language_code || "en";
 
     const { data: record, error: insertErr } = await supabaseAdmin
       .from("transcriptions")
