@@ -44,8 +44,8 @@ export const CREDIT_COSTS = {
  * Duration → credit cost bands for free-design video services (AI Video, Social, Typography).
  * COGS scales ~linearly with duration (more beats = more GPT-5.4 scene calls + TTS + images), so
  * a 60s video must cost more than a 15s one. Margin-calibrated to ~72–76% at the $49/1,500 plan rate.
- * NOTE: data only — NOT yet wired into charging (generate routes still deduct the flat per-service
- * cost above). Wiring duration-aware deduction is the next pricing task. See serviceCatalog.js.
+ * WIRED into charging: generate routes deduct via creditsForDuration() — AI Video (promptVideo.js)
+ * and Typography charge by the chosen duration; Social uses the smallest band (no duration picker).
  */
 export const VIDEO_DURATION_BANDS = { 15: 15, 30: 30, 45: 45, 60: 60 };
 // ^ ~1 credit/second (2026-06-23). MEASURED: a 41s video = ~$0.70 (OpenAI $0.42 + Fal $0.25 +
