@@ -15,7 +15,6 @@ import { useCreditsStore } from "./store/useCreditsStore";
 import "./App.css"
 import LandingPage     from "./pages/LandingPage";
 import AivLab          from "./pages/AivLab";
-import MotionLab       from "./pages/MotionLab";
 import HostGuard       from "./ui/HostGuard";
 import TermsOfService  from "./pages/legal/TermsOfService";
 import PrivacyPolicy   from "./pages/legal/PrivacyPolicy";
@@ -165,7 +164,6 @@ export default function App() {
         <Route path="/about"         element={<About />} />
         <Route path="/faq"           element={<FAQ />} />
         <Route path="/status"        element={<StatusPage />} />
-        <Route path="/motion-lab"    element={<MotionLab />} />
         <Route path="/help"          element={<HelpCenter />} />
         <Route path="/help/:slug"    element={<HelpArticle />} />
         <Route path="/terms"         element={<TermsOfService />} />
