@@ -659,23 +659,22 @@ export default function LandingPage() {
   }, [location.hash]);
 
   const handleCTA = () => {
-    if (session) { navigate("/dashboard"); return; }
-    navigate("/login"); // logged-out visitors → dedicated login page (lives on app.vidquence.com)
+    // Auth lives on app.vidquence.com; the marketing host can't see that session (per-origin),
+    // so always route to /login and let app. resolve login state (logged-in → dashboard).
+    navigate("/login");
   };
 
   // Plan "Get Started": signed-in users go straight to checkout; logged-out visitors sign in
   // first, then resume to that exact checkout (so the click never just bounces back to home).
   const goToPlan = (slug) => {
     const dest = `/checkout?plan=${slug}&cycle=${cycle}`;
-    if (session) { navigate(dest); return; }
     navigate(`/login?next=${encodeURIComponent(dest)}`); // login on app., then resume to checkout
   };
 
   // Service cards: signed-in users go straight to the tool; logged-out visitors are
   // funneled to signup (protected routes would just bounce them to /login anyway).
   const handleCardClick = (route) => {
-    if (session) navigate(route);
-    else handleCTA();
+    navigate(`/login?next=${encodeURIComponent(route)}`); // login on app., then go to the tool
   };
 
   return (

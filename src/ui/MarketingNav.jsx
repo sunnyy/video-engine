@@ -48,9 +48,9 @@ export default function MarketingNav({ active }) {
                 {label}
               </a>
             ))}
-            <button onClick={() => navigate(session ? "/dashboard" : "/login")}
+            <button onClick={() => navigate("/login")}
               style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#0F0E1A", background: "#f5c518", border: "none", borderRadius: 7, padding: "9px 18px", cursor: "pointer", marginLeft: 4 }}>
-              {session ? "Go to Dashboard" : "Start Free"}
+              Get Started
             </button>
           </div>
         </div>
