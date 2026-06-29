@@ -9,7 +9,6 @@ import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
-import AuthModal from "../ui/AuthModal";
 import { videoServices } from "../config/serviceCatalog";
 import { SERVICE_COST_LABEL, TOOLS_COST_LABEL } from "../config/serviceCostLabels";
 import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown } from "lucide-react";
@@ -76,7 +75,7 @@ const CSS = `
   .hero-h1 { font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(40px, 5.2vw, 74px); line-height: 1.08; letter-spacing: -0.02em; color: var(--text); margin-bottom: 20px; }
   .hero-h1 .yellow { color: var(--yellow); }
   .hero-h1 .outline { -webkit-text-stroke: 1.5px rgba(255,255,255,0.18); color: transparent; }
-  .hero-sub { font-family: var(--font-body); font-size: 18px; color: var(--muted); line-height: 1.65; max-width: 700px; margin: 0 auto 30px; }
+  .hero-sub { font-family: var(--font-body); font-size: 18px; color: var(--muted); line-height: 1.65; max-width: 750px; margin: 0 auto 30px; }
   .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
   .hero-cta { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0F0E1A; background: var(--yellow); border: none; border-radius: 10px; padding: 16px 36px; cursor: pointer; transition: opacity 0.2s; }
   .hero-cta:hover { opacity: 0.85; }
@@ -622,8 +621,6 @@ export default function LandingPage() {
   const [plans, setPlans] = useState([]);
   const [rate, setRate] = useState(FALLBACK_RATE);
   const [cycle, setCycle] = useState("annual");
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authNext, setAuthNext] = useState(null);
 
   useEffect(() => {
     getSession()
@@ -663,8 +660,7 @@ export default function LandingPage() {
 
   const handleCTA = () => {
     if (session) { navigate("/dashboard"); return; }
-    setAuthNext(null);
-    setAuthOpen(true); // open the sign-in modal for logged-out visitors
+    navigate("/login"); // logged-out visitors → dedicated login page (lives on app.vidquence.com)
   };
 
   // Plan "Get Started": signed-in users go straight to checkout; logged-out visitors sign in
@@ -672,8 +668,7 @@ export default function LandingPage() {
   const goToPlan = (slug) => {
     const dest = `/checkout?plan=${slug}&cycle=${cycle}`;
     if (session) { navigate(dest); return; }
-    setAuthNext(dest);
-    setAuthOpen(true);
+    navigate(`/login?next=${encodeURIComponent(dest)}`); // login on app., then resume to checkout
   };
 
   // Service cards: signed-in users go straight to the tool; logged-out visitors are
@@ -726,9 +721,8 @@ export default function LandingPage() {
               <span>Trusted by <strong>1,500+</strong> creators</span>
             </div>
             <h1 className="hero-h1">
-              The only video tool
-              <br />
-              you'll ever <span className="yellow">need.</span>
+              Turn any post, product, or idea
+              into a <span className="yellow">video.</span>
             </h1>
             <p className="hero-sub">
               Generate editable export-ready videos in minutes, save hours of work, and scale your content with one AI-powered platform built for every workflow.
@@ -771,111 +765,107 @@ export default function LandingPage() {
       <section className="section" id="services">
         <div className="container">
           <div className="section-label">The Full Suite</div>
+          <h2 className="section-h">
+            Stop switching tabs.<br /><span className="yellow">Start creating.</span>
+          </h2>
+          <p className="section-sub">Every kind of video your brand needs — in one place.</p>
 
           {/* ── Desktop bento grid ── */}
           <div className="services-desktop">
           {(() => {
-            const CARDS = [
-              { emoji: "🎬", name: "AI Video Generator",    desc: "Script to viral video in minutes",       route: "/dashboard",      accent: "#7c5cfc", col: "span 3", image: "/assets/images/services/AIVideoGenerator.png"    },
-              { emoji: "📦", name: "Product Video Ads",     desc: "One photo → cinematic ad",               route: "/product-video",    accent: "#f97316", col: "span 2", image: "/assets/images/services/ProductVideoAds.png"     },
-              { emoji: "👗", name: "Virtual Try-On",        desc: "AI model wearing your product",          route: "/virtual-tryon",  accent: "#ec4899", col: "span 2", image: "/assets/images/services/VirtualTryOn.png"        },
-              { emoji: "🎨", name: "Banner Design",         desc: "Social media banners in seconds",        route: "/banner-design",  accent: "#f5c518", col: "span 2", image: "/assets/images/services/BannerDesign.png"        },
-              { emoji: "🖼️", name: "Thumbnail Generator",  desc: "Click-worthy thumbnails with AI",        route: "/thumbnail",      accent: "#ef4444", col: "span 2", image: "/assets/images/services/ThumbnailGenerator.png"  },
-              { emoji: "🎨", name: "Poster Studio",         desc: "Luxury product posters in seconds",      route: "/product-poster", accent: "#d946ef", col: "span 2", image: "/assets/images/services/PosterStudio.png"        },
-              { emoji: "💬", name: "Caption Studio",        desc: "Auto-captions with style",               route: "/video-captions", accent: "#22c55e", col: "span 2", image: "/assets/images/services/CaptionStudio.png"       },
-              { emoji: "🎙️", name: "Voice Studio",         desc: "Natural AI voiceovers, multilingual",    route: "/voiceover",      accent: "#3b82f6", col: "span 3", image: "/assets/images/services/VoiceStudio.png"         },
-              { emoji: "🔤", name: "Speech to Text",        desc: "Accurate transcription instantly",       route: "/speech-to-text", accent: "#8b5cf6", col: "span 3", image: "/assets/images/services/SpeechtoText.png"        },
+            // Bento mosaic — mixed sizes, portrait-heavy. AI Video is the big feature (2×2); four
+            // tall portrait tiles; two wide landscape tiles. Image/audio tools sit below as squares.
+            // Images intentionally null for now → clean dark placeholders. Drop a file into each
+            // path below (and set image:) when the new artwork is ready.
+            const VIDEO = [
+              { feature: true, icon: "film", name: "Prompt to Video", desc: "Any idea → a fully designed, narrated video", route: "/ai-video", accent: "#7c5cfc", image: "/assets/images/services/prompt_video.png", cs: 2, rs: 2 },
+              { icon: "link",    name: "Social Post to Video", desc: "Paste a post → a reel",               route: "/social-video",     accent: "#22d3ee", image: "/assets/images/services/social_video.png", cs: 1, rs: 2 },
+              { icon: "box",     name: "Product Video Ads",    desc: "One photo → a cinematic ad",          route: "/product-video",    accent: "#f97316", image: "/assets/images/services/product_video.png", cs: 1, rs: 2 },
+              { icon: "rocket",  name: "SaaS / Promo Video",   desc: "Product or site → a promo",           route: "/promo-video",      accent: "#6366f1", image: "/assets/images/services/saas_video.png", cs: 1, rs: 2 },
+              { icon: "type",    name: "Typography Video",     desc: "Bold, kinetic text",                  route: "/typography-video", accent: "#a855f7", image: "/assets/images/services/typography_video.png", cs: 1, rs: 2 },
+              { icon: "mic",     name: "Talking Head",         desc: "Captions, B-roll & cuts",             route: "/talking-head",     accent: "#34d399", image: "/assets/images/services/talking_head.png", cs: 1, rs: 2 },
+              { icon: "captions", name: "Auto Captions",       desc: "Animated captions",                   route: "/video-captions",   accent: "#f5c518", image: "/assets/images/services/auto_captions.png", cs: 1, rs: 2 },
+            ];
+            const EXTRAS = [
+              { name: "Thumbnails",     route: "/thumbnail",      accent: "#ef4444", image: "/assets/images/services/thumbnail_generator.png" },
+              { name: "Banner Design",  route: "/banner-design",  accent: "#f5c518", image: "/assets/images/services/banner_design.png" },
+              { name: "Poster Studio",  route: "/product-poster", accent: "#d946ef", image: "/assets/images/services/product_poster.png" },
+              { name: "Virtual Try-On", route: "/virtual-tryon",  accent: "#ec4899", image: "/assets/images/services/virtual_tryon.png" },
+              { name: "Voice Studio",   route: "/voiceover",      accent: "#3b82f6", image: "/assets/images/services/ai_voicover.png" },
+              { name: "Speech to Text", route: "/speech-to-text", accent: "#8b5cf6", image: "/assets/images/services/speed_to_text.png" },
             ];
 
-            const cardStyle = (accent, col, image) => ({
-              gridColumn: col,
+            const tile = (image, extra = {}) => ({
               position: "relative",
-              background: image ? `url(${image}) center/cover no-repeat` : "#13131e",
+              background: image ? `#0d0d16 url(${image}) center/contain no-repeat` : "#13131e",
               border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 18,
-              padding: "28px 24px 22px",
+              borderRadius: 16,
+              overflow: "hidden",
+              cursor: "pointer",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "space-between",
-              minHeight: col === "span 3" ? 240 : 190,
-              overflow: "hidden",
+              justifyContent: "flex-end",
               transition: "border-color 0.2s, transform 0.2s",
-              cursor: "pointer",
+              ...extra,
             });
+            const hov = (accent) => ({
+              onMouseEnter: (e) => { e.currentTarget.style.borderColor = accent + "66"; e.currentTarget.style.transform = "translateY(-2px)"; },
+              onMouseLeave: (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.transform = "translateY(0)"; },
+            });
+            const ov = () => <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "55%", background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%)", pointerEvents: "none" }} />;
+
+            // Clean line-style icons (lucide-ish) instead of emoji.
+            const ICON_PATHS = {
+              film:    <><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>,
+              link:    <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>,
+              box:     <><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="M3.3 7 12 12l8.7-5" /><path d="M12 22V12" /></>,
+              rocket:  <><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></>,
+              type:    <><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" x2="15" y1="20" y2="20" /><line x1="12" x2="12" y1="4" y2="20" /></>,
+              mic:     <><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></>,
+              captions:<><rect width="18" height="14" x="3" y="5" rx="2" ry="2" /><path d="M7 15h4M15 15h2M7 11h2M13 11h4" /></>,
+            };
+            const Icon = (name, size) => (
+              <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.92 }}>
+                {ICON_PATHS[name]}
+              </svg>
+            );
 
             return (
-              <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginTop: 40 }}>
-                {/* Row 1 left — heading card */}
-                <div style={{
-                  gridColumn: "span 3",
-                  background: "linear-gradient(135deg, #13131e 60%, rgba(245,197,24,0.07))",
-                  border: "1px solid rgba(245,197,24,0.18)",
-                  borderRadius: 18,
-                  padding: "36px 32px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  minHeight: 240,
-                }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2, color: "#f5c518", fontFamily: "var(--font-mono)", textTransform: "uppercase", marginBottom: 16 }}>The Full Suite</div>
-                  <h2 style={{ margin: 0, fontSize: "clamp(44px, 5.6vw, 68px)", fontWeight: 800, color: "#e8e8f0", lineHeight: 1.15, letterSpacing: "-0.5px", textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
-                    Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
-                  </h2>
-                  <p style={{ margin: "14px 0 0", fontSize: 18, color: "#e8e8f0", lineHeight: 1.6, maxWidth: 340 }}>
-                    Every creative tool your brand needs — in one place.
-                  </p>
+              <div data-reveal style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* Bento mosaic — 4 cols, mixed portrait (tall) + landscape (wide) + 1 feature */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gridAutoRows: 240, gridAutoFlow: "row dense", gap: 14 }}>
+                  {VIDEO.map((svc) => (
+                    <div key={svc.name} data-service={svc.name} onClick={() => handleCardClick(svc.route)} {...hov(svc.accent)}
+                      style={tile(svc.image, { gridColumn: `span ${svc.cs}`, gridRow: `span ${svc.rs}`, padding: svc.feature ? "28px 30px" : "16px 16px" })}>
+                      {ov()}
+                      <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontSize: svc.feature ? 24 : 14, fontWeight: 800, color: "#fff", lineHeight: 1.2, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>{svc.name}</div>
+                            {Icon(svc.icon, svc.feature ? 24 : 18)}
+                          </div>
+                          <div style={{ fontSize: svc.feature ? 14 : 11.5, color: "#d2d2e2", marginTop: 5, lineHeight: 1.35 }}>{svc.desc}</div>
+                        </div>
+                        {svc.feature && (
+                          <span style={{ flexShrink: 0, background: svc.accent + "22", border: `1px solid ${svc.accent}66`, color: svc.accent, borderRadius: 20, padding: "6px 15px", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>Open →</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Service cards */}
-                {CARDS.map((svc) => (
-                  <div
-                    key={svc.name}
-                    data-service={svc.name}
-                    style={cardStyle(svc.accent, svc.col, svc.image)}
-                    onClick={() => handleCardClick(svc.route)}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = svc.accent + "55"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.transform = "translateY(0)"; }}
-                  >
-                    {/* Dark overlay for text readability over background image */}
-                    {svc.image && (
-                      <div style={{ position: "absolute", inset: "-1px", background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.72) 100%)", pointerEvents: "none" }} />
-                    )}
-                    {/* Accent glow */}
-                    {!svc.image && (
-                      <div style={{ position: "absolute", top: -60, right: -60, width: 160, height: 160, borderRadius: "50%", background: svc.accent, opacity: 0.07, pointerEvents: "none" }} />
-                    )}
-
-                    {/* Bottom — name + desc + button */}
-                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, position: "relative", zIndex: 1, marginTop: "auto" }}>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3, fontFamily: "'Outfit', sans-serif", textTransform: "uppercase" }}>{svc.name}</div>
-                          <span style={{ fontSize: 20 }}>{svc.emoji}</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: "#e8e8f0", marginTop: 4, lineHeight: 1.4 }}>{svc.desc}</div>
-                      </div>
-                      <button
-                        style={{
-                          flexShrink: 0,
-                          background: svc.accent + "22",
-                          border: `1px solid ${svc.accent}55`,
-                          color: svc.accent,
-                          borderRadius: 20,
-                          padding: "5px 13px",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = svc.accent + "44"}
-                        onMouseLeave={e => e.currentTarget.style.background = svc.accent + "22"}
-                      >
-                        Open →
-                      </button>
+                {/* Image & audio tools — small squares, single row ("also included") */}
+                <div style={{ marginTop: 8, fontSize: 11, letterSpacing: 2, color: "var(--dim)", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
+                  Plus image &amp; audio tools
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14 }}>
+                  {EXTRAS.map((svc) => (
+                    <div key={svc.name} data-service={svc.name} onClick={() => handleCardClick(svc.route)} {...hov(svc.accent)} style={tile(svc.image, { aspectRatio: "1 / 1", padding: "12px 12px" })}>
+                      {ov()}
+                      <div style={{ position: "relative", zIndex: 1, fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>{svc.name}</div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             );
           })()}
@@ -887,22 +877,20 @@ export default function LandingPage() {
               <h2 style={{ margin: 0, fontSize: 38, fontWeight: 800, color: "#e8e8f0", lineHeight: 1.1, textTransform: "uppercase", fontFamily: "'Bebas Neue', sans-serif" }}>
                 Stop Switching Tabs.<br /><span style={{ background: "linear-gradient(90deg, #f5c518, #ff7a00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Start Creating.</span>
               </h2>
-              <p style={{ margin: "10px 0 0", fontSize: 15, color: "#e8e8f0", lineHeight: 1.5 }}>Every creative tool your brand needs — in one place.</p>
+              <p style={{ margin: "10px 0 0", fontSize: 15, color: "#e8e8f0", lineHeight: 1.5 }}>Every kind of video your brand needs — in one place.</p>
             </div>
             <div className="m-svc-grid">
               {[
-                { emoji: "🎬", name: "AI Video Generator",   desc: "Script to viral video",          route: "/dashboard",      accent: "#7c5cfc", image: "/assets/images/services/AIVideoGenerator.png"   },
-                { emoji: "📦", name: "Product Video Ads",    desc: "One photo → cinematic ad",       route: "/product-video",    accent: "#f97316", image: "/assets/images/services/ProductVideoAds.png"    },
-                { emoji: "👗", name: "Virtual Try-On",       desc: "AI model, your product",         route: "/virtual-tryon",  accent: "#ec4899", image: "/assets/images/services/VirtualTryOn.png"       },
-                { emoji: "🎨", name: "Banner Design",        desc: "Social banners in seconds",      route: "/banner-design",  accent: "#f5c518", image: "/assets/images/services/BannerDesign.png"       },
-                { emoji: "🖼️", name: "Thumbnails",          desc: "Click-worthy AI thumbnails",     route: "/thumbnail",      accent: "#ef4444", image: "/assets/images/services/ThumbnailGenerator.png" },
-                { emoji: "🎨", name: "Poster Studio",        desc: "Luxury product posters",         route: "/product-poster", accent: "#d946ef", image: "/assets/images/services/PosterStudio.png"       },
-                { emoji: "💬", name: "Caption Studio",       desc: "Auto-captions with style",       route: "/video-captions", accent: "#22c55e", image: "/assets/images/services/CaptionStudio.png"      },
-                { emoji: "🎙️", name: "Voice Studio",        desc: "AI voiceovers, multilingual",    route: "/voiceover",      accent: "#3b82f6", image: "/assets/images/services/VoiceStudio.png"        },
-                { emoji: "🔤", name: "Speech to Text",       desc: "Accurate transcription",         route: "/speech-to-text", accent: "#8b5cf6", image: "/assets/images/services/SpeechtoText.png"       },
+                { emoji: "🎬", name: "Prompt to Video",      desc: "Any idea → a designed video",    route: "/ai-video",         accent: "#7c5cfc", image: "/assets/images/services/prompt_video.png" },
+                { emoji: "🔗", name: "Social Post to Video", desc: "Paste a post → a reel",          route: "/social-video",     accent: "#22d3ee", image: "/assets/images/services/social_video.png" },
+                { emoji: "📦", name: "Product Video Ads",    desc: "One photo → a cinematic ad",     route: "/product-video",    accent: "#f97316", image: "/assets/images/services/product_video.png" },
+                { emoji: "🚀", name: "SaaS / Promo Video",   desc: "Product or site → a promo",      route: "/promo-video",      accent: "#6366f1", image: "/assets/images/services/saas_video.png" },
+                { emoji: "🔤", name: "Typography Video",     desc: "Bold, kinetic text videos",      route: "/typography-video", accent: "#a855f7", image: "/assets/images/services/typography_video.png" },
+                { emoji: "🎤", name: "Talking Head",         desc: "Your clip → captions & B-roll",  route: "/talking-head",     accent: "#34d399", image: "/assets/images/services/talking_head.png" },
+                { emoji: "💬", name: "Auto Captions",        desc: "Animated captions on any video", route: "/video-captions",   accent: "#f5c518", image: "/assets/images/services/auto_captions.png" },
               ].map(svc => (
                 <div key={svc.name} className="m-svc-card"
-                  style={{ background: svc.image ? `url(${svc.image}) center/cover no-repeat` : "#13131e", borderColor: svc.accent + "33" }}
+                  style={{ background: svc.image ? `#0d0d16 url(${svc.image}) center/contain no-repeat` : "#13131e", borderColor: svc.accent + "33" }}
                   onClick={() => handleCardClick(svc.route)}
                 >
                   {svc.image && <div className="m-svc-card-overlay" />}
@@ -942,7 +930,7 @@ export default function LandingPage() {
                 icon: "📱",
                 title: "Content Creators",
                 desc: "Generate faceless or talking head videos in any niche. Add captions, voiceovers, and thumbnails — all without editing software.",
-                tags: ["AI Videos", "Captions", "Thumbnails", "Voiceover"],
+                tags: ["Prompt to Video", "Captions", "Thumbnails", "Voiceover"],
               },
               {
                 icon: "🏢",
@@ -1047,7 +1035,7 @@ export default function LandingPage() {
                 </div>
               </div>
               {[
-              ["AI Video (prompt → video)", false, true],
+              ["Prompt to Video", false, true],
               ["SaaS/Promo Video (incl. URL mode)", false, true],
               ["Social Post to Video", false, true],
               ["Typography Video", false, true],
@@ -1311,7 +1299,6 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} next={authNext} />
     </div>
   );
 }
