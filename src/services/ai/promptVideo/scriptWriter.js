@@ -91,7 +91,7 @@ THE BEAT SYSTEM:
 - A "beat" is one spoken moment that will get its own visual. Divide the narration into beats by MEANING — a new beat wherever the idea, subject, or moment should change. Let the CONTENT decide how many beats and how long each runs; no fixed count, no per-beat word limit.
 - FAST PACING — short-form cuts every ~2–4 seconds, so aim for roughly ${Math.max(3, Math.round(targetDuration / 3))} beats for this ${targetDuration}s video. Each beat is a DISTINCT moment.
 - "continues_previous" is a RARE exception (two adjacent beats that are one quick moment together under ~4s, e.g. a two-line title landing). Default false.
-- TARGET RUNTIME ≈ ${targetDuration}s — a goal to PACE toward, not a hard cap. Narration runs ~145 wpm, so ${targetDuration}s ≈ ${targetWords} words. A little over is fine (happy up to ~${Math.round(targetDuration * 1.4)}s); don't drift to ~double.
+- TARGET RUNTIME ≈ ${targetDuration}s — a goal to PACE toward, not a hard cap. Narration runs ~145 wpm, so ${targetDuration}s ≈ ${targetWords} words. A little over is fine (happy up to ~${Math.round(targetDuration * 1.4)}s); don't drift to ~double. Just as important: do NOT UNDER-write — for longer runtimes especially, give enough real substance to actually FILL ~${targetDuration}s (≈${targetWords} words). Landing far short of the target (e.g. a 60s ask that runs ~40s) is a failure.
 - RESPECT THE TOPIC OVER THE CLOCK: deliver what the topic IS in full — a list covers all its items, a story reaches its ending, a comparison weighs both sides, a how-to gives every step. If it names a quantity, cover that many. NEVER silently drop a point, the hook, or the CTA to save seconds. When fuller than the time, make each part TIGHTER, don't cut it.
 
 NARRATION — THE SINGLE MOST IMPORTANT PART. The voiceover is what the viewer HEARS; if it sounds like a list of captions read out, the whole video fails.
@@ -194,21 +194,35 @@ export async function writeScript({ research, targetDuration = 45, language = "e
   try { plan = await runWriterCompletion(prompt); }
   catch (e) { throw new Error(`script writer returned invalid JSON: ${e.message}`); }
 
-  // RUNTIME SAFETY NET — only catches an EGREGIOUS overrun (~1.6× target); re-ask to TIGHTEN while
-  // keeping every point (hook, items, CTA), never trimming the script in code.
+  // RUNTIME SAFETY NET (bidirectional) — nudge the draft into the target band: TIGHTEN an egregious
+  // overrun (> ~1.6× target) AND EXPAND a significant underrun (< ~0.75× target — the long-duration
+  // failure where the model under-writes so the video lands far short, e.g. 60s → ~41s). We re-ask
+  // the model; we never edit the script in code.
   const targetWords = budgetWords(targetDuration);
-  const ACCEPT_WORDS = Math.round(targetWords * 1.6);
+  const CAP_WORDS   = Math.round(targetWords * 1.6);   // over this → too long → tighten
+  const FLOOR_WORDS = Math.round(targetWords * 0.75);  // under this → too short → expand
   for (let attempt = 1; attempt <= 2; attempt++) {
     const words = narrationWordCount(plan);
-    if (words <= ACCEPT_WORDS) break;
     const estSeconds = Math.round((words / WORDS_PER_MINUTE) * 60);
-    console.warn(`[ai-video/writer] draft ${words}w ≈ ${estSeconds}s >> target ${targetDuration}s (band ≤ ${ACCEPT_WORDS}w) — tighten regen ${attempt}/2`);
-    try {
-      const tighter = await runWriterCompletion(prompt,
-        `RUNTIME — your narration is ${words} words ≈ ${estSeconds} seconds, far over the ~${targetDuration}-second target. TIGHTEN it (same JSON schema): keep EVERY point (hook, every requested fact/item, the CTA) but make each line punchier by cutting filler, landing closer to ${targetDuration}s (≈${targetWords} words). Do NOT drop or add points. Keep it ONE flowing, naturally-spoken narration.`);
-      if (Array.isArray(tighter?.beats) && tighter.beats.length >= 3 && narrationWordCount(tighter) < words) plan = tighter;
-      else break;
-    } catch { break; }
+    if (words > CAP_WORDS) {
+      console.warn(`[ai-video/writer] draft ${words}w ≈ ${estSeconds}s >> target ${targetDuration}s — tighten regen ${attempt}/2`);
+      try {
+        const tighter = await runWriterCompletion(prompt,
+          `RUNTIME — your narration is ${words} words ≈ ${estSeconds} seconds, far OVER the ~${targetDuration}-second target. TIGHTEN it (same JSON schema): keep EVERY point (hook, every requested fact/item, the CTA) but cut filler so it lands near ${targetDuration}s (≈${targetWords} words). Do NOT drop or add points. One flowing, naturally-spoken narration.`);
+        if (Array.isArray(tighter?.beats) && tighter.beats.length >= 3 && narrationWordCount(tighter) < words) { plan = tighter; continue; }
+      } catch {}
+      break;
+    } else if (words < FLOOR_WORDS) {
+      console.warn(`[ai-video/writer] draft ${words}w ≈ ${estSeconds}s << target ${targetDuration}s — expand regen ${attempt}/2`);
+      try {
+        const longer = await runWriterCompletion(prompt,
+          `RUNTIME — your narration is only ${words} words ≈ ${estSeconds} seconds, well UNDER the ~${targetDuration}-second target. EXPAND it (same JSON schema) to ≈${targetWords} words (~${targetDuration}s): add real substance — more specifics, a concrete example, an extra beat — and deepen the existing points. Do NOT pad with filler or repetition. One flowing, naturally-spoken narration.`);
+        if (Array.isArray(longer?.beats) && longer.beats.length >= 3 && narrationWordCount(longer) > words) { plan = longer; continue; }
+      } catch {}
+      break;
+    } else {
+      break; // within [FLOOR_WORDS, CAP_WORDS] — accept
+    }
   }
 
   let beats = Array.isArray(plan.beats) ? plan.beats : [];
