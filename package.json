@@ -69,6 +69,7 @@
     "vite": "^7.3.1"
   },
   "overrides": {
+    "esbuild": "^0.28.1",
     "form-data": "^4.0.6",
     "protobufjs": "^7.6.1",
     "react-gradient-color-picker": {
