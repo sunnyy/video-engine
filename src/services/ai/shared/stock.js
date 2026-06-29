@@ -11,6 +11,7 @@
  * returned URL themselves (storage paths are service-specific).
  */
 import sharp from "sharp";
+import { reportOk, reportFail } from "../../../server/services/apiHealth.js";
 
 const pexelsKey  = () => process.env.PEXELS_API_KEY;
 const pixabayKey = () => process.env.VITE_PIXABAY_API_KEY;
@@ -45,9 +46,10 @@ async function pexelsImages(query, spec) {
     const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&orientation=${spec.pexels}&per_page=20`;
     const res = await fetch(url, { headers: { Authorization: key } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    reportOk("stock").catch(() => {});
     const data = await res.json();
     return (data.photos ?? []).map(p => p.src?.large2x ?? p.src?.large ?? p.src?.original).filter(Boolean);
-  } catch { return []; }
+  } catch (e) { reportFail("stock", { message: e.message }).catch(() => {}); return []; }
 }
 
 async function pexelsVideos(query, spec, minDuration) {
@@ -56,6 +58,7 @@ async function pexelsVideos(query, spec, minDuration) {
     const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=${spec.pexels}&per_page=20`;
     const res = await fetch(url, { headers: { Authorization: key } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    reportOk("stock").catch(() => {});
     const data = await res.json();
     const out = [];
     for (const v of data.videos ?? []) {
@@ -68,7 +71,7 @@ async function pexelsVideos(query, spec, minDuration) {
       if (file?.link) out.push(file.link);
     }
     return out;
-  } catch { return []; }
+  } catch (e) { reportFail("stock", { message: e.message }).catch(() => {}); return []; }
 }
 
 // ── Pixabay ─────────────────────────────────────────────────────────────────
@@ -78,9 +81,10 @@ async function pixabayImages(query, spec) {
     const url = `https://pixabay.com/api/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(query)}&image_type=photo&orientation=${spec.pixabay}&per_page=20&safesearch=true`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    reportOk("stock").catch(() => {});
     const data = await res.json();
     return (data.hits ?? []).map(h => h.largeImageURL).filter(Boolean);
-  } catch { return []; }
+  } catch (e) { reportFail("stock", { message: e.message }).catch(() => {}); return []; }
 }
 
 async function pixabayVideos(query, spec, minDuration) {
@@ -89,6 +93,7 @@ async function pixabayVideos(query, spec, minDuration) {
     const url = `https://pixabay.com/api/videos/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(query)}&per_page=20&safesearch=true`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    reportOk("stock").catch(() => {});
     const data = await res.json();
     const usable = (data.hits ?? []).filter(h => (h.duration ?? 0) >= minDuration);
     // Pixabay videos have no orientation param — filter by the rendition's dims.
@@ -99,7 +104,7 @@ async function pixabayVideos(query, spec, minDuration) {
     });
     const pool = matched.length ? matched : usable;
     return pool.map(h => (h.videos?.large ?? h.videos?.medium ?? h.videos?.small)?.url).filter(Boolean);
-  } catch { return []; }
+  } catch (e) { reportFail("stock", { message: e.message }).catch(() => {}); return []; }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

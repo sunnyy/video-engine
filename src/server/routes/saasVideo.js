@@ -10,6 +10,7 @@ import { processTalkingHeadVideo, processTalkingHeadFromPath } from "../../servi
 import { runV2Pipeline, planPromoNarration } from "../../services/ai/saasVideo/pipelineOrchestrator.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
+import { blockIfOutage } from "../services/apiHealth.js";
 
 export const router = express.Router();
 
@@ -122,7 +123,7 @@ router.post("/init", requireAuth, async (req, res) => {
 });
 
 // ── POST /promo-video/create ─────────────────────────────────────────────────
-router.post("/create", requireAuth, async (req, res) => {
+router.post("/create", requireAuth, blockIfOutage, async (req, res) => {
   let creditAmount = 0;
   try {
     const {

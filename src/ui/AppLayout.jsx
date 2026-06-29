@@ -5,6 +5,7 @@ import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useNotificationsStore } from "../store/useNotificationsStore";
 import { supabase } from "../lib/supabase";
+import SystemStatusBanner from "./SystemStatusBanner";
 
 /* ── Icons ── */
 const Icons = {
@@ -563,6 +564,7 @@ export default function AppLayout({ children }) {
 
         {/* ── Main content ── */}
         <div className="flex-1 flex flex-col min-w-0">
+          <SystemStatusBanner />
           {children}
         </div>
 

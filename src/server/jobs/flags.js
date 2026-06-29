@@ -24,6 +24,28 @@ async function setBool(key, on) {
   cache.set(key, { value: !!on, t: Date.now() });
 }
 
+// Like getBool but with a default when no row exists (so a flag can default ON).
+async function getBoolDefault(key, dflt) {
+  const c = cache.get(key);
+  if (c && Date.now() - c.t < TTL) return c.value;
+  let value = dflt;
+  try {
+    const { data } = await supabaseAdmin.from("system_flags").select("bool_value").eq("key", key).maybeSingle();
+    if (data && data.bool_value != null) value = !!data.bool_value;
+  } catch { /* keep default */ }
+  cache.set(key, { value, t: Date.now() });
+  return value;
+}
+
+// API-breaker enforcement: when ON (default), a tripped CRITICAL dependency fast-fails manual
+// generation + pauses automation. Flip OFF (admin toggle or API_BREAKER_ENFORCE=0) if it ever
+// misbehaves — detection/alerts keep working regardless.
+export async function getApiBreakerEnforce() {
+  if (process.env.API_BREAKER_ENFORCE === "0" || process.env.API_BREAKER_ENFORCE === "false") return false;
+  return getBoolDefault("api_breaker_enforce", true);
+}
+export function setApiBreakerEnforce(on) { return setBool("api_breaker_enforce", on); }
+
 /** Global kill switch: stop claiming/starting new jobs. Env var forces it on. */
 export async function isKillSwitchOn() {
   if (process.env.WORKER_KILL_SWITCH === "1" || process.env.WORKER_KILL_SWITCH === "true") return true;

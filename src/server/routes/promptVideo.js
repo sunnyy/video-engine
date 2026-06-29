@@ -2,6 +2,7 @@ import express from "express";
 import { requireAuth, deductCredits, addCredits, safeMessage, supabaseAdmin } from "../middleware/shared.js";
 import { runPromptPipeline, runPromptPlan } from "../../services/ai/promptVideo/pipelineOrchestrator.js";
 import { creditsForDuration } from "../../core/utils/creditCosts.js";
+import { blockIfOutage } from "../services/apiHealth.js";
 
 export const router = express.Router();
 
@@ -32,7 +33,7 @@ router.post("/plan", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/generate", requireAuth, async (req, res) => {
+router.post("/generate", requireAuth, blockIfOutage, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
@@ -99,7 +100,7 @@ router.post("/generate", requireAuth, async (req, res) => {
 // ── POST /ai-video/:id/finish ──────────────────────────────────────────────
 // Complete a previously-saved INCOMPLETE generation (voiceover stage had failed). Re-runs production
 // from the saved plan — no re-research/re-write — and charges credits only now, on completion.
-router.post("/:id/finish", requireAuth, async (req, res) => {
+router.post("/:id/finish", requireAuth, blockIfOutage, async (req, res) => {
   const userId = req.user.id;
   const projectId = req.params.id;
   let creditAmount = 0;

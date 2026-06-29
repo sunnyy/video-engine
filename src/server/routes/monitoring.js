@@ -6,7 +6,7 @@
  */
 import express from "express";
 import { requireAuth, requireAdmin, supabaseAdmin } from "../middleware/shared.js";
-import { getWorkerHeartbeat, getKillSwitch } from "../jobs/flags.js";
+import { getWorkerHeartbeat, getKillSwitch, getApiBreakerEnforce } from "../jobs/flags.js";
 import { listRecentEvents } from "../services/automation/events.js";
 import { getHealth } from "../services/apiHealth.js";
 
@@ -81,6 +81,7 @@ router.get("/metrics", requireAuth, requireAdmin, async (_req, res) => {
       publish: { published7d, failed7d: failedPub7d, successRate: publishSuccessRate },
       worker: { heartbeat, alive: workerAlive, killSwitch: await getKillSwitch() },
       apiHealth: await getHealth(),
+      apiBreakerEnforce: await getApiBreakerEnforce(),
       events: enrichedEvents,
       generatedAt: new Date().toISOString(),
     });

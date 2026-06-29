@@ -4,6 +4,7 @@ import { runProductVideoPipeline, planProductVideo } from "../../services/ai/pro
 import { scrapeProductUrl } from "../../services/ai/productVideo/productScraper.js";
 import { guardContent } from "../../services/ai/shared/moderation.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
+import { blockIfOutage } from "../services/apiHealth.js";
 
 export const router = express.Router();
 
@@ -20,7 +21,7 @@ function handleVoiceoverError(send, err) {
   return true;
 }
 
-router.post("/generate", requireAuth, async (req, res) => {
+router.post("/generate", requireAuth, blockIfOutage, async (req, res) => {
   const {
     productImageUrl,
     logoUrl,

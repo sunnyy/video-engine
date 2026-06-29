@@ -47,10 +47,15 @@ import { router as statusRouter }            from "./routes/status.js";
 import { router as devLabRouter }            from "./routes/devLab.js";
 import { router as devSnapshotRouter }       from "./routes/devSnapshot.js";
 import { installLogGate } from "../core/utils/logger.js";
+import { instrumentOpenAI } from "./services/apiHealth.js";
+import { openai } from "./middleware/shared.js";
 
 // Gate all process-narration logs by level (quiet in production, verbose locally or
 // with VERBOSE_LOGS=1). warn/error always print. Must run before any request handling.
 installLogGate();
+
+// Instrument the shared OpenAI client once so every GPT call reports "script" API health.
+instrumentOpenAI(openai);
 
 console.log("Server starting...", new Date().toISOString());
 

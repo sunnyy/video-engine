@@ -8,6 +8,7 @@
  * transient network errors) with backoff + jitter so parallel fetches de-sync and recover.
  */
 import { supabaseAdmin } from "../../../server/middleware/shared.js";
+import { reportOk, reportFail } from "../../../server/services/apiHealth.js";
 
 const MAX_BYTES = 40 * 1024 * 1024; // covers stock video clips
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -37,7 +38,8 @@ export async function persistRemote(url, { runId, label, contentType = "image/jp
     const ext  = contentType.includes("mp4") ? "mp4" : contentType.includes("png") ? "png" : "jpg";
     const path = `ai-assets/${runId}/${label}-${Date.now()}.${ext}`;
     const { error } = await supabaseAdmin.storage.from("user-assets").upload(path, buffer, { contentType, upsert: true });
-    if (error) throw new Error(error.message);
+    if (error) { reportFail("storage", { message: error.message }).catch(() => {}); throw new Error(error.message); }
+    reportOk("storage").catch(() => {});   // Supabase storage responded — healthy
     const { data: pub } = supabaseAdmin.storage.from("user-assets").getPublicUrl(path);
     return pub?.publicUrl ?? null;
   } catch (e) {

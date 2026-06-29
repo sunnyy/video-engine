@@ -12,6 +12,11 @@ import "./middleware/shared.js";        // initialises env + supabaseAdmin
 import "./jobs/handlers.js";            // side-effect: registers all job handlers
 import { claimNext, complete, fail, sweepStaleJobs, requeueRunning } from "./jobs/queue.js";
 import { isKillSwitchOn, touchWorkerHeartbeat } from "./jobs/flags.js";
+import { runRecoveryProbes, instrumentOpenAI } from "./services/apiHealth.js";
+import { openai } from "./middleware/shared.js";
+
+// Instrument this (worker) process's OpenAI client too — it's separate from the web process.
+instrumentOpenAI(openai);
 import { getHandler, registeredTypes } from "./jobs/registry.js";
 import { tick as schedulerTick } from "./services/automation/scheduler.js";
 import { checkOAuthHealth } from "./services/social/health.js";
@@ -110,6 +115,13 @@ const sweepTimer = setInterval(() => {
   if (running) sweepStaleJobs(STALE_MS).then((n) => { if (n) console.warn(`[worker] recovered ${n} stale job(s)`); }).catch(() => {});
 }, SWEEP_MS);
 sweepTimer.unref?.();
+
+// API-health recovery probe — re-test any DOWN critical dependency so a tripped breaker flips back
+// to healthy once the provider returns (blocked traffic can't self-recover).
+const healthProbeTimer = setInterval(() => {
+  if (running) runRecoveryProbes().catch((e) => console.warn("[apiHealth] probe error:", e.message));
+}, SWEEP_MS);
+healthProbeTimer.unref?.();
 
 // OAuth health monitor — refresh expiring tokens, flag/notify broken accounts.
 const runOAuthHealth = () => {

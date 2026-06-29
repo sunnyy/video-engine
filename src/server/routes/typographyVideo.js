@@ -3,6 +3,7 @@ import { requireAuth, deductCredits, addCredits, safeMessage, supabaseAdmin } fr
 import { runTypographyPipeline, planTypography, produceTypography } from "../../services/ai/typographyVideo/pipelineOrchestrator.js";
 import { moderateInput } from "../../services/ai/shared/moderation.js";
 import { creditsForDuration } from "../../core/utils/creditCosts.js";
+import { blockIfOutage } from "../services/apiHealth.js";
 
 export const router = express.Router();
 
@@ -19,7 +20,7 @@ function handleVoiceoverError(send, err) {
   return true;
 }
 
-router.post("/generate", requireAuth, async (req, res) => {
+router.post("/generate", requireAuth, blockIfOutage, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 
@@ -77,7 +78,7 @@ router.post("/plan", requireAuth, async (req, res) => {
 });
 
 // ── Phase 2: PRODUCE (charges) — build from the confirmed/edited plan ──
-router.post("/produce", requireAuth, async (req, res) => {
+router.post("/produce", requireAuth, blockIfOutage, async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 

@@ -19,6 +19,7 @@ import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 import { supabaseAdmin, deductCredits, sendUserEmail, userRenderCompleteEmail } from "../middleware/shared.js";
 import { notifyUser, notifyUserById } from "../services/notificationService.js";
 import { resolveAudienceIds } from "../services/announcements/audience.js";
+import { blockedCapability } from "../services/apiHealth.js";
 
 // A cancellation "error" the worker treats as terminal (never retried).
 function cancelledError() { const e = new Error("canceled by user"); e.noRetry = true; return e; }
@@ -323,6 +324,15 @@ registerHandler("generate_video", async (payload, job) => {
   if (campaign.status !== "active" && !manual) {
     logEvent({ userId, campaignId, action: "generate", entity: "campaign", status: "skip", message: `campaign ${campaign.status} — scheduler skipped` });
     return { skipped: `campaign ${campaign.status}` };
+  }
+
+  // 0a) API outage — a CRITICAL dependency is down (breaker tripped). Pause ALL of this user's
+  // active campaigns at once (don't churn out failing jobs) and stop retrying. Generic reason to
+  // the user; true cause is in the event meta. Recovers automatically when the provider returns.
+  const outage = await blockedCapability();
+  if (outage) {
+    await pauseAllUserCampaigns(userId, "temporary internal issue", { stage: outage.capability });
+    const e = new Error("Campaign paused: temporary internal issue"); e.noRetry = true; throw e;
   }
 
   // 0) Quota cap (runaway-cost guard). Exceeded → pause + notify, nothing reserved.

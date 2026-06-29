@@ -18,6 +18,7 @@
  */
 import { supabaseAdmin } from "../middleware/shared.js";
 import { sendAdminAlert } from "./emailService.js";
+import { getApiBreakerEnforce } from "../jobs/flags.js";
 
 // `critical` = no fallback; a sustained outage should halt generation (enforced in Phase 2).
 // `label` is the admin/user-facing name — we NEVER expose provider names or raw errors publicly.
@@ -137,4 +138,69 @@ export async function getPublicStatus() {
   const components = health.map((h) => ({ name: h.label, status: h.status === "down" ? "down" : "operational" }));
   const anyDown = components.some((c) => c.status === "down");
   return { status: anyDown ? "degraded" : "operational", components, updatedAt: new Date().toISOString() };
+}
+
+// ── Phase 2: enforcement ──────────────────────────────────────────────────────
+const CRITICAL = Object.entries(CAPABILITIES).filter(([, m]) => m.critical).map(([id]) => id);
+
+/** If enforcement is ON and a CRITICAL capability is down, return {capability,label}; else null. */
+export async function blockedCapability() {
+  if (!(await getApiBreakerEnforce())) return null;
+  const rows = await loadAll();
+  for (const id of CRITICAL) {
+    const r = rows.find((x) => x.capability === id);
+    if (r && r.status === "down") return { capability: id, label: CAPABILITIES[id].label };
+  }
+  return null;
+}
+
+/** Express middleware: fast-fail generation (no work, no charge) when a critical dependency is down. */
+export async function blockIfOutage(req, res, next) {
+  try {
+    if (await blockedCapability()) {
+      return res.status(503).json({ error: "We’re having a temporary issue and can’t generate right now — please try again shortly.", code: "SERVICE_UNAVAILABLE" });
+    }
+  } catch { /* never block on the breaker's own error */ }
+  next();
+}
+
+// ── Recovery probes ────────────────────────────────────────────────────────────
+// Once we BLOCK on a down capability, no real traffic flows to recover it — so the worker
+// periodically probes any DOWN critical capability with one cheap real request; success → reportOk.
+const PROBES = {
+  voiceover: async () => {
+    const key = process.env.ELEVENLABS_API_KEY; if (!key) return false;
+    const r = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": key }, signal: AbortSignal.timeout(8000) });
+    return r.ok;
+  },
+  script: async () => {
+    const key = process.env.OPENAI_API_KEY; if (!key) return false;
+    const r = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
+    return r.ok;
+  },
+  storage: async () => {
+    const { error } = await supabaseAdmin.from("system_flags").select("key").limit(1);
+    return !error;
+  },
+};
+
+export async function runRecoveryProbes() {
+  const rows = await loadAll();
+  for (const id of CRITICAL) {
+    const r = rows.find((x) => x.capability === id);
+    if (!r || r.status !== "down" || !PROBES[id]) continue;
+    try { if (await PROBES[id]()) await reportOk(id); } catch { /* still down — leave it */ }
+  }
+}
+
+// ── OpenAI instrumentation ───────────────────────────────────────────────────────
+// Wrap the shared OpenAI client's chat.completions.create ONCE so every GPT call across all services
+// reports "script" health — no per-call-site edits. A 400 (bad request) is user input, not an
+// outage, so it doesn't count toward tripping. Called once at server startup.
+export function instrumentOpenAI(client) {
+  if (!client?.chat?.completions?.create || client.__healthWrapped) return;
+  const orig = client.chat.completions.create.bind(client.chat.completions);
+  client.chat.completions.create = (...args) =>
+    track("script", () => orig(...args), (err) => (err?.status ? err.status !== 400 : true));
+  client.__healthWrapped = true;
 }

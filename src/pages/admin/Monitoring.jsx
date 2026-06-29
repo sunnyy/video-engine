@@ -48,6 +48,12 @@ export default function Monitoring() {
     catch (e) { setError(e.message); } finally { setBusy(false); }
   }
 
+  async function toggleEnforce(on) {
+    setBusy(true);
+    try { await serverFetch("/api/flags/api-breaker", { method: "POST", body: JSON.stringify({ on }) }); await load(); }
+    catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
   return (
     <AdminLayout>
       <div className="flex items-center justify-between mb-1 gap-4 flex-wrap">
@@ -97,7 +103,19 @@ export default function Monitoring() {
           {/* API health (external dependencies) */}
           {data.apiHealth && (
             <div className="bg-[#111118] border border-white/[0.08] rounded-2xl p-6 mb-6">
-              <div className="text-base font-semibold text-[#888] uppercase tracking-wider mb-4">API health</div>
+              <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                <div className="text-base font-semibold text-[#888] uppercase tracking-wider">API health</div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs" style={{ color: data.apiBreakerEnforce ? "#22c55e" : "#facc15" }}>
+                    Auto-halt: <b>{data.apiBreakerEnforce ? "ON" : "off"}</b>
+                  </span>
+                  <button onClick={() => toggleEnforce(!data.apiBreakerEnforce)} disabled={busy}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border"
+                    style={{ borderColor: "rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "#c8c8d8", cursor: busy ? "default" : "pointer" }}>
+                    {data.apiBreakerEnforce ? "Disable auto-halt" : "Enable auto-halt"}
+                  </button>
+                </div>
+              </div>
               <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
                 {data.apiHealth.map((h) => {
                   const down = h.status === "down";
