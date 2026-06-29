@@ -14,7 +14,7 @@ Everything you create is yours to edit. Every AI video opens in a built-in edito
 
 **What you can make**
 
-- **Videos** — AI Video, Social to Video, Product ads, Typography, Promo/website videos, Talking Head, and Auto Captions.
+- **Videos** — Prompt to Video, Social to Video, Product ads, Typography, Promo/website videos, Talking Head, and Auto Captions.
 - **Images** — AI image generation, product posters, banners, thumbnails, and virtual try-on.
 - **Audio** — AI voiceovers (text to speech) and speech to text.
 
@@ -26,7 +26,7 @@ New accounts get **150 free credits** to try things out — no credit card requi
  $md$The fastest way to start is the prompt box on your **dashboard**.
 
 1. Open your dashboard.
-2. Pick a service (e.g. **AI Video**) from the options above the prompt box.
+2. Pick a service (e.g. **Prompt to Video**) from the options above the prompt box.
 3. Describe what you want — your topic, the vibe, and any details that matter.
 4. Set options like voice/language, duration, and orientation.
 5. Hit send and let Vidquence research, script, design, and render your video.
@@ -55,7 +55,7 @@ Your current credit balance is always shown at the bottom of the sidebar.$md$,
  'A quick guide to picking the right tool for your goal.',
  $md$Each video service is tuned for a different job:
 
-- **AI Video** — any topic from a text prompt; great for explainers, faceless content, and storytelling.
+- **Prompt to Video** — any topic from a text prompt; great for explainers, faceless content, and storytelling.
 - **Social to Video** — turn a post, article, or idea into a short social-ready video.
 - **Product Video** — turn a product photo into a video ad.
 - **Typography Video** — bold text-driven motion videos.
@@ -63,7 +63,7 @@ Your current credit balance is always shown at the bottom of the sidebar.$md$,
 - **Talking Head** — upload your own clip and Vidquence builds the video around it (captions, b-roll, music).
 - **Auto Captions** — add animated captions to a video you already have.
 
-Not sure? Start with **AI Video** — it's the most general-purpose.$md$,
+Not sure? Start with **Prompt to Video** — it's the most general-purpose.$md$,
  'published', 4),
 
 -- ─────────────────────────── CREDITS & BILLING ───────────────────────────
@@ -124,13 +124,13 @@ Reach out through **Help & Support** and our team will look into it.$md$,
  'published', 5),
 
 -- ─────────────────────────── VIDEO SERVICES ───────────────────────────
-('ai-video', 'AI Video (prompt to video)', 'Video Services',
+('ai-video', 'Prompt to Video', 'Video Services',
  'Turn any topic into a fully designed video from a prompt.',
- $md$**AI Video** turns a text prompt into a complete, edit-ready video. It researches your topic, writes a script, designs each scene, adds voiceover and music, and renders the result.
+ $md$**Prompt to Video** turns a text prompt into a complete, edit-ready video. It researches your topic, writes a script, designs each scene, adds voiceover and music, and renders the result.
 
 **How to use it**
 
-1. Select **AI Video** on the dashboard.
+1. Select **Prompt to Video** on the dashboard.
 2. Describe your topic and what you want to cover.
 3. Choose voice/language, duration, and orientation (vertical or wide).
 4. Generate — then refine everything in the editor.

@@ -32,7 +32,7 @@ export function registeredPipelines() { return Object.keys(pipelines); }
 
 // ── AI Video (Prompt-to-Video) — the first automatable service ──
 registerPipeline("ai_video", {
-  label: "AI Video",
+  label: "Prompt to Video",
   creditKey: "ai_video",
   // Duration-aware cost: a 60s campaign video costs more than a 15s one (more beats = more COGS).
   cost: (campaign) => creditsForDuration(campaign.target_duration || DEFAULT_DURATION),

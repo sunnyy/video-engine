@@ -51,7 +51,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   const cost = creditsForDuration(effDuration);
 
   try {
-    const deduction = await deductCredits(userId, cost, "ai_video", `AI Video generation (${effDuration}s)`, null);
+    const deduction = await deductCredits(userId, cost, "ai_video", `Prompt to Video generation (${effDuration}s)`, null);
     if (!deduction.success) {
       send({ error: "Insufficient credits", code: "NO_CREDITS" });
       return res.end();
@@ -76,7 +76,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     res.end();
   } catch (err) {
     if (creditAmount > 0) {
-      addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: AI Video failed").catch(() => {});
+      addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Prompt to Video failed").catch(() => {});
     }
     // Voiceover unavailable (our TTS quota/outage) — the work may be saved as an incomplete project
     // the user can Finish later. NEVER reveal the internal cause; show generic copy either way.
@@ -124,7 +124,7 @@ router.post("/:id/finish", requireAuth, async (req, res) => {
 
     const effDuration = Math.min(75, Math.max(15, parseInt(gp.targetDuration, 10) || 45));
     const cost = creditsForDuration(effDuration);
-    const deduction = await deductCredits(userId, cost, "ai_video", `AI Video generation (${effDuration}s)`, projectId);
+    const deduction = await deductCredits(userId, cost, "ai_video", `Prompt to Video generation (${effDuration}s)`, projectId);
     if (!deduction.success) { send({ error: "Insufficient credits", code: "NO_CREDITS" }); return res.end(); }
     creditAmount = cost;
 
@@ -136,7 +136,7 @@ router.post("/:id/finish", requireAuth, async (req, res) => {
     res.end();
   } catch (err) {
     if (creditAmount > 0) {
-      addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: AI Video finish failed").catch(() => {});
+      addCredits(userId, creditAmount, "refund", "ai_failure_refund", "Refund: Prompt to Video finish failed").catch(() => {});
     }
     if (err?.isVoiceoverError) {
       console.warn("[ai-video/finish] voiceover still unavailable:", err.cause);

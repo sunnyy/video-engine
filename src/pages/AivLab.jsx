@@ -63,7 +63,7 @@ export default function AivLab() {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Outfit',sans-serif", padding: "28px 22px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 4px" }}>AI Video — Step Lab</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 4px" }}>Prompt to Video — Step Lab</h1>
         <div style={{ color: C.faint, fontSize: 12.5, marginBottom: 18 }}>Run each pipeline stage on its own and inspect the output. Nothing is saved or charged.</div>
 
         {/* Inputs */}

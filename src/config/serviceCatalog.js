@@ -22,7 +22,7 @@ const durationPricing = { model: "duration", bands: VIDEO_DURATION_BANDS };
 
 export const SERVICE_CATALOG = [
   // ── Tier 1 — hero video services (prompt / website / content = a complete story) ──
-  { key: "ai_video", name: "AI Video", category: "create", tier: 1, featured: true, beta: false,
+  { key: "ai_video", name: "Prompt to Video", category: "create", tier: 1, featured: true, beta: false,
     route: "/ai-video", creditKey: "ai_video", pricing: durationPricing, publishable: true,
     blurb: "Generate a unique video from a prompt — every scene designed by AI, no templates." },
   { key: "promo_video", name: "SaaS/Promo Video", category: "create", tier: 1, featured: true, beta: false,

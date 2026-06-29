@@ -3,7 +3,7 @@ import AdminLayout from "./AdminLayout";
 import { serverFetch } from "../../services/serverApi";
 
 const SERVICE_LABELS = {
-  ai_video:         "AI Video",
+  ai_video:         "Prompt to Video",
   typography_video: "Typography Video",
   product_ad:       "Product Ad",
   ai_image:         "AI Images",

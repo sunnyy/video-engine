@@ -293,7 +293,7 @@ export default function Videos() {
       {/* Header + tabs */}
       <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0d0d14", flexShrink: 0, display: "flex", alignItems: "center", gap: 24 }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#f5c518", fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>
-          AI Videos
+          Videos
         </h1>
         <div style={{ display: "flex", gap: 4 }}>
           {[["videos", `My Videos${!loading && videoProjects.length ? ` (${videoProjects.length})` : ""}`]].map(([id, label]) => (
