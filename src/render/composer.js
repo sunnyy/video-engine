@@ -109,7 +109,7 @@ export function compose(project, { width = 1080, height = 1920, fps = 30 } = {})
     trimStart: l.trimStart ?? 0, playbackRate: l.playbackRate ?? 1,
     iconSvg: l.type === "icon" ? iconToSvg(l.iconName, Math.min(l.transform?.width ?? 120, l.transform?.height ?? 120), l.style?.color) : null,
     clipPath: l.maskShape ? getClipPathCSS(l.maskShape) : (l.clipPath ?? null),
-    captionStyle: l.captionStyle || {}, segments: l.segments || null,
+    captionStyle: l.captionStyle || {}, captionConfig: l.captionConfig || null, segments: l.segments || null,
     filter: l.filter ?? null, backdropFilter: l.backdropFilter ?? null,
     mixBlendMode: l.mixBlendMode ?? l.blendMode ?? null,
     borderRadius: l.transform?.borderRadius ?? l.borderRadius ?? null,
@@ -199,7 +199,8 @@ const nodes = LAYERS.map((L,i)=>{
   const el=document.createElement("div"); el.className="vq-layer"; el.style.zIndex=L.zIndex;
   if(L.type==="text"){
     const s=L.style||{};
-    Object.assign(el.style,{fontFamily:withDeva(s.fontFamily),fontSize:(s.fontSize||48)+"px",fontWeight:s.fontWeight||700,
+    const capScale=L.captionConfig?.scale??1; // SIZE slider — scales caption text in the export to match the editor
+    Object.assign(el.style,{fontFamily:withDeva(s.fontFamily),fontSize:((s.fontSize||48)*capScale)+"px",fontWeight:s.fontWeight||700,
       fontStyle:s.fontStyle||"normal",color:s.color||"#fff",textAlign:s.textAlign||"center",lineHeight:s.lineHeight||1.2,
       letterSpacing:(s.letterSpacing||0)+"px",textTransform:s.textTransform||"none",background:s.background||"",
       borderRadius:(s.borderRadius||0)+"px",padding:(s.padding||0)+"px",textShadow:s.textShadow||"",

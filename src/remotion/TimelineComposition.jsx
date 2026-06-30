@@ -259,7 +259,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
             ...baseStyle,
             position: "absolute",
             fontFamily: withDevanagari(s.fontFamily),
-            fontSize: s.fontSize || 48,
+            fontSize: (s.fontSize || 48) * (layer.captionConfig?.scale ?? 1),
             fontWeight: s.fontWeight || 700,
             fontStyle: s.fontStyle || "normal",
             color: s.color || "#ffffff",
