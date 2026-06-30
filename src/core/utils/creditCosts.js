@@ -32,6 +32,7 @@ export const CREDIT_COSTS = {
   promo_video:           { 1: 50, 3: 120, 5: 200 }, // SaaS/Promo Video — per scene count
   promo_video_th:        180,                       // SaaS Talking Head mode — flat rate
   talking_head:          20,                         // standalone Talking Head — NOMINAL display only; real charge is duration-based (creditsForTalkingHead)
+  video_clipping:        20,                         // Video Clipping — NOMINAL display only; real charge scales with SOURCE length (creditsForClipping)
   // Dashboard video services (plan → produce)
   ai_video:              75,  // Prompt to Video / AI Video
   social_video:          30,  // Social Video
@@ -68,6 +69,14 @@ export const TALKING_HEAD_PER_30S = 10;
 export function creditsForTalkingHead(seconds) {
   const sec = Math.max(1, Math.round(Number(seconds)) || 30);
   return Math.max(15, Math.ceil(sec / 30) * TALKING_HEAD_PER_30S);
+}
+
+// Video Clipping — charged by SOURCE length (transcription + per-clip cut/caption work scale with
+// minutes of footage uploaded, not by number of clips returned). NOMINAL floor + per-minute rate.
+export const VIDEO_CLIPPING_PER_MIN = 4;
+export function creditsForClipping(seconds) {
+  const sec = Math.max(1, Math.round(Number(seconds)) || 60);
+  return Math.max(20, Math.ceil(sec / 60) * VIDEO_CLIPPING_PER_MIN);
 }
 
 // Full cost estimates per service — used by CreditConfirmModal

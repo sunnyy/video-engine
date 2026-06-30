@@ -15,13 +15,15 @@ import { showToast } from "../ui/Toast";
 const T = { bg: "#090b11", surface: "#0e1018", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", faint: "#55667a" };
 
 const FILTERS = [
-  { id: "all",              label: "All",             sources: null },
-  { id: "ai_video",         label: "Prompt to Video", sources: ["ai_video"] },
-  { id: "promo_video",      label: "SaaS Video",      sources: ["promo_video"] },
-  { id: "product_video",    label: "Product Video",   sources: ["product_video", "product_video_v2", "product_ad"] },
-  { id: "social_video",     label: "Social",          sources: ["social_video"] },
-  { id: "typography_video", label: "Typography",      sources: ["typography_video"] },
-  { id: "caption_studio",   label: "Captions",        sources: ["caption_studio"] },
+  { id: "all",              label: "All",              sources: null },
+  { id: "ai_video",         label: "Prompt Video",     sources: ["ai_video"] },
+  { id: "promo_video",      label: "SaaS Video",       sources: ["promo_video"] },
+  { id: "product_video",    label: "Product Video",    sources: ["product_video", "product_video_v2", "product_ad"] },
+  { id: "social_video",     label: "Social Video",     sources: ["social_video"] },
+  { id: "talking_head",     label: "Talking Head",     sources: ["talking_head"] },
+  { id: "video_clip",       label: "Video Clipping",   sources: ["video_clip"] },
+  { id: "typography_video", label: "Typography Video", sources: ["typography_video"] },
+  { id: "caption_studio",   label: "Auto Captions",    sources: ["caption_studio"] },
 ];
 
 function timeLabel(dateStr) {
@@ -174,16 +176,19 @@ const PAGE_SIZE = 30;
 export default function Projects() {
   const { projects, loading, fetchProjects } = useProjectsStore();
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
 
   useEffect(() => { fetchProjects(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset the page window whenever the active filter changes.
-  useEffect(() => { setVisible(PAGE_SIZE); }, [filter]);
+  // Reset the page window whenever the active filter or search query changes.
+  useEffect(() => { setVisible(PAGE_SIZE); }, [filter, query]);
 
   const active = FILTERS.find(f => f.id === filter) ?? FILTERS[0];
+  const q = query.trim().toLowerCase();
   const matched = [...projects]
     .filter(p => !active.sources || active.sources.includes(p.source))
+    .filter(p => !q || (p.name || "Untitled").toLowerCase().includes(q))
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   const shown = matched.slice(0, visible);
   const hasMore = matched.length > visible;
@@ -195,16 +200,37 @@ export default function Projects() {
         <div style={{ padding: "40px 40px 80px" }}>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: "0 0 18px" }}>Your Projects</h1>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-            {FILTERS.map(f => {
-              const sel = filter === f.id;
-              return (
-                <button key={f.id} onClick={() => setFilter(f.id)}
-                  style={{ padding: "7px 13px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sel ? "rgba(124,92,252,0.55)" : T.border}`, background: sel ? "rgba(124,92,252,0.14)" : "rgba(255,255,255,0.03)", color: sel ? "#fff" : T.muted }}>
-                  {f.label}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {FILTERS.map(f => {
+                const sel = filter === f.id;
+                return (
+                  <button key={f.id} onClick={() => setFilter(f.id)}
+                    style={{ padding: "7px 13px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sel ? "rgba(124,92,252,0.55)" : T.border}`, background: sel ? "rgba(124,92,252,0.14)" : "rgba(255,255,255,0.03)", color: sel ? "#fff" : T.muted }}>
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ position: "relative", width: 260, flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.faint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search projects by name…"
+                style={{ width: "100%", padding: "9px 32px 9px 36px", borderRadius: 10, fontSize: 13, fontFamily: "inherit", color: T.text, background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, outline: "none", boxSizing: "border-box" }}
+              />
+              {query && (
+                <button onClick={() => setQuery("")} aria-label="Clear search"
+                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 22, height: 22, borderRadius: 6, border: "none", cursor: "pointer", background: "transparent", color: T.muted, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, lineHeight: 1 }}>
+                  ×
                 </button>
-              );
-            })}
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -213,7 +239,9 @@ export default function Projects() {
               <span style={{ fontSize: 13 }}>Loading…</span>
             </div>
           ) : shown.length === 0 ? (
-            <div style={{ padding: "60px 0", textAlign: "center", color: T.faint, fontSize: 14 }}>No projects here yet — make one from the dashboard.</div>
+            <div style={{ padding: "60px 0", textAlign: "center", color: T.faint, fontSize: 14 }}>
+              {q ? `No projects match “${query.trim()}”.` : "No projects here yet — make one from the dashboard."}
+            </div>
           ) : (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16 }}>

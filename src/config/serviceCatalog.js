@@ -42,6 +42,9 @@ export const SERVICE_CATALOG = [
   { key: "typography_video", name: "Typography Video", category: "create", tier: 2, featured: false, beta: false,
     route: "/typography-video", creditKey: "typography_video", pricing: durationPricing, publishable: false,
     blurb: "Kinetic text videos for punchy, muted-friendly social clips." },
+  { key: "video_clipping", name: "Video Clipping", category: "create", tier: 2, featured: false, beta: true,
+    route: "/video-clipping", creditKey: "video_clipping", pricing: { model: "flat", credits: CREDIT_COSTS.video_clipping }, publishable: false,
+    blurb: "Upload a long video or podcast — AI finds the best moments and turns them into captioned vertical clips. Charged by source length." },
 
   // ── Tier 4 — supporting tools ("Plus 10+ AI Tools") ──
   { key: "ai_images", name: "AI Images", category: "tool", tier: 4, featured: false, beta: false,
