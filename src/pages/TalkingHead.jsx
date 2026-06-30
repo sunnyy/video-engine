@@ -47,6 +47,7 @@ export default function TalkingHead() {
   const [theme, setTheme]           = useState("auto");
   const [accentColor, setAccent]    = useState(null);
   const [accentColor2, setAccent2]  = useState(null);
+  const [productUrl, setProductUrl] = useState("");
   const [busy, setBusy]             = useState(false);
   const [stepIdx, setStepIdx]       = useState(0);
   const [error, setError]           = useState(null);
@@ -63,7 +64,7 @@ export default function TalkingHead() {
     try {
       const { url } = await uploadTalkingHeadVideo(file);
       const result = await generateTalkingHead(
-        { videoUrl: url, durationSeconds: Math.round(duration), captionStyle, captionPos, reframe, music, styleId, theme, accentColor, accentColor2 },
+        { videoUrl: url, durationSeconds: Math.round(duration), captionStyle, captionPos, reframe, music, styleId, theme, accentColor, accentColor2, productUrl },
         ({ step }) => setStepIdx((i) => Math.min(STEPS.length - 1, i + 1)),
       );
       fetchCredits?.();
@@ -164,6 +165,17 @@ export default function TalkingHead() {
                   accentColor2={accentColor2} onAccentChange2={setAccent2}
                   accent={T.accent}
                 />
+              </div>
+
+              {/* Product / website link — scraped for real copy, brand colour & screenshots */}
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>Product link <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500, opacity: 0.7 }}>— optional</span></div>
+                <input
+                  type="text" value={productUrl} onChange={(e) => setProductUrl(e.target.value)}
+                  placeholder="yoursite.com — we'll pull real screenshots, copy & brand colour"
+                  style={{ width: "100%", background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 10, padding: "11px 13px", color: T.text, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                />
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>If your clip talks about a product or website, we'll show real screenshots of it. (We also auto-detect a link you mention.)</div>
               </div>
 
               {/* Music */}

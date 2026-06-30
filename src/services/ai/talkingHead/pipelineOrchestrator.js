@@ -23,6 +23,16 @@ import { track, easeOutCubic } from "../shared/easing.js";
 import { loadSfxTracks, pickSfx } from "./sfx.js";
 import { injectMusic } from "../shared/music.js";
 import { moderateInput } from "../shared/moderation.js";
+import { harvestAssets } from "../saasVideo/assetHarvester.js";
+import { normalizeUrl } from "../shared/safeFetch.js";
+
+// Find a product/site URL the speaker mentions (only clear domains) so we can auto-ground without
+// the user pasting one. Conservative: explicit http(s)/www, or a token on a common TLD.
+function detectUrlInText(text) {
+  if (!text) return "";
+  const m = String(text).match(/\b((?:https?:\/\/|www\.)[^\s]+|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|io|ai|dev|co|app|org|net|xyz|so))\b/i);
+  return m ? normalizeUrl(m[0].replace(/[.,)]+$/, "")) : "";
+}
 
 export const TH_STATUS_STEPS = [
   "Listening to your video…",
@@ -171,6 +181,7 @@ export async function runTalkingHeadPipeline(params, onStep, onCharge) {
     videoUrl, userId,
     captionStyle = "wordBlaze", captionPos = 80, reframe = "source", music = true,
     styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null,
+    productUrl = "",
   } = params;
   const step = (msg) => { console.log(`[talking-head] ${msg}`); onStep?.({ step: msg }); };
   if (!videoUrl) throw new Error("no video provided");
@@ -190,13 +201,24 @@ export async function runTalkingHeadPipeline(params, onStep, onCharge) {
   step(TH_STATUS_STEPS[1]);
   let beats = segmentWords(words);
 
+  // ── Product grounding: scrape a provided URL (or one the speaker mentions) for real copy,
+  //    brand colour, and screenshots → fed to the director + used as "product_shot" b-roll. ──
+  let harvest = null;
+  const urlToScrape = normalizeUrl(productUrl || "") || detectUrlInText(full_transcript);
+  if (urlToScrape) {
+    try { harvest = await harvestAssets(urlToScrape, runId); }
+    catch (e) { console.warn("[talking-head] product harvest failed:", e.message); }
+    console.log(`[talking-head] harvested ${urlToScrape} → ${harvest?.screenshotUrls?.length || 0} shots, brand=${harvest?.brandColor || "—"}`);
+  }
+  const screenshots = harvest?.screenshotUrls ?? [];
+
   // ── Editorial direction: speaker vs B-roll, per beat ──────────────────────
   step(TH_STATUS_STEPS[2]);
   const canvas = canvasFromDimensions(dimensions, reframe);
   step(TH_STATUS_STEPS[3]);
   let style = null, palette = null, niche = "general", musicMood = "ambient", publish = null;
   try {
-    const directed = await directTalkingHead(beats, { language, styleId, theme, accentColor, accentColor2 });
+    const directed = await directTalkingHead(beats, { language, styleId, theme, accentColor, accentColor2, harvest });
     beats = directed.beats; style = directed.style; palette = directed.palette; niche = directed.niche;
     musicMood = directed.music_mood || "ambient"; publish = directed.publish || null;
   } catch (e) {
@@ -216,7 +238,7 @@ export async function runTalkingHeadPipeline(params, onStep, onCharge) {
   // ── Resolve B-roll assets (speaker beats are asset_type "none" → skipped) ──
   step(TH_STATUS_STEPS[4]);
   if (style) {
-    try { await resolveVisuals(beats, style, runId, canvas.orientation); }
+    try { await resolveVisuals(beats, style, runId, canvas.orientation, screenshots); }
     catch (e) { console.warn("[talking-head] visual resolve failed:", e.message); }
   }
 

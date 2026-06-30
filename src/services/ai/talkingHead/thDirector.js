@@ -17,12 +17,29 @@ import { normalizeHex, ensureVividAccent } from "./utils.js";
 import { resolveThemePalette } from "../shared/themeRegistry.js";
 
 const MODEL = "gpt-4.1";
-const ASSET_TYPES = ["none", "ai_image", "photo", "stock_video"];
+const ASSET_TYPES = ["none", "ai_image", "photo", "stock_video", "product_shot"];
+
+/** Compact grounding block from a scraped product page — fed to the director so its decisions
+ *  (entity names, queries, card facts, and when to show a real screenshot) match the real product. */
+function groundingBlock(harvest) {
+  if (!harvest) return "";
+  const parts = [];
+  if (harvest.title)       parts.push(`Product/brand: ${harvest.title}`);
+  if (harvest.description) parts.push(`Tagline: ${harvest.description}`);
+  if (harvest.headlines?.length) parts.push(`Headlines: ${harvest.headlines.slice(0, 8).join(" | ")}`);
+  if (harvest.bullets?.length)   parts.push(`Features: ${harvest.bullets.slice(0, 10).join(" | ")}`);
+  if (harvest.bodyText)    parts.push(`Page text: ${harvest.bodyText.slice(0, 1000)}`);
+  const shots = harvest.screenshotUrls?.length || 0;
+  if (!parts.length && !shots) return "";
+  return `\n\nREAL PRODUCT CONTEXT (the speaker is talking about this — use the correct names/facts; ${shots} real screenshot${shots === 1 ? "" : "s"} of it are available for "product_shot" beats):\n${parts.join("\n")}`;
+}
 const CAMERAS = ["slow_zoom_in", "fast_zoom_in", "slow_zoom_out", "pan_left", "pan_right", "hold"];
 const VTYPES = ["concept", "scene", "place", "object", "person", "texture", "abstract"];
 
-function buildPrompt(beats, language) {
+function buildPrompt(beats, language, harvest = null) {
   const beatList = beats.map((b) => `#${b.beat_index} [${b.duration_seconds}s]: ${b.spoken}`).join("\n");
+  const grounding = groundingBlock(harvest);
+  const hasShots = (harvest?.screenshotUrls?.length || 0) > 0;
   return {
     system: `You are the EDITOR of a short-form talking-head video. A person is speaking to camera; their clip is the spine and their words are FIXED (given below as timed beats). Your job: decide, beat by beat, when to STAY on the speaker and when to CUT AWAY to a visual that ILLUSTRATES what they're saying — the way great creators cut to B-roll.
 
@@ -37,7 +54,7 @@ Aim for a natural rhythm — a healthy mix of all moments (speaker carries perso
 FOR "broll" BEATS — choose the SOURCE (cheapest, most real first):
 - "photo" + "subject_entity" = the EXACT Wikipedia article title of a real person/org/place/landmark/product (e.g. "Roman Forum", "Elon Musk") → a real photo is fetched (free, strongest). Use whenever a real, nameable thing is the subject.
 - "stock_video" + "shot_query" = a concrete searchable phrase for real footage of a real-world scene (a city street, a crowd, ocean waves, typing hands). Free. Prefer this for generic real-world scenes.
-- "ai_image" + "image_prompt" = a generated cinematic shot. LAST RESORT (capped per video) — only for un-photographable concepts/metaphors. Frame it like a shot (subject + composition + light + mood), and NEVER put text/words in the image.
+- "ai_image" + "image_prompt" = a generated cinematic shot. LAST RESORT (capped per video) — only for un-photographable concepts/metaphors. Frame it like a shot (subject + composition + light + mood), and NEVER put text/words in the image.${hasShots ? `\n- "product_shot" = show a REAL SCREENSHOT of the product/app/website being discussed. Use it ONLY when the line refers to the product itself, its interface/dashboard, the website, or "as you can see / here it is / look at this" moments. Strongest choice for those — prefer it over stock/AI when the beat is about the product.` : ""}
 Also give every broll beat: "layout" — "full" (footage covers the whole frame) or "pip" (keep the SPEAKER on screen and tuck the footage into a corner; use pip for "as you can see / here / look at this" moments where the speaker's presence still matters) — plus "camera" (one of: ${CAMERAS.join(", ")}, chosen by emotion), "visual_type" (${VTYPES.join(" | ")}), and "keywords" (2–4 concrete lowercase nouns of what's shown).
 
 EMPHASIS PUNCH — set "emphasis": true on the FEW most impactful SPEAKER beats (the hook, a bold claim, a punchline) so the camera punches in for energy. Use it sparingly (~1 in 5 speaker beats); on everything else leave it false. Only meaningful on "speaker" beats.
@@ -58,17 +75,17 @@ Return ONLY valid JSON:
   "music_mood": "ambient | inspiring | upbeat | cinematic | chill",
   "publish": { "title": "≤95 chars", "description": "1–2 sentences", "hashtags": ["#tag1", "#tag2"] },
   "beats": [
-    { "beat_index": 0, "visual_mode": "speaker|broll|card|overlay", "emphasis": false, "asset_type": "none|photo|stock_video|ai_image", "layout": "full", "subject_entity": null, "shot_query": null, "image_prompt": null, "camera": null, "visual_type": null, "keywords": [], "content": null }
+    { "beat_index": 0, "visual_mode": "speaker|broll|card|overlay", "emphasis": false, "asset_type": "none|photo|stock_video|ai_image${hasShots ? "|product_shot" : ""}", "layout": "full", "subject_entity": null, "shot_query": null, "image_prompt": null, "camera": null, "visual_type": null, "keywords": [], "content": null }
   ]
 }
 Every input beat must appear exactly once, by beat_index.`,
-    user: `TIMED BEATS (the spoken words, fixed):\n${beatList}\n\nDecide visual_mode (and B-roll source for broll beats) for every beat.`,
+    user: `TIMED BEATS (the spoken words, fixed):\n${beatList}\n\nDecide visual_mode (and B-roll source for broll beats) for every beat.${grounding}`,
   };
 }
 
 // One GPT pass over a chunk of beats.
-async function runChunk(beats, language) {
-  const prompt = buildPrompt(beats, language);
+async function runChunk(beats, language, harvest) {
+  const prompt = buildPrompt(beats, language, harvest);
   const res = await openai.chat.completions.create({
     model: MODEL, max_tokens: 8000, response_format: { type: "json_object" }, // beats JSON per chunk grows with video length — headroom
     messages: [{ role: "system", content: prompt.system }, { role: "user", content: prompt.user }],
@@ -80,16 +97,17 @@ async function runChunk(beats, language) {
  * directTalkingHead(beats, { language }) → { style, palette, niche, beats }
  * beats: input beats augmented with visual_mode + (for broll) AI-Video-compatible visual fields.
  */
-export async function directTalkingHead(beats, { language = "en", styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null } = {}) {
+export async function directTalkingHead(beats, { language = "en", styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null, harvest = null } = {}) {
   // Chunk long transcripts so the model stays accurate and within context.
   const CHUNK = 24;
+  const hasShots = (harvest?.screenshotUrls?.length || 0) > 0;
   const decisionsByIndex = new Map();
   let style_id = null, paletteRaw = null, niche = null, music_mood = null, publishRaw = null;
 
   for (let i = 0; i < beats.length; i += CHUNK) {
     const slice = beats.slice(i, i + CHUNK);
     let plan;
-    try { plan = await runChunk(slice, language); }
+    try { plan = await runChunk(slice, language, harvest); }
     catch (e) { console.warn(`[talking-head/director] chunk ${i} failed: ${e.message}`); continue; }
     style_id   = style_id   || plan.style_id;
     paletteRaw = paletteRaw || plan.palette;
@@ -111,6 +129,8 @@ export async function directTalkingHead(beats, { language = "en", styleId = "aut
   palette.accent = ensureVividAccent(normalizeHex(palette.accent, "#f59e0b"), "#f59e0b");
   palette.accent2 = ensureVividAccent(normalizeHex(palette.accent2, "#38bdf8"), "#38bdf8");
   palette.text   = normalizeHex(palette.text, "#ffffff");
+  // Brand-aware: a scraped brand colour seeds the accent unless the user pinned one.
+  if (!accentColor && harvest?.brandColor) palette.accent = ensureVividAccent(normalizeHex(harvest.brandColor, palette.accent), palette.accent);
   const themePalette = resolveThemePalette(theme, accentColor, accentColor2);
   if (themePalette) { palette.bg = themePalette.background; palette.text = themePalette.primaryText; if (accentColor) palette.accent = accentColor; }
   if (accentColor2) palette.accent2 = accentColor2;
@@ -142,11 +162,15 @@ export async function directTalkingHead(beats, { language = "en", styleId = "aut
         attribution: null,
       };
     } else if (visual_mode === "broll") {
+      // A real product screenshot — strongest source when the line is about the product.
+      const isProductShot = d.asset_type === "product_shot" && hasShots;
       // Ground the source: a broll beat must have something to fetch.
-      const hasSpec = d.subject_entity || d.shot_query || d.image_prompt;
+      const hasSpec = isProductShot || d.subject_entity || d.shot_query || d.image_prompt;
       if (!hasSpec) { visual_mode = "speaker"; asset_type = "none"; }
-      else {
-        if (asset_type === "none") asset_type = d.subject_entity ? "photo" : (d.shot_query ? "stock_video" : "ai_image");
+      else if (isProductShot) {
+        asset_type = "product_shot";
+      } else {
+        if (asset_type === "none" || asset_type === "product_shot") asset_type = d.subject_entity ? "photo" : (d.shot_query ? "stock_video" : "ai_image");
         if (asset_type === "ai_image") {
           if (aiImageCount >= AI_CAP) { // over the AI budget → fall back to stock, else keep speaker
             if (d.shot_query) asset_type = "stock_video";

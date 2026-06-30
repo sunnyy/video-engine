@@ -79,10 +79,19 @@ function toRequest(beat) {
  * the shared waterfall (budgeted), writes beat.asset, and lets continuation beats
  * inherit the asset they extend.
  */
-export async function resolveVisuals(beats, style, runId, orientation = "9:16") {
+export async function resolveVisuals(beats, style, runId, orientation = "9:16", screenshots = []) {
   const totalDur = beats.reduce((a, b) => a + (b.duration_seconds ?? 0), 0);
   const aiBudget = aiBudgetFor(totalDur);
   beats.forEach(b => { b.asset = null; });
+
+  // Product screenshots fill "product_shot" beats directly (cheapest, most real). If none were
+  // captured, degrade to a stock shot of the spoken line so the beat still resolves.
+  let shotIdx = 0;
+  for (const b of beats) {
+    if (b.asset_type !== "product_shot" || b.continues_previous) continue;
+    if (screenshots.length) b.asset = { kind: "image", src: screenshots[shotIdx++ % screenshots.length], real: true };
+    else { b.asset_type = "stock_video"; b.shot_query = b.shot_query || (b.spoken || "").slice(0, 120); }
+  }
 
   const assetBeats = beats.filter(b => !b.continues_previous && NEEDS_ASSET.has(b.asset_type));
   const requests   = assetBeats.map(toRequest);

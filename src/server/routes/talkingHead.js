@@ -22,6 +22,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     reframe = "source",
     music = true,
     styleId = "auto", theme = "auto", accentColor = null, accentColor2 = null,
+    productUrl = "",
   } = req.body;
 
   if (!videoUrl?.trim()) return res.status(400).json({ error: "videoUrl is required (upload the video first)" });
@@ -48,6 +49,7 @@ router.post("/generate", requireAuth, async (req, res) => {
         reframe: reframe === "9:16" ? "9:16" : "source",
         music: music !== false,
         styleId, theme, accentColor, accentColor2,
+        productUrl: typeof productUrl === "string" ? productUrl.trim().slice(0, 300) : "",
       },
       ({ step }) => send({ step }),
       // Charge off the REAL transcribed duration (the client-supplied durationSeconds is NOT trusted
