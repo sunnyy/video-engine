@@ -9,11 +9,15 @@ import { openai } from "../../../server/middleware/shared.js";
  * Throws: Error with `.code = "CONTENT_BLOCKED"` and `.categories` (array).
  */
 
-// Categories we always refuse outright, regardless of the overall `flagged` flag.
+// The ONLY categories we refuse. We block on THESE, not on OpenAI's blanket `flagged` — the overall
+// flag trips on generic "violence" (war, history, conflict, true-crime) and "harassment" (roasts,
+// satire), which are legitimate short-form topics. We allow those and refuse only genuinely harmful
+// content: sexual, minors, self-harm, threats/hate, graphic gore, and illicit/illegal instructions.
 const HARD_BLOCK = [
   "sexual/minors",
   "sexual",
   "child",
+  "hate",
   "hate/threatening",
   "harassment/threatening",
   "self-harm",
@@ -30,7 +34,7 @@ function evaluate(result, label, message) {
     .filter(([, on]) => on)
     .map(([cat]) => cat);
   const hardHit = flaggedCats.some(cat => HARD_BLOCK.includes(cat));
-  if (result.flagged || hardHit) {
+  if (hardHit) {
     console.warn(`[moderation] BLOCKED ${label} — categories: ${flaggedCats.join(", ") || "(flagged)"}`);
     const err = new Error(message);
     err.code = "CONTENT_BLOCKED";

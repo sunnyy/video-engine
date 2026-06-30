@@ -85,6 +85,13 @@ LITERAL INTENT — answer the request as it was actually asked, this comes FIRST
 - HONOR EXPLICIT STRUCTURE. If the request specifies a count or format — "5 facts", "3 reasons", "top 7 …", "myths vs facts" — deliver exactly that: that many real, on-subject points in "facts", in a sensible order, and set "angle" to match (e.g. "countdown"). Do not substitute a different framing.
 - SOURCE MATERIAL is a helper, not a mandate: if a provided extract is about a DIFFERENT sense of the term than the user clearly means (e.g. a movie when they mean the deity), IGNORE that extract and use your own knowledge of the real subject.
 
+EXECUTE vs EXPLAIN — decide what KIND of request this is, because it changes everything:
+- A creative FORMAT or SCENARIO to PERFORM — a simulation ("AI simulates the next 30 days if X happens"), a hypothetical ("what if…"), a prediction/timeline, a story, a "day in the life", a POV, a roleplay, a ranking/tier-list. The video must PERFORM the thing, NOT describe or explain it. Set "format" to a one-line directive telling the creative team what to DELIVER and HOW it should unfold — e.g. "Play out a vivid, speculative day-by-day timeline of the next 30 days of a hypothetical World War 3, escalating realistically from the triggering event to its consequences." For these, your "facts" are real grounding that makes the scenario PLAUSIBLE (real dynamics, actors, mechanisms) — NOT an explainer of the term itself.
+- A straight factual topic / explainer / listicle — set "format" to null and proceed normally.
+- NEVER flatten a "perform it" request into an explainer of its title. If asked to simulate the next 30 days, the brief must enable the team to actually simulate them.
+
+DELIVER THE PROMISE — NEVER ARGUE AGAINST THE TOPIC: the user's title/hook is the video's promise. Build a brief that PAYS IT OFF — deliver the actual thing it teases (the trick, the secret, the payoff) with its intriguing framing intact. NEVER turn it into a myth-buster, a "well, actually…", or a debunk that contradicts its own hook — e.g. a "7-second iPhone trick banned in 12 countries" brief must DELIVER that trick with its hooky framing, NOT explain why it isn't really banned or doesn't work. (Accuracy below means not FABRICATING new hard stats/quotes as ground truth — it does NOT mean policing or contradicting the user's creative hook.)
+
 ACCURACY — the most important rule:
 - When SOURCE MATERIAL is provided, ground your facts in it and NEVER contradict it.
 - Do NOT state a specific number, date, statistic, or quote unless you are confident it is correct, or it appears in the source. When unsure, omit the specific or phrase it qualitatively ("collapsed gradually over centuries", not "fell in 476 AD when 80%…"). A wrong fact on screen is worse than a missing one.
@@ -94,6 +101,7 @@ ACCURACY — the most important rule:
 Return ONLY valid JSON:
 {
   "topic": "one-line restatement of what the video is about",
+  "format": "if the request is a creative scenario/format to PERFORM (simulation, what-if, prediction, story, day-in-the-life, POV, ranking), a one-line directive of what the video must DELIVER and how it unfolds; else null",
   "angle": "the most engaging framing for a short-form video (debate, countdown, reveal, story, comparison, explainer)",
   "tone": "fun | dramatic | informative | inspiring | provocative",
   "entities": [{ "name": "...", "kind": "person|company|product|place|landmark|group|concept", "visual_identity": "what they look like / are visually known for" }],
@@ -132,6 +140,10 @@ export async function researchTopic(prompt) {
   brief.contrasts = Array.isArray(brief.contrasts) ? brief.contrasts.slice(0, 4)  : [];
   brief.artifacts = Array.isArray(brief.artifacts) ? brief.artifacts.slice(0, 8)  : [];
   if (!brief.topic) brief.topic = prompt.slice(0, 120);
+  // The verbatim request + the perform-this directive (if any) flow to the writer so a creative
+  // premise ("simulate the next 30 days if X") is EXECUTED, not flattened into an explainer.
+  brief.request = String(prompt || "").slice(0, 400);
+  brief.format  = (typeof brief.format === "string" && brief.format.trim()) ? brief.format.trim() : null;
 
   console.log(`[ai-video/research] "${brief.topic}" — ${brief.entities.length} entities, ${brief.facts.length} facts, ${brief.artifacts.length} artifacts (grounded: ${grounding ? "wikipedia" : "none"})`);
   return brief;

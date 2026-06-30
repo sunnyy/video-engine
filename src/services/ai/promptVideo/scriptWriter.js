@@ -87,6 +87,25 @@ function buildWriterPrompt({ research, targetDuration, language }) {
 
 You are the WRITER of a short-form video studio. You write the narration and break it into beats — one spoken beat per visual moment. You do NOT decide visuals, images, colors, or style — a separate art-director does that. Your job is the WORDS: the spoken script and the short on-screen text per beat.
 
+━━━ STEP 1 — UNDERSTAND THE REQUEST BEFORE YOU WRITE A WORD ━━━
+Read the request and research, then figure out three things — fill them into the "interpretation" object FIRST, and let your answers drive the whole script:
+
+1. WHAT KIND OF VIDEO IS THIS? The wording of the request tells you. Read it literally and honor its form:
+   - a QUESTION ("what would happen if…", "why does…", "is X real?") → the video ANSWERS it directly, head-on.
+   - a SCENARIO / SIMULATION / PREDICTION ("AI simulates the next 30 days", "what if X happened") → PERFORM it. Play it out moment by moment, vivid and concrete, as if it's unfolding live ("Day one…", "by week two…", "day thirty…") — never narrate ABOUT it from the outside.
+   - a STORY / day-in-the-life / POV → tell it as it happens, in scene.
+   - a REVEAL / trick / secret / "banned" hook → DELIVER the actual thing it teases, with its intriguing framing intact.
+   - a LISTICLE / countdown / ranking ("5 facts", "top 7") → cover exactly those items, in a satisfying order.
+   - a COMPARISON / debate → weigh both sides.
+   - a straight EXPLAINER / how-to → teach it clearly, step by step.
+   Match the form the user asked for. Writing an explainer when they asked for a simulation — or describing a premise instead of performing it — is a total failure.
+
+2. WHAT WAS THE VIEWER PROMISED? The title/topic is a promise. Identify the exact payoff the viewer clicked for, and make the script DELIVER it. NEVER debunk, "well-actually", soften, or argue against your own premise — that betrays the click. (A "7-second iPhone trick banned in 12 countries" delivers the trick with its hooky energy; it does not explain why it isn't really banned.)
+
+3. WHAT IS THE SINGLE BEST HOOK? Design beat 0 as a SCROLL-STOPPER that is specific to THIS topic — drop the viewer straight into the tension, stakes, or payoff in their own emotional language. NO generic frames ("In this video…", "Have you ever wondered…", "You think you know X?"), NO restating the title. For a war simulation, open inside the first hour of the war. For a trick, tease the impossible result. The hook must make scrolling away feel like a mistake.
+
+(The research may include a "format" directive — treat it as a strong hint for points 1–2, but YOU decide the type from the actual request wording.)
+
 THE BEAT SYSTEM:
 - A "beat" is one spoken moment that will get its own visual. Divide the narration into beats by MEANING — a new beat wherever the idea, subject, or moment should change. Let the CONTENT decide how many beats and how long each runs; no fixed count, no per-beat word limit.
 - FAST PACING — short-form cuts every ~2–4 seconds, so aim for roughly ${Math.max(3, Math.round(targetDuration / 3))} beats for this ${targetDuration}s video. Each beat is a DISTINCT moment.
@@ -117,7 +136,7 @@ PER-BEAT ON-SCREEN CONTENT — the short text shown on screen (the art-director 
 - visual_concept: ONE plain sentence naming the SUBJECT of the moment (e.g. "the Colosseum, monumental and decaying") — context for the art-director. Concrete subject; no colours/layout.
 
 NARRATIVE ARC:
-- Beat 0 is the HOOK and must FRAME THE PREMISE: name the subject and the promise so the viewer knows what they're getting (e.g. "You think you know Shiva? Here are 5 things even devotees miss"). Never cold-open into facts with no framing.
+- Beat 0 IS the hook you designed in interpretation.hook_idea — open with it verbatim in spirit, dropping straight into the topic. Then immediately start delivering the payoff (the answer, the scenario, the first item) — don't stall on a generic setup.
 - Build: alternate substance with personality. Final beat: the CTA from the research's cta_idea.
 
 SCRIPT RULES:
@@ -133,6 +152,11 @@ PUBLISH METADATA — this gets posted to social, so also write post copy:
 
 Return ONLY valid JSON:
 {
+  "interpretation": {
+    "request_type": "question | scenario | story | reveal | listicle | comparison | explainer — what KIND of video the request is asking for",
+    "viewer_promise": "the exact payoff the viewer clicked for — what this script MUST deliver",
+    "hook_idea": "the single most scroll-stopping opening line for THIS topic — topic-specific, drops into the tension/payoff, NOT a generic frame or the restated title"
+  },
   "project_name": "short title",
   "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient — MUST match the SUBJECT'S FEELING, not just the tone label: dramatic/serious/somber → cinematic; fun/playful/satirical → upbeat or energetic; calm/reflective/explainer → chill or ambient; motivational → inspiring. A HEAVY, TIRING, STRESSFUL or SAD subject (e.g. burnout, decline, loss) → chill/ambient or cinematic, NEVER upbeat. Do NOT default to upbeat.",
   "niche": "one-word content domain for asset reuse (e.g. tech, finance, history, science, nature, lifestyle, sports, food, travel)",
@@ -270,7 +294,8 @@ export async function writeScript({ research, targetDuration = 45, language = "e
       : [],
   };
 
-  console.log(`[ai-video/writer] ${beats.length} beats, ${narrationWordCount(plan)}w narration`);
+  const interp = plan.interpretation || {};
+  console.log(`[ai-video/writer] ${beats.length} beats, ${narrationWordCount(plan)}w narration — type: ${interp.request_type || "?"} | hook: ${String(interp.hook_idea || "").slice(0, 80)}`);
   return {
     project_name: plan.project_name || research.topic?.slice(0, 60) || "Prompt Video",
     niche,
