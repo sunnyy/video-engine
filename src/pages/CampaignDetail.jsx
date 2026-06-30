@@ -119,7 +119,10 @@ export default function CampaignDetail() {
   const fieldStyle = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13, padding: "8px 10px", outline: "none", fontFamily: "inherit" };
   const lbl = { fontSize: 11, fontWeight: 700, color: T.muted, marginBottom: 4, display: "block" };
   const opt = { background: T.surface, color: T.text };
-  const btn = (bg) => ({ background: bg, border: "none", color: "#fff", fontWeight: 700, fontSize: 12.5, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" });
+  const btn = (bg, dis = false) => ({ background: bg, border: "none", color: "#fff", fontWeight: 700, fontSize: 12.5, padding: "8px 14px", borderRadius: 8, cursor: dis ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: dis ? 0.55 : 1, transition: "opacity 0.15s, filter 0.15s", display: "inline-flex", alignItems: "center", gap: 6 });
+  // Live label while an action is in flight, so each button shows it was clicked.
+  const ACTING = { "run-once": "Starting…", start: "Starting…", resume: "Resuming…", pause: "Pausing…", stop: "Stopping…", delete: "Deleting…" };
+  const spin = <span style={{ width: 11, height: 11, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "vqspin 0.6s linear infinite" }} />;
   const connectedAccounts = accounts.filter(a => a.status === "connected");
   const panel = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18 };
   const panelHead = { fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 10 };
@@ -164,12 +167,15 @@ export default function CampaignDetail() {
               <span style={{ fontSize: 11, fontWeight: 700, color: st.color, background: `${st.color}1c`, padding: "3px 10px", borderRadius: 20 }}>{st.label}</span>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <button onClick={() => act("run-once")} disabled={busy || generating} style={btn(generating ? "#3a3a52" : T.accent)}>{generating ? "Generating…" : "Run once"}</button>
-              {(c.status === "draft" || c.status === "stopped") && <button onClick={() => act("start")} disabled={busy} style={btn("#22c55e")}>Start</button>}
-              {c.status === "active" && <button onClick={() => act("pause")} disabled={busy} style={btn("#3a3a52")}>Pause</button>}
-              {c.status === "paused" && <button onClick={() => act("resume")} disabled={busy} style={btn("#22c55e")}>Resume</button>}
-              {(c.status === "active" || c.status === "paused") && <button onClick={() => act("stop")} disabled={busy} style={btn("#3a3a52")}>Stop</button>}
-              <button onClick={remove} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: "#f87171" }}>Delete</button>
+              <style>{`@keyframes vqspin { to { transform: rotate(360deg); } }`}</style>
+              <button onClick={() => act("run-once")} disabled={!!busy || generating} style={btn(generating ? "#3a3a52" : T.accent, !!busy || generating)}>
+                {busy === "run-once" ? <>{spin} Starting…</> : generating ? "Generating…" : "Run once"}
+              </button>
+              {(c.status === "draft" || c.status === "stopped") && <button onClick={() => act("start")} disabled={!!busy} style={btn("#22c55e", !!busy)}>{busy === "start" ? <>{spin} Starting…</> : "Start"}</button>}
+              {c.status === "active" && <button onClick={() => act("pause")} disabled={!!busy} style={btn("#3a3a52", !!busy)}>{busy === "pause" ? <>{spin} Pausing…</> : "Pause"}</button>}
+              {c.status === "paused" && <button onClick={() => act("resume")} disabled={!!busy} style={btn("#22c55e", !!busy)}>{busy === "resume" ? <>{spin} Resuming…</> : "Resume"}</button>}
+              {(c.status === "active" || c.status === "paused") && <button onClick={() => act("stop")} disabled={!!busy} style={btn("#3a3a52", !!busy)}>{busy === "stop" ? <>{spin} Stopping…</> : "Stop"}</button>}
+              <button onClick={remove} disabled={!!busy} style={{ ...btn("transparent", !!busy), border: `1px solid ${busy === "delete" ? "#f8717188" : T.border}`, color: "#f87171" }}>{busy === "delete" ? <>{spin} Deleting…</> : "Delete"}</button>
             </div>
           </div>
 

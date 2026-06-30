@@ -326,6 +326,11 @@ function SetupModal({ setup, setSetup, busy, onSave, onRemove, onCopy, T, btn })
                     </li>
                   ))}
                 </ol>
+
+                {/* Daily upload limit heads-up — the #1 reason automation appears to "stop" */}
+                <div style={{ marginTop: 16, background: "rgba(245,197,24,0.07)", border: "1px solid rgba(245,197,24,0.28)", borderRadius: 10, padding: "11px 13px", fontSize: 12.5, color: "rgba(255,255,255,0.8)", lineHeight: 1.6 }}>
+                  <strong style={{ color: "#f5c518" }}>One more thing — your daily upload limit.</strong> YouTube limits new or unverified channels to just a few uploads per day. <strong style={{ color: T.text }}>Verify your channel</strong> (free, takes a minute) at <a href="https://www.youtube.com/verify" target="_blank" rel="noreferrer" style={{ color: "#f5c518" }}>youtube.com/verify</a> to raise it to ~100 uploads/day. If a campaign hits the limit, publishing pauses and auto-resumes after YouTube's daily reset — you'll get a notification.
+                </div>
               </div>
 
               {/* Right — enter credentials + what to expect (separated by a divider) */}

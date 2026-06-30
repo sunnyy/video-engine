@@ -285,7 +285,7 @@ registerHandler("publish_post", async (payload, job) => {
         link: projectId ? `/video-editor/${projectId}` : "/automation",
         title: upload ? "Publishing paused — YouTube upload limit" : "Publishing paused — YouTube API quota",
         body: upload
-          ? "YouTube limits how many videos an account can upload per day — and that cap is low for new or unverified channels. We'll retry automatically after it resets. To raise it: verify your channel at youtube.com/verify and finish Google app verification (set the OAuth app to Production)."
+          ? "YouTube limits new or unverified channels to just a few uploads per day. We'll retry automatically after the daily reset. To raise your limit to ~100/day, verify your channel at youtube.com/verify — it's free and takes a minute."
           : "Your Google project's daily API quota is used up. We'll retry automatically after it resets. To upload more per day, request a YouTube API quota increase in Google Cloud." });
       return { deferred: true, platform, postId, retryAt: new Date(retryAt).toISOString() };
     }

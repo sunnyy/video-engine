@@ -44,12 +44,14 @@ export default function Automation() {
   };
 
   const lifecycle = async (id, action) => {
-    setBusy(id);
+    setBusy(`${id}:${action}`);
     try { await serverFetch(`/api/automation/campaigns/${id}/${action}`, { method: "POST" }); await loadCampaigns(); }
     catch (_) {} finally { setBusy(""); }
   };
+  const ACTING = { start: "Starting…", resume: "Resuming…", pause: "Pausing…", stop: "Stopping…" };
+  const spin = <span style={{ width: 10, height: 10, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "vqspin 0.6s linear infinite" }} />;
 
-  const btn = (bg) => ({ background: bg, border: "none", color: "#fff", fontWeight: 700, fontSize: 12.5, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" });
+  const btn = (bg, dis = false) => ({ background: bg, border: "none", color: "#fff", fontWeight: 700, fontSize: 12.5, padding: "8px 14px", borderRadius: 8, cursor: dis ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: dis ? 0.55 : 1, transition: "opacity 0.15s", display: "inline-flex", alignItems: "center", gap: 6 });
   const th = { padding: "10px 14px", textAlign: "left", fontWeight: 700 };
   const thC = { ...th, textAlign: "center" };
   const td = { padding: "12px 14px", color: T.text };
@@ -63,6 +65,7 @@ export default function Automation() {
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
         <div style={{ padding: "36px 32px 80px" }}>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: "0 0 18px" }}>Automation</h1>
+          <style>{`@keyframes vqspin { to { transform: rotate(360deg); } }`}</style>
 
           {/* Tabs */}
           <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${T.border}`, marginBottom: 24 }}>
@@ -116,11 +119,13 @@ export default function Automation() {
                               <td style={tdC}>{c.queued || 0}</td>
                               <td style={{ ...td, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
                                 <div style={{ display: "inline-flex", gap: 8 }}>
+                                  {(() => { const rowBusy = busy.startsWith(`${c.id}:`); const lbl = (a, def) => busy === `${c.id}:${a}` ? <>{spin} {ACTING[a]}</> : def; return (<>
                                   <button onClick={() => nav(`/automation/campaigns/${c.id}`)} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted }}>Edit</button>
-                                  {(c.status === "draft" || c.status === "stopped") && <button onClick={() => lifecycle(c.id, "start")} disabled={busy === c.id} style={btn("#22c55e")}>Start</button>}
-                                  {c.status === "active" && <button onClick={() => lifecycle(c.id, "pause")} disabled={busy === c.id} style={btn("#3a3a52")}>Pause</button>}
-                                  {c.status === "paused" && <button onClick={() => lifecycle(c.id, "resume")} disabled={busy === c.id} style={btn("#22c55e")}>Resume</button>}
-                                  {(c.status === "active" || c.status === "paused") && <button onClick={() => lifecycle(c.id, "stop")} disabled={busy === c.id} style={btn("#3a3a52")}>Stop</button>}
+                                  {(c.status === "draft" || c.status === "stopped") && <button onClick={() => lifecycle(c.id, "start")} disabled={rowBusy} style={btn("#22c55e", rowBusy)}>{lbl("start", "Start")}</button>}
+                                  {c.status === "active" && <button onClick={() => lifecycle(c.id, "pause")} disabled={rowBusy} style={btn("#3a3a52", rowBusy)}>{lbl("pause", "Pause")}</button>}
+                                  {c.status === "paused" && <button onClick={() => lifecycle(c.id, "resume")} disabled={rowBusy} style={btn("#22c55e", rowBusy)}>{lbl("resume", "Resume")}</button>}
+                                  {(c.status === "active" || c.status === "paused") && <button onClick={() => lifecycle(c.id, "stop")} disabled={rowBusy} style={btn("#3a3a52", rowBusy)}>{lbl("stop", "Stop")}</button>}
+                                  </>); })()}
                                 </div>
                               </td>
                             </tr>
