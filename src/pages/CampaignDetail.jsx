@@ -29,6 +29,7 @@ export default function CampaignDetail() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState("");
+  const [tab, setTab] = useState("settings");
 
   const refresh = async () => {
     const d = await serverFetch(`/api/automation/campaigns/${id}`).then(r => r.json());
@@ -119,6 +120,27 @@ export default function CampaignDetail() {
   const opt = { background: T.surface, color: T.text };
   const btn = (bg) => ({ background: bg, border: "none", color: "#fff", fontWeight: 700, fontSize: 12.5, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" });
   const connectedAccounts = accounts.filter(a => a.status === "connected");
+  const panel = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18 };
+  const panelHead = { fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 10 };
+
+  // Group posts by state for the Videos tab.
+  const publishedPosts = data.posts.filter(p => p.status === "published");
+  const awaitingPosts  = data.posts.filter(p => p.status === "awaiting_approval");
+  const failedPosts    = data.posts.filter(p => p.status === "failed" || p.status === "deferred");
+  const otherPosts     = data.posts.filter(p => !["published", "awaiting_approval", "failed", "deferred"].includes(p.status));
+
+  // One published-or-pending post row (shared by the grouped lists).
+  const postRow = (p) => (
+    <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+      <span style={{ fontSize: 12.5, color: T.text }}>
+        <span style={{ color: POST_COLOR[p.status] || T.faint }}>●</span> {p.platform}
+        <span style={{ color: T.faint, marginLeft: 6 }}>{p.status.replace("_", " ")}</span>
+      </span>
+      {p.platform_post_id && p.platform === "youtube"
+        ? <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>
+        : (p.status === "failed" || p.status === "deferred") && <button onClick={() => retryPost(p.id)} disabled={publishing} title={publishing ? "A publish is in progress — wait for it to finish" : "Re-publish this video"} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5, opacity: publishing ? 0.45 : 1, cursor: publishing ? "not-allowed" : "pointer" }}>{busy === `retry-${p.id}` ? "Retrying…" : "Retry"}</button>}
+    </div>
+  );
 
   return (
     <AppLayout>
@@ -143,134 +165,155 @@ export default function CampaignDetail() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.1fr) minmax(0,1fr)", gap: 24, alignItems: "start" }}>
-
-            {/* ── Settings ── */}
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: T.text }}>Settings</div>
-
-              <div><span style={lbl}>Campaign name</span><input style={fieldStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-              <div><span style={lbl}>Niche(s) — comma separated</span><input style={fieldStyle} value={form.niches} onChange={e => setForm(f => ({ ...f, niches: e.target.value }))} placeholder="ai tools, productivity" /></div>
-
-              <div>
-                <span style={lbl}>Publish to</span>
-                {connectedAccounts.length === 0
-                  ? <div style={{ fontSize: 12, color: T.faint }}>No connected accounts — add one under Automation → Social Accounts.</div>
-                  : <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {connectedAccounts.map(a => {
-                        const on = form.target_accounts.includes(a.id);
-                        return (
-                          <button key={a.id} onClick={() => setForm(f => ({ ...f, target_accounts: on ? f.target_accounts.filter(x => x !== a.id) : [...f.target_accounts, a.id] }))}
-                            style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${on ? T.accent + "88" : T.border}`, background: on ? `${T.accent}22` : "rgba(255,255,255,0.03)", color: on ? "#fff" : T.muted }}>
-                            {a.platform} · {a.display_name || "account"}
-                          </button>
-                        );
-                      })}
-                    </div>}
+          {/* Overview strip — campaign pulse, always visible */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 18 }}>
+            {[
+              { label: "Status",        value: st.label, color: st.color },
+              { label: "Posts / day",   value: c.posts_per_day || 1 },
+              { label: "Topics queued", value: data.queued ?? 0 },
+              { label: "Published",     value: publishedPosts.length },
+              { label: "Auto-publish",  value: c.auto_publish !== false ? "On" : "Off" },
+            ].map(s => (
+              <div key={s.label} style={{ flex: "1 1 130px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: T.faint, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: s.color || T.text, marginTop: 4, fontFamily: "'Outfit',sans-serif" }}>{s.value}</div>
               </div>
+            ))}
+          </div>
 
-              <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1 }}><span style={lbl}>Posts / day</span>
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${T.border}`, marginBottom: 20 }}>
+            {[["settings", "Settings"], ["videos", "Videos"], ["activity", "Activity"]].map(([key, label]) => {
+              const on = tab === key;
+              return (
+                <button key={key} onClick={() => setTab(key)} style={{ background: "none", border: "none", borderBottom: `2px solid ${on ? T.accent : "transparent"}`, color: on ? T.text : T.muted, fontSize: 13.5, fontWeight: 700, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", marginBottom: -1 }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Videos tab ── */}
+          {tab === "videos" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {data.active.length > 0 && (
+                <div style={panel}>
+                  <div style={panelHead}>In progress</div>
+                  {data.active.map(j => (
+                    <div key={j.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                      <span style={{ fontSize: 12.5, color: T.text }}>
+                        <span style={{ color: j.status === "running" ? "#38bdf8" : T.faint }}>●</span> {STAGE_LABEL[j.type] || j.type}
+                        {j.type === "render_timeline" && j.progress ? ` ${j.progress}%` : ""}
+                        <span style={{ color: T.faint, marginLeft: 6 }}>{j.status}</span>
+                      </span>
+                      {(j.status === "queued" || j.status === "running") && <button onClick={() => act("cancel-job", { body: { jobId: j.id } })} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5 }}>{j.status === "running" ? "Abort" : "Cancel"}</button>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {[["Awaiting approval", awaitingPosts], ["Published", publishedPosts], ["Failed", failedPosts], ["Queued", otherPosts]]
+                .filter(([, arr]) => arr.length)
+                .map(([title, arr]) => (
+                  <div key={title} style={panel}>
+                    <div style={panelHead}>{title} <span style={{ color: T.faint, fontWeight: 600 }}>· {arr.length}</span></div>
+                    {arr.map(postRow)}
+                  </div>
+                ))}
+
+              {data.posts.length === 0 && data.active.length === 0 && (
+                <div style={panel}><div style={{ fontSize: 12.5, color: T.faint }}>Nothing yet. Start the campaign or hit Run once.</div></div>
+              )}
+            </div>
+          )}
+
+          {/* ── Settings tab ── */}
+          {tab === "settings" && (
+            <div style={panel}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 14 }}>
+                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Campaign name</span><input style={fieldStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Niche(s) — comma separated</span><input style={fieldStyle} value={form.niches} onChange={e => setForm(f => ({ ...f, niches: e.target.value }))} placeholder="ai tools, productivity" /></div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <span style={lbl}>Publish to</span>
+                  {connectedAccounts.length === 0
+                    ? <div style={{ fontSize: 12, color: T.faint }}>No connected accounts — add one under Automation → Social Accounts.</div>
+                    : <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {connectedAccounts.map(a => {
+                          const on = form.target_accounts.includes(a.id);
+                          return (
+                            <button key={a.id} onClick={() => setForm(f => ({ ...f, target_accounts: on ? f.target_accounts.filter(x => x !== a.id) : [...f.target_accounts, a.id] }))}
+                              style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${on ? T.accent + "88" : T.border}`, background: on ? `${T.accent}22` : "rgba(255,255,255,0.03)", color: on ? "#fff" : T.muted }}>
+                              {a.platform} · {a.display_name || "account"}
+                            </button>
+                          );
+                        })}
+                      </div>}
+                </div>
+
+                <div><span style={lbl}>Posts / day</span>
                   <select style={fieldStyle} value={form.posts_per_day} onChange={e => setForm(f => ({ ...f, posts_per_day: e.target.value }))}>
                     {[1, 2, 3, 4, 5].map(n => <option key={n} value={n} style={opt}>{n}</option>)}
                   </select>
                 </div>
-                <div style={{ flex: 1 }}><span style={lbl}>Privacy</span>
+                <div><span style={lbl}>Privacy</span>
                   <select style={fieldStyle} value={form.privacy} onChange={e => setForm(f => ({ ...f, privacy: e.target.value }))}>
                     <option value="public" style={opt}>Public</option><option value="unlisted" style={opt}>Unlisted</option><option value="private" style={opt}>Private</option>
                   </select>
                 </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1 }}><span style={lbl}>Duration</span>
+                <div><span style={lbl}>Duration</span>
                   <select style={fieldStyle} value={form.target_duration} onChange={e => setForm(f => ({ ...f, target_duration: e.target.value }))}>
                     {DURATIONS.map(d => <option key={d.id} value={d.id} style={opt}>{d.label}</option>)}
                   </select>
                 </div>
-                <div style={{ flex: 1 }}><span style={lbl}>Orientation</span>
+                <div><span style={lbl}>Orientation</span>
                   <select style={fieldStyle} value={form.orientation} onChange={e => setForm(f => ({ ...f, orientation: e.target.value }))}>
                     <option value="9:16" style={opt}>9:16</option><option value="1:1" style={opt}>1:1</option><option value="16:9" style={opt}>16:9</option>
                   </select>
                 </div>
+
+                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Visual style</span>
+                  <select style={fieldStyle} value={form.style_id} onChange={e => setForm(f => ({ ...f, style_id: e.target.value }))}>
+                    {VISUAL_STYLE_OPTIONS.map(s => <option key={s.id} value={s.id} style={opt}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Posting times — "HH:MM", comma-separated (blank = AI decides)</span><input style={fieldStyle} value={form.posting_times} onChange={e => setForm(f => ({ ...f, posting_times: e.target.value }))} placeholder="09:00, 18:00" /></div>
+
+                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Audience (optional)</span><input style={fieldStyle} value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} /></div>
+                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Tone (optional)</span><input style={fieldStyle} value={form.tone} onChange={e => setForm(f => ({ ...f, tone: e.target.value }))} /></div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <span style={lbl}>Voice &amp; language</span>
+                  <LanguageVoicePicker language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accentColor={T.accent} border={T.border} />
+                </div>
+
+                <label style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
+                  <input type="checkbox" checked={form.auto_publish} onChange={e => setForm(f => ({ ...f, auto_publish: e.target.checked }))} />
+                  Auto-publish (off = render then wait for your approval)
+                </label>
               </div>
 
-              <div><span style={lbl}>Visual style</span>
-                <select style={fieldStyle} value={form.style_id} onChange={e => setForm(f => ({ ...f, style_id: e.target.value }))}>
-                  {VISUAL_STYLE_OPTIONS.map(s => <option key={s.id} value={s.id} style={opt}>{s.label}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <span style={lbl}>Voice &amp; language</span>
-                <LanguageVoicePicker language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accentColor={T.accent} border={T.border} />
-              </div>
-
-              <div><span style={lbl}>Posting times — comma "HH:MM" (blank = AI decides)</span><input style={fieldStyle} value={form.posting_times} onChange={e => setForm(f => ({ ...f, posting_times: e.target.value }))} placeholder="09:00, 18:00" /></div>
-
-              <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1 }}><span style={lbl}>Audience (optional)</span><input style={fieldStyle} value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} /></div>
-                <div style={{ flex: 1 }}><span style={lbl}>Tone (optional)</span><input style={fieldStyle} value={form.tone} onChange={e => setForm(f => ({ ...f, tone: e.target.value }))} /></div>
-              </div>
-
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
-                <input type="checkbox" checked={form.auto_publish} onChange={e => setForm(f => ({ ...f, auto_publish: e.target.checked }))} />
-                Auto-publish (off = render then wait for your approval)
-              </label>
-
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 2 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
                 <button onClick={save} disabled={saving} style={btn(T.accent)}>{saving ? "Saving…" : "Save settings"}</button>
                 <button onClick={() => act("topics/skip-next")} disabled={busy} style={btn("#3a3a52")}>Skip next topic</button>
-              </div>
-              {msg && <div style={{ fontSize: 12.5, fontWeight: 600, color: msg.ok ? "#22c55e" : "#f87171" }}>{msg.text}</div>}
-            </div>
-
-            {/* ── Videos + activity ── */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 10 }}>Videos <span style={{ color: T.faint, fontWeight: 600 }}>· {data.queued} topics queued</span></div>
-
-                {/* In flight */}
-                {data.active.length > 0 && data.active.map(j => (
-                  <div key={j.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-                    <span style={{ fontSize: 12.5, color: T.text }}>
-                      <span style={{ color: j.status === "running" ? "#38bdf8" : T.faint }}>●</span> {STAGE_LABEL[j.type] || j.type}
-                      {j.type === "render_timeline" && j.progress ? ` ${j.progress}%` : ""}
-                      <span style={{ color: T.faint, marginLeft: 6 }}>{j.status}</span>
-                    </span>
-                    {(j.status === "queued" || j.status === "running") && <button onClick={() => act("cancel-job", { body: { jobId: j.id } })} disabled={busy} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5 }}>{j.status === "running" ? "Abort" : "Cancel"}</button>}
-                  </div>
-                ))}
-
-                {/* Published */}
-                {data.posts.length === 0 && data.active.length === 0 && <div style={{ fontSize: 12.5, color: T.faint }}>Nothing yet. Start the campaign or hit Run once.</div>}
-                {data.posts.map(p => (
-                  <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-                    <span style={{ fontSize: 12.5, color: T.text }}>
-                      <span style={{ color: POST_COLOR[p.status] || T.faint }}>●</span> {p.platform}
-                      <span style={{ color: T.faint, marginLeft: 6 }}>{p.status.replace("_", " ")}</span>
-                    </span>
-                    {p.platform_post_id && p.platform === "youtube"
-                      ? <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>
-                      : (p.status === "failed" || p.status === "deferred") && <button onClick={() => retryPost(p.id)} disabled={publishing} title={publishing ? "A publish is in progress — wait for it to finish" : "Re-publish this video"} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5, opacity: publishing ? 0.45 : 1, cursor: publishing ? "not-allowed" : "pointer" }}>{busy === `retry-${p.id}` ? "Retrying…" : "Retry"}</button>}
-                  </div>
-                ))}
-              </div>
-
-              {/* Activity */}
-              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 10 }}>Activity</div>
-                {data.events.length === 0 ? <div style={{ fontSize: 12.5, color: T.faint }}>No activity yet.</div>
-                  : data.events.slice(0, 20).map(e => (
-                    <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "5px 0", fontSize: 12 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: POST_COLOR[e.status] || (e.status === "ok" ? "#22c55e" : e.status === "fail" ? "#f87171" : "#8896a8"), flexShrink: 0 }} />
-                      <span style={{ color: T.text, fontWeight: 600, width: 88, flexShrink: 0 }}>{e.action}</span>
-                      <span style={{ color: T.faint, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.message || e.entity || ""}</span>
-                    </div>
-                  ))}
+                {msg && <span style={{ fontSize: 12.5, fontWeight: 600, color: msg.ok ? "#22c55e" : "#f87171" }}>{msg.text}</span>}
               </div>
             </div>
-          </div>
+          )}
+
+          {/* ── Activity tab ── */}
+          {tab === "activity" && (
+            <div style={panel}>
+              {data.events.length === 0 ? <div style={{ fontSize: 12.5, color: T.faint }}>No activity yet.</div>
+                : data.events.slice(0, 40).map(e => (
+                  <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", fontSize: 12, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: POST_COLOR[e.status] || (e.status === "ok" ? "#22c55e" : e.status === "fail" ? "#f87171" : "#8896a8"), flexShrink: 0 }} />
+                    <span style={{ color: T.text, fontWeight: 600, width: 110, flexShrink: 0 }}>{e.action}</span>
+                    <span style={{ color: T.faint, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.message || e.entity || ""}</span>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

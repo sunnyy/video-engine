@@ -8,7 +8,7 @@ import { requireAuth, requireAdmin, supabaseAdmin } from "../middleware/shared.j
 import {
   listCampaigns, listAllCampaigns, getCampaign, getCampaignForUser, createCampaign, updateCampaign, setCampaignStatus, deleteCampaign,
 } from "../services/automation/campaigns.js";
-import { ensureTopics, getQueuedCount, skipOldestQueued } from "../services/automation/topics.js";
+import { ensureTopics, getQueuedCount, skipOldestQueued, clearQueuedTopics } from "../services/automation/topics.js";
 import { listCampaignEvents, logEvent } from "../services/automation/events.js";
 import { enqueue, cancelCampaignJobs, cancelJob, isJobLive } from "../jobs/queue.js";
 
@@ -86,11 +86,30 @@ router.get("/campaigns/:id", requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Settings that drive topic generation — when any change, the pre-generated topic queue is stale.
+const TOPIC_DRIVING_FIELDS = ["niches", "audience", "tone", "keywords_emphasize", "keywords_avoid"];
+
 router.put("/campaigns/:id", requireAuth, async (req, res) => {
   try {
     const existing = await getCampaignForUser(req.user.id, req.params.id);
     if (!existing) return res.status(404).json({ error: "Campaign not found" });
-    res.json({ campaign: await updateCampaign(req.user.id, req.params.id, req.body || {}) });
+    const updated = await updateCampaign(req.user.id, req.params.id, req.body || {});
+
+    // If the topic-driving inputs changed, the already-queued topics were generated from the OLD
+    // settings — future videos would keep using them. Drop the unused queue and re-prime from the
+    // new settings so the next videos follow the updated topic. Reserved/consumed are untouched.
+    const topicsChanged = TOPIC_DRIVING_FIELDS.some(
+      (f) => JSON.stringify(existing[f] ?? null) !== JSON.stringify(updated[f] ?? null)
+    );
+    if (topicsChanged) {
+      try {
+        const removed = await clearQueuedTopics(updated.id);
+        const { added } = await ensureTopics(updated);
+        logEvent({ userId: req.user.id, campaignId: updated.id, action: "topics_regenerated", entity: "campaign", message: `settings changed — cleared ${removed} queued, generated ${added}` });
+      } catch (e) { console.warn("[automation] topic regen after edit failed:", e.message); }
+    }
+
+    res.json({ campaign: updated });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 

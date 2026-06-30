@@ -139,6 +139,16 @@ export async function skipTopic(topicId) {
   await supabaseAdmin.from("automation_topics").update({ status: "skipped" }).eq("id", topicId);
 }
 
+/** Delete all UNUSED (queued) topics for a campaign — used when settings that drive topic
+ *  generation change, so the stale queue can be regenerated from the new niche. Reserved
+ *  (mid-generation), consumed, and skipped topics are left intact. Returns the count removed. */
+export async function clearQueuedTopics(campaignId) {
+  const { error, count } = await supabaseAdmin.from("automation_topics")
+    .delete({ count: "exact" }).eq("campaign_id", campaignId).eq("status", "queued");
+  if (error) throw new Error(error.message);
+  return count || 0;
+}
+
 /** Skip the oldest queued topic for a campaign. Returns true if one was skipped. */
 export async function skipOldestQueued(campaignId) {
   const { data } = await supabaseAdmin.from("automation_topics")
