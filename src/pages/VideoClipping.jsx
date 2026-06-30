@@ -7,7 +7,10 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
+import UpgradeGate from "../ui/UpgradeGate";
 import { useCreditsStore } from "../store/useCreditsStore";
+import { usePlanStore } from "../store/usePlanStore";
+import { useEffect } from "react";
 import { uploadClipSource, generateClips } from "../services/ai/videoClipping/generateClips";
 import { captionStyleLabels } from "../core/registries/captionTimelineRegistry.jsx";
 import { creditsForClipping } from "../core/utils/creditCosts";
@@ -41,6 +44,8 @@ export default function VideoClipping() {
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState(null);
   const [clips, setClips] = useState(null);
+  const { isProPlus, loaded: planLoaded, fetchPlan } = usePlanStore();
+  useEffect(() => { fetchPlan(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const styleEntries = Object.entries(captionStyleLabels || { wordBlaze: "Word Blaze" });
   const estCost = duration ? creditsForClipping(duration) : null;
@@ -77,6 +82,8 @@ export default function VideoClipping() {
       setBusy(false);
     }
   }
+
+  if (planLoaded && !isProPlus) return <UpgradeGate feature="Video Clipping" blurb="Video Clipping — turn a long video or podcast into captioned vertical clips — is available on the Pro and Agency plans." />;
 
   return (
     <AppLayout>

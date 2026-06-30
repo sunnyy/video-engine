@@ -1172,8 +1172,9 @@ export default function LandingPage() {
               <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
               <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
                 <Check>⚡ 600 credits / month</Check>
-                <VideoServicesList />
+                <VideoServicesList exclude={["video_clipping"]} />
                 <Check>Credit top-ups anytime</Check>
+                <Cross>Video clipping (long video → shorts)</Cross>
                 <Cross>Automation &amp; auto-publish to social</Cross>
               </div>
             </div>
@@ -1210,6 +1211,7 @@ export default function LandingPage() {
                 <Check>⚡ 1,500 credits / month</Check>
                 <VideoServicesList />
                 <PlusLabel>Everything in Starter, plus:</PlusLabel>
+                <Check>Video clipping (long video → shorts)</Check>
                 <Check>Automation &amp; auto-publish to social</Check>
                 <Check>Credit top-ups anytime</Check>
               </div>

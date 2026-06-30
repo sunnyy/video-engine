@@ -30,6 +30,7 @@ export default function CampaignDetail() {
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState("");
   const [tab, setTab] = useState("settings");
+  const [vidPage, setVidPage] = useState(0);
 
   const refresh = async () => {
     const d = await serverFetch(`/api/automation/campaigns/${id}`).then(r => r.json());
@@ -66,7 +67,7 @@ export default function CampaignDetail() {
       if (perDay < 1 || perDay > MAX_POSTS_PER_DAY) throw new Error(`Posts / day must be between 1 and ${MAX_POSTS_PER_DAY}.`);
       const res = await serverFetch(`/api/automation/campaigns/${id}`, { method: "PUT", body: JSON.stringify({
         name: form.name, niches: form.niches.split(",").map(s => s.trim()).filter(Boolean),
-        audience: form.audience || null, tone: form.tone || null, language: form.language, voice_id: form.voice_id,
+        language: form.language, voice_id: form.voice_id,
         style_id: form.style_id, target_duration: parseInt(form.target_duration, 10) || 40, orientation: form.orientation,
         posts_per_day: Math.max(1, Math.min(MAX_POSTS_PER_DAY, perDay)),
         posting_times: form.posting_times.split(",").map(s => s.trim()).filter(Boolean),
@@ -123,22 +124,29 @@ export default function CampaignDetail() {
   const panel = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18 };
   const panelHead = { fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 10 };
 
-  // Group posts by state for the Videos tab.
-  const publishedPosts = data.posts.filter(p => p.status === "published");
-  const awaitingPosts  = data.posts.filter(p => p.status === "awaiting_approval");
-  const failedPosts    = data.posts.filter(p => p.status === "failed" || p.status === "deferred");
-  const otherPosts     = data.posts.filter(p => !["published", "awaiting_approval", "failed", "deferred"].includes(p.status));
+  const publishedCount = data.posts.filter(p => p.status === "published").length;
 
-  // One published-or-pending post row (shared by the grouped lists).
+  // Paginated Videos list (topic + status). Server returns newest-first, up to 200.
+  const PER_PAGE = 10;
+  const totalPages = Math.max(1, Math.ceil(data.posts.length / PER_PAGE));
+  const page = Math.min(vidPage, totalPages - 1);
+  const pagePosts = data.posts.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+
+  // One video row — leads with the topic (project name), with platform · status beneath.
   const postRow = (p) => (
-    <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-      <span style={{ fontSize: 12.5, color: T.text }}>
-        <span style={{ color: POST_COLOR[p.status] || T.faint }}>●</span> {p.platform}
-        <span style={{ color: T.faint, marginLeft: 6 }}>{p.status.replace("_", " ")}</span>
-      </span>
-      {p.platform_post_id && p.platform === "youtube"
-        ? <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>
-        : (p.status === "failed" || p.status === "deferred") && <button onClick={() => retryPost(p.id)} disabled={publishing} title={publishing ? "A publish is in progress — wait for it to finish" : "Re-publish this video"} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5, opacity: publishing ? 0.45 : 1, cursor: publishing ? "not-allowed" : "pointer" }}>{busy === `retry-${p.id}` ? "Retrying…" : "Retry"}</button>}
+    <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.projects?.name || "Untitled video"}</div>
+        <div style={{ fontSize: 11.5, color: T.faint, marginTop: 3 }}>
+          <span style={{ color: POST_COLOR[p.status] || T.faint }}>●</span> {p.platform}
+          <span style={{ marginLeft: 6 }}>{p.status.replace("_", " ")}</span>
+        </div>
+      </div>
+      <div style={{ flexShrink: 0 }}>
+        {p.platform_post_id && p.platform === "youtube"
+          ? <a href={`https://youtu.be/${p.platform_post_id}`} target="_blank" rel="noreferrer" style={{ color: T.accent, fontSize: 12 }}>view ↗</a>
+          : (p.status === "failed" || p.status === "deferred") && <button onClick={() => retryPost(p.id)} disabled={publishing} title={publishing ? "A publish is in progress — wait for it to finish" : "Re-publish this video"} style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: T.muted, padding: "4px 10px", fontSize: 11.5, opacity: publishing ? 0.45 : 1, cursor: publishing ? "not-allowed" : "pointer" }}>{busy === `retry-${p.id}` ? "Retrying…" : "Retry"}</button>}
+      </div>
     </div>
   );
 
@@ -171,7 +179,7 @@ export default function CampaignDetail() {
               { label: "Status",        value: st.label, color: st.color },
               { label: "Posts / day",   value: c.posts_per_day || 1 },
               { label: "Topics queued", value: data.queued ?? 0 },
-              { label: "Published",     value: publishedPosts.length },
+              { label: "Published",     value: publishedCount },
               { label: "Auto-publish",  value: c.auto_publish !== false ? "On" : "Off" },
             ].map(s => (
               <div key={s.label} style={{ flex: "1 1 130px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px" }}>
@@ -212,14 +220,21 @@ export default function CampaignDetail() {
                 </div>
               )}
 
-              {[["Awaiting approval", awaitingPosts], ["Published", publishedPosts], ["Failed", failedPosts], ["Queued", otherPosts]]
-                .filter(([, arr]) => arr.length)
-                .map(([title, arr]) => (
-                  <div key={title} style={panel}>
-                    <div style={panelHead}>{title} <span style={{ color: T.faint, fontWeight: 600 }}>· {arr.length}</span></div>
-                    {arr.map(postRow)}
-                  </div>
-                ))}
+              {data.posts.length > 0 && (
+                <div style={panel}>
+                  <div style={panelHead}>Videos <span style={{ color: T.faint, fontWeight: 600 }}>· {data.posts.length}</span></div>
+                  {pagePosts.map(postRow)}
+                  {totalPages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                      <button onClick={() => setVidPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                        style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: page === 0 ? T.faint : T.muted, padding: "5px 12px", fontSize: 12, cursor: page === 0 ? "not-allowed" : "pointer", opacity: page === 0 ? 0.5 : 1 }}>‹ Prev</button>
+                      <span style={{ fontSize: 12, color: T.faint }}>Page {page + 1} of {totalPages}</span>
+                      <button onClick={() => setVidPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                        style={{ ...btn("transparent"), border: `1px solid ${T.border}`, color: page >= totalPages - 1 ? T.faint : T.muted, padding: "5px 12px", fontSize: 12, cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", opacity: page >= totalPages - 1 ? 0.5 : 1 }}>Next ›</button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {data.posts.length === 0 && data.active.length === 0 && (
                 <div style={panel}><div style={{ fontSize: 12.5, color: T.faint }}>Nothing yet. Start the campaign or hit Run once.</div></div>
@@ -278,9 +293,6 @@ export default function CampaignDetail() {
                   </select>
                 </div>
                 <div style={{ gridColumn: "span 2" }}><span style={lbl}>Posting times — "HH:MM", comma-separated (blank = AI decides)</span><input style={fieldStyle} value={form.posting_times} onChange={e => setForm(f => ({ ...f, posting_times: e.target.value }))} placeholder="09:00, 18:00" /></div>
-
-                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Audience (optional)</span><input style={fieldStyle} value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} /></div>
-                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Tone (optional)</span><input style={fieldStyle} value={form.tone} onChange={e => setForm(f => ({ ...f, tone: e.target.value }))} /></div>
 
                 <div style={{ gridColumn: "1 / -1" }}>
                   <span style={lbl}>Voice &amp; language</span>

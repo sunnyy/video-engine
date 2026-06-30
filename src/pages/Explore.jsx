@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
+import { usePlanStore } from "../store/usePlanStore";
 
 /**
  * Explore — home for the Image & Audio tools that don't fit the video chatbox hub.
@@ -19,7 +20,7 @@ const SECTIONS = [
       { emoji: "📦", label: "Product Video",        desc: "One product photo → a cinematic promo ad",            to: "/product-video",     accent: "#f97316" },
       { emoji: "🔤", label: "Typography Video",     desc: "Bold kinetic-text videos, great on mute",             to: "/typography-video",  accent: "#a855f7" },
       { emoji: "🎙", label: "Talking Head",         desc: "Your clip → auto captions, cuts & B-roll",            to: "/talking-head",      accent: "#34d399" },
-      { emoji: "✂️", label: "Video Clipping",       desc: "Long video → AI-picked captioned vertical clips",      to: "/video-clipping",    accent: "#f5c518" },
+      { emoji: "✂️", label: "Video Clipping",       desc: "Long video → AI-picked captioned vertical clips",      to: "/video-clipping",    accent: "#f5c518", proPlus: true },
       { emoji: "📱", label: "App Promo Video",      desc: "App Store / Play link → a promo from its screenshots", to: "/app-video",         accent: "#38bdf8" },
       { emoji: "💬", label: "Auto Captions",        desc: "Add animated, word-synced captions to any video",      to: "/video-captions",    accent: "#f5c518" },
     ],
@@ -45,18 +46,22 @@ const SECTIONS = [
 
 function ToolCard({ item }) {
   const [hov, setHov] = useState(false);
+  const isProPlus = usePlanStore((s) => s.isProPlus);
+  const locked = item.proPlus && !isProPlus;
   const glow = item.accent + "18";
   return (
     <Link
       to={item.to}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
+        position: "relative",
         background: hov ? `linear-gradient(140deg, ${glow}, ${T.surface} 60%)` : T.surface,
         border: `1px solid ${hov ? item.accent + "55" : T.border}`, borderRadius: 14, padding: "16px 18px",
         cursor: "pointer", transition: "all 0.18s", transform: hov ? "translateY(-2px)" : "none",
         display: "flex", flexDirection: "column", gap: 10, textDecoration: "none",
       }}
     >
+      {locked && <span style={{ position: "absolute", top: 12, right: 12, fontSize: 10, fontWeight: 800, letterSpacing: "0.08em", color: "#a78bfa", background: "rgba(124,92,252,0.16)", border: "1px solid rgba(124,92,252,0.4)", borderRadius: 6, padding: "3px 7px" }}>🔒 PRO</span>}
       <span style={{ fontSize: 26, lineHeight: 1 }}>{item.emoji}</span>
       <div>
         <div style={{ fontSize: 15, fontWeight: 700, color: hov ? item.accent : T.text, fontFamily: "'Outfit',sans-serif", marginBottom: 4, transition: "color 0.18s" }}>{item.label}</div>

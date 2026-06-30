@@ -45,3 +45,6 @@ src/server/temp
 
 # Local dev: AI Video snapshot frames/JSON
 .aiv-preview/
+
+# Local dev: experimental Motion (Claude+Remotion) pipeline output
+.motion-lab/

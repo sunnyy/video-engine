@@ -347,7 +347,7 @@ router.post("/change-user-plan", requireAuth, requireAdmin, async (req, res) => 
     let newBalance = null;
     if (grantCredits) {
       const result = await addCredits(
-        userId, plan.credits, "plan_assign", "admin_plan_change",
+        userId, plan.credits, "purchase", "plan_assign",
         `Plan changed to ${plan.name} by admin`,
       );
       newBalance = result.balance;

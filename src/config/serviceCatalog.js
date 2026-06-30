@@ -42,7 +42,7 @@ export const SERVICE_CATALOG = [
   { key: "typography_video", name: "Typography Video", category: "create", tier: 2, featured: false, beta: false,
     route: "/typography-video", creditKey: "typography_video", pricing: durationPricing, publishable: false,
     blurb: "Kinetic text videos for punchy, muted-friendly social clips." },
-  { key: "video_clipping", name: "Video Clipping", category: "create", tier: 2, featured: false, beta: true,
+  { key: "video_clipping", name: "Video Clipping", category: "create", tier: 2, featured: false, beta: true, proPlus: true,
     route: "/video-clipping", creditKey: "video_clipping", pricing: { model: "flat", credits: CREDIT_COSTS.video_clipping }, publishable: false,
     blurb: "Upload a long video or podcast — AI finds the best moments and turns them into captioned vertical clips. Charged by source length." },
   { key: "app_video", name: "App Promo Video", category: "create", tier: 2, featured: false, beta: true,

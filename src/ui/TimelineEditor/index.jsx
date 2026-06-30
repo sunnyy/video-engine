@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTimelineStore } from "../../store/useTimelineStore";
+import { showToast } from "../Toast";
 import TopBar from "./TopBar";
 import LeftPanel from "./LeftPanel";
 import Preview from "./Preview";
@@ -56,6 +57,21 @@ export default function TimelineEditor() {
       if (e.code === "Escape") {
         useTimelineStore.getState().selectLayer(null);
         return;
+      }
+
+      // Ctrl+C — copy a selected TEXT layer's content to the clipboard (the guard above
+      // already lets native copy run when you're typing inside an input/textarea).
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyC") {
+        const { selectedLayerId, project } = useTimelineStore.getState();
+        const layer = (project?.layers || []).find((l) => l.id === selectedLayerId);
+        if (layer?.type === "text" && (layer.content ?? "").trim()) {
+          e.preventDefault();
+          navigator.clipboard?.writeText(layer.content).then(
+            () => showToast("Text copied", "success"),
+            () => showToast("Couldn't copy the text."),
+          );
+          return;
+        }
       }
 
       // Delete / Backspace — remove selected layer

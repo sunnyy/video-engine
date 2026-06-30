@@ -255,7 +255,7 @@ export default function Settings() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    <div className="text-[13px]" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>No active plan — you're on free credits.</div>
+                    <div className="text-[13px]" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>No active plan — choose a plan to start creating.</div>
                     <button onClick={() => navigate("/#pricing")}
                       className="self-start px-3 py-1.5 rounded-[7px] text-[12px] font-semibold border transition-all cursor-pointer"
                       style={{ background: "rgba(245,197,24,0.08)", borderColor: "rgba(245,197,24,0.3)", color: "#f5c518", fontFamily: "'Outfit',sans-serif" }}>

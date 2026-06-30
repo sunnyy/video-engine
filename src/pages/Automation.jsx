@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
 import BrandKitPanel from "../ui/BrandKitPanel";
+import UpgradeGate from "../ui/UpgradeGate";
+import { usePlanStore } from "../store/usePlanStore";
 import { serverFetch } from "../services/serverApi";
 
 /**
@@ -26,6 +28,8 @@ export default function Automation() {
   const [tab, setTab] = useState("campaigns");
   const [campaigns, setCampaigns] = useState(null);
   const [busy, setBusy] = useState("");
+  const { isProPlus, loaded: planLoaded, fetchPlan } = usePlanStore();
+  useEffect(() => { fetchPlan(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadCampaigns = async () => { try { const d = await serverFetch("/api/automation/campaigns").then(r => r.json()); setCampaigns(d.campaigns || []); } catch (_) {} };
 
@@ -51,6 +55,8 @@ export default function Automation() {
   const td = { padding: "12px 14px", color: T.text };
   const tdC = { ...td, textAlign: "center", color: T.muted };
   const TABS = [["campaigns", "Campaigns"], ["brandkit", "Brand Kit"]];
+
+  if (planLoaded && !isProPlus) return <UpgradeGate feature="Automation" blurb="Automation — auto-generate and publish videos on a schedule — is available on the Pro and Agency plans." />;
 
   return (
     <AppLayout>

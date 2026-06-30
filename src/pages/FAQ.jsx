@@ -37,12 +37,12 @@ const FAQS = [
     a: "Yes — clothing, fashion, wearables (watches, earphones, shoes), beauty products, food, gadgets, and more. For clothing, the system uses AI model avatars to show the product being worn. For other products, it generates cinematic product photography shots. Upload one product photo and get a full video ad with multiple scenes, transitions, and background music.",
   },
   {
-    q: "Is there a free trial?",
-    a: "New accounts get 50 free credits — enough to try several services without a credit card. Product Video Ads requires an active plan. Paid plans start at ₹999/month with no long-term commitment.",
+    q: "Is there a free plan?",
+    a: "There's no free tier — every account starts on a paid plan. Each video uses real AI compute, so a paid entry point keeps generation fast and high-quality for everyone. The Starter plan is $29/month for 600 credits, with no long-term commitment — cancel anytime.",
   },
   {
     q: "What are the plan limits?",
-    a: "Starter includes 1,800 credits per month. Pro includes 3,500 credits. Agency includes 6,000 credits. All plans include every service on the platform. Check the pricing section for current plan rates.",
+    a: "Starter includes 600 credits per month, Pro 1,500, and Agency 4,000. Every plan unlocks every service on the platform; Automation & auto-publish are available on Pro and Agency. Check the pricing section for current rates.",
   },
   {
     q: "Can I cancel anytime?",

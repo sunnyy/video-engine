@@ -368,7 +368,7 @@ async function checkLifecycleEmails() {
       if (!hasProject.has(u.id) && ageDays >= 2 && ageDays <= 14 && !sentAt[`${u.id}|onboarding_nudge`]) {
         await fire(u, "onboarding_nudge", {
           type: "onboarding_nudge", icon: "🎬", severity: "info", link: "/dashboard",
-          title: "Ready to make your first video?", body: "Your free credits are waiting — it takes about two minutes.",
+          title: "Ready to make your first video?", body: "Pick a plan and create your first video — it takes about two minutes.",
         }, userOnboardingNudgeEmail);
         nudges++;
         continue;

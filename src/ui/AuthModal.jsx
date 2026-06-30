@@ -68,7 +68,7 @@ export default function AuthModal({ open, onClose, next = null }) {
           Continue with Google
         </button>
 
-        <div className="vq-auth-perk">✦ Free credits on signup · No credit card required</div>
+        <div className="vq-auth-perk">✦ Every service, one subscription · Cancel anytime</div>
 
         <div className="vq-auth-divider">Secure sign-in via Google</div>
 

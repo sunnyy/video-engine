@@ -189,8 +189,8 @@ export function userWelcomeEmail(name) {
     subject: "Welcome to Vidquence 🎬",
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Welcome, ${name || "Creator"}!</h2>
-      <p style="color:#c8c8d8;margin:0 0 16px">Your account is ready. You've got <strong style="color:#f5c518">150 free credits</strong> to get started — enough to explore the platform and create your first video.</p>
-      <p style="color:#c8c8d8;margin:0 0 24px">Head to your dashboard and create your first short.</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">Your account is ready. Pick a plan to unlock every service and start creating — one subscription, every tool, cancel anytime.</p>
+      <p style="color:#c8c8d8;margin:0 0 24px">Choose a plan and make your first short in minutes.</p>
       <a href="${APP_URL}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Go to Dashboard →</a>
     `),
   };
@@ -215,10 +215,10 @@ export function userCreditsPurchasedEmail(name, amount, balance) {
 
 export function userOnboardingNudgeEmail(name) {
   return {
-    subject: "Your free credits are waiting 🎬",
+    subject: "Make your first video 🎬",
     html: wrap(`
       <h2 style="margin:0 0 12px;font-size:22px;color:#f5c518">Make your first video, ${name || "Creator"}</h2>
-      <p style="color:#c8c8d8;margin:0 0 16px">You signed up but haven't created anything yet — and your <strong style="color:#f5c518">free credits</strong> are still here.</p>
+      <p style="color:#c8c8d8;margin:0 0 16px">You signed up but haven't created anything yet. Pick a plan and you're one prompt away from your first video.</p>
       <p style="color:#c8c8d8;margin:0 0 24px">It takes about two minutes: just describe what you want on the dashboard and Vidquence builds the video for you.</p>
       <a href="${APP_URL}/dashboard" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">Create your first video →</a>
     `),

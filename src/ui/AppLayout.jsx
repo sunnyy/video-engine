@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signOut } from "../services/auth/authService";
 import { useCreditsStore } from "../store/useCreditsStore";
 import { useNotificationsStore } from "../store/useNotificationsStore";
+import { usePlanStore } from "../store/usePlanStore";
 import { supabase } from "../lib/supabase";
 import SystemStatusBanner from "./SystemStatusBanner";
 
@@ -231,7 +232,7 @@ function NavItem({ icon, label, sub, to, href, active, soon }) {
 }
 
 /* ── IconBtn: narrow column icon + label ── */
-function IconBtn({ icon, label, to, href, onClick, active }) {
+function IconBtn({ icon, label, to, href, onClick, active, locked }) {
   const [hov, setHov] = useState(false);
   const style = {
     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -242,7 +243,10 @@ function IconBtn({ icon, label, to, href, onClick, active }) {
   };
   const inner = (
     <>
-      <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
+      <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+        {icon}
+        {locked && <span title="Pro & Agency" style={{ position: "absolute", top: -7, right: -9, fontSize: 9, lineHeight: 1 }}>🔒</span>}
+      </span>
       <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "center", width: "100%" }}>{label}</span>
     </>
   );
@@ -470,6 +474,7 @@ export default function AppLayout({ children }) {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { balance } = useCreditsStore();
+  const { isProPlus, fetchPlan } = usePlanStore();
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -483,7 +488,8 @@ export default function AppLayout({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAdmin(session?.user?.app_metadata?.role === "admin");
     });
-  }, []);
+    fetchPlan();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -506,7 +512,7 @@ export default function AppLayout({ children }) {
             <IconBtn icon={Icons.home} label="Home" to="/dashboard" active={path === "/dashboard"} />
             <IconBtn icon={Icons.folder}  label="Projects" to="/projects" active={path === "/projects"} />
             <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
-            <IconBtn icon={Icons.autopilot} label="Automation" to="/automation" active={path === "/automation" || path.startsWith("/automation/")} />
+            <IconBtn icon={Icons.autopilot} label="Automation" to="/automation" active={path === "/automation" || path.startsWith("/automation/")} locked={!isProPlus} />
             <IconBtn icon={Icons.connections} label="Social Accounts" to="/connections" active={path === "/connections"} />
             <NotificationsBell />
 

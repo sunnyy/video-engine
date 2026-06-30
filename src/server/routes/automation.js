@@ -11,8 +11,12 @@ import {
 import { ensureTopics, getQueuedCount, skipOldestQueued, clearQueuedTopics } from "../services/automation/topics.js";
 import { listCampaignEvents, logEvent } from "../services/automation/events.js";
 import { enqueue, cancelCampaignJobs, cancelJob, isJobLive } from "../jobs/queue.js";
+import { requireProPlus } from "../middleware/planGate.js";
 
 export const router = express.Router();
+
+// Automation is a Pro/Agency feature — Starter can't create or run campaigns.
+const requireAutomation = requireProPlus("Automation");
 
 const INFLIGHT_TYPES = ["generate_video", "render_timeline", "publish_post"];
 
@@ -52,7 +56,7 @@ router.get("/campaigns", requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post("/campaigns", requireAuth, async (req, res) => {
+router.post("/campaigns", requireAuth, requireAutomation, async (req, res) => {
   try {
     const c = await createCampaign(req.user.id, req.body || {});
     logEvent({ userId: req.user.id, campaignId: c.id, action: "create", entity: "campaign", message: c.name });
@@ -70,8 +74,8 @@ router.get("/campaigns/:id", requireAuth, async (req, res) => {
       supabaseAdmin.from("jobs").select("id, type, status, progress, created_at, run_at")
         .in("type", INFLIGHT_TYPES).in("status", ["queued", "running"])
         .filter("payload->>campaignId", "eq", campaign.id).order("created_at", { ascending: true }),
-      supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at")
-        .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(60),
+      supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at, project_id, projects(name)")
+        .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(200),
     ]);
     // Only jobs running/queued-to-run-now are "active". A deferral SCHEDULED for later (run_at in the
     // future) goes in `scheduled` — so it no longer shows as a phantom "Publishing…" row nor disables
@@ -134,13 +138,13 @@ async function transition(req, res, status, { cancelJobs = false, primeTopics = 
   logEvent({ userId: req.user.id, campaignId: req.params.id, action: status, entity: "campaign", message: "manual" });
   res.json({ campaign: updated });
 }
-router.post("/campaigns/:id/start",  requireAuth, (req, res) => transition(req, res, "active", { primeTopics: true }).catch((e) => res.status(400).json({ error: e.message })));
-router.post("/campaigns/:id/resume", requireAuth, (req, res) => transition(req, res, "active").catch((e) => res.status(400).json({ error: e.message })));
+router.post("/campaigns/:id/start",  requireAuth, requireAutomation, (req, res) => transition(req, res, "active", { primeTopics: true }).catch((e) => res.status(400).json({ error: e.message })));
+router.post("/campaigns/:id/resume", requireAuth, requireAutomation, (req, res) => transition(req, res, "active").catch((e) => res.status(400).json({ error: e.message })));
 router.post("/campaigns/:id/pause",  requireAuth, (req, res) => transition(req, res, "paused").catch((e) => res.status(400).json({ error: e.message })));
 router.post("/campaigns/:id/stop",   requireAuth, (req, res) => transition(req, res, "stopped", { cancelJobs: true }).catch((e) => res.status(400).json({ error: e.message })));
 
 /* ── Manual "Run once" — deliberate kick that runs even while paused/stopped ── */
-router.post("/campaigns/:id/run-once", requireAuth, async (req, res) => {
+router.post("/campaigns/:id/run-once", requireAuth, requireAutomation, async (req, res) => {
   try {
     const campaign = await getCampaignForUser(req.user.id, req.params.id);
     if (!campaign) return res.status(404).json({ error: "Campaign not found" });
@@ -288,8 +292,8 @@ router.get("/admin/campaigns/:id", requireAuth, requireAdmin, async (req, res) =
       supabaseAdmin.from("jobs").select("id, type, status, progress, created_at, run_at")
         .in("type", INFLIGHT_TYPES).in("status", ["queued", "running"])
         .filter("payload->>campaignId", "eq", campaign.id).order("created_at", { ascending: true }),
-      supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at")
-        .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(60),
+      supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at, project_id, projects(name)")
+        .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(200),
     ]);
     const active    = (jobs || []).filter(isJobLive);
     const scheduled = (jobs || []).filter((j) => !isJobLive(j));

@@ -238,21 +238,8 @@ router.post("/webhooks/user-created", async (req, res) => {
     const { id, email, raw_user_meta_data } = record;
     const name = raw_user_meta_data?.full_name || raw_user_meta_data?.name || "";
 
-    // Block signup bonus for previously deleted accounts
-    const { data: wasDeleted } = await supabaseAdmin
-      .from("deleted_users")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    try {
-      if (!wasDeleted) {
-        await addCredits(id, 150, "bonus", "signup_bonus", "Welcome bonus — free credits");
-      }
-    } catch (creditsErr) {
-      console.error("[webhook/user-created] Failed to grant credits:", creditsErr.message);
-      // Admin alert still fires below so the signup can be manually topped up
-    }
+    // No signup credits — accounts start empty; users pick a paid plan to begin (avoids
+    // throwaway-account abuse of free generation, which has real per-video COGS).
 
     // Admin alert (fire-and-forget)
     const adminEmail = adminNewUserEmail({ id, email, name });
@@ -261,8 +248,8 @@ router.post("/webhooks/user-created", async (req, res) => {
     // Welcome email to user
     const welcome = userWelcomeEmail(name);
     sendUserEmail(email, welcome.subject, welcome.html);
-    notifyUser(id, { type: "welcome", icon: "🎬", severity: "success", link: "/dashboard",
-      title: "Welcome to Vidquence", body: wasDeleted ? "Your account is ready." : "Your account is ready — 150 free credits to get started." });
+    notifyUser(id, { type: "welcome", icon: "🎬", severity: "success", link: "/#pricing",
+      title: "Welcome to Vidquence", body: "Your account is ready — choose a plan to start creating." });
 
     res.json({ success: true });
   } catch (err) {

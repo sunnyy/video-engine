@@ -37,7 +37,7 @@ export default function Invite() {
 
   const share = async () => {
     if (navigator.share) {
-      try { await navigator.share({ title: "Vidquence", text: "Make videos with AI — join Vidquence and we both get free credits.", url: link }); } catch { /* dismissed */ }
+      try { await navigator.share({ title: "Vidquence", text: "Make videos with AI — join Vidquence.", url: link }); } catch { /* dismissed */ }
     } else {
       copy(link);
     }
@@ -50,8 +50,8 @@ export default function Invite() {
 
           <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: 0 }}>Invite &amp; Earn</h1>
           <p style={{ fontSize: 14.5, color: T.muted, marginTop: 8, lineHeight: 1.6, maxWidth: 620 }}>
-            Share your link. Your friend gets <strong style={{ color: T.text }}>{data?.refereeBonus ?? 50} bonus credits</strong> when they sign up, and you get{" "}
-            <strong style={{ color: T.text }}>{data?.referrerReward ?? 100} credits</strong> the first time they make a purchase.
+            Share your link. The first time a friend you invite subscribes to a plan, you earn{" "}
+            <strong style={{ color: T.text }}>{data?.referrerReward ?? 100} credits</strong> — invite as many as you like.
           </p>
 
           {error && <div style={{ marginTop: 20, color: "#f87171", fontSize: 14 }}>{error}</div>}

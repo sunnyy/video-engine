@@ -113,7 +113,7 @@ export default function Auth() {
               Continue with Google
             </button>
 
-            <div className="auth-perk">✦ Free credits on signup · No credit card required</div>
+            <div className="auth-perk">✦ Every service, one subscription · Cancel anytime</div>
 
             <div className="auth-divider">Secure sign-in via Google</div>
 

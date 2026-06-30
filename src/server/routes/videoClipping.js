@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, deductCredits, addCredits, safeMessage } from "../middleware/shared.js";
+import { requireProPlus } from "../middleware/planGate.js";
 import { runClippingPipeline } from "../../services/ai/videoClipping/pipelineOrchestrator.js";
 import { creditsForClipping } from "../../core/utils/creditCosts.js";
 
@@ -10,7 +11,7 @@ const MAX_INPUT_SECONDS = 90 * 60; // 90 min cap (MVP)
 // POST /video-clipping/generate — SSE. Takes an already-uploaded video URL (reuse /api/caption/
 // upload-video to upload) + options, transcribes, GPT-4.1 picks the best moments, cuts + captions
 // each into an editable 9:16 timeline project, deletes the source, and returns the clip list.
-router.post("/generate", requireAuth, async (req, res) => {
+router.post("/generate", requireAuth, requireProPlus("Video clipping"), async (req, res) => {
   const userId = req.user.id;
   let creditAmount = 0;
 

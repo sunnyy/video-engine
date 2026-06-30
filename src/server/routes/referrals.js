@@ -14,8 +14,10 @@ import { notifyUser } from "../services/notificationService.js";
 
 export const router = express.Router();
 
-const REFEREE_BONUS    = 50;   // credits the new user gets on signup (on top of the 150 welcome)
-const REFERRER_REWARD  = 100;  // credits the referrer gets when the referee first purchases
+const REFEREE_BONUS    = 0;    // no signup credits — paid-only model; referee perk would reopen
+                               // throwaway-account abuse (self-refer for free credits).
+const REFERRER_REWARD  = 100;  // credits the referrer gets when the referee first purchases (gated
+                               // on a real purchase → not abusable)
 const CLAIM_WINDOW_DAYS = 30;  // a referral can only be claimed within N days of the account's creation
 
 /* ── Code generation ── */
@@ -102,16 +104,17 @@ router.post("/referrals/claim", requireAuth, async (req, res) => {
     // Unique violation = a concurrent claim already landed; treat as already-claimed.
     if (insErr) return res.json({ claimed: false, reason: "already" });
 
-    try {
-      await addCredits(refereeId, REFEREE_BONUS, "bonus", "referral_signup", "Referral bonus — joined via a friend's invite");
-    } catch (e) {
-      console.error("[referrals/claim] referee bonus failed:", e.message);
+    if (REFEREE_BONUS > 0) {
+      try {
+        await addCredits(refereeId, REFEREE_BONUS, "bonus", "referral_signup", "Referral bonus — joined via a friend's invite");
+      } catch (e) {
+        console.error("[referrals/claim] referee bonus failed:", e.message);
+      }
+      notifyUser(refereeId, {
+        type: "referral_bonus", icon: "🎁", severity: "success", link: "/credits",
+        title: `You earned ${REFEREE_BONUS} bonus credits`, body: "Welcome bonus for joining through a friend's invite.",
+      });
     }
-
-    notifyUser(refereeId, {
-      type: "referral_bonus", icon: "🎁", severity: "success", link: "/credits",
-      title: `You earned ${REFEREE_BONUS} bonus credits`, body: "Welcome bonus for joining through a friend's invite.",
-    });
     notifyUser(referrer.id, {
       type: "referral_joined", icon: "👋", severity: "info", link: "/invite",
       title: "Someone joined with your invite", body: `You'll earn ${REFERRER_REWARD} credits when they make their first purchase.`,

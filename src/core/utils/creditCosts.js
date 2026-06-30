@@ -150,7 +150,7 @@ export function estimateCreditCost(duration, options = {}) {
 
 // Reference only — the live source of truth for plans is the `plans` DB table (see plans_single.sql).
 export const PLANS = {
-  free:   { price: 0,  credits: 150,  label: "Free"   },
-  pro:    { price: 49, credits: 1500, label: "Pro"    },
-  agency: { price: 99, credits: 4000, label: "Agency" },
+  starter: { price: 29, credits: 600,  label: "Starter" },
+  pro:     { price: 49, credits: 1500, label: "Pro"     },
+  agency:  { price: 99, credits: 4000, label: "Agency"  },
 };

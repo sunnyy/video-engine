@@ -1,12 +1,12 @@
 /**
  * devSnapshot.js — PRIVATE one-shot project inspector (LOCAL DEV ONLY).
  *
- * Give it a project id and it: (1) fetches raw_ai_json (the plan + beat HTMLs) and
- * safe_project_json (the timeline) straight from Supabase, (2) writes both to
- * <repo>/.aiv-preview/<id>/, (3) renders sparse PREVIEW frames (one every ~1.5s) through our own
- * render engine — the real composed page, not the final MP4 — into the same folder, and (4) writes
- * a manifest.json summarising scenes/sources. So an AI Video run can be inspected end-to-end from
- * an id alone (no manual export/screenshot/paste).
+ * Give it ANY video project's id (ai_video / promo_video / social_video / product_video /
+ * typography_video / TH) and it: (1) fetches raw_ai_json (the plan + designed HTML) and
+ * safe_project_json (the timeline), (2) writes both to a PER-SERVICE folder <repo>/.aiv-preview/
+ * <source>/ (so each service keeps its own latest snapshot), (3) renders sparse PREVIEW frames
+ * (scene-NN.png) from the timeline + the original designed HTML (design-NN.png) so the two can be
+ * compared, and (4) writes a manifest.json. Any service's run can be inspected from an id alone.
  *
  * GATE: loopback address + NODE_ENV !== "production" ONLY. This never serves in prod and needs no
  * auth token, so it can be driven from a local shell. Mounted at /api/dev (BEFORE the auth'd lab
@@ -29,13 +29,25 @@ router.use((req, res, next) => {
   return res.status(403).json({ error: "devSnapshot is local-dev only" });
 });
 
-// ONE flat folder, fully wiped before every snapshot — so there's only ever the latest run's
-// frames + JSON to look at (no per-project subfolders to clean up).
-const OUT_DIR = path.join(PROJECT_ROOT, ".aiv-preview", "latest");
-function freshOutDir() {
-  try { fs.rmSync(OUT_DIR, { recursive: true, force: true }); } catch {}
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  return OUT_DIR;
+// One folder PER SERVICE (source), wiped before each snapshot — so every service keeps its own
+// latest run's frames + JSON side by side (e.g. .aiv-preview/social_video/, .aiv-preview/ai_video/).
+const BASE_DIR = path.join(PROJECT_ROOT, ".aiv-preview");
+function freshOutDir(source) {
+  const dir = path.join(BASE_DIR, String(source || "unknown").replace(/[^a-z0-9_-]/gi, "_"));
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// Designed HTML is stored under a different key per service — collect whichever this project used,
+// so design-NN.png renders for all of them (typography saves none → design frames simply skipped).
+function extractDesignHTMLs(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw.beatHTMLs)  && raw.beatHTMLs.some(Boolean))  return raw.beatHTMLs;   // ai_video
+  if (Array.isArray(raw.sceneHTMLs) && raw.sceneHTMLs.some(Boolean)) return raw.sceneHTMLs;  // social / product / promo-TH
+  if (Array.isArray(raw.beats))  { const h = raw.beats.map((b) => b?.html ?? null);  if (h.some(Boolean)) return h; } // saas faceless
+  if (Array.isArray(raw.scenes)) { const h = raw.scenes.map((s) => s?.html ?? null); if (h.some(Boolean)) return h; }
+  return [];
 }
 
 async function fetchProject(id) {
@@ -86,7 +98,7 @@ router.get("/snapshot/:id", async (req, res) => {
     const mode = req.query.mode === "cadence" ? "cadence" : "scene";
     const everySec = Math.max(0.5, Math.min(5, parseFloat(req.query.every) || 1.5));
     const proj = await fetchProject(id);
-    const outDir = freshOutDir();
+    const outDir = freshOutDir(proj.source);
 
     fs.writeFileSync(path.join(outDir, "safe_project.json"), JSON.stringify(proj.safe_project_json ?? null, null, 2));
     fs.writeFileSync(path.join(outDir, "raw_ai_json.json"), JSON.stringify(proj.raw_ai_json ?? null, null, 2));
@@ -100,11 +112,11 @@ router.get("/snapshot/:id", async (req, res) => {
     // Also render each beat's ORIGINAL designed HTML (design-NN.png) so it can be compared against
     // the converted scene-NN.png — exposing where the measure/convert pipeline diverges from intent.
     let designs = null, designsError = null;
-    const beatHTMLs = proj.raw_ai_json?.beatHTMLs;
-    if (Array.isArray(beatHTMLs) && beatHTMLs.some(Boolean)) {
+    const htmls = extractDesignHTMLs(proj.raw_ai_json);
+    if (htmls.length) {
       const W = proj.safe_project_json?.format?.width ?? 1080;
       const H = proj.safe_project_json?.format?.height ?? 1920;
-      try { designs = await renderBeatDesigns(beatHTMLs, { outDir, width: W, height: H }); }
+      try { designs = await renderBeatDesigns(htmls, { outDir, width: W, height: H }); }
       catch (e) { designsError = e.message; }
     }
 
@@ -122,7 +134,7 @@ router.get("/snapshot/:id", async (req, res) => {
 router.get("/project/:id", async (req, res) => {
   try {
     const proj = await fetchProject(req.params.id);
-    const outDir = freshOutDir();
+    const outDir = freshOutDir(proj.source);
     fs.writeFileSync(path.join(outDir, "safe_project.json"), JSON.stringify(proj.safe_project_json ?? null, null, 2));
     fs.writeFileSync(path.join(outDir, "raw_ai_json.json"), JSON.stringify(proj.raw_ai_json ?? null, null, 2));
     res.json({ id: proj.id, name: proj.name, source: proj.source, outDir, summary: summarize(proj.safe_project_json, proj.raw_ai_json) });
