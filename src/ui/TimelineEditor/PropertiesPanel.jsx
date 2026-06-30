@@ -1644,6 +1644,11 @@ function VoiceoverTool() {
     return () => { alive = false; };
   }, []);
 
+  // ONLY for recovering a MISSING voiceover (TTS outage / accidentally deleted). We never offer
+  // "regenerate": re-voicing an edited script would desync the whole timeline (that needs a full
+  // regenerate). So the tool is hidden once the video already has a voiceover.
+  if (hasVO) return null;
+
   const handleGenerate = async () => {
     if (!script || busy) return;
     setBusy(true);
@@ -1666,7 +1671,7 @@ function VoiceoverTool() {
       });
       const newDuration = Math.max(project.format?.duration ?? 0, ...layers.map((l) => l.end || 0));
       updateProject({ layers, format: { ...project.format, duration: newDuration } });
-      showToast(hasVO ? "Voiceover regenerated" : "Voiceover generated", "success");
+      showToast("Voiceover generated", "success");
     } catch (e) {
       showToast(e.message || "Couldn’t generate the voiceover — please try again.");
     } finally {
@@ -1690,10 +1695,10 @@ function VoiceoverTool() {
             disabled={busy}
             style={{ width: "100%", padding: "8px 0", borderRadius: 7, border: "none", cursor: busy ? "default" : "pointer", fontWeight: 700, fontSize: 12.5, fontFamily: "inherit", background: busy ? "rgba(124,92,252,0.5)" : "#7c5cfc", color: "#fff" }}
           >
-            {busy ? "Generating…" : hasVO ? "Regenerate voiceover" : "Generate voiceover"}
+            {busy ? "Generating…" : "Generate voiceover"}
           </button>
           <p style={{ margin: "8px 0 0", fontSize: 11, color: "#7a7a98", lineHeight: 1.5 }}>
-            Narrates this video’s script and {hasVO ? "replaces the current voiceover." : "adds it to the timeline."}
+            This video is missing its voiceover — narrate the saved script and add it to the timeline.
           </p>
         </>
       ) : (
