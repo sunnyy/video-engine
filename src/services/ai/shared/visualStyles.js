@@ -38,6 +38,18 @@ export const VISUAL_STYLES = {
     motion: { energy: "calm", transitions: ["fade", "slide-up"], cutSeconds: 3.4 },
     treatmentBias: { typography_punch: 3, ai_illustration: 2, artifact: 2, stock_moment: 2, cutout_colorblock: 1, annotated_photo: 1, versus_split: 1 },
   },
+  editorial: {
+    id: "editorial",
+    label: "Editorial",
+    description: "Refined print editorial — cream paper & deep-green fields, big serif words, generous space",
+    colors: ["#efe9dc", "#1f3d2b"],
+    illustrationStyle: "refined editorial illustration, restrained two-tone, elegant fine line work, subtle paper texture, textless artwork",
+    photoStyle: "elegant editorial photograph, soft natural light, muted refined tones, generous negative space",
+    paletteGuidance: "Calm full-bleed fields that ALTERNATE per beat — warm cream/ivory paper AND deep forest-green — with one quiet ink accent. No loud saturation; restraint and paper-feel ARE the look.",
+    typeSystem: "High-contrast serif display (Playfair Display, Cormorant Garamond) at large editorial scale — big centered words, italic for emphasis, classic magazine hierarchy; optionally a small letter-spaced grotesque kicker.",
+    motion: { energy: "calm", transitions: ["fade", "slide-up"], cutSeconds: 3.2 },
+    treatmentBias: { typography_punch: 3, stock_moment: 2, artifact: 2, ai_illustration: 1, annotated_photo: 1, cutout_colorblock: 1, versus_split: 1 },
+  },
   bold_pop: {
     id: "bold_pop",
     label: "Bold Pop",

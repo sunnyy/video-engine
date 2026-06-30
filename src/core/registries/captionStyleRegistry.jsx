@@ -1,5 +1,6 @@
 import React from "react";
 import { spring, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { editorialWords, wordReveal } from "./editorialCaption";
 
 /* ─────────────────────────────────────────────────────────────
    HELPERS
@@ -403,6 +404,39 @@ function EditorialSerif({ text, frame, fps, brandColor, beatDuration }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   EDITORIAL (clean, box-free serif over video; active word italic + accent)
+───────────────────────────────────────────────────────────── */
+function EditorialClean({ text, frame, fps, brandColor, beatDuration }) {
+  const ws = editorialWords(text);
+  const localTime = (frame || 0) / (fps || 30);
+  const duration = beatDuration || 2.2;
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "baseline", gap: "2px 12px", maxWidth: 700, fontFamily: "'Playfair Display', serif", lineHeight: 1.02, textShadow: "0 2px 18px rgba(0,0,0,0.55)" }}>
+      {ws.map((w, i) => {
+        const { opacity, dy } = wordReveal(localTime, duration, i, ws.length);
+        return (
+          <span
+            key={i}
+            style={{
+              ...(w.hero ? { flexBasis: "100%", textAlign: "center" } : {}),
+              fontSize: w.size,
+              fontWeight: w.hero ? 700 : 500,
+              fontStyle: w.italic ? "italic" : "normal",
+              color: w.hero ? (brandColor || "#e8c66a") : "#ffffff",
+              opacity,
+              transform: dy ? `translateY(${dy}px)` : undefined,
+            }}
+          >
+            {w.word}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
    7. NEON TICKER
    Characters appear one-by-one with a blinking cursor, teal glow
 ───────────────────────────────────────────────────────────── */
@@ -630,6 +664,11 @@ export const captionStyleRegistry = {
   karaokeFill: {
     label: "Karaoke Fill",
     render: (props) => <KaraokeFill {...props} />,
+  },
+
+  editorial: {
+    label: "Editorial",
+    render: (props) => <EditorialClean {...props} />,
   },
 
   stackReveal: {

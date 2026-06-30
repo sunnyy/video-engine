@@ -28,6 +28,13 @@ export const CAPTION_PREVIEWS = {
       <span style={{ color: "rgba(255,255,255,0.15)", margin: "0 2px" }}>Today</span>
     </div>
   ),
+  editorial: () => (
+    <div style={{ fontFamily: "'Playfair Display',serif", textAlign: "center", lineHeight: 1.0, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>
+      <div style={{ fontSize: 11, fontWeight: 500, color: "#fff" }}>they don't</div>
+      <div style={{ fontSize: 23, fontWeight: 700, fontStyle: "italic", color: "#e8c66a" }}>actually</div>
+      <div style={{ fontSize: 11, fontWeight: 500, color: "#fff" }}>leave</div>
+    </div>
+  ),
   stackReveal: () => (
     <div style={{ fontFamily: "'Unbounded',sans-serif", fontSize: 13, fontWeight: 900, textAlign: "center", lineHeight: 1.2 }}>
       <div><span style={{ color: "#fff" }}>STACK</span> <span style={{ color: "#ffd60a" }}>REVEAL</span></div>

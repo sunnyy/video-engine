@@ -11,6 +11,8 @@ import { useProjectsStore } from "../store/useProjectsStore";
 import { createProject, deleteProject } from "../services/projects/projectService";
 import { captionStylePresets, captionStyleLabels, captionStyleAccents } from "../core/registries/captionTimelineRegistry";
 import { CAPTION_PREVIEWS as PREVIEWS } from "../ui/components/CaptionStylePreview.jsx";
+import { sentenceVideoLayers } from "../services/captions/sentenceSegments";
+import { AccentField } from "../ui/fields/index.js";
 import AppLayout from "../ui/AppLayout";
 
 function CaptionStylePreview({ styleKey, selected, onClick }) {
@@ -172,6 +174,7 @@ function GeneratorForm() {
   const [captionStyle, setCaptionStyle] = useState("wordBlaze");
   const [captionPos,   setCaptionPos]   = useState(80);
   const [captionLang,  setCaptionLang]  = useState("auto");
+  const [accentColor,  setAccentColor]  = useState(null);
   const [creating,     setCreating]     = useState(false);
   const [error,        setError]        = useState(null);
   const [dragging,     setDragging]     = useState(false);
@@ -252,7 +255,7 @@ function GeneratorForm() {
         content:   chunk.text,
         style:     { ...preset.style, _captionStyle: captionStyle },
         captionStyle,
-        captionConfig: { scale: 1.5 },
+        captionConfig: { scale: 1.5, ...(accentColor ? { brandColor: accentColor } : {}) },
         start:     chunk.start,
         end:       chunk.end,
         zIndex:    10,
@@ -271,16 +274,7 @@ function GeneratorForm() {
         version: "2.0",
         format:  { width: 1080, height: 1920, fps, duration: totalDuration },
         layers:  [
-          {
-            id: "base_video", trackId: "track_base_video", name: "Video",
-            type: "video", src: videoUrl, objectFit: "cover",
-            start: 0, end: totalDuration, zIndex: 0,
-            visible: true, locked: false, sfx: null, animation: null,
-            volume: 1, muted: false, trimStart: 0, trimEnd: totalDuration, fadeIn: 0, fadeOut: 0,
-            keyframes:  { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
-            transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
-            transform:  { x: 0, y: 0, width: 1080, height: 1920, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
-          },
+          ...sentenceVideoLayers(videoUrl, segments, totalDuration, { width: 1080, height: 1920 }),
           ...captionLayers,
         ],
       };
@@ -456,6 +450,17 @@ function GeneratorForm() {
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Highlight Colour */}
+        {done && (
+          <div style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#55556a", letterSpacing: "0.08em", textTransform: "uppercase" }}>Highlight Colour</div>
+              <div style={{ fontSize: 12, color: "#9494a8", marginTop: 3 }}>Colour of the emphasised / active word. Auto uses the style's default.</div>
+            </div>
+            <AccentField value={accentColor} onChange={setAccentColor} accent="#7c5cfc" />
           </div>
         )}
 

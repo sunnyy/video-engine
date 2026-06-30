@@ -2,6 +2,7 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, Audio, Img, Seque
 import { loadSFXLibrary, getSFXPreviewUrl, getSFXDuration } from "../core/registries/sfxRegistry";
 import { getClipPathCSS } from "../core/registries/shapeRegistry";
 import assetShineRegistry from "../core/registries/assetShineRegistry";
+import { editorialWords, wordReveal } from "../core/registries/editorialCaption";
 import { useMemo, useEffect } from "react";
 import * as LucideIcons from "lucide-react";
 
@@ -252,6 +253,31 @@ function TimelineLayer({ layer, currentTime, fps }) {
 
   if (layer.type === "text") {
     const s = layer.style || {};
+    const capScale = layer.captionConfig?.scale ?? 1;
+    // Editorial caption: multi-size serif (small words + big italic hero on its own line) — same
+    // layout as the editor, so the exported MP4 matches the preview.
+    if (layer.captionStyle === "editorial") {
+      const accent = layer.captionConfig?.brandColor || "#e8c66a";
+      const words = editorialWords(layer.content);
+      const localTime = Math.max(0, currentTime - layer.start);
+      const duration = Math.max(0.1, layer.end - layer.start);
+      return (
+        <Sequence from={startFrame} durationInFrames={durationFrames}>
+          <div style={{ ...baseStyle, position: "absolute", display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "baseline", gap: `${2 * capScale}px ${12 * capScale}px`, maxWidth: 700 * capScale, fontFamily: withDevanagari(s.fontFamily), lineHeight: 1.02, textShadow: s.textShadow || "0 2px 18px rgba(0,0,0,0.55)" }}>
+              {words.map((ws, i) => {
+                const { opacity, dy } = wordReveal(localTime, duration, i, words.length);
+                return (
+                  <span key={i} style={{ ...(ws.hero ? { flexBasis: "100%", textAlign: "center" } : {}), fontSize: ws.size * capScale, fontWeight: ws.hero ? 700 : 500, fontStyle: ws.italic ? "italic" : "normal", color: ws.hero ? accent : (s.color || "#ffffff"), opacity, transform: dy ? `translateY(${dy * capScale}px)` : undefined }}>
+                    {ws.word}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </Sequence>
+      );
+    }
     return (
       <Sequence from={startFrame} durationInFrames={durationFrames}>
         <div
@@ -259,7 +285,7 @@ function TimelineLayer({ layer, currentTime, fps }) {
             ...baseStyle,
             position: "absolute",
             fontFamily: withDevanagari(s.fontFamily),
-            fontSize: (s.fontSize || 48) * (layer.captionConfig?.scale ?? 1),
+            fontSize: (s.fontSize || 48) * capScale,
             fontWeight: s.fontWeight || 700,
             fontStyle: s.fontStyle || "normal",
             color: s.color || "#ffffff",

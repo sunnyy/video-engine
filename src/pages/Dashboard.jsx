@@ -15,7 +15,7 @@ import { planTypographyVideo, produceTypographyVideo } from "../services/ai/typo
 import { generateCaptions } from "../services/captions/generateCaptions";
 import { uploadUserAsset } from "../services/assets/uploadUserAsset";
 import { captionStylePresets, captionStyleLabels } from "../core/registries/captionTimelineRegistry.jsx";
-import { VoiceLanguageField, DurationField, OrientationField, SelectField, ReviewToggleField, LookField, CaptionStyleField } from "../ui/fields/index.js";
+import { VoiceLanguageField, DurationField, OrientationField, SelectField, ReviewToggleField, LookField, CaptionStyleField, AccentField } from "../ui/fields/index.js";
 import { SERVICE_FIELDS } from "../config/serviceFields.js";
 import { creditsForDuration } from "../core/utils/creditCosts.js";
 import { getReviewScriptFirst, setReviewScriptFirst } from "../core/utils/reviewScriptPref.js";
@@ -894,6 +894,7 @@ function CaptionsChatbox({ onBusy }) {
   const [captionStyle, setCaptionStyle] = useState(cfg.specific.captionStyle.default);
   const [position,     setPosition]     = useState(cfg.specific.position.default);
   const [captionLang,  setCaptionLang]  = useState("auto");
+  const [accentColor,  setAccentColor]  = useState(null);
   const [loading,      setLoading]      = useState(false);
   const [statusStep,   setStatusStep]   = useState(0);
   const [error,        setError]        = useState(null);
@@ -909,7 +910,7 @@ function CaptionsChatbox({ onBusy }) {
     setLoading(true); setError(null); setStatusStep(0);
     try {
       const result = await generateCaptions(
-        { file, captionStyle, captionPos: position, language: captionLang },
+        { file, captionStyle, captionPos: position, language: captionLang, accentColor },
         ({ step }) => { if (typeof step === "number") setStatusStep(step); },
       );
       invalidateProjectCaches("caption_studio", "all");
@@ -942,6 +943,7 @@ function CaptionsChatbox({ onBusy }) {
             <CaptionStyleField value={captionStyle} onChange={setCaptionStyle} options={CAPTION_STYLE_OPTIONS} accent={CC} />
             <SelectField icon={<Languages size={16} />}    label="Language"      value={captionLang}  onChange={setCaptionLang}  options={CAPTION_LANG_OPTIONS} accent={CC} />
             <SelectField icon={<MoveVertical size={16} />} label="Position"      value={position}     onChange={setPosition}     options={cfg.specific.position.options} accent={CC} />
+            <AccentField value={accentColor} onChange={setAccentColor} accent={CC} />
           </div>
           <button onClick={handleGenerate} disabled={!canGo} title="Add captions"
             style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: canGo ? "pointer" : "not-allowed", background: canGo ? CC : "rgba(52,211,153,0.25)", color: "#04231a", display: "flex", alignItems: "center", justifyContent: "center" }}>

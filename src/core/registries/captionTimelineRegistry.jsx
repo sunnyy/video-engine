@@ -4,6 +4,7 @@
  * Components take { text, localTime, duration, brandColor } — no Remotion.
  * localTime = seconds elapsed since this caption chunk started (0 → duration).
  */
+import { editorialWords, wordReveal } from "./editorialCaption";
 
 /* ── Helpers ───────────────────────────────────────────────── */
 function splitWords(text) {
@@ -310,6 +311,35 @@ export function EditorialSerif({ text, localTime, duration }) {
   );
 }
 
+/* ── Editorial — multi-size serif, word-by-word reveal: small words + big italic "hero" word ── */
+export function EditorialClean({ text, localTime = 0, duration = 0, brandColor = "#e8c66a" }) {
+  const ws = editorialWords(text);
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "baseline", gap: "2px 12px", maxWidth: 700, fontFamily: "'Playfair Display', serif", lineHeight: 1.02, textShadow: "0 2px 18px rgba(0,0,0,0.55)" }}>
+      {ws.map((w, i) => {
+        const { opacity, dy } = wordReveal(localTime, duration, i, ws.length);
+        return (
+          <span
+            key={i}
+            style={{
+              ...(w.hero ? { flexBasis: "100%", textAlign: "center" } : {}),
+              fontSize: w.size,
+              fontWeight: w.hero ? 700 : 500,
+              fontStyle: w.italic ? "italic" : "normal",
+              color: w.hero ? brandColor : "currentColor",
+              opacity,
+              transform: dy ? `translateY(${dy}px)` : undefined,
+            }}
+          >
+            {w.word}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── 7. Neon Ticker ────────────────────────────────────────── */
 export function NeonTicker({ text, localTime }) {
   const charsPerSec  = 45;
@@ -480,6 +510,7 @@ export function LuxuryGold({ text, localTime, duration }) {
 export const captionTimelineRegistry = {
   wordBlaze:      WordBlaze,
   karaokeFill:    KaraokeFill,
+  editorial:      EditorialClean,
   stackReveal:    StackReveal,
   markerPen:      MarkerPen,
   glitchStamp:    GlitchStamp,
@@ -493,10 +524,11 @@ export const captionTimelineRegistry = {
 export const captionStyleLabels = {
   wordBlaze:      "Word Blaze",
   karaokeFill:    "Karaoke",
+  editorial:      "Editorial",
   stackReveal:    "Stack Reveal",
   markerPen:      "Marker Pen",
   glitchStamp:    "Glitch Stamp",
-  editorialSerif: "Editorial",
+  editorialSerif: "Editorial Card",
   neonTicker:     "Neon Ticker",
   pillDrop:       "Pill Drop",
   brutalSlam:     "Brutal Slam",
@@ -507,6 +539,7 @@ export const captionStyleLabels = {
 export const captionStyleAccents = {
   wordBlaze:      "#f5c518",
   karaokeFill:    "#f5c518",
+  editorial:      "#e8c66a",
   stackReveal:    "#ffd60a",
   markerPen:      "#ffd700",
   glitchStamp:    "#00f7ff",
@@ -525,6 +558,10 @@ export const captionStylePresets = {
   karaokeFill: {
     style:      { fontFamily: "'Outfit',sans-serif",           fontSize: 70, fontWeight: "800", color: "#ffffff", textAlign: "center" },
     transition: { in: { type: "slide-up",   duration: 0.12, intensity: 0.6 }, out: { type: "fade",    duration: 0.08, intensity: 1   } },
+  },
+  editorial: {
+    style:      { fontFamily: "'Playfair Display',serif",      fontSize: 60, fontWeight: "500", color: "#ffffff", textAlign: "center", textShadow: "0 2px 18px rgba(0,0,0,0.55)" },
+    transition: { in: { type: "fade",       duration: 0.18, intensity: 1   }, out: { type: "fade",    duration: 0.1,  intensity: 1   } },
   },
   stackReveal: {
     style:      { fontFamily: "'Unbounded',sans-serif",        fontSize: 58, fontWeight: "900", color: "#ffffff", textAlign: "center" },

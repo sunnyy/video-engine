@@ -2,6 +2,7 @@ import { serverFetch, SERVER } from "../serverApi";
 import { supabase } from "../../lib/supabase";
 import { createProject } from "../projects/projectService";
 import { captionStylePresets } from "../../core/registries/captionTimelineRegistry.jsx";
+import { sentenceVideoLayers } from "./sentenceSegments";
 
 /**
  * generateCaptions({ file, captionStyle, captionPos }, onProgress)
@@ -29,7 +30,7 @@ function chunkSegments(segments, wordsPerChunk = 3) {
   return result;
 }
 
-export async function generateCaptions({ file, captionStyle = "wordBlaze", captionPos = 80, language = "auto" }, onProgress) {
+export async function generateCaptions({ file, captionStyle = "wordBlaze", captionPos = 80, language = "auto", accentColor = null }, onProgress) {
   if (!file) throw new Error("No video selected");
 
   // 1. Upload
@@ -64,7 +65,7 @@ export async function generateCaptions({ file, captionStyle = "wordBlaze", capti
     id: `caption_${i}`, trackId: `caption_${i}`, name: `Caption ${i + 1}`,
     type: "text", content: chunk.text,
     style: { ...preset.style, _captionStyle: captionStyle }, captionStyle,
-    captionConfig: { scale: 1.5 },
+    captionConfig: { scale: 1.5, ...(accentColor ? { brandColor: accentColor } : {}) },
     start: chunk.start, end: chunk.end, zIndex: 10,
     visible: true, locked: false, sfx: null, animation: null,
     keyframes:  { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
@@ -80,16 +81,7 @@ export async function generateCaptions({ file, captionStyle = "wordBlaze", capti
     version: "2.0",
     format:  { width: 1080, height: 1920, fps, duration: totalDuration },
     layers: [
-      {
-        id: "base_video", trackId: "track_base_video", name: "Video",
-        type: "video", src: videoUrl, objectFit: "cover",
-        start: 0, end: totalDuration, zIndex: 0,
-        visible: true, locked: false, sfx: null, animation: null,
-        volume: 1, muted: false, trimStart: 0, trimEnd: totalDuration, fadeIn: 0, fadeOut: 0,
-        keyframes:  { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
-        transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
-        transform:  { x: 0, y: 0, width: 1080, height: 1920, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
-      },
+      ...sentenceVideoLayers(videoUrl, segments, totalDuration, { width: 1080, height: 1920 }),
       ...captionLayers,
     ],
   };
