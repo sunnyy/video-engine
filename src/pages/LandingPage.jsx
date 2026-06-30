@@ -280,7 +280,7 @@ const CSS = `
 
   /* MOBILE SERVICE CARDS */
   .m-svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
-  .m-svc-card { position: relative; border-radius: 16px; padding: 20px 16px 16px; display: flex; flex-direction: column; justify-content: flex-end; min-height: 150px; overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.07); background: #13131e; transition: border-color 0.2s, transform 0.2s; }
+  .m-svc-card { position: relative; border-radius: 16px; padding: 20px 16px 16px; display: flex; flex-direction: column; justify-content: flex-end; min-height: 150px; overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.07); background: #010002; transition: border-color 0.2s, transform 0.2s; }
   .m-svc-card:active { transform: scale(0.97); }
   .m-svc-card-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.75) 100%); pointer-events: none; }
   .m-svc-card-name { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: #e8e8f0; text-transform: uppercase; line-height: 1.2; position: relative; z-index: 1; }
@@ -601,11 +601,11 @@ function ServiceCostRow({ name, cost }) {
 }
 // The full service list shown on every pricing card (from the catalog, so it never drifts), with
 // each service's credit cost on the right so users see exactly how far their credits go.
-function VideoServicesList() {
+function VideoServicesList({ exclude = [] }) {
   return (
     <>
       <PlusLabel>All video services</PlusLabel>
-      {videoServices().map((s) => (
+      {videoServices().filter((s) => !exclude.includes(s.key)).map((s) => (
         <ServiceCostRow key={s.key} name={s.name} cost={SERVICE_COST_LABEL[s.key]} />
       ))}
       <ServiceCostRow name="10+ AI image & audio tools" cost={TOOLS_COST_LABEL} />
@@ -796,7 +796,7 @@ export default function LandingPage() {
 
             const tile = (image, extra = {}) => ({
               position: "relative",
-              background: image ? `#0d0d16 url(${image}) center/contain no-repeat` : "#13131e",
+              background: image ? `#010002 url(${image}) center/contain no-repeat` : "#010002",
               border: "1px solid rgba(255,255,255,0.07)",
               borderRadius: 16,
               overflow: "hidden",
@@ -889,7 +889,7 @@ export default function LandingPage() {
                 { emoji: "💬", name: "Auto Captions",        desc: "Animated captions on any video", route: "/video-captions",   accent: "#f5c518", image: "/assets/images/services/auto_captions.png" },
               ].map(svc => (
                 <div key={svc.name} className="m-svc-card"
-                  style={{ background: svc.image ? `#0d0d16 url(${svc.image}) center/contain no-repeat` : "#13131e", borderColor: svc.accent + "33" }}
+                  style={{ background: svc.image ? `#010002 url(${svc.image}) center/contain no-repeat` : "#010002", borderColor: svc.accent + "33" }}
                   onClick={() => handleCardClick(svc.route)}
                 >
                   {svc.image && <div className="m-svc-card-overlay" />}
@@ -1086,7 +1086,7 @@ export default function LandingPage() {
             <br />
             <span className="yellow">No surprises.</span>
           </h2>
-          <p className="section-sub">Start free. Every plan unlocks every service. Upgrade or cancel anytime.</p>
+          <p className="section-sub">Every plan unlocks every service. Upgrade or cancel anytime.</p>
           
 
           <div style={{ display: "flex", justifyContent: "center", marginTop: 34 }}>
@@ -1143,28 +1143,38 @@ export default function LandingPage() {
             data-reveal
             style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}
           >
-            {/* Free */}
+            {/* Starter — entry paid plan */}
             <div className="plan">
               <div className="plan-head">
-                <div className="plan-name">Free</div>
+                <div className="plan-name">Starter</div>
               </div>
-              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For getting started.</p>
+              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For trying it out &amp; light use.</p>
               <div className="plan-price-row">
-                <div>
-                  <div className="plan-price"><span>$</span>0</div>
-                  <div className="plan-cycle" style={{ marginBottom: 2 }}>free forever</div>
-                </div>
+                {cycle === "annual" ? (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: "var(--dim)", textDecoration: "line-through" }}>$29</div>
+                      <div className="plan-price" ><span>$</span>24</div>
+                      <span style={{ fontSize: 14, color: "var(--dim)" }}>/mo</span>
+                    </div>
+                    <div className="plan-cycle" style={{ marginBottom: 2, marginTop: 4 }}>$290 billed annually · 17% off</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="plan-price"><span>$</span>29<span style={{ fontSize: 14, color: "var(--dim)" }}> /mo</span></div>
+                    <div className="plan-cycle" style={{ marginBottom: 2 }}>billed monthly</div>
+                  </div>
+                )}
               </div>
-              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={handleCTA}>
-                Start free
+              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={() => goToPlan("starter")}>
+                Get Started
               </button>
-              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>No credit card required</div>
+              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
               <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <Check>⚡ 150 credits to start</Check>
-                <Check>Watermarked exports</Check>
+                <Check>⚡ 600 credits / month</Check>
                 <VideoServicesList />
+                <Check>Credit top-ups anytime</Check>
                 <Cross>Automation &amp; auto-publish to social</Cross>
-                <Cross>Credit top-ups anytime</Cross>
               </div>
             </div>
 
@@ -1195,11 +1205,11 @@ export default function LandingPage() {
               <button className="plan-btn plan-btn-hot" style={{ marginTop: 16 }} onClick={() => goToPlan("pro")}>
                 Get Started
               </button>
-              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>150 free credits first · cancel anytime</div>
+              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
               <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
                 <Check>⚡ 1,500 credits / month</Check>
                 <VideoServicesList />
-                <PlusLabel>Everything in Free, plus:</PlusLabel>
+                <PlusLabel>Everything in Starter, plus:</PlusLabel>
                 <Check>Automation &amp; auto-publish to social</Check>
                 <Check>Credit top-ups anytime</Check>
               </div>
@@ -1254,10 +1264,10 @@ export default function LandingPage() {
                 <br />
                 Start creating.
               </div>
-              <div className="cta-banner-sub">150 free credits. No card required. Every service unlocked.</div>
+              <div className="cta-banner-sub">Every service unlocked. Plans from $29/mo. Cancel anytime.</div>
             </div>
             <button className="cta-banner-btn" onClick={handleCTA}>
-              Get Started Free →
+              Get Started →
             </button>
           </div>
         </div>
