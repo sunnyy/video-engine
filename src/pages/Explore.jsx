@@ -11,6 +11,20 @@ const T = { bg: "#090b11", surface: "#0e1018", border: "rgba(255,255,255,0.08)",
 
 const SECTIONS = [
   {
+    label: "Video",
+    items: [
+      { emoji: "🎬", label: "Prompt to Video",      desc: "Any idea or topic → a fully designed, narrated video", to: "/ai-video",          accent: "#7c5cfc" },
+      { emoji: "🚀", label: "SaaS / Promo Video",   desc: "Turn your product or website into a polished promo",   to: "/promo-video",       accent: "#6366f1" },
+      { emoji: "🔗", label: "Social Post to Video", desc: "Repurpose a post or link into a ready-to-publish reel", to: "/social-video",      accent: "#22d3ee" },
+      { emoji: "📦", label: "Product Video",        desc: "One product photo → a cinematic promo ad",            to: "/product-video",     accent: "#f97316" },
+      { emoji: "🔤", label: "Typography Video",     desc: "Bold kinetic-text videos, great on mute",             to: "/typography-video",  accent: "#a855f7" },
+      { emoji: "🎙", label: "Talking Head",         desc: "Your clip → auto captions, cuts & B-roll",            to: "/talking-head",      accent: "#34d399" },
+      { emoji: "✂️", label: "Video Clipping",       desc: "Long video → AI-picked captioned vertical clips",      to: "/video-clipping",    accent: "#f5c518" },
+      { emoji: "📱", label: "App Promo Video",      desc: "App Store / Play link → a promo from its screenshots", to: "/app-video",         accent: "#38bdf8" },
+      { emoji: "💬", label: "Auto Captions",        desc: "Add animated, word-synced captions to any video",      to: "/video-captions",    accent: "#f5c518" },
+    ],
+  },
+  {
     label: "Image",
     items: [
       { emoji: "🖼", label: "AI Images",      desc: "Product shots, ad creatives & social visuals", to: "/image-generation", accent: "#a78bfa" },
@@ -59,7 +73,7 @@ export default function Explore() {
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
         <div style={{ padding: "40px 40px 80px" }}>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: "0 0 6px" }}>Explore</h1>
-          <p style={{ fontSize: 14, color: T.muted, margin: "0 0 28px" }}>Image & audio tools to go with your videos.</p>
+          <p style={{ fontSize: 14, color: T.muted, margin: "0 0 28px" }}>Every video service, plus the image & audio tools that go with them.</p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
             {SECTIONS.map(section => (

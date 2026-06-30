@@ -22,6 +22,7 @@ const FILTERS = [
   { id: "social_video",     label: "Social Video",     sources: ["social_video"] },
   { id: "talking_head",     label: "Talking Head",     sources: ["talking_head"] },
   { id: "video_clip",       label: "Video Clipping",   sources: ["video_clip"] },
+  { id: "app_video",        label: "App Promo",        sources: ["app_video"] },
   { id: "typography_video", label: "Typography Video", sources: ["typography_video"] },
   { id: "caption_studio",   label: "Auto Captions",    sources: ["caption_studio"] },
 ];

@@ -45,6 +45,9 @@ export const SERVICE_CATALOG = [
   { key: "video_clipping", name: "Video Clipping", category: "create", tier: 2, featured: false, beta: true,
     route: "/video-clipping", creditKey: "video_clipping", pricing: { model: "flat", credits: CREDIT_COSTS.video_clipping }, publishable: false,
     blurb: "Upload a long video or podcast — AI finds the best moments and turns them into captioned vertical clips. Charged by source length." },
+  { key: "app_video", name: "App Promo Video", category: "create", tier: 2, featured: false, beta: true,
+    route: "/app-video", creditKey: "app_video", pricing: { model: "scene", tiers: CREDIT_COSTS.app_video }, publishable: false,
+    blurb: "Paste an App Store or Play Store link — we turn its screenshots, info and reviews into a promo video (per scene count)." },
 
   // ── Tier 4 — supporting tools ("Plus 10+ AI Tools") ──
   { key: "ai_images", name: "AI Images", category: "tool", tier: 4, featured: false, beta: false,

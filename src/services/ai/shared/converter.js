@@ -556,6 +556,17 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     // icon on top of the hand-built shapes. Only convert leaf elements to icons.
     const iconName = normalizeIconName(n.dataIcon);
     if (iconName && !n.hasRoleChildren) {
+      // Preserve a FILLED icon chip: if the icon element has its own background fill (a rounded
+      // coloured box), that box is the designer's intent. Converting straight to a glyph drops the
+      // fill — leaving a white icon on a light page (invisible). When there's a real fill, emit the
+      // chip as a separate rounded box BEHIND the glyph (pushed first → same z, earlier in array →
+      // underneath) so the filled shape survives and the white icon stays legible on top.
+      const chipBg = n.css.bgImage || n.css.bgColor || null;
+      if (chipBg) {
+        graph.push({ ...entry, id: `${entry.id}_chip`, type: "gradient", iconName: undefined,
+          background: chipBg, text: null, style: {} });
+        entry.background = null;
+      }
       entry.type = "icon";
       entry.iconName = iconName;
       entry.style = entry.style ?? {};
@@ -713,11 +724,18 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
   // colour field). Demote every full-canvas background gradient below the floor so the image — and
   // all content — always sits above it. A LOCAL text-band scrim is partial-height (not full-canvas),
   // so it's untouched and still sits over its photo as the designer authored it.
+  // Only SINK the page background to a negative z (behind the renderer's canvas base) when there's a
+  // full-frame IMAGE it must not bury. With no such image, a negative z hides the ONLY background
+  // behind the black base → the whole scene renders black (broke light/brand-tinted designed scenes).
+  // In that case keep it at the floor (z0) so it actually paints, with all content sitting above it.
+  const hasFullCanvasImage = graph.some(e => e.type === "image" && e.src &&
+    e.width >= canvasW * 0.92 && e.height >= canvasH * 0.92 &&
+    e.x <= canvasW * 0.08 && e.y <= canvasH * 0.08);
   for (const el of graph) {
     if (el.type === "gradient" && el.role === "background" &&
         el.width >= canvasW * 0.92 && el.height >= canvasH * 0.92 &&
         el.x <= canvasW * 0.08 && el.y <= canvasH * 0.08) {
-      el.zIndex = Math.min(el.zIndex, -1);
+      el.zIndex = hasFullCanvasImage ? Math.min(el.zIndex, -1) : Math.min(el.zIndex, 0);
     }
   }
 

@@ -1,0 +1,334 @@
+/**
+ * renderOrchestrator.js
+ * src/services/ai/saasVideo/renderOrchestrator.js
+ *
+ * Pipeline order:
+ *   1. Generate TTS for all AI-voiceover scenes
+ *   2. Estimate TTS duration → update scene.duration_seconds
+ *   3. Fetch Pixabay stock images for stock / ai_generated scenes
+ *   4. Assemble timeline with corrected durations and injected assets
+ *   5. Inject TTS audio layers into timeline
+ *   6. Save timeline to projects table for editor access
+ *   7. Render with Remotion, upload to storage
+ *   8. Mark project rendered / failed
+ */
+
+import fs from "fs";
+import path from "path";
+import { supabaseAdmin, TEMP_DIR, PROJECT_ROOT, uuidv4 } from "../../../server/middleware/shared.js";
+import { generatePromoVoiceovers, injectVoiceoversIntoTimeline } from "./ttsGenerator.js";
+import { PROJECT_STATUS, ASSET_SOURCE, ASSET_TYPE } from "./projectSchema.js";
+import { pickAutoMood } from "../../../core/registries/musicRegistry.js";
+import { searchStockImage } from "../shared/stock.js";
+
+// Bump this version string whenever TimelineComposition.jsx positioning logic changes.
+// The bundle cache is invalidated when the version file changes, forcing a rebuild.
+const BUNDLE_VERSION = "v2-topleft-coords";
+
+async function getBundle() {
+  const prebundleDir = path.join(PROJECT_ROOT, "remotion-bundle");
+  const versionFile  = path.join(prebundleDir, "bundle-version.txt");
+
+  const cachedVersion = fs.existsSync(versionFile) ? fs.readFileSync(versionFile, "utf8").trim() : null;
+  const bundleReady   = fs.existsSync(path.join(prebundleDir, "index.html"));
+
+  if (bundleReady && cachedVersion === BUNDLE_VERSION) return prebundleDir;
+
+  console.log(`[renderOrchestrator] building Remotion bundle (version: ${BUNDLE_VERSION})…`);
+  const { bundle } = await import("@remotion/bundler");
+  const outDir = await bundle({ entryPoint: path.join(PROJECT_ROOT, "src/remotion/Root.jsx") });
+  // Write version marker so cache is reused until next code change
+  fs.writeFileSync(path.join(outDir, "bundle-version.txt"), BUNDLE_VERSION, "utf8");
+  return outDir;
+}
+
+async function setStatus(projectId, status, extra = {}) {
+  await supabaseAdmin
+    .from("promo_videos")
+    .update({ status, updated_at: new Date().toISOString(), ...extra })
+    .eq("id", projectId);
+}
+
+// Estimate TTS speaking duration from word count.
+function estimateTtsDuration(script) {
+  const words = script.trim().split(/\s+/).filter(Boolean).length;
+  if (words <= 6)  return parseFloat((2.0 + Math.random() * 0.5).toFixed(1));
+  if (words <= 14) return parseFloat((3.0 + (words - 6) / 8).toFixed(1));
+  return Math.min(6.0, parseFloat((4.0 + (words - 14) / 10).toFixed(1)));
+}
+
+const SKIP_WORDS = new Set(["a","an","the","of","for","with","and","or","in","on","at","to","is","are","be","was","were","that","this","it","as","by","from","into","about","showing","featuring","displaying","dynamic","short","quick","simple","clean","professional","modern","background","scene","shot","image","video","photo","showing"]);
+
+function extractSearchQuery(hint) {
+  if (!hint) return "";
+  const words = hint.split(/\s+/).filter(w => w.length > 2 && !SKIP_WORDS.has(w.toLowerCase().replace(/[^a-z]/g, "")));
+  return words.slice(0, 4).join(" ") || hint.split(/\s+/).slice(0, 3).join(" ");
+}
+
+// Stock image — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
+async function fetchPixabayImage(hint, orientation = "9:16") {
+  if (!hint) return null;
+  const hit = await searchStockImage(hint, { orientation });
+  return hit?.url ?? null;
+}
+
+export async function orchestratePromoRender(projectId) {
+  const jobId = uuidv4();
+
+  const { data: row, error: fetchErr } = await supabaseAdmin
+    .from("promo_videos")
+    .select("*")
+    .eq("id", projectId)
+    .single();
+
+  if (fetchErr || !row) throw new Error(`Project not found: ${projectId}`);
+
+  // ── V2 projects: pipeline already ran during /create — nothing to redo ──────
+  if (row.scene_format === 'v2') {
+    await setStatus(projectId, PROJECT_STATUS.RENDERED, { editor_project_id: row.editor_project_id });
+    console.log(`[renderOrchestrator] ${projectId} → V2 timeline pre-built, opening editor`);
+    return { projectId, video_url: null, editor_project_id: row.editor_project_id };
+  }
+
+  await setStatus(projectId, PROJECT_STATUS.RENDERING);
+
+  const framesDir  = path.join(TEMP_DIR, `promo-frames-${jobId}`);
+  const outputPath = path.join(TEMP_DIR, `promo-render-${jobId}.mp4`);
+
+  try {
+    const style = (row.style && Object.keys(row.style).length > 0)
+      ? row.style
+      : {
+          caption_style:    row.caption_style    ?? "minimal",
+          transition_style: row.transition_style ?? "cut",
+          music_mood:       row.music_mood       ?? "upbeat",
+          motion_style:     row.motion_style     ?? null,
+          color_palette:    row.color_palette    ?? null,
+        };
+
+    // Work on cloned scenes so we can mutate durations and asset_urls
+    let scenes = (row.scenes || []).map(s => ({ ...s }));
+    const isThVideo = row.video_type === "talking_head";
+
+    // ── Step 1: Build voiceover queue + generate TTS ─────────────────────────
+    let voiceover_queue;
+    if (isThVideo) {
+      voiceover_queue = [];
+    } else {
+      voiceover_queue = scenes
+        .filter(s => s.asset_type === ASSET_TYPE.AI_VOICEOVER && s.script?.trim())
+        .map(s => ({ scene_id: s.scene_id, script: s.script, voice: "nova" }));
+    }
+
+    let voiceover_results = [];
+    if (voiceover_queue.length > 0) {
+      console.log(`[renderOrchestrator] generating ${voiceover_queue.length} TTS voiceovers for ${projectId}`);
+      voiceover_results = await generatePromoVoiceovers(voiceover_queue, projectId);
+    }
+
+    // ── Step 2: Update scene durations from actual TTS audio length ──────────
+    if (!isThVideo) {
+      const durBySid = {};
+      for (const r of voiceover_results) {
+        if (r.duration_seconds != null) durBySid[r.scene_id] = r.duration_seconds;
+      }
+      for (const scene of scenes) {
+        if (scene.asset_type === ASSET_TYPE.AI_VOICEOVER && scene.script?.trim()) {
+          const measured = durBySid[scene.scene_id];
+          scene.duration_seconds = measured != null
+            ? parseFloat((measured + 0.3).toFixed(2))
+            : estimateTtsDuration(scene.script);
+        }
+      }
+    }
+
+    // ── Step 3: Fetch Pixabay images for stock / AI-generated scenes ───────
+    const stockScenes = scenes.filter(s =>
+      s.asset_source === ASSET_SOURCE.STOCK || s.asset_source === ASSET_SOURCE.AI_GENERATED
+    );
+    if (stockScenes.length > 0) {
+      console.log(`[renderOrchestrator] fetching ${stockScenes.length} Pixabay images`);
+      await Promise.all(stockScenes.map(async scene => {
+        const query = extractSearchQuery(scene.asset_hint || scene.scene_type);
+        const imageUrl = await fetchPixabayImage(query, row.format_ratio ?? "9:16");
+        if (imageUrl) scene.asset_url = imageUrl;
+      }));
+    }
+
+    // ── Step 4: Assemble timeline with corrected durations + stock images ──
+    const totalDuration = scenes.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+    const thUrl = scenes.find(s => s.th_url)?.th_url ?? null;
+    const project = { ...row, style, scenes, duration_seconds: totalDuration, talking_head_url: thUrl };
+
+    throw new Error("Legacy non-v2 promo render is no longer supported. Re-create the project to use the current pipeline.");
+
+    // ── Step 5: Inject TTS audio layers ───────────────────────────────────
+    const finalTimeline = voiceover_results.length > 0
+      ? injectVoiceoversIntoTimeline(timeline, voiceover_results)
+      : timeline;
+
+    // ── Step 5b: Inject background music ─────────────────────────────────
+    // Skip for V2 — pipelineOrchestrator already injected music during /create.
+    if (row.scene_format === 'v2') {
+      console.log(`[renderOrchestrator] ${projectId} — V2: skipping music injection (already done)`);
+    }
+    if (row.scene_format !== 'v2') try {
+      const mood = pickAutoMood(row.video_goal, row.tone);
+      const { data: allTracks } = await supabaseAdmin
+        .from("music_tracks")
+        .select("public_url, title, mood")
+        .eq("is_active", true);
+
+      if (allTracks?.length) {
+        const moodTracks = allTracks.filter(t => t.mood === mood);
+        const pool  = moodTracks.length ? moodTracks : allTracks;
+        const track = pool[Math.floor(Math.random() * pool.length)];
+        const musicDur = finalTimeline.format.duration; // use post-inject duration
+        finalTimeline.layers.push({
+          id: "music_global", trackId: "track_music",
+          type: "audio", audioType: "music", src: track.public_url,
+          start: 0, end: musicDur, zIndex: 0,
+          visible: true, locked: false,
+          trimStart: 0, trimEnd: musicDur,
+          volume: 0.15, muted: false, fadeIn: 1, fadeOut: 1,
+          sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+        });
+        console.log(`[renderOrchestrator] music injected: "${track.title}" (${mood})`);
+      }
+    } catch (e) {
+      console.warn("[renderOrchestrator] music injection skipped:", e.message);
+    }
+
+    // ── Step 6: Save timeline to projects table for editor access ──────────
+    let editorProjectId = null;
+    try {
+      const { data: editorRow } = await supabaseAdmin
+        .from("projects")
+        .insert({
+          user_id:           row.user_id,
+          name:              `${row.product_name ?? "Promo Video"} — Promo`,
+          safe_project_json: finalTimeline,
+          orientation:       "9:16",
+          mode:              "timeline",
+          source:            "promo_video",
+          editor_version:    "timeline",
+        })
+        .select("id")
+        .single();
+      editorProjectId = editorRow?.id ?? null;
+    } catch (e) {
+      console.warn(`[renderOrchestrator] projects insert failed (non-fatal):`, e.message);
+    }
+
+    await supabaseAdmin
+      .from("promo_videos")
+      .update({ timeline: finalTimeline, editor_project_id: editorProjectId, updated_at: new Date().toISOString() })
+      .eq("id", projectId);
+
+    // ── TH videos: skip Remotion — timeline JSON is the output ──────────────
+    // The editor opens the timeline directly. Export to MP4 is user-triggered
+    // from the editor, same as any other timeline project.
+    if (isThVideo) {
+      await setStatus(projectId, PROJECT_STATUS.RENDERED, { editor_project_id: editorProjectId });
+      console.log(`[renderOrchestrator] ${projectId} → TH timeline ready, opening editor`);
+      return { projectId, video_url: null, editor_project_id: editorProjectId };
+    }
+
+    // ── Step 7: Remotion render (faceless only) ────────────────────────────
+    // Resolve sfx keys → Supabase storage public URLs before handing to Remotion.
+    // Drop audio/video layers with null src.
+    let sfxUrlMap = {};
+    try {
+      const sfxKeys = [...new Set(finalTimeline.layers.filter(l => l.sfx?.key).map(l => l.sfx.key))];
+      if (sfxKeys.length > 0) {
+        const { data: sfxRows } = await supabaseAdmin
+          .from("sfx_tracks").select("key, public_url").in("key", sfxKeys).eq("is_active", true);
+        sfxUrlMap = Object.fromEntries((sfxRows || []).map(r => [r.key, r.public_url]));
+      }
+    } catch (e) {
+      console.warn("[renderOrchestrator] SFX lookup skipped:", e.message);
+    }
+
+    const renderTimeline = {
+      ...finalTimeline,
+      layers: finalTimeline.layers
+        .filter(l => l.type !== "audio" && l.type !== "video" ? true : !!l.src)
+        .map(l => l.sfx?.key && sfxUrlMap[l.sfx.key]
+          ? { ...l, sfx: { ...l.sfx, src: sfxUrlMap[l.sfx.key] } }
+          : l.sfx ? { ...l, sfx: null } : l  // strip sfx if URL not found — don't crash render
+        ),
+    };
+
+    // ── Watermark for free users (no active subscription) ──────────────────
+    // Set on renderTimeline only (a copy) — the editor project saved above keeps
+    // a clean timeline; when the user later exports from the editor, render.js
+    // re-applies the watermark there. New meta object so finalTimeline is untouched.
+    try {
+      const { data: sub } = await supabaseAdmin
+        .from("subscriptions").select("id")
+        .eq("user_id", row.user_id).eq("status", "active").maybeSingle();
+      if (!sub) renderTimeline.meta = { ...renderTimeline.meta, showWatermark: true };
+    } catch (_) {}
+
+    const serveUrl = await getBundle();
+    const { getCompositions, renderFrames, stitchFramesToVideo } = await import("@remotion/renderer");
+
+    const comps = await getCompositions(serveUrl, { inputProps: { project: renderTimeline } });
+    const comp  = comps.find(c => c.id === "TimelineComposition");
+    if (!comp) throw new Error("TimelineComposition not found in Remotion bundle");
+
+    fs.mkdirSync(framesDir, { recursive: true });
+
+    const hasVideo = renderTimeline.layers?.some(l => l.type === "video") ?? false;
+    const { assetsInfo } = await renderFrames({
+      composition:     comp,
+      serveUrl,
+      inputProps:      { project: renderTimeline },
+      outputDir:       framesDir,
+      imageFormat:     "jpeg",
+      concurrency:     hasVideo ? 4 : 6,
+      chromiumOptions: { gl: "angle" },
+    });
+
+    await stitchFramesToVideo({
+      composition:    comp,
+      serveUrl,
+      inputProps:     { project: renderTimeline },
+      codec:          "h264",
+      assetsInfo,
+      outputLocation: outputPath,
+      fps:            comp.fps,
+      width:          comp.width,
+      height:         comp.height,
+    });
+
+    fs.rmSync(framesDir, { recursive: true, force: true });
+
+    // ── Step 8: Upload to Supabase storage ────────────────────────────────
+    const storageKey  = `promo-renders/${projectId}/video.mp4`;
+    const videoBuffer = fs.readFileSync(outputPath);
+
+    const { error: storageErr } = await supabaseAdmin.storage
+      .from("user-assets")
+      .upload(storageKey, videoBuffer, { contentType: "video/mp4", upsert: true });
+
+    if (storageErr) throw new Error(`Storage upload failed: ${storageErr.message}`);
+    try { fs.unlinkSync(outputPath); } catch {}
+
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from("user-assets")
+      .getPublicUrl(storageKey);
+
+    await setStatus(projectId, PROJECT_STATUS.RENDERED, { video_url: publicUrl, editor_project_id: editorProjectId });
+    console.log(`[renderOrchestrator] ${projectId} → rendered: ${publicUrl}`);
+    return { projectId, video_url: publicUrl, editor_project_id: editorProjectId };
+
+  } catch (err) {
+    try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
+
+    console.error(`[renderOrchestrator] ${projectId} failed:`, err.message);
+    await setStatus(projectId, PROJECT_STATUS.FAILED, { error_message: err.message }).catch(() => {});
+    throw err;
+  }
+}

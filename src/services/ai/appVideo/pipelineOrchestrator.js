@@ -1,0 +1,1027 @@
+/**
+ * pipelineOrchestrator.js
+ * src/services/ai/saasVideo/pipelineOrchestrator.js
+ *
+ * SaaS / Promo Video pipeline — VOICEOVER-FIRST beat model. The live path is runV2BeatPipeline
+ * (faceless); talking-head forks to runTHPipeline. The legacy scene pipeline + its helpers have
+ * been removed (it was unreachable behind BEAT_PIPELINE=true).
+ *
+ * Flow (runV2BeatPipeline):
+ *   1. (URL mode) harvest the product page for grounding (copy / brand / screenshots)
+ *   2. Generate narration → ONE TTS voiceover FIRST, with real word timestamps
+ *   3. planVisualBeats — time the visual beats to the spoken word timestamps (no drift)
+ *   4. Design each beat as HTML → headless measure / parse → positioned layers
+ *   5. Resolve visuals (stock / AI image), build the timeline, inject voiceover + music
+ *   6. Save the timeline to the projects table (opens in the editor)
+ */
+
+import sharp from "sharp";
+import { supabaseAdmin, openai }                      from "../../../server/middleware/shared.js";
+import { simplifyTimelineKeyframes }                  from "../shared/motion.js";
+import { generateFullVoiceover } from "./ttsGenerator.js";
+import { VoiceoverError }                             from "../shared/voiceoverError.js";
+import { saveIncompleteProject }                      from "../shared/incompleteProject.js";
+import { pickAutoMood }                               from "../../../core/registries/musicRegistry.js";
+import { generateNarration } from "./scriptGenerator.js";
+import { planVisualBeats }                           from "./visualDirector.js";
+import { designScene }                               from "./sceneDesigner.js";
+import { designFreeScene }                           from "./sceneDesignerFree.js";
+import { parseSceneHTML }                             from "./htmlParser.js";
+import { measureSceneHTML, closeMeasureBrowser }      from "../shared/converter.js";
+import { searchStockImage, searchStockVideo }         from "../shared/stock.js";
+import { styleImagePrompt }                            from "../shared/visualStyles.js";
+import { generateAiImage }                             from "../shared/aiImage.js";
+import { persistRemote }                               from "../shared/persist.js";
+import { normalizeUrl }                                from "../shared/safeFetch.js";
+import { buildTimeline, buildTimelineFromBeats }      from "./timelineBuilder.js";
+import { generateAssetRequirements }                  from "./assetRequirements.js";
+import { ASSET_PLACEHOLDER_SRC }                       from "../../../core/utils/placeholders.js";
+import { fetchAppListing }                             from "./appStoreFetcher.js";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const SKIP_WORDS = new Set(["a","an","the","of","for","with","and","or","in","on","at","to","is","are","be","was","were","that","this","it","as","by","from","into","about","showing","featuring","displaying","dynamic","short","quick","simple","clean","professional","modern","background","scene","shot","image","video","photo","showing"]);
+
+function extractSearchQuery(hint) {
+  if (!hint) return "";
+  const words = hint.split(/\s+/).filter(w => w.length > 2 && !SKIP_WORDS.has(w.toLowerCase().replace(/[^a-z]/g, "")));
+  return words.slice(0, 4).join(" ") || hint.split(/\s+/).slice(0, 3).join(" ");
+}
+
+// ── Brand palette from the app's accent (its icon color) ────────────────────────
+// The whole video should look like it belongs to THIS app — not a generic dark deck. We build a
+// real palette around the brand accent: a bright brand-tinted field for light/vivid brands, or a
+// deep brand-tinted field (never pure black) for dark brands. Luminance of the accent decides.
+const _hx = (h) => { const m = String(h || "").replace("#", ""); return { r: parseInt(m.slice(0, 2) || "66", 16), g: parseInt(m.slice(2, 4) || "66", 16), b: parseInt(m.slice(4, 6) || "66", 16) }; };
+const _mix = (hex, target, t) => { const a = _hx(hex), b = _hx(target); const c = (k) => Math.round(a[k] + (b[k] - a[k]) * t); const h = (v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0"); return `#${h(c("r"))}${h(c("g"))}${h(c("b"))}`; };
+const _lum = (hex) => { const { r, g, b } = _hx(hex); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
+
+function deriveBrandPalette(accent) {
+  if (!accent || !/^#[0-9a-f]{6}$/i.test(accent)) return null;
+  // Light/medium brand (most app-store creative) → bright, brand-tinted field, dark text.
+  return {
+    bg:           _mix(accent, "#ffffff", 0.90), // pale brand wash
+    bgSecondary:  _mix(accent, "#ffffff", 0.80),
+    primaryText:  _mix(accent, "#000000", 0.78), // very deep brand tone for hard contrast on the light field
+    secondaryText:_mix(accent, "#000000", 0.55),
+    accent,
+    accent2:      _mix(accent, "#000000", 0.30),
+    light:        true,
+  };
+}
+
+// Stock image — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
+// Re-host to Supabase: raw Pixabay/Pexels CDN URLs are hotlink-protected and fail to
+// load in Remotion's Chrome at export (ERR_BLOCKED_BY_ORB / 400), crashing the render.
+async function fetchPixabayImage(hint, orientation = "9:16", runId = "promo") {
+  if (!hint) return null;
+  const hit = await searchStockImage(hint, { orientation });
+  if (!hit?.url) return null;
+  const persisted = await persistRemote(hit.url, { runId, label: `stock-${Date.now()}`, contentType: "image/jpeg", referer: "https://pixabay.com/" });
+  return persisted ?? hit.url;
+}
+
+// Orientation-aware AI image via the shared, universal generator (FLUX + text-gate
+// + permanent persist). image_size is derived from orientation there — no hardcoding.
+async function generateFalImage(hint, projectId, styleId = "auto", orientation = "9:16") {
+  if (!hint) return null;
+  const prompt = `${hint}, ${styleImagePrompt(styleId, "photo")}, sharp focus, 8k quality, no people, no faces`;
+  return await generateAiImage(prompt, { runId: projectId ?? "promo", label: `ai-${Date.now()}`, orientation });
+}
+
+// ── Orientation-aware reframing ────────────────────────────────────────────────
+// A landscape/horizontal asset center-cropped to a full-bleed 9:16 frame loses most of
+// itself and looks bad. After media is resolved we probe each full-bleed IMAGE's real
+// orientation and, if it's landscape, reframe it like Social's "framed" treatment: the
+// REAL image is CONTAINED (whole thing visible) over a blurred cover-fill of itself.
+const LANDSCAPE_MIN_ASPECT = 1.25;
+async function imageAspectRatio(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    return (meta.width && meta.height) ? meta.width / meta.height : null;
+  } catch { return null; }
+}
+async function reframeLandscapeMedia(timeline) {
+  const W = timeline.format?.width, H = timeline.format?.height;
+  if (!W || !H) return;
+  // Only full-canvas cover IMAGES (the egregious case). Videos are requested 9:16 + need ffprobe; skip.
+  const fullBleed = timeline.layers.filter(l =>
+    l.type === "image" && l.src && l.objectFit === "cover" &&
+    Math.abs((l.transform?.width ?? 0) - W) < 2 && Math.abs((l.transform?.height ?? 0) - H) < 2);
+  if (!fullBleed.length) return;
+
+  const extras = [];
+  await Promise.all(fullBleed.map(async (l) => {
+    // App screenshots are PHONE screens (taller than 9:16) — cover-cropping hides the app UI. Always
+    // show the WHOLE screen (contain) over a soft blurred fill of itself: the app-store-preview look.
+    const isAppShot = l._appShot === true;
+    const aspect = isAppShot ? null : await imageAspectRatio(l.src);
+    if (!isAppShot && (aspect == null || aspect < LANDSCAPE_MIN_ASPECT)) return; // non-app portrait/square stays full-bleed cover
+    // Blurred cover-fill backdrop (a clone, keeps the cover Ken Burns) sits beneath at z0.
+    const bg = JSON.parse(JSON.stringify(l));
+    bg.id = `${l.id}bg`; bg.trackId = `${l.id}bg`; bg.name = "Media BG";
+    bg.objectFit = "cover";
+    bg.filter = isAppShot ? "blur(48px) brightness(0.55) saturate(1.2)" : "blur(42px) brightness(0.5)";
+    bg.zIndex = 0;
+    extras.push(bg);
+    // The real screen: WHOLE thing (contain) at z1 — above the blurred bg, below text (z≥8).
+    l.objectFit = "contain";
+    l.zIndex = 1;
+    if (isAppShot) { l.boxShadow = "rgba(0,0,0,0.5) 0px 24px 70px 0px"; if (l.transform) l.transform.borderRadius = 28; }
+    // Panning a letterboxed image looks wrong — keep only a gentle zoom, drop x/y drift.
+    if (l.keyframes) l.keyframes = { ...l.keyframes, x: [], y: [] };
+    console.log(`[v2/beats] reframed ${isAppShot ? "app screenshot" : `landscape media (aspect ${aspect.toFixed(2)})`} ${l.id} → contain + blurred fill`);
+  }));
+  if (extras.length) timeline.layers.push(...extras);
+}
+
+// Stock video b-roll — orientation-aware, randomized, Pexels→Pixabay (shared/stock.js).
+// Re-hosted for the same reason as stock images (hotlink-protected CDN fails at export).
+async function fetchPixabayVideo(hint, orientation = "9:16", runId = "promo") {
+  if (!hint) return null;
+  const hit = await searchStockVideo(hint, { orientation });
+  if (!hit?.url) return null;
+  const persisted = await persistRemote(hit.url, { runId, label: `stockvid-${Date.now()}`, contentType: "video/mp4", referer: "https://pixabay.com/" });
+  return persisted ?? hit.url;
+}
+
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
+const CANVAS_SIZES = {
+  '9:16': { width: 1080, height: 1920 },
+  '16:9': { width: 1920, height: 1080 },
+  '1:1':  { width: 1080, height: 1080 },
+};
+
+// Phase 1 beat pipeline toggle — set false to fall back to the legacy scene pipeline.
+const BEAT_PIPELINE = true;
+// EXPERIMENTAL: let GPT write natural nested HTML/CSS and flatten it via a headless
+// browser (htmlMeasure) instead of the absolute-only parser. Toggle to A/B.
+const USE_HEADLESS_MEASURE = true;
+
+export async function runV2Pipeline(project) {
+  if (project.video_type === 'talking_head') {
+    return await runTHPipeline(project);
+  }
+  if (BEAT_PIPELINE) {
+    return await runV2BeatPipeline(project);
+  }
+}
+
+// ── V2 Beat pipeline (voiceover-first, timed visual beats) ─────────────────────
+
+/**
+ * planPromoNarration — script-only plan for the "Review script" step. Harvests the URL
+ * (so URL-mode narration is grounded like the real run), generates the narration, and
+ * returns it for the user to review/edit BEFORE the full (paid) pipeline runs. No TTS,
+ * no design, no DB write.
+ */
+export async function planPromoNarration(project) {
+  const appUrl = (project.app_url ?? "").trim();
+  if (appUrl) {
+    const harvest = await fetchAppListing(appUrl, { country: project.country ?? "us" });
+    project = {
+      ...project,
+      product_name:        harvest.title       || project.product_name        || "App",
+      product_description: harvest.description || project.product_description || "",
+      _harvest:            harvest,
+      _app:                harvest.app ?? null,
+    };
+  }
+  const n = await generateNarration(project);
+  return { full_script: n.full_script, projectName: n.projectName };
+}
+
+async function runV2BeatPipeline(project) {
+  const projectId   = project.id;
+  const formatRatio = project.format_ratio ?? '9:16';
+  const canvas      = CANVAS_SIZES[formatRatio] ?? CANVAS_SIZES['9:16'];
+
+  // ── Step 0: App-store fetch — pull real listing copy, icon, screenshots, reviews ──
+  // The fetched listing is always the source of truth for an app (name/description ground the
+  // script; screenshots are the hero visuals; rating/reviews become social proof + CTA).
+  let harvest = null;
+  const appUrl = (project.app_url ?? "").trim();
+  if (appUrl) {
+    console.log(`[app-video] ${projectId} — fetching app listing ${appUrl}`);
+    harvest = await fetchAppListing(appUrl, { country: project.country ?? "us" });
+    project = {
+      ...project,
+      product_name:        harvest.title       || project.product_name        || "App",
+      product_description: harvest.description || project.product_description || "",
+      _harvest:            harvest,
+      _app:                harvest.app ?? null,
+    };
+  }
+  const screenshots = harvest?.screenshotUrls ?? [];
+
+  // App mode auto-brands from the listing icon/color where available; user's pinned accent wins.
+  const brandAccent = project.accent_color ?? harvest?.brandColor ?? project.style?.color_palette ?? "#6366f1";
+  const brandPalette = deriveBrandPalette(brandAccent);
+
+  const projectContext = {
+    projectId,
+    productName:     project.product_name    ?? "App",
+    niche:           project.style?.niche    ?? harvest?.app?.genre?.toLowerCase() ?? "mobile app",
+    // App-mode signals for the designer (mobile-app aesthetic + category mood, not generic SaaS).
+    isMobileApp:     true,
+    appGenre:        harvest?.app?.genre  ?? null,
+    appStore:        harvest?.app?.store  ?? "ios",
+    appRating:       harvest?.app?.rating ?? null,
+    accentColor:     brandAccent,
+    accentColor2:    project.accent_color_2 ?? brandPalette?.accent2 ?? null,   // optional pinned secondary (else a deeper brand shade)
+    brandPalette,    // full palette derived from the app's branding — drives every designed frame
+    accent2:         brandPalette?.accent2 ?? null,
+    visualStyle:     project.visual_style    ?? "radiant",
+    typographyStyle: project.typography_style ?? "modern",
+    logoUrl:         project.logo_url ?? harvest?.logoUrl ?? null,
+    logoWidth:       project.logo_width      ?? null,
+    logoHeight:      project.logo_height     ?? null,
+    fps:             30,
+    musicMood:       project.style?.music_mood ?? "upbeat",
+    voiceId:         project.voice_id        ?? null,
+    language:        project.language        ?? "en",
+    canvasWidth:     canvas.width,
+    canvasHeight:    canvas.height,
+    formatRatio,
+    theme:           project.theme ?? 'dark',
+    tone:            project.tone  ?? 'professional',
+    // Director uses this to offer "product_shot" media when real screenshots exist.
+    screenshotCount: screenshots.length,
+  };
+
+  // ── Step 1: Narration (single continuous voiceover script) ──
+  // Honour a user-reviewed/edited script when provided (skip generation); else write one.
+  let narration;
+  if (project.script?.trim()) {
+    console.log(`[v2/beats] ${projectId} — using user-provided script (skipping narration generation)`);
+    narration = { full_script: project.script.trim(), creative_direction: null };
+  } else {
+    console.log(`[v2/beats] ${projectId} — generating narration`);
+    narration = await generateNarration(project);
+  }
+  const full_script = narration.full_script;
+  const creativeDirection = narration.creative_direction;
+  if (creativeDirection) console.log(`[v2/beats] direction: ${creativeDirection}`);
+
+  // ── Step 2: Voiceover FIRST (so visuals can be timed to real speech) ──────
+  let voiceoverAudioUrl = null, voiceoverDuration = 0, wordTimestamps = [];
+  try {
+    const tts = await generateFullVoiceover(full_script, projectId, projectContext.voiceId);
+    voiceoverAudioUrl = tts.audio_url;
+    voiceoverDuration = tts.duration_seconds;
+    wordTimestamps    = tts.wordTimestamps ?? [];
+  } catch (err) {
+    const ve = VoiceoverError.from(err);
+    // Voiceover is REQUIRED — never ship a silent video. On a retryable failure, save this as an
+    // INCOMPLETE project (config + script kept) so the user can Finish it later for free; the route refunds.
+    if (ve.retryable && project.user_id) {
+      try {
+        ve.projectId  = await saveIncompleteProject({
+          userId: project.user_id, source: "app_video", name: `${project.product_name ?? "App"} — App Promo`,
+          orientation: project.format_ratio ?? "9:16", canvas, ve, existingProjectId: project.existingProjectId ?? null,
+          resume: { project: { ...project, script: full_script } },
+        });
+        ve.incomplete = !!ve.projectId;
+      } catch (saveErr) { console.error("[v2/beats] could not save incomplete project:", saveErr.message); }
+    }
+    throw ve;
+  }
+
+  // ── Step 3: Visual director → timed beats ─────────────────────────────────
+  const beats = await planVisualBeats({ full_script, wordTimestamps, audioDuration: voiceoverDuration, projectContext });
+
+  // ── Step 4: Design each beat in parallel ──────────────────────────────────
+  const splitTop = Math.round(canvas.height * 0.55); // media top 55%, text bottom 45%
+  const beatResults = await Promise.all(beats.map(async (beat) => {
+    try {
+      const isMedia    = beat.presentation !== "html";
+      const hasOverlay = beat.presentation === "media_full" || beat.presentation === "media_split";
+      let media   = null;
+      let sceneCtx = { ...projectContext, visualConcept: beat.creative_brief, creativeBrief: beat.creative_brief, wantsProductVisual: beat.wants_product_visual, beatDuration: beat.duration, layout: beat.layout };
+
+      if (isMedia) {
+        // map director media_source → asset type + layer kind
+        const assetType = beat.media_source === "stock_video"  ? "stock_video"
+                        : beat.media_source === "ai_image"     ? "ai"
+                        : beat.media_source === "product_shot" ? "product" : "stock";
+        const kind = beat.media_source === "stock_video" ? "video" : "image";
+        if (beat.presentation === "media_split") {
+          media   = { kind, assetType, assetHint: beat.asset_hint, region: { y: 0, height: splitTop } };
+          sceneCtx = { ...sceneCtx, overlayMode: true, regionTop: splitTop, regionHeight: canvas.height - splitTop };
+        } else {
+          media   = { kind, assetType, assetHint: beat.asset_hint, region: { y: 0, height: canvas.height } };
+          sceneCtx = { ...sceneCtx, overlayMode: true };
+        }
+      }
+
+      // media_only beats carry no text — skip the designer entirely (faster + cheaper).
+      if (isMedia && !hasOverlay) {
+        console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.media_source}/${beat.motion}) — media only, no overlay`);
+        return { graph: [], media, html: null };
+      }
+
+      const pseudoScene = {
+        scene_index:          beat.beat_index,
+        intent:               beat.presentation,
+        script_segment:       beat.spoken,
+        creative_brief:       beat.creative_brief,
+        wants_product_visual: beat.wants_product_visual,
+      };
+
+      // Headless path: GPT writes natural nested CSS → browser measures → layers.
+      // Falls back to the absolute-only designer+parser on any failure.
+      if (USE_HEADLESS_MEASURE) {
+        try {
+          const html  = await designFreeScene(pseudoScene, sceneCtx);
+          const graph = await measureSceneHTML(html || "", beat.beat_index, canvas);
+          console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.motion}) — measured ${graph.length} layers${media ? ` + ${media.kind}` : ""}`);
+          return { graph, media, html };
+        } catch (mErr) {
+          console.warn(`[v2/beats] beat ${beat.beat_index} headless measure failed, falling back to parser:`, mErr.message);
+          const html  = await designScene(pseudoScene, sceneCtx);
+          const graph = parseSceneHTML(html || "", beat.beat_index, canvas);
+          return { graph, media, html };
+        }
+      }
+
+      const html  = await designScene(pseudoScene, sceneCtx);
+      const graph = parseSceneHTML(html || "", beat.beat_index, canvas);
+      console.log(`[v2/beats] beat ${beat.beat_index} (${beat.presentation}/${beat.motion}) — ${graph.length} layers${media ? ` + ${media.kind}` : ""}`);
+      return { graph, media, html };
+    } catch (err) {
+      console.error(`[v2/beats] beat ${beat.beat_index} design failed:`, err.message);
+      return { graph: [], media: null, html: null };
+    }
+  }));
+
+  // GPT-5.4 scene HTML per beat — saved to raw_ai_json so the design output is inspectable.
+  const sceneHTMLs = beatResults.map(r => r.html ?? null);
+
+  if (USE_HEADLESS_MEASURE) { try { await closeMeasureBrowser(); } catch {} }
+
+  // ── Step 5: Build timeline from beats ─────────────────────────────────────
+  const { timeline } = buildTimelineFromBeats(beats, beatResults, projectContext);
+
+  // ── Step 6: Inject the single global voiceover layer ──────────────────────
+  let finalTimeline = timeline;
+  if (voiceoverAudioUrl) {
+    const totalDur = finalTimeline.format.duration;
+    finalTimeline = {
+      ...finalTimeline,
+      layers: [
+        ...finalTimeline.layers,
+        {
+          id: "voiceover_full", trackId: "track_voiceover",
+          type: "audio", audioType: "voiceover", src: voiceoverAudioUrl,
+          start: 0, end: totalDur, zIndex: 0,
+          visible: true, locked: false, trimStart: 0, trimEnd: totalDur,
+          volume: 1.0, muted: false, fadeIn: 0.1, fadeOut: 0.3,
+          sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+        },
+      ],
+    };
+  }
+
+  // ── Step 7: Background music ──────────────────────────────────────────────
+  await injectBackgroundMusic(finalTimeline, project);
+
+  // ── Step 7.5: Whoosh SFX on each beat cut ─────────────────────────────────
+  await attachBeatTransitionSfx(finalTimeline, beats.length);
+
+  // ── Step 8: Resolve media + product-asset placeholders (image AND video) ──
+  // Real product screenshots from the URL harvest fill "product" beats in order;
+  // if we run out (or none were captured) the beat degrades to a stock image.
+  let shotIdx = 0;
+  const placeholderLayers = finalTimeline.layers.filter(l => (l.type === "image" || l.type === "video") && !l.src && l.assetHint);
+  await Promise.all(placeholderLayers.map(async (layer) => {
+    if (layer.assetType === "product") {
+      layer.src = screenshots.length ? screenshots[shotIdx++ % screenshots.length] : null;
+      if (layer.src) { layer._appShot = true; }                 // real phone screen → app-store-preview framing
+      else { layer.assetType = "stock"; layer.src = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio, projectId); }
+    } else if (layer.assetType === "stock") {
+      const query = extractSearchQuery(layer.assetHint);
+      layer.src = await fetchPixabayImage(query, formatRatio, projectId);
+    } else if (layer.assetType === "stock_video") {
+      layer.src = await fetchPixabayVideo(extractSearchQuery(layer.assetHint), formatRatio, projectId);
+      // Fallback: no matching stock clip → degrade to a stock image so the beat isn't empty.
+      if (!layer.src) {
+        layer.type = "image";
+        layer.src  = await fetchPixabayImage(extractSearchQuery(layer.assetHint), formatRatio, projectId);
+        console.warn(`[v2/beats] stock_video had no match for ${layer.id} — fell back to image`);
+      }
+    } else if (layer.assetType === "ai") {
+      layer.src = await generateFalImage(layer.assetHint, projectId, project.visual_style, formatRatio);
+    } else if (layer.assetType === "asset") {
+      layer.assetQueued  = true;
+      layer.src          = ASSET_PLACEHOLDER_SRC;
+      layer.isPlaceholder = true;
+    }
+    if (layer.src) console.log(`[v2/beats] resolved ${layer.assetType} placeholder: ${layer.id}`);
+  }));
+
+  // Drop stock/ai media that failed to resolve — an empty image/video box should
+  // never render. (asset placeholders keep ASSET_PLACEHOLDER_SRC for user upload.)
+  const beforeDrop = finalTimeline.layers.length;
+  finalTimeline.layers = finalTimeline.layers.filter(l =>
+    !((l.type === "image" || l.type === "video") && !l.src && l.assetType && l.assetType !== "asset"));
+  if (finalTimeline.layers.length !== beforeDrop) {
+    console.log(`[v2/beats] dropped ${beforeDrop - finalTimeline.layers.length} unresolved media layer(s)`);
+  }
+
+  // ── Step 8.5: Reframe landscape assets (don't crop a horizontal image to full-bleed) ──
+  try { await reframeLandscapeMedia(finalTimeline); }
+  catch (e) { console.warn("[v2/beats] landscape reframe skipped:", e.message); }
+
+  // ── Step 8.6: Global brand-color base ─────────────────────────────────────
+  // A full-bleed brand-colored layer spanning the WHOLE video, behind everything, so any scene
+  // transition, gap, or edge shows the app's brand color — never the black/blank canvas (which looks
+  // bad on cuts and at the very start). z0 is the floor (negative z renders behind the black base);
+  // unshift makes it the first/bottom layer so every scene's own background still paints over it.
+  {
+    const a1 = projectContext.accentColor || "#6366f1";
+    const a2 = projectContext.accent2 || a1;
+    finalTimeline.layers.unshift({
+      id: "app_brand_base", trackId: "track_brand_base", name: "Brand Background",
+      type: "gradient", start: 0, end: finalTimeline.format.duration, zIndex: 0,
+      visible: true, locked: false, sfx: null, animation: null,
+      gradient: `linear-gradient(160deg, ${a1} 0%, ${a2} 100%)`,
+      keyframes: { x: [], y: [], scale: [], rotation: [], opacity: [], blur: [] },
+      transition: { in: { type: "none", duration: 0 }, out: { type: "none", duration: 0 } },
+      transform: { x: 0, y: 0, width: canvas.width, height: canvas.height, opacity: 1, rotation: 0, scale: 1, blur: 0, borderRadius: 0, borderWidth: 0, borderColor: "#ffffff" },
+    });
+  }
+
+  // ── Step 9: Asset manifest (product screenshots only) ─────────────────────
+  const assetManifest = buildAssetManifest(finalTimeline);
+  await persistAssetManifest(assetManifest, projectId);
+
+  // ── Step 10: Save timeline ────────────────────────────────────────────────
+  // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
+  simplifyTimelineKeyframes(finalTimeline);
+  if (full_script) finalTimeline.full_script = full_script;
+  const editorProjectId = await saveTimeline(finalTimeline, project, 'app_video', {
+    creative_direction: creativeDirection,
+    beats: beats.map((b, i) => ({
+      index: b.beat_index, presentation: b.presentation, motion: b.motion,
+      media_source: b.media_source, spoken: b.spoken, creative_brief: b.creative_brief,
+      html: sceneHTMLs[i] ?? null, // GPT-5.4 scene HTML/CSS for this beat
+    })),
+  });
+
+  const totalDuration = parseFloat(finalTimeline.format.duration.toFixed(2));
+  return {
+    ...project,
+    full_script,
+    scene_format:      "v2",        // render gate expects "v2"; beat marker is pipeline_version
+    pipeline_version:  "v2_beats",
+    status:            "script_generated",
+    duration_seconds:  totalDuration,
+    editor_project_id: editorProjectId,
+    _timeline:         finalTimeline,
+    _assetManifest:    assetManifest,
+    updated_at:        new Date().toISOString(),
+  };
+}
+
+// ── Shared pipeline helpers (used by both runV2Pipeline and runTHPipeline) ─────
+
+async function resolveImagePlaceholders(finalTimeline, project) {
+  const placeholderLayers = finalTimeline.layers.filter(l => l.type === "image" && !l.src && l.assetHint);
+  if (!placeholderLayers.length) return;
+  await Promise.all(placeholderLayers.map(async (layer) => {
+    if (layer.assetType === "stock") {
+      const query = extractSearchQuery(layer.assetHint);
+      layer.src = await fetchPixabayImage(query, project.format_ratio ?? "9:16", project.id);
+    } else if (layer.assetType === "ai") {
+      layer.src = await generateFalImage(layer.assetHint, project.id, project.visual_style, project.format_ratio ?? "9:16");
+    } else if (layer.assetType === "asset") {
+      layer.assetQueued = true;
+    }
+    if (layer.src) console.log(`[v2/pipeline] resolved ${layer.assetType} placeholder: ${layer.id}`);
+  }));
+}
+
+// Whoosh SFX on each beat cut (beat 1 onward). Attaches to the lowest-z layer of
+// the incoming beat via its `sfx` field, which the renderer fires at the layer start.
+async function attachBeatTransitionSfx(finalTimeline, beatCount) {
+  try {
+    const { data: tracks } = await supabaseAdmin.from("sfx_tracks").select("key, public_url").eq("is_active", true);
+    const whoosh = (tracks ?? []).find(t => /whoosh|swoosh|woosh|swish|transition/i.test(t.key));
+    if (!whoosh) return;
+    let attached = 0;
+    for (let i = 1; i < beatCount; i++) {
+      const layers = finalTimeline.layers.filter(l => l.id?.startsWith(`s${i}_`) && l.type !== "audio");
+      if (!layers.length) continue;
+      const target = layers.reduce((a, b) => ((a.zIndex ?? 0) <= (b.zIndex ?? 0) ? a : b));
+      target.sfx = { key: whoosh.key, src: whoosh.public_url, volume: 0.4, delay: -0.08 };
+      attached++;
+    }
+    if (attached) console.log(`[v2/beats] transition sfx: ${attached}x "${whoosh.key}"`);
+  } catch (e) {
+    console.warn("[v2/beats] transition sfx skipped:", e.message);
+  }
+}
+
+async function injectBackgroundMusic(finalTimeline, project, volume = 0.25) {
+  try {
+    const mood = pickAutoMood(project.video_goal, project.tone);
+    const { data: allTracks } = await supabaseAdmin
+      .from("music_tracks").select("public_url, title, mood").eq("is_active", true);
+    if (allTracks?.length) {
+      const moodTracks = allTracks.filter(t => t.mood === mood);
+      const pool  = moodTracks.length ? moodTracks : allTracks;
+      const track = pool[Math.floor(Math.random() * pool.length)];
+      const musicDur = finalTimeline.format.duration;
+      finalTimeline.layers.push({
+        id: "music_global", trackId: "track_music",
+        type: "audio", audioType: "music", src: track.public_url,
+        start: 0, end: musicDur, zIndex: 0,
+        visible: true, locked: false, trimStart: 0, trimEnd: musicDur,
+        volume, muted: false, fadeIn: 1, fadeOut: 1,
+        sfx: null, keyframes: {}, animation: null, transition: null, transform: null,
+      });
+      console.log(`[v2/pipeline] music injected: "${track.title}" (${mood})`);
+    }
+  } catch (e) {
+    console.warn("[v2/pipeline] music injection skipped:", e.message);
+  }
+}
+
+function buildAssetManifest(finalTimeline) {
+  function deriveAspectRatio(w, h) {
+    if (!w || !h) return null;
+    const r = w / h;
+    if (r >= 1.6)            return '16:9 — Landscape';
+    if (r <= 0.65)           return '9:16 — Portrait';
+    if (r > 0.9 && r < 1.1) return '1:1 — Square';
+    if (r > 1.1 && r < 1.6) return '4:3 — Landscape';
+    return '3:4 — Portrait';
+  }
+  const queuedLayers = finalTimeline.layers.filter(
+    l => l.type === 'image' && l.assetQueued === true && l.assetType === 'asset'
+  );
+  const userRequired = queuedLayers.map(layer => {
+    const sceneIndex = parseInt((layer.id.match(/^s(\d+)_/) || [])[1] ?? '0', 10);
+    const w = Math.round(layer.transform?.width  ?? 0);
+    const h = Math.round(layer.transform?.height ?? 0);
+    return {
+      scene_id:     sceneIndex + 1,
+      layer_id:     layer.id,
+      asset_hint:   layer.assetHint || 'product interface screenshot',
+      asset_type:   'asset',
+      width:        w || null,
+      height:       h || null,
+      aspect_ratio: deriveAspectRatio(w, h),
+      status:       'pending',
+      asset_url:    null,
+    };
+  });
+  return {
+    user_required:               userRequired,
+    ai_generate:                 [],
+    stock_fetch:                 [],
+    placeholders:                [],
+    total_user_uploads_required: userRequired.length,
+    all_assets_provided:         userRequired.length === 0,
+  };
+}
+
+async function persistAssetManifest(assetManifest, projectId) {
+  console.log(`[v2/pipeline] asset manifest: ${assetManifest.user_required.length} user uploads required`);
+  try {
+    await supabaseAdmin.from("promo_videos")
+      .update({ asset_manifest: assetManifest }).eq("id", projectId);
+  } catch (e) {
+    console.warn("[v2/pipeline] asset manifest save failed (non-fatal):", e.message);
+  }
+}
+
+async function saveTimeline(finalTimeline, project, source = 'app_video', rawAiJson = null) {
+  try {
+    const name = `${project.product_name ?? "App"} — App Promo`;
+    if (project.existingProjectId) {
+      // FINISHING a previously-incomplete project — overwrite the placeholder + clear the flag.
+      const { error } = await supabaseAdmin.from("projects")
+        .update({ name, safe_project_json: finalTimeline, orientation: project.format_ratio ?? '9:16', mode: "timeline", source, editor_version: "timeline", status: null, raw_ai_json: rawAiJson, updated_at: new Date().toISOString() })
+        .eq("id", project.existingProjectId).eq("user_id", project.user_id);
+      if (error) throw new Error(error.message);
+      console.log(`[v2/pipeline] timeline saved to projects (finished: ${project.existingProjectId})`);
+      return project.existingProjectId;
+    }
+    const { data: editorRow } = await supabaseAdmin
+      .from("projects")
+      .insert({
+        user_id:           project.user_id,
+        name,
+        safe_project_json: finalTimeline,
+        orientation:       project.format_ratio ?? '9:16',
+        mode:              "timeline",
+        source,
+        editor_version:    "timeline",
+        raw_ai_json:       rawAiJson,
+      })
+      .select("id")
+      .single();
+    const editorProjectId = editorRow?.id ?? null;
+    console.log(`[v2/pipeline] timeline saved to projects (editor: ${editorProjectId})`);
+    return editorProjectId;
+  } catch (e) {
+    console.warn("[v2/pipeline] projects insert failed (non-fatal):", e.message);
+    return null;
+  }
+}
+
+// ── TH transcript normalizer ───────────────────────────────────────────────────
+
+async function normalizeTHTranscript(project) {
+  const { scenes: whisperSegments, full_transcript } = project.th_transcript ?? {};
+
+  if (!whisperSegments?.length) {
+    throw new Error('No transcript found.');
+  }
+
+  const prompt = `You are a short-form video editor making visual decisions for a talking-head video (TikTok/Reels/Shorts style).
+
+The speaker's video plays as the base layer throughout. Your job is to decide, for each spoken moment, what visual treatment to apply — and to synchronize visuals tightly to the speech.
+
+TRANSCRIPT (with timestamps):
+${whisperSegments.map(s => `[${s.start}s–${s.end}s]: "${s.spoken}"`).join('\n')}
+
+---
+
+CORE RULE — SPEECH-SYNCED VISUALS:
+Visuals must appear the moment the corresponding information is spoken. Do NOT keep th_full running while the speaker says something visual. Every noun, category, list, feature, statistic, product, website, or claim triggers a visual within 0–1 seconds of being spoken.
+
+CRITICAL: The purpose of grouping is NOT to preserve sentences. The purpose of grouping is to maximize visual storytelling. Split based on visual beats, not grammar.
+
+A new group must be created whenever:
+- A new concept is introduced
+- A list begins
+- A feature or category is mentioned
+- A comparison is introduced
+- A CTA begins
+- A reveal begins
+- Any visual opportunity appears
+
+GROUPING RULES:
+- Split on every new concept, category, or topic shift — even if only 1.5–2 seconds long.
+- If the speaker reads a list of related categories, features, examples, resources, or benefits in rapid succession, keep them in a SINGLE visual scene. Animate items appearing progressively as they are spoken. Do NOT create a new scene for every list item. A list that takes 6 seconds to speak is ONE 6-second scene, not 6 scenes.
+- Maximum group duration: 5 seconds. Split anything longer.
+- Minimum group duration: 1.5 seconds. Merge only if truly no visual opportunity exists.
+- Talking-head fullscreen (th_full) scenes must never exceed 3 seconds.
+- Maximum total groups: 10.
+
+CRITICAL LIST RULE — this overrides everything else:
+When the speaker reads multiple items that are clearly part of the same list — even if they span many Whisper segments — they form ONE single group. Do not start a new group mid-list. The list ends when the speaker moves to a completely different topic.
+
+CONCRETE EXAMPLE using this exact type of script:
+WRONG (what you must NOT do):
+Group 2: "Free Games" → th_pip (1.6s)
+Group 3: "Open Source Software, Learning Materials, Public Domain Books" → th_pip (3.1s)
+Group 4: "Tools" → th_split (0.8s)
+Group 5: "Extensions और काफी इंटरेस्टिंग कलेक्शन्स" → th_pip (1.8s)
+
+CORRECT (what you must do):
+Group 2: "Free Games, Open Source Software, Learning Materials, Public Domain Books, Tools, Extensions और काफी इंटरेस्टिंग कलेक्शन्स" → th_pip (7.4s, visual_source: "categories", archetype: feature_grid)
+The entire list = ONE group. One card grid showing all 6 categories.
+
+TREATMENT RULES:
+
+"th_full": Use ONLY for the opening 2–3 seconds of the hook, pure transitions, or goodbyes. If the speaker says ANYTHING that can be shown visually, do NOT use th_full.
+
+"th_hero": TH video fills canvas. GPT-5.4 overlays a title/badge/stat in top safe zone (y 0–15%) or bottom safe zone (y 68–100%) only. Use for: key one-liner statements where speaker stays prominent but a text overlay reinforces the point.
+
+"th_pip": Full canvas generated visual. Speaker appears as small circular PiP bottom-left. Use for: lists, category grids, feature showcases, resource libraries, UI demos — when content needs full screen but speaker should stay visible.
+
+"th_split": TH video top 45%, generated visual bottom 55%. Use for: when speaker references one specific thing to show below them — a named feature, a comparison, a step.
+
+"content_only": Full screen generated visual, speaker hidden. Use for: dramatic reveals, key stats, product name reveal, save/follow CTA takeover. Max 1–2 per video.
+
+VARIETY RULE: Never use the same treatment more than once in a row (exception: th_full at the very start only).
+
+TIMING EXAMPLE for a script like this one:
+- "Today I found a website..." → th_full (2s, opening hook only)
+- "...with rare internet resources" → th_hero (2s, overlay title "RARE INTERNET RESOURCES")
+- "Free Games, Open Source, Books, Tools..." → th_pip (4s, animated category grid fills screen)
+- "Save this reel right now" → content_only (2s, bold CTA)
+- "These sites don't show up on Google" → th_split (3s, Google vs hidden comparison)
+- "Just open the website, select a category..." → th_pip (3s, UI walkthrough mockup)
+- "The website is called DeepWebNest" → content_only (2s, hero name reveal)
+- "Save and follow for daily websites" → content_only (2s, CTA)
+
+---
+
+VISUAL DIRECTION (required for all non-th_full scenes):
+One short phrase describing what to show visually — must match the archetype.
+Examples:
+- feature_grid: "6 resource category cards, icon per card, staggered reveal"
+- split_composition: "Google search bar left, hidden gems vault right"
+- minimal_cta: "bold save CTA, animated bookmark icon"
+- typography_hero: "RARE INTERNET RESOURCES title overlay, bottom safe zone"
+- process_steps: "3 numbered steps, sequential reveal"
+- single_stat: "one dominant number, radial glow behind"
+Do NOT write layout instructions, pixel sizes, animation timing, or color details. GPT-5.4 handles all of that.
+
+ARCHETYPE — pick one per non-th_full scene:
+typography_hero | single_stat | split_composition | numbered_list | feature_grid | full_bleed_image | minimal_cta | proof_social | process_steps | quote_statement
+
+VISUAL SOURCE — pick one per non-th_full scene:
+- "categories": the spoken content is a list, grid, features, or named items — build cards, tiles, or a grid entirely in HTML, NO image placeholder
+- "asset": a specific product screenshot or UI mockup is needed — include one image-placeholder
+- null: th_full scenes only
+
+---
+
+Return ONLY valid JSON:
+{
+  "groups": [
+    {
+      "group_index": 0,
+      "intent": "hook",
+      "treatment": "th_full",
+      "script_segment": "exact spoken text",
+      "start": 0.0,
+      "end": 2.5,
+      "duration_seconds": 2.5,
+      "visual_direction": null,
+      "visual_source": null,
+      "archetype": null
+    }
+  ],
+  "full_transcript": "complete transcript"
+}
+
+intent options: "hook" | "problem" | "solution" | "feature" | "proof" | "cta"
+treatment options: "th_full" | "th_hero" | "th_pip" | "th_split" | "content_only"
+visual_direction: detailed string for non-th_full scenes, null for th_full
+visual_source: "categories" | "asset" | null
+archetype: pick one for non-th_full scenes, null for th_full`;
+
+  const response = await openai.chat.completions.create({
+    model:           'gpt-4.1',
+    messages:        [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+    temperature:     0.1,
+  });
+
+  const { groups, full_transcript: cleanedTranscript } = JSON.parse(
+    response.choices[0].message.content
+  );
+  console.log('[normalizeTHTranscript] raw groups:', JSON.stringify(groups, null, 2));
+
+  const thPatternMap = {
+    th_full:      'th_full',
+    th_hero:      'hero',
+    th_pip:       'pip',
+    th_split:     'split',
+    content_only: 'content_only',
+  };
+
+  const scenes = (groups ?? []).map(g => ({
+    ...g,
+    scene_index:    g.group_index,
+    spoken:         g.script_segment,
+    thPattern:      thPatternMap[g.treatment] ?? 'th_full',
+    visual_concept: g.visual_direction ?? '',
+    visual_source:  g.visual_source ?? null,
+    archetype:      g.archetype ?? null,
+    classification: g.treatment === 'th_full' ? 'th_only' : 'generate_scene',
+  }));
+
+  const genCount = scenes.filter(s => s.classification === 'generate_scene').length;
+  console.log(`[v2/pipeline-th] grouped into ${scenes.length} scenes: ${genCount} with visuals, ${scenes.length - genCount} th_full`);
+  return { scenes, full_transcript: cleanedTranscript ?? full_transcript, groups };
+}
+
+// ── TH v2 pipeline ─────────────────────────────────────────────────────────────
+
+async function runTHPipeline(project) {
+  const projectId   = project.id;
+  const formatRatio = project.format_ratio ?? '9:16';
+  const canvas      = CANVAS_SIZES[formatRatio] ?? CANVAS_SIZES['9:16'];
+
+  console.log(`[v2/pipeline-th] ${projectId} — starting TH pipeline`);
+
+  // Step 1 — Normalize Whisper transcript into intent-tagged scene segments
+  const { scenes, full_transcript, groups: rawGroups } = await normalizeTHTranscript(project);
+
+  // Step 2 — Build project context
+  const projectContext = {
+    projectId,
+    productName:        project.product_name     ?? 'Product',
+    productDescription: project.product_description ?? '',
+    niche:              project.style?.niche     ?? 'saas',
+    accentColor:        project.accent_color     ?? '#6366f1',
+    visualStyle:        project.visual_style     ?? 'radiant',
+    typographyStyle:    project.typography_style ?? 'modern',
+    theme:              project.theme            ?? 'dark',
+    language:           project.language         ?? 'en',
+    tone:               project.tone             ?? 'professional',
+    logoUrl:            project.logo_url         ?? null,
+    logoWidth:          project.logo_width       ?? null,
+    logoHeight:         project.logo_height      ?? null,
+    canvasWidth:        canvas.width,
+    canvasHeight:       canvas.height,
+    formatRatio,
+    videoType:          'talking_head',
+    fps:                30,
+    patternName:        null,
+  };
+
+  // Step 3 — Design scenes: th_full = fullscreen TH video only, split/content_only = generate visuals
+  const genNeeded = scenes.filter(s => s.thPattern !== 'th_full').length;
+  console.log(`[v2/pipeline-th] ${projectId} — designing ${genNeeded} of ${scenes.length} scenes`);
+  const sceneGraphs     = [];
+  const thSceneHTMLs    = new Array(scenes.length).fill(null);
+  const generatedScenes = [];
+
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
+
+    if (scene.thPattern === 'th_full') {
+      console.log(`[v2/pipeline-th] scene ${i} — th_full (${scene.duration_seconds?.toFixed(1)}s) — fullscreen`);
+      sceneGraphs.push([]);
+      continue;
+    }
+
+    try {
+      const sceneProjectContext = {
+        ...projectContext,
+        archetype:      scene.archetype      ?? null,
+        sceneIntent:    scene.intent,
+        visualConcept:  scene.visual_concept,
+        visual_source:  scene.visual_source  ?? null,
+        previousScenes: generatedScenes.slice(-2).map(s => ({
+          index:          s.scene_index,
+          intent:         s.intent,
+          archetype:      s.archetype        ?? null,
+          visual_concept: s.visual_concept,
+        })),
+      };
+      const html = await designScene(scene, sceneProjectContext);
+      thSceneHTMLs[i] = html;
+      const graph = parseSceneHTML(html || '', i, canvas);
+      console.log(`[v2/pipeline-th] scene ${i} (${scene.intent}/${scene.thPattern}) — ${graph.length} layers`);
+      sceneGraphs.push(graph);
+      generatedScenes.push(scene);
+    } catch (err) {
+      console.error(`[v2/pipeline-th] scene ${i} design failed:`, err.message);
+      sceneGraphs.push([]);
+    }
+  }
+
+  // Step 4 — Build timeline from scene graphs
+  const { timeline: rawTimeline, asset_queue } = buildTimeline(sceneGraphs, scenes, projectContext);
+
+  // Step 5 — Inject TH video layer spanning full duration
+  // src is null here — filled in at render time when user uploads the video to Supabase
+  const totalDur      = rawTimeline.format.duration;
+  const finalTimeline = {
+    ...rawTimeline,
+    layers: [
+      {
+        id:          'th_video_base',
+        trackId:     'track_th_base',
+        name:        'TH Video',
+        type:        'video',
+        src:         null,
+        objectFit:   'cover',
+        start:       0,
+        end:         totalDur,
+        zIndex:      0,
+        visible:     true,
+        locked:      false,
+        sfx:         null,
+        keyframes:   { x: [], y: [], blur: [], scale: [], opacity: [], rotation: [] },
+        transition:  { in: { type: 'none', duration: 0 }, out: { type: 'none', duration: 0 } },
+        transform:   { x: 0, y: 0, blur: 0, scale: 1, width: canvas.width, height: canvas.height, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 0, borderRadius: 0 },
+        volume:      1,
+        muted:       false,
+      },
+      ...rawTimeline.layers,
+    ],
+  };
+
+  // Step 5b — Inject positioned TH video clip layers for hero/split/pip scenes
+  // Compute scene start/end timings by walking cumulative durations (mirrors buildTimeline cursor)
+  {
+    let tc = 0;
+    for (let i = 0; i < scenes.length; i++) {
+      const scene  = scenes[i];
+      const dur    = parseFloat((scene.duration_seconds ?? 0).toFixed(4));
+      const tStart = parseFloat(tc.toFixed(4));
+      const tEnd   = parseFloat((tc + dur).toFixed(4));
+      tc = tEnd;
+
+      if (scene.thPattern === 'th_full' || scene.thPattern === 'content_only' || !scene.thPattern) continue;
+
+      const sid = `s${i}_th`;
+      let clipLayer = null;
+
+      if (scene.thPattern === 'hero') {
+        clipLayer = {
+          id:         `${sid}_hero`,
+          trackId:    'track_th_clip',
+          name:       'TH Hero',
+          type:       'video',
+          src:        '__TH_VIDEO__',
+          objectFit:  'cover',
+          start:      tStart,
+          end:        tEnd,
+          zIndex:     2,
+          visible:    true,
+          locked:     false,
+          sfx:        null,
+          keyframes:  { x: [], y: [], blur: [], scale: [], opacity: [], rotation: [] },
+          transition: { in: { type: 'none', duration: 0 }, out: { type: 'none', duration: 0 } },
+          transform:  { x: 0, y: 0, blur: 0, scale: 1, width: canvas.width, height: canvas.height, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 0, borderRadius: 0 },
+          volume:     0,
+          muted:      true,
+        };
+      } else if (scene.thPattern === 'split') {
+        const splitH = Math.round(canvas.height * 0.45);
+        clipLayer = {
+          id:         `${sid}_split`,
+          trackId:    'track_th_clip',
+          name:       'TH Split',
+          type:       'video',
+          src:        '__TH_VIDEO__',
+          objectFit:  'cover',
+          start:      tStart,
+          end:        tEnd,
+          zIndex:     2,
+          visible:    true,
+          locked:     false,
+          sfx:        null,
+          keyframes:  { x: [], y: [], blur: [], scale: [], opacity: [], rotation: [] },
+          transition: { in: { type: 'none', duration: 0 }, out: { type: 'none', duration: 0 } },
+          transform:  { x: 0, y: 0, blur: 0, scale: 1, width: canvas.width, height: splitH, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 0, borderRadius: 0 },
+          volume:     0,
+          muted:      true,
+        };
+      } else if (scene.thPattern === 'pip') {
+        const pipSize = Math.floor(canvas.width * 0.305); // ~330px at 1080
+        const pipY = canvas.height - pipSize - 40; // ~1550px at 1920
+        clipLayer = {
+          id:         `${sid}_pip`,
+          trackId:    'track_th_clip',
+          name:       'TH PiP',
+          type:       'video',
+          src:        '__TH_VIDEO__',
+          objectFit:  'cover',
+          start:      tStart,
+          end:        tEnd,
+          zIndex:     50,
+          visible:    true,
+          locked:     false,
+          sfx:        null,
+          keyframes:  { x: [], y: [], blur: [], scale: [], opacity: [{ time: 0.1, value: 0 }, { time: 0.4, value: 1 }], rotation: [] },
+          transition: { in: { type: 'fade', duration: 0.3 }, out: { type: 'none', duration: 0 } },
+          transform:  { x: 40, y: pipY, blur: 0, scale: 1, width: pipSize, height: pipSize, opacity: 1, rotation: 0, borderColor: '#ffffff', borderWidth: 3, borderRadius: pipSize / 2 },
+          volume:     0,
+          muted:      true,
+        };
+      }
+
+      if (clipLayer) finalTimeline.layers.push(clipLayer);
+    }
+  }
+
+  // Step 6 — Resolve image placeholders
+  await resolveImagePlaceholders(finalTimeline, project);
+
+  // Step 7 — Background music (quiet — TH audio is the primary track)
+  await injectBackgroundMusic(finalTimeline, project, 0.12);
+
+  // Step 8 — Asset manifest
+  const assetManifest = buildAssetManifest(finalTimeline);
+  await persistAssetManifest(assetManifest, projectId);
+
+  // Step 9 — Save timeline
+  if (full_transcript) finalTimeline.full_script = full_transcript;
+  const editorProjectId = await saveTimeline(finalTimeline, project, 'promo_video_th', {
+    groups:     rawGroups ?? null,
+    sceneHTMLs: thSceneHTMLs,
+  });
+
+  return {
+    ...project,
+    scenes,
+    script:            full_transcript,
+    full_script:       full_transcript,
+    scene_format:      'v2',
+    pipeline_version:  'v2',
+    status:            'script_generated',
+    has_script:        true,
+    duration_seconds:  parseFloat(totalDur.toFixed(2)),
+    editor_project_id: editorProjectId,
+    _timeline:         finalTimeline,
+    _asset_queue:      asset_queue,
+    _assetManifest:    assetManifest,
+    updated_at:        new Date().toISOString(),
+  };
+}

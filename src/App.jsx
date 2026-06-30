@@ -61,6 +61,7 @@ import TTSStudio       from "./pages/Voiceover";
 import CaptionStudio      from "./pages/VideoCaptions";
 import TalkingHead        from "./pages/TalkingHead";
 import VideoClipping      from "./pages/VideoClipping";
+import AppVideo           from "./pages/AppVideo";
 import VideoEditor        from "./pages/VideoEditor";
 import OutfitStudio              from "./pages/VirtualTryOn";
 import SocialPostGenerator       from "./pages/BannerDesign";
@@ -206,6 +207,7 @@ export default function App() {
             <Route path="/ai-video"       element={<PromptVideo />} />
             <Route path="/talking-head"   element={<TalkingHead />} />
             <Route path="/video-clipping" element={<VideoClipping />} />
+            <Route path="/app-video"      element={<AppVideo />} />
             <Route path="/typography-video"   element={<TypographyVideo />} />
             <Route path="/social-video"       element={<SocialVideo />} />
             <Route path="/product-poster"    element={<PosterStudio />} />

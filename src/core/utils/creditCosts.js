@@ -41,6 +41,9 @@ export const CREDIT_COSTS = {
   product_video_per_scene: { image: 20, hybrid: 35, video: 50 },
 };
 
+// App Promo Video reuses SaaS/Promo's scene-based pricing (kept in sync via this alias).
+CREDIT_COSTS.app_video = CREDIT_COSTS.promo_video;
+
 /**
  * Duration → credit cost bands for free-design video services (AI Video, Social, Typography).
  * COGS scales ~linearly with duration (more beats = more GPT-5.4 scene calls + TTS + images), so

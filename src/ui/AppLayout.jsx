@@ -503,25 +503,19 @@ export default function AppLayout({ children }) {
 
           {/* Top nav */}
           <nav style={{ flex: 1, padding: "8px 6px", display: "flex", flexDirection: "column", gap: 2 }}>
-            {isAdmin && (
-              <IconBtn icon={Icons.admin} label="Admin" to="/admin" active={path === "/admin" || path.startsWith("/admin/")} />
-            )}
             <IconBtn icon={Icons.home} label="Home" to="/dashboard" active={path === "/dashboard"} />
-
-            <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
-
-            <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
-
             <IconBtn icon={Icons.folder}  label="Projects" to="/projects" active={path === "/projects"} />
-            {isAdmin && (
-              <IconBtn icon={Icons.autopilot} label="Automation" to="/automation" active={path === "/automation" || path.startsWith("/automation/")} />
-            )}
+            <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
+            <IconBtn icon={Icons.autopilot} label="Automation" to="/automation" active={path === "/automation" || path.startsWith("/automation/")} />
             <IconBtn icon={Icons.connections} label="Social Accounts" to="/connections" active={path === "/connections"} />
-            
-
-            <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
-
             <NotificationsBell />
+
+            {isAdmin && (
+              <>
+                <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
+                <IconBtn icon={Icons.admin} label="Admin" to="/admin" active={path === "/admin" || path.startsWith("/admin/")} />
+              </>
+            )}
           </nav>
 
           {/* Bottom: credits + account + signout */}

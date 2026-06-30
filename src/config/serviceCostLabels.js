@@ -18,6 +18,7 @@ export const SERVICE_COST_LABEL = {
   promo_video:      `${Math.min(...promo)}–${Math.max(...promo)} cr`,
   talking_head:     `~${TALKING_HEAD_PER_30S} cr / 30s`,
   video_clipping:   `~${VIDEO_CLIPPING_PER_MIN} cr / min`,
+  app_video:        `${Math.min(...promo)}–${Math.max(...promo)} cr`,
 };
 
 // The "10+ AI image & audio tools" bucket — cheapest item (an AI image) sets the "from" floor.
