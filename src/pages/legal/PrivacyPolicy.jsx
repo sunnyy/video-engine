@@ -89,13 +89,13 @@ export default function PrivacyPolicy() {
       </Section>
 
       <Section title="9. Cookies">
-        <P>We use only essential session cookies required for authentication and maintaining your logged-in state. We do not use:</P>
+        <P>We use only essential cookies and browser local storage required for authentication and maintaining your logged-in state. We do not use:</P>
         <UL items={[
           "Advertising or tracking cookies",
           "Third-party analytics cookies (e.g. Google Analytics)",
           "Cross-site tracking of any kind",
         ]} />
-        <P>Session cookies are automatically deleted when you close your browser or log out. You can disable cookies in your browser settings, but this will prevent you from using the Service.</P>
+        <P>This essential storage is cleared when you log out or clear your browser's site data. You can disable it in your browser settings, but this will prevent you from using the Service. For full details, see our <a href="/cookies" style={{ color: "#f5c518" }}>Cookie Policy</a>.</P>
       </Section>
 
       <Section title="10. Children's Privacy">

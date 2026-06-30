@@ -113,6 +113,64 @@ router.get("/user/credits", requireAuth, async (req, res) => {
   }
 });
 
+/* ── Self-service: export own data (GDPR Art. 15 access + Art. 20 portability) ──
+   Mirrors the tables wiped by /account/delete, minus any credentials/secrets:
+   social tokens and BYO OAuth client secrets are never included. */
+router.get("/account/export", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+    const [
+      profile, credits, subscriptions, transactions, projects, generatedImages, socialAccounts,
+    ] = await Promise.all([
+      supabaseAdmin.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      supabaseAdmin.from("user_credits").select("balance, lifetime_credits").eq("user_id", userId).maybeSingle(),
+      supabaseAdmin.from("subscriptions").select("*").eq("user_id", userId),
+      supabaseAdmin.from("credit_transactions")
+        .select("id, amount, type, action, description, balance_after, created_at, project_id")
+        .eq("user_id", userId).order("created_at", { ascending: false }),
+      supabaseAdmin.from("projects")
+        .select("id, name, source, status, orientation, created_at, updated_at, rendered_video_url, last_rendered_at, safe_project_json")
+        .eq("user_id", userId).order("created_at", { ascending: false }),
+      supabaseAdmin.from("generated_images").select("*").eq("user_id", userId),
+      // Connected accounts: identity only — never access_token / refresh_token.
+      supabaseAdmin.from("social_accounts")
+        .select("id, platform, platform_account_id, display_name, status, created_at")
+        .eq("user_id", userId),
+    ]);
+
+    const payload = {
+      export_meta: {
+        generated_at: new Date().toISOString(),
+        service: "Vidquence",
+        note: "Personal data export per GDPR Art. 15 (access) and Art. 20 (portability). Credentials and secrets (social tokens, OAuth client secrets) are intentionally excluded.",
+      },
+      account: {
+        id: userId,
+        email: user?.email || null,
+        name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
+        created_at: user?.created_at || null,
+      },
+      profile:             profile.data || null,
+      credits:             credits.data || null,
+      subscriptions:       subscriptions.data || [],
+      credit_transactions: transactions.data || [],
+      projects:            projects.data || [],
+      generated_images:    generatedImages.data || [],
+      connected_accounts:  socialAccounts.data || [],
+    };
+
+    const filename = `vidquence-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(JSON.stringify(payload, null, 2));
+  } catch (err) {
+    console.error("[account/export]", err.message);
+    res.status(500).json({ error: safeMessage(err) });
+  }
+});
+
 /* ── Self-service: delete own account ── */
 router.post("/account/delete", requireAuth, async (req, res) => {
   try {

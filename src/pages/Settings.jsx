@@ -98,6 +98,7 @@ export default function Settings() {
   const [deleting,          setDeleting]          = useState(false);
   const [deleteError,       setDeleteError]       = useState("");
   const [avatarError,       setAvatarError]       = useState(false);
+  const [exporting,         setExporting]         = useState(false);
 
   const DELETE_REASONS = [
     "Too expensive / not worth it",
@@ -145,6 +146,27 @@ export default function Settings() {
       setTimeout(() => setPrefSaved(false), 2500);
     } catch { showToast("Couldn't save preferences."); } finally {
       setPrefSaving(false);
+    }
+  }
+
+  async function handleExportData() {
+    setExporting(true);
+    try {
+      const res = await serverFetch("/api/account/export");
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `vidquence-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast("Couldn't export your data. Please try again.");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -281,6 +303,24 @@ export default function Settings() {
                   </div>
                 );
               })}
+            </Card>
+          </section>
+
+          {/* Your Data */}
+          <section>
+            <SectionLabel>Your Data</SectionLabel>
+            <Card>
+              <div>
+                <div className="text-[15px] font-bold mb-1" style={{ color: "#e8e8f0", fontFamily: "'Outfit',sans-serif" }}>Export My Data</div>
+                <div className="text-[13px] mb-4" style={{ color: "#8888a8", fontFamily: "'Outfit',sans-serif" }}>
+                  Download a copy of your personal data — profile, credits, billing, projects, and connected accounts — as a JSON file. Credentials and secrets are never included.
+                </div>
+                <button onClick={handleExportData} disabled={exporting}
+                  className="px-4 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer border transition-all"
+                  style={{ background: "rgba(124,92,252,0.08)", borderColor: "rgba(124,92,252,0.3)", color: "#c4b0ff", fontFamily: "'Outfit',sans-serif", opacity: exporting ? 0.6 : 1, cursor: exporting ? "not-allowed" : "pointer" }}>
+                  {exporting ? "Preparing…" : "Export My Data"}
+                </button>
+              </div>
             </Card>
           </section>
 

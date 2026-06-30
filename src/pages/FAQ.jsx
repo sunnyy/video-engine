@@ -159,6 +159,7 @@ export default function FAQ() {
               <a href="/terms" className="footer-link">Terms</a>
               <a href="/privacy" className="footer-link">Privacy</a>
               <a href="/refunds" className="footer-link">Refunds</a>
+              <a href="/cookies" className="footer-link">Cookies</a>
             </div>
             <a href="mailto:hello@vidquence.com" className="footer-link">hello@vidquence.com</a>
             <div className="footer-copy">© 2026 VIDQUENCE</div>

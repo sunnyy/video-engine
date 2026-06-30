@@ -117,6 +117,7 @@ export default function HelpArticle() {
               <a href="/faq" className="footer-link">FAQ</a>
               <a href="/terms" className="footer-link">Terms</a>
               <a href="/privacy" className="footer-link">Privacy</a>
+              <a href="/cookies" className="footer-link">Cookies</a>
             </div>
             <div className="footer-copy">© 2026 VIDQUENCE</div>
           </div>

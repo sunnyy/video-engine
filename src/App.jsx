@@ -19,6 +19,7 @@ import HostGuard       from "./ui/HostGuard";
 import TermsOfService  from "./pages/legal/TermsOfService";
 import PrivacyPolicy   from "./pages/legal/PrivacyPolicy";
 import RefundPolicy    from "./pages/legal/RefundPolicy";
+import CookiePolicy    from "./pages/legal/CookiePolicy";
 import About           from "./pages/About";
 import FAQ             from "./pages/FAQ";
 import StatusPage      from "./pages/StatusPage";
@@ -169,6 +170,7 @@ export default function App() {
         <Route path="/terms"         element={<TermsOfService />} />
         <Route path="/privacy"       element={<PrivacyPolicy />} />
         <Route path="/refunds"       element={<RefundPolicy />} />
+        <Route path="/cookies"       element={<CookiePolicy />} />
         <Route path="/pricing"       element={<Navigate to="/#pricing" replace />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 

@@ -143,6 +143,7 @@ export default function HelpCenter() {
               <a href="/faq" className="footer-link">FAQ</a>
               <a href="/terms" className="footer-link">Terms</a>
               <a href="/privacy" className="footer-link">Privacy</a>
+              <a href="/cookies" className="footer-link">Cookies</a>
             </div>
             <a href="mailto:hello@vidquence.com" className="footer-link">hello@vidquence.com</a>
             <div className="footer-copy">© 2026 VIDQUENCE</div>

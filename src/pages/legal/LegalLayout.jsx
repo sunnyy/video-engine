@@ -30,7 +30,7 @@ export default function LegalLayout({ title, lastUpdated, children }) {
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "32px 40px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div style={{ fontSize: 13, color: "rgba(255,255,255,0.25)" }}>© 2026 Vidquence. All rights reserved.</div>
         <div style={{ display: "flex", gap: 24 }}>
-          {[["Terms", "/terms"], ["Privacy", "/privacy"], ["Refund Policy", "/refunds"]].map(([label, href]) => (
+          {[["Terms", "/terms"], ["Privacy", "/privacy"], ["Refund Policy", "/refunds"], ["Cookies", "/cookies"]].map(([label, href]) => (
             <button key={href} onClick={() => navigate(href)}
               style={{ background: "none", border: "none", color: "rgba(255,255,255,0.35)", fontSize: 13, cursor: "pointer", fontFamily: "inherit", transition: "color 0.2s" }}
               onMouseEnter={e => e.target.style.color = "#fff"}

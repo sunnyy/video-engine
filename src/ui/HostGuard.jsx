@@ -12,7 +12,7 @@ import { useLocation } from "react-router-dom";
 const APP_HOST = "app.vidquence.com";
 const MARKETING_HOSTS = ["vidquence.com", "www.vidquence.com"];
 // Content pages that belong on the marketing host; everything else (login, app, admin) is the app.
-const MARKETING_PATHS = ["/", "/about", "/faq", "/help", "/terms", "/privacy", "/refunds", "/status", "/pricing"];
+const MARKETING_PATHS = ["/", "/about", "/faq", "/help", "/terms", "/privacy", "/refunds", "/cookies", "/status", "/pricing"];
 const isMarketingPath = (p) =>
   MARKETING_PATHS.some((m) => (m === "/" ? p === "/" : p === m || p.startsWith(m + "/")));
 

@@ -1289,6 +1289,9 @@ export default function LandingPage() {
               <a href="/refunds" className="footer-link">
                 Refunds
               </a>
+              <a href="/cookies" className="footer-link">
+                Cookies
+              </a>
             </div>
             <a href="mailto:hello@vidquence.com" className="footer-link">
               hello@vidquence.com
