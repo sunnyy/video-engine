@@ -15,7 +15,7 @@ import { requireProPlus } from "../middleware/planGate.js";
 
 export const router = express.Router();
 
-// Automation is a Pro/Agency feature — Starter can't create or run campaigns.
+// Automation is a Pro/Max feature — Starter can't create or run campaigns.
 const requireAutomation = requireProPlus("Automation");
 
 const INFLIGHT_TYPES = ["generate_video", "render_timeline", "publish_post"];

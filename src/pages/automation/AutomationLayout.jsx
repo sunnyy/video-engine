@@ -11,7 +11,7 @@ import { usePlanStore } from "../../store/usePlanStore";
  *   /automation/channels    → Channels    (AutomationChannels.jsx — the Social Accounts panel)
  *   /automation/brand-kit   → Brand Kit   (AutomationBrandKit.jsx)
  * The layout is open to all plans (Channels power the editor's Publish button too); the Campaigns
- * and Brand Kit tab pages gate themselves to Pro/Agency.
+ * and Brand Kit tab pages gate themselves to Pro/Max.
  */
 
 const T = { bg: "#090b11", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", accent: "#7c5cfc" };

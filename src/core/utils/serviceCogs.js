@@ -44,7 +44,7 @@ export const serviceCogs = {
 
 /**
  * Gross margin for a service. `creditUsdValue` = what one credit is worth in plan revenue
- * (Pro: $49 / 1,500 ≈ $0.0327; Agency: $99 / 4,000 ≈ $0.0248). Returns 0..1 or null.
+ * (Pro: $49 / 1,500 ≈ $0.0327; Max: $99 / 4,000 ≈ $0.0248). Returns 0..1 or null.
  */
 export function grossMargin(serviceKey, creditUsdValue = 0.0327) {
   const s = serviceCogs[serviceKey];

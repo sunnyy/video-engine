@@ -7,7 +7,7 @@ import { create } from "zustand";
 import { serverFetch } from "../services/serverApi";
 import { supabase } from "../lib/supabase";
 
-const PRO_PLUS = new Set(["pro", "agency"]);
+const PRO_PLUS = new Set(["pro", "max"]);
 
 export const usePlanStore = create((set, get) => ({
   planSlug: null,

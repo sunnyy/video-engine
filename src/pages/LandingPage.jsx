@@ -11,7 +11,7 @@ import { getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
 import { videoServices } from "../config/serviceCatalog";
 import { SERVICE_COST_LABEL, TOOLS_COST_LABEL } from "../config/serviceCostLabels";
-import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown, Play, Users, Rocket, ShieldCheck, Package, BookOpen, Mail, Globe, Zap, DollarSign, Pencil } from "lucide-react";
+import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown, Play, Users, Rocket, ShieldCheck, Package, BookOpen, Mail, Globe, Zap, DollarSign, Pencil, Crown, ArrowRight } from "lucide-react";
 
 const FALLBACK_RATE = 92.6;
 function toINR(usd, rate) {
@@ -227,12 +227,20 @@ const CSS = `
 
   /* PRICING */
   .pricing-grid { display: grid; gap: 16px; margin-top: 50px; }
-  .plan { background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(17,17,24,0.98)); border: 1px solid var(--border2); border-radius: var(--radius); padding: 28px; position: relative; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s; }
+  .plan { background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(17,17,24,0.98)); border: 2px solid var(--border2); border-radius: var(--radius); padding: 28px; position: relative; transition: transform 0.25s, box-shadow 0.25s; }
   .plan::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle at 78% 12%, rgba(245,197,24,0.09), transparent 34%); opacity: 0; transition: opacity 0.25s; pointer-events: none; }
-  .plan:hover { border-color: rgba(245,197,24,0.28); transform: translateY(-6px); box-shadow: 0 24px 80px rgba(0,0,0,0.38); }
+  .plan:hover { transform: translateY(-6px); box-shadow: 0 24px 80px rgba(0,0,0,0.38); }
   .plan:hover::before { opacity: 1; }
   .plan-hot { border-color: rgba(245,197,24,0.45) !important; box-shadow: 0 0 0 1px rgba(245,197,24,0.12) inset; }
   .plan-hot-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0F0E1A; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 5px 18px; border-radius: 100px; white-space: nowrap; z-index: 2; }
+  .plan-pro { border-color: #7c5cfc !important; background: linear-gradient(180deg, rgba(124,92,252,0.10), rgba(17,17,24,0.98)) !important; box-shadow: 0 0 0 1px rgba(124,92,252,0.25) inset; }
+  .plan-pro:hover { border-color: #7c5cfc !important; }
+  .plan-pro-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg,#a78bfa,#7c5cfc); color: #fff; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 5px 16px; border-radius: 100px; white-space: nowrap; z-index: 2; box-shadow: 0 4px 14px rgba(124,92,252,0.5); }
+  .plan-credits-pill { display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; margin-top: 18px; padding: 9px 16px; border-radius: 999px; background: rgba(124,92,252,0.12); border: 1px solid rgba(124,92,252,0.3); }
+  .plan-cta { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border-radius: 12px; cursor: pointer; font-family: var(--font-body); font-size: 15px; font-weight: 800; transition: transform 0.2s, opacity 0.2s; }
+  .plan-cta-hot { background: linear-gradient(135deg,#f5c518,#f97316); color: #0b0b12; border: none; }
+  .plan-cta-outline { background: transparent; color: var(--text); border: 1px solid rgba(139,92,252,0.5); }
+  .plan:hover .plan-cta { transform: translateY(-1px); }
 
   .plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
   .plan-name { font-family: var(--font-body); font-size: 14px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
@@ -612,6 +620,80 @@ function VideoServicesList({ exclude = [] }) {
       ))}
       <ServiceCostRow name="10+ AI image & audio tools" cost={TOOLS_COST_LABEL} />
     </>
+  );
+}
+
+// Pricing plans — display values (marketing-rounded). Styled to match the in-app Upgrade modal.
+const PRICING_PLANS = [
+  {
+    slug: "starter", name: "Starter", desc: "For trying it out & light use.", Icon: Rocket, accent: "#38bdf8", popular: false,
+    monthly: 29, annualPerMo: 24, annualBilled: "$290 billed annually · 17% off", credits: "600",
+    excludeServices: ["video_clipping"],
+    checks: ["Credit top-ups anytime"],
+    crosses: ["Video clipping (long video → shorts)", "Automation & auto-publish to social"],
+  },
+  {
+    slug: "pro", name: "Pro", desc: "For creators, marketers & teams.", Icon: Crown, accent: "#f5c518", popular: true,
+    monthly: 49, annualPerMo: 41, annualBilled: "$490 billed annually · 17% off", credits: "1,500",
+    plusLabel: "Everything in Starter, plus:",
+    checks: ["Video clipping (long video → shorts)", "Automation & auto-publish to social", "Credit top-ups anytime"],
+  },
+  {
+    slug: "max", name: "Max", desc: "For power users & high-volume output.", Icon: Users, accent: "#a855f7", popular: false,
+    monthly: 99, annualPerMo: 83, annualBilled: "$990 billed annually · 17% off", credits: "4,000",
+    plusLabel: "Everything in Pro, plus:",
+    checks: ["More credits for high-volume output", "Best value — lower cost per credit"],
+  },
+];
+
+function PricingCard({ plan, cycle, onChoose }) {
+  const { Icon, accent, popular } = plan;
+  const annual = cycle === "annual";
+  return (
+    <div className={`plan${popular ? " plan-pro" : ""}`} style={{ display: "flex", flexDirection: "column", ...(popular ? {} : { borderColor: `${accent}66` }) }}>
+      {popular && <div className="plan-pro-badge">★ Most Popular</div>}
+
+      {/* Icon + name + description */}
+      <div style={{ display: "flex", alignItems: "center", gap: 13, position: "relative", zIndex: 1 }}>
+        <span style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: `${accent}1c`, border: `1px solid ${accent}3a` }}>
+          <Icon size={23} style={{ color: accent }} strokeWidth={2.2} />
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 19, fontWeight: 800, color: "var(--text)", lineHeight: 1.1 }}>{plan.name}</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 3, lineHeight: 1.4 }}>{plan.desc}</div>
+        </div>
+      </div>
+
+      {/* Price */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 9, marginTop: 20, position: "relative", zIndex: 1 }}>
+        {annual && <span style={{ fontFamily: "var(--font-mono)", fontSize: 21, color: "var(--dim)", textDecoration: "line-through", marginBottom: 6 }}>${plan.monthly}</span>}
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 48, fontWeight: 800, color: "var(--yellow)", lineHeight: 0.85, letterSpacing: "-2px" }}>${annual ? plan.annualPerMo : plan.monthly}</span>
+        <span style={{ fontSize: 15, color: "var(--dim)", marginBottom: 6 }}>/mo</span>
+      </div>
+      <div className="plan-cycle" style={{ marginTop: 7 }}>{annual ? plan.annualBilled : "billed monthly"}</div>
+
+      {/* Credits pill */}
+      <div className="plan-credits-pill">
+        <Zap size={15} color="#f5c518" fill="#f5c518" />
+        <span style={{ fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{plan.credits} credits / month</span>
+      </div>
+
+      {/* CTA — sits above the feature list */}
+      <button className={`plan-cta ${popular ? "plan-cta-hot" : "plan-cta-outline"}`} style={{ marginTop: 18 }} onClick={() => onChoose(plan.slug)}>
+        Upgrade to {plan.name} <ArrowRight size={16} />
+      </button>
+      <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 9 }}>cancel anytime</div>
+
+      <hr className="plan-hr" />
+
+      {/* Full inclusions */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <VideoServicesList exclude={plan.excludeServices} />
+        {plan.plusLabel && <PlusLabel>{plan.plusLabel}</PlusLabel>}
+        {(plan.checks || []).map((c, i) => <Check key={`c${i}`}>{c}</Check>)}
+        {(plan.crosses || []).map((c, i) => <Cross key={`x${i}`}>{c}</Cross>)}
+      </div>
+    </div>
   );
 }
 
@@ -1137,115 +1219,9 @@ export default function LandingPage() {
             data-reveal
             style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}
           >
-            {/* Starter — entry paid plan */}
-            <div className="plan">
-              <div className="plan-head">
-                <div className="plan-name">Starter</div>
-              </div>
-              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For trying it out &amp; light use.</p>
-              <div className="plan-price-row">
-                {cycle === "annual" ? (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: "var(--dim)", textDecoration: "line-through" }}>$29</div>
-                      <div className="plan-price" ><span>$</span>24</div>
-                      <span style={{ fontSize: 14, color: "var(--dim)" }}>/mo</span>
-                    </div>
-                    <div className="plan-cycle" style={{ marginBottom: 2, marginTop: 4 }}>$290 billed annually · 17% off</div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="plan-price"><span>$</span>29<span style={{ fontSize: 14, color: "var(--dim)" }}> /mo</span></div>
-                    <div className="plan-cycle" style={{ marginBottom: 2 }}>billed monthly</div>
-                  </div>
-                )}
-              </div>
-              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={() => goToPlan("starter")}>
-                Get Started
-              </button>
-              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
-              <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <Check>⚡ 600 credits / month</Check>
-                <VideoServicesList exclude={["video_clipping"]} />
-                <Check>Credit top-ups anytime</Check>
-                <Cross>Video clipping (long video → shorts)</Cross>
-                <Cross>Automation &amp; auto-publish to social</Cross>
-              </div>
-            </div>
-
-            {/* Pro — the single paid plan */}
-            <div className="plan plan-hot">
-              <div className="plan-hot-badge">Most Popular</div>
-              <div className="plan-head">
-                <div className="plan-name">Pro</div>
-              </div>
-              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For creators, marketers &amp; teams.</p>
-              <div className="plan-price-row">
-                {cycle === "annual" ? (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: "var(--dim)", textDecoration: "line-through" }}>$49</div>
-                      <div className="plan-price" ><span>$</span>41</div>
-                      <span style={{ fontSize: 14, color: "var(--dim)" }}>/mo</span>
-                    </div>
-                    <div className="plan-cycle" style={{ marginBottom: 2, marginTop: 4 }}>$490 billed annually · 17% off</div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="plan-price"><span>$</span>49<span style={{ fontSize: 14, color: "var(--dim)" }}> /mo</span></div>
-                    <div className="plan-cycle" style={{ marginBottom: 2 }}>billed monthly</div>
-                  </div>
-                )}
-              </div>
-              <button className="plan-btn plan-btn-hot" style={{ marginTop: 16 }} onClick={() => goToPlan("pro")}>
-                Get Started
-              </button>
-              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
-              <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <Check>⚡ 1,500 credits / month</Check>
-                <VideoServicesList />
-                <PlusLabel>Everything in Starter, plus:</PlusLabel>
-                <Check>Video clipping (long video → shorts)</Check>
-                <Check>Automation &amp; auto-publish to social</Check>
-                <Check>Credit top-ups anytime</Check>
-              </div>
-            </div>
-
-            {/* Agency — high-volume teams */}
-            <div className="plan">
-              <div className="plan-head">
-                <div className="plan-name">Agency</div>
-              </div>
-              <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", minHeight: 36, lineHeight: 1.5 }}>For agencies &amp; high-volume teams.</p>
-              <div className="plan-price-row">
-                {cycle === "annual" ? (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: "var(--dim)", textDecoration: "line-through" }}>$99</div>
-                      <div className="plan-price" ><span>$</span>83</div>
-                      <span style={{ fontSize: 14, color: "var(--dim)" }}>/mo</span>
-                    </div>
-                    <div className="plan-cycle" style={{ marginBottom: 2, marginTop: 4 }}>$990 billed annually · 17% off</div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="plan-price"><span>$</span>99<span style={{ fontSize: 14, color: "var(--dim)" }}> /mo</span></div>
-                    <div className="plan-cycle" style={{ marginBottom: 2 }}>billed monthly</div>
-                  </div>
-                )}
-              </div>
-              <button className="plan-btn plan-btn-default" style={{ marginTop: 16 }} onClick={() => goToPlan("agency")}>
-                Get Started
-              </button>
-              <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 7 }}>cancel anytime</div>
-              <div style={{ borderTop: "1px solid var(--border2)", marginTop: 18, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <Check>⚡ 4,000 credits / month</Check>
-                <VideoServicesList />
-                <PlusLabel>Everything in Pro, plus:</PlusLabel>
-                <Check>More credits for high-volume output</Check>
-                <Check>Best value — lower cost per credit</Check>
-              </div>
-            </div>
+            {PRICING_PLANS.map((p) => (
+              <PricingCard key={p.slug} plan={p} cycle={cycle} onChoose={goToPlan} />
+            ))}
           </div>
         </div>
       </section>
@@ -1328,7 +1304,7 @@ export default function LandingPage() {
             <div>
               <a href="/" className="nav-logo"><img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 40, width: "auto" }} /></a>
               <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--muted)", lineHeight: 1.6, margin: "16px 0 20px", maxWidth: 250 }}>
-                The all-in-one AI content engine for brands, creators, and agencies. Describe it. We create it.
+                The all-in-one AI content engine for brands, creators, and marketers. Describe it. We create it.
               </p>
               <div style={{ display: "flex", gap: 10 }}>
                 {["youtube", "instagram", "tiktok", "x", "linkedin"].map((id) => (

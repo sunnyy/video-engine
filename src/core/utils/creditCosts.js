@@ -152,5 +152,5 @@ export function estimateCreditCost(duration, options = {}) {
 export const PLANS = {
   starter: { price: 29, credits: 600,  label: "Starter" },
   pro:     { price: 49, credits: 1500, label: "Pro"     },
-  agency:  { price: 99, credits: 4000, label: "Agency"  },
+  max:     { price: 99, credits: 4000, label: "Max"     },
 };

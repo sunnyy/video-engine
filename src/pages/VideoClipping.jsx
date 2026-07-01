@@ -83,7 +83,7 @@ export default function VideoClipping() {
     }
   }
 
-  if (planLoaded && !isProPlus) return <UpgradeGate feature="Video Clipping" blurb="Video Clipping — turn a long video or podcast into captioned vertical clips — is available on the Pro and Agency plans." />;
+  if (planLoaded && !isProPlus) return <UpgradeGate feature="Video Clipping" blurb="Video Clipping — turn a long video or podcast into captioned vertical clips — is available on the Pro and Max plans." />;
 
   return (
     <AppLayout>

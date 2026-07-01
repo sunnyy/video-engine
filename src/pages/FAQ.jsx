@@ -42,7 +42,7 @@ const FAQS = [
   },
   {
     q: "What are the plan limits?",
-    a: "Starter includes 600 credits per month, Pro 1,500, and Agency 4,000. Every plan unlocks every service on the platform; Automation & auto-publish are available on Pro and Agency. Check the pricing section for current rates.",
+    a: "Starter includes 600 credits per month, Pro 1,500, and Max 4,000. Every plan unlocks every service on the platform; Automation & auto-publish are available on Pro and Max. Check the pricing section for current rates.",
   },
   {
     q: "Can I cancel anytime?",

@@ -7,6 +7,7 @@ import { useNotificationsStore } from "../store/useNotificationsStore";
 import { usePlanStore } from "../store/usePlanStore";
 import { supabase } from "../lib/supabase";
 import SystemStatusBanner from "./SystemStatusBanner";
+import UpgradeModal from "./UpgradeModal";
 
 /* ── Icons ── */
 const Icons = {
@@ -254,7 +255,7 @@ function IconBtn({ icon, label, to, href, onClick, active, locked }) {
       </span>
       <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 15.5, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "left" }}>{label}</span>
       {locked && (
-        <svg aria-label="Pro & Agency" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f5c518" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.9 }}>
+        <svg aria-label="Pro & Max" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f5c518" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.9 }}>
           <rect x="4" y="11" width="16" height="10" rx="2" />
           <path d="M8 11V7a4 4 0 0 1 8 0v4" />
         </svg>
@@ -488,6 +489,7 @@ export default function AppLayout({ children }) {
   const { isProPlus, fetchPlan } = usePlanStore();
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
 // Video service nav is hidden — those live in the Dashboard chatbox now. Image/Audio
   // tools live under Explore; user projects under Projects. (Routes/pages kept intact.)
@@ -556,11 +558,13 @@ export default function AppLayout({ children }) {
               </div>
             </button>
 
-            {/* Show to anyone not on a paid plan (no free plan exists); admins on no plan see it too. */}
-            {!isProPlus && (
-              <a href="/#pricing" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, padding: "10px 12px", borderRadius: 10, background: "linear-gradient(135deg, #f5c518, #f97316)", color: "#0b0b12", fontWeight: 700, fontSize: 13.5, fontFamily: "'Outfit',sans-serif", textDecoration: "none" }}>
+            {/* Show to anyone not on a paid plan (no free plan exists); admins always see it so they
+                can preview the modal. Opens the in-app upgrade modal, not the marketing /#pricing page. */}
+            {(!isProPlus || isAdmin) && (
+              <button onClick={() => setUpgradeOpen(true)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, padding: "10px 12px", borderRadius: 10, background: "linear-gradient(135deg, #f5c518, #f97316)", color: "#0b0b12", fontWeight: 700, fontSize: 13.5, fontFamily: "'Outfit',sans-serif", border: "none", cursor: "pointer", width: "100%" }}>
                 <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>{Icons.star}</span> Upgrade
-              </a>
+              </button>
             )}
 
             <FlyoutGroup icon={Icons.settings} label="Account" active={inAccount}>
@@ -586,6 +590,7 @@ export default function AppLayout({ children }) {
         </div>
 
       </div>
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </>
   );
 }

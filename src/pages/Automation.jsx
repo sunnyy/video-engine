@@ -8,7 +8,7 @@ import { serverFetch } from "../services/serverApi";
 /**
  * Automation → Campaigns (the index tab of /automation). Overview stat cards + a searchable
  * campaigns table with quick lifecycle actions. Page chrome (title + tabs) lives in
- * AutomationLayout. Pro/Agency only.
+ * AutomationLayout. Pro/Max only.
  */
 
 const T = { bg: "#090b11", surface: "#0e1018", surface2: "#14141e", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", faint: "#55667a", accent: "#7c5cfc" };
@@ -76,7 +76,7 @@ export default function Automation() {
   const th = { padding: "11px 16px", textAlign: "left", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.06em", color: T.faint };
   const td = { padding: "14px 16px", color: T.text, verticalAlign: "middle" };
 
-  if (planLoaded && !isProPlus) return <UpgradeGate feature="Automation" blurb="Automation — auto-generate and publish videos on a schedule — is available on the Pro and Agency plans." />;
+  if (planLoaded && !isProPlus) return <UpgradeGate feature="Automation" blurb="Automation — auto-generate and publish videos on a schedule — is available on the Pro and Max plans." />;
 
   const list = campaigns || [];
   const activeCount = list.filter(c => c.status === "active").length;
