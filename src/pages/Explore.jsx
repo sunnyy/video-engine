@@ -51,7 +51,12 @@ const FEATURED = [
   { emoji: "🎬", label: "Prompt to Video",    tag: "Most Popular", tagColor: "#a78bfa", desc: "Turn any idea into a fully designed, narrated video", to: "/ai-video",     cta: "Generate Video", accent: "#a78bfa", grad: "linear-gradient(135deg, rgba(124,92,252,0.30), rgba(20,16,42,0.35))" },
   { emoji: "🚀", label: "SaaS / Promo Video", tag: "Popular",      tagColor: "#fb923c", desc: "Turn your product or website into a polished promo",   to: "/promo-video",  cta: "Create Promo",   accent: "#fb923c", grad: "linear-gradient(135deg, rgba(249,115,22,0.24), rgba(32,18,10,0.35))" },
   { emoji: "🎙", label: "Talking Head",       tag: "Creator fave", tagColor: "#34d399", desc: "Your clip → auto captions, cuts & B-roll",            to: "/talking-head", cta: "Create Video",   accent: "#34d399", grad: "linear-gradient(135deg, rgba(52,211,153,0.22), rgba(8,28,20,0.35))" },
+  { emoji: "🔗", label: "Social Post to Video", tag: "Trending",   tagColor: "#22d3ee", desc: "Repurpose a post or link into a ready-to-publish reel", to: "/social-video", cta: "Create Video",   accent: "#22d3ee", grad: "linear-gradient(135deg, rgba(34,211,238,0.22), rgba(6,24,30,0.35))" },
+  { emoji: "📦", label: "Product Video",      tag: "New",          tagColor: "#fb923c", desc: "One product photo → a cinematic promo ad",            to: "/product-video", cta: "Create Video",  accent: "#fb923c", grad: "linear-gradient(135deg, rgba(249,115,22,0.24), rgba(32,18,10,0.35))" },
 ];
+
+// Routes shown as Featured cards — don't repeat them in the section grids below.
+const FEATURED_ROUTES = new Set(FEATURED.map(f => f.to));
 
 function IconTile({ emoji, accent, size = 40 }) {
   return (
@@ -182,19 +187,28 @@ export default function Explore() {
               {/* Featured */}
               <div style={{ marginBottom: 36 }}>
                 <Heading>Featured Tools ✨</Heading>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+                <div className="explore-featured-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12 }}>
                   {FEATURED.map(f => <FeatureCard key={f.to} f={f} />)}
                 </div>
+                <style>{`
+                  @media (max-width: 1080px){ .explore-featured-grid{ grid-template-columns: repeat(3, minmax(0,1fr)) !important; } }
+                  @media (max-width: 720px){ .explore-featured-grid{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; } }
+                  @media (max-width: 480px){ .explore-featured-grid{ grid-template-columns: 1fr !important; } }
+                `}</style>
               </div>
 
-              {/* Sections */}
+              {/* Sections — featured tools are excluded here so nothing repeats */}
               <div style={{ display: "flex", flexDirection: "column", gap: 34 }}>
-                {SECTIONS.map(s => (
-                  <div key={s.label}>
-                    <Heading>{s.label}</Heading>
-                    <SectionGrid items={s.items} />
-                  </div>
-                ))}
+                {SECTIONS.map(s => {
+                  const items = s.items.filter(it => !FEATURED_ROUTES.has(it.to));
+                  if (!items.length) return null;
+                  return (
+                    <div key={s.label}>
+                      <Heading>{s.label}</Heading>
+                      <SectionGrid items={items} />
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}

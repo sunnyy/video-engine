@@ -18,7 +18,8 @@ import { logEvent } from "../services/automation/events.js";
 import { CREDIT_COSTS } from "../../core/utils/creditCosts.js";
 import { supabaseAdmin, deductCredits, sendUserEmail, userRenderCompleteEmail } from "../middleware/shared.js";
 import { notifyUser, notifyUserById } from "../services/notificationService.js";
-import { resolveAudienceIds } from "../services/announcements/audience.js";
+import { resolveAudienceIds, emailsForIds } from "../services/announcements/audience.js";
+import { userAnnouncementEmail } from "../services/emailService.js";
 import { blockedCapability } from "../services/apiHealth.js";
 
 // A cancellation "error" the worker treats as terminal (never retried).
@@ -481,5 +482,25 @@ registerHandler("broadcast_announcement", async (payload) => {
   }
 
   await supabaseAdmin.from("announcements").update({ status: "sent", sent_count: sent, updated_at: new Date().toISOString() }).eq("id", announcementId);
-  return { sent };
+
+  // Optional email fan-out. Announcements are a locked category (no opt-out), so every user in
+  // the audience is emailed — this path is meant for product news and, crucially, legal updates.
+  // Sent sequentially with a light throttle so a large list stays under the provider's rate limit.
+  let emailed = 0;
+  if (a.email) {
+    try {
+      const recipients = await emailsForIds(ids);
+      const tpl = userAnnouncementEmail({ title: a.title, body: a.body, link: a.link });
+      for (const r of recipients) {
+        try { await sendUserEmail(r.email, tpl.subject, tpl.html); emailed++; }
+        catch (err) { console.error(`[broadcast] email failed for ${r.id}: ${err.message}`); }
+        if (emailed % 20 === 0) await new Promise(res => setTimeout(res, 1000));
+      }
+      await supabaseAdmin.from("announcements").update({ email_count: emailed, updated_at: new Date().toISOString() }).eq("id", announcementId);
+    } catch (err) {
+      console.error(`[broadcast] email fan-out failed: ${err.message}`);
+    }
+  }
+
+  return { sent, emailed };
 });

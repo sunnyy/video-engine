@@ -78,6 +78,20 @@ export async function resolveAudienceIds(audience = {}) {
   return ids;
 }
 
+/**
+ * Map a set of user ids to their emails (+ display name). Pages the auth list once and filters
+ * to the requested ids, so it's used AFTER resolveAudienceIds when an announcement also emails.
+ * Returns [{ id, email, name }] — users without an email are dropped.
+ */
+export async function emailsForIds(ids = []) {
+  const want = new Set(ids);
+  if (!want.size) return [];
+  const users = await listAllUsers();
+  return users
+    .filter(u => want.has(u.id) && u.email)
+    .map(u => ({ id: u.id, email: u.email, name: u.user_metadata?.full_name || u.user_metadata?.name || "" }));
+}
+
 /** Icon + severity defaults per category (server is the source of truth). */
 export const CATEGORY_META = {
   news:        { icon: "📣", severity: "info" },

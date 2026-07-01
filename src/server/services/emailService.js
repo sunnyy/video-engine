@@ -343,6 +343,24 @@ export function userRenderCompleteEmail(name, videoUrl, projectName) {
   };
 }
 
+export function userAnnouncementEmail({ title, body = "", link = null, ctaLabel = "Open Vidquence" } = {}) {
+  const paras = String(body || "")
+    .split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+    .map(p => `<p style="color:#c8c8d8;margin:0 0 16px;line-height:1.6">${p.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+  const href = link
+    ? (/^https?:\/\//i.test(link) ? link : `${APP_URL}${link.startsWith("/") ? "" : "/"}${link}`)
+    : APP_URL;
+  return {
+    subject: title,
+    html: wrap(`
+      <h2 style="margin:0 0 16px;font-size:22px;color:#f5c518">${title}</h2>
+      ${paras}
+      <a href="${href}" style="display:inline-block;background:#f5c518;color:#0b0b10;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;margin-top:4px">${ctaLabel} →</a>
+    `),
+  };
+}
+
 /* ── Support templates ─────────────────────────────────────── */
 
 export function adminSupportEmail({ kind = "new", ticketId, subject, category = "", userEmail = "", message = "" }) {

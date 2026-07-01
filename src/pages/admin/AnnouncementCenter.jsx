@@ -54,6 +54,9 @@ export default function AnnouncementCenter() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [seg, setSeg] = useState({ plan: "", maxBalance: "", inactiveDays: "", signupAfter: "" });
 
+  // delivery
+  const [email, setEmail] = useState(false);
+
   // schedule
   const [scheduleOn, setScheduleOn] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
@@ -124,10 +127,10 @@ export default function AnnouncementCenter() {
     if (!title.trim()) { setErr("Title is required."); return; }
     setErr(""); setMsg(""); setBusy("test");
     try {
-      const res = await serverFetch("/api/admin/announcements/test", { method: "POST", body: JSON.stringify({ title, body, link, category }) });
+      const res = await serverFetch("/api/admin/announcements/test", { method: "POST", body: JSON.stringify({ title, body, link, category, email }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      setMsg("Test notification sent to you — check the bell.");
+      setMsg(email ? "Test sent to you — check the bell and your inbox." : "Test notification sent to you — check the bell.");
     } catch (e) { setErr(e.message); }
     setBusy("");
   }
@@ -138,12 +141,12 @@ export default function AnnouncementCenter() {
     try {
       const res = await serverFetch("/api/admin/announcements", {
         method: "POST",
-        body: JSON.stringify({ title, body, link, category, audience: buildAudience(), scheduledAt: scheduleOn ? scheduledAt : null }),
+        body: JSON.stringify({ title, body, link, category, audience: buildAudience(), scheduledAt: scheduleOn ? scheduledAt : null, email }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setMsg(scheduleOn ? "Announcement scheduled." : "Announcement is sending — users will receive it shortly.");
-      setTitle(""); setBody(""); setLink(""); setSelectedIds([]); setCount(null); setScheduleOn(false); setScheduledAt("");
+      setTitle(""); setBody(""); setLink(""); setSelectedIds([]); setCount(null); setScheduleOn(false); setScheduledAt(""); setEmail(false);
       loadHistory();
     } catch (e) { setErr(e.message); }
     setBusy("");
@@ -163,7 +166,7 @@ export default function AnnouncementCenter() {
     <AdminLayout>
       <div style={{ maxWidth: 1100, margin: "0 auto", color: T.text }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, margin: "0 0 4px" }}>Announcements</h1>
-        <p style={{ fontSize: 13, color: T.muted, margin: "0 0 24px" }}>Broadcast an in-app notification to your users.</p>
+        <p style={{ fontSize: 13, color: T.muted, margin: "0 0 24px" }}>Broadcast an in-app notification to your users — and optionally email them too (for legal/policy updates).</p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 24, alignItems: "start" }}>
           {/* ── Composer ── */}
@@ -263,6 +266,18 @@ export default function AnnouncementCenter() {
               </div>
             </div>
 
+            {/* ── Delivery ── */}
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 700, color: T.text, cursor: "pointer" }}>
+                <input type="checkbox" checked={email} onChange={e => setEmail(e.target.checked)} />
+                Also send by email
+              </label>
+              <p style={{ fontSize: 11.5, color: T.faint, margin: 0, lineHeight: 1.5 }}>
+                In-app bell is always delivered. Turn this on to also email the audience — use it for legal/policy
+                updates (Privacy, Terms) that everyone must be notified of, or important product news.
+              </p>
+            </div>
+
             {/* ── Schedule ── */}
             <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 700, color: T.text, cursor: "pointer" }}>
@@ -316,6 +331,7 @@ export default function AnnouncementCenter() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</div>
                   <div style={{ fontSize: 11, color: T.faint }}>{(a.audience?.type || "all")} · {a.scheduled_at ? `scheduled ${fmtDate(a.scheduled_at)}` : fmtDate(a.created_at)}</div>
                 </div>
+                {a.email && <span title={`${a.email_count ?? 0} emailed`} style={{ fontSize: 11, fontWeight: 700, color: "#38bdf8", background: "rgba(56,189,248,0.14)", padding: "2px 8px", borderRadius: 99 }}>✉ {a.email_count ?? 0}</span>}
                 <span style={{ fontSize: 12, color: T.muted }}>{a.sent_count} sent</span>
                 <StatusBadge status={a.status} />
               </div>

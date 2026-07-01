@@ -8,6 +8,7 @@ import { supabaseAdmin, requireAuth, requireAdmin } from "../middleware/shared.j
 import { enqueue } from "../jobs/queue.js";
 import { resolveAudienceIds, CATEGORY_META } from "../services/announcements/audience.js";
 import { notifyUser } from "../services/notificationService.js";
+import { sendUserEmail, userAnnouncementEmail } from "../services/emailService.js";
 
 export const router = express.Router();
 
@@ -20,7 +21,7 @@ function metaFor(category) {
 /* ── POST /api/admin/announcements — create + send (or schedule) ── */
 router.post("/announcements", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { title, body = null, link = null, category = "news", audience, scheduledAt = null } = req.body || {};
+    const { title, body = null, link = null, category = "news", audience, scheduledAt = null, email = false } = req.body || {};
     if (!title?.trim()) return res.status(400).json({ error: "title is required" });
     if (!audience?.type) return res.status(400).json({ error: "audience is required" });
     const cat = CATEGORIES.includes(category) ? category : "news";
@@ -32,7 +33,7 @@ router.post("/announcements", requireAuth, requireAdmin, async (req, res) => {
       .from("announcements")
       .insert({
         title: title.trim(), body, link, category: cat, icon, severity,
-        audience, status: future ? "scheduled" : "queued",
+        audience, email: !!email, status: future ? "scheduled" : "queued",
         scheduled_at: future ? new Date(scheduledAt).toISOString() : null,
         created_by: req.user.id,
       })
@@ -81,10 +82,14 @@ router.post("/announcements/preview-count", requireAuth, requireAdmin, async (re
 /* ── POST /api/admin/announcements/test — send only to the requesting admin ── */
 router.post("/announcements/test", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { title, body = null, link = null, category = "news" } = req.body || {};
+    const { title, body = null, link = null, category = "news", email = false } = req.body || {};
     if (!title?.trim()) return res.status(400).json({ error: "title is required" });
     const { icon, severity } = metaFor(CATEGORIES.includes(category) ? category : "news");
     await notifyUser(req.user.id, { type: "announcement", title: `[Test] ${title.trim()}`, body, link, icon, severity });
+    if (email && req.user.email) {
+      const tpl = userAnnouncementEmail({ title: `[Test] ${title.trim()}`, body, link });
+      await sendUserEmail(req.user.email, tpl.subject, tpl.html);
+    }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
