@@ -7,6 +7,7 @@ import { VoiceLanguageField } from "../ui/fields/voiceLanguage.jsx";
 import { OrientationField } from "../ui/fields/orientation.jsx";
 import { DurationField } from "../ui/fields/duration.jsx";
 import { StyleField } from "../ui/fields/style.jsx";
+import { Activity, Send, ListChecks, CheckCircle2, Zap } from "lucide-react";
 
 /**
  * CampaignDetail — one campaign's cockpit: settings editor + lifecycle controls + its video
@@ -127,7 +128,8 @@ export default function CampaignDetail() {
   const ACTING = { "run-once": "Starting…", start: "Starting…", resume: "Resuming…", pause: "Pausing…", stop: "Stopping…", delete: "Deleting…" };
   const spin = <span style={{ width: 11, height: 11, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "vqspin 0.6s linear infinite" }} />;
   const connectedAccounts = accounts.filter(a => a.status === "connected");
-  const panel = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18 };
+  const panel = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 22, boxShadow: "0 1px 3px rgba(0,0,0,0.28)" };
+  const sectionHead = { fontSize: 11, fontWeight: 800, color: T.faint, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 13 };
   const panelHead = { fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 10 };
 
   const publishedCount = data.posts.filter(p => p.status === "published").length;
@@ -191,17 +193,22 @@ export default function CampaignDetail() {
           </div>
 
           {/* Overview strip — campaign pulse, always visible */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, marginBottom: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, marginBottom: 22 }}>
             {[
-              { label: "Status",        value: st.label, color: st.color },
-              { label: "Posts / day",   value: c.posts_per_day || 1 },
-              { label: "Topics queued", value: data.queued ?? 0 },
-              { label: "Published",     value: publishedCount },
-              { label: "Auto-publish",  value: c.auto_publish !== false ? "On" : "Off" },
+              { label: "Status",        value: st.label,                                 color: st.color,                                        Icon: Activity,     tint: st.color },
+              { label: "Posts / day",   value: c.posts_per_day || 1,                                                                             Icon: Send,         tint: T.accent },
+              { label: "Topics queued", value: data.queued ?? 0,                                                                                 Icon: ListChecks,   tint: "#38bdf8" },
+              { label: "Published",     value: publishedCount,                           color: publishedCount > 0 ? "#22c55e" : T.text,         Icon: CheckCircle2, tint: "#22c55e" },
+              { label: "Auto-publish",  value: c.auto_publish !== false ? "On" : "Off",  color: c.auto_publish !== false ? "#22c55e" : T.muted,  Icon: Zap,          tint: c.auto_publish !== false ? "#22c55e" : T.faint },
             ].map(s => (
-              <div key={s.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", minWidth: 0 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: T.faint, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: s.color || T.text, marginTop: 4, fontFamily: "'Outfit',sans-serif" }}>{s.value}</div>
+              <div key={s.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "13px 14px", minWidth: 0, display: "flex", flexDirection: "column", gap: 9, boxShadow: "0 1px 2px rgba(0,0,0,0.25)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: T.faint, textTransform: "uppercase", letterSpacing: "0.07em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 7, background: `${s.tint}1a`, color: s.tint, flexShrink: 0 }}>
+                    <s.Icon size={13} strokeWidth={2.4} />
+                  </span>
+                </div>
+                <div style={{ fontSize: 19, fontWeight: 800, color: s.color || T.text, fontFamily: "'Outfit',sans-serif", lineHeight: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.value}</div>
               </div>
             ))}
           </div>
@@ -210,9 +217,11 @@ export default function CampaignDetail() {
           <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${T.border}`, marginBottom: 20 }}>
             {[["settings", "Settings"], ["videos", "Videos"], ["activity", "Activity"]].map(([key, label]) => {
               const on = tab === key;
+              const count = key === "videos" ? data.posts.length : null;
               return (
-                <button key={key} onClick={() => setTab(key)} style={{ background: "none", border: "none", borderBottom: `2px solid ${on ? T.accent : "transparent"}`, color: on ? T.text : T.muted, fontSize: 13.5, fontWeight: 700, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", marginBottom: -1 }}>
+                <button key={key} onClick={() => setTab(key)} style={{ background: "none", border: "none", borderBottom: `2px solid ${on ? T.accent : "transparent"}`, color: on ? T.text : T.muted, fontSize: 13.5, fontWeight: 700, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", marginBottom: -1, display: "inline-flex", alignItems: "center", gap: 7 }}>
                   {label}
+                  {count ? <span style={{ fontSize: 11, fontWeight: 700, color: on ? T.accent : T.faint, background: on ? `${T.accent}1e` : "rgba(255,255,255,0.05)", borderRadius: 20, padding: "1px 7px" }}>{count}</span> : null}
                 </button>
               );
             })}
@@ -261,49 +270,67 @@ export default function CampaignDetail() {
 
           {/* ── Settings tab ── */}
           {tab === "settings" && (
-            <div style={panel}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "22px 16px" }}>
-                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Niche(s) — comma separated</span><input style={fieldStyle} value={form.niches} onChange={e => setForm(f => ({ ...f, niches: e.target.value }))} placeholder="ai tools, productivity" /></div>
+            <div style={panel} className="camp-form">
+              <style>{`.camp-form input:focus, .camp-form select:focus { border-color: ${T.accent}88; box-shadow: 0 0 0 3px ${T.accent}22; }`}</style>
 
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <span style={lbl}>Publish to</span>
-                  {connectedAccounts.length === 0
-                    ? <div style={{ fontSize: 12, color: T.faint }}>No connected accounts — add one under Automation → Social Accounts.</div>
-                    : <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {connectedAccounts.map(a => {
-                          const on = form.target_accounts.includes(a.id);
-                          return (
-                            <button key={a.id} onClick={() => setForm(f => ({ ...f, target_accounts: on ? f.target_accounts.filter(x => x !== a.id) : [...f.target_accounts, a.id] }))}
-                              style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${on ? T.accent + "88" : T.border}`, background: on ? `${T.accent}22` : "rgba(255,255,255,0.03)", color: on ? "#fff" : T.muted }}>
-                              {a.platform} · {a.display_name || "account"}
-                            </button>
-                          );
-                        })}
-                      </div>}
+              <div style={{ marginBottom: 26 }}>
+                <div style={sectionHead}>Content</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
+                  <div style={{ gridColumn: "span 2" }}><span style={lbl}>Niche(s) — comma separated</span><input style={fieldStyle} value={form.niches} onChange={e => setForm(f => ({ ...f, niches: e.target.value }))} placeholder="ai tools, productivity" /></div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <span style={lbl}>Publish to</span>
+                    {connectedAccounts.length === 0
+                      ? <div style={{ fontSize: 12, color: T.faint }}>No connected accounts — add one under Automation → Social Accounts.</div>
+                      : <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {connectedAccounts.map(a => {
+                            const on = form.target_accounts.includes(a.id);
+                            return (
+                              <button key={a.id} onClick={() => setForm(f => ({ ...f, target_accounts: on ? f.target_accounts.filter(x => x !== a.id) : [...f.target_accounts, a.id] }))}
+                                style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${on ? T.accent + "88" : T.border}`, background: on ? `${T.accent}22` : "rgba(255,255,255,0.03)", color: on ? "#fff" : T.muted }}>
+                                {a.platform} · {a.display_name || "account"}
+                              </button>
+                            );
+                          })}
+                        </div>}
+                  </div>
                 </div>
+              </div>
 
-                <div><span style={lbl}>Posts / day</span>
-                  <select style={fieldStyle} value={form.posts_per_day} onChange={e => setForm(f => ({ ...f, posts_per_day: e.target.value }))}>
-                    {[1, 2, 3, 4, 5].map(n => <option key={n} value={n} style={opt}>{n}</option>)}
-                  </select>
+              <div style={{ marginBottom: 26 }}>
+                <div style={sectionHead}>Schedule</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
+                  <div><span style={lbl}>Posts / day</span>
+                    <select style={fieldStyle} value={form.posts_per_day} onChange={e => setForm(f => ({ ...f, posts_per_day: e.target.value }))}>
+                      {[1, 2, 3, 4, 5].map(n => <option key={n} value={n} style={opt}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: "span 3" }}><span style={lbl}>Posting times — "HH:MM", comma-separated (blank = AI decides)</span><input style={fieldStyle} value={form.posting_times} onChange={e => setForm(f => ({ ...f, posting_times: e.target.value }))} placeholder="09:00, 18:00" /></div>
                 </div>
-                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Posting times — "HH:MM", comma-separated (blank = AI decides)</span><input style={fieldStyle} value={form.posting_times} onChange={e => setForm(f => ({ ...f, posting_times: e.target.value }))} placeholder="09:00, 18:00" /></div>
-                <div><span style={lbl}>Privacy</span>
-                  <select style={fieldStyle} value={form.privacy} onChange={e => setForm(f => ({ ...f, privacy: e.target.value }))}>
-                    <option value="public" style={opt}>Public</option><option value="unlisted" style={opt}>Unlisted</option><option value="private" style={opt}>Private</option>
-                  </select>
-                </div>
-                <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+              </div>
+
+              <div style={{ marginBottom: 26 }}>
+                <div style={sectionHead}>Look &amp; voice</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
                   <VoiceLanguageField language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accent={T.accent} />
                   <DurationField value={Number(form.target_duration)} onChange={(v) => setForm(f => ({ ...f, target_duration: v }))} options={DURATIONS} accent={T.accent} />
                   <OrientationField value={form.orientation} onChange={(v) => setForm(f => ({ ...f, orientation: v }))} accent={T.accent} />
                   <StyleField value={form.style_id} onChange={(v) => setForm(f => ({ ...f, style_id: v || "auto" }))} options={VISUAL_STYLE_OPTIONS} accent={T.accent} />
                 </div>
+              </div>
 
-                <label style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
-                  <input type="checkbox" checked={form.auto_publish} onChange={e => setForm(f => ({ ...f, auto_publish: e.target.checked }))} />
-                  Auto-publish (off = render then wait for your approval)
-                </label>
+              <div>
+                <div style={sectionHead}>Publishing</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
+                  <div><span style={lbl}>Privacy</span>
+                    <select style={fieldStyle} value={form.privacy} onChange={e => setForm(f => ({ ...f, privacy: e.target.value }))}>
+                      <option value="public" style={opt}>Public</option><option value="unlisted" style={opt}>Unlisted</option><option value="private" style={opt}>Private</option>
+                    </select>
+                  </div>
+                  <label style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
+                    <input type="checkbox" checked={form.auto_publish} onChange={e => setForm(f => ({ ...f, auto_publish: e.target.checked }))} />
+                    Auto-publish (off = render then wait for your approval)
+                  </label>
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
