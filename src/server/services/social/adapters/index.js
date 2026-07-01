@@ -4,8 +4,9 @@
  * refresh, publish). Nothing else in the codebase needs platform-specific knowledge.
  */
 import { youtube } from "./youtube.js";
+import { instagram } from "./instagram.js";
 
-const ADAPTERS = { youtube };
+const ADAPTERS = { youtube, instagram };
 
 export function getAdapter(platform) {
   const a = ADAPTERS[platform];

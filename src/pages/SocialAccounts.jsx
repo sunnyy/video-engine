@@ -20,7 +20,7 @@ const T = { bg: "#090b11", surface: "#0e1018", surface2: "#14141e", border: "rgb
 const PLATFORMS = [
   { id: "youtube", label: "YouTube", ready: true, byo: true, color: "#FF0000" },
   { id: "tiktok", label: "TikTok", ready: false, color: "#141417" },
-  { id: "instagram", label: "Instagram", ready: false, color: "#E1306C" },
+  { id: "instagram", label: "Instagram", ready: true, color: "#E1306C", note: "Needs a Business or Creator account" },
   { id: "linkedin", label: "LinkedIn", ready: false, color: "#0A66C2" },
   { id: "x", label: "X", ready: false, color: "#141417" },
 ];
@@ -177,6 +177,9 @@ export default function SocialAccounts() {
                     <button onClick={() => openSetup(p.id)} style={{ background: "none", border: "none", color: T.faint, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", padding: 0, textAlign: "left" }}>
                       {credStatus[p.id]?.configured ? "Manage Google credentials" : "Uses your own Google project"}
                     </button>
+                  )}
+                  {p.ready && !p.byo && p.note && !connected && (
+                    <div style={{ fontSize: 11.5, color: T.faint, lineHeight: 1.5 }}>{p.note}</div>
                   )}
                 </div>
               );

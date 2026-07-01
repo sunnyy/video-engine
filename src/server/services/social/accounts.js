@@ -80,8 +80,9 @@ export async function getFreshAccessTokenByAccountId(accountId) {
   // instead of burning 5 attempts with backoff.
   if (!data || data.status === "disconnected") { const e = new Error("connected account not found"); e.noRetry = true; throw e; }
 
+  const acctMeta = { platform_account_id: data.platform_account_id };
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
-  if (expiresAt - Date.now() > 60_000) return { accessToken: decrypt(data.access_token), platform: data.platform };
+  if (expiresAt - Date.now() > 60_000) return { accessToken: decrypt(data.access_token), platform: data.platform, account: acctMeta };
 
   const refreshToken = decrypt(data.refresh_token);
   if (!refreshToken) {
@@ -92,9 +93,12 @@ export async function getFreshAccessTokenByAccountId(accountId) {
   const fresh = await getAdapter(data.platform).refresh(refreshToken, creds);
   await supabaseAdmin.from("social_accounts").update({
     access_token: encrypt(fresh.access_token), expires_at: fresh.expires_at,
+    // Some platforms rotate the refresh credential on every refresh (e.g. Instagram's long-lived
+    // token refreshes itself). Persist it when returned; keep the existing one otherwise (YouTube).
+    ...(fresh.refresh_token ? { refresh_token: encrypt(fresh.refresh_token) } : {}),
     status: "connected", updated_at: new Date().toISOString(),
   }).eq("id", data.id);
-  return { accessToken: fresh.access_token, platform: data.platform };
+  return { accessToken: fresh.access_token, platform: data.platform, account: acctMeta };
 }
 
 /**
@@ -119,6 +123,7 @@ export async function getFreshAccessToken(userId, platform) {
   const fresh = await getAdapter(platform).refresh(refreshToken, creds);
   await supabaseAdmin.from("social_accounts").update({
     access_token: encrypt(fresh.access_token), expires_at: fresh.expires_at,
+    ...(fresh.refresh_token ? { refresh_token: encrypt(fresh.refresh_token) } : {}),
     status: "connected", updated_at: new Date().toISOString(),
   }).eq("id", data.id);
   return fresh.access_token;

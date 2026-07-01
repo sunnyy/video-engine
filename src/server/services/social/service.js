@@ -81,7 +81,9 @@ export async function publish(userId, platform, video, metadata) {
  * publish to a particular channel. The platform is derived from the account row.
  */
 export async function publishToAccount(accountId, video, metadata) {
-  const { accessToken, platform } = await getFreshAccessTokenByAccountId(accountId);
+  const { accessToken, platform, account } = await getFreshAccessTokenByAccountId(accountId);
   const adapter = getAdapter(platform);
-  return adapter.publish({ accessToken, video, metadata: normalizeMetadata(platform, metadata) });
+  // Pass the connected-account identity through — platforms like Instagram publish to a specific
+  // account id (YouTube ignores it).
+  return adapter.publish({ accessToken, video, metadata: normalizeMetadata(platform, metadata), account });
 }
