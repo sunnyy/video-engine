@@ -116,7 +116,10 @@ router.get("/snapshot/:id", async (req, res) => {
     if (htmls.length) {
       const W = proj.safe_project_json?.format?.width ?? 1080;
       const H = proj.safe_project_json?.format?.height ?? 1920;
-      try { designs = await renderBeatDesigns(htmls, { outDir, width: W, height: H }); }
+      // Render the design previews on the video's real field (palette base) — not browser-white — so
+      // the preview faithfully predicts the video instead of faking invisible-text/contrast failures.
+      const field = proj.raw_ai_json?.palette?.bg ?? null;
+      try { designs = await renderBeatDesigns(htmls, { outDir, width: W, height: H, background: field }); }
       catch (e) { designsError = e.message; }
     }
 

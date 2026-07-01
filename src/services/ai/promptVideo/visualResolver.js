@@ -13,7 +13,7 @@
  * (legacy primary). Duplicate images across beats are re-picked so scenes stay distinct.
  */
 import { resolveAssets, resolveAsset } from "../shared/assetResolver.js";
-import { generateAiImage } from "../shared/aiImage.js";
+import { generateAiImage, removeBackground } from "../shared/aiImage.js";
 import { aiImageBudgetFor } from "./artDirector.js";
 
 function libMeta(beat, asset) {
@@ -67,12 +67,31 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
   // Service-specific generation (styled illustration / photo) for the ai_image / generate tier.
   const generate = async (req) => {
     const { beat, asset } = req._ref;
+    const cutout    = asset.treatment === "cutout";
     const styleStr  = asset.source === "ai_image" ? style.illustrationStyle : style.photoStyle;
     const promptSrc = asset.prompt || asset.query || beat.content?.headline || beat.visual_concept || "";
-    const src = await generateAiImage(`${promptSrc}, ${styleStr}`, { runId, label: `${req._label}-ai`, orientation: req.orientation ?? orientation, noTextGate: true });
-    return src ? { src, kind: "image", libraryEligible: true } : null;
+    // CUTOUT: render ONE subject on a plain seamless backdrop so birefnet can isolate it cleanly, then
+    // remove the background → a transparent PNG the designer PLACES into the composition. Non-cutout →
+    // a full styled scene as before.
+    const genPrompt = cutout
+      ? `${promptSrc}, a single subject, centered, fully in frame, isolated on a plain seamless neutral studio backdrop, dramatic studio lighting, ${styleStr}`
+      : `${promptSrc}, ${styleStr}`;
+    const src = await generateAiImage(genPrompt, { runId, label: `${req._label}-ai`, orientation: req.orientation ?? orientation, noTextGate: true });
+    if (!src) return null;
+    if (cutout) {
+      const cut = await removeBackground(src, { runId, label: `${req._label}-cut` });
+      if (cut) return { src: cut, kind: "image", cutout: true, libraryEligible: false };
+    }
+    return { src, kind: "image", libraryEligible: true };
   };
-  const onEntity = async (src) => ({ src, kind: "image" });
+  // Entity/stock photos requested as a cutout get birefnet bg-removal too (best-effort; keep original on failure).
+  const onEntity = async (src, req) => {
+    if (req?._ref?.asset?.treatment === "cutout") {
+      const cut = await removeBackground(src, { runId, label: `${req._label || "ent"}-cut` });
+      if (cut) return { src: cut, kind: "image", cutout: true };
+    }
+    return { src, kind: "image" };
+  };
 
   const results = await resolveAssets(flat.map(f => f.req), {
     runId, orientation, aiBudget, generate, onEntity,
@@ -85,6 +104,7 @@ export async function resolveVisuals(beats, style, runId, orientation = "9:16") 
     if (!r) return;
     const a = { kind: r.kind, src: r.src, label: f.asset.label || null };
     if (r.real) a.real = true;
+    if (r.cutout) a.cutout = true;
     if (r.assetMeta) a.assetMeta = r.assetMeta;
     beats[f.beatIdx].resolvedAssets.push(a);
   });

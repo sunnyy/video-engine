@@ -38,6 +38,7 @@ test.html
 Launch.txt
 promoPrompts.js
 autopilot.txt
+animated_series.md
 
 src/server/temp
 # @vidquence/render shadow-diff output
@@ -48,3 +49,15 @@ src/server/temp
 
 # Local dev: experimental Motion (Claude+Remotion) pipeline output
 .motion-lab/
+
+# Local dev: experimental Motion service source (not shipped yet)
+src/services/ai/motion/
+src/remotion-motion/
+src/pages/MotionLab.jsx
+src/server/routes/motion.js
+src/services/captions/captionMotion.js
+src/ui/fields/motionToggle.jsx
+motion-rerender.mjs
+
+# Local dev: scratch/test files
+_wtest.mjs

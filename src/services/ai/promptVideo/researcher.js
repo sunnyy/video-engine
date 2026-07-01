@@ -82,13 +82,14 @@ function buildMessages(prompt, grounding) {
 
 LITERAL INTENT — answer the request as it was actually asked, this comes FIRST:
 - The subject is the PRIMARY, most widely-known referent of the user's words. "Lord Shiva" means the Hindu deity — NOT a film, novel, or character named after him. Never drift to a tangential, modern, or pop-culture reinterpretation of the subject unless the user explicitly asks for it. If you find yourself reframing the topic into something cleverer than what was asked, stop and answer the literal request.
-- HONOR EXPLICIT STRUCTURE. If the request specifies a count or format — "5 facts", "3 reasons", "top 7 …", "myths vs facts" — deliver exactly that: that many real, on-subject points in "facts", in a sensible order, and set "angle" to match (e.g. "countdown"). Do not substitute a different framing.
+- HONOR EXPLICIT STRUCTURE. If the request specifies a count or format — "5 facts", "3 reasons", "top 7 …", "myths vs facts" — gather exactly that: that many real, on-subject points in "facts", in a sensible order. Do not substitute a different set.
 - SOURCE MATERIAL is a helper, not a mandate: if a provided extract is about a DIFFERENT sense of the term than the user clearly means (e.g. a movie when they mean the deity), IGNORE that extract and use your own knowledge of the real subject.
 
 EXECUTE vs EXPLAIN — decide what KIND of request this is, because it changes everything:
-- A creative FORMAT or SCENARIO to PERFORM — a simulation ("AI simulates the next 30 days if X happens"), a hypothetical ("what if…"), a prediction/timeline, a story, a "day in the life", a POV, a roleplay, a ranking/tier-list. The video must PERFORM the thing, NOT describe or explain it. Set "format" to a one-line directive telling the creative team what to DELIVER and HOW it should unfold — e.g. "Play out a vivid, speculative day-by-day timeline of the next 30 days of a hypothetical World War 3, escalating realistically from the triggering event to its consequences." For these, your "facts" are real grounding that makes the scenario PLAUSIBLE (real dynamics, actors, mechanisms) — NOT an explainer of the term itself.
+- A creative FORMAT or SCENARIO to PERFORM — a simulation, a hypothetical ("what if…"), a prediction/timeline, a story, a "day in the life", a POV, a roleplay, a ranking/tier-list. The video must PERFORM the thing, NOT describe or explain it. Set "format" to a one-line directive telling the creative team what to DELIVER and HOW it should unfold, written for whatever THIS request actually asks for.
+- For a scenario/simulation, ARM the writer with concrete raw material to dramatize it, so its "facts" are NOT abstract. But you GATHER possibilities — you do NOT pick the narrative. If the request leaves something OPEN (an unnamed trigger, cause, person, place, company, or an "if X happens"), collect SEVERAL plausible options rather than selecting or inventing a single one — the writer chooses later, and may keep it deliberately open if that makes a stronger hook. Provide the real entities, mechanisms, and a plausible progression (a beginning, a middle, an end) the writer MAY draw on. This is SUPPORTING material only: it must NOT decide the opening — never frame it so the video is forced to open on one specific chosen detail.
 - A straight factual topic / explainer / listicle — set "format" to null and proceed normally.
-- NEVER flatten a "perform it" request into an explainer of its title. If asked to simulate the next 30 days, the brief must enable the team to actually simulate them.
+- NEVER flatten a "perform it" request into an explainer of its title. If the request asks to perform a scenario, the brief must enable the team to actually perform it.
 
 DELIVER THE PROMISE — NEVER ARGUE AGAINST THE TOPIC: the user's title/hook is the video's promise. Build a brief that PAYS IT OFF — deliver the actual thing it teases (the trick, the secret, the payoff) with its intriguing framing intact. NEVER turn it into a myth-buster, a "well, actually…", or a debunk that contradicts its own hook — e.g. a "7-second iPhone trick banned in 12 countries" brief must DELIVER that trick with its hooky framing, NOT explain why it isn't really banned or doesn't work. (Accuracy below means not FABRICATING new hard stats/quotes as ground truth — it does NOT mean policing or contradicting the user's creative hook.)
 
@@ -98,18 +99,18 @@ ACCURACY — the most important rule:
 - If the subject is obscure or you are not confident, return FEWER facts rather than fabricate.
 - ENTITIES — prioritise CONCRETE, PHOTOGRAPHABLE named subjects, each as its OWN entry with its real name: specific landmarks (e.g. Colosseum, Roman Forum), peoples/groups (e.g. Visigoths, Vandals), and named figures (e.g. Romulus Augustulus). Do NOT bury these inside another entity's visual_identity text — surfaced as named entities, they unlock free real photos downstream. Abstract "concept" entities are fine too, but always list the concrete named ones separately.
 
+You gather WHAT EXISTS — facts, entities, material, unknowns. You do NOT decide HOW to tell it: the hook, the opening line, the narrative order, the angle, and the ending are the WRITER's job, not yours. Never propose openings or a framing.
+
 Return ONLY valid JSON:
 {
   "topic": "one-line restatement of what the video is about",
   "format": "if the request is a creative scenario/format to PERFORM (simulation, what-if, prediction, story, day-in-the-life, POV, ranking), a one-line directive of what the video must DELIVER and how it unfolds; else null",
-  "angle": "the most engaging framing for a short-form video (debate, countdown, reveal, story, comparison, explainer)",
-  "tone": "fun | dramatic | informative | inspiring | provocative",
+  "tone": "the SUBJECT'S emotional truth (what the topic FEELS like): fun | dramatic | tense | tragic | hopeful | informative | inspiring | provocative",
   "entities": [{ "name": "...", "kind": "person|company|product|place|landmark|group|concept", "visual_identity": "what they look like / are visually known for" }],
   "facts": ["short, true, interesting facts with numbers ONLY where you are confident — these become on-screen stats and script lines"],
   "contrasts": ["X vs Y framings inside the topic, if any"],
   "artifacts": ["concrete REAL visual artifacts the video can reference: famous moments, objects, logos, quotes, covers, datasets — each described in one line"],
-  "hook_options": ["2-3 opening lines that would stop a scroll"],
-  "cta_idea": "how the video should end (question to comments, follow prompt, takeaway)"
+  "open_questions": ["things the request INTENTIONALLY leaves unresolved (an unnamed 'X', trigger, cause, person, place, or outcome) — the writer preserves these as open, and NEVER invents a specific answer to them; [] if none"]
 }`,
       },
       { role: "user", content: `VIDEO REQUEST:\n${prompt}${sourceBlock}` },
@@ -135,13 +136,17 @@ export async function researchTopic(prompt) {
     throw new Error(`researcher returned invalid JSON: ${e.message}`);
   }
 
-  brief.entities  = Array.isArray(brief.entities)  ? brief.entities.slice(0, 8)   : [];
-  brief.facts     = Array.isArray(brief.facts)     ? brief.facts.slice(0, 12)     : [];
-  brief.contrasts = Array.isArray(brief.contrasts) ? brief.contrasts.slice(0, 4)  : [];
-  brief.artifacts = Array.isArray(brief.artifacts) ? brief.artifacts.slice(0, 8)  : [];
+  brief.entities       = Array.isArray(brief.entities)       ? brief.entities.slice(0, 8)        : [];
+  brief.facts          = Array.isArray(brief.facts)          ? brief.facts.slice(0, 12)          : [];
+  brief.contrasts      = Array.isArray(brief.contrasts)      ? brief.contrasts.slice(0, 4)       : [];
+  brief.artifacts      = Array.isArray(brief.artifacts)      ? brief.artifacts.slice(0, 8)       : [];
+  brief.open_questions = Array.isArray(brief.open_questions) ? brief.open_questions.slice(0, 6)  : [];
+  // Research gathers WHAT EXISTS; it must NOT hand the writer a framing/opening. Drop any such fields
+  // if the model emitted them anyway, so they can't bias the writer's hook (the writer owns those).
+  delete brief.angle; delete brief.hook_options; delete brief.cta_idea;
   if (!brief.topic) brief.topic = prompt.slice(0, 120);
   // The verbatim request + the perform-this directive (if any) flow to the writer so a creative
-  // premise ("simulate the next 30 days if X") is EXECUTED, not flattened into an explainer.
+  // premise (a scenario the request asks to perform) is EXECUTED, not flattened into an explainer.
   brief.request = String(prompt || "").slice(0, 400);
   brief.format  = (typeof brief.format === "string" && brief.format.trim()) ? brief.format.trim() : null;
 

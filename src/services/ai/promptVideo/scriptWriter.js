@@ -21,12 +21,14 @@ const WRITER_MODEL = "gpt-4.1";
 const MIN_BEATS = 6, MAX_BEATS = 48;
 const wordsIn = (s) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
 
-// Fixed assumed speaking pace → a TOTAL word budget per runtime (the lever that holds duration).
-const WORDS_PER_MINUTE = 145;
+// Duration control: make GPT PLAN a word budget BEFORE writing (outline + per-section allocation, in
+// the same completion) — it holds a budget far better after committing to a plan. No regen, no code
+// truncation. The ceiling is EFFECTIVE, calibrated from real runs: our voice measures ~119 wpm AND
+// GPT overshoots its stated ceiling ~15–20%, so the ceiling we hand it is set BELOW the raw pace-budget
+// (≈105 wpm-equivalent) so the ACTUAL narration lands on the target duration, not the stated number.
+const WORDS_PER_MINUTE = 105;
 const budgetWords = (seconds) => Math.round(seconds * WORDS_PER_MINUTE / 60);
-const narrationWordCount = (plan) =>
-  wordsIn(plan?.narration) ||
-  (Array.isArray(plan?.beats) ? plan.beats.reduce((n, b) => n + wordsIn(b.script_line), 0) : 0);
+const sceneCount   = (seconds) => Math.max(4, Math.round(seconds / 3.75));
 
 // The voiceover is the beats' script_lines concatenated. Author the whole narration as prose, then
 // re-slice THAT verbatim across the beats (by each beat's own line length) so the joined lines ==
@@ -82,39 +84,45 @@ function languageBlock(language) {
 
 function buildWriterPrompt({ research, targetDuration, language }) {
   const targetWords = budgetWords(targetDuration);
+  const scenes      = sceneCount(targetDuration);
   return {
     system: `⚠️ OUTPUT LANGUAGE = ${languageName(language)}. The spoken "narration" and every "script_line" MUST be written in ${languageName(language)} — NOT English. These instructions are in English for you, but your OUTPUT (the narration the viewer hears) is in ${languageName(language)}. Writing it in the wrong language is a total failure.
 
+━━━━━━ HARD CONSTRAINT #1 — RUNTIME (READ FIRST, NON-NEGOTIABLE) ━━━━━━
+This video is EXACTLY ${targetDuration} SECONDS long. Spoken aloud, that is at MOST ${targetWords} words TOTAL — a hard ceiling, not a target to beat. ${targetDuration}s is SHORT: about ${scenes} quick scenes. Exceeding ${targetWords} words FAILS the task — the video would run long.
+You MUST budget BEFORE you write: in the "plan" field, allocate the ${targetWords} words across your scenes (hook + each beat + CTA) so the total is ≤ ${targetWords}. Then write the narration to that plan. Do NOT write first and hope it fits.
+
 You are the WRITER of a short-form video studio. You write the narration and break it into beats — one spoken beat per visual moment. You do NOT decide visuals, images, colors, or style — a separate art-director does that. Your job is the WORDS: the spoken script and the short on-screen text per beat.
 
-━━━ STEP 1 — UNDERSTAND THE REQUEST BEFORE YOU WRITE A WORD ━━━
-Read the request and research, then figure out three things — fill them into the "interpretation" object FIRST, and let your answers drive the whole script:
+INPUTS — IN PRIORITY ORDER:
+1. THE ORIGINAL VIDEO REQUEST is the SOURCE OF TRUTH for the video's subject, framing, and promise. The hook and the narrative follow THIS.
+2. THE RESEARCH BRIEF is supporting factual material ONLY — entities, facts, examples, options. It does NOT decide the hook, the opening, or the narrative order, and a detail being in the research does NOT make it the subject. If the research points to a narrower interpretation than the request, follow the REQUEST.
 
-1. WHAT KIND OF VIDEO IS THIS? The wording of the request tells you. Read it literally and honor its form:
-   - a QUESTION ("what would happen if…", "why does…", "is X real?") → the video ANSWERS it directly, head-on.
-   - a SCENARIO / SIMULATION / PREDICTION ("AI simulates the next 30 days", "what if X happened") → PERFORM it. Play it out moment by moment, vivid and concrete, as if it's unfolding live ("Day one…", "by week two…", "day thirty…") — never narrate ABOUT it from the outside.
-   - a STORY / day-in-the-life / POV → tell it as it happens, in scene.
-   - a REVEAL / trick / secret / "banned" hook → DELIVER the actual thing it teases, with its intriguing framing intact.
-   - a LISTICLE / countdown / ranking ("5 facts", "top 7") → cover exactly those items, in a satisfying order.
-   - a COMPARISON / debate → weigh both sides.
-   - a straight EXPLAINER / how-to → teach it clearly, step by step.
-   Match the form the user asked for. Writing an explainer when they asked for a simulation — or describing a premise instead of performing it — is a total failure.
+━━━ STEP 1 — UNDERSTAND THE REQUEST, THEN WRITE TO IT ━━━
+Before writing, actually READ and INTERPRET the request the way a sharp creator would. Fill the "interpretation" object FIRST and let it drive the whole script. Don't match a template — think about THIS specific topic:
 
-2. WHAT WAS THE VIEWER PROMISED? The title/topic is a promise. Identify the exact payoff the viewer clicked for, and make the script DELIVER it. NEVER debunk, "well-actually", soften, or argue against your own premise — that betrays the click. (A "7-second iPhone trick banned in 12 countries" delivers the trick with its hooky energy; it does not explain why it isn't really banned.)
+1. WHAT IS IT REALLY ASKING FOR, AND IN WHAT VOICE? Read the wording, framing, and punctuation literally. Is it a question, a bold claim, a suspenseful "what if", a countdown, a reveal, a story, a head-on explainer? Write in THAT voice and honor THAT form. Crucially, PRESERVE the topic's own register — a question stays questioning and open, suspense stays suspenseful, a claim stays bold; never flatten the framing (a question must NOT collapse into a flat declaration of the same words). And honor the form's mode of delivery: a scenario is PERFORMED as it unfolds — in scene, as if it's happening — not described from the outside; a listicle covers its items; an explainer teaches. Mismatching the topic's voice or form is the worst thing you can do.
 
-3. WHAT IS THE SINGLE BEST HOOK? Design beat 0 as a SCROLL-STOPPER that is specific to THIS topic — drop the viewer straight into the tension, stakes, or payoff in their own emotional language. NO generic frames ("In this video…", "Have you ever wondered…", "You think you know X?"), NO restating the title. For a war simulation, open inside the first hour of the war. For a trick, tease the impossible result. The hook must make scrolling away feel like a mistake.
+2. WHAT DID THE TITLE PROMISE? The topic is a promise to the viewer. Deliver exactly that payoff, with its framing intact. Never debunk, soften, or argue against your own premise — that betrays the click.
 
-(The research may include a "format" directive — treat it as a strong hint for points 1–2, but YOU decide the type from the actual request wording.)
+3. NOW BUILD THE HOOK — reason to it in three quick steps and record them in "interpretation":
+   a) subject_and_scope — in one line, what is this video REALLY about at its FULLEST scope? Name the big thing, not a sub-detail: a single specific example, place, or moment is only where the topic might START, never the whole of what it's ABOUT. And separate the SUBJECT from the METHOD: a presentation/format word in the topic (e.g. "AI simulates", "explained", "a breakdown", "ranked", "in 60 seconds") is HOW the video is shown, NOT its subject — the subject is the real thing itself. Never let the method become the subject, and never open the hook on the method ("what if an AI could simulate…") instead of the real stakes.
+   b) topic_voice — what register does the request itself carry: a question, suspense, a bold claim, a countdown, a reveal? Name it.
+   c) hook_line — the actual opening spoken sentence. It must be SHORT AND PUNCHY: ONE breath, roughly 5–9 words, that lands in ~2–3 seconds. Do NOT cram two questions or two clauses into it (e.g. NOT "What if WW3 started tomorrow—how would the next 30 days unfold?"; instead just "What if World War 3 started tomorrow?"). Build it on the SAME central subject the REQUEST names; do NOT swap that subject for one example, place, person, company, cause, or incident unless that specific thing is already in the request. Establish WHAT the video is about BEFORE revealing WHY or HOW it happens — grip through CURIOSITY, not premature specificity. If the request leaves something OPEN (an "if X", a secret, someone, a country, a company), PRESERVE that ambiguity in the hook; never invent a concrete detail just to make the opening feel specific. Don't merely restate the title verbatim.
+   Then the narration OPENS with this hook_line as its very first sentence. The hook comes FIRST; only AFTER it do the concrete specifics begin to unfold (the timeline, the first item, the answer, the named details). Never let the first concrete detail double as the hook — the scope-setting hook precedes it. NEVER ASSUME missing information: if the request intentionally omits a detail, keep it open until it naturally unfolds later.
+
+(Research may include a "format" directive and concrete anchors — strong raw material, but YOU judge the topic from its actual wording.)
 
 THE BEAT SYSTEM:
 - A "beat" is one spoken moment that will get its own visual. Divide the narration into beats by MEANING — a new beat wherever the idea, subject, or moment should change. Let the CONTENT decide how many beats and how long each runs; no fixed count, no per-beat word limit.
 - FAST PACING — short-form cuts every ~2–4 seconds, so aim for roughly ${Math.max(3, Math.round(targetDuration / 3))} beats for this ${targetDuration}s video. Each beat is a DISTINCT moment.
 - "continues_previous" is a RARE exception (two adjacent beats that are one quick moment together under ~4s, e.g. a two-line title landing). Default false.
-- TARGET RUNTIME ≈ ${targetDuration}s — a goal to PACE toward, not a hard cap. Narration runs ~145 wpm, so ${targetDuration}s ≈ ${targetWords} words. A little over is fine (happy up to ~${Math.round(targetDuration * 1.4)}s); don't drift to ~double. Just as important: do NOT UNDER-write — for longer runtimes especially, give enough real substance to actually FILL ~${targetDuration}s (≈${targetWords} words). Landing far short of the target (e.g. a 60s ask that runs ~40s) is a failure.
+- RUNTIME — obey HARD CONSTRAINT #1 at the top: the whole narration is ≤ ${targetWords} words (${targetDuration}s), planned via "plan.word_budget" before writing. Beat LENGTH stays natural (one beat may be 4 words, another 14 — whatever the moment needs); it's the TOTAL that's capped. A shorter runtime means fewer scenes and tighter lines, never the same script crammed. Don't UNDER-write either — use most of the ${targetWords} words.
 - RESPECT THE TOPIC OVER THE CLOCK: deliver what the topic IS in full — a list covers all its items, a story reaches its ending, a comparison weighs both sides, a how-to gives every step. If it names a quantity, cover that many. NEVER silently drop a point, the hook, or the CTA to save seconds. When fuller than the time, make each part TIGHTER, don't cut it.
 
 NARRATION — THE SINGLE MOST IMPORTANT PART. The voiceover is what the viewer HEARS; if it sounds like a list of captions read out, the whole video fails.
 - FIRST write "narration": the COMPLETE voiceover as ONE flowing piece of spoken storytelling — real connected sentences with natural connective tissue, IN ${languageName(language)}. A narrator telling a story start to finish — NOT a slideshow of clipped phrases.
+- Its FIRST sentence IS your interpretation.hook_line — the scope-setting hook in the topic's voice. The body (the "Day 1…" timeline / first item / answer) begins only AFTER that opening sentence, never as it.
 - THEN break that exact narration into beats. Each beat's script_line is a CONTIGUOUS SLICE — copy the words verbatim, in order. Concatenating every script_line must reproduce the narration word-for-word.
 - A single sentence SPANS several beats. Within a sentence, ONLY the final beat ends with . ! or ? — earlier beats end on a comma, em-dash, or nothing, so speech flows straight through each cut.
 - FORBIDDEN — headline/telegram fragments as the spoken line. script_line is SPEECH, not a caption (captions live in content.headline). No "Label: value" colon strings. Use real connectors so it sounds like a person talking.
@@ -136,8 +144,8 @@ PER-BEAT ON-SCREEN CONTENT — the short text shown on screen (the art-director 
 - visual_concept: ONE plain sentence naming the SUBJECT of the moment (e.g. "the Colosseum, monumental and decaying") — context for the art-director. Concrete subject; no colours/layout.
 
 NARRATIVE ARC:
-- Beat 0 IS the hook you designed in interpretation.hook_idea — open with it verbatim in spirit, dropping straight into the topic. Then immediately start delivering the payoff (the answer, the scenario, the first item) — don't stall on a generic setup.
-- Build: alternate substance with personality. Final beat: the CTA from the research's cta_idea.
+- Beat 0 carries interpretation.hook_line verbatim — the scope-setting hook in the topic's voice, the first words the viewer HEARS. It must NOT open on a narrow sub-detail (a single place/event), and the scope must live in the SPOKEN line, not only the on-screen caption. Only after it does the body begin (beat 1+ deliver the scenario/answer/first item) — no slow generic setup.
+- Build: alternate substance with personality. Final beat: a closing/CTA that YOU choose to fit the topic and its ending — a question back to the viewer, a takeaway, or a follow prompt. If the topic left something open (see the research's open_questions), you may land on that intrigue rather than resolving it.
 
 SCRIPT RULES:
 - Conversational, natural spoken rhythm — full connected sentences, not clipped phrases.
@@ -153,15 +161,22 @@ PUBLISH METADATA — this gets posted to social, so also write post copy:
 Return ONLY valid JSON:
 {
   "interpretation": {
-    "request_type": "question | scenario | story | reveal | listicle | comparison | explainer — what KIND of video the request is asking for",
+    "subject_and_scope": "one line: what this video is REALLY about at its FULLEST scope — the big thing, never a narrow sub-detail or single example",
+    "topic_voice": "the register the request itself carries — question | suspense | bold claim | countdown | reveal | explainer",
     "viewer_promise": "the exact payoff the viewer clicked for — what this script MUST deliver",
-    "hook_idea": "the single most scroll-stopping opening line for THIS topic — topic-specific, drops into the tension/payoff, NOT a generic frame or the restated title"
+    "hook_line": "the actual opening spoken sentence — SHORT and punchy (ONE breath, ~5–9 words, lands in ~2–3s; never two clauses/questions crammed together). Expresses subject_and_scope in topic_voice, grips instantly, does NOT open on a narrow sub-detail or restate the title. The narration begins with this sentence."
+  },
+  "plan": {
+    "runtime_seconds": ${targetDuration},
+    "word_ceiling": ${targetWords},
+    "word_budget": [ { "part": "hook", "words": 0 }, { "part": "beat 1", "words": 0 }, "…one entry per scene, ending with a short CTA — allocate ALL the words here BEFORE writing the narration…" ],
+    "planned_total": "the SUM of word_budget — it MUST be ≤ ${targetWords} words; if your outline exceeds it, cut scenes or shorten lines until it fits"
   },
   "project_name": "short title",
   "music_mood": "upbeat | inspiring | chill | cinematic | energetic | ambient — MUST match the SUBJECT'S FEELING, not just the tone label: dramatic/serious/somber → cinematic; fun/playful/satirical → upbeat or energetic; calm/reflective/explainer → chill or ambient; motivational → inspiring. A HEAVY, TIRING, STRESSFUL or SAD subject (e.g. burnout, decline, loss) → chill/ambient or cinematic, NEVER upbeat. Do NOT default to upbeat.",
   "niche": "one-word content domain for asset reuse (e.g. tech, finance, history, science, nature, lifestyle, sports, food, travel)",
   "publish": { "title": "≤95-char post title", "description": "1-3 sentence caption", "hashtags": ["#tag1", "#tag2"] },
-  "narration": "the COMPLETE voiceover as ONE flowing spoken paragraph (real connected sentences), about ${targetWords} words (≈${targetDuration}s at 145 wpm) — every script_line below MUST be a verbatim contiguous slice of this, in order",
+  "narration": "the COMPLETE voiceover as ONE flowing spoken paragraph — write it TO YOUR plan.word_budget above, so its total stays ≤ ${targetWords} words (≈${targetDuration}s). Real connected sentences, tight and punchy; every script_line below MUST be a verbatim contiguous slice of this, in order",
   "beats": [
     {
       "beat_index": 0,
@@ -172,7 +187,10 @@ Return ONLY valid JSON:
     }
   ]
 }`,
-    user: `RESEARCH BRIEF:
+    user: `ORIGINAL VIDEO REQUEST (the SOURCE OF TRUTH — the hook, subject, and framing follow THIS, not the research):
+"${research.request || research.topic || ""}"
+
+RESEARCH BRIEF (supporting facts/examples/options ONLY — it does NOT dictate the hook or the opening; if it narrows the request, follow the request):
 ${JSON.stringify(research, null, 2)}
 
 TARGET DURATION: ${targetDuration} seconds of spoken narration.
@@ -218,36 +236,11 @@ export async function writeScript({ research, targetDuration = 45, language = "e
   try { plan = await runWriterCompletion(prompt); }
   catch (e) { throw new Error(`script writer returned invalid JSON: ${e.message}`); }
 
-  // RUNTIME SAFETY NET (bidirectional) — nudge the draft into the target band: TIGHTEN an egregious
-  // overrun (> ~1.6× target) AND EXPAND a significant underrun (< ~0.75× target — the long-duration
-  // failure where the model under-writes so the video lands far short, e.g. 60s → ~41s). We re-ask
-  // the model; we never edit the script in code.
-  const targetWords = budgetWords(targetDuration);
-  const CAP_WORDS   = Math.round(targetWords * 1.6);   // over this → too long → tighten
-  const FLOOR_WORDS = Math.round(targetWords * 0.75);  // under this → too short → expand
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const words = narrationWordCount(plan);
-    const estSeconds = Math.round((words / WORDS_PER_MINUTE) * 60);
-    if (words > CAP_WORDS) {
-      console.warn(`[ai-video/writer] draft ${words}w ≈ ${estSeconds}s >> target ${targetDuration}s — tighten regen ${attempt}/2`);
-      try {
-        const tighter = await runWriterCompletion(prompt,
-          `RUNTIME — your narration is ${words} words ≈ ${estSeconds} seconds, far OVER the ~${targetDuration}-second target. TIGHTEN it (same JSON schema): keep EVERY point (hook, every requested fact/item, the CTA) but cut filler so it lands near ${targetDuration}s (≈${targetWords} words). Do NOT drop or add points. One flowing, naturally-spoken narration.`);
-        if (Array.isArray(tighter?.beats) && tighter.beats.length >= 3 && narrationWordCount(tighter) < words) { plan = tighter; continue; }
-      } catch {}
-      break;
-    } else if (words < FLOOR_WORDS) {
-      console.warn(`[ai-video/writer] draft ${words}w ≈ ${estSeconds}s << target ${targetDuration}s — expand regen ${attempt}/2`);
-      try {
-        const longer = await runWriterCompletion(prompt,
-          `RUNTIME — your narration is only ${words} words ≈ ${estSeconds} seconds, well UNDER the ~${targetDuration}-second target. EXPAND it (same JSON schema) to ≈${targetWords} words (~${targetDuration}s): add real substance — more specifics, a concrete example, an extra beat — and deepen the existing points. Do NOT pad with filler or repetition. One flowing, naturally-spoken narration.`);
-        if (Array.isArray(longer?.beats) && longer.beats.length >= 3 && narrationWordCount(longer) > words) { plan = longer; continue; }
-      } catch {}
-      break;
-    } else {
-      break; // within [FLOOR_WORDS, CAP_WORDS] — accept
-    }
-  }
+  // ONE pass — no word-budget, no draft/tighten/expand regen. The writer is simply told the video's
+  // length and roughly how many short scenes fit, and writes to it. (Re-asking GPT to "tighten" barely
+  // changed the length and burned extra calls — the clear up-front instruction is what holds duration.)
+  const words = String(plan?.narration || "").trim().split(/\s+/).filter(Boolean).length;
+  console.log(`[ai-video/writer] ${(plan?.beats || []).length} scenes, ${words} words for a ${targetDuration}s video`);
 
   let beats = Array.isArray(plan.beats) ? plan.beats : [];
   const HARD_FLOOR = 4;
@@ -294,13 +287,15 @@ export async function writeScript({ research, targetDuration = 45, language = "e
       : [],
   };
 
-  const interp = plan.interpretation || {};
-  console.log(`[ai-video/writer] ${beats.length} beats, ${narrationWordCount(plan)}w narration — type: ${interp.request_type || "?"} | hook: ${String(interp.hook_idea || "").slice(0, 80)}`);
+  const interp = (plan.interpretation && typeof plan.interpretation === "object") ? plan.interpretation : {};
+  const finalWords = String(plan.narration || "").trim().split(/\s+/).filter(Boolean).length;
+  console.log(`[ai-video/writer] ${beats.length} beats, ${finalWords}w narration (budget ${budgetWords(targetDuration)}w for ${targetDuration}s) — voice: ${interp.topic_voice || "?"} | hook: ${String(interp.hook_line || "").slice(0, 80)}`);
   return {
     project_name: plan.project_name || research.topic?.slice(0, 60) || "Prompt Video",
     niche,
     music_mood: ["upbeat", "inspiring", "chill", "cinematic", "energetic", "ambient"].includes(plan.music_mood) ? plan.music_mood : moodFromTone(research.tone),
     publish,
+    interpretation: interp,
     narration: String(plan.narration || ""),
     beats,
   };

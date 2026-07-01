@@ -493,13 +493,14 @@ async function composeFilm({ research, styleId = "auto", targetDuration = 45, la
   const dir    = await directVisuals({ research, beats: script.beats, targetDuration, styleId, theme, accentColor, accentColor2, orientation });
   const beats  = dir.beats.map(b => ({ ...b, niche: script.niche }));
   return {
-    project_name: script.project_name,
-    style:        dir.style,
-    palette:      dir.palette,
-    niche:        script.niche,
-    music_mood:   script.music_mood,
-    publish:      script.publish,
-    narration:    script.narration,
+    project_name:   script.project_name,
+    style:          dir.style,
+    palette:        dir.palette,
+    niche:          script.niche,
+    music_mood:     script.music_mood,
+    publish:        script.publish,
+    interpretation: script.interpretation,
+    narration:      script.narration,
     beats,
   };
 }
@@ -616,15 +617,25 @@ export async function runPromptPipeline(params, onStep) {
   beats = capVisualHold(beats); // enforce a fresh, distinct visual every ≤4s (before assets resolve)
   if (beats.length > 0) {
     const sum  = beats.reduce((a, b) => a + b.duration_seconds, 0);
-    const last = beats[beats.length - 1];
-    // Cover trailing audio, but never balloon the final beat — anything beyond
-    // 1.5s of overshoot is audio-tail estimation noise, not content.
-    const overshoot = Math.max(0, voiceoverDuration - sum);
-    if (overshoot > 0) {
-      last.duration_seconds = parseFloat((last.duration_seconds + Math.min(overshoot, 1.5)).toFixed(3));
-      if (overshoot > 1.5) console.warn(`[ai-video] voiceover overshoot ${overshoot.toFixed(1)}s — capped last-beat pad at 1.5s`);
+    // Cover the FULL voiceover so the tail is never clipped — but DISTRIBUTE the slack across ALL
+    // beats proportionally (scale every beat), NOT dump it on the last one (that ballooned a single
+    // scene to 20s+). Each scene stretches only slightly, so cuts stay fast (~3–4s). Then a small
+    // breathing tail on the last beat.
+    if (sum > 0 && voiceoverDuration > sum) {
+      const scale = voiceoverDuration / sum;
+      for (const b of beats) b.duration_seconds = parseFloat((b.duration_seconds * scale).toFixed(3));
     }
-    last.duration_seconds = parseFloat((last.duration_seconds + 0.5).toFixed(3));
+    const last = beats[beats.length - 1];
+    last.duration_seconds = parseFloat((last.duration_seconds + 0.6).toFixed(3));
+  }
+
+  // Runtime calibration (TTS is the source of truth): log requested vs ACTUAL voiceover length + word
+  // count → the real spoken pace. Over many runs this tells us our true wpm instead of guessing it.
+  {
+    const nw = String(film.narration || "").trim().split(/\s+/).filter(Boolean).length;
+    if (voiceoverDuration > 0 && nw > 0) {
+      console.log(`[ai-video] runtime — requested ${targetDuration}s | VO ${voiceoverDuration.toFixed(1)}s | ${nw} words → ${Math.round(nw / voiceoverDuration * 60)} wpm`);
+    }
   }
 
   // ── Stage 3: Visual resolution (parallel) ─────────────────────────────────
@@ -831,9 +842,14 @@ export async function runPromptPipeline(params, onStep) {
     const rawJson = {
       pipeline: "ai_video_v1",
       prompt,
+      // Diagnostics: the EXACT duration target the pipeline ran with (surfaces whether the UI's 30s
+      // selection actually reached the writer) + the resulting narration length.
+      target_duration: targetDuration,
+      narration_words: String(film.narration || "").trim().split(/\s+/).filter(Boolean).length,
       style_id: style.id,
       palette,
-      research: { topic: research.topic, angle: research.angle, entities: research.entities, facts: research.facts, artifacts: research.artifacts },
+      interpretation: film.interpretation ?? null,
+      research: { topic: research.topic, entities: research.entities, facts: research.facts, artifacts: research.artifacts, open_questions: research.open_questions },
       beats: beats.map(b => ({
         beat_index: b.beat_index, asset_type: b.asset_type, source: b.source ?? null, fallback: b.fallback ?? null,
         assets: b.assets ?? [],

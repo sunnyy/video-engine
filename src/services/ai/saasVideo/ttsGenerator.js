@@ -16,14 +16,24 @@ function normalizeTtsText(text) {
     .replace(/£\s*/g, "pounds ");
 }
 
-/* Normalize audio to -9 LUFS — identical filter to tts.js */
+// "HH:MM:SS.ss" → seconds (ffmpeg codecData duration format).
+function hmsToSeconds(s) {
+  const m = String(s || "").match(/(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  return m ? (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]) : null;
+}
+
+/* Normalize audio to -9 LUFS — identical filter to tts.js. Resolves { buffer, durationSec },
+ * where durationSec is ffmpeg's EXACT decoded length (loudnorm doesn't change length) — far more
+ * accurate than byte-math, so the timeline can be sized to fit the whole voiceover with no tail cut. */
 function normalizeLoudness(inputBuffer) {
   return new Promise((resolve, reject) => {
     const tag     = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const rawPath = path.join(tmpdir(), `promo-raw-${tag}.mp3`);
     const outPath = path.join(tmpdir(), `promo-norm-${tag}.mp3`);
     fs.writeFileSync(rawPath, inputBuffer);
+    let durationSec = null;
     ffmpeg(rawPath)
+      .on("codecData", (d) => { durationSec = hmsToSeconds(d.duration); })
       .audioFilters("loudnorm=I=-9:TP=-1:LRA=7")
       .audioCodec("libmp3lame")
       .audioBitrate("192k")
@@ -32,7 +42,7 @@ function normalizeLoudness(inputBuffer) {
         const normalized = fs.readFileSync(outPath);
         try { fs.unlinkSync(rawPath); } catch {}
         try { fs.unlinkSync(outPath); } catch {}
-        resolve(normalized);
+        resolve({ buffer: normalized, durationSec });
       })
       .on("error", (err) => {
         try { fs.unlinkSync(rawPath); } catch {}
@@ -40,6 +50,22 @@ function normalizeLoudness(inputBuffer) {
         reject(err);
       })
       .run();
+  });
+}
+
+// Decode the FINAL audio buffer with ffmpeg and read its EXACT duration — the source of truth for how
+// long the voiceover plays (CBR/VBR, loudnorm or not), so the timeline can't be sized short. null on fail.
+function probeDuration(buffer) {
+  return new Promise((resolve) => {
+    const p = path.join(tmpdir(), `probe-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.mp3`);
+    try { fs.writeFileSync(p, buffer); } catch { return resolve(null); }
+    let dur = null;
+    ffmpeg(p)
+      .on("codecData", (d) => { dur = hmsToSeconds(d.duration); })
+      .on("end",   () => { try { fs.unlinkSync(p); } catch {} resolve(dur); })
+      .on("error", () => { try { fs.unlinkSync(p); } catch {} resolve(dur); })
+      .addOption("-f", "null")
+      .save(process.platform === "win32" ? "NUL" : "/dev/null");
   });
 }
 
@@ -206,10 +232,12 @@ async function _generateFullVoiceover(script, projectId, voiceId, speed = 1.0) {
 
   // Normalize loudness to -9 LUFS — matches tts.js and typographyVideo.js pipelines
   let buffer = rawBuffer;
+  let probedDur = null; // ffmpeg's exact decoded length (most accurate)
   try {
     const normalized = await normalizeLoudness(rawBuffer);
-    if (normalized && normalized.length > 1024) {
-      buffer = normalized;
+    if (normalized?.buffer && normalized.buffer.length > 1024) {
+      buffer    = normalized.buffer;
+      probedDur = normalized.durationSec;
     } else {
       console.warn("[ttsGenerator] loudnorm produced empty/tiny buffer, using raw audio");
     }
@@ -219,9 +247,14 @@ async function _generateFullVoiceover(script, projectId, voiceId, speed = 1.0) {
 
   if (!buffer || buffer.length === 0) throw new Error("Audio buffer is empty after TTS generation");
 
+  // Prefer ffmpeg's exact decoded length; fall back to byte-math / word-count (which can
+  // under-report and clip the voiceover tail). Always floor by the word-count estimate.
+  const finalProbe       = await probeDuration(buffer);
   const parsed           = parseMp3Duration(buffer);
   const estimated        = estimateScriptDuration(script.trim());
-  const duration_seconds = parsed != null ? Math.max(parsed, estimated) : estimated;
+  const duration_seconds = parseFloat(
+    Math.max(finalProbe ?? 0, probedDur ?? 0, parsed ?? 0, estimated ?? 0).toFixed(2)
+  ) || estimated;
 
   const storageKey = `promo-voiceovers/${projectId}/full.mp3`;
   const { error: uploadErr } = await supabaseAdmin.storage
