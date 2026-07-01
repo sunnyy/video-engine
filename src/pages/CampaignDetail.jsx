@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
 import { serverFetch } from "../services/serverApi";
 import { VISUAL_STYLE_OPTIONS } from "../services/ai/shared/visualStyles.js";
-import { LanguageVoicePicker } from "../ui/LanguageVoicePicker.jsx";
+import { VoiceLanguageField } from "../ui/fields/voiceLanguage.jsx";
 
 /**
  * CampaignDetail — one campaign's cockpit: settings editor + lifecycle controls + its video
@@ -302,7 +302,9 @@ export default function CampaignDetail() {
 
                 <div style={{ gridColumn: "1 / -1" }}>
                   <span style={lbl}>Voice &amp; language</span>
-                  <LanguageVoicePicker language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accentColor={T.accent} border={T.border} />
+                  <div style={{ marginTop: 6 }}>
+                    <VoiceLanguageField language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accent={T.accent} />
+                  </div>
                 </div>
 
                 <label style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>

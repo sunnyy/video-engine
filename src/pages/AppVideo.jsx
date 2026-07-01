@@ -10,6 +10,7 @@ import { useCreditsStore } from "../store/useCreditsStore";
 import { showToast } from "../ui/Toast";
 import { planAppScript, createAppVideo } from "../services/ai/appVideo/generateAppVideo";
 import { CREDIT_COSTS } from "../core/utils/creditCosts";
+import { VoiceLanguageField } from "../ui/fields/voiceLanguage.jsx";
 
 const T = { bg: "#0a0a10", surface: "#13131c", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", accent: "#7c5cfc" };
 
@@ -19,7 +20,6 @@ const LENGTHS = [
   { id: 45, label: "Long (~45s)", scenes: 5 },
 ];
 const FORMATS = [{ id: "9:16", label: "Vertical 9:16" }, { id: "1:1", label: "Square 1:1" }, { id: "16:9", label: "Wide 16:9" }];
-const LANGS = [{ id: "en", label: "English" }, { id: "hinglish", label: "Hindi" }, { id: "es", label: "Spanish" }];
 
 const costFor = (sc) => CREDIT_COSTS.promo_video?.[sc] ?? CREDIT_COSTS.promo_video?.[3] ?? 120;
 
@@ -31,6 +31,7 @@ export default function AppVideo() {
   const [lengthId, setLengthId] = useState(30);
   const [format, setFormat] = useState("9:16");
   const [language, setLanguage] = useState("en");
+  const [voiceId, setVoiceId] = useState(null);
   const [notes, setNotes] = useState("");
   const [script, setScript] = useState("");      // reviewed/edited script (optional)
   const [reviewing, setReviewing] = useState(false);
@@ -40,7 +41,7 @@ export default function AppVideo() {
 
   const sceneCount = (LENGTHS.find((l) => l.id === lengthId) || LENGTHS[1]).scenes;
   const estCost = costFor(sceneCount);
-  const opts = () => ({ app_url: appUrl.trim(), target_duration: lengthId, format_ratio: format, language, notes });
+  const opts = () => ({ app_url: appUrl.trim(), target_duration: lengthId, format_ratio: format, language, voice_id: voiceId, notes });
 
   async function handleReview() {
     if (!appUrl.trim() || busy) return;
@@ -95,7 +96,7 @@ export default function AppVideo() {
             placeholder="https://apps.apple.com/us/app/…  or  https://play.google.com/store/apps/details?id=…"
             style={{ ...field, marginBottom: 16 }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div>
               <label style={lbl}>Length</label>
               <select value={lengthId} onChange={(e) => setLengthId(Number(e.target.value))} disabled={busy} style={{ ...field, cursor: "pointer" }}>
@@ -108,12 +109,11 @@ export default function AppVideo() {
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </select>
             </div>
-            <div>
-              <label style={lbl}>Language</label>
-              <select value={language} onChange={(e) => setLanguage(e.target.value)} disabled={busy} style={{ ...field, cursor: "pointer" }}>
-                {LANGS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
-              </select>
-            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={lbl}>Voice &amp; language</label>
+            <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={T.accent} />
           </div>
 
           <label style={lbl}>Angle / notes <span style={{ fontWeight: 400 }}>(optional)</span></label>

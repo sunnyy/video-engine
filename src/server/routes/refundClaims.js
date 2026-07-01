@@ -31,6 +31,24 @@ router.post("/refund-claims", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "credits_requested must be a positive integer" });
     }
 
+    // Cap the claim at what was actually charged for this project — a refund can return at most
+    // the credits the user paid (blocks claiming 500 credits against a 30-credit charge).
+    if (project_id) {
+      const { data: charge } = await supabaseAdmin
+        .from("credit_transactions")
+        .select("amount")
+        .eq("user_id", req.user.id)
+        .eq("project_id", project_id)
+        .eq("type", "deduction")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const charged = charge ? Math.abs(charge.amount) : 0;
+      if (charged > 0 && credits_requested > charged) {
+        return res.status(400).json({ error: `Refund cannot exceed the ${charged} credits charged for this project`, code: "EXCEEDS_CHARGE" });
+      }
+    }
+
     // Monthly limit check
     const { start, end } = monthRange();
     const { count } = await supabaseAdmin

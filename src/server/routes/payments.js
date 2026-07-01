@@ -138,8 +138,8 @@ router.post("/payments/create-order", requireAuth, async (req, res) => {
 /** POST /api/payments/verify — verify signature, provision credits, insert subscription */
 router.post("/payments/verify", requireAuth, async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planSlug, billingCycle, couponCode } = req.body;
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !planSlug) {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -150,6 +150,27 @@ router.post("/payments/verify", requireAuth, async (req, res) => {
       .digest("hex");
 
     if (expected !== razorpay_signature) {
+      return res.status(400).json({ error: "Payment verification failed" });
+    }
+
+    // Bind the grant to the ORDER that was actually paid. A valid signature only proves
+    // order_id|payment_id is genuine — NOT what was purchased. So plan, billing cycle and
+    // coupon come from the order notes (set server-side in create-order), never the request
+    // body; otherwise a client could pay for a cheap plan (or monthly) and claim an expensive
+    // one (or annual = 12× credits).
+    let order;
+    try {
+      order = await getRazorpay().orders.fetch(razorpay_order_id);
+    } catch {
+      return res.status(400).json({ error: "Payment verification failed" });
+    }
+    if (!order || order.notes?.user_id !== req.user.id) {
+      return res.status(400).json({ error: "Payment verification failed" });
+    }
+    const planSlug     = order.notes.plan_slug;
+    const billingCycle = order.notes.billing_cycle;
+    const couponCode   = order.notes.coupon_code || null;
+    if (!planSlug || !billingCycle) {
       return res.status(400).json({ error: "Payment verification failed" });
     }
 
@@ -362,8 +383,8 @@ router.post("/credits/topup/create-order", requireAuth, async (req, res) => {
 
 router.post("/credits/topup/verify", requireAuth, async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, packageId } = req.body;
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !packageId) {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -372,6 +393,19 @@ router.post("/credits/topup/verify", requireAuth, async (req, res) => {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
     if (expected !== razorpay_signature) return res.status(400).json({ error: "Payment verification failed" });
+
+    // The credit pack comes from the paid order's notes, never the request body — a valid
+    // signature doesn't prove which pack was bought (else pay for the $19 pack, claim the $99 one).
+    let order;
+    try {
+      order = await getRazorpay().orders.fetch(razorpay_order_id);
+    } catch {
+      return res.status(400).json({ error: "Payment verification failed" });
+    }
+    if (!order || order.notes?.user_id !== req.user.id || order.notes?.type !== "credit_topup") {
+      return res.status(400).json({ error: "Payment verification failed" });
+    }
+    const packageId = order.notes.package_id;
 
     // Idempotency: skip if this payment was already processed
     const { data: existingTopupTx, error: topupIdempotencyErr } = await supabaseAdmin

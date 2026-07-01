@@ -50,12 +50,20 @@ export async function attachTransitionSfx(layers, scenes, { cap = 6, volume = 0.
       .from("sfx_tracks").select("key, public_url, duration").eq("is_active", true);
     if (!tracks?.length) return 0;
 
-    const byKey = new Map(tracks.map(t => [t.key, t]));
-    const has   = (k) => byKey.has(k);
-    // First existing key in any of the given preference lists (overall fallback chain).
+    // Group by CATEGORY (strip a trailing _<n> so "whoosh_3" and "whoosh" share a pool);
+    // named variants like "whoosh_soft" stay their own category. More rows per category = variety.
+    const byCat = new Map();
+    for (const t of tracks) {
+      const cat = t.key.replace(/_\d+$/, "");
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat).push(t);
+    }
+    const has = (k) => byCat.has(k);
+    // First existing category in any of the given preference lists (overall fallback chain).
     const firstExisting = (...keys) => keys.find(has) ?? null;
+    const pickFrom = (cat) => { const a = byCat.get(cat) || []; return a[Math.floor(Math.random() * a.length)] || null; };
 
-    let attached = 0, lastKey = null;
+    let attached = 0, lastCat = null;
     const chosen = [];
 
     for (let i = 0; i < scenes.length - 1; i++) {
@@ -70,17 +78,17 @@ export async function attachTransitionSfx(layers, scenes, { cap = 6, volume = 0.
       if (!target) continue;
 
       const palette = PALETTES[paletteFor(next, t)] ?? PALETTES.whoosh;
-      // Prefer a palette sound we have and didn't just use; then any palette sound; then any whoosh/impact.
-      const key = palette.find(k => has(k) && k !== lastKey)
+      // Prefer a palette category we have and didn't just use; then any palette category; then a whoosh/impact.
+      const cat = palette.find(k => has(k) && k !== lastCat)
         ?? palette.find(has)
         ?? firstExisting("whoosh", "whoosh_soft", "swoosh_cinematic", "impact")
-        ?? tracks[0].key;
-      const track = byKey.get(key);
+        ?? tracks[0].key.replace(/_\d+$/, "");
+      const track = pickFrom(cat);
       if (!track) continue;
 
       target.sfx = { key: track.key, src: track.public_url, volume, delay: -0.1 };
-      lastKey = key;
-      chosen.push(key);
+      lastCat = cat;
+      chosen.push(track.key);
       attached++;
     }
 

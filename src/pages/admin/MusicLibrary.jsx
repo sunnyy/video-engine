@@ -15,11 +15,15 @@ async function fetchTracks() {
   return data || [];
 }
 
-const MOODS    = ["upbeat", "chill", "cinematic", "playful", "epic", "peaceful", "devotional", "transcendent", "warm", "cheerful", "professional", "futuristic", "confident", "wanderlust", "neutral", "curious", "quirky", "silly", "inspirational", "driven", "elegant", "fresh", "tense", "dramatic", "aggressive", "dark", "energetic"];
+// Canonical moods — must match the set the services request (shared/music.js) so tagging aligns.
+const MOODS    = ["energetic", "upbeat", "calm", "chill", "dramatic", "cinematic", "playful", "inspiring", "tense", "luxury"];
 const ENERGIES = ["low", "medium", "high"];
 
-function TrackRow({ track, onToggle, onDelete, toggling, deleting }) {
+function TrackRow({ track, onToggle, onDelete, onSave, toggling, deleting }) {
   const [playing, setPlaying] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const [form,    setForm]    = useState({ title: "", mood: "", energy: "", bpm: "" });
   const audioRef = useRef(null);
 
   const togglePlay = () => {
@@ -37,7 +41,24 @@ function TrackRow({ track, onToggle, onDelete, toggling, deleting }) {
     }
   };
 
+  const startEdit = () => {
+    setForm({ title: track.title || "", mood: track.mood || "", energy: track.energy || "", bpm: track.bpm ?? "" });
+    setEditing(true);
+  };
+  const save = async () => {
+    setSaving(true);
+    const ok = await onSave(track, {
+      title:  form.title.trim() || track.title,
+      mood:   form.mood || null,
+      energy: form.energy || null,
+      bpm:    form.bpm === "" ? null : parseInt(form.bpm, 10),
+    });
+    setSaving(false);
+    if (ok) setEditing(false);
+  };
+
   const energyColor = track.energy === "high" ? "#f97316" : track.energy === "low" ? "#3b9eff" : "#888";
+  const inp = "px-2 py-1 bg-[#0d0d14] border border-white/[0.1] rounded text-sm text-white outline-none focus:border-[#7c5cfc] w-full";
 
   return (
     <tr className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
@@ -52,21 +73,42 @@ function TrackRow({ track, onToggle, onDelete, toggling, deleting }) {
         <div className="text-sm font-mono text-[#a78bfa]">{track.key}</div>
       </td>
       <td className="px-4 py-3">
-        <div className="text-sm text-white font-medium">{track.title}</div>
-        {track.artist && <div className="text-xs text-[#666]">{track.artist}</div>}
-      </td>
-      <td className="px-4 py-3 text-sm text-[#888]">{track.mood || "—"}</td>
-      <td className="px-4 py-3">
-        {track.energy && (
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-            style={{ color: energyColor, background: energyColor + "22" }}>
-            {track.energy}
-          </span>
+        {editing ? (
+          <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className={inp} />
+        ) : (
+          <>
+            <div className="text-sm text-white font-medium">{track.title}</div>
+            {track.artist && <div className="text-xs text-[#666]">{track.artist}</div>}
+          </>
         )}
       </td>
-      <td className="px-4 py-3 text-sm text-[#888] font-mono">{track.bpm || "—"}</td>
+      <td className="px-4 py-3 text-sm text-[#888]">
+        {editing ? (
+          <select value={form.mood} onChange={e => setForm(f => ({ ...f, mood: e.target.value }))} className={`${inp} cursor-pointer`}>
+            <option value="">— none —</option>
+            {MOODS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        ) : (track.mood || "—")}
+      </td>
       <td className="px-4 py-3">
-        <button onClick={() => onToggle(track)} disabled={toggling === track.id}
+        {editing ? (
+          <select value={form.energy} onChange={e => setForm(f => ({ ...f, energy: e.target.value }))} className={`${inp} cursor-pointer`}>
+            <option value="">—</option>
+            {ENERGIES.map(en => <option key={en} value={en}>{en}</option>)}
+          </select>
+        ) : track.energy ? (
+          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: energyColor, background: energyColor + "22" }}>
+            {track.energy}
+          </span>
+        ) : null}
+      </td>
+      <td className="px-4 py-3 text-sm text-[#888] font-mono">
+        {editing ? (
+          <input type="number" value={form.bpm} onChange={e => setForm(f => ({ ...f, bpm: e.target.value }))} className={inp} />
+        ) : (track.bpm || "—")}
+      </td>
+      <td className="px-4 py-3">
+        <button onClick={() => onToggle(track)} disabled={toggling === track.id || editing}
           className={`px-3 py-1 rounded-md text-xs font-medium cursor-pointer border transition-colors disabled:opacity-50
             ${track.is_active
               ? "bg-[#22c55e]/10 border-[#22c55e]/30 text-[#22c55e] hover:bg-[#22c55e]/20"
@@ -75,10 +117,29 @@ function TrackRow({ track, onToggle, onDelete, toggling, deleting }) {
         </button>
       </td>
       <td className="px-4 py-3">
-        <button onClick={() => onDelete(track)} disabled={deleting === track.id}
-          className="px-3 py-1 bg-[#f97316]/10 border border-[#f97316]/30 rounded-md text-[#f97316] text-xs cursor-pointer hover:bg-[#f97316]/20 transition-colors disabled:opacity-50">
-          {deleting === track.id ? "…" : "Delete"}
-        </button>
+        {editing ? (
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving}
+              className="px-3 py-1 bg-[#7c5cfc]/15 border border-[#7c5cfc]/40 rounded-md text-[#a78bfa] text-xs cursor-pointer hover:bg-[#7c5cfc]/25 transition-colors disabled:opacity-50">
+              {saving ? "…" : "Save"}
+            </button>
+            <button onClick={() => setEditing(false)} disabled={saving}
+              className="px-3 py-1 bg-transparent border border-white/[0.1] rounded-md text-[#888] text-xs cursor-pointer hover:text-white transition-colors disabled:opacity-50">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button onClick={startEdit}
+              className="px-3 py-1 bg-white/[0.04] border border-white/[0.1] rounded-md text-[#aaa] text-xs cursor-pointer hover:text-white transition-colors">
+              Edit
+            </button>
+            <button onClick={() => onDelete(track)} disabled={deleting === track.id}
+              className="px-3 py-1 bg-[#f97316]/10 border border-[#f97316]/30 rounded-md text-[#f97316] text-xs cursor-pointer hover:bg-[#f97316]/20 transition-colors disabled:opacity-50">
+              {deleting === track.id ? "…" : "Delete"}
+            </button>
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -252,6 +313,16 @@ export default function MusicLibrary() {
     finally { setToggling(null); }
   };
 
+  const handleSave = async (track, patch) => {
+    try {
+      const { error: e } = await supabase.from("music_tracks").update(patch).eq("id", track.id);
+      if (e) throw new Error(e.message);
+      setTracks(ts => ts.map(t => t.id === track.id ? { ...t, ...patch } : t));
+      showToast("Track updated");
+      return true;
+    } catch (e) { showToast("Save failed: " + e.message); return false; }
+  };
+
   const handleDelete = async (track) => {
     if (!confirm(`Delete "${track.title}" (${track.key})?\nThis removes the file from storage and the database row.`)) return;
     setDeleting(track.id);
@@ -311,6 +382,7 @@ export default function MusicLibrary() {
                     track={track}
                     onToggle={handleToggle}
                     onDelete={handleDelete}
+                    onSave={handleSave}
                     toggling={toggling}
                     deleting={deleting}
                   />

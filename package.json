@@ -14,7 +14,8 @@
     "prebundle": "node scripts/prebundle.mjs",
     "shadow": "node scripts/renderShadowDiff.mjs",
     "fetch-fonts": "node scripts/fetch-fonts.mjs",
-    "fetch-music": "node --env-file=.env scripts/fetchMusic.js"
+    "fetch-music": "node --env-file=.env scripts/fetchMusic.js",
+    "fetch-sfx": "node --env-file=.env scripts/fetchSfx.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
