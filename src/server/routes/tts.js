@@ -228,48 +228,55 @@ router.get("/promo-video/voice-sample/:voiceId", requireAuth, async (req, res) =
 // ── Generic video voices — language-aware, shared by all video generators ──────
 const LANG_TO_EL_CODE = { hinglish: "hi", es: "es" };
 
+const VOICES_PAGE_SIZE = 12;
+
+// One page of ElevenLabs shared-library voices for a language code. Shared-voices `page` is
+// 0-indexed and the response carries `has_more`. Returns { voices, hasMore }.
+async function sharedVoicesPage(elCode, apiPage) {
+  const url = `https://api.elevenlabs.io/v1/shared-voices?language=${elCode}&page_size=${VOICES_PAGE_SIZE}&page=${apiPage}`;
+  const elRes = await fetch(url, { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } });
+  const data = elRes.ok ? await elRes.json() : { voices: [] };
+  const voices = (data.voices || []).map(v => ({
+    id:          v.voice_id,
+    label:       v.name,
+    gender:      v.gender ?? v.labels?.gender ?? "neutral",
+    desc:        (v.description ?? "Natural voice").slice(0, 50),
+    preview_url: v.preview_url ?? null,
+  }));
+  return { voices, hasMore: data.has_more ?? (voices.length === VOICES_PAGE_SIZE) };
+}
+
 router.get("/video/voices", requireAuth, async (req, res) => {
   const lang   = req.query.lang;
   const elCode = LANG_TO_EL_CODE[lang];
+  const page   = Math.max(1, parseInt(req.query.page, 10) || 1);
 
-  if (elCode) {
-    try {
-      const elUrl = `https://api.elevenlabs.io/v1/shared-voices?language=${elCode}&page_size=20`;
-      console.log(`[video/voices] fetching: ${elUrl}`);
-      const elRes = await fetch(elUrl, { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } });
-      console.log(`[video/voices] status: ${elRes.status}`);
-      const raw = await elRes.text();
-      console.log(`[video/voices] raw (first 600): ${raw.slice(0, 600)}`);
-      const data = elRes.ok ? JSON.parse(raw) : { voices: [] };
-      const voices = (data.voices || []).slice(0, 5).map(v => ({
-        id:          v.voice_id,
-        label:       v.name,
-        gender:      v.gender ?? v.labels?.gender ?? "neutral",
-        desc:        (v.description ?? "Natural voice").slice(0, 50),
-        preview_url: v.preview_url ?? null,
-      }));
-      console.log(`[video/voices] returning ${voices.length} voices for lang=${lang}`);
-      return res.json({ voices });
-    } catch (err) {
-      console.error(`[video/voices] error for lang=${lang}:`, err.message);
-      return res.json({ voices: [] });
-    }
-  }
-
-  // English: curated ElevenLabs voices with live preview URLs
   try {
-    const elRes = await fetch("https://api.elevenlabs.io/v1/voices", {
-      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
-    });
-    const data = elRes.ok ? await elRes.json() : { voices: [] };
-    const byId = Object.fromEntries((data.voices || []).map(v => [v.voice_id, v]));
-    const voices = PROMO_VOICE_META.map(meta => ({
-      ...meta,
-      preview_url: byId[meta.id]?.preview_url ?? null,
-    }));
-    return res.json({ voices });
-  } catch {
-    return res.json({ voices: PROMO_VOICE_META.map(v => ({ ...v, preview_url: null })) });
+    // Non-English: paginate straight through the shared library.
+    if (elCode) {
+      const { voices, hasMore } = await sharedVoicesPage(elCode, page - 1);
+      return res.json({ voices, hasMore });
+    }
+
+    // English page 1: the curated defaults, with live preview URLs from the account voices.
+    if (page === 1) {
+      let byId = {};
+      try {
+        const elRes = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } });
+        const data = elRes.ok ? await elRes.json() : { voices: [] };
+        byId = Object.fromEntries((data.voices || []).map(v => [v.voice_id, v]));
+      } catch {}
+      const voices = PROMO_VOICE_META.map(meta => ({ ...meta, preview_url: byId[meta.id]?.preview_url ?? null }));
+      return res.json({ voices, hasMore: true }); // "load more" pulls English voices from the shared library
+    }
+
+    // English "load more": shared-library English voices, skipping the curated ids already shown.
+    const curatedIds = new Set(PROMO_VOICE_META.map(v => v.id));
+    const { voices, hasMore } = await sharedVoicesPage("en", page - 2);
+    return res.json({ voices: voices.filter(v => !curatedIds.has(v.id)), hasMore });
+  } catch (err) {
+    console.error(`[video/voices] error lang=${lang} page=${page}:`, err.message);
+    return res.json({ voices: [], hasMore: false });
   }
 });
 

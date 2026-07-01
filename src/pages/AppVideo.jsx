@@ -11,6 +11,8 @@ import { showToast } from "../ui/Toast";
 import { planAppScript, createAppVideo } from "../services/ai/appVideo/generateAppVideo";
 import { CREDIT_COSTS } from "../core/utils/creditCosts";
 import { VoiceLanguageField } from "../ui/fields/voiceLanguage.jsx";
+import { OrientationField } from "../ui/fields/orientation.jsx";
+import { DurationField } from "../ui/fields/duration.jsx";
 
 const T = { bg: "#0a0a10", surface: "#13131c", border: "rgba(255,255,255,0.08)", text: "#e8eaf0", muted: "#8896a8", accent: "#7c5cfc" };
 
@@ -19,7 +21,7 @@ const LENGTHS = [
   { id: 30, label: "Standard (~30s)", scenes: 3 },
   { id: 45, label: "Long (~45s)", scenes: 5 },
 ];
-const FORMATS = [{ id: "9:16", label: "Vertical 9:16" }, { id: "1:1", label: "Square 1:1" }, { id: "16:9", label: "Wide 16:9" }];
+const DUR_OPTS = LENGTHS.map((l) => ({ id: l.id, label: `~${l.id}s` }));
 
 const costFor = (sc) => CREDIT_COSTS.promo_video?.[sc] ?? CREDIT_COSTS.promo_video?.[3] ?? 120;
 
@@ -96,23 +98,9 @@ export default function AppVideo() {
             placeholder="https://apps.apple.com/us/app/…  or  https://play.google.com/store/apps/details?id=…"
             style={{ ...field, marginBottom: 16 }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-            <div>
-              <label style={lbl}>Length</label>
-              <select value={lengthId} onChange={(e) => setLengthId(Number(e.target.value))} disabled={busy} style={{ ...field, cursor: "pointer" }}>
-                {LENGTHS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>Format</label>
-              <select value={format} onChange={(e) => setFormat(e.target.value)} disabled={busy} style={{ ...field, cursor: "pointer" }}>
-                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={lbl}>Voice &amp; language</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+            <DurationField value={lengthId} onChange={setLengthId} options={DUR_OPTS} accent={T.accent} />
+            <OrientationField value={format} onChange={setFormat} accent={T.accent} />
             <VoiceLanguageField language={language} onLanguageChange={setLanguage} voiceId={voiceId} onVoiceChange={setVoiceId} accent={T.accent} />
           </div>
 

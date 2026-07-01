@@ -4,6 +4,9 @@ import AppLayout from "../ui/AppLayout";
 import { serverFetch } from "../services/serverApi";
 import { VISUAL_STYLE_OPTIONS } from "../services/ai/shared/visualStyles.js";
 import { VoiceLanguageField } from "../ui/fields/voiceLanguage.jsx";
+import { OrientationField } from "../ui/fields/orientation.jsx";
+import { DurationField } from "../ui/fields/duration.jsx";
+import { StyleField } from "../ui/fields/style.jsx";
 
 /**
  * CampaignDetail — one campaign's cockpit: settings editor + lifecycle controls + its video
@@ -156,15 +159,23 @@ export default function CampaignDetail() {
   return (
     <AppLayout>
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 1000, margin: "0 auto", padding: "28px 24px 80px" }}>
+        <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 24px 80px" }}>
 
           <button onClick={() => nav("/automation")} style={{ background: "none", border: "none", color: T.muted, fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 14, fontFamily: "inherit" }}>‹ Automation</button>
 
           {/* Header + lifecycle */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 22 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <h1 style={{ fontSize: 24, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: 0 }}>{c.name}</h1>
-              <span style={{ fontSize: 11, fontWeight: 700, color: st.color, background: `${st.color}1c`, padding: "3px 10px", borderRadius: 20 }}>{st.label}</span>
+              <input
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onFocus={e => (e.currentTarget.style.borderBottomColor = T.border)}
+                onBlur={e => { e.currentTarget.style.borderBottomColor = "transparent"; const v = form.name.trim(); if (v && v !== c.name) save(); }}
+                onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                size={Math.max(8, (form.name || "").length + 1)}
+                title="Click to rename"
+                style={{ fontSize: 24, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: 0, background: "transparent", border: "none", borderBottom: "1px solid transparent", outline: "none", padding: "0 0 2px" }}
+              />
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <style>{`@keyframes vqspin { to { transform: rotate(360deg); } }`}</style>
@@ -180,7 +191,7 @@ export default function CampaignDetail() {
           </div>
 
           {/* Overview strip — campaign pulse, always visible */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, marginBottom: 18 }}>
             {[
               { label: "Status",        value: st.label, color: st.color },
               { label: "Posts / day",   value: c.posts_per_day || 1 },
@@ -188,7 +199,7 @@ export default function CampaignDetail() {
               { label: "Published",     value: publishedCount },
               { label: "Auto-publish",  value: c.auto_publish !== false ? "On" : "Off" },
             ].map(s => (
-              <div key={s.label} style={{ flex: "1 1 130px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px" }}>
+              <div key={s.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", minWidth: 0 }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: T.faint, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: s.color || T.text, marginTop: 4, fontFamily: "'Outfit',sans-serif" }}>{s.value}</div>
               </div>
@@ -251,8 +262,7 @@ export default function CampaignDetail() {
           {/* ── Settings tab ── */}
           {tab === "settings" && (
             <div style={panel}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 14 }}>
-                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Campaign name</span><input style={fieldStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "22px 16px" }}>
                 <div style={{ gridColumn: "span 2" }}><span style={lbl}>Niche(s) — comma separated</span><input style={fieldStyle} value={form.niches} onChange={e => setForm(f => ({ ...f, niches: e.target.value }))} placeholder="ai tools, productivity" /></div>
 
                 <div style={{ gridColumn: "1 / -1" }}>
@@ -277,34 +287,17 @@ export default function CampaignDetail() {
                     {[1, 2, 3, 4, 5].map(n => <option key={n} value={n} style={opt}>{n}</option>)}
                   </select>
                 </div>
+                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Posting times — "HH:MM", comma-separated (blank = AI decides)</span><input style={fieldStyle} value={form.posting_times} onChange={e => setForm(f => ({ ...f, posting_times: e.target.value }))} placeholder="09:00, 18:00" /></div>
                 <div><span style={lbl}>Privacy</span>
                   <select style={fieldStyle} value={form.privacy} onChange={e => setForm(f => ({ ...f, privacy: e.target.value }))}>
                     <option value="public" style={opt}>Public</option><option value="unlisted" style={opt}>Unlisted</option><option value="private" style={opt}>Private</option>
                   </select>
                 </div>
-                <div><span style={lbl}>Duration</span>
-                  <select style={fieldStyle} value={form.target_duration} onChange={e => setForm(f => ({ ...f, target_duration: e.target.value }))}>
-                    {DURATIONS.map(d => <option key={d.id} value={d.id} style={opt}>{d.label}</option>)}
-                  </select>
-                </div>
-                <div><span style={lbl}>Orientation</span>
-                  <select style={fieldStyle} value={form.orientation} onChange={e => setForm(f => ({ ...f, orientation: e.target.value }))}>
-                    <option value="9:16" style={opt}>9:16</option><option value="1:1" style={opt}>1:1</option><option value="16:9" style={opt}>16:9</option>
-                  </select>
-                </div>
-
-                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Visual style</span>
-                  <select style={fieldStyle} value={form.style_id} onChange={e => setForm(f => ({ ...f, style_id: e.target.value }))}>
-                    {VISUAL_STYLE_OPTIONS.map(s => <option key={s.id} value={s.id} style={opt}>{s.label}</option>)}
-                  </select>
-                </div>
-                <div style={{ gridColumn: "span 2" }}><span style={lbl}>Posting times — "HH:MM", comma-separated (blank = AI decides)</span><input style={fieldStyle} value={form.posting_times} onChange={e => setForm(f => ({ ...f, posting_times: e.target.value }))} placeholder="09:00, 18:00" /></div>
-
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <span style={lbl}>Voice &amp; language</span>
-                  <div style={{ marginTop: 6 }}>
-                    <VoiceLanguageField language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accent={T.accent} />
-                  </div>
+                <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+                  <VoiceLanguageField language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accent={T.accent} />
+                  <DurationField value={Number(form.target_duration)} onChange={(v) => setForm(f => ({ ...f, target_duration: v }))} options={DURATIONS} accent={T.accent} />
+                  <OrientationField value={form.orientation} onChange={(v) => setForm(f => ({ ...f, orientation: v }))} accent={T.accent} />
+                  <StyleField value={form.style_id} onChange={(v) => setForm(f => ({ ...f, style_id: v || "auto" }))} options={VISUAL_STYLE_OPTIONS} accent={T.accent} />
                 </div>
 
                 <label style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>

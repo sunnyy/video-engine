@@ -64,18 +64,37 @@ router.post("/campaigns", requireAuth, requireAutomation, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+/* Fetch a campaign's published posts + project names WITHOUT a PostgREST embed.
+ * published_posts has no FK to projects, so `projects(name)` silently errors → empty list
+ * (and the error was being swallowed). Names are fetched separately and mapped in, keeping
+ * the { projects: { name } } shape the frontend expects. */
+async function fetchCampaignPosts(campaignId) {
+  const { data: posts, error } = await supabaseAdmin
+    .from("published_posts")
+    .select("id, platform, platform_post_id, status, error, published_at, created_at, project_id")
+    .eq("campaign_id", campaignId).order("created_at", { ascending: false }).limit(200);
+  if (error) throw new Error(`published_posts query failed: ${error.message}`);
+  const rows = posts || [];
+  const ids = [...new Set(rows.map(p => p.project_id).filter(Boolean))];
+  let nameById = {};
+  if (ids.length) {
+    const { data: projs } = await supabaseAdmin.from("projects").select("id, name").in("id", ids);
+    nameById = Object.fromEntries((projs || []).map(p => [p.id, p.name]));
+  }
+  return rows.map(p => ({ ...p, projects: nameById[p.project_id] ? { name: nameById[p.project_id] } : null }));
+}
+
 /* ── Detail feed (campaign + inflight jobs + published posts + queue + events) ── */
 router.get("/campaigns/:id", requireAuth, async (req, res) => {
   try {
     let campaign = await getCampaignForUser(req.user.id, req.params.id);
     if (!campaign) return res.status(404).json({ error: "Campaign not found" });
     campaign = await pruneDeadTargetAccounts(campaign);
-    const [{ data: jobs }, { data: posts }] = await Promise.all([
+    const [{ data: jobs }, posts] = await Promise.all([
       supabaseAdmin.from("jobs").select("id, type, status, progress, created_at, run_at")
         .in("type", INFLIGHT_TYPES).in("status", ["queued", "running"])
         .filter("payload->>campaignId", "eq", campaign.id).order("created_at", { ascending: true }),
-      supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at, project_id, projects(name)")
-        .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(200),
+      fetchCampaignPosts(campaign.id),
     ]);
     // Only jobs running/queued-to-run-now are "active". A deferral SCHEDULED for later (run_at in the
     // future) goes in `scheduled` — so it no longer shows as a phantom "Publishing…" row nor disables
@@ -288,12 +307,11 @@ router.get("/admin/campaigns/:id", requireAuth, requireAdmin, async (req, res) =
   try {
     const campaign = await getCampaign(req.params.id);
     if (!campaign) return res.status(404).json({ error: "Campaign not found" });
-    const [{ data: jobs }, { data: posts }] = await Promise.all([
+    const [{ data: jobs }, posts] = await Promise.all([
       supabaseAdmin.from("jobs").select("id, type, status, progress, created_at, run_at")
         .in("type", INFLIGHT_TYPES).in("status", ["queued", "running"])
         .filter("payload->>campaignId", "eq", campaign.id).order("created_at", { ascending: true }),
-      supabaseAdmin.from("published_posts").select("id, platform, platform_post_id, status, error, published_at, created_at, project_id, projects(name)")
-        .eq("campaign_id", campaign.id).order("created_at", { ascending: false }).limit(200),
+      fetchCampaignPosts(campaign.id),
     ]);
     const active    = (jobs || []).filter(isJobLive);
     const scheduled = (jobs || []).filter((j) => !isJobLive(j));

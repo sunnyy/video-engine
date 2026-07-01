@@ -40,31 +40,59 @@ export function LanguageVoicePicker({
 }) {
   const [voices,          setVoices]          = useState([]);
   const [loading,         setLoading]         = useState(false);
+  const [page,            setPage]            = useState(1);
+  const [hasMore,         setHasMore]         = useState(false);
+  const [loadingMore,     setLoadingMore]     = useState(false);
   const [playingVoiceId,  setPlayingVoiceId]  = useState(null);
   const voiceAudioRef     = useRef(null);
   const requestedRef      = useRef(null);
   const rgb               = hexToRgb(accentColor);
 
-  // Fetch voices whenever language changes
+  const voicesUrl = (p) => {
+    const params = new URLSearchParams();
+    if (language !== "en") params.set("lang", language);
+    params.set("page", String(p));
+    return `/api/video/voices?${params.toString()}`;
+  };
+
+  // Fetch the first page whenever language changes
   useEffect(() => {
     setLoading(true);
-    const url = language === "en"
-      ? "/api/video/voices"
-      : `/api/video/voices?lang=${language}`;
-
-    serverFetch(url)
+    setPage(1);
+    serverFetch(voicesUrl(1))
       .then(r => r.json())
       .then(d => {
         const list = d.voices || [];
         setVoices(list);
+        setHasMore(!!d.hasMore);
         // Auto-select first voice if nothing selected or current not in new list
         if (list.length && (!voiceId || !list.find(v => v.id === voiceId))) {
           onVoiceChange?.(list[0].id);
         }
       })
-      .catch(() => setVoices([]))
+      .catch(() => { setVoices([]); setHasMore(false); })
       .finally(() => setLoading(false));
   }, [language]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    const next = page + 1;
+    try {
+      const d = await serverFetch(voicesUrl(next)).then(r => r.json());
+      const list = d.voices || [];
+      setVoices(prev => {
+        const seen = new Set(prev.map(v => v.id));
+        return [...prev, ...list.filter(v => !seen.has(v.id))];
+      });
+      setHasMore(!!d.hasMore);
+      setPage(next);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // Stop audio on unmount
   useEffect(() => {
@@ -170,7 +198,7 @@ export function LanguageVoicePicker({
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>Loading voices…</span>
           </div>
         ) : (
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxHeight: 340, overflowY: "auto", paddingRight: 4 }}>
             {voices.map(v => {
               const selected = voiceId === v.id;
               const playing  = playingVoiceId === v.id;
@@ -179,7 +207,7 @@ export function LanguageVoicePicker({
                   key={v.id}
                   onClick={() => !disabled && onVoiceChange?.(v.id)}
                   style={{
-                    flex: "1 1 0", minWidth: 88,
+                    minWidth: 0,
                     display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                     padding: "12px 10px 10px",
                     borderRadius: 10, textAlign: "center",
@@ -233,6 +261,21 @@ export function LanguageVoicePicker({
               );
             })}
           </div>
+        )}
+        {!loading && hasMore && (
+          <button
+            onClick={loadMore}
+            disabled={loadingMore || disabled}
+            style={{
+              marginTop: 10, width: "100%", padding: "9px", borderRadius: 10,
+              border: `1px solid ${border}`, background: "rgba(255,255,255,0.03)",
+              color: accentColor, fontSize: 12.5, fontWeight: 700,
+              cursor: (loadingMore || disabled) ? "default" : "pointer",
+              fontFamily: "inherit", opacity: (loadingMore || disabled) ? 0.6 : 1,
+            }}
+          >
+            {loadingMore ? "Loading…" : "Load more voices"}
+          </button>
         )}
       </div>
 
