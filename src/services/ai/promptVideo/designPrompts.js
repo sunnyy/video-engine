@@ -29,7 +29,14 @@ function infoBlock(beat) {
       ? `• values to compare honestly: ${JSON.stringify(c.items)}`
       : `• items: ${JSON.stringify(c.items)}`);
   }
-  if (lines.length === 1) lines.push(`• (no text required — this may be a pure-visual frame)`);
+  if (lines.length === 1) {
+    // No on-screen content was written for this beat → it is a deliberate VISUAL-ONLY breather.
+    // The spoken line for such a beat is often a mid-sentence fragment ("fracture—can"); putting
+    // it on screen reads as gibberish. Force a clean full-bleed frame with NO sentence text.
+    lines.push(`• NO on-screen text for this frame — it is a VISUAL-ONLY breather. Let the image FILL THE ENTIRE CANVAS edge to edge (full-bleed). Do NOT put the spoken words on screen — they may be a mid-sentence fragment. At most a tiny kicker word; otherwise let the picture carry the beat alone.`);
+    lines.push(`Spell every word exactly as given.`);
+    return lines.join("\n");
+  }
   lines.push(`You choose what to surface and how big — feature ONE as a giant line/number, distil it, or use all. You are NOT required to show a kicker + headline + subtext. Spell every word exactly as given.`);
   return lines.join("\n");
 }
@@ -42,7 +49,7 @@ function paletteBlock(palette) {
               :                      "a DEEP / near-black field with light text";
   return `PALETTE — the video's family; THIS frame owns its own field within it:
 • accent ${palette.accent} · accent2 ${palette.accent2} · base ${field} · text ${palette.text}
-Vary the field scene to scene (deep dark / near-white / an accent block / a tint / a moody gradient) so consecutive frames don't look identical. Build a real palette around the accent — never flat monochrome.`;
+Vary the field scene to scene (deep dark / near-white / an accent block / a tint / a moody gradient) so consecutive frames don't look identical — but CONTRAST IS NON-NEGOTIABLE: on a LIGHT / near-white field, ALL text and key elements MUST be dark (near-black or a deep accent); on a DARK field, text MUST be light. NEVER light text on a light field or dark text on a dark field. Build a real palette around the accent — never flat monochrome.`;
 }
 
 export function buildBeatPrompt(beat, ctx) {
@@ -63,11 +70,20 @@ export function buildBeatPrompt(beat, ctx) {
     situation = `SITUATION: a cinematic clip plays FULL-BLEED behind this frame — the pipeline already placed the video AND a legibility scrim. You build NEITHER: html/body stay transparent, no background element, no <img>, no full-canvas element. You compose ONLY the type/graphics that sit over the clip.`;
     rootBg = "transparent";
   } else if (images.length) {
-    const imgList = images.map((im, k) => `   image ${k + 1}${im.label ? ` "${im.label}"` : ""}: ${im.src}`).join("\n");
-    const multi = images.length > 1
-      ? ` Lead with the STRONGEST as the hero; use a second ONLY if it genuinely composes as a true diptych/collage where both sides fill — NEVER as a small floating inset / picture-in-picture rectangle parked in a corner (that is the amateur look). Don't slice them into thin vertical strips. Using just one is fine if the rest don't earn their place.`
-      : "";
-    situation = `SITUATION: you have ${images.length} real photo${images.length > 1 ? "s" : ""} to place as <img> (object-fit:cover) and compose WITH the type. A photo can be the entire frame or a small accent — your call.${multi}\n${imgList}`;
+    const cutouts = images.filter(a => a.cutout);
+    const photos  = images.filter(a => !a.cutout);
+    const line = (im, k, kind) => `   ${kind} ${k + 1}${im.label ? ` "${im.label}"` : ""}: ${im.src}`;
+    const parts = [];
+    if (cutouts.length) {
+      parts.push(`${cutouts.length} CUTOUT${cutouts.length > 1 ? "s" : ""} — a subject with its background already REMOVED (transparent PNG). PLACE it INTO the composition as a hero element: <img style="object-fit:contain"> sized and positioned deliberately (it may run large and bleed off an edge for drama), with type and graphics composed AROUND it on the palette field. NEVER stretch a cutout with object-fit:cover and NEVER treat it as a full-bleed background — it has no background; that is the whole point. Build the field/backdrop yourself (palette base + your graphics), then set the subject into it.\n${cutouts.map((im, k) => line(im, k, "cutout")).join("\n")}`);
+    }
+    if (photos.length) {
+      const multi = photos.length > 1
+        ? ` Lead with the STRONGEST as the hero; a second ONLY if it composes as a true diptych/collage where both sides fill — NEVER a small floating inset / picture-in-picture rectangle in a corner. Don't slice them into thin strips.`
+        : "";
+      parts.push(`${photos.length} real photo${photos.length > 1 ? "s" : ""} to place as <img> (object-fit:cover) — the entire frame or a strong accent, your call.${multi}\n${photos.map((im, k) => line(im, k, "photo")).join("\n")}`);
+    }
+    situation = `SITUATION: compose WITH what you're given (each element shares ONE frame):\n${parts.join("\n")}`;
     rootBg = palette.bg;
   } else {
     situation = `SITUATION: NO photo — the design IS the whole frame, built in pure HTML/CSS: either TYPE as the picture (one commanding mass) OR a built graphic that ILLUSTRATES the idea (a UI / app panel, a meter, a labelled diagram, a comparison diptych, a stat/quote card, a tile grid, a flat device frame, an abstract composition). Whichever you choose must OWN the frame. THE failure to avoid: a headline parked at the very top, a line parked at the very bottom, and a dead empty gap between them — never a header-top / footer-bottom split with a void in the middle, and no floating divider/line stranded in empty space. Don't CSS-draw a realistic photo subject (a real map, face, animal, logo or object as if photographed) — illustrate the concept graphically instead.`;
@@ -98,7 +114,7 @@ ${RENDERER_CONSTRAINTS}`;
 
   const quality = `DON'T BREAK IT (quality guards, not layout rules):
 • Legibility is yours, but NEVER darken the whole photo — no full-frame dark wash and no filter:brightness on the <img> (that murk is a top failure). Keep the photo bright; win contrast with text-shadow, by sitting type over a naturally calm/dark region, or with ONE local gradient scrim that is fully transparent over the image and dark ONLY under the text band (e.g. linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.7) 100%)).
-• Say each fact ONCE — never print the same info in two elements; a kicker/label must add NEW context, not echo the headline. To stress a word, style it IN PLACE — never copy it into a second element, and never overlap two text elements.
+• Say each string ONCE — this is strict. Every provided line (headline AND subtext) appears in EXACTLY ONE element. Do NOT print the subtext both as an inline subhead and again as a bottom chip/label; do NOT repeat it as a top kicker AND a bottom bar. A common failure is echoing the subtext top and bottom — never do this. A kicker/chip/label is ONLY for a category word YOU invent (e.g. "FAST", "RESTRICTION") or genuinely NEW context — never a copy of the headline or the subtext. To stress a word, style it IN PLACE — never copy it into a second element, and never overlap two text elements.
 • No orphan decoration — every mark belongs to content (it IS content, HOLDS content, or STRUCTURES it). No floating lines / rings / dots / chips, and NEVER an empty box / hollow card / placeholder panel with nothing inside it.
 • Compose for the WHOLE vertical frame as ONE picture — don't cram everything into the top and strand a kicker/line at the very bottom with a dead empty band in the middle. Either anchor it as one cohesive block or distribute the elements so there is no large hollow gap.
 • Never invent a number, date, or fact that isn't in the information above. Never print internal/direction words on screen — e.g. Hook / Stat / CTA / SPOKEN / BEAT / scene numbers, AND the design style's name ("${style.label}") or any word from it, are art-direction notes for you, never visible text (never render the style name as a masthead, byline, footer or label).`;

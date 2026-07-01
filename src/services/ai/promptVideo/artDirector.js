@@ -57,14 +57,23 @@ ${style ? styleDirectiveBlock(style) : `## VISUAL STYLE: choose ONE style_id for
 ${themeBlock}
 
 HOW TO DIRECT EACH BEAT — you give it an "assets" list, the designer composes them into the frame:
-- Decide what the viewer should SEE, then list the asset(s) for the beat. ONE asset for a normal scene. SEVERAL assets when the beat is genuinely multiple subjects — a LIST ("Visigoths, Vandals, Huns" → three entity/stock images), a COMPARISON / versus, a before→after, a trio. Multi-asset scenes are how a list becomes three real images instead of a text list. Don't force multiple where one is right; don't collapse a real multi-subject moment into one.
+- Decide what the viewer should SEE, then list the asset(s) for the beat. ONE asset for a normal scene. SEVERAL assets ONLY when the beat is genuinely multiple DEPICTABLE, NAMED subjects — a LIST of real things each with its own clear photo ("Visigoths, Vandals, Huns" → three entity images), a COMPARISON / versus of two real places, a before→after. Multi-asset scenes turn a list of REAL SUBJECTS into real images.
+- BUT an ABSTRACT enumeration — labels/categories/concepts that have NO clean iconic photo ("Banks / Power grids / Media", "NATO alerts / Russian movements / US deployments", "Fear, Doubt, Panic") — is NOT multi-asset. Do NOT attach one image per line; a stock search for "russian movements" returns a random irrelevant truck. Make it a TYPOGRAPHIC beat ([] assets) where the LIST ITSELF is the visual, or ONE atmospheric background image for the whole beat. One image per abstract label is the #1 way scenes come out as cluttered collages of mismatched photos.
+- Don't force multiple where one is right; don't collapse a real multi-subject moment into one.
 - For EACH asset pick the cheapest source that shows it well (free first):
   • "entity" + exact Wikipedia title — for a named real person / group / org / place / landmark (e.g. Visigoths, Colosseum, Theodosian Walls). FREE, real, strongest — REACH FOR THIS whenever the subject is a real named thing with a Wikipedia page. Only skip it if that subject's canonical photo is anachronistic for the moment.
   • "stock_video" + a SHORT search phrase — real footage of a real-world moment.
-  • "stock_image" + a SHORT search phrase — a real photo of a concrete subject/object/symbol/place/mood.
+  • "stock_image" + a SHORT search phrase — ONLY for a CONCRETE, photographable thing (an object, a place, a vehicle, a crowd, a device). NOT for a mood, an emotion, an abstract state, or a market/political/economic concept — a stock search for "markets in chaos" returns a smiling trader, "diplomacy" returns an exit sign. For those abstract/emotional moments use a cinematic "ai_image" or a typographic frame, never a literal stock keyword.
   • "ai_image" + a cinematic TEXT-FREE prompt — for a bespoke concept, a MAP or DIAGRAM, a metaphor, or a historical moment with no real photo. Budget = ${aiImageBudget} ai_images for the WHOLE video; allocate sparingly. AN ai_image IS ONE SINGLE SCENE/SUBJECT — NEVER a "split image", "split-screen", "two sides", "on one side… on the other…", or several contrasted subjects in one prompt (for ANY contrast/comparison/"X not Y" hook, use MULTIPLE assets instead, one real image each). And NEVER mention a poster, sign, screen, document, label, or any text-bearing object in the prompt (the generator garbles text — e.g. a "malaria poster" comes out as gibberish).
 - A beat with NO assets ([]) is a deliberate TYPOGRAPHIC frame — for a pure-information moment (a stat, quote, title, CTA) where type alone is strongest. Use a few across the video for rhythm; the designer fills the frame.
 - DEPICTABLE SUBJECTS GET IMAGERY — never leave a depictable beat empty.
+
+TREATMENT — for EACH asset also set "treatment":
+  • "background" — the image fills the frame / IS the scene (atmospheres, places, crowds, moments, environments). The default for scenes.
+  • "cutout" — the subject is ISOLATED (its background removed) and PLACED into a designed composition: a single clean HERO SUBJECT (a person, product, device, vehicle, creature, weapon, object, or icon) that sits IN the frame with type and graphics composed around it. This is one of our strongest, most PREMIUM looks — actively USE it, don't default every beat to a full-bleed background (a video that's all full-bleed backgrounds feels like a passive stock reel; placing isolated subjects into designed frames is what makes it feel hand-crafted and premium). WHENEVER a beat centers on ONE clear subject rather than a whole environment, make it a cutout. It works best from an "ai_image" (we render the subject clean) or a clearly-isolable "entity"/"stock_image" object.
+- NEVER CUT OUT FLAT DETAILED ARTWORK — a MAP, mosaic, fresco, painting, coin, medal, manuscript, engraving, seal, tapestry, chart or diagram does NOT isolate (its edges smudge into black blobs) and its fine detail + baked-in labels turn to illegible mush at video size. Many historical "entity" images ARE this kind of flat artwork. For such an image use "treatment":"background" (let it fill the frame as-is, detail and all) — or better, if a clean subject is what the beat needs, switch to a cinematic "ai_image" scene instead. And NEVER collage several of these detailed artworks together (three mosaics/maps side by side is a cluttered smudgy mess) — if a multi-subject beat's only images are flat artworks, make it ONE background or a typographic frame.
+- ORG / BRAND LOGOS ARE NOT SCENES — for an organization, alliance, company, agency, or institution (e.g. NATO, the UN, a bank), the "entity" image is a LOGO / FLAG / EMBLEM that looks BROKEN cropped full-bleed. NEVER use an org's entity image as a background. Show the org through a CINEMATIC "ai_image" scene (a summit hall, delegates at a long table, warships at sea, a situation room, a trading floor) or real stock footage of that scene. A bare logo may appear ONLY as a small contained cutout chip — never the frame.
+- LEAN INTO CINEMATIC ai_image for atmosphere/tension/hero moments (within budget) — those bespoke, moody frames are what make the video feel premium rather than a stock reel.
 
 CRITICAL SOURCE RULES (the lab caught these):
 - MAPS, DIAGRAMS, charts, and ABSTRACT CONCEPTS are NOT on stock — use "ai_image" for them (a stock search for "empire map" returns a random statue). But use AT MOST ONE map in the whole video — multiple generated maps look near-identical and repetitive. For a geographic comparison/split (e.g. East vs West, Rome vs Constantinople), do a 2-asset SPLIT of the two real places (two entity/stock images), NOT a second map.
@@ -90,7 +99,7 @@ Return ONLY valid JSON. A directive for EVERY beat, in order:
     {
       "beat_index": 0,
       "assets": [
-        { "source": "entity | stock_video | stock_image | ai_image", "entity": "Wikipedia title or null", "query": "short stock phrase or null", "prompt": "cinematic ai prompt or null", "label": "optional short label for this item (e.g. for a list), else null" }
+        { "source": "entity | stock_video | stock_image | ai_image", "treatment": "background | cutout", "entity": "Wikipedia title or null", "query": "short stock phrase or null", "prompt": "cinematic ai prompt or null", "label": "optional short label for this item (e.g. for a list), else null" }
       ],
       "fallback": "stock_image | stock_video | entity | ai_image | typographic",
       "camera": "slow_zoom_in | ... | hold (or null)",
@@ -102,7 +111,7 @@ Return ONLY valid JSON. A directive for EVERY beat, in order:
   ]
 }`,
     user: `RESEARCH BRIEF (for grounding subjects/entities):
-${JSON.stringify({ topic: research.topic, angle: research.angle, entities: research.entities, facts: research.facts, artifacts: research.artifacts }, null, 2)}
+${JSON.stringify({ topic: research.topic, entities: research.entities, facts: research.facts, artifacts: research.artifacts }, null, 2)}
 
 THE WRITER'S BEATS (direct a visual for each — do NOT change any words):
 ${JSON.stringify(beatsForPrompt(beats), null, 2)}
@@ -125,7 +134,8 @@ function cleanAsset(a, beat) {
   if (source === "stock_image" && !(query || derived)) source = null;
   if (source === "ai_image" && !(prompt || derived)) source = null;
   if (!source) return null;
-  return { source, entity, query: query || (source.startsWith("stock") ? derived : ""), prompt: source === "ai_image" ? (prompt || derived) : "", label };
+  const treatment = a.treatment === "cutout" ? "cutout" : "background";
+  return { source, treatment, entity, query: query || (source.startsWith("stock") ? derived : ""), prompt: source === "ai_image" ? (prompt || derived) : "", label };
 }
 
 /**

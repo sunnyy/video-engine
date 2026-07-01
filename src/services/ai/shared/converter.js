@@ -201,13 +201,14 @@ function collectInPage(cw, ch) {
     // headline renders tiny inside a correctly-measured (large) box. So when the element
     // has no direct text of its own, read the font fields from the first descendant that
     // actually holds text. (When the role element carries the text directly, tcs === cs.)
+    let textRect = null; // rect of the descendant that actually holds the text (for correct positioning)
     const tcs = (() => {
       const hasDirectText = (node) => {
         for (const c of node.childNodes) if (c.nodeType === 3 && c.textContent.trim()) return true;
         return false;
       };
       if (hasDirectText(el)) return cs;
-      for (const d of el.querySelectorAll("*")) if (hasDirectText(d)) return getComputedStyle(d);
+      for (const d of el.querySelectorAll("*")) if (hasDirectText(d)) { const dr = d.getBoundingClientRect(); textRect = { x: dr.x, y: dr.y, width: dr.width, height: dr.height }; return getComputedStyle(d); }
       return cs;
     })();
 
@@ -266,6 +267,11 @@ function collectInPage(cw, ch) {
       // layout wrapper (text lives in tagged children) from a text element that merely contains a
       // small decorative tagged child (e.g. a typed line + a <div data-role="divider"> cursor).
       ownText:      Array.from(el.childNodes).filter(c => c.nodeType === 3).map(c => c.textContent).join(" ").replace(/\s+/g, " ").trim(),
+      // Text carried by tagged (data-role) descendants. If empty, any role-children are purely
+      // decorative (badge/bullet/icon/divider) and the element's text lives in plain children — so
+      // the element's innerText still belongs to THIS layer and must NOT be dropped as a wrapper.
+      childRoleText: Array.from(el.querySelectorAll("[data-role]")).map(d => (d.innerText || "")).join(" ").replace(/\s+/g, " ").trim(),
+      textRect,
       rect:         { x: r.x, y: r.y, width: r.width, height: r.height },
       offsetW:      el.offsetWidth,
       offsetH:      el.offsetHeight,
@@ -304,6 +310,102 @@ function collectInPage(cw, ch) {
   const bbImg = bodyCs.backgroundImage && bodyCs.backgroundImage !== "none" ? bodyCs.backgroundImage : null;
   const bbCol = bodyCs.backgroundColor && !/rgba?\(0, 0, 0, 0\)|transparent/.test(bodyCs.backgroundColor) ? bodyCs.backgroundColor : null;
   return { nodes: out, bodyBg: bbImg || bbCol || null };
+}
+
+// ── Text-contrast guarantee ──────────────────────────────────────────────────
+// The dynamic palette hands the designer ONE text colour but tells it to vary the field
+// scene-to-scene (incl. near-white) — so a light-field scene renders light text on light bg,
+// invisible. This deterministic pass reads the SOLID colour of whatever sits directly behind
+// each text layer and, if the contrast is too low to read, flips the text to a readable
+// near-black/near-white. It only ever changes text COLOUR — never geometry, z, or anything
+// over an image (those are handled by scrims) — so it cannot break layout.
+const CONTRAST_MIN = 3.5;            // WCAG large-text floor (~3.0) with a small safety margin
+const CONTRAST_DARK = "#0c0d12", CONTRAST_LIGHT = "#f6f7fb";
+function parseColor(str) {
+  if (!str || typeof str !== "string") return null;
+  let s = str.trim();
+  if (/gradient/i.test(s)) { const m = s.match(/#[0-9a-f]{3,8}|rgba?\([^)]*\)/i); if (!m) return null; s = m[0]; }
+  let m;
+  if ((m = s.match(/^#([0-9a-f]{3})$/i)))            return { r: parseInt(m[1][0] + m[1][0], 16), g: parseInt(m[1][1] + m[1][1], 16), b: parseInt(m[1][2] + m[1][2], 16) };
+  if ((m = s.match(/^#([0-9a-f]{6})[0-9a-f]{0,2}$/i))) return { r: parseInt(m[1].slice(0, 2), 16), g: parseInt(m[1].slice(2, 4), 16), b: parseInt(m[1].slice(4, 6), 16) };
+  if ((m = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i))) return { r: +m[1], g: +m[2], b: +m[3] };
+  return null;
+}
+function relLuminance({ r, g, b }) {
+  const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+// Effective luminance of a backdrop for contrast decisions. A solid colour → its luminance.
+// A GRADIENT is judged by its OPAQUE base stops only: translucent accent stops (a faint amber
+// glow at 22% alpha) sit over whatever's beneath and must NOT be read as the background — doing
+// so once flipped a white headline to near-black on a dark frame (invisible text). If the opaque
+// stops span both dark and light, the backdrop is genuinely ambiguous → return null (don't flip).
+function backdropLuminance(str, bodyBg) {
+  if (!str || typeof str !== "string") return null;
+  const s = str.trim();
+  if (!/gradient/i.test(s)) { const c = parseColor(s); return c ? relLuminance(c) : null; }
+  const stops = [];
+  const re = /#[0-9a-f]{3,8}|rgba?\([^)]*\)/ig; let m;
+  while ((m = re.exec(s))) {
+    const tok = m[0]; let alpha = 1;
+    const am = tok.match(/rgba\(\s*[\d.]+[,\s]+[\d.]+[,\s]+[\d.]+[,\s/]+([\d.]+)/i);
+    if (am) alpha = parseFloat(am[1]);
+    else if (/^#[0-9a-f]{8}$/i.test(tok)) alpha = parseInt(tok.slice(7, 9), 16) / 255;
+    const c = parseColor(tok);
+    if (c) stops.push({ lum: relLuminance(c), alpha });
+  }
+  const opaque = stops.filter((st) => st.alpha >= 0.5);
+  if (!opaque.length) { const bc = parseColor(bodyBg); return bc ? relLuminance(bc) : null; }
+  const lums = opaque.map((st) => st.lum);
+  const min = Math.min(...lums), max = Math.max(...lums);
+  if (min <= 0.4 && max >= 0.5) return null;           // spans dark+light → ambiguous, leave text alone
+  return lums.reduce((a, b) => a + b, 0) / lums.length;
+}
+function contrastRatio(a, b) {
+  const l1 = relLuminance(a), l2 = relLuminance(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+// The colour of the layer directly behind this text's centre. If that's an IMAGE, return
+// { isImage:true } and we leave the text alone (unknown luminance; scrims cover legibility).
+function backdropBehind(textEntry, graph, bodyBg) {
+  const cx = textEntry.x + textEntry.width / 2, cy = textEntry.y + textEntry.height / 2;
+  let best = null;
+  for (const e of graph) {
+    if (e === textEntry || e.type === "text") continue;
+    if ((e.zIndex ?? 0) >= (textEntry.zIndex ?? 0)) continue;
+    // Glows / radial accents are soft, mostly-transparent decorations that fade to nothing away
+    // from their centre — they are NOT a legibility surface. Treating one as the backdrop once
+    // flipped white text to dark over a glow's transparent edge (invisible). Skip them, same as images.
+    if (e.role === "glow" || /radial-gradient/i.test(e.background || "")) continue;
+    if (cx < e.x || cx > e.x + e.width || cy < e.y || cy > e.y + e.height) continue;
+    if (best == null || (e.zIndex ?? 0) > (best.zIndex ?? 0)) best = e;
+  }
+  if (best) return best.type === "image" ? { isImage: true } : { color: best.background };
+  return { color: bodyBg };
+}
+function enforceTextContrast(graph, bodyBg) {
+  for (const e of graph) {
+    if (e.type !== "text" || !e.style) continue;
+    const tc = e.style.color;
+    if (!tc || /gradient/i.test(tc)) continue;      // gradient text → can't simply flip
+    const textRGB = parseColor(tc);
+    if (!textRGB) continue;
+    // A chip/pill sits on its OWN background (solid or gradient); otherwise use what's behind it.
+    let backdropColor, isImage = false;
+    if (e.style.background && !/url/i.test(e.style.background)) {
+      backdropColor = e.style.background;
+    } else {
+      const b = backdropBehind(e, graph, bodyBg);
+      isImage = !!b.isImage; backdropColor = b.color;
+    }
+    if (isImage) continue;
+    const bgLum = backdropLuminance(backdropColor, bodyBg);
+    if (bgLum == null) continue;                     // unknown/ambiguous backdrop → don't risk a flip
+    const textLum = relLuminance(textRGB);
+    const ratio = (Math.max(textLum, bgLum) + 0.05) / (Math.min(textLum, bgLum) + 0.05);
+    if (ratio >= CONTRAST_MIN) continue;
+    e.style.color = bgLum > 0.4 ? CONTRAST_DARK : CONTRAST_LIGHT;
+  }
 }
 
 /**
@@ -408,6 +510,10 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
     // (the children stay separate layers). Only a true wrapper (no own text) is dropped/treated as bg.
     if (type === "text" && n.hasRoleChildren) {
       if (n.ownText) { n.text = n.ownText; }
+      // Role-children carry NO text → they're decorative (a bullet dot, an icon) and the row's real
+      // text sits in a plain child. Keep the innerText and re-anchor to the text child's rect so it
+      // renders in the right place (e.g. after the bullet), instead of being dropped entirely.
+      else if (!n.childRoleText && n.text) { if (n.textRect && n.textRect.width > 0) n.rect = n.textRect; }
       else if (n.css.bgImage || n.css.bgColor) { type = "gradient"; }
       else { continue; }
     }
@@ -767,6 +873,9 @@ export async function measureSceneHTML(htmlString, sceneIndex, canvas = { width:
       }
     }
   }
+
+  // Guarantee readable text: flip any text whose colour doesn't contrast with its solid backdrop.
+  enforceTextContrast(graph, bodyBg);
 
   graph.sort((a, b) => a.zIndex - b.zIndex);
   return graph;

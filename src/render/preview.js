@@ -57,10 +57,15 @@ async function injectVideo(page, videoFrames, f) {
  * is GPT's INTENT; comparing it to the converted scene-<NN>.png frame exposes where the measure /
  * timeline / render pipeline diverges from the design (so converter/CSS bugs become visible).
  */
-export async function renderBeatDesigns(beatHTMLs, { outDir, width = 1080, height = 1920, scale = 1 } = {}) {
+export async function renderBeatDesigns(beatHTMLs, { outDir, width = 1080, height = 1920, scale = 1, background = null } = {}) {
   if (!Array.isArray(beatHTMLs) || !beatHTMLs.some(Boolean)) return [];
   fs.mkdirSync(outDir, { recursive: true });
   const fontCss = localFontsCss();
+  // Designs use `body { background: transparent }` — in the VIDEO that transparency is filled by the
+  // scene's media or the palette base, but a bare headless render falls back to browser-default WHITE,
+  // which makes light-on-dark designs look like invisible-text failures that DON'T exist in the video.
+  // Paint the real field (the palette base) behind the transparent design so the preview is faithful.
+  const fieldCss = background ? `html{background:${background}!important;}` : null;
   const browser = await puppeteer.launch({ headless: true, executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, args: LAUNCH_ARGS });
   const out = [];
   try {
@@ -73,6 +78,7 @@ export async function renderBeatDesigns(beatHTMLs, { outDir, width = 1080, heigh
         await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
         if (fontCss) { try { await page.addStyleTag({ content: fontCss }); } catch {} }
         try { await page.addStyleTag({ content: "*{min-width:0!important;}" }); } catch {}
+        if (fieldCss) { try { await page.addStyleTag({ content: fieldCss }); } catch {} }
         await page.evaluate(async () => {
           try { await (document.fonts && document.fonts.ready); } catch {}
           const imgs = [...document.images].filter((i) => !i.complete);
@@ -108,11 +114,13 @@ export function sceneWindows(project) {
   return [...byScene.values()].filter(w => w.end > w.start).sort((a, b) => a.start - b.start);
 }
 
-// A representative instant for a scene: MID-scene — entrance animations finish by ~50% of the
-// scene, so ~60% is settled but well clear of both the start and the out-transition at the end.
+// A representative instant for a scene: LATE in the scene — a STAGGERED multi-element entrance
+// (each line fading up in turn) can run to ~75-80% of the scene, so an earlier sample freezes the
+// frame before the last line appears (looked like a dropped headline). Sample at ~82%, still clamped
+// clear of the out-transition (end - 0.25s), so the still shows the fully settled composition.
 function sceneSampleTime(w) {
   const dur = w.end - w.start;
-  return Math.max(w.start + 0.4, Math.min(w.end - 0.25, w.start + dur * 0.6));
+  return Math.max(w.start + 0.4, Math.min(w.end - 0.25, w.start + dur * 0.82));
 }
 
 /**
