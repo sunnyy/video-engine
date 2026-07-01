@@ -52,7 +52,9 @@ import SaasVideo            from "./pages/SaasVideo";
 import PromptVideo           from "./pages/PromptVideo";
 import BrandKit              from "./pages/BrandKit";
 import Automation          from "./pages/Automation";
-import SocialAccounts      from "./pages/SocialAccounts";
+import AutomationLayout    from "./pages/automation/AutomationLayout";
+import AutomationChannels  from "./pages/automation/AutomationChannels";
+import AutomationBrandKit  from "./pages/automation/AutomationBrandKit";
 import CampaignDetail      from "./pages/CampaignDetail";
 import PosterStudio         from "./pages/ProductPoster";
 import Thumbnails           from "./pages/Thumbnails";
@@ -197,9 +199,13 @@ export default function App() {
             <Route path="/credits"          element={<CreditsPage />} />
             <Route path="/settings"         element={<Settings />} />
             <Route path="/brand-kit"        element={<BrandKit />} />
-            <Route path="/automation"       element={<Automation />} />
-            <Route path="/connections"      element={<SocialAccounts />} />
+            <Route path="/automation" element={<AutomationLayout />}>
+              <Route index element={<Automation />} />
+              <Route path="channels" element={<AutomationChannels />} />
+              <Route path="brand-kit" element={<AutomationBrandKit />} />
+            </Route>
             <Route path="/automation/campaigns/:id" element={<CampaignDetail />} />
+            <Route path="/connections" element={<Navigate to="/automation/channels" replace />} />
             <Route path="/video-editor/:id" element={<VideoEditor />} />
             <Route path="/promo-video"             element={<SaasVideo />} />
             <Route path="/promo-video/:projectId"  element={<SaasVideo />} />

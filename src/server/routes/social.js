@@ -70,7 +70,7 @@ router.delete("/:platform/credentials", requireAuth, async (req, res) => {
 /** OAuth redirect target (no auth header — identity travels in the signed `state`). */
 router.get("/:platform/callback", async (req, res) => {
   const { code, state, error } = req.query;
-  const back = (q) => res.redirect(`${APP_URL}/connections?${q}`);
+  const back = (q) => res.redirect(`${APP_URL}/automation/channels?${q}`);
   if (error) return back(`social_error=${encodeURIComponent(String(error))}`);
   if (!code || !state) return back("social_error=missing_code");
   try {

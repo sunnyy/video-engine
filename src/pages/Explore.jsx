@@ -166,12 +166,8 @@ export default function Explore() {
               </div>
             </div>
 
-            {/* Decorative panel (swap for real art later) */}
-            <div style={{ flex: "0 0 320px", height: 210, position: "relative", borderRadius: 20, overflow: "hidden", border: `1px solid ${T.border}`, background: "radial-gradient(120% 120% at 80% 10%, rgba(124,92,252,0.35), rgba(14,16,24,0.6))", display: "none" }} className="explore-hero-art">
-              <span style={{ position: "absolute", top: 26, left: 30, fontSize: 30, opacity: 0.9 }}>🎬</span>
-              <span style={{ position: "absolute", top: 90, right: 40, fontSize: 26, opacity: 0.85 }}>Aa</span>
-              <span style={{ position: "absolute", bottom: 30, left: 60, fontSize: 24, opacity: 0.8 }}>🎵</span>
-              <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 64, height: 64, borderRadius: "50%", background: "rgba(124,92,252,0.85)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: "0 8px 30px rgba(124,92,252,0.5)" }}>▶</span>
+            <div style={{ flex: "0 0 340px", height: 210, position: "relative", borderRadius: 20, overflow: "hidden", border: `1px solid ${T.border}`, background: "#0e1018", display: "none" }} className="explore-hero-art">
+              <img src="/assets/images/explore_tools.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
             </div>
             <style>{`@media (min-width: 900px){ .explore-hero-art{ display:block !important; } }`}</style>
           </div>

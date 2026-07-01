@@ -556,8 +556,8 @@ export default function AppLayout({ children }) {
               </div>
             </button>
 
-            {/* TEMP preview — restore condition: !isAdmin && !isProPlus */}
-            {true && (
+            {/* Show to anyone not on a paid plan (no free plan exists); admins on no plan see it too. */}
+            {!isProPlus && (
               <a href="/#pricing" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, padding: "10px 12px", borderRadius: 10, background: "linear-gradient(135deg, #f5c518, #f97316)", color: "#0b0b12", fontWeight: 700, fontSize: 13.5, fontFamily: "'Outfit',sans-serif", textDecoration: "none" }}>
                 <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>{Icons.star}</span> Upgrade
               </a>

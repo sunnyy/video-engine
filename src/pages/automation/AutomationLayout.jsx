@@ -39,12 +39,8 @@ export default function AutomationLayout() {
                 <p style={{ fontSize: 14.5, color: T.muted, margin: "8px 0 0", lineHeight: 1.5 }}>Create, manage and automate content across channels.</p>
               </div>
             </div>
-            <div className="autom-hero-art" style={{ display: "none", flex: "0 0 300px", height: 130, position: "relative", borderRadius: 18, overflow: "hidden", border: `1px solid ${T.border}`, background: "radial-gradient(120% 120% at 70% 20%, rgba(124,92,252,0.32), rgba(14,16,24,0.5))" }}>
-              <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 56, height: 56, borderRadius: 14, background: "rgba(124,92,252,0.9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, boxShadow: "0 8px 30px rgba(124,92,252,0.5)" }}>⚡</span>
-              <span style={{ position: "absolute", top: 16, left: 30, fontSize: 18 }}>▶️</span>
-              <span style={{ position: "absolute", top: 20, right: 40, fontSize: 18 }}>📸</span>
-              <span style={{ position: "absolute", bottom: 18, right: 32, fontSize: 15, fontWeight: 800, color: "#fff" }}>𝕏</span>
-              <span style={{ position: "absolute", bottom: 20, left: 46, fontSize: 16 }}>🎵</span>
+            <div className="autom-hero-art" style={{ display: "none", flex: "0 0 320px", height: 140, position: "relative", borderRadius: 18, overflow: "hidden", border: `1px solid ${T.border}`, background: "#0e1018" }}>
+              <img src="/assets/images/automation_hero.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
             </div>
             <style>{`@media (min-width: 900px){ .autom-hero-art{ display:block !important; } }`}</style>
           </div>

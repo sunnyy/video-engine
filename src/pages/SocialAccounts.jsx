@@ -37,7 +37,7 @@ function PlatformBadge({ id, color }) {
   return <div style={{ width: 38, height: 38, borderRadius: 10, background: color, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{glyph}</div>;
 }
 
-export default function SocialAccounts() {
+export function ChannelsPanel({ embedded = false }) {
   const [conns, setConns] = useState(null);
   const [connMsg, setConnMsg] = useState(null);
   const [busy, setBusy] = useState("");
@@ -62,7 +62,7 @@ export default function SocialAccounts() {
     const q = new URLSearchParams(window.location.search);
     if (q.get("connected")) { setConnMsg({ ok: true, text: `Connected ${q.get("connected")} ✓` }); showToast(`${q.get("connected")} connected ✓`, "success"); }
     else if (q.get("social_error")) { const t = decodeURIComponent(q.get("social_error")); setConnMsg({ ok: false, text: t }); showToast(`Couldn't connect: ${t}`); }
-    if (q.get("connected") || q.get("social_error")) window.history.replaceState({}, "", "/connections");
+    if (q.get("connected") || q.get("social_error")) window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
   const accountFor = (platform) => (conns?.accounts || []).find(a => a.platform === platform) || null;
@@ -141,11 +141,13 @@ export default function SocialAccounts() {
 
   const btn = (bg) => ({ background: bg, border: "none", color: "#fff", fontWeight: 700, fontSize: 12.5, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" });
 
+  const outerStyle = embedded ? { maxWidth: 900 } : { flex: 1, overflowY: "auto", background: T.bg };
+  const innerStyle = embedded ? {} : { maxWidth: 900, margin: "0 auto", padding: "44px 24px 80px" };
   return (
-    <AppLayout>
-      <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "44px 24px 80px" }}>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: "0 0 6px" }}>Social Accounts</h1>
+    <>
+      <div style={outerStyle}>
+        <div style={innerStyle}>
+          {!embedded && <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: "0 0 6px" }}>Social Accounts</h1>}
           <p style={{ fontSize: 14, color: T.muted, marginTop: 0, marginBottom: 26 }}>
             Connect the channels you publish to — then post your videos straight from the editor, or let Automation publish for you.
           </p>
@@ -205,6 +207,14 @@ export default function SocialAccounts() {
           btn={btn}
         />
       )}
+    </>
+  );
+}
+
+export default function SocialAccounts() {
+  return (
+    <AppLayout>
+      <ChannelsPanel />
     </AppLayout>
   );
 }

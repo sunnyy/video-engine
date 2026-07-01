@@ -25,7 +25,7 @@ async function notifyBroken(userId, platform, reason) {
          <p>Open Vidquence and reconnect ${platform} to resume automatic posting.</p>`);
     }
   } catch (_) {}
-  notifyUser(userId, { type: "social_disconnected", icon: "🔌", severity: "error", link: "/connections",
+  notifyUser(userId, { type: "social_disconnected", icon: "🔌", severity: "error", link: "/automation/channels",
     title: `Reconnect your ${platform} account`, body: `Your ${platform} connection stopped working — reconnect to resume posting.` });
 }
 

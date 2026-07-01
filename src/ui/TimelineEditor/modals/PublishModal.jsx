@@ -63,7 +63,7 @@ export default function PublishModal({ name, initialPublish, publishedAccounts =
           {accounts === null ? <div style={{ fontSize: 13, color: T.faint }}>Loading accounts…</div>
             : accounts.length === 0 ? (
               <div style={{ fontSize: 13, color: T.muted, padding: "12px 14px", border: `1px dashed ${T.border}`, borderRadius: 10 }}>
-                No connected accounts. <a href="/connections" style={{ color: T.accent }}>Connect a social account →</a>
+                No connected accounts. <a href="/automation/channels" style={{ color: T.accent }}>Connect a channel →</a>
               </div>
             ) : (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

@@ -11,7 +11,7 @@ import { getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
 import { videoServices } from "../config/serviceCatalog";
 import { SERVICE_COST_LABEL, TOOLS_COST_LABEL } from "../config/serviceCostLabels";
-import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown, Play, Users, Rocket, ShieldCheck, Package, BookOpen, Mail, Globe, Zap, DollarSign } from "lucide-react";
+import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown, Play, Users, Rocket, ShieldCheck, Package, BookOpen, Mail, Globe, Zap, DollarSign, Pencil } from "lucide-react";
 
 const FALLBACK_RATE = 92.6;
 function toINR(usd, rate) {
@@ -565,10 +565,10 @@ function CountUp({ to, prefix = "", suffix = "", duration = 1400 }) {
 }
 
 const HERO_FEATURES = [
-  { Icon: Zap,         title: "10X Faster",           sub: "Create content in minutes",         color: "#38bdf8" },
-  { Icon: DollarSign,  title: "Cost Effective",       sub: "Save time and budget",              color: "#22d3ee" },
-  { Icon: Users,       title: "Loved by 10K+ Brands", sub: "From startups to enterprises",      color: "#a855f7" },
-  { Icon: ShieldCheck, title: "All-in-One Platform",  sub: "Everything you need, in one place", color: "#22c55e" },
+  { Icon: Zap,        title: "10X Faster",           sub: "Create content in minutes",    color: "#38bdf8" },
+  { Icon: Pencil,     title: "Fully Editable",       sub: "Edit anything",                color: "#f472b6" },
+  { Icon: DollarSign, title: "Cost Effective",       sub: "Save time and budget",         color: "#22d3ee" },
+  { Icon: Users,      title: "Loved by 10K+ Brands", sub: "From startups to enterprises", color: "#a855f7" },
 ];
 
 // Checkmark feature row + the "Everything in X, plus:" group label for the pricing cards.
