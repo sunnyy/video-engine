@@ -11,7 +11,7 @@ import { getSession } from "../services/auth/authService";
 import { SERVER } from "../services/serverApi";
 import { videoServices } from "../config/serviceCatalog";
 import { SERVICE_COST_LABEL, TOOLS_COST_LABEL } from "../config/serviceCostLabels";
-import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown } from "lucide-react";
+import { Sparkles, Clapperboard, ShoppingBag, MessageCircle, Type, Captions, Palette, Mic, Clock, Smartphone, ArrowUp, ChevronDown, Play, Users, Rocket, ShieldCheck, Package, BookOpen, Mail, Globe, Zap, DollarSign } from "lucide-react";
 
 const FALLBACK_RATE = 92.6;
 function toINR(usd, rate) {
@@ -125,7 +125,9 @@ const CSS = `
   .stat-label { font-family: var(--font-body); font-size: 15px; color: var(--muted); }
 
   /* SECTION */
-  .section { padding: 90px 0; }
+  .section { padding: 90px 0; position: relative; }
+  .section:nth-of-type(odd)  { background: radial-gradient(ellipse 85% 75% at 88% 0%, rgba(245,197,24,0.10), transparent 62%); }
+  .section:nth-of-type(even) { background: radial-gradient(ellipse 85% 75% at 12% 0%, rgba(124,92,252,0.14), transparent 62%); }
   .section-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--yellow); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 12px; }
   .section-label::before, .section-label::after { content: ''; width: 24px; height: 1px; background: var(--yellow); }
   .section-h { font-family: 'Inter', sans-serif; font-weight: 800; font-size: clamp(32px, 4vw, 56px); line-height: 1.08; color: var(--text); letter-spacing: -0.02em; margin-bottom: 16px; text-align: center; }
@@ -288,8 +290,8 @@ const CSS = `
 
   /* CTA */
   .cta-banner-section { padding: 40px 0 80px; }
-  .cta-banner { background: linear-gradient(135deg, #14140e 0%, #1a1a10 100%); border: 1px solid rgba(245,197,24,0.2); border-radius: 20px; padding: 60px 64px; display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; position: relative; overflow: hidden; }
-  .cta-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 70% 50%, rgba(245,197,24,0.06), transparent 60%); pointer-events: none; }
+  .cta-banner { background: linear-gradient(135deg, rgba(124,92,252,0.14) 0%, #0e0e17 42%, #0b0b12 100%); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 60px 64px; display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; position: relative; overflow: hidden; }
+  .cta-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 82% 40%, rgba(124,92,252,0.10), transparent 58%); pointer-events: none; }
   .cta-banner-title { font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(32px, 4vw, 50px); color: var(--text); line-height: 1.08; letter-spacing: -0.02em; position: relative; z-index: 1; }
   .cta-banner-sub { font-family: var(--font-body); font-size: 16px; color: var(--muted); margin-top: 12px; position: relative; z-index: 1; }
   .cta-banner-btn { position: relative; z-index: 1; font-family: var(--font-body); font-size: 15px; font-weight: 700; color: var(--yellow); background: #0F0E1A; border: none; border-radius: 12px; padding: 18px 40px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity 0.2s; }
@@ -522,7 +524,7 @@ function SamplesGallery() {
   }, []);
   if (!samples || !samples.length) return null; // nothing curated yet → hide entirely
   return (
-    <section className="section" id="samples" style={{ paddingTop: 40 }}>
+    <section className="section" id="samples">
       <div className="container">
         <div className="section-label">Made with Vidquence</div>
         <h2 className="section-h">See what people<br /><span className="yellow">are making.</span></h2>
@@ -562,11 +564,11 @@ function CountUp({ to, prefix = "", suffix = "", duration = 1400 }) {
   return <span ref={ref}>{prefix}{n.toLocaleString()}{suffix}</span>;
 }
 
-const HERO_STATS = [
-  { to: 20,   suffix: "K+", label: "Videos created" },
-  { to: 7500, suffix: "+",  label: "Creators & brands" },
-  { to: 30,   suffix: "+",  label: "Languages supported" },
-  { to: 1, suffix: "m+", label: "Idea to finished video" },
+const HERO_FEATURES = [
+  { Icon: Zap,         title: "10X Faster",           sub: "Create content in minutes",         color: "#38bdf8" },
+  { Icon: DollarSign,  title: "Cost Effective",       sub: "Save time and budget",              color: "#22d3ee" },
+  { Icon: Users,       title: "Loved by 10K+ Brands", sub: "From startups to enterprises",      color: "#a855f7" },
+  { Icon: ShieldCheck, title: "All-in-One Platform",  sub: "Everything you need, in one place", color: "#22c55e" },
 ];
 
 // Checkmark feature row + the "Everything in X, plus:" group label for the pricing cards.
@@ -743,14 +745,21 @@ export default function LandingPage() {
 
 
       {/* STATS */}
-      <section style={{ padding: "28px 0 0" }}>
+      <section style={{ padding: "28px 0 68px" }}>
         <div className="container">
-          <div className="stats-divider" />
-          <div className="stats-row" data-reveal>
-            {HERO_STATS.map((s, i) => (
-              <div key={i} className="stat-cell">
-                <div className="stat-num"><CountUp to={s.to} prefix={s.prefix} suffix={s.suffix} /></div>
-                <div className="stat-label">{s.label}</div>
+          <style>{`
+            .hero-feat-row { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border2); border-radius: 16px; overflow: hidden; background: rgba(255,255,255,0.02); }
+            @media (max-width: 760px) { .hero-feat-row { grid-template-columns: 1fr 1fr; } }
+            @media (max-width: 460px) { .hero-feat-row { grid-template-columns: 1fr; } }
+          `}</style>
+          <div className="hero-feat-row" data-reveal>
+            {HERO_FEATURES.map((it, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "20px 22px", borderLeft: i ? "1px solid var(--border2)" : "none" }}>
+                <span style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", background: `${it.color}1a`, border: `1px solid ${it.color}33`, color: it.color }}><it.Icon size={20} strokeWidth={2} /></span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", fontFamily: "'Outfit',sans-serif" }}>{it.title}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--dim)", marginTop: 2 }}>{it.sub}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -904,9 +913,11 @@ export default function LandingPage() {
       </section>
 
       {/* WHO IT'S FOR */}
-      <section className="section" style={{ paddingTop: 0 }}>
+      <section className="section">
         <div className="container">
-          <div className="section-label">Built For</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "2px", textTransform: "uppercase", color: "#c4b5fd", background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.32)", borderRadius: 100, padding: "6px 16px" }}>✦ Built for brands that win ✦</span>
+          </div>
           <h2 className="section-h">
             Made for brands
             <br />
@@ -919,40 +930,18 @@ export default function LandingPage() {
 
           <div className="audience-grid" data-reveal>
             {[
-              {
-                icon: "🛒",
-                title: "E-commerce Brands",
-                desc: "Create product video ads, virtual try-on images, and social media posts for every product in your catalog — without a photoshoot.",
-                tags: ["Product Ads", "Virtual Try-On", "Social Posts", "Posters"],
-              },
-              {
-                icon: "📱",
-                title: "Content Creators",
-                desc: "Generate faceless or talking head videos in any niche. Add captions, voiceovers, and thumbnails — all without editing software.",
-                tags: ["Prompt to Video", "Captions", "Thumbnails", "Voiceover"],
-              },
-              {
-                icon: "🏢",
-                title: "Marketing Agencies",
-                desc: "Produce marketing creatives at scale for your clients. Video ads, social graphics, and more — delivered in minutes, not days.",
-                tags: ["Product Ads", "Social Posts", "Posters", "Thumbnails"],
-              },
-              {
-                icon: "🚀",
-                title: "Solo Founders & Startups",
-                desc: "Ship marketing content without a team. Replace your designer, video editor, and voice artist with one platform.",
-                tags: ["All Services", "Low Cost", "Fast Output"],
-              },
+              { icon: "🛒", title: "E-commerce Brands",       desc: "Create product video ads, virtual try-on images, and social media posts for every product in your catalog — without a photoshoot.", tags: ["Product Ads", "Virtual Try-On", "Social Posts", "Posters"], accent: "#a855f7", grad: "linear-gradient(135deg,#7c5cfc,#a855f7)" },
+              { icon: "📱", title: "Content Creators",        desc: "Generate faceless or talking head videos in any niche. Add captions, voiceovers, and thumbnails — all without editing software.", tags: ["Prompt to Video", "Captions", "Thumbnails", "Voiceover"], accent: "#f59e0b", grad: "linear-gradient(135deg,#f59e0b,#f97316)" },
+              { icon: "🏢", title: "Marketing Agencies",      desc: "Produce marketing creatives at scale for your clients. Video ads, social graphics, and more — delivered in minutes, not days.", tags: ["Product Ads", "Social Posts", "Posters", "Thumbnails"], accent: "#38bdf8", grad: "linear-gradient(135deg,#3b82f6,#38bdf8)" },
+              { icon: "🚀", title: "Solo Founders & Startups", desc: "Ship marketing content without a team. Replace your designer, video editor, and voice artist with one platform.", tags: ["All Services", "Low Cost", "Fast Output"], accent: "#22c55e", grad: "linear-gradient(135deg,#16a34a,#22c55e)" },
             ].map((a, i) => (
-              <div key={i} className="audience-card">
-                <div className="audience-icon">{a.icon}</div>
+              <div key={i} className="audience-card" style={{ position: "relative", overflow: "hidden", border: `1px solid ${a.accent}33`, background: `linear-gradient(135deg, ${a.accent}24, transparent 62%), var(--card)`, boxShadow: `0 10px 40px ${a.accent}12` }}>
+                <div style={{ width: 52, height: 52, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, background: a.grad, boxShadow: `0 8px 22px ${a.accent}55`, marginBottom: 16 }}>{a.icon}</div>
                 <div className="audience-title">{a.title}</div>
                 <div className="audience-desc">{a.desc}</div>
                 <div className="audience-tags">
                   {a.tags.map((t, j) => (
-                    <span key={j} className="audience-tag">
-                      {t}
-                    </span>
+                    <span key={j} style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: a.accent, background: `${a.accent}18`, border: `1px solid ${a.accent}33`, borderRadius: 100, padding: "3px 10px" }}>{t}</span>
                   ))}
                 </div>
               </div>
@@ -980,28 +969,33 @@ export default function LandingPage() {
           </h2>
           <p className="section-sub">No learning curve. No complex settings. Just describe what you need and get it.</p>
 
-          <div className="process" data-reveal>
+          <style>{`
+            .process-row { display: flex; align-items: stretch; gap: 14px; margin-top: 56px; }
+            .process-row .p-card { flex: 1; min-width: 0; }
+            .process-arrow { color: var(--muted); font-size: 22px; }
+            @media (max-width: 700px) { .process-row { flex-direction: column; } .process-arrow { display: none; } }
+          `}</style>
+          <div className="process-row" data-reveal>
             {[
-              {
-                n: "01",
-                title: "Describe or Upload",
-                desc: "Type a topic, paste a URL, or upload your product photo, logo, or video. That's all the input you need.",
-              },
-              {
-                n: "02",
-                title: "AI Does the Work",
-                desc: "Our AI writes the strategy, generates visuals, records voiceovers, applies layouts, adds music — all automatically.",
-              },
-              {
-                n: "03",
-                title: "Download & Publish",
-                desc: "Export your finished asset in seconds. Edit anything you want in our full editor before exporting.",
-              },
+              { n: "01", img: "/assets/images/describe_upload.png",  title: "Describe or Upload", desc: "Type a topic, paste a URL, or upload your product photo, logo, or video. That's all the input you need.", chips: ["Text", "URL", "Upload", "Video"], accent: "#f5c518" },
+              { n: "02", img: "/assets/images/ai_work.png",          title: "AI Does the Work", desc: "Our AI writes the strategy, generates visuals, records voiceovers, applies layouts, adds music — all automatically.", chips: ["Strategy", "Visuals", "Voiceover", "Music"], accent: "#f97316" },
+              { n: "03", img: "/assets/images/start_publishing.png", title: "Download & Publish", desc: "Export your finished asset in seconds. Edit anything you want in our full editor before exporting.", chips: ["Export", "Edit", "Publish"], accent: "#f5c518" },
             ].map((s, i) => (
-              <div key={i} className="process-step">
-                <div className="process-num">{s.n}</div>
-                <div className="process-title">{s.title}</div>
-                <div className="process-desc">{s.desc}</div>
+              <div key={i} className="p-card" style={{ position: "relative", background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 16, display: "flex", flexDirection: "column" }}>
+                {i > 0 && <span className="process-arrow" style={{ position: "absolute", left: -18, top: "50%", transform: "translateY(-50%)" }}>→</span>}
+                <div style={{ position: "relative", height: 240, borderRadius: "16px 16px 0 0", overflow: "hidden", borderBottom: "1px solid var(--border2)", background: "var(--card2)" }}>
+                  <img src={s.img} alt={s.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <span style={{ position: "absolute", top: 16, left: 16, width: 46, height: 46, borderRadius: "50%", border: `2px solid ${s.accent}`, color: s.accent, background: "rgba(0,0,0,0.4)", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.n}</span>
+                </div>
+                <div style={{ padding: "22px 26px 24px", display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div className="process-title">{s.title}</div>
+                  <div className="process-desc" style={{ flex: 1 }}>{s.desc}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 18 }}>
+                    {s.chips.map((c, j) => (
+                      <span key={j} style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border2)", borderRadius: 100, padding: "4px 11px" }}>{c}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -1259,55 +1253,138 @@ export default function LandingPage() {
       {/* CTA BANNER */}
       <div className="cta-banner-section">
         <div className="container">
-          <div className="cta-banner" data-reveal>
-            <div>
-              <div className="cta-banner-title">
+          <div className="cta-banner" data-reveal style={{ alignItems: "center", gap: 48 }}>
+            {/* Left */}
+            <div style={{ position: "relative", zIndex: 1, flex: "1 1 460px", minWidth: 0 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(245,197,24,0.10)", border: "1px solid rgba(245,197,24,0.3)", borderRadius: 100, padding: "6px 14px", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "2px", textTransform: "uppercase", color: "#f5c518" }}>
+                <Sparkles size={13} /> All features. One platform.
+              </span>
+              <div className="cta-banner-title" style={{ marginTop: 20 }}>
                 Stop hiring.
                 <br />
-                Start creating.
+                <span className="yellow">Start creating.</span>
               </div>
-              <div className="cta-banner-sub">Every service unlocked. Plans from $29/mo. Cancel anytime.</div>
+              <div className="cta-banner-sub">Every service unlocked. Plans from <span className="yellow" style={{ fontWeight: 700 }}>$29/mo</span>. Cancel anytime.</div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 38, marginTop: 32 }}>
+                {[
+                  { Icon: Play,        t: "All Tools",      s: "Unlimited access"    },
+                  { Icon: Users,       t: "No Hiring",      s: "Save time & money"   },
+                  { Icon: Rocket,      t: "10X Faster",     s: "Produce in minutes"  },
+                  { Icon: ShieldCheck, t: "Cancel Anytime", s: "No commitments"      },
+                ].map((f, i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <span style={{ width: 62, height: 62, borderRadius: 16, border: "1px solid rgba(245,197,24,0.30)", background: "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015))", color: "#f5c518", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}><f.Icon size={26} strokeWidth={2} /></span>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", fontFamily: "'Outfit',sans-serif" }}>{f.t}</div>
+                      <div style={{ fontSize: 12.5, color: "var(--dim)", marginTop: 2 }}>{f.s}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 28, flexWrap: "wrap" }}>
+                <div style={{ display: "flex" }}>
+                  {["#7c5cfc", "#f97316", "#22c55e", "#38bdf8"].map((c, i) => (
+                    <span key={i} style={{ width: 30, height: 30, borderRadius: "50%", background: `linear-gradient(135deg, ${c}, #14140e)`, border: "2px solid #14140e", marginLeft: i ? -10 : 0 }} />
+                  ))}
+                </div>
+                <span style={{ color: "#f5c518", letterSpacing: 2, fontSize: 14 }}>★★★★★</span>
+                <span style={{ fontSize: 13.5, color: "var(--muted)" }}>Loved by 10K+ creators &amp; brands</span>
+              </div>
             </div>
-            <button className="cta-banner-btn" onClick={handleCTA}>
-              Get Started →
-            </button>
+
+            {/* Right */}
+            <div style={{ position: "relative", zIndex: 1, flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={{ borderRadius: 16, border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden", background: "#0c0c13" }}>
+                <img src="/assets/images/download_publish.png" alt="All features, one platform" style={{ width: "100%", height: "auto", display: "block" }} />
+              </div>
+              <button className="cta-banner-btn" onClick={handleCTA} style={{ background: "linear-gradient(135deg,#f5c518,#f97316)", color: "#0b0b12", padding: "16px 40px", borderRadius: 14, fontSize: 16, width: "100%" }}>
+                Get Started →
+              </button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 12.5, color: "var(--dim)" }}>
+                <ShieldCheck size={14} /> Secure payments. 30-day money back guarantee.
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* FOOTER */}
-      <footer className="footer">
+      <footer className="footer" style={{ background: "linear-gradient(180deg, transparent, rgba(124,92,252,0.05))" }}>
+        <style>{`
+          .footer-grid { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1fr 1.9fr; gap: 32px; }
+          @media (max-width: 900px) { .footer-grid { grid-template-columns: 1fr 1fr; gap: 28px; } }
+          @media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
+          .footer-col-link { font-family: var(--font-body); font-size: 14px; color: var(--dim); text-decoration: none; transition: color 0.2s; }
+          .footer-col-link:hover { color: var(--muted); }
+          .footer-social { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(255,255,255,0.04); border: 1px solid var(--border2); text-decoration: none; transition: all 0.2s; }
+          .footer-social:hover { background: rgba(124,92,252,0.15); border-color: rgba(124,92,252,0.4); }
+          .footer-social svg { width: 17px; height: 17px; }
+        `}</style>
         <div className="container">
-          <div className="footer-inner">
-            <a href="/" className="nav-logo">
-              <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 38, width: "auto" }} />
-            </a>
-            <div className="footer-links">
-              <a href="/about" className="footer-link">
-                About
-              </a>
-              <a href="/help" className="footer-link">
-                Help Center
-              </a>
-              <a href="/faq" className="footer-link">
-                FAQ
-              </a>
-              <a href="/terms" className="footer-link">
-                Terms of Service
-              </a>
-              <a href="/privacy" className="footer-link">
-                Privacy Policy
-              </a>
-              <a href="/refunds" className="footer-link">
-                Refunds
-              </a>
-              <a href="/cookies" className="footer-link">
-                Cookies
-              </a>
+          <div className="footer-grid">
+            {/* Brand */}
+            <div>
+              <a href="/" className="nav-logo"><img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 40, width: "auto" }} /></a>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--muted)", lineHeight: 1.6, margin: "16px 0 20px", maxWidth: 250 }}>
+                The all-in-one AI content engine for brands, creators, and agencies. Describe it. We create it.
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                {["youtube", "instagram", "tiktok", "x", "linkedin"].map((id) => (
+                  <a key={id} href="#" title={id} className="footer-social"><BrandIcon id={id} /></a>
+                ))}
+              </div>
             </div>
-            <a href="mailto:hello@vidquence.com" className="footer-link">
-              hello@vidquence.com
-            </a>
+
+            {/* Link columns */}
+            {[
+              { Icon: Package,     title: "Product",   links: [["Features", "#services"], ["How it Works", "#how"], ["Pricing", "#pricing"]] },
+              { Icon: BookOpen,    title: "Resources", links: [["Help Center", "/help"], ["FAQ", "/faq"]] },
+              { Icon: Users,       title: "Company",   links: [["About", "/about"], ["Contact", "mailto:hello@vidquence.com"]] },
+            ].map((col) => (
+              <div key={col.title}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <col.Icon size={15} style={{ color: "#a78bfa" }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", fontFamily: "'Outfit',sans-serif" }}>{col.title}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+                  {col.links.map(([label, href]) => <a key={label} href={href} className="footer-col-link">{label}</a>)}
+                </div>
+              </div>
+            ))}
+
+            {/* Stay in the loop */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <Mail size={15} style={{ color: "#a78bfa" }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", fontFamily: "'Outfit',sans-serif" }}>Stay in the loop</span>
+              </div>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55, margin: "0 0 14px", maxWidth: 260 }}>Get product updates, tips, and creator resources.</p>
+              <form onSubmit={(e) => { e.preventDefault(); const v = e.currentTarget.email.value.trim(); if (v) window.location.href = `mailto:hello@vidquence.com?subject=Newsletter%20signup&body=${encodeURIComponent("Please add me: " + v)}`; }}
+                style={{ display: "flex", gap: 8, maxWidth: 300 }}>
+                <input name="email" type="email" required placeholder="Enter your email"
+                  style={{ flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border2)", color: "var(--text)", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                <button type="submit" title="Subscribe" style={{ flexShrink: 0, width: 42, borderRadius: 10, border: "none", cursor: "pointer", background: "linear-gradient(135deg, #7c5cfc, #a855f7)", color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>→</button>
+              </form>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 12, fontSize: 12.5, color: "var(--dim)" }}>
+                <ShieldCheck size={13} style={{ color: "#a78bfa" }} /> No spam. Unsubscribe anytime.
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div style={{ borderTop: "1px solid var(--border2)", marginTop: 40, paddingTop: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--border2)", borderRadius: 10, padding: "7px 12px" }}>
+              <Globe size={14} style={{ color: "var(--muted)" }} />
+              <select style={{ background: "transparent", border: "none", color: "var(--muted)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", cursor: "pointer" }}>
+                <option>English</option>
+              </select>
+            </div>
+            <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--dim)" }}>Made with <span style={{ color: "#a855f7" }}>💜</span> for creators worldwide.</div>
+            <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--dim)", display: "flex", alignItems: "center", gap: 7 }}>
+              <ShieldCheck size={13} style={{ color: "#a78bfa" }} /> Secure · Encrypted · Trusted
+            </div>
             <div className="footer-copy">© 2026 VIDQUENCE</div>
           </div>
         </div>

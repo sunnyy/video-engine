@@ -39,6 +39,15 @@ export async function getQueuedCount(campaignId) {
   return count || 0;
 }
 
+/** The next queued topics for a campaign (titles only — for the Upcoming Posts panel). */
+export async function listQueuedTopics(campaignId, limit = 8) {
+  const { data } = await supabaseAdmin.from("automation_topics")
+    .select("id, title, niche, created_at")
+    .eq("campaign_id", campaignId).eq("status", "queued")
+    .order("created_at", { ascending: true }).limit(limit);
+  return data || [];
+}
+
 // Everything we should avoid repeating for THIS campaign: its consumed history + its queue.
 async function avoidContext(campaignId) {
   const [hist, topics] = await Promise.all([

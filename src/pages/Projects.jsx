@@ -172,7 +172,7 @@ function Card({ project }) {
   );
 }
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 18;
 
 export default function Projects() {
   const { projects, loading, fetchProjects } = useProjectsStore();

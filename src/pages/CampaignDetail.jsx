@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../ui/AppLayout";
 import { serverFetch } from "../services/serverApi";
@@ -35,6 +35,7 @@ export default function CampaignDetail() {
   const [busy, setBusy] = useState("");
   const [tab, setTab] = useState("settings");
   const [vidPage, setVidPage] = useState(0);
+  const nameRef = useRef(null);
 
   const refresh = async () => {
     const d = await serverFetch(`/api/automation/campaigns/${id}`).then(r => r.json());
@@ -130,6 +131,39 @@ export default function CampaignDetail() {
   const connectedAccounts = accounts.filter(a => a.status === "connected");
   const panel = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 22, boxShadow: "0 1px 3px rgba(0,0,0,0.28)" };
   const sectionHead = { fontSize: 11, fontWeight: 800, color: T.faint, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 13 };
+  const SectionHeader = ({ n, title, subtitle }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "baseline", gap: 8 }}>
+        <span style={{ color: T.accent }}>{n}.</span>{title}
+      </div>
+      {subtitle && <div style={{ fontSize: 12.5, color: T.faint, marginTop: 3 }}>{subtitle}</div>}
+    </div>
+  );
+  const relTime = (d) => {
+    if (!d) return "";
+    const s = Math.floor((Date.now() - new Date(d)) / 1000);
+    if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    const days = Math.floor(s / 86400);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  };
+  const Spark = ({ color }) => {
+    const bars = Array.from({ length: 30 }, (_, i) => 0.3 + (((i * 29 + 13) % 100) / 100) * 0.7);
+    return <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 20, marginTop: 10 }}>{bars.map((h, i) => <span key={i} style={{ width: 2, height: `${Math.round(h * 20)}px`, background: color, borderRadius: 2, opacity: 0.55 }} />)}</div>;
+  };
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} title="Toggle auto-publish" style={{ marginTop: 12, width: 44, height: 24, borderRadius: 20, border: "none", cursor: "pointer", background: on ? "#22c55e" : "rgba(255,255,255,0.15)", position: "relative", alignSelf: "flex-end", padding: 0 }}>
+      <span style={{ position: "absolute", top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+    </button>
+  );
+  const hbtn = (kind, dis = false) => {
+    const base = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, fontWeight: 700, fontSize: 13, fontFamily: "inherit", cursor: dis ? "default" : "pointer", border: "1px solid transparent", opacity: dis ? 0.6 : 1 };
+    if (kind === "primary") return { ...base, background: T.accent, color: "#fff" };
+    if (kind === "green")   return { ...base, background: "#22c55e", color: "#08110b" };
+    if (kind === "dark")    return { ...base, background: T.surface, border: `1px solid ${T.border}`, color: T.text };
+    if (kind === "danger")  return { ...base, background: "transparent", border: `1px solid #f8717155`, color: "#f87171" };
+    return base;
+  };
   const panelHead = { fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 10 };
 
   const publishedCount = data.posts.filter(p => p.status === "published").length;
@@ -161,63 +195,76 @@ export default function CampaignDetail() {
   return (
     <AppLayout>
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 24px 80px" }}>
+        <div style={{ maxWidth: 1080, margin: "0 auto", padding: "28px 24px 80px" }}>
 
           <button onClick={() => nav("/automation")} style={{ background: "none", border: "none", color: T.muted, fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 14, fontFamily: "inherit" }}>‹ Automation</button>
 
           {/* Header + lifecycle */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 22 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <input
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                onFocus={e => (e.currentTarget.style.borderBottomColor = T.border)}
-                onBlur={e => { e.currentTarget.style.borderBottomColor = "transparent"; const v = form.name.trim(); if (v && v !== c.name) save(); }}
-                onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
-                size={Math.max(8, (form.name || "").length + 1)}
-                title="Click to rename"
-                style={{ fontSize: 24, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: 0, background: "transparent", border: "none", borderBottom: "1px solid transparent", outline: "none", padding: "0 0 2px" }}
-              />
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 22 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  ref={nameRef}
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  onFocus={e => (e.currentTarget.style.borderBottomColor = T.border)}
+                  onBlur={e => { e.currentTarget.style.borderBottomColor = "transparent"; const v = form.name.trim(); if (v && v !== c.name) save(); }}
+                  onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                  size={Math.max(8, (form.name || "").length + 1)}
+                  title="Click to rename"
+                  style={{ fontSize: 28, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: 0, background: "transparent", border: "none", borderBottom: "1px solid transparent", outline: "none", padding: "0 0 2px" }}
+                />
+                <button onClick={() => nameRef.current?.focus()} title="Rename" style={{ background: "none", border: "none", color: T.faint, cursor: "pointer", fontSize: 15, padding: 2 }}>✎</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 13 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: st.color, fontWeight: 700 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.color }} />{st.label}
+                </span>
+                <span style={{ color: T.faint }}>· Created {relTime(c.created_at)}</span>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <style>{`@keyframes vqspin { to { transform: rotate(360deg); } }`}</style>
-              <button onClick={() => act("run-once")} disabled={!!busy || generating} style={btn(generating ? "#3a3a52" : T.accent, !!busy || generating)}>
-                {busy === "run-once" ? <>{spin} Starting…</> : generating ? "Generating…" : "Run once"}
+              <button onClick={() => act("run-once")} disabled={!!busy || generating} style={hbtn("primary", !!busy || generating)}>
+                {busy === "run-once" ? <>{spin} Starting…</> : generating ? "Generating…" : <>▶ Run once</>}
               </button>
-              {(c.status === "draft" || c.status === "stopped") && <button onClick={() => act("start")} disabled={!!busy} style={btn("#22c55e", !!busy)}>{busy === "start" ? <>{spin} Starting…</> : "Start"}</button>}
-              {c.status === "active" && <button onClick={() => act("pause")} disabled={!!busy} style={btn("#3a3a52", !!busy)}>{busy === "pause" ? <>{spin} Pausing…</> : "Pause"}</button>}
-              {c.status === "paused" && <button onClick={() => act("resume")} disabled={!!busy} style={btn("#22c55e", !!busy)}>{busy === "resume" ? <>{spin} Resuming…</> : "Resume"}</button>}
-              {(c.status === "active" || c.status === "paused") && <button onClick={() => act("stop")} disabled={!!busy} style={btn("#3a3a52", !!busy)}>{busy === "stop" ? <>{spin} Stopping…</> : "Stop"}</button>}
-              <button onClick={remove} disabled={!!busy} style={{ ...btn("transparent", !!busy), border: `1px solid ${busy === "delete" ? "#f8717188" : T.border}`, color: "#f87171" }}>{busy === "delete" ? <>{spin} Deleting…</> : "Delete"}</button>
+              {(c.status === "draft" || c.status === "stopped") && <button onClick={() => act("start")} disabled={!!busy} style={hbtn("green", !!busy)}>{busy === "start" ? <>{spin} Starting…</> : <>▶ Start</>}</button>}
+              {c.status === "active" && <button onClick={() => act("pause")} disabled={!!busy} style={hbtn("dark", !!busy)}>{busy === "pause" ? <>{spin} Pausing…</> : <>❚❚ Pause</>}</button>}
+              {c.status === "paused" && <button onClick={() => act("resume")} disabled={!!busy} style={hbtn("green", !!busy)}>{busy === "resume" ? <>{spin} Resuming…</> : <>▶ Resume</>}</button>}
+              {(c.status === "active" || c.status === "paused") && <button onClick={() => act("stop")} disabled={!!busy} style={hbtn("dark", !!busy)}>{busy === "stop" ? <>{spin} Stopping…</> : <>■ Stop</>}</button>}
+              <button onClick={remove} disabled={!!busy} style={hbtn("danger", !!busy)}>{busy === "delete" ? <>{spin} Deleting…</> : <>🗑 Delete</>}</button>
             </div>
           </div>
 
           {/* Overview strip — campaign pulse, always visible */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, marginBottom: 22 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12, marginBottom: 24 }}>
             {[
-              { label: "Status",        value: st.label,                                 color: st.color,                                        Icon: Activity,     tint: st.color },
-              { label: "Posts / day",   value: c.posts_per_day || 1,                                                                             Icon: Send,         tint: T.accent },
-              { label: "Topics queued", value: data.queued ?? 0,                                                                                 Icon: ListChecks,   tint: "#38bdf8" },
-              { label: "Published",     value: publishedCount,                           color: publishedCount > 0 ? "#22c55e" : T.text,         Icon: CheckCircle2, tint: "#22c55e" },
-              { label: "Auto-publish",  value: c.auto_publish !== false ? "On" : "Off",  color: c.auto_publish !== false ? "#22c55e" : T.muted,  Icon: Zap,          tint: c.auto_publish !== false ? "#22c55e" : T.faint },
+              { label: "Status",        value: st.label,                          sub: c.status === "active" ? "Campaign is running" : c.status === "paused" ? "Campaign paused" : "Not running", color: st.color,                                Icon: Activity,     tint: st.color,  spark: true },
+              { label: "Posts / day",   value: c.posts_per_day || 1,              sub: "Posts every day",                                                                                     Icon: Send,         tint: T.accent,  spark: true },
+              { label: "Topics queued", value: data.queued ?? 0,                  sub: "Ready to be posted",                                                                                  Icon: ListChecks,   tint: "#38bdf8", spark: true },
+              { label: "Published",     value: publishedCount,                    sub: "Total published",                              color: publishedCount > 0 ? "#22c55e" : T.text,        Icon: CheckCircle2, tint: "#22c55e", spark: true },
+              { label: "Auto-publish",  value: form.auto_publish ? "On" : "Off",  sub: form.auto_publish ? "Posts are auto-published" : "Waiting for approval", color: form.auto_publish ? "#22c55e" : T.muted, Icon: Zap, tint: form.auto_publish ? "#22c55e" : T.faint, toggle: true },
             ].map(s => (
-              <div key={s.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "13px 14px", minWidth: 0, display: "flex", flexDirection: "column", gap: 9, boxShadow: "0 1px 2px rgba(0,0,0,0.25)" }}>
+              <div key={s.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "14px 15px", minWidth: 0, display: "flex", flexDirection: "column", boxShadow: "0 1px 2px rgba(0,0,0,0.25)" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: T.faint, textTransform: "uppercase", letterSpacing: "0.07em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
                   <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 7, background: `${s.tint}1a`, color: s.tint, flexShrink: 0 }}>
                     <s.Icon size={13} strokeWidth={2.4} />
                   </span>
                 </div>
-                <div style={{ fontSize: 19, fontWeight: 800, color: s.color || T.text, fontFamily: "'Outfit',sans-serif", lineHeight: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.value}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: s.color || T.text, fontFamily: "'Outfit',sans-serif", lineHeight: 1, marginTop: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.value}</div>
+                <div style={{ fontSize: 11.5, color: T.faint, marginTop: 5 }}>{s.sub}</div>
+                {s.spark && <Spark color={s.tint} />}
+                {s.toggle && <Toggle on={form.auto_publish} onClick={() => setForm(f => ({ ...f, auto_publish: !f.auto_publish }))} />}
               </div>
             ))}
           </div>
 
           {/* Tabs */}
           <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${T.border}`, marginBottom: 20 }}>
-            {[["settings", "Settings"], ["videos", "Videos"], ["activity", "Activity"]].map(([key, label]) => {
+            {[["settings", "Settings"], ["videos", "Published"], ["queued", "Queued"], ["activity", "Activity"]].map(([key, label]) => {
               const on = tab === key;
-              const count = key === "videos" ? data.posts.length : null;
+              const count = key === "videos" ? data.posts.length : key === "queued" ? (data.queued ?? 0) : null;
               return (
                 <button key={key} onClick={() => setTab(key)} style={{ background: "none", border: "none", borderBottom: `2px solid ${on ? T.accent : "transparent"}`, color: on ? T.text : T.muted, fontSize: 13.5, fontWeight: 700, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", marginBottom: -1, display: "inline-flex", alignItems: "center", gap: 7 }}>
                   {label}
@@ -270,11 +317,13 @@ export default function CampaignDetail() {
 
           {/* ── Settings tab ── */}
           {tab === "settings" && (
-            <div style={panel} className="camp-form">
+            <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
+             <div style={{ flex: "1 1 520px", minWidth: 0 }} className="camp-form">
               <style>{`.camp-form input:focus, .camp-form select:focus { border-color: ${T.accent}88; box-shadow: 0 0 0 3px ${T.accent}22; }`}</style>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-              <div style={{ marginBottom: 26 }}>
-                <div style={sectionHead}>Content</div>
+              <div style={panel}>
+                <SectionHeader n={1} title="Content" subtitle="What do you want to automate?" />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
                   <div style={{ gridColumn: "span 2" }}><span style={lbl}>Niche(s) — comma separated</span><input style={fieldStyle} value={form.niches} onChange={e => setForm(f => ({ ...f, niches: e.target.value }))} placeholder="ai tools, productivity" /></div>
                   <div style={{ gridColumn: "1 / -1" }}>
@@ -296,8 +345,8 @@ export default function CampaignDetail() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: 26 }}>
-                <div style={sectionHead}>Schedule</div>
+              <div style={panel}>
+                <SectionHeader n={2} title="Schedule" subtitle="When should we post?" />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
                   <div><span style={lbl}>Posts / day</span>
                     <select style={fieldStyle} value={form.posts_per_day} onChange={e => setForm(f => ({ ...f, posts_per_day: e.target.value }))}>
@@ -308,8 +357,8 @@ export default function CampaignDetail() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: 26 }}>
-                <div style={sectionHead}>Look &amp; voice</div>
+              <div style={panel}>
+                <SectionHeader n={3} title="Video Settings" subtitle="Customize how your videos are generated" />
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
                   <VoiceLanguageField language={form.language} onLanguageChange={(id2) => setForm(f => ({ ...f, language: id2 }))} voiceId={form.voice_id} onVoiceChange={(id2) => setForm(f => ({ ...f, voice_id: id2 }))} accent={T.accent} />
                   <DurationField value={Number(form.target_duration)} onChange={(v) => setForm(f => ({ ...f, target_duration: v }))} options={DURATIONS} accent={T.accent} />
@@ -318,8 +367,8 @@ export default function CampaignDetail() {
                 </div>
               </div>
 
-              <div>
-                <div style={sectionHead}>Publishing</div>
+              <div style={panel}>
+                <SectionHeader n={4} title="Publishing" subtitle="Control how your content is published" />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
                   <div><span style={lbl}>Privacy</span>
                     <select style={fieldStyle} value={form.privacy} onChange={e => setForm(f => ({ ...f, privacy: e.target.value }))}>
@@ -333,11 +382,72 @@ export default function CampaignDetail() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
                 <button onClick={save} disabled={saving} style={btn(T.accent)}>{saving ? "Saving…" : "Save settings"}</button>
                 <button onClick={() => act("topics/skip-next")} disabled={busy} style={btn("#3a3a52")}>Skip next topic</button>
                 {msg && <span style={{ fontSize: 12.5, fontWeight: 600, color: msg.ok ? "#22c55e" : "#f87171" }}>{msg.text}</span>}
               </div>
+              </div>
+             </div>
+
+             <aside style={{ flex: "1 1 290px", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+              <div style={panel}>
+                <div style={panelHead}>Activity</div>
+                {(data.events || []).length === 0
+                  ? <div style={{ fontSize: 12.5, color: T.faint }}>No activity yet.</div>
+                  : (data.events || []).slice(0, 6).map(e => (
+                    <div key={e.id} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "7px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: POST_COLOR[e.status] || (e.status === "ok" ? "#22c55e" : e.status === "fail" ? "#f87171" : "#8896a8") }} />
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: T.text, textTransform: "capitalize" }}>{e.action}</span>
+                        {e.message && <span style={{ display: "block", fontSize: 11.5, color: T.muted, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.message}</span>}
+                      </span>
+                    </div>
+                  ))}
+                {(data.events || []).length > 0 && (
+                  <button onClick={() => setTab("activity")} style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>View full activity</button>
+                )}
+              </div>
+
+              <div style={panel}>
+                <div style={panelHead}>Upcoming Posts <span style={{ color: T.faint, fontWeight: 600 }}>· {data.queued ?? 0}</span></div>
+                {(data.upcomingTopics || []).length === 0
+                  ? <div style={{ fontSize: 12.5, color: T.faint }}>No topics queued yet.</div>
+                  : (data.upcomingTopics || []).slice(0, 6).map(t => (
+                    <div key={t.id} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "8px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                      <span style={{ flexShrink: 0, marginTop: 1, fontSize: 13 }}>📅</span>
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: "block", fontSize: 12.5, color: T.text, lineHeight: 1.35 }}>{t.title}</span>
+                        {t.niche && <span style={{ display: "block", fontSize: 11, color: T.faint, marginTop: 2 }}>{t.niche}</span>}
+                      </span>
+                    </div>
+                  ))}
+                {(data.upcomingTopics || []).length > 0 && (
+                  <button onClick={() => setTab("queued")} style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>View all queued</button>
+                )}
+              </div>
+             </aside>
+            </div>
+          )}
+
+          {/* ── Queued tab ── */}
+          {tab === "queued" && (
+            <div style={panel}>
+              <div style={panelHead}>Queued topics <span style={{ color: T.faint, fontWeight: 600 }}>· {data.queued ?? 0}</span></div>
+              {(data.upcomingTopics || []).length === 0
+                ? <div style={{ fontSize: 12.5, color: T.faint }}>No queued topics to show.</div>
+                : (data.upcomingTopics || []).map((t, i) => (
+                  <div key={t.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "11px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                    <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, background: "rgba(124,92,252,0.14)", color: "#a78bfa", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13.5, color: T.text, lineHeight: 1.4 }}>{t.title}</div>
+                      {t.niche && <div style={{ fontSize: 11.5, color: T.faint, marginTop: 2 }}>{t.niche}</div>}
+                    </div>
+                  </div>
+                ))}
+              {(data.queued ?? 0) > (data.upcomingTopics || []).length && (
+                <div style={{ fontSize: 11.5, color: T.faint, marginTop: 12 }}>Showing {(data.upcomingTopics || []).length} of {data.queued} — the rest refill as topics are posted.</div>
+              )}
             </div>
           )}
 

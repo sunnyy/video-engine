@@ -22,6 +22,12 @@ const Icons = {
       <path d="M9 21V12h6v9"/>
     </svg>
   ),
+  create: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/>
+      <path d="M18.5 15l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8.8-1.9z"/>
+    </svg>
+  ),
   brand: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="13.5" cy="6.5" r="1.2"/><circle cx="17.5" cy="10.5" r="1.2"/>
@@ -235,19 +241,24 @@ function NavItem({ icon, label, sub, to, href, active, soon }) {
 function IconBtn({ icon, label, to, href, onClick, active, locked }) {
   const [hov, setHov] = useState(false);
   const style = {
-    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-    padding: "9px 4px", borderRadius: 10, cursor: "pointer", gap: 5, width: "100%",
+    display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "flex-start",
+    padding: "10px 12px", borderRadius: 10, cursor: "pointer", gap: 12, width: "100%",
     background: active ? "rgba(124,92,252,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
-    color: active ? "#a78bfa" : hov ? "#d0d0e8" : "#6e6e88",
+    color: active ? "#a78bfa" : hov ? "#d0d0e8" : "#8b8ba0",
     transition: "all 0.15s", textDecoration: "none", border: "none", fontFamily: "inherit", boxSizing: "border-box",
   };
   const inner = (
     <>
-      <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+      <span style={{ width: 20, height: 20, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {icon}
-        {locked && <span title="Pro & Agency" style={{ position: "absolute", top: -7, right: -9, fontSize: 9, lineHeight: 1 }}>🔒</span>}
       </span>
-      <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "center", width: "100%" }}>{label}</span>
+      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 15.5, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "left" }}>{label}</span>
+      {locked && (
+        <svg aria-label="Pro & Agency" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f5c518" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.9 }}>
+          <rect x="4" y="11" width="16" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      )}
     </>
   );
   const events = { onMouseEnter: () => setHov(true), onMouseLeave: () => setHov(false), style };
@@ -284,15 +295,15 @@ function FlyoutGroup({ icon, label, active, children }) {
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
         style={{
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          padding: "9px 4px", borderRadius: 10, cursor: "pointer", gap: 5, width: "100%",
+          display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "flex-start",
+          padding: "10px 12px", borderRadius: 10, cursor: "pointer", gap: 12, width: "100%",
           background: active || open ? "rgba(124,92,252,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
-          color: active || open ? "#a78bfa" : hov ? "#d0d0e8" : "#6e6e88",
+          color: active || open ? "#a78bfa" : hov ? "#d0d0e8" : "#8b8ba0",
           transition: "all 0.15s", fontFamily: "inherit", boxSizing: "border-box",
         }}
       >
-        <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
-        <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "center", width: "100%" }}>{label}</span>
+        <span style={{ width: 20, height: 20, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
+        <span style={{ fontSize: 15.5, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "left" }}>{label}</span>
       </div>
 
       {open && createPortal(
@@ -371,14 +382,14 @@ function NotificationsBell() {
         onClick={toggle}
         onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
         style={{
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          padding: "9px 4px", borderRadius: 10, cursor: "pointer", gap: 5, width: "100%",
+          display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "flex-start",
+          padding: "10px 12px", borderRadius: 10, cursor: "pointer", gap: 12, width: "100%",
           background: open ? "rgba(124,92,252,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
-          color: open ? "#a78bfa" : hov ? "#d0d0e8" : "#6e6e88",
+          color: open ? "#a78bfa" : hov ? "#d0d0e8" : "#8b8ba0",
           transition: "all 0.15s", border: "none", fontFamily: "inherit", boxSizing: "border-box", position: "relative",
         }}
       >
-        <span style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+        <span style={{ width: 20, height: 20, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
           {Icons.bell}
           {unread > 0 && (
             <span style={{ position: "absolute", top: -5, right: -7, minWidth: 15, height: 15, padding: "0 4px", borderRadius: 8, background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily: "'JetBrains Mono',monospace" }}>
@@ -386,7 +397,7 @@ function NotificationsBell() {
             </span>
           )}
         </span>
-        <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "center", width: "100%" }}>Alerts</span>
+        <span style={{ fontSize: 15.5, fontWeight: 500, fontFamily: "'Outfit',sans-serif", letterSpacing: "0.01em", textAlign: "left" }}>Alerts</span>
       </button>
 
       {open && createPortal(
@@ -500,54 +511,60 @@ export default function AppLayout({ children }) {
         {/* ── Narrow sidebar ── */}
         <aside
           className="flex flex-col shrink-0 border-r"
-          style={{ width: 96, borderColor: "rgba(255,255,255,0.06)", background: "#13131e" }}
+          style={{ width: 172, borderColor: "rgba(255,255,255,0.06)", background: "#13131e" }}
         >
           {/* Logo */}
-          <Link to="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 6px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)", textDecoration: "none" }}>
-            <img src="/assets/images/favicon.png" alt="Vidquence" style={{ height: 56, width: "auto" }} />
+          <Link to="/" title="Home" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 18px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", textDecoration: "none" }}>
+            <img src="/assets/images/logo-v.png" alt="Vidquence" style={{ height: 100, width: "auto" }} />
           </Link>
 
           {/* Top nav */}
-          <nav style={{ flex: 1, padding: "8px 6px", display: "flex", flexDirection: "column", gap: 2 }}>
-            <IconBtn icon={Icons.home} label="Home" to="/dashboard" active={path === "/dashboard"} />
+          <nav style={{ flex: 1, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 3 }}>
+            <IconBtn icon={Icons.create} label="Create" to="/dashboard" active={path === "/dashboard"} />
             <IconBtn icon={Icons.folder}  label="Projects" to="/projects" active={path === "/projects"} />
             <IconBtn icon={Icons.gallery} label="Explore"  to="/explore"  active={path === "/explore" || inImages || inAudio} />
             <IconBtn icon={Icons.autopilot} label="Automation" to="/automation" active={path === "/automation" || path.startsWith("/automation/")} locked={!isProPlus} />
-            <IconBtn icon={Icons.connections} label="Social Accounts" to="/connections" active={path === "/connections"} />
             <NotificationsBell />
-
-            {isAdmin && (
-              <>
-                <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
-                <IconBtn icon={Icons.admin} label="Admin" to="/admin" active={path === "/admin" || path.startsWith("/admin/")} />
-              </>
-            )}
           </nav>
 
           {/* Bottom: credits + account + signout */}
-          <div style={{ padding: "6px 6px 10px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ padding: "10px 12px 12px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 3 }}>
+            {isAdmin && (
+              <IconBtn icon={Icons.admin} label="Admin" to="/admin" active={path === "/admin" || path.startsWith("/admin/")} />
+            )}
+
             {/* Credits */}
             <button
               onClick={() => navigate("/credits")}
               style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, width: "100%" }}
             >
               <div style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                padding: "8px 4px", borderRadius: 10,
-                background: balance !== null && balance < 10 ? "rgba(249,115,22,0.1)" : "rgba(124,92,252,0.1)",
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 12px", borderRadius: 10,
+                background: balance !== null && balance < 10
+                  ? "linear-gradient(135deg, rgba(249,115,22,0.28), rgba(249,115,22,0.06))"
+                  : "linear-gradient(135deg, rgba(124,92,252,0.30), rgba(124,92,252,0.06))",
+                border: `1px solid ${balance !== null && balance < 10 ? "rgba(249,115,22,0.32)" : "rgba(124,92,252,0.32)"}`,
               }}>
-                <span style={{ fontSize: 14, lineHeight: 1 }}>⚡</span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'JetBrains Mono',monospace" }}>
-                  {balance ?? "—"}
-                </span>
+                <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>⚡</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.1 }}>
+                    {balance ?? "—"}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#9a9ab0", fontFamily: "'Outfit',sans-serif", lineHeight: 1 }}>Credits</span>
+                </div>
               </div>
             </button>
 
+            {/* TEMP preview — restore condition: !isAdmin && !isProPlus */}
+            {true && (
+              <a href="/#pricing" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, padding: "10px 12px", borderRadius: 10, background: "linear-gradient(135deg, #f5c518, #f97316)", color: "#0b0b12", fontWeight: 700, fontSize: 13.5, fontFamily: "'Outfit',sans-serif", textDecoration: "none" }}>
+                <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>{Icons.star}</span> Upgrade
+              </a>
+            )}
+
             <FlyoutGroup icon={Icons.settings} label="Account" active={inAccount}>
-              <NavItem icon={Icons.star}     label="Upgrade"  href="/#pricing" active={false} />
               <NavItem icon={Icons.gift}     label="Invite & Earn" to="/invite" active={path === "/invite"} />
-              <NavItem icon={Icons.brand}    label="Brand Kit" to="/brand-kit" active={path === "/brand-kit"} />
-              <NavItem icon={Icons.credits}  label="Credits"  to="/credits"    active={path === "/credits"} />
               <NavItem icon={Icons.settings} label="Settings" to="/settings"   active={path === "/settings"} />
               <NavItem icon={Icons.support}  label="Help & Support" to="/support" active={path === "/support"} />
               <NavItem icon={Icons.message}  label="Feedback" to="/feedback"   active={path === "/feedback"} />

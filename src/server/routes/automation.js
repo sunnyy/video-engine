@@ -8,7 +8,7 @@ import { requireAuth, requireAdmin, supabaseAdmin } from "../middleware/shared.j
 import {
   listCampaigns, listAllCampaigns, getCampaign, getCampaignForUser, createCampaign, updateCampaign, setCampaignStatus, deleteCampaign,
 } from "../services/automation/campaigns.js";
-import { ensureTopics, getQueuedCount, skipOldestQueued, clearQueuedTopics } from "../services/automation/topics.js";
+import { ensureTopics, getQueuedCount, skipOldestQueued, clearQueuedTopics, listQueuedTopics } from "../services/automation/topics.js";
 import { listCampaignEvents, logEvent } from "../services/automation/events.js";
 import { enqueue, cancelCampaignJobs, cancelJob, isJobLive } from "../jobs/queue.js";
 import { requireProPlus } from "../middleware/planGate.js";
@@ -104,6 +104,7 @@ router.get("/campaigns/:id", requireAuth, async (req, res) => {
     res.json({
       campaign, active, scheduled, posts: posts || [],
       queued: await getQueuedCount(campaign.id),
+      upcomingTopics: await listQueuedTopics(campaign.id, 50),
       events: await listCampaignEvents(campaign.id, 40),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -318,6 +319,7 @@ router.get("/admin/campaigns/:id", requireAuth, requireAdmin, async (req, res) =
     res.json({
       campaign, active, scheduled, posts: posts || [],
       queued: await getQueuedCount(campaign.id),
+      upcomingTopics: await listQueuedTopics(campaign.id, 50),
       events: await listCampaignEvents(campaign.id, 40),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
