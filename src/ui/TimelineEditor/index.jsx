@@ -14,6 +14,16 @@ export default function TimelineEditor() {
   const fullscreenRef  = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // On phones the editor becomes a preview/export surface: panels + timeline are hidden
+  // and the canvas is locked (Preview handles the player bar + lock overlay).
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const hidePanels = isFullscreen || isMobile;
+
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onChange);
@@ -171,11 +181,18 @@ export default function TimelineEditor() {
     >
       <TopBar />
 
+      {/* Mobile notice — editing is desktop-only; here it's preview + export/publish */}
+      {isMobile && (
+        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "6px 14px", background: "rgba(245,197,24,0.08)", borderBottom: "1px solid rgba(245,197,24,0.15)", color: "#C2AF72", fontSize: 10.5, lineHeight: 1.3, textAlign: "center" }}>
+          <span>Editing is available on desktop. On mobile you can preview, export &amp; publish.</span>
+        </div>
+      )}
+
       {/* Main body below the top bar */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-        {/* Left panel — hidden when fullscreen */}
-        {!isFullscreen && <LeftPanel />}
+        {/* Left panel — hidden when fullscreen or on mobile */}
+        {!hidePanels && <LeftPanel />}
 
         {/* Fullscreen wrapper — contains canvas + properties panel.
             This is the element that goes fullscreen so both remain visible. */}
@@ -193,8 +210,8 @@ export default function TimelineEditor() {
           <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
             <Preview fullscreenRef={fullscreenRef} />
 
-            {/* Drag handle — hidden when fullscreen */}
-            {!isFullscreen && (
+            {/* Drag handle — hidden when fullscreen or on mobile */}
+            {!hidePanels && (
               <div
                 ref={dragRef}
                 onMouseDown={onDividerMouseDown}
@@ -213,8 +230,8 @@ export default function TimelineEditor() {
               </div>
             )}
 
-            {/* Timeline — hidden when fullscreen */}
-            {!isFullscreen && (
+            {/* Timeline — hidden when fullscreen or on mobile */}
+            {!hidePanels && (
               <div style={{ height: timelineHeight, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <TimelineToolbar />
                 <Timeline />
@@ -222,8 +239,8 @@ export default function TimelineEditor() {
             )}
           </div>
 
-          {/* Right column: properties panel, full height */}
-          <PropertiesPanel />
+          {/* Right column: properties panel — hidden when fullscreen or on mobile */}
+          {!hidePanels && <PropertiesPanel />}
         </div>
 
       </div>

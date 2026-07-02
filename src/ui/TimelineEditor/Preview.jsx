@@ -1445,6 +1445,7 @@ export default function Preview({ fullscreenRef }) {
   const toggleLayerSelection = useTimelineStore((s) => s.toggleLayerSelection);
   const setCurrentTime = useTimelineStore((s) => s.setCurrentTime);
   const setIsPlaying   = useTimelineStore((s) => s.setIsPlaying);
+  const duration       = useTimelineStore((s) => s.duration);
 
   const containerRef = useRef(null);
   const [scale, setScale]           = useState(1);
@@ -1461,6 +1462,15 @@ export default function Preview({ fullscreenRef }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Mobile = simplified player: editing is locked and only playback controls show.
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const fmtTime = (s) => { s = Math.max(0, s || 0); const m = Math.floor(s / 60); const ss = Math.floor(s % 60); return `${m}:${String(ss).padStart(2, "0")}`; };
 
   const ZOOM_STEP = 0.2;
   const clampZoom = (z) => Math.max(0.15, Math.min(6, z));
@@ -1856,7 +1866,8 @@ export default function Preview({ fullscreenRef }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
 
-      {/* ── Shortcuts toolbar ─────────────────────────────────────────────── */}
+      {/* ── Shortcuts toolbar (desktop only) ──────────────────────────────── */}
+      {!isMobile && (
       <div style={{
         display: "flex", alignItems: "center", padding: "5px 12px",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -1902,6 +1913,7 @@ export default function Preview({ fullscreenRef }) {
           >All Shortcuts</button>
         </div>
       </div>
+      )}
 
       {/* ── Canvas area (fullscreened on F / button) ───────────────────────── */}
     <div
@@ -1920,7 +1932,8 @@ export default function Preview({ fullscreenRef }) {
       }}
       onMouseDown={handleContainerMouseDown}
     >
-      {/* Fullscreen toggle */}
+      {/* Fullscreen toggle (desktop only — mobile has it in the player bar) */}
+      {!isMobile && (
       <button
         onClick={toggleFullscreen}
         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
@@ -1955,6 +1968,7 @@ export default function Preview({ fullscreenRef }) {
           </svg>
         )}
       </button>
+      )}
 
       {audioLayers.map((layer) => (
         <AudioLayerEl
@@ -2078,7 +2092,46 @@ export default function Preview({ fullscreenRef }) {
           }}
         />
       </div>
+
+      {/* Mobile lock overlay — swallows canvas taps so layers can't be selected/dragged;
+          a tap toggles play/pause, turning the canvas into a simple player surface. */}
+      {isMobile && (
+        <div
+          onClick={() => setIsPlaying(!isPlaying)}
+          style={{ position: "absolute", inset: 0, zIndex: 80, background: "transparent", cursor: "pointer" }}
+          aria-label="Preview (editing is disabled on mobile)"
+        />
+      )}
     </div>
+
+    {/* Mobile player bar — play/pause, scrubber, time, fullscreen */}
+    {isMobile && (
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px calc(10px + env(safe-area-inset-bottom))", background: "#0d0d18", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <button
+          onClick={() => setIsPlaying(!isPlaying)}
+          aria-label={isPlaying ? "Pause" : "Play"}
+          style={{ flexShrink: 0, width: 40, height: 40, borderRadius: "50%", border: "none", cursor: "pointer", background: "#7c5cfc", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          {isPlaying
+            ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            : <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>}
+        </button>
+        <span style={{ fontSize: 11.5, color: "#9a9ab0", fontFamily: "monospace", flexShrink: 0, minWidth: 34 }}>{fmtTime(currentTime)}</span>
+        <input
+          type="range" min={0} max={duration || 0} step={0.01} value={Math.min(currentTime, duration || 0)}
+          onChange={(e) => { setIsPlaying(false); setCurrentTime(+e.target.value); }}
+          style={{ flex: 1, minWidth: 0, accentColor: "#7c5cfc" }}
+        />
+        <span style={{ fontSize: 11.5, color: "#9a9ab0", fontFamily: "monospace", flexShrink: 0, minWidth: 34 }}>{fmtTime(duration)}</span>
+        <button
+          onClick={toggleFullscreen}
+          aria-label="Fullscreen"
+          style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", background: "rgba(255,255,255,0.05)", color: "#e8e8f0", display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        </button>
+      </div>
+    )}
 
       {/* ── Shortcuts modal ────────────────────────────────────────────────── */}
       {showShortcuts && (

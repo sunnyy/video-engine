@@ -41,6 +41,14 @@ export default function TopBar() {
   const [showDownloads, setShowDownloads] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [showPubHistory, setShowPubHistory] = useState(false);
+
+  // Mobile = minimal top bar: Back + title + Export + Publish only (editing controls hidden).
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   // Durable publish status — the source of truth lives in the jobs table (server-side), so a
   // reloaded / reopened editor recomputes it instead of showing a fresh Publish button.
   const [pubStatus, setPubStatus] = useState(null); // { active, phase, progress, published, failed, total, last }
@@ -398,16 +406,17 @@ export default function TopBar() {
           outline: "none",
           padding: "5px 10px",
           borderRadius: 6,
-          maxWidth: 220,
-          width: 200,
           marginLeft: 2,
-          flexShrink: 0,
+          ...(isMobile
+            ? { flex: 1, minWidth: 0, width: "auto" }
+            : { maxWidth: 220, width: 200, flexShrink: 0 }),
         }}
         onMouseOver={(e) => (e.target.style.background = "rgba(255,255,255,0.06)")}
         onMouseOut={(e) => (e.target.style.background = "transparent")}
       />
 
       {/* Delete this project (permanent, with confirmation) — red outline, like Publish */}
+      {!isMobile && (
       <button
         onClick={handleDeleteProject}
         disabled={deleting}
@@ -421,9 +430,11 @@ export default function TopBar() {
       >
         {deleting ? "Deleting…" : "🗑 Delete"}
       </button>
+      )}
 
-      {/* Center: editing guidance note */}
-      <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0, padding: "0 8px" }}>
+      {/* Center: editing guidance note (desktop only) */}
+      <div style={{ flex: isMobile ? "0 0 auto" : 1, display: "flex", justifyContent: "center", minWidth: 0, padding: isMobile ? 0 : "0 8px" }}>
+        {!isMobile && (
         <div
           title="Vidquence's editor is for light touch-ups — replacing images/video/audio, editing text, recoloring, and nudging timing. It isn't a full pro editor: big structural changes (deleting core layers, reworking the layout/scenes) can break how the video was composed. For major changes, regenerate the video instead."
           style={{
@@ -439,10 +450,12 @@ export default function TopBar() {
             Editing is best for light edits — swap media, tweak text, or change colors. Heavy restructuring may break the video.
           </span>
         </div>
+        )}
       </div>
 
       {/* Right: controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {!isMobile && (
         <button
           style={_history.length ? btn : btnDisabled}
           onClick={undo}
@@ -451,6 +464,8 @@ export default function TopBar() {
         >
           ↩ Undo
         </button>
+        )}
+        {!isMobile && (
         <button
           style={_future.length ? btn : btnDisabled}
           onClick={redo}
@@ -459,6 +474,7 @@ export default function TopBar() {
         >
           ↪ Redo
         </button>
+        )}
 
         {/* Orientation toggle hidden: a naive width/height swap mis-positions every scene
             (layouts are measured per-canvas). A real aspect switch = regenerate each scene.
@@ -487,7 +503,7 @@ export default function TopBar() {
         )}
 
         {/* Download dropdown — previous exports (versions), newest first */}
-        {renders.length > 0 && (
+        {!isMobile && renders.length > 0 && (
           <div style={{ position: "relative", marginLeft: 4 }}>
             <button
               onClick={() => setShowDownloads((v) => !v)}
@@ -557,7 +573,7 @@ export default function TopBar() {
 
         {/* Persistent "already published" chip + history — survives reload (server-derived), so a
             user who missed the toast still sees this video was posted, with links to the live posts. */}
-        {canPublish && !pubActive && lastPub && (
+        {!isMobile && canPublish && !pubActive && lastPub && (
           <div style={{ position: "relative", marginLeft: 4 }}>
             <button
               onClick={() => setShowPubHistory((v) => !v)}
