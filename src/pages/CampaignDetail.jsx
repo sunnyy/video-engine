@@ -195,7 +195,7 @@ export default function CampaignDetail() {
   return (
     <AppLayout>
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 1080, margin: "0 auto", padding: "28px 24px 80px" }}>
+        <div className="page-pad" style={{ maxWidth: 1080, margin: "0 auto", padding: "28px 24px 80px" }}>
 
           <button onClick={() => nav("/automation")} style={{ background: "none", border: "none", color: T.muted, fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 14, fontFamily: "inherit" }}>‹ Automation</button>
 
@@ -237,7 +237,7 @@ export default function CampaignDetail() {
           </div>
 
           {/* Overview strip — campaign pulse, always visible */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12, marginBottom: 24 }}>
+          <div className="rgrid-5" style={{ display: "grid", gap: 12, marginBottom: 24 }}>
             {[
               { label: "Status",        value: st.label,                          sub: c.status === "active" ? "Campaign is running" : c.status === "paused" ? "Campaign paused" : "Not running", color: st.color,                                Icon: Activity,     tint: st.color,  spark: true },
               { label: "Posts / day",   value: c.posts_per_day || 1,              sub: "Posts every day",                                                                                     Icon: Send,         tint: T.accent,  spark: true },
@@ -324,7 +324,7 @@ export default function CampaignDetail() {
 
               <div style={panel}>
                 <SectionHeader n={1} title="Content" subtitle="What do you want to automate?" />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
+                <div className="rgrid-4" style={{ display: "grid", gap: "18px 16px" }}>
                   <div style={{ gridColumn: "span 2" }}><span style={lbl}>Niche(s) — comma separated</span><input style={fieldStyle} value={form.niches} onChange={e => setForm(f => ({ ...f, niches: e.target.value }))} placeholder="ai tools, productivity" /></div>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <span style={lbl}>Publish to</span>
@@ -347,7 +347,7 @@ export default function CampaignDetail() {
 
               <div style={panel}>
                 <SectionHeader n={2} title="Schedule" subtitle="When should we post?" />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
+                <div className="rgrid-4" style={{ display: "grid", gap: "18px 16px" }}>
                   <div><span style={lbl}>Posts / day</span>
                     <select style={fieldStyle} value={form.posts_per_day} onChange={e => setForm(f => ({ ...f, posts_per_day: e.target.value }))}>
                       {[1, 2, 3, 4, 5].map(n => <option key={n} value={n} style={opt}>{n}</option>)}
@@ -369,7 +369,7 @@ export default function CampaignDetail() {
 
               <div style={panel}>
                 <SectionHeader n={4} title="Publishing" subtitle="Control how your content is published" />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "18px 16px" }}>
+                <div className="rgrid-4" style={{ display: "grid", gap: "18px 16px" }}>
                   <div><span style={lbl}>Privacy</span>
                     <select style={fieldStyle} value={form.privacy} onChange={e => setForm(f => ({ ...f, privacy: e.target.value }))}>
                       <option value="public" style={opt}>Public</option><option value="unlisted" style={opt}>Unlisted</option><option value="private" style={opt}>Private</option>

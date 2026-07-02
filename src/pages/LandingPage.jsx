@@ -58,9 +58,18 @@ const CSS = `
   .nav-inner { max-width: var(--container); margin: 0 auto; padding: 0 40px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
   @media (max-width: 768px) { .nav-inner { padding: 0 20px; } }
   .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-  .nav-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .nav-right { display: flex; align-items: center; gap: 8px; }
   .nav-link { font-family: var(--font-body); font-size: 15px; color: var(--muted); text-decoration: none; padding: 7px 14px; border-radius: 6px; transition: color 0.2s; }
   .nav-link:hover { color: var(--text); }
+  .nav-burger { display: none; align-items: center; justify-content: center; width: 42px; height: 38px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 9px; color: var(--text); cursor: pointer; }
+  .nav-drawer { position: fixed; top: 60px; left: 0; right: 0; z-index: 199; background: rgba(15,14,26,0.98); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border2); padding: 12px 20px 18px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-drawer .nav-link { font-size: 16px; padding: 12px 8px; border-bottom: 1px solid var(--border2); }
+  .nav-drawer .btn-yellow { margin-top: 10px; width: 100%; }
+  @media (max-width: 768px) {
+    .nav-links { display: none !important; }
+    .nav-burger { display: inline-flex; }
+  }
+  @media (min-width: 769px) { .nav-drawer { display: none !important; } }
   .btn-yellow { font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #0F0E1A; background: var(--yellow); border: none; border-radius: 7px; padding: 9px 18px; cursor: pointer; transition: opacity 0.2s; }
   .btn-yellow:hover { opacity: 0.85; }
 
@@ -718,6 +727,7 @@ export default function LandingPage() {
   const [plans, setPlans] = useState([]);
   const [rate, setRate] = useState(FALLBACK_RATE);
   const [cycle, setCycle] = useState("annual");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     getSession()
@@ -785,24 +795,37 @@ export default function LandingPage() {
             <img src="/assets/images/logo.png" alt="Vidquence" style={{ height: 38, width: "auto" }} />
           </a>
           <div className="nav-right">
-            <a href="/about" className="nav-link">
-              About Us
-            </a>
-            <a href="#services" className="nav-link">
-              Services
-            </a>
-            <a href="#how" className="nav-link">
-              How It Works
-            </a>
-            <a href="#pricing" className="nav-link">
-              Pricing
-            </a>
-            <button className="btn-yellow" onClick={handleCTA}>
-              {session ? "Go to Dashboard" : "Get Started"}
+            <div className="nav-links" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <a href="/about" className="nav-link">About Us</a>
+              <a href="#services" className="nav-link">Services</a>
+              <a href="#how" className="nav-link">How It Works</a>
+              <a href="#pricing" className="nav-link">Pricing</a>
+              <button className="btn-yellow" onClick={handleCTA}>
+                {session ? "Go to Dashboard" : "Get Started"}
+              </button>
+            </div>
+            <button className="nav-burger" aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>
+              {menuOpen ? (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+              )}
             </button>
           </div>
         </div>
       </nav>
+
+      {menuOpen && (
+        <div className="nav-drawer">
+          <a href="/about" className="nav-link" onClick={() => setMenuOpen(false)}>About Us</a>
+          <a href="#services" className="nav-link" onClick={() => setMenuOpen(false)}>Services</a>
+          <a href="#how" className="nav-link" onClick={() => setMenuOpen(false)}>How It Works</a>
+          <a href="#pricing" className="nav-link" onClick={() => setMenuOpen(false)}>Pricing</a>
+          <button className="btn-yellow" onClick={() => { setMenuOpen(false); handleCTA(); }}>
+            {session ? "Go to Dashboard" : "Get Started"}
+          </button>
+        </div>
+      )}
 
       {/* HERO */}
       <section className="hero">
@@ -936,7 +959,7 @@ export default function LandingPage() {
             return (
               <div data-reveal style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 16 }}>
                 {/* Bento mosaic — 4 cols, mixed portrait (tall) + landscape (wide) + 1 feature */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gridAutoRows: 240, gridAutoFlow: "row dense", gap: 14 }}>
+                <div className="bento-grid">
                   {VIDEO.map((svc) => (
                     <div key={svc.name} data-service={svc.name} onClick={() => handleCardClick(svc.route)} {...hov(svc.accent)}
                       style={tile(svc.image, { gridColumn: `span ${svc.cs}`, gridRow: `span ${svc.rs}`, padding: svc.feature ? "28px 30px" : "16px 16px" })}>
@@ -961,7 +984,7 @@ export default function LandingPage() {
                 <div style={{ marginTop: 8, fontSize: 11, letterSpacing: 2, color: "var(--dim)", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
                   Plus image &amp; audio tools
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14 }}>
+                <div className="extras-grid">
                   {EXTRAS.map((svc) => (
                     <div key={svc.name} data-service={svc.name} onClick={() => handleCardClick(svc.route)} {...hov(svc.accent)} style={tile(svc.image, { aspectRatio: "1 / 1", padding: "12px 12px" })}>
                       {ov()}

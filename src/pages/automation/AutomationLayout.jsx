@@ -29,7 +29,7 @@ export default function AutomationLayout() {
   return (
     <AppLayout>
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 40px 80px" }}>
+        <div className="page-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 40px 80px" }}>
           {/* Hero */}
           <div style={{ position: "relative", display: "flex", gap: 24, alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 22 }}>
             <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flex: "1 1 420px", minWidth: 0 }}>

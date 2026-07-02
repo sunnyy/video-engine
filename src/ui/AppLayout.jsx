@@ -482,6 +482,31 @@ function MobileBanner() {
   );
 }
 
+/* ── Mobile bottom-nav pieces (rendered only < 768px via CSS) ── */
+const Dots = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+);
+
+function MobileTab({ icon, label, active, onClick }) {
+  return (
+    <button onClick={onClick}
+      style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, background: "none", border: "none", cursor: "pointer", padding: "7px 2px", color: active ? "#a78bfa" : "#8890a4", fontFamily: "'Outfit',sans-serif" }}>
+      <span style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
+      <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>{label}</span>
+    </button>
+  );
+}
+
+function SheetRow({ icon, label, onClick, danger }) {
+  return (
+    <button onClick={onClick}
+      style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", padding: "13px 16px", background: "none", border: "none", borderRadius: 12, cursor: "pointer", color: danger ? "#f87171" : "#e8e8f0", fontSize: 15, fontFamily: "'Outfit',sans-serif", textAlign: "left" }}>
+      <span style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: danger ? "#f87171" : "#9a9ab0" }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+    </button>
+  );
+}
+
 export default function AppLayout({ children }) {
   const location  = useLocation();
   const navigate  = useNavigate();
@@ -490,6 +515,7 @@ export default function AppLayout({ children }) {
   const path = location.pathname;
   const [isAdmin, setIsAdmin] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
 // Video service nav is hidden — those live in the Dashboard chatbox now. Image/Audio
   // tools live under Explore; user projects under Projects. (Routes/pages kept intact.)
@@ -510,9 +536,9 @@ export default function AppLayout({ children }) {
       <style>{`@keyframes flyoutIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }`}</style>
       <div className="flex h-screen overflow-hidden text-[#e8e8f0]" style={{ background: "#0b0b10" }}>
 
-        {/* ── Narrow sidebar ── */}
+        {/* ── Narrow sidebar (hidden on mobile; bottom-nav takes over) ── */}
         <aside
-          className="flex flex-col shrink-0 border-r"
+          className="app-sidebar flex flex-col shrink-0 border-r"
           style={{ width: 172, borderColor: "rgba(255,255,255,0.06)", background: "#13131e" }}
         >
           {/* Logo */}
@@ -584,12 +610,66 @@ export default function AppLayout({ children }) {
         </aside>
 
         {/* ── Main content ── */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="app-main flex-1 flex flex-col min-w-0">
           <SystemStatusBanner />
           {children}
         </div>
 
       </div>
+
+      {/* ── Mobile bottom nav (< 768px) ── */}
+      <nav className="app-bottomnav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: 60, zIndex: 60, display: "none", alignItems: "stretch", background: "#13131e", borderTop: "1px solid rgba(255,255,255,0.08)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <MobileTab icon={Icons.create}    label="Create"     active={path === "/dashboard"} onClick={() => navigate("/dashboard")} />
+        <MobileTab icon={Icons.folder}    label="Projects"   active={path === "/projects"} onClick={() => navigate("/projects")} />
+        <MobileTab icon={Icons.gallery}   label="Explore"    active={path === "/explore" || inImages || inAudio} onClick={() => navigate("/explore")} />
+        <MobileTab icon={Icons.autopilot} label="Automation" active={path === "/automation" || path.startsWith("/automation/")} onClick={() => navigate("/automation")} />
+        <MobileTab icon={Dots}            label="More"       active={moreOpen} onClick={() => setMoreOpen(true)} />
+      </nav>
+
+      {/* ── Mobile "More" sheet ── */}
+      {moreOpen && (
+        <div onClick={() => setMoreOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(6,7,12,0.6)", display: "flex", alignItems: "flex-end" }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ width: "100%", background: "#13131e", borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTop: "1px solid rgba(255,255,255,0.1)", padding: "10px 10px calc(16px + env(safe-area-inset-bottom))", maxHeight: "80vh", overflowY: "auto" }}>
+            <div style={{ width: 38, height: 4, borderRadius: 99, background: "rgba(255,255,255,0.18)", margin: "6px auto 12px" }} />
+
+            {/* Credits */}
+            <button onClick={() => { setMoreOpen(false); navigate("/credits"); }}
+              style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 16px", marginBottom: 6, borderRadius: 12, cursor: "pointer",
+                background: balance !== null && balance < 10 ? "linear-gradient(135deg, rgba(249,115,22,0.28), rgba(249,115,22,0.06))" : "linear-gradient(135deg, rgba(124,92,252,0.30), rgba(124,92,252,0.06))",
+                border: `1px solid ${balance !== null && balance < 10 ? "rgba(249,115,22,0.32)" : "rgba(124,92,252,0.32)"}` }}>
+              <span style={{ fontSize: 20 }}>⚡</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: balance !== null && balance < 10 ? "#f97316" : "#a78bfa", fontFamily: "'JetBrains Mono',monospace" }}>{balance ?? "—"}</span>
+              <span style={{ fontSize: 14, color: "#9a9ab0", flex: 1 }}>Credits</span>
+            </button>
+
+            {(!isProPlus || isAdmin) && (
+              <button onClick={() => { setMoreOpen(false); setUpgradeOpen(true); }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "12px", marginBottom: 8, borderRadius: 12, border: "none", cursor: "pointer", background: "linear-gradient(135deg, #f5c518, #f97316)", color: "#0b0b12", fontWeight: 800, fontSize: 15, fontFamily: "'Outfit',sans-serif" }}>
+                <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>{Icons.star}</span> Upgrade
+              </button>
+            )}
+
+            {isAdmin && <SheetRow icon={Icons.admin} label="Admin" onClick={() => { setMoreOpen(false); navigate("/admin"); }} />}
+            <SheetRow icon={Icons.gift}     label="Invite & Earn"   onClick={() => { setMoreOpen(false); navigate("/invite"); }} />
+            <SheetRow icon={Icons.settings} label="Settings"        onClick={() => { setMoreOpen(false); navigate("/settings"); }} />
+            <SheetRow icon={Icons.support}  label="Help & Support"  onClick={() => { setMoreOpen(false); navigate("/support"); }} />
+            <SheetRow icon={Icons.message}  label="Feedback"        onClick={() => { setMoreOpen(false); navigate("/feedback"); }} />
+            <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "6px 12px" }} />
+            <SheetRow icon={Icons.signout}  label="Logout" danger   onClick={async () => { await signOut(); window.location.href = "/"; }} />
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @media (max-width: 767px){
+          .app-sidebar{ display: none !important; }
+          .app-main{ padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+          .app-bottomnav{ display: flex !important; }
+        }
+      `}</style>
+
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </>
   );

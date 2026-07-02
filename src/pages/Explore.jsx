@@ -149,7 +149,7 @@ export default function Explore() {
   return (
     <AppLayout>
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "36px 40px 90px" }}>
+        <div className="page-pad" style={{ maxWidth: 1180, margin: "0 auto", padding: "36px 40px 90px" }}>
 
           {/* Hero */}
           <div style={{ position: "relative", display: "flex", gap: 24, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 40 }}>

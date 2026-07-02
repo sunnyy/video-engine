@@ -42,3 +42,30 @@ input:-webkit-autofill:focus {
   align-items: center;
   justify-content: center;
 }
+
+/* ── Responsive helpers for app pages (paired with the mobile bottom-nav shell) ── */
+/* Trim the big desktop side padding on phones so content isn't crushed. */
+@media (max-width: 767px) {
+  .page-pad { padding-left: 16px !important; padding-right: 16px !important; }
+}
+/* Projects card grid: fixed 6-up on desktop, steps down on smaller screens. */
+.proj-grid { display: grid; gap: 16px; grid-template-columns: repeat(6, 1fr); }
+@media (max-width: 1300px) { .proj-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 900px)  { .proj-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px)  { .proj-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+
+/* Auto-collapsing grids (stat cards, field rows). Columns set here, gap stays inline. */
+.rgrid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.rgrid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rgrid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .rgrid-5, .rgrid-4, .rgrid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .rgrid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rgrid-4, .rgrid-3, .rgrid-2 { grid-template-columns: 1fr; } }
+
+/* Landing services showcase: bento mosaic + extras row. */
+.bento-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 240px; grid-auto-flow: row dense; gap: 14px; }
+@media (max-width: 900px) { .bento-grid { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 180px; } }
+@media (max-width: 560px) { .bento-grid { grid-template-columns: 1fr; grid-auto-rows: 150px; } }
+.extras-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+@media (max-width: 900px) { .extras-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 560px) { .extras-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; } }

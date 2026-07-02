@@ -14,7 +14,7 @@ export default function LegalLayout({ title, lastUpdated, children }) {
       <MarketingNav />
 
       {/* Content */}
-      <div style={{ maxWidth: 800, margin: "0 auto", padding: "60px 32px 120px" }}>
+      <div className="page-pad" style={{ maxWidth: 800, margin: "0 auto", padding: "60px 32px 120px" }}>
         <div style={{ marginBottom: 48 }}>
           <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#f5c518", marginBottom: 12 }}>Legal</div>
           <h1 style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, lineHeight: 1.1, marginBottom: 12, color: "#fff" }}>{title}</h1>

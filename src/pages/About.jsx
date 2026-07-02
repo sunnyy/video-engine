@@ -42,7 +42,7 @@ export default function About() {
       <MarketingNav active="/about" />
 
       {/* Content */}
-      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "64px 40px 100px" }}>
+      <div className="page-pad" style={{ maxWidth: 1160, margin: "0 auto", padding: "64px 40px 100px" }}>
 
         {/* Hero */}
         <section style={{ marginBottom: 96 }}>
@@ -97,7 +97,7 @@ export default function About() {
         {/* What We Do */}
         <section style={{ marginBottom: 96 }}>
           <SectionLabel>The Studio</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          <div className="rgrid-3" style={{ display: "grid", gap: 16 }}>
             {WHAT_WE_DO.map(item => (
               <div key={item.title} style={{
                 background: "#111118",
@@ -120,7 +120,7 @@ export default function About() {
         {/* Values */}
         <section style={{ marginBottom: 96 }}>
           <SectionLabel>Values</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+          <div className="rgrid-2" style={{ display: "grid", gap: 16 }}>
             {VALUES.map(v => (
               <div key={v.title} style={{
                 background: "#111118",

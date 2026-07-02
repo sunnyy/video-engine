@@ -198,7 +198,7 @@ export default function Projects() {
     <AppLayout>
       <style>{`@keyframes pv-spin { to { transform: rotate(360deg); } }`}</style>
       <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
-        <div style={{ padding: "40px 40px 80px" }}>
+        <div className="page-pad" style={{ padding: "40px 40px 80px" }}>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, fontFamily: "'Outfit',sans-serif", margin: "0 0 18px" }}>Your Projects</h1>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
@@ -245,7 +245,7 @@ export default function Projects() {
             </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16 }}>
+              <div className="proj-grid">
                 {shown.map(p => <Card key={p.id} project={p} />)}
               </div>
               {hasMore && (
