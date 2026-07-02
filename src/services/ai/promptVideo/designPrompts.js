@@ -102,6 +102,7 @@ Within that taste you have TOTAL freedom of form, and you MUST make each frame s
   const technical = `TECHNICAL CONSTRAINTS — the ONLY hard limits; everything else is yours:
 • Real HTML/CSS with flow / flex / grid / auto-sizing — a browser lays it out and we flatten it. Never hand-compute pixel coordinates.
 • Everything fits fully inside ${canvasW}×${canvasH}: nothing clipped or off the edge; a long line wraps or sizes down; smallest readable text ~26px.
+• SAFE MARGINS (this is posted to Shorts / Reels / TikTok, which cover the edges with their own UI): keep ALL text, logos, kickers, captions and key graphics within a safe box — pad ~${Math.round(canvasH*0.12)}px at the TOP, ~${Math.round(canvasH*0.18)}px at the BOTTOM, and ~${Math.round(canvasW*0.12)}px on the RIGHT (the like/share rail). A full-bleed background PHOTO/VIDEO/gradient may fill the whole frame, but never place a headline or any readable text in those top/bottom/right margins — it will be hidden behind the app's buttons.
 • Tag every MEANINGFUL element (layout wrappers don't need tags) — each becomes an animatable layer:
    data-role="headline|subhead|kicker|label|badge|stat-number|card|divider|glow|background|icon|decoration"
    data-layer="text|gradient|image|effect|decoration" · data-scene-element="hero|background|supporting|decoration"

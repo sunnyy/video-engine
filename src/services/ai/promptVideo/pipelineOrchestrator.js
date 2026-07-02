@@ -17,6 +17,7 @@
 
 import { supabaseAdmin }         from "../../../server/middleware/shared.js";
 import { simplifyTimelineKeyframes } from "../shared/motion.js";
+import { enforceSafeArea } from "../shared/safeArea.js";
 import { researchTopic }         from "./researcher.js";
 import { writeScript }           from "./scriptWriter.js";
 import { directVisuals }         from "./artDirector.js";
@@ -831,6 +832,10 @@ export async function runPromptPipeline(params, onStep) {
     visual_style: style?.id || null,
     visual_style_label: style?.label || null,
   };
+
+  // Keep readable text/icons out of the Shorts/Reels/TikTok UI zones (top/bottom/right); media
+  // stays full-bleed. Deterministic per-scene nudge — runs before keyframe simplification.
+  enforceSafeArea(finalTimeline);
 
   // Strip redundant keyframes (constant tracks, plain fades) — motion identical, far less bloat.
   simplifyTimelineKeyframes(finalTimeline);
