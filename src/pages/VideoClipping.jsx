@@ -19,10 +19,11 @@ const T = { bg: "#0a0a10", surface: "#13131c", border: "rgba(255,255,255,0.08)",
 
 const STEPS = ["Uploading & analyzing…", "Transcribing…", "Finding the best moments…", "Cutting your clips…", "Almost ready…"];
 
+// No rigid per-clip bands — the AI cuts on complete thoughts and picks each clip's natural length.
+// The only option is an optional platform CEILING (Shorts/Reels fit); "Auto" = full natural range.
 const LENGTH_PRESETS = [
-  { id: "short",    label: "Shorts (15–30s)", min: 15, max: 30 },
-  { id: "standard", label: "Standard (20–60s)", min: 20, max: 60 },
-  { id: "long",     label: "Long (45–90s)", min: 45, max: 90 },
+  { id: "auto",   label: "Auto — AI picks the best length", min: 15, max: 90 },
+  { id: "shorts", label: "Keep under 60s (Shorts/Reels)",   min: 12, max: 60 },
 ];
 
 const MAX_MIN = 90;
@@ -39,7 +40,7 @@ export default function VideoClipping() {
   const [duration, setDuration] = useState(0);
   const [tooLong, setTooLong] = useState(false);
   const [captionStyle, setStyle] = useState("wordBlaze");
-  const [lengthId, setLengthId] = useState("standard");
+  const [lengthId, setLengthId] = useState("auto");
   const [busy, setBusy] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState(null);
@@ -68,9 +69,9 @@ export default function VideoClipping() {
     setBusy(true); setError(null); setStepIdx(0); setClips(null);
     try {
       const { url, key } = await uploadClipSource(file);
-      const preset = LENGTH_PRESETS.find((p) => p.id === lengthId) || LENGTH_PRESETS[1];
+      const preset = LENGTH_PRESETS.find((p) => p.id === lengthId) || LENGTH_PRESETS[0];
       const result = await generateClips(
-        { videoUrl: url, sourceKey: key, captionStyle, clipLenMin: preset.min, clipLenMax: preset.max },
+        { videoUrl: url, sourceKey: key, captionStyle, clipLenMin: preset.min, clipLenMax: preset.max, autoLength: true },
         () => setStepIdx((i) => Math.min(STEPS.length - 1, i + 1)),
       );
       fetchCredits?.();

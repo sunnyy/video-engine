@@ -81,7 +81,7 @@ async function pool(items, limit, worker) {
 export async function runClippingPipeline(params, onStep, onCharge) {
   const {
     videoUrl, sourceKey = null, userId,
-    captionStyle = "wordBlaze", clipLenMin = 20, clipLenMax = 60, language = "en",
+    captionStyle = "wordBlaze", clipLenMin = 20, clipLenMax = 60, autoLength = false, language = "en",
   } = params;
   const step = (msg) => { console.log(`[video-clipping] ${msg}`); onStep?.({ step: msg }); };
   if (!videoUrl) throw new Error("no video provided");
@@ -132,7 +132,7 @@ export async function runClippingPipeline(params, onStep, onCharge) {
     // ── Select best moments ──
     step(CLIP_STATUS_STEPS[2]);
     const segments = segmentWords(words);
-    const picks = await selectClips(segments, { minLen: clipLenMin, maxLen: clipLenMax, maxClips: MAX_CLIPS, language: detectedLang });
+    const picks = await selectClips(segments, { minLen: clipLenMin, maxLen: clipLenMax, autoLength, maxClips: MAX_CLIPS, language: detectedLang });
     if (!picks.length) throw new Error("Couldn't find strong clip-worthy moments in this video.");
 
     // ── Cut + upload + build + save each clip (bounded concurrency) ──

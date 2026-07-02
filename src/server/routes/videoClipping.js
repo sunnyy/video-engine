@@ -21,6 +21,7 @@ router.post("/generate", requireAuth, requireProPlus("Video clipping"), async (r
     captionStyle = "wordBlaze",
     clipLenMin = 20,
     clipLenMax = 60,
+    autoLength = false,   // Auto: AI picks each clip's own natural length across the full range
     language = "en",
   } = req.body;
 
@@ -51,6 +52,7 @@ router.post("/generate", requireAuth, requireProPlus("Video clipping"), async (r
         captionStyle,
         clipLenMin: Math.max(10, Math.min(60, parseInt(clipLenMin, 10) || 20)),
         clipLenMax: Math.max(20, Math.min(90, parseInt(clipLenMax, 10) || 60)),
+        autoLength: !!autoLength,
         language,
       },
       ({ step }) => send({ step }),

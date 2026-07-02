@@ -21,7 +21,7 @@ const mmss = (s) => {
  * selectClips(segments, { minLen, maxLen, maxClips, language }) → [{ start, end, title, reason }]
  * segments: [{ start, end, spoken }] (from segmentWords). Returns clip windows in SECONDS.
  */
-export async function selectClips(segments, { minLen = 20, maxLen = 60, maxClips = 10, language = "en" } = {}) {
+export async function selectClips(segments, { minLen = 20, maxLen = 60, autoLength = false, maxClips = 10, language = "en" } = {}) {
   if (!segments?.length) return [];
 
   const lines = segments.map((s, i) => `#${i} [${mmss(s.start)}-${mmss(s.end)}] ${s.spoken}`).join("\n");
@@ -31,7 +31,9 @@ export async function selectClips(segments, { minLen = 20, maxLen = 60, maxClips
 RULES:
 - Each clip must be SELF-CONTAINED: a complete thought, story, tip, or insight that makes sense on its own without the rest of the video. Start on a strong hook; end on a satisfying or punchy beat. NEVER cut mid-sentence.
 - Prefer genuinely engaging moments: a surprising claim, a vivid story, a strong actionable tip, an emotional or funny beat, a quotable one-liner. SKIP intros, sponsor reads, filler, rambling, and dead air.
-- Target length ${minLen}-${maxLen} seconds.
+${autoLength
+  ? `- LENGTH IS YOURS PER CLIP — make each clip its OWN natural length (roughly ${minLen}-${maxLen}s): a punchy one-liner can be short, a story or full explanation can run longer. Do NOT force a uniform length; end exactly where the thought lands. Vary lengths across clips.`
+  : `- Target length ${minLen}-${maxLen} seconds.`}
 - Choose "start_index" and "end_index" from the numbered segments (inclusive, end_index >= start_index). Clips must NOT overlap.
 - Quality over quantity: return ONLY as many clips as are truly good, at most ${maxClips}. If the video has few strong moments, return few. Do not pad.
 - "title" and "reason" must be in ENGLISH/Latin script${language && language !== "en" ? ` (the speaker may talk in "${language}", but titles must be English/Latin)` : ""}.

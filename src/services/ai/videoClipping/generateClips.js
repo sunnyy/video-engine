@@ -15,12 +15,12 @@ export async function uploadClipSource(file) {
  * Streams SSE progress; resolves { clips, clipCount, sourceDuration }.
  */
 export async function generateClips(
-  { videoUrl, sourceKey = null, captionStyle = "wordBlaze", clipLenMin = 20, clipLenMax = 60, language = "en" },
+  { videoUrl, sourceKey = null, captionStyle = "wordBlaze", clipLenMin = 20, clipLenMax = 60, autoLength = false, language = "en" },
   onProgress,
 ) {
   const res = await serverFetch("/api/video-clipping/generate", {
     method: "POST",
-    body: JSON.stringify({ videoUrl, sourceKey, captionStyle, clipLenMin, clipLenMax, language }),
+    body: JSON.stringify({ videoUrl, sourceKey, captionStyle, clipLenMin, clipLenMax, autoLength, language }),
   });
 
   if (!res.ok && res.status !== 200) {
