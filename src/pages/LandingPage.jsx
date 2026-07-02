@@ -235,7 +235,9 @@ const CSS = `
   .plan-hot-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--yellow); color: #0F0E1A; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 5px 18px; border-radius: 100px; white-space: nowrap; z-index: 2; }
   .plan-pro { border-color: #7c5cfc !important; background: linear-gradient(180deg, rgba(124,92,252,0.10), rgba(17,17,24,0.98)) !important; box-shadow: 0 0 0 1px rgba(124,92,252,0.25) inset; }
   .plan-pro:hover { border-color: #7c5cfc !important; }
+  .plan-max { border-color: #f5c518 !important; }
   .plan-pro-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg,#a78bfa,#7c5cfc); color: #fff; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 5px 16px; border-radius: 100px; white-space: nowrap; z-index: 2; box-shadow: 0 4px 14px rgba(124,92,252,0.5); }
+  .plan-max-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg,#f5c518,#f97316); color: #0b0b10; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 5px 16px; border-radius: 100px; white-space: nowrap; z-index: 2; box-shadow: 0 4px 14px rgba(245,150,24,0.5); }
   .plan-credits-pill { display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; margin-top: 18px; padding: 9px 16px; border-radius: 999px; background: rgba(124,92,252,0.12); border: 1px solid rgba(124,92,252,0.3); }
   .plan-cta { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border-radius: 12px; cursor: pointer; font-family: var(--font-body); font-size: 15px; font-weight: 800; transition: transform 0.2s, opacity 0.2s; }
   .plan-cta-hot { background: linear-gradient(135deg,#f5c518,#f97316); color: #0b0b12; border: none; }
@@ -626,32 +628,43 @@ function VideoServicesList({ exclude = [] }) {
 // Pricing plans — display values (marketing-rounded). Styled to match the in-app Upgrade modal.
 const PRICING_PLANS = [
   {
-    slug: "starter", name: "Starter", desc: "For trying it out & light use.", Icon: Rocket, accent: "#38bdf8", popular: false,
+    slug: "starter", name: "Starter", desc: "For trying it out & light use.", Icon: Rocket, accent: "#14b8a6", popular: false,
     monthly: 29, annualPerMo: 24, annualBilled: "$290 billed annually · 17% off", credits: "600",
     excludeServices: ["video_clipping"],
     checks: ["Credit top-ups anytime"],
     crosses: ["Video clipping (long video → shorts)", "Automation & auto-publish to social"],
   },
   {
-    slug: "pro", name: "Pro", desc: "For creators, marketers & teams.", Icon: Crown, accent: "#f5c518", popular: true,
+    slug: "pro", name: "Pro", desc: "For creators, marketers & teams.", Icon: Crown, accent: "#7c5cfc", popular: true,
     monthly: 49, annualPerMo: 41, annualBilled: "$490 billed annually · 17% off", credits: "1,500",
     plusLabel: "Everything in Starter, plus:",
     checks: ["Video clipping (long video → shorts)", "Automation & auto-publish to social", "Credit top-ups anytime"],
   },
   {
-    slug: "max", name: "Max", desc: "For power users & high-volume output.", Icon: Users, accent: "#a855f7", popular: false,
+    slug: "max", name: "Max", desc: "For power users & high-volume output.", Icon: Users, accent: "#f5c518", popular: false,
     monthly: 99, annualPerMo: 83, annualBilled: "$990 billed annually · 17% off", credits: "4,000",
     plusLabel: "Everything in Pro, plus:",
-    checks: ["More credits for high-volume output", "Best value — lower cost per credit"],
+    checks: ["More credits for high-volume output", "Best value — lower cost per credit", "Credit top-ups anytime"],
   },
 ];
+
+// CTA gradient per plan — matches each card's border/accent colour.
+const CTA_STYLE = {
+  starter: { grad: "linear-gradient(135deg,#2dd4bf,#10b981)", text: "#053024" },
+  pro:     { grad: "linear-gradient(135deg,#a78bfa,#7c5cfc)", text: "#fff" },
+  max:     { grad: "linear-gradient(135deg,#f5c518,#f97316)", text: "#0b0b12" },
+};
 
 function PricingCard({ plan, cycle, onChoose }) {
   const { Icon, accent, popular } = plan;
   const annual = cycle === "annual";
+  const isMax = plan.slug === "max";
+  const cta = CTA_STYLE[plan.slug] || CTA_STYLE.starter;
   return (
-    <div className={`plan${popular ? " plan-pro" : ""}`} style={{ display: "flex", flexDirection: "column", ...(popular ? {} : { borderColor: `${accent}66` }) }}>
+    <div className={`plan${popular ? " plan-pro" : ""}${isMax ? " plan-max" : ""}`} style={{ display: "flex", flexDirection: "column",
+      ...(popular || isMax ? {} : { borderColor: `${accent}66` }) }}>
       {popular && <div className="plan-pro-badge">★ Most Popular</div>}
+      {isMax && <div className="plan-max-badge">★ Best Value</div>}
 
       {/* Icon + name + description */}
       <div style={{ display: "flex", alignItems: "center", gap: 13, position: "relative", zIndex: 1 }}>
@@ -667,19 +680,19 @@ function PricingCard({ plan, cycle, onChoose }) {
       {/* Price */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 9, marginTop: 20, position: "relative", zIndex: 1 }}>
         {annual && <span style={{ fontFamily: "var(--font-mono)", fontSize: 21, color: "var(--dim)", textDecoration: "line-through", marginBottom: 6 }}>${plan.monthly}</span>}
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 48, fontWeight: 800, color: "var(--yellow)", lineHeight: 0.85, letterSpacing: "-2px" }}>${annual ? plan.annualPerMo : plan.monthly}</span>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 48, fontWeight: 800, color: "#fff", lineHeight: 0.85, letterSpacing: "-2px" }}>${annual ? plan.annualPerMo : plan.monthly}</span>
         <span style={{ fontSize: 15, color: "var(--dim)", marginBottom: 6 }}>/mo</span>
       </div>
       <div className="plan-cycle" style={{ marginTop: 7 }}>{annual ? plan.annualBilled : "billed monthly"}</div>
 
       {/* Credits pill */}
-      <div className="plan-credits-pill">
-        <Zap size={15} color="#f5c518" fill="#f5c518" />
-        <span style={{ fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{plan.credits} credits / month</span>
+      <div className="plan-credits-pill" style={{ background: `${accent}1f`, borderColor: `${accent}4d` }}>
+        <Zap size={15} color={accent} fill={accent} />
+        <span style={{ fontSize: 14, fontWeight: 800, color: accent }}>{plan.credits} credits / month</span>
       </div>
 
       {/* CTA — sits above the feature list */}
-      <button className={`plan-cta ${popular ? "plan-cta-hot" : "plan-cta-outline"}`} style={{ marginTop: 18 }} onClick={() => onChoose(plan.slug)}>
+      <button className="plan-cta" style={{ marginTop: 18, background: cta.grad, color: cta.text, border: "none" }} onClick={() => onChoose(plan.slug)}>
         Upgrade to {plan.name} <ArrowRight size={16} />
       </button>
       <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 9 }}>cancel anytime</div>

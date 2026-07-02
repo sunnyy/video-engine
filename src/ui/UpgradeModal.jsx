@@ -21,11 +21,18 @@ const POPULAR_SLUG = "pro";
 
 // Per-plan icon + accent (visual). Feature structure lives in PLAN_FEATURES below.
 const PLAN_META = {
-  starter: { Icon: Rocket, accent: "#38bdf8" },
-  pro:     { Icon: Crown,  accent: "#f5c518" },
-  max:     { Icon: Users,  accent: "#a855f7" },
+  starter: { Icon: Rocket, accent: "#14b8a6" },
+  pro:     { Icon: Crown,  accent: "#7c5cfc" },
+  max:     { Icon: Users,  accent: "#f5c518" },
 };
 const FALLBACK_META = { Icon: Zap, accent: "#7c5cfc" };
+
+// CTA gradient per plan — matches each card's border/accent colour.
+const CTA_STYLE = {
+  starter: { grad: "linear-gradient(135deg,#2dd4bf,#10b981)", text: "#053024" },
+  pro:     { grad: "linear-gradient(135deg,#a78bfa,#7c5cfc)", text: "#fff" },
+  max:     { grad: "linear-gradient(135deg,#f5c518,#f97316)", text: "#0b0b12" },
+};
 
 // Per-plan feature structure — mirrors the landing pricing cards so the two never drift.
 //   excludeServices: video-service keys hidden from the "All video services" list
@@ -43,7 +50,7 @@ const PLAN_FEATURES = {
   },
   max: {
     plusLabel: "Everything in Pro, plus:",
-    checks: ["More credits for high-volume output", "Best value — lower cost per credit"],
+    checks: ["More credits for high-volume output", "Best value — lower cost per credit", "Credit top-ups anytime"],
   },
 };
 
@@ -213,11 +220,19 @@ export default function UpgradeModal({ open, onClose }) {
                   const meta = PLAN_META[slug] || FALLBACK_META;
                   const { Icon, accent } = meta;
                   const feat = PLAN_FEATURES[slug] || {};
+                  const cta = CTA_STYLE[slug] || CTA_STYLE.starter;
                   return (
-                    <div key={plan.slug} style={{ position: "relative", display: "flex", flexDirection: "column", background: popular ? "rgba(124,92,252,0.08)" : "#0e0e18",
-                      border: `2px solid ${popular ? "#7c5cfc" : accent + "66"}`, borderRadius: 18, padding: "26px 24px" }}>
+                    <div key={plan.slug} className={slug === "max" ? "upg-card-max" : undefined}
+                      style={{ position: "relative", display: "flex", flexDirection: "column", borderRadius: 18, padding: "26px 24px",
+                        ...(slug === "max" ? {} : {
+                          background: popular ? "rgba(124,92,252,0.08)" : "#0e0e18",
+                          border: `2px solid ${popular ? "#7c5cfc" : accent + "66"}`,
+                        }) }}>
                       {popular && (
                         <span style={{ position: "absolute", top: -11, left: "50%", transform: "translateX(-50%)", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#fff", background: "linear-gradient(135deg,#a78bfa,#7c5cfc)", padding: "4px 14px", borderRadius: 99, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(124,92,252,0.5)" }}>★ Most Popular</span>
+                      )}
+                      {slug === "max" && (
+                        <span style={{ position: "absolute", top: -11, left: "50%", transform: "translateX(-50%)", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#0b0b10", background: "linear-gradient(135deg,#f5c518,#f97316)", padding: "4px 14px", borderRadius: 99, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(245,150,24,0.5)" }}>★ Best Value</span>
                       )}
 
                       {/* Icon + name */}
@@ -236,7 +251,7 @@ export default function UpgradeModal({ open, onClose }) {
                         {annual && p.savePct > 0 && (
                           <span style={{ fontSize: 18, color: "#55667a", textDecoration: "line-through", marginBottom: 5 }}>${p.monthlyUSD}</span>
                         )}
-                        <span style={{ fontSize: 38, fontWeight: 800, color: "#f5c518", lineHeight: 1 }}>${p.perMonthUSD}</span>
+                        <span style={{ fontSize: 38, fontWeight: 800, color: "#fff", lineHeight: 1 }}>${p.perMonthUSD}</span>
                         <span style={{ fontSize: 14, color: "#9494a8", marginBottom: 4 }}>/mo</span>
                       </div>
                       <div style={{ fontSize: 12, color: "#55667a", marginTop: 5 }}>
@@ -245,18 +260,16 @@ export default function UpgradeModal({ open, onClose }) {
 
                       {/* Credits pill */}
                       {plan.credits != null && (
-                        <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 7, marginTop: 16, padding: "8px 14px", borderRadius: 99, background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.3)" }}>
-                          <Zap size={14} style={{ color: "#f5c518" }} fill="#f5c518" />
-                          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#a78bfa" }}>{Number(plan.credits).toLocaleString()} credits / month</span>
+                        <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 7, marginTop: 16, padding: "8px 14px", borderRadius: 99, background: `${accent}1f`, border: `1px solid ${accent}4d` }}>
+                          <Zap size={14} style={{ color: accent }} fill={accent} />
+                          <span style={{ fontSize: 13.5, fontWeight: 800, color: accent }}>{Number(plan.credits).toLocaleString()} credits / month</span>
                         </div>
                       )}
 
                       {/* CTA — sits above the feature list */}
                       <button onClick={() => goCheckout(plan.slug)}
                         style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", marginTop: 18, padding: "13px 0", borderRadius: 12, cursor: "pointer", fontWeight: 800, fontSize: 14.5, fontFamily: "inherit",
-                          background: popular ? "linear-gradient(135deg, #f5c518, #f97316)" : "transparent",
-                          border: popular ? "none" : "1px solid rgba(139,92,252,0.5)",
-                          color: popular ? "#0b0b12" : "#e8eaf0" }}>
+                          background: cta.grad, border: "none", color: cta.text }}>
                         Upgrade to {plan.name} <ArrowRight size={16} />
                       </button>
 
@@ -293,6 +306,7 @@ export default function UpgradeModal({ open, onClose }) {
       <style>{`
         @media (max-width: 780px){ .upg-plan-grid{ grid-template-columns: 1fr !important; } }
         @media (max-width: 640px){ .upg-hero-art{ display:none !important; } }
+        .upg-card-max{ border: 2px solid #f5c518 !important; background: #0e0e18 !important; }
         .upg-modal-scroll{ scrollbar-width: thin; scrollbar-color: #2a2a3a transparent; }
         .upg-modal-scroll::-webkit-scrollbar{ width: 10px; }
         .upg-modal-scroll::-webkit-scrollbar-track{ background: transparent; }
